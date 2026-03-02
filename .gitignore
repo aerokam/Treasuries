@@ -1,1 +1,11 @@
+# Apps Script — kept in Google Sheets, not in repo
+appsscript/
+
+# Auto-memory (Claude Code internal)
 memory/
+
+# Data — only the 3 auto-updated reference CSVs are tracked
+data/*
+!data/TipsYields.csv
+!data/RefCPI.csv
+!data/TipsRef.csv
