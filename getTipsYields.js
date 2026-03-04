@@ -3,7 +3,7 @@
 // Writes data/TipsYields.csv with settlement date, price, and yield per CUSIP.
 //
 // Usage: node getTipsYields.js
-// Run on-demand before rebalance (prices update throughout the day on FedInvest).
+// Prices published once daily at ~1pm ET on FedInvest; scheduled job runs at 1:00 and 1:05 PM ET.
 
 const FEDINVEST_URL = 'https://www.treasurydirect.gov/GA-FI/FedInvest/todaySecurityPriceDetail';
 

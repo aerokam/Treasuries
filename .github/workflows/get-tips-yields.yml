@@ -1,15 +1,18 @@
 name: Get TIPS Yields
 
-# FedInvest prices available ~1pm–5pm ET, Mon–Fri (non-holidays)
-# ET = UTC-5 (EST) or UTC-4 (EDT); 17:00–22:00 UTC covers both.
-# Adjust frequency below (currently every 30 minutes).
-# Note: GitHub Actions cron cannot skip holidays — runs will produce no change
+# FedInvest publishes prices once daily at ~1pm ET, Mon–Fri (non-holidays).
+# Run at 1:00pm and 1:05pm ET in case of slight delay.
+# ET = UTC-5 (EST) or UTC-4 (EDT); both hours covered below.
+# Note: GitHub Actions cron cannot skip holidays — runs produce no change
 #       on holidays since FedInvest returns no data; the commit step is a no-op.
 
 on:
   schedule:
-    - cron: '*/30 17-22 * * 1-5'   # ← change frequency here
-  workflow_dispatch:                  # manual trigger
+    - cron: '0 17 * * 1-5'   # 1:00 PM EDT (UTC-4)
+    - cron: '5 17 * * 1-5'   # 1:05 PM EDT
+    - cron: '0 18 * * 1-5'   # 1:00 PM EST (UTC-5)
+    - cron: '5 18 * * 1-5'   # 1:05 PM EST
+  workflow_dispatch:          # manual trigger
 
 jobs:
   fetch:

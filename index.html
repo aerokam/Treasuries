@@ -3,11 +3,18 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>TIPS Ladder Rebalancer</title>
+<title>TIPS Ladder Builder</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; }
   body { font-family: system-ui, sans-serif; font-size: 13px; margin: 0; padding: 20px; color: #222; background: #fafafa; }
   h1 { font-size: 18px; margin: 0 0 16px; }
+
+  /* ── Mode toggle ── */
+  .mode-toggle { display: flex; gap: 4px; margin-bottom: 8px; }
+  .mode-btn { padding: 4px 12px; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 4px;
+              font-size: 12px; color: #64748b; cursor: pointer; font-weight: 600; }
+  .mode-btn.active { background: #1e293b; color: #fff; border-color: #1e293b; }
+  .mode-btn:hover:not(.active) { background: #e2e8f0; }
 
   /* ── Top row (form + net cash) ── */
   #top-row { display: flex; gap: 12px; align-items: stretch; margin-bottom: 16px; }
@@ -27,11 +34,11 @@
   #status { margin: 4px 0 0; font-size: 12px; color: #555; min-height: 16px; }
   #status.error { color: #c0392b; font-weight: 600; }
 
-  /* ── Net Cash callout ── */
-  #net-cash-bar { display: none; background: #fff; border: 1px solid #ddd; border-radius: 6px;
+  /* ── Net Cash / Total Cost callout ── */
+  #net-cash-bar, #bfs-net-cash-bar { display: none; background: #fff; border: 1px solid #ddd; border-radius: 6px;
                   padding: 10px 20px; flex-direction: column; justify-content: center; }
-  #net-cash-bar .nc-label { font-size: 10px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: .04em; }
-  #net-cash-bar .nc-val { font-size: 22px; font-weight: 700; margin-top: 2px; line-height: 1; }
+  #net-cash-bar .nc-label, #bfs-net-cash-bar .nc-label { font-size: 10px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: .04em; }
+  #net-cash-bar .nc-val, #bfs-net-cash-bar .nc-val { font-size: 22px; font-weight: 700; margin-top: 2px; line-height: 1; }
 
   /* ── Parameters bar ── */
   .params-bar { display: flex; flex-wrap: wrap; gap: 0; background: #fff; border: 1px solid #ddd; border-radius: 6px; padding: 10px 16px; margin-bottom: 12px; }
@@ -80,22 +87,28 @@
   table.simple td { padding: 6px 12px; border-bottom: 1px solid #eee; white-space: nowrap; font-variant-numeric: tabular-nums; }
   table.simple td:not(:first-child):not(:nth-child(2)):not(:nth-child(3)) { text-align: right; }
   table.simple tr.no-change td { color: #bbb; }
+  table.simple tr.bracket td { background: #f0f9ff; }
   table.simple tr:hover td { background: #fffde7; }
 
-  #output { display: none; }
+  #output     { display: none; }
+  #bfs-output { display: none; }
 </style>
 <script data-goatcounter="https://tipsladder.goatcounter.com/count"
         async src="//gc.zgo.at/count.js"></script>
 </head>
 <body>
-<h1>TIPS Ladder Rebalancer</h1>
+<h1>TIPS Ladder Builder</h1>
 
 <div id="data-info">Loading market data…</div>
 
 <div id="top-row">
   <div class="form-card">
+    <div class="mode-toggle">
+      <button class="mode-btn active" data-mode="rebalance">Rebalance</button>
+      <button class="mode-btn" data-mode="build">Build</button>
+    </div>
     <div class="fields">
-      <div class="field">
+      <div class="field" id="field-holdings">
         <label>Holdings CSV</label>
         <input type="file" id="holdings-file" accept=".csv">
       </div>
@@ -103,12 +116,16 @@
         <label>DARA ($)</label>
         <input type="number" id="dara" placeholder="auto-infer" step="1" min="0" style="width:110px">
       </div>
-      <div class="field">
+      <div class="field" id="field-method">
         <label>Method</label>
         <select id="method">
           <option value="Gap">Gap</option>
           <option value="Full">Full</option>
         </select>
+      </div>
+      <div class="field" id="field-last-year" style="display:none">
+        <label>Last Year</label>
+        <select id="last-year"><option value="">Select year…</option></select>
       </div>
       <div class="field" style="justify-content:flex-end">
         <button id="run-btn" disabled>Run Rebalance</button>
@@ -116,13 +133,14 @@
     </div>
     <div id="status"></div>
   </div>
+</div>
+
+<!-- Rebalance output -->
+<div id="output">
   <div id="net-cash-bar">
     <div class="nc-label">Net Cash</div>
     <div class="nc-val" id="net-cash-val"></div>
   </div>
-</div>
-
-<div id="output">
   <div class="params-bar" id="params-bar"></div>
   <div class="tabs">
     <button class="tab-btn active" data-tab="simple">Simple</button>
@@ -143,10 +161,23 @@
   </div>
 </div>
 
+<!-- Build from Scratch output -->
+<div id="bfs-output">
+  <div id="bfs-net-cash-bar">
+    <div class="nc-label">Total Cost</div>
+    <div class="nc-val" id="bfs-net-cash-val"></div>
+  </div>
+  <div class="params-bar" id="bfs-params-bar"></div>
+  <div style="border:1px solid #ddd; border-radius:6px; background:#fff; overflow-x:auto; padding:12px 16px;">
+    <table class="simple" id="bfs-table"></table>
+  </div>
+</div>
+
 <script type="module">
 import { buildTipsMapFromYields, localDate, runRebalance } from './rebalance-lib.js';
+import { runBuildFromScratch } from './build-lib.js';
 
-// ─── CSV parser (simple: no quoted-field support needed for these CSVs) ──────
+// ─── CSV parser ───────────────────────────────────────────────────────────────
 function parseCsv(text) {
   const lines = text.trim().split('\n').filter(l => l.trim());
   if (lines.length < 2) return [];
@@ -159,11 +190,10 @@ function parseCsv(text) {
   });
 }
 
-// ─── Load data CSVs from same repo ───────────────────────────────────────────
+// ─── Load data CSVs ───────────────────────────────────────────────────────────
 let tipsMap = null, refCpiRows = null, settlementDate = null;
 
 async function loadData() {
-  const status = document.getElementById('status');
   const dataInfo = document.getElementById('data-info');
   try {
     const [yieldsRes, refCpiRes] = await Promise.all([
@@ -188,14 +218,27 @@ async function loadData() {
       refCpi: parseFloat(r.refCpi),
     }));
 
-    // Settlement date = date field from TipsYields.csv (all rows share same date)
     const settleDateStr = yieldsRows[0]?.settlementDate;
     if (!settleDateStr) throw new Error('TipsYields.csv has no settlementDate');
     settlementDate = localDate(settleDateStr);
 
     tipsMap = buildTipsMapFromYields(yieldsRows);
 
-    dataInfo.textContent = `Market data as of ${settleDateStr} · ${yieldsRows.length} TIPS · RefCPI rows: ${refCpiRows.length}`;
+    // Populate last-year dropdown with available TIPS maturity years
+    const lastYearSel = document.getElementById('last-year');
+    while (lastYearSel.options.length > 1) lastYearSel.remove(1);
+    const bfsYears = [...new Set(
+      [...tipsMap.values()]
+        .filter(b => b.maturity && b.maturity > settlementDate)
+        .map(b => b.maturity.getFullYear())
+    )].sort((a, b) => a - b);
+    bfsYears.forEach(y => {
+      const opt = document.createElement('option');
+      opt.value = y; opt.textContent = y;
+      lastYearSel.appendChild(opt);
+    });
+
+    dataInfo.textContent = `Prices as of ${settleDateStr} · ${yieldsRows.length} TIPS`;
     document.getElementById('run-btn').disabled = false;
 
     // Pre-populate sample holdings if no file already selected
@@ -218,7 +261,7 @@ async function loadData() {
   }
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 function setStatus(msg, isError = false) {
   const el = document.getElementById('status');
   el.textContent = msg;
@@ -236,7 +279,6 @@ function esc(s) {
 }
 
 function fmtI(n) { return typeof n === 'number' ? Math.round(n).toLocaleString() : String(n); }
-function pct(n)  { return typeof n === 'number' ? (n * 100).toFixed(1) + '%' : 'N/A'; }
 function sign(n) {
   if (typeof n !== 'number') return String(n);
   const r = Math.round(n);
@@ -255,6 +297,35 @@ function cell(v, ci) {
   return `<td class="${ci >= 4 ? 'num' : ''}">${esc(s)}</td>`;
 }
 
+// ─── Mode toggle ──────────────────────────────────────────────────────────────
+let currentMode = 'rebalance';
+let rebalanceRendered = false, bfsRendered = false;
+
+document.querySelectorAll('.mode-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const mode = btn.dataset.mode;
+    if (mode === currentMode) return;
+    currentMode = mode;
+
+    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    const isRebalance = mode === 'rebalance';
+    const daraEl = document.getElementById('dara');
+    daraEl.step        = '1000';
+    daraEl.placeholder = isRebalance ? 'auto-infer' : 'required';
+    document.getElementById('field-holdings').style.display  = isRebalance ? '' : 'none';
+    document.getElementById('field-method').style.display    = isRebalance ? '' : 'none';
+    document.getElementById('field-last-year').style.display = isRebalance ? 'none' : '';
+    document.getElementById('run-btn').textContent = isRebalance ? 'Run Rebalance' : 'Build Ladder';
+
+    document.getElementById('output').style.display     = isRebalance && rebalanceRendered ? 'block' : 'none';
+    document.getElementById('bfs-output').style.display = !isRebalance && bfsRendered     ? 'block' : 'none';
+
+    setStatus('');
+  });
+});
+
 // ─── Tab switching ────────────────────────────────────────────────────────────
 document.querySelectorAll('.tab-btn').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -265,7 +336,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
   });
 });
 
-// ─── Render output ────────────────────────────────────────────────────────────
+// ─── Render rebalance output ──────────────────────────────────────────────────
 function renderOutput({ results, HDR, summary }) {
   const {
     settleDateDisp, refCPI, DARA, inferredDARA, method,
@@ -295,12 +366,10 @@ function renderOutput({ results, HDR, summary }) {
     param('Range',         `${firstYear} – ${lastYear} (${rungCount} rungs)`) +
     param('Gap Years',     gapYears.join(', ') || '—');
 
-  const dp = (label, val) =>
+  const dp  = (label, val) =>
     `<div class="param"><span class="param-label">${label}</span><span class="param-val">${val}</span></div>`;
-
   const wpct = n => typeof n === 'number' ? Math.round(n * 100) + '%' : 'N/A';
-
-  const grp = (...items) => `<div class="param-group">${items.join('')}</div>`;
+  const grp  = (...items) => `<div class="param-group">${items.join('')}</div>`;
 
   document.getElementById('detail-bar').innerHTML =
     grp(
@@ -318,12 +387,11 @@ function renderOutput({ results, HDR, summary }) {
       dp('Upper Wt Target/Before/After', `${wpct(upperWeight)} / ${wpct(beforeUpperWeight)} / ${wpct(afterUpperWeight)}`),
     );
 
-  const tableEl = document.getElementById('main-table');
+  const tableEl  = document.getElementById('main-table');
   const headerRow = `<thead><tr>${HDR.map(h => `<th>${esc(h)}</th>`).join('')}</tr></thead>`;
   const bodyRows  = results.map(r => '<tr>' + r.map((v, ci) => cell(v, ci)).join('') + '</tr>').join('\n');
   tableEl.innerHTML = headerRow + `<tbody>${bodyRows}</tbody>`;
 
-  // Colour Qty Delta (col 9) and Cost Delta (col 11)
   tableEl.querySelectorAll('tbody tr').forEach(tr => {
     [9, 11].forEach(ci => {
       const td = tr.cells[ci];
@@ -333,8 +401,7 @@ function renderOutput({ results, HDR, summary }) {
     });
   });
 
-  // Simple view
-  // HDR: 0=CUSIP 1=Qty 2=Maturity 3=FY 8=Target Qty 9=Qty Delta 11=Cost Delta
+  // Simple view — HDR: 0=CUSIP 1=Qty 2=Maturity 3=FY 8=Target Qty 9=Qty Delta 11=Cost Delta
   const SIMPLE_COLS = [
     { label: 'CUSIP',    ci: 0 },
     { label: 'Maturity', ci: 2 },
@@ -344,18 +411,18 @@ function renderOutput({ results, HDR, summary }) {
     { label: 'Delta',    ci: 9 },
     { label: 'Cash Δ',   ci: 11 },
   ];
-  const simpleEl = document.getElementById('simple-table');
+  const simpleEl     = document.getElementById('simple-table');
   const simpleHeader = `<thead><tr>${SIMPLE_COLS.map(c => `<th>${esc(c.label)}</th>`).join('')}</tr></thead>`;
-  const simpleBody = results.map(r => {
-    const delta = r[9];
+  const simpleBody   = results.map(r => {
+    const delta    = r[9];
     const noChange = typeof delta === 'number' && delta === 0;
-    const cells = SIMPLE_COLS.map(({ ci }) => {
+    const cells    = SIMPLE_COLS.map(({ ci }) => {
       const v = r[ci];
       let s;
       if (typeof v !== 'number') {
         s = String(v);
       } else if (ci === 1 || ci === 3 || ci === 8) {
-        s = String(Math.round(v));  // plain integers, no comma
+        s = String(Math.round(v));
       } else {
         const rounded = Math.round(v);
         s = (ci === 9 || ci === 11) && rounded > 0 ? '+' + rounded.toLocaleString('en-US')
@@ -369,55 +436,152 @@ function renderOutput({ results, HDR, summary }) {
   }).join('\n');
   simpleEl.innerHTML = simpleHeader + `<tbody>${simpleBody}</tbody>`;
 
+  rebalanceRendered = true;
   document.getElementById('output').style.display = 'block';
 }
 
-// ─── Run handler ─────────────────────────────────────────────────────────────
+// ─── Render Build from Scratch output ────────────────────────────────────────
+function renderBFSOutput({ results, HDR, summary }) {
+  const {
+    settleDateDisp, refCPI, dara,
+    firstYear, lastYear, gapYears,
+    gapParams, lowerYear, upperYear,
+    lowerDur, upperDur, lowerWt, upperWt,
+    totalBuyCost, totalExcessCost,
+  } = summary;
+
+  const ncBar = document.getElementById('bfs-net-cash-bar');
+  const ncVal = document.getElementById('bfs-net-cash-val');
+  ncVal.textContent = '$' + Math.round(totalBuyCost).toLocaleString();
+  ncVal.className = 'nc-val';
+  ncBar.style.display = 'flex';
+
+  const param = (label, val) =>
+    `<div class="param"><span class="param-label">${label}</span><span class="param-val">${val}</span></div>`;
+
+  const durFormula =
+    `${lowerWt.toFixed(2)} × ${lowerDur.toFixed(1)} (${lowerYear}) + ` +
+    `${upperWt.toFixed(2)} × ${upperDur.toFixed(1)} (${upperYear}) = ` +
+    `${gapParams.avgDuration.toFixed(1)}`;
+
+  // Gap Cost + Excess Cost grouped with a blue tint box
+  const gp = (label, val, last = false) =>
+    `<div class="param" style="${last ? 'border-right:none;padding-right:0;margin-right:0' : 'padding-right:12px;margin-right:12px;border-right:1px solid #93c5fd'}">` +
+    `<span class="param-label">${label}</span><span class="param-val">${val}</span></div>`;
+  const costGroup =
+    `<div style="display:inline-flex;align-items:flex-start;background:#eff6ff;border:1px solid #bfdbfe;border-radius:4px;padding:6px 10px;">` +
+    gp('Gap Cost', fmtI(gapParams.totalCost)) +
+    gp('Excess Cost', fmtI(totalExcessCost), true) +
+    `</div>`;
+
+  document.getElementById('bfs-params-bar').innerHTML =
+    param('Date',      esc(settleDateDisp)) +
+    param('RefCPI',    refCPI) +
+    param('DARA',      fmtI(dara)) +
+    param('Range',     `${firstYear} – ${lastYear}`) +
+    param('Gap Years', gapYears.join(', ') || '—') +
+    param('Lower ⌂',  `${lowerYear} (${lowerDur.toFixed(1)} yr)`) +
+    param('Upper ⌂',  `${upperYear} (${upperDur.toFixed(1)} yr)`) +
+    param('Dur Match', durFormula) +
+    costGroup;
+
+  // Build table — columns: CUSIP(0), Maturity(1), FY(2), FY Qty(3), Excess Qty(4), Total Qty(5), FY Amount(6), FY Cost(7), Excess Amount(8), Excess Cost(9)
+  const tableEl = document.getElementById('bfs-table');
+  const header  = `<thead><tr>${HDR.map((h, i) => {
+    const align = i <= 1 ? 'text-align:left' : '';
+    return `<th style="${align}">${esc(h)}</th>`;
+  }).join('')}</tr></thead>`;
+
+  const body = results.map(r => {
+    const isBracket = r[2] === lowerYear || r[2] === upperYear;
+    const cells = r.map((v, i) => {
+      let s;
+      if (typeof v !== 'number') {
+        s = String(v);
+      } else if (i === 2) {
+        s = String(v); // FY year — no comma
+      } else {
+        s = Math.round(v).toLocaleString('en-US');
+      }
+      const align = i <= 1 ? '' : ' style="text-align:right"';
+      return `<td${align}>${esc(s)}</td>`;
+    }).join('');
+    return `<tr class="${isBracket ? 'bracket' : ''}">${cells}</tr>`;
+  }).join('\n');
+
+  tableEl.innerHTML = header + `<tbody>${body}</tbody>`;
+
+  bfsRendered = true;
+  document.getElementById('bfs-output').style.display = 'block';
+}
+
+// ─── Run handler ──────────────────────────────────────────────────────────────
 document.getElementById('run-btn').addEventListener('click', async () => {
   setStatus('');
-  const fileInput = document.getElementById('holdings-file');
-  if (!fileInput.files.length) { setStatus('Please select a holdings CSV file.', true); return; }
-
-  const daraInput = document.getElementById('dara').value.trim();
-  const dara      = daraInput ? parseFloat(daraInput) : null;
-  const method    = document.getElementById('method').value;
-
-  const text = await fileInput.files[0].text();
-  const rawLines = text.trim().split('\n').filter(l => l.trim());
-  if (rawLines.length === 0) { setStatus('Holdings CSV is empty.', true); return; }
-
-  // Detect and skip optional header row (first field not 9 alphanumeric chars)
-  const CUSIP_RE = /^[A-Z0-9]{9}$/i;
-  const startIdx = CUSIP_RE.test(rawLines[0].split(',')[0].trim()) ? 0 : 1;
-
-  const holdingsRaw = new Map();
-  for (let i = startIdx; i < rawLines.length; i++) {
-    const parts = rawLines[i].split(',').map(s => s.trim());
-    const lineNum = i + 1;
-    if (parts.length < 2) {
-      setStatus(`Row ${lineNum}: expected "cusip,qty" — got "${rawLines[i]}"`, true); return;
-    }
-    const [cusip, qtyStr] = parts;
-    if (!CUSIP_RE.test(cusip)) {
-      setStatus(`Row ${lineNum}: "${cusip}" is not a valid 9-character CUSIP`, true); return;
-    }
-    const qty = parseInt(qtyStr, 10);
-    if (isNaN(qty) || qty < 0) {
-      setStatus(`Row ${lineNum}: qty "${qtyStr}" must be a non-negative integer`, true); return;
-    }
-    holdingsRaw.set(cusip, (holdingsRaw.get(cusip) ?? 0) + qty);
-  }
-
-  if (holdingsRaw.size === 0) { setStatus('Holdings CSV has no valid data rows.', true); return; }
-  const holdings = Array.from(holdingsRaw, ([cusip, qty]) => ({ cusip, qty }));
 
   try {
     const settleDateStr = settlementDate.toLocaleDateString('en-CA');
     const refCPI = lookupRefCpi(settleDateStr);
-    setStatus('Running rebalance…');
-    const result = runRebalance({ dara, method, holdings, tipsMap, refCPI, settlementDate });
-    renderOutput(result);
-    setStatus('');
+
+    if (currentMode === 'build') {
+      // ── Build from Scratch ──
+      const daraInput = document.getElementById('dara').value.trim();
+      if (!daraInput) { setStatus('DARA is required for Build from Scratch.', true); return; }
+      const dara = parseFloat(daraInput);
+      if (isNaN(dara) || dara <= 0) { setStatus('DARA must be a positive number.', true); return; }
+
+      const lastYearVal = document.getElementById('last-year').value;
+      if (!lastYearVal) { setStatus('Please select a Last Year.', true); return; }
+      const lastYear = parseInt(lastYearVal, 10);
+      if (isNaN(lastYear)) { setStatus('Invalid Last Year selection.', true); return; }
+
+      setStatus('Building ladder…');
+      const result = runBuildFromScratch({ dara, lastYear, tipsMap, refCPI, settlementDate });
+      renderBFSOutput(result);
+      setStatus('');
+
+    } else {
+      // ── Rebalance ──
+      const fileInput = document.getElementById('holdings-file');
+      if (!fileInput.files.length) { setStatus('Please select a holdings CSV file.', true); return; }
+
+      const daraInput = document.getElementById('dara').value.trim();
+      const dara      = daraInput ? parseFloat(daraInput) : null;
+      const method    = document.getElementById('method').value;
+
+      const text     = await fileInput.files[0].text();
+      const rawLines = text.trim().split('\n').filter(l => l.trim());
+      if (rawLines.length === 0) { setStatus('Holdings CSV is empty.', true); return; }
+
+      const CUSIP_RE = /^[A-Z0-9]{9}$/i;
+      const startIdx = CUSIP_RE.test(rawLines[0].split(',')[0].trim()) ? 0 : 1;
+
+      const holdingsRaw = new Map();
+      for (let i = startIdx; i < rawLines.length; i++) {
+        const parts   = rawLines[i].split(',').map(s => s.trim());
+        const lineNum = i + 1;
+        if (parts.length < 2) {
+          setStatus(`Row ${lineNum}: expected "cusip,qty" — got "${rawLines[i]}"`, true); return;
+        }
+        const [cusip, qtyStr] = parts;
+        if (!CUSIP_RE.test(cusip)) {
+          setStatus(`Row ${lineNum}: "${cusip}" is not a valid 9-character CUSIP`, true); return;
+        }
+        const qty = parseInt(qtyStr, 10);
+        if (isNaN(qty) || qty < 0) {
+          setStatus(`Row ${lineNum}: qty "${qtyStr}" must be a non-negative integer`, true); return;
+        }
+        holdingsRaw.set(cusip, (holdingsRaw.get(cusip) ?? 0) + qty);
+      }
+
+      if (holdingsRaw.size === 0) { setStatus('Holdings CSV has no valid data rows.', true); return; }
+      const holdings = Array.from(holdingsRaw, ([cusip, qty]) => ({ cusip, qty }));
+
+      setStatus('Running rebalance…');
+      const result = runRebalance({ dara, method, holdings, tipsMap, refCPI, settlementDate });
+      renderOutput(result);
+      setStatus('');
+    }
   } catch (err) {
     setStatus('Error: ' + err.message, true);
     console.error(err);

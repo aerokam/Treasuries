@@ -429,6 +429,7 @@ export function runRebalance({ dara, method, holdings: holdingsRaw, tipsMap, ref
   };
 
   const buySellTargets  = {};
+  const nonTargetSells  = {}; // non-latest bonds sold in multi-bond years
   const postRebalQtyMap = {};
   for (const h of holdings) postRebalQtyMap[h.cusip] = h.qty;
 
@@ -444,9 +445,12 @@ export function runRebalance({ dara, method, holdings: holdingsRaw, tipsMap, ref
     const isBracket = bracketYearSet.has(year);
     const isRebal   = rebalYearSet.has(year);
 
-    let targetCUSIP = null, targetMaturity = null, maxQty = 0;
+    // Select target as latest-maturing bond in year (ensures "sell earliest first" basis)
+    let targetCUSIP = null, targetMaturity = null;
     for (const h of yi.holdings) {
-      if (h.qty > maxQty) { maxQty = h.qty; targetCUSIP = h.cusip; targetMaturity = h.maturity; }
+      if (!targetMaturity || h.maturity > targetMaturity) {
+        targetMaturity = h.maturity; targetCUSIP = h.cusip;
+      }
     }
 
     const targetBondR  = tipsMap.get(targetCUSIP);
@@ -461,24 +465,61 @@ export function runRebalance({ dara, method, holdings: holdingsRaw, tipsMap, ref
     let targetFYQty, postRebalQty;
 
     if (isBracket || isRebal) {
+      const totalPINeeded = DARA - rebuildLaterMatInt;
+
       if (yi.holdings.length === 1) {
-        targetFYQty = Math.round((DARA - rebuildLaterMatInt) / calculatePIPerBond(targetCUSIP, targetMaturity, refCPI, tipsMap));
+        // Issue 1: clamp — can't sell more than owned
+        targetFYQty = Math.max(0, Math.round(totalPINeeded / calculatePIPerBond(targetCUSIP, targetMaturity, refCPI, tipsMap)));
       } else {
-        let nonTargetPI = 0;
-        for (const h of yi.holdings) {
-          if (h.cusip !== targetCUSIP) nonTargetPI += h.qty * calculatePIPerBond(h.cusip, h.maturity, refCPI, tipsMap);
+        // Multi-bond year: sell earliest-maturing bonds first, then latest
+        const sortedH  = [...yi.holdings].sort((a, b) => a.maturity - b.maturity);
+        const nonLatest = sortedH.slice(0, -1); // all but the latest-maturing
+
+        // Pre-compute PI per bond for all holdings in this year
+        const piMap = {};
+        for (const h of yi.holdings)
+          piMap[h.cusip] = calculatePIPerBond(h.cusip, h.maturity, refCPI, tipsMap);
+
+        let nonLatestPI = 0;
+        for (const h of nonLatest) nonLatestPI += h.qty * piMap[h.cusip];
+
+        let targetLatestQty = Math.round((totalPINeeded - nonLatestPI) / piMap[targetCUSIP]);
+
+        if (targetLatestQty < currentQty) {
+          // Would need to sell latest → zero non-latest from earliest first instead
+          let reducedNonLatestPI = nonLatestPI;
+          for (const h of nonLatest) {
+            reducedNonLatestPI    -= h.qty * piMap[h.cusip];
+            postRebalQtyMap[h.cusip] = 0; // tentatively zero this bond
+            targetLatestQty = Math.round((totalPINeeded - reducedNonLatestPI) / piMap[targetCUSIP]);
+            if (targetLatestQty >= currentQty) break; // enough freed up
+          }
+          // Issue 1: even after zeroing all non-latest, clamp at 0
+          targetLatestQty = Math.max(0, targetLatestQty);
         }
-        targetFYQty = Math.round((DARA - rebuildLaterMatInt - nonTargetPI) / calculatePIPerBond(targetCUSIP, targetMaturity, refCPI, tipsMap));
+
+        targetFYQty = targetLatestQty;
+
+        // Record qty changes for non-latest bonds
+        for (const h of nonLatest) {
+          const newQ = postRebalQtyMap[h.cusip];
+          if (newQ !== h.qty) {
+            const bond = tipsMap.get(h.cusip);
+            const hCPB = (bond?.price ?? 0) / 100 * (refCPI / (bond?.baseCpi ?? refCPI)) * 1000;
+            nonTargetSells[h.cusip] = {
+              newQty:     newQ,
+              qtyDelta:   newQ - h.qty,
+              costDelta:  -((newQ - h.qty) * hCPB),
+              targetCost: newQ * hCPB,
+            };
+          }
+        }
       }
+
       postRebalQty = isBracket
         ? targetFYQty + Math.round(bracketExcessTarget[year] / costPerBond)
         : targetFYQty;
-    } else {
-      targetFYQty  = currentQty;
-      postRebalQty = currentQty;
-    }
 
-    if (isBracket || isRebal) {
       buySellTargets[year] = {
         targetCUSIP, targetFYQty,
         targetQty: postRebalQty, postRebalQty, qtyDelta: postRebalQty - currentQty,
@@ -489,16 +530,18 @@ export function runRebalance({ dara, method, holdings: holdingsRaw, tipsMap, ref
           ? (currentQty - bracketTargetFYQtyBefore[year]) * costPerBond
           : undefined,
       };
+    } else {
+      targetFYQty  = currentQty;
+      postRebalQty = currentQty;
     }
 
     postRebalQtyMap[targetCUSIP] = postRebalQty;
     for (const h of yi.holdings) {
-      const qtyForInt = h.cusip === targetCUSIP ? postRebalQty : h.qty;
       const bond = tipsMap.get(h.cusip);
       const c  = bond?.coupon  ?? 0;
       const bc = bond?.baseCpi ?? refCPI;
       const ir = refCPI / bc;
-      rebuildLaterMatInt += qtyForInt * 1000 * ir * c;
+      rebuildLaterMatInt += postRebalQtyMap[h.cusip] * 1000 * ir * c;
     }
   }
 
@@ -603,6 +646,12 @@ export function runRebalance({ dara, method, holdings: holdingsRaw, tipsMap, ref
       qtyDelta   = buySellTargets[h.year].qtyDelta;
       targetCost = buySellTargets[h.year].targetCost;
       costDelta  = buySellTargets[h.year].costDelta;
+    } else if (nonTargetSells[h.cusip]) {
+      const s    = nonTargetSells[h.cusip];
+      targetQty  = s.newQty;
+      qtyDelta   = s.qtyDelta;
+      targetCost = s.targetCost;
+      costDelta  = s.costDelta;
     }
 
     let excessBefore = '', excessAfter = '';
