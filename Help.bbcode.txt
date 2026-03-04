@@ -1,0 +1,99 @@
+[b][size=5]TIPS Ladder Builder[/size][/b]
+[url=https://aerokam.github.io/TipsLadderBuilder/]https://aerokam.github.io/TipsLadderBuilder/[/url]
+
+A free, browser-based tool for building and rebalancing TIPS (Treasury Inflation-Protected Securities) ladders. All calculations run locally in your browser — no data is uploaded anywhere. Prices are fetched from FedInvest once daily at ~1 PM ET.
+
+[b]Source:[/b] [url=https://github.com/aerokam/TipsLadderBuilder]https://github.com/aerokam/TipsLadderBuilder[/url]
+
+[b]―――――――――――――――――――――――――――――――――――――――[/b]
+
+[b][size=4]Overview[/size][/b]
+
+[b]Rebalance[/b] — for existing TIPS ladder holders rebalancing into newly issued TIPS. Assumes you want to keep using the same lower bracket TIPS you originally purchased.
+
+[b]Build[/b] — designs a new TIPS ladder from scratch with zero existing holdings.
+
+[b]―――――――――――――――――――――――――――――――――――――――[/b]
+
+[b][size=4]Key Concepts[/size][/b]
+
+[b]TIPS[/b] — Treasury bonds whose principal adjusts with CPI inflation. All values are in [i]real[/i] (inflation-adjusted, today's dollars) terms.
+
+[b]TIPS Ladder[/b] — A portfolio of TIPS maturing in successive years, providing predictable inflation-adjusted income each year.
+
+[b]DARA (Desired Annual Real Amount)[/b] — Your target annual income from the ladder in today's dollars. Each rung is sized to produce this amount.
+
+[b]Gap Years[/b] — Years where Treasury has not issued TIPS (currently 2037, 2038, 2039). The ladder holds excess bonds in [i]bracket[/i] years flanking the gap to match the average duration of the missing maturities.
+
+[b]Bracket Years[/b] — [i]Upper bracket[/i]: always the Feb 2040 TIPS. [i]Lower bracket[/i]: for Build, the latest issued 10-year TIPS before the gap; for Rebalance, the TIPS before the gap with the largest existing holdings. Excess bonds in these years duration-match the gap.
+
+[b]―――――――――――――――――――――――――――――――――――――――[/b]
+
+[b][size=4]Mode: Rebalance[/size][/b]
+
+For existing TIPS ladder holders. Sells excess bracket bonds and buys into newly available maturities (former gap years). Assumes you want to continue using your original lower bracket TIPS.
+
+[b]Inputs:[/b]
+[list]
+[*][b]Holdings CSV[/b] — A two-column CSV with headers [font=monospace]cusip[/font] and [font=monospace]qty[/font]. One row per position. A sample is pre-populated when you click the file input.
+[*][b]DARA ($)[/b] — Target annual real income. Leave blank to auto-infer from your holdings.
+[*][b]Method[/b] — [i]Gap[/i]: rebalances only the bracket years and previous gap years (sells excess from brackets, buys into previous gap years). [i]Full[/i]: rebalances all rungs across the full contiguous ladder range.
+[/list]
+
+[b]Holdings CSV format:[/b]
+[code]cusip,qty
+912828S50,50
+91282CEJ6,30
+912810QF8,100[/code]
+
+[b]Output — Simple tab:[/b]
+[list]
+[*][b]Net Cash[/b] callout — net proceeds from sells minus buys (negative = net purchase)
+[*]One row per position: CUSIP · Maturity · FY · Current Qty · Target Qty · Delta (green=buy, red=sell) · Cash Δ
+[*]No-change rows are dimmed. Bracket rows highlighted in blue.
+[/list]
+
+[b]Output — Detail tab:[/b] Full computation with ARA before/after, later maturity interest, cost per bond, and weight verification.
+
+[b]―――――――――――――――――――――――――――――――――――――――[/b]
+
+[b][size=4]Mode: Build[/size][/b]
+
+Designs a new TIPS ladder from scratch with zero existing holdings. Currently uses the latest-maturing TIPS in each funded year.
+
+[b]Inputs:[/b]
+[list]
+[*][b]DARA ($)[/b] — Target annual real income (required). Enter any amount; up/down arrows adjust in $1,000 increments for convenience. Defaults to $10,000.
+[*][b]Last Year[/b] — Final funded year. Dropdown shows all available TIPS maturities. First year is always the current calendar year.
+[/list]
+Gap years (2037–2039) are handled automatically.
+
+[b]Output columns:[/b]
+[list]
+[*][b]FY Qty[/b] — bonds needed to fund the rung to DARA
+[*][b]Excess Qty[/b] — extra bonds in bracket years for duration matching
+[*][b]Total Qty[/b] — FY + Excess
+[*][b]FY Amount[/b] — inflation-adjusted P+I from FY bonds + later maturity interest ≈ DARA
+[*][b]FY Cost[/b] — purchase cost of FY bonds
+[*][b]Excess Amount / Excess Cost[/b] — bracket rows only
+[/list]
+
+[b]Total Cost[/b] — full ladder purchase cost.
+
+[b]―――――――――――――――――――――――――――――――――――――――[/b]
+
+[b][size=4]Duration Matching[/size][/b]
+
+Synthetic TIPS are created for gap years using yield interpolation between the bracket anchors. Excess bonds are split between the lower and upper bracket so their weighted duration matches the average duration of the gap years:
+
+[code]lowerWt × lowerDur + upperWt × upperDur = gapAvgDuration
+e.g.  0.46 × 9.1 (2036) + 0.54 × 12.1 (2040) = 10.7[/code]
+
+[b]―――――――――――――――――――――――――――――――――――――――[/b]
+
+[b][size=4]Data Sources[/size][/b]
+[list]
+[*]TIPS prices & yields — [url=https://www.treasurydirect.gov/GA-FI/FedInvest/todaySecurityPriceDetail]FedInvest (TreasuryDirect)[/url] — updated daily ~1 PM ET, Mon–Fri
+[*]Reference CPI — BLS via TreasuryDirect — updated monthly
+[*]TIPS metadata (coupon, base CPI) — TreasuryDirect securities list
+[/list]
