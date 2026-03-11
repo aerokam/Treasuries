@@ -249,7 +249,55 @@ export function buildDrillHTML(d, colKey, summary) {
           + row('Excess Cost After', 'cost/bond \xd7 excess qty', fm(exQty * d.costPerBond), true);
       }
     }
+  // ── Rebalance: Gap Cash Delta ─────────────────────────────────────────────────────
+  } else if (colKey === 'gapCashDelta') {
+    const exQtyBef  = d.excessQtyBefore;
+    const exQtyAft  = d.excessQtyAfter;
+    const exQtyDel  = exQtyAft - exQtyBef;
+    const gapCash   = -(exQtyDel * d.costPerBond);
+    const delSign   = exQtyDel >= 0 ? '+' : '';
+    const cashSign  = gapCash  >= 0 ? '+' : '';
+    rows =
+      row('Price (unadjusted)', '', fd(d.price, 4)) +
+      row('refCPI', '', fd(d.refCPI, 5)) +
+      row('Dated date CPI', '', fd(d.baseCpi, 5)) +
+      row('Index ratio', fd(d.refCPI, 5) + ' / ' + fd(d.baseCpi, 5), fd(d.indexRatio, 5)) +
+      sep() +
+      row('Cost per bond', 'price/100 × index ratio × 1,000', fm2(d.costPerBond)) +
+      sep() +
+      row('Excess qty before', 'current total − FY target', exQtyBef + ' bonds') +
+      row('Excess qty after',  'rebalanced excess', exQtyAft + ' bonds') +
+      row('Excess qty delta',  'after − before', delSign + exQtyDel + ' bonds') +
+      sep() +
+      row('Gap Cash Δ', '−(excess qty delta × cost/bond)', cashSign + fm(Math.abs(gapCash)), true);
+
   }
 
+  return '<table style="border-collapse:collapse;width:auto;font-size:12px">' + rows + '</table>';
+}
+
+export function buildDurationPopupHTML(summary, mode) {
+  const lowerYear  = mode === 'rebal' ? summary.brackets.lowerYear  : summary.lowerYear;
+  const upperYear  = mode === 'rebal' ? summary.brackets.upperYear  : summary.upperYear;
+  const lowerLabel = mode === 'build'
+    ? summary.lowerMonth + ' ' + lowerYear : String(lowerYear);
+  const upperLabel = mode === 'build'
+    ? summary.upperMonth + ' ' + upperYear : String(upperYear);
+  const { lowerDuration, upperDuration, lowerWeight, upperWeight, gapParams } = summary;
+  const wFml  = '(upper dur − avg dur) / (upper dur − lower dur)';
+  const match = lowerWeight.toFixed(4) + ' × ' + lowerDuration.toFixed(2)
+              + ' + ' + upperWeight.toFixed(4) + ' × ' + upperDuration.toFixed(2)
+              + ' = ' + gapParams.avgDuration.toFixed(2);
+  const rows =
+      row('Gap avg duration', '', gapParams.avgDuration.toFixed(2) + ' yr')
+    + row('Gap years',        '', (summary.gapYears || []).join(', ') || '—')
+    + sep()
+    + row('Lower bracket (' + lowerLabel + ')', 'mod. duration', lowerDuration.toFixed(2) + ' yr')
+    + row('Upper bracket (' + upperLabel + ')', 'mod. duration', upperDuration.toFixed(2) + ' yr')
+    + sep()
+    + row('Lower weight', wFml, lowerWeight.toFixed(4))
+    + row('Upper weight', '1 − lower weight', upperWeight.toFixed(4))
+    + sep()
+    + row('Duration match', '', match, true);
   return '<table style="border-collapse:collapse;width:100%;font-size:12px">' + rows + '</table>';
 }

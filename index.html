@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>TIPS Ladder Builder</title>
+<title>TIPS Ladders: Build or Rebalance</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; }
   body { font-family: system-ui, sans-serif; font-size: 13px; margin: 0; padding: 20px; color: #222; background: #fafafa; }
@@ -34,26 +34,7 @@
   #status { margin: 4px 0 0; font-size: 12px; color: #555; min-height: 16px; }
   #status.error { color: #c0392b; font-weight: 600; }
 
-  /* ── Net Cash / Total Cost callout ── */
-  #net-cash-bar, #build-net-cash-bar { display: none; background: #fff; border: 1px solid #ddd; border-radius: 6px;
-                  padding: 10px 20px; flex-direction: column; justify-content: center; }
-  #net-cash-bar .nc-label, #build-net-cash-bar .nc-label { font-size: 10px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: .04em; }
-  #net-cash-bar .nc-val, #build-net-cash-bar .nc-val { font-size: 22px; font-weight: 700; margin-top: 2px; line-height: 1; }
 
-  /* ── Parameters bar ── */
-  .params-bar { display: flex; flex-wrap: wrap; gap: 0; background: #fff; border: 1px solid #ddd; border-radius: 6px; padding: 10px 16px; margin-bottom: 12px; }
-  .param { display: flex; flex-direction: column; padding: 0 20px 0 0; margin-right: 20px; border-right: 1px solid #eee; }
-  .param:last-child { border-right: none; padding-right: 0; margin-right: 0; }
-  .param-label { font-size: 10px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: .04em; }
-  .param-val { font-weight: 600; font-size: 13px; margin-top: 2px; white-space: nowrap; }
-
-  /* ── Detail info bar ── */
-  .detail-bar { display: flex; flex-wrap: wrap; background: #fff; border-bottom: 1px solid #eee; }
-  .param-group { display: flex; padding: 10px 16px; border-right: 2px solid #cbd5e1; }
-  .param-group:last-child { border-right: none; }
-  .param-group .param { border-right: 1px solid #eee; padding-right: 16px; margin-right: 16px; }
-  .param-group .param:last-child { border-right: none; padding-right: 0; margin-right: 0; }
-  .net { font-weight: 700; font-size: 16px; margin: 4px 0 0; }
 
   /* ── Main table ── */
   .table-wrap { padding: 12px 16px; }
@@ -71,8 +52,6 @@
   td.drillable { cursor: pointer; text-decoration: underline dotted #94a3b8; }
   td.drillable:hover { background: #fef9c3 !important; text-decoration: underline solid #475569; }
 
-  /* ── Data freshness ── */
-  #data-info { font-size: 11px; color: #888; margin-bottom: 16px; }
 
   /* ── Tabs ── */
   .tabs { display: flex; gap: 2px; margin-bottom: 0; }
@@ -92,11 +71,26 @@
   table.simple td { padding: 6px 12px; border-bottom: 1px solid #eee; white-space: nowrap; font-variant-numeric: tabular-nums; }
   table.simple td:not(:first-child):not(:nth-child(2)):not(:nth-child(3)) { text-align: right; }
   table.simple tr.no-change td { color: #bbb; }
-  table.simple tr.excess-subrow td { background: #f0f9ff; color: #475569; font-size: 12px; }
+  table.simple tr.excess-subrow td { background: #f1f5f9; color: #475569; font-size: 12px; }
   table.simple tr.bracket td { background: #f0f9ff; }
   table.simple tr:hover td { background: #fffde7; }
   table.simple tfoot td { font-weight: 600; border-top: 2px solid #94a3b8; background: #f8fafc; padding: 6px 12px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 
+
+  /* ── Info strip ── */
+  #info-strip { font-size: 11px; color: #64748b; margin-top: 5px; line-height: 1.5; }
+  .info-link { color: #1a56db; text-decoration: none; cursor: pointer; border-bottom: 1px dotted #1a56db; font-size: 11px; }
+  .info-link:hover { color: #1748c0; }
+  .copy-dara { cursor: pointer; border-bottom: 1px dotted #64748b; }
+  .copy-dara:hover { border-bottom-color: #1e293b; }
+  .copy-dara.copied { color: #16a34a; border-bottom-color: #16a34a; }
+  #net-cash-inline { display:none; align-self:flex-end; padding-bottom:4px; white-space:nowrap; margin-left:auto; }
+  #net-cash-inline .nc-label { font-size:10px; font-weight:600; color:#888; text-transform:uppercase; letter-spacing:.04em; display:block; }
+  #net-cash-inline .nc-val { font-size:15px; font-weight:700; line-height:1; }
+  /* ── Info popover card ── */
+  #info-card { position: fixed; background: #fff; border: 1px solid #cbd5e1; border-radius: 6px; padding: 14px 16px 12px; width: max-content; max-width: 90vw; box-shadow: 0 4px 16px rgba(0,0,0,.15); z-index: 300; font-size: 12px; cursor: default; }
+  #info-card-close { position: absolute; top: 6px; right: 8px; background: none; border: none; font-size: 16px; color: #888; cursor: pointer; line-height: 1; padding: 0; }
+  #info-card-title { font-size: 12px; font-weight: 700; margin-bottom: 10px; color: #1e293b; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; cursor: move; user-select: none; }
 
   #output     { display: none; }
   #build-output { display: none; }
@@ -105,13 +99,13 @@
         async src="//gc.zgo.at/count.js"></script>
 </head>
 <body>
-<h1>TIPS Ladder Builder <button id="help-btn" title="Help" style="font-size:11px;padding:2px 8px;background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;border-radius:10px;font-weight:600;cursor:pointer;vertical-align:middle;margin-left:6px;">?</button></h1>
+<h1>TIPS Ladders: Build or Rebalance <button id="help-btn" title="Help" style="font-size:11px;padding:2px 8px;background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;border-radius:10px;font-weight:600;cursor:pointer;vertical-align:middle;margin-left:6px;">?</button></h1>
 
 <!-- Help modal -->
 <div id="help-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100;overflow-y:auto;">
   <div style="background:#fff;max-width:680px;margin:40px auto;border-radius:8px;padding:28px 32px;position:relative;font-size:13px;line-height:1.6;">
     <button id="help-close" style="position:absolute;top:12px;right:14px;background:none;border:none;font-size:20px;color:#888;cursor:pointer;padding:0;line-height:1;">×</button>
-    <h2 style="margin:0 0 8px;font-size:16px;">TIPS Ladder Builder — Help</h2>
+    <h2 style="margin:0 0 8px;font-size:16px;">TIPS Ladders: Build or Rebalance — Help</h2>
     <p style="margin:0 0 6px;color:#444;font-size:12px;">All calculations run in your browser. Prices updated daily ~1 PM ET from FedInvest.</p>
     <p style="margin:0 0 16px;font-size:12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:4px;padding:8px;">
       <b>Rebalance</b> — for existing ladder holders rebalancing into newly issued TIPS. Assumes you want to keep using the same lower bracket TIPS you originally purchased.<br>
@@ -153,6 +147,13 @@ e.g.  0.46 × 9.1 (2036) + 0.54 × 12.1 (2040) = 10.7</pre>
   </div>
 </div>
 
+<!-- Info popover card -->
+<div id="info-card" style="display:none">
+  <button id="info-card-close">&#215;</button>
+  <div id="info-card-title"></div>
+  <div id="info-card-content"></div>
+</div>
+
 <!-- Drill-down modal -->
 <div id="drill-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;overflow:hidden;">
   <div id="drill-modal" style="background:#fff;max-width:calc(100vw - 32px);box-sizing:border-box;border-radius:8px;padding:24px 28px;position:fixed;top:60px;left:50%;transform:translateX(-50%);font-size:13px;">
@@ -161,8 +162,6 @@ e.g.  0.46 × 9.1 (2036) + 0.54 × 12.1 (2040) = 10.7</pre>
     <div id="drill-content"></div>
   </div>
 </div>
-
-<div id="data-info">Loading market data…</div>
 
 <div id="top-row">
   <div class="form-card">
@@ -193,22 +192,18 @@ e.g.  0.46 × 9.1 (2036) + 0.54 × 12.1 (2040) = 10.7</pre>
       <div class="field" style="justify-content:flex-end">
         <button id="run-btn" disabled>Run Rebalance</button>
       </div>
+      <div id="net-cash-inline">
+        <span class="nc-label" id="nc-label">Net Cash</span>
+        <span class="nc-val" id="net-cash-val"></span>
+      </div>
     </div>
     <div id="status"></div>
-  </div>
-  <div id="net-cash-bar">
-    <div class="nc-label">Net Cash</div>
-    <div class="nc-val" id="net-cash-val"></div>
-  </div>
-  <div id="build-net-cash-bar">
-    <div class="nc-label">Total Cost</div>
-    <div class="nc-val" id="build-net-cash-val"></div>
+    <div id="info-strip">Loading market data…</div>
   </div>
 </div>
 
 <!-- Rebalance output -->
 <div id="output">
-  <div class="params-bar" id="params-bar"></div>
   <div class="table-wrap">
     <div class="table-scroll-wrap" id="simple-scroll">
       <table class="simple" id="simple-table"></table>
@@ -218,7 +213,6 @@ e.g.  0.46 × 9.1 (2036) + 0.54 × 12.1 (2040) = 10.7</pre>
 
 <!-- Build from Scratch output -->
 <div id="build-output">
-  <div class="params-bar" id="build-params-bar"></div>
   <div style="border:1px solid #ddd; border-radius:6px; background:#fff; padding:12px 16px;">
     <div class="table-scroll-wrap" id="build-scroll">
       <table class="simple" id="build-table"></table>
@@ -230,8 +224,8 @@ e.g.  0.46 × 9.1 (2036) + 0.54 × 12.1 (2040) = 10.7</pre>
 import { buildTipsMapFromYields, localDate, runRebalance, inferDARAFromCash } from './rebalance-lib.js';
 import { runBuild } from './build-lib.js';
 import { renderTable } from './render.js';
-import { buildDrillHTML } from './drill.js';
-import { fetchTipsData } from './data.js';
+import { buildDrillHTML, buildDurationPopupHTML } from './drill.js';
+import { fetchTipsData, lookupRefCpi } from './data.js';
 
 const simpleEl = document.getElementById('simple-table');
 const tableEl  = document.getElementById('build-table');
@@ -251,7 +245,7 @@ document.getElementById('help-overlay').addEventListener('click', e => {
 let tipsMap = null, refCpiRows = null, settlementDate = null;
 
 async function loadData() {
-  const dataInfo = document.getElementById('data-info');
+  const dataInfo = document.getElementById('info-strip');
   try {
     const { yieldsRows, refCpiRows: rows } = await fetchTipsData();
     refCpiRows = rows;
@@ -274,7 +268,19 @@ async function loadData() {
       lastYearSel.appendChild(opt);
     });
 
-    dataInfo.textContent = `Prices as of ${settleDateStr} · ${yieldsRows.length} TIPS`;
+    const staticRefCPI = lookupRefCpi(refCpiRows, settleDateStr);
+        const _matYears = new Set([...tipsMap.values()]
+          .filter(b => b.maturity > settlementDate).map(b => b.maturity.getFullYear()));
+        const _sortedYrs = [..._matYears].sort((a, b) => a - b);
+        const _gaps = [];
+        for (let y = _sortedYrs[0]; y <= _sortedYrs[_sortedYrs.length - 1]; y++)
+          if (!_matYears.has(y)) _gaps.push(y);
+        const _gapSuffix = _gaps.length
+          ? ', none for ' + _gaps[0] + '–' + _gaps[_gaps.length - 1] + ' (gap years)'
+          : '';
+        _staticInfo = 'Prices as of ' + settleDateStr + ' · RefCPI ' + staticRefCPI.toFixed(5)
+          + ' · ' + yieldsRows.length + ' TIPS' + _gapSuffix;
+        dataInfo.textContent = _staticInfo;
     document.getElementById('run-btn').disabled = false;
 
     // Pre-populate sample holdings if no file already selected
@@ -293,6 +299,7 @@ async function loadData() {
     }
   } catch (err) {
     dataInfo.textContent = '';
+    _staticInfo = '';
     setStatus('Failed to load market data: ' + err.message, true);
   }
 }
@@ -304,11 +311,6 @@ function setStatus(msg, isError = false) {
   el.className = isError ? 'error' : '';
 }
 
-function lookupRefCpi(dateStr) {
-  const matches = refCpiRows.filter(r => r.date <= dateStr);
-  if (matches.length === 0) throw new Error(`No RefCPI data on or before ${dateStr}`);
-  return matches[matches.length - 1].refCpi;
-}
 
 function esc(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -329,6 +331,9 @@ let buildDetails = null;
 let rebalDetails = null;
 let rebalSummary = null;
 let buildSummary = null;
+let _staticInfo = '', _rebalRunInfo = '', _buildRunInfo = '';
+let _daraRebal = '', _daraBuild = '10000';
+const _infoPopups = {};
 
 document.querySelectorAll('.mode-btn').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -343,7 +348,8 @@ document.querySelectorAll('.mode-btn').forEach(btn => {
     const daraEl = document.getElementById('dara');
     daraEl.step        = '1000';
     daraEl.placeholder = isRebalance ? 'auto-infer' : '';
-    if (!isRebalance && !daraEl.value) daraEl.value = 10000;
+    if (isRebalance) { _daraBuild = daraEl.value; daraEl.value = _daraRebal; }
+    else             { _daraRebal = daraEl.value; daraEl.value = _daraBuild || '10000'; }
     document.getElementById('field-holdings').style.display  = isRebalance ? '' : 'none';
     document.getElementById('field-method').style.display    = isRebalance ? '' : 'none';
     document.getElementById('field-last-year').style.display = isRebalance ? 'none' : '';
@@ -352,8 +358,10 @@ document.querySelectorAll('.mode-btn').forEach(btn => {
 
     document.getElementById('output').style.display     = isRebalance && rebalanceRendered ? 'block' : 'none';
     document.getElementById('build-output').style.display = !isRebalance && buildRendered     ? 'block' : 'none';
-    document.getElementById('net-cash-bar').style.display     = isRebalance && rebalanceRendered ? 'flex' : 'none';
-    document.getElementById('build-net-cash-bar').style.display = !isRebalance && buildRendered ? 'flex' : 'none';
+    const _nci = document.getElementById('net-cash-inline');
+    _nci.style.display = (isRebalance ? rebalanceRendered : buildRendered) ? '' : 'none';
+    document.getElementById('nc-label').textContent = isRebalance ? 'Net Cash' : 'Total Cost';
+    document.getElementById('info-strip').innerHTML = _staticInfo + (isRebalance ? _rebalRunInfo : _buildRunInfo);
 
     setStatus('');
   });
@@ -371,23 +379,21 @@ function renderOutput({ results, HDR, summary, details }, portfolioCash = null) 
     costDeltaSum,
   } = summary;
 
-  const ncBar = document.getElementById('net-cash-bar');
-  const ncVal = document.getElementById('net-cash-val');
-  ncVal.textContent = sign(costDeltaSum);
-  ncVal.className = 'nc-val ' + (costDeltaSum >= 0 ? 'pos' : 'neg');
-  ncBar.style.display = 'flex';
-
-  const param = (label, val) =>
-    `<div class="param"><span class="param-label">${label}</span><span class="param-val">${val}</span></div>`;
-
-  document.getElementById('params-bar').innerHTML =
-    param('Date',          esc(settleDateDisp)) +
-    param('RefCPI',        refCPI) +
-    param('DARA',          fmtI(DARA)) +
-    param('Range',         `${firstYear} – ${lastYear} (${rungCount} rungs)`) +
-    param('Gap Years',     gapYears.join(', ') || '—') +
-    (portfolioCash !== null ? param('Market Value', '$' + Math.round(portfolioCash).toLocaleString()) : '');
-
+  document.getElementById('net-cash-val').textContent = sign(costDeltaSum);
+    document.getElementById('net-cash-val').className = 'nc-val ' + (costDeltaSum >= 0 ? 'pos' : 'neg');
+    document.getElementById('nc-label').textContent = 'Net Cash';
+    document.getElementById('net-cash-inline').style.display = '';
+    _infoPopups.range = '<p style="margin:0;line-height:1.6">Range <b>' + firstYear + '–' + lastYear + '</b> (' + rungCount + ' rungs). Method: <b>' + method + '</b>.<br>' +
+      (method === 'Gap' ? 'Bracket years and former gap years rebalanced; other rungs unchanged.'
+                        : 'All contiguous rungs in this range are rebalanced.') + '</p>';
+    _infoPopups.duration = buildDurationPopupHTML(summary, 'rebal');
+    _rebalRunInfo = ' · DARA <b><span class="copy-dara" data-val="' + Math.round(DARA) + '" title="Click to copy">' + esc(Math.round(DARA).toLocaleString()) + '</span></b>'
+      + (inferredDARA ? ' <span style="color:#888;font-weight:400">(inferred)</span>' : '')
+      + ' · FY ' + firstYear + '–' + lastYear + ', ' + rungCount + ' rungs'
+      + ' <a class="info-link" data-popup="range">ⓘ</a>'
+      + ' · <a class="info-link" data-popup="duration">Duration calcs</a>';
+    document.getElementById('info-strip').innerHTML = _staticInfo + _rebalRunInfo;
+  
   rebalDetails = details;
   rebalSummary = summary;
 
@@ -396,7 +402,7 @@ function renderOutput({ results, HDR, summary, details }, portfolioCash = null) 
 
     rebalanceRendered = true;
   document.getElementById('output').style.display = 'block';
-  updateStickyTop('simple-table', 'params-bar');
+  updateStickyTop('simple-table');
 }
 
 // ─── Render Build from Scratch output ────────────────────────────────────────
@@ -409,41 +415,16 @@ function renderBuildOutput({ results, HDR, summary, details }) {
     totalBuyCost, totalExcessCost,
   } = summary;
 
-  const ncBar = document.getElementById('build-net-cash-bar');
-  const ncVal = document.getElementById('build-net-cash-val');
-  ncVal.textContent = '$' + Math.round(totalBuyCost).toLocaleString();
-  ncVal.className = 'nc-val';
-  ncBar.style.display = 'flex';
-
-  const param = (label, val) =>
-    `<div class="param"><span class="param-label">${label}</span><span class="param-val">${val}</span></div>`;
-
-  const durFormula =
-    `${lowerWeight.toFixed(2)} × ${lowerDuration.toFixed(1)} (${lowerMonth} ${lowerYear} duration) + ` +
-    `${upperWeight.toFixed(2)} × ${upperDuration.toFixed(1)} (${upperMonth} ${upperYear} duration) = ` +
-    `${gapParams.avgDuration.toFixed(1)}`;
-
-  // Gap Cost + Excess Cost grouped with a blue tint box
-  const gp = (label, val, last = false) =>
-    `<div class="param" style="${last ? 'border-right:none;padding-right:0;margin-right:0' : 'padding-right:12px;margin-right:12px;border-right:1px solid #93c5fd'}">` +
-    `<span class="param-label">${label}</span><span class="param-val">${val}</span></div>`;
-  const costGroup =
-    `<div style="display:inline-flex;align-items:flex-start;background:#eff6ff;border:1px solid #bfdbfe;border-radius:4px;padding:6px 10px;">` +
-    gp('Cost of Hypothetical Gap Year TIPS', fmtI(gapParams.totalCost)) +
-    gp('Excess Cost', fmtI(totalExcessCost), true) +
-    `</div>`;
-
-  document.getElementById('build-params-bar').innerHTML =
-    param('Date',      esc(settleDateDisp)) +
-    param('RefCPI',    refCPI) +
-    param('DARA',      fmtI(dara)) +
-    param('Range',     `${firstYear} – ${lastYear}`) +
-    param('Gap Years', gapYears.join(', ') || '—') +
-    param('Hypothetical Avg Gap Year Duration', gapParams.avgDuration.toFixed(1) + ' yr') +
-    param('Duration Match', durFormula) +
-    costGroup;
-
-  buildDetails = details;
+  document.getElementById('net-cash-val').textContent = '$' + Math.round(totalBuyCost).toLocaleString();
+    document.getElementById('net-cash-val').className = 'nc-val';
+    document.getElementById('nc-label').textContent = 'Total Cost';
+    document.getElementById('net-cash-inline').style.display = '';
+    _infoPopups.duration = buildDurationPopupHTML(summary, 'build');
+    _buildRunInfo = ' · DARA <b>' + esc(Math.round(dara).toLocaleString()) + '</b>'
+      + ' · FY ' + firstYear + '–' + lastYear
+      + ' · <a class="info-link" data-popup="duration">Duration calcs</a>';
+    document.getElementById('info-strip').innerHTML = _staticInfo + _buildRunInfo;
+    buildDetails = details;
   buildSummary  = summary;
 
   const { headerHTML: bHdr, bodyHTML: bBody, tfootHTML: bFoot } = renderTable({ details, mode: 'build', summary });
@@ -451,19 +432,17 @@ function renderBuildOutput({ results, HDR, summary, details }) {
 
     buildRendered = true;
   document.getElementById('build-output').style.display = 'block';
-  updateStickyTop('build-table', 'build-params-bar');
+  updateStickyTop('build-table');
 }
 
 // ─── Sticky header helper ─────────────────────────────────────────────────────────
-function updateStickyTop(tableId, paramsBarId) {
+function updateStickyTop(tableId) {
   const topRow    = document.getElementById('top-row');
-  const paramsBar = document.getElementById(paramsBarId);
   const scrollId  = tableId === 'simple-table' ? 'simple-scroll' : 'build-scroll';
   const scrollWrap = document.getElementById(scrollId);
   if (!scrollWrap) return;
-  const used = (topRow ? topRow.offsetHeight : 0) + (paramsBar ? paramsBar.offsetHeight : 0) + 48;
+  const used = (topRow ? topRow.offsetHeight : 0) + 48;
   scrollWrap.style.maxHeight = (window.innerHeight - used) + 'px';
-  // th top:0 is relative to scroll container — no inline override needed
 }
 
 // ─── Run handler ──────────────────────────────────────────────────────────────
@@ -472,7 +451,7 @@ document.getElementById('run-btn').addEventListener('click', async () => {
 
   try {
     const settleDateStr = settlementDate.toLocaleDateString('en-CA');
-    const refCPI = lookupRefCpi(settleDateStr);
+    const refCPI = lookupRefCpi(refCpiRows, settleDateStr);
 
     if (currentMode === 'build') {
       // ── Build from Scratch ──
@@ -599,6 +578,47 @@ let _drillDragging = false;
   });
 }
 
+// ─── Info popover handler ──────────────────────────────────────────────
+{
+  const _ic = document.getElementById('info-card');
+  const _ict = document.getElementById('info-card-title');
+  const _icb = document.getElementById('info-card-content');
+  let _icDrag = false, _icOX = 0, _icOY = 0;
+  document.getElementById('info-card-close').addEventListener('click', () => { _ic.style.display = 'none'; });
+  document.addEventListener('click', e => {
+    const cd = e.target.closest('.copy-dara');
+    if (cd) { navigator.clipboard.writeText(cd.dataset.val); cd.classList.add('copied'); setTimeout(() => cd.classList.remove('copied'), 1200); return; }
+    const link = e.target.closest('.info-link');
+    if (link) {
+      const key = link.dataset.popup;
+      const html = _infoPopups[key];
+      if (html == null) return;
+      const titles = { range: 'Rebalance Range', duration: 'Duration Calculations' };
+      _ict.textContent = titles[key] || key;
+      _icb.innerHTML = html;
+      const rect = link.getBoundingClientRect();
+      _ic.style.display = 'block';
+      const cardW = _ic.offsetWidth;
+      const left = Math.min(rect.left, window.innerWidth - cardW - 16);
+      _ic.style.left = Math.max(16, left) + 'px';
+      _ic.style.top = (rect.bottom + 8) + 'px';
+      e.stopPropagation();
+      return;
+    }
+    if (!_icDrag && e.target.closest('#info-card') == null) _ic.style.display = 'none';
+  });
+  _ict.addEventListener('mousedown', e => {
+    const rect = _ic.getBoundingClientRect();
+    _icOX = e.clientX - rect.left; _icOY = e.clientY - rect.top;
+    _icDrag = true; e.preventDefault();
+  });
+  document.addEventListener('mousemove', e => {
+    if (!_icDrag) return;
+    _ic.style.left = (e.clientX - _icOX) + 'px';
+    _ic.style.top  = (e.clientY - _icOY) + 'px';
+  });
+  document.addEventListener('mouseup', () => { _icDrag = false; });
+}
 
 document.getElementById('simple-table').addEventListener('click', e => {
   const td = e.target.closest('td.drillable');
@@ -612,7 +632,8 @@ document.getElementById('simple-table').addEventListener('click', e => {
     qtyBefore: 'Qty Before', qtyAfter: 'Qty After', cashDelta: 'Cash Δ',
     costBefore: 'Cost Before', costAfter: 'Cost After',
     gapAmtBefore: 'Gap Amount Before', gapAmtAfter: 'Gap Amount After',
-    gapCostBefore: 'Gap Cost Before', gapCostAfter: 'Gap Cost After' };
+    gapCostBefore: 'Gap Cost Before', gapCostAfter: 'Gap Cost After',
+    gapCashDelta: 'Gap Cash Δ' };
   document.getElementById('drill-title').textContent =
     colNames[key] + ' — FY ' + d.fundedYear + ' · ' + d.cusip + ' · ' + d.maturityStr;
   document.getElementById('drill-content').innerHTML = buildDrillHTML(d, key, rebalSummary);

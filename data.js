@@ -18,6 +18,15 @@ export function parseCsv(text) {
 // Fetches TipsYields.csv and RefCPI.csv from R2, parses and types the rows.
 // Returns: { yieldsRows, refCpiRows }
 // Throws on HTTP errors.
+
+// Looks up the reference CPI for a given settlement date string (YYYY-MM-DD).
+// Returns the most recent refCpi on or before the date.
+export function lookupRefCpi(refCpiRows, dateStr) {
+  const matches = refCpiRows.filter(r => r.date <= dateStr);
+  if (matches.length === 0) throw new Error('No RefCPI data on or before ' + dateStr);
+  return matches[matches.length - 1].refCpi;
+}
+
 export async function fetchTipsData() {
   const [yieldsRes, refCpiRes] = await Promise.all([
     fetch(BASE_URL + '/TipsYields.csv'),

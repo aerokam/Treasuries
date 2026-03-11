@@ -77,6 +77,7 @@ export const COLS = [
   { label: 'Cash Delta',    key: 'cashDelta',  fmt: 'sgn', rebalOnly: true,
     value:    d => d.isBracketTarget ? 0 : -((d.qtyAfter - d.qtyBefore) * d.costPerBond),
     subValue: d => -((d.excessQtyAfter - d.excessQtyBefore) * d.costPerBond),
+    subDrillKey: 'gapCashDelta',
     total: true, totalFn: d => -((d.qtyAfter - d.qtyBefore) * d.costPerBond),
     drill: true, drillCond: v => typeof v === 'number' && v !== 0 },
 
