@@ -537,7 +537,7 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
       cusip: h.cusip, maturityStr: fmtDate(h.maturity), fundedYear: h.year,
       coupon: b.coupon, price: b.price, baseCpi: b.baseCpi, refCPI, indexRatio: ir,
       principalPerBond: 1000 * ir, costPerBond: (b.price / 100 * ir * 1000),
-      DARA,
+      DARA: daraByYear?.get(h.year) ?? DARA,
       qtyBefore: h.qty, qtyAfter: tQ,
       fundedYearQtyBefore: isBT ? Math.min(bracketTargetFundedYearQtyBefore[h.year] ?? 0, h.qty) : h.qty,
       fundedYearQtyAfter: tFundedYearQty,
@@ -552,7 +552,8 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
       araAfterLaterMatInt:  isLast ? (postARABreakdown[h.year]?.laterMatInt  ?? 0) : null,
       nPeriods: (h.maturity.getMonth() + 1 < 7 ? 1 : 2)
     });
-    results.unshift([h.cusip, h.qty, fmtDate(h.maturity), fy, pFY, iFY, aFY, cFY, tQ, qD, tC, cD, aB, aB - DARA, aA, aA - DARA, exB * calculatePIPerBond(h.cusip, h.maturity, refCPI, tipsMap), exA * calculatePIPerBond(h.cusip, h.maturity, refCPI, tipsMap)]);
+    const rowDARA = daraByYear?.get(h.year) ?? DARA;
+    results.unshift([h.cusip, h.qty, fmtDate(h.maturity), fy, pFY, iFY, aFY, cFY, tQ, qD, tC, cD, aB, aB - rowDARA, aA, aA - rowDARA, exB * calculatePIPerBond(h.cusip, h.maturity, refCPI, tipsMap), exA * calculatePIPerBond(h.cusip, h.maturity, refCPI, tipsMap)]);
   }
 
   const costDeltaSum = results.reduce((s, r) => s + (typeof r[11] === 'number' ? r[11] : 0), 0);
