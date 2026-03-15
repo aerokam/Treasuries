@@ -66,10 +66,13 @@
   /* ── Simple table ── */
   table.simple { border-collapse: collapse; width: auto; font-size: 13px; }
   table.simple th { background: #1e293b; color: #fff; padding: 6px 12px; text-align: right; box-shadow: 0 1px 0 #334155;
-                    font-weight: 600; white-space: nowrap; position: sticky; top: 0; z-index: 10; }
+                    font-weight: 600; white-space: nowrap; position: sticky; top: 0; z-index: 10; vertical-align: bottom; }
+  table.simple th:has(br) { text-align: center; }
+  table.simple th:nth-child(3):has(br) { text-align: center; }
   table.simple th:first-child, table.simple th:nth-child(2), table.simple th:nth-child(3) { text-align: left; }
   table.simple td { padding: 6px 12px; border-bottom: 1px solid #eee; white-space: nowrap; font-variant-numeric: tabular-nums; }
   table.simple td:not(:first-child):not(:nth-child(2)):not(:nth-child(3)) { text-align: right; }
+  table.simple td:nth-child(3) { text-align: center; }
   table.simple tr.no-change td { color: #94a3b8; }
   table.simple tr.excess-subrow td { background: #fef9c3; color: #854d0e; font-size: 12px; }
   table.simple tr.bracket:not(.excess-subrow) td { background: #bfdbfe; }

@@ -29,53 +29,53 @@ export const COLS = [
     value: d => d.cusip,       subValue: d => d.cusip },
   { label: 'Maturity',    key: 'maturity',    fmt: 'str',
     value: d => d.maturityStr, subValue: d => d.maturityStr },
-  { label: 'Funded Year', key: 'fundedYear',  fmt: 'fy',
+  { label: 'Funded Year', headerHTML: 'Funded<br>Year', key: 'fundedYear',  fmt: 'fy',
     value: (d, ri, details) => (ri === details.length - 1 || details[ri+1].fundedYear !== d.fundedYear) ? d.fundedYear : '',
     subValue: () => 'Gap' },
 
   // Rebalance-only
-  { label: 'Amount Before', key: 'amtBefore', fmt: 'amt', rebalOnly: true,
+  { label: 'Amount Before', headerHTML: 'Amt<br>Before', key: 'amtBefore', fmt: 'amt', rebalOnly: true,
     value:       d => d.araBeforeTotal,
     subValue:    d => d.excessQtyBefore * pi(d),
     subDrillKey: 'gapAmtBefore',
     total: true, totalFn: d => (d.araBeforeTotal ?? 0) + (d.excessQtyBefore * pi(d) || 0),
     drill: true, drillCond: (_v, d) => d.araBeforeTotal !== null },
 
-  { label: 'Amount After',  key: 'amtAfter',  fmt: 'amt', rebalOnly: true,
+  { label: 'Amount After',  headerHTML: 'Amt<br>After',  key: 'amtAfter',  fmt: 'amt', rebalOnly: true,
     value:       d => d.araAfterTotal,
     subValue:    d => d.excessQtyAfter * pi(d),
     subDrillKey: 'gapAmtAfter',
     total: true, totalFn: d => (d.araAfterTotal ?? 0) + (d.excessQtyAfter * pi(d) || 0),
     drill: true, drillCond: (_v, d) => d.araAfterTotal !== null },
 
-  { label: 'Cost Before',   key: 'costBefore', fmt: 'amt', rebalOnly: true,
+  { label: 'Cost Before',   headerHTML: 'Cost<br>Before', key: 'costBefore', fmt: 'amt', rebalOnly: true,
     value:       d => d.fundedYearQtyBefore * d.costPerBond,
     subValue:    d => d.excessQtyBefore * d.costPerBond,
     subDrillKey: 'gapCostBefore',
     total: true, totalFn: d => (d.fundedYearQtyBefore * d.costPerBond) + (d.excessQtyBefore * d.costPerBond || 0),
     drill: true, drillCond: v => typeof v === 'number' && v > 0 },
 
-  { label: 'Cost After',    key: 'costAfter',  fmt: 'amt', rebalOnly: true,
+  { label: 'Cost After',    headerHTML: 'Cost<br>After', key: 'costAfter',  fmt: 'amt', rebalOnly: true,
     value:       d => d.fundedYearQtyAfter * d.costPerBond,
     subValue:    d => d.excessQtyAfter * d.costPerBond,
     subDrillKey: 'gapCostAfter',
     total: true, totalFn: d => (d.fundedYearQtyAfter * d.costPerBond) + (d.excessQtyAfter * d.costPerBond || 0),
     drill: true, drillCond: v => typeof v === 'number' && v > 0 },
 
-  { label: 'Qty Before',    key: 'qtyBefore',  fmt: 'qty', rebalOnly: true,
+  { label: 'Qty Before',    headerHTML: 'Qty<br>Before', key: 'qtyBefore',  fmt: 'qty', rebalOnly: true,
     value:    d => d.fundedYearQtyBefore,
     subValue: d => d.excessQtyBefore },
 
-  { label: 'Qty After',     key: 'qtyAfter',   fmt: 'qty', rebalOnly: true,
+  { label: 'Qty After',     headerHTML: 'Qty<br>After', key: 'qtyAfter',   fmt: 'qty', rebalOnly: true,
     value:    d => d.fundedYearQtyAfter,
     subValue: d => d.excessQtyAfter,
     drill: true, drillCond: v => typeof v === 'number' && v > 0 },
 
-  { label: 'Qty Delta',     key: 'qtyDelta',   fmt: 'sgn', rebalOnly: true,
+  { label: 'Qty Delta',     headerHTML: 'Qty<br>Delta', key: 'qtyDelta',   fmt: 'sgn', rebalOnly: true,
     value:    d => d.fundedYearQtyAfter - d.fundedYearQtyBefore,
     subValue: d => d.excessQtyAfter - d.excessQtyBefore },
 
-  { label: 'Cash Delta',    key: 'cashDelta',  fmt: 'sgn', rebalOnly: true,
+  { label: 'Cash Delta',    headerHTML: 'Cash<br>Delta', key: 'cashDelta',  fmt: 'sgn', rebalOnly: true,
     value:    d => -((d.fundedYearQtyAfter - d.fundedYearQtyBefore) * d.costPerBond),
     subValue: d => -((d.excessQtyAfter - d.excessQtyBefore) * d.costPerBond),
     subDrillKey: 'gapCashDelta',
@@ -130,7 +130,7 @@ export function renderTable({ details, mode, summary }) {
   const cols = COLS.filter(c => mode === 'rebal' ? !c.buildOnly : !c.rebalOnly);
 
   const headerHTML = '<thead><tr>' +
-    cols.map(c => '<th data-col="' + c.key + '" style="cursor:help">' + esc(c.label) + '</th>').join('') +
+    cols.map(c => '<th data-col="' + c.key + '" style="cursor:help">' + (c.headerHTML || esc(c.label)) + '</th>').join('') +
     '</tr></thead>';
 
   const bodyRows = details.map((d, ri) => {
