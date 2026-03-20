@@ -35,7 +35,7 @@ They are the same algorithm — both do a longest-to-shortest ladder sweep, both
 ### 4. Transparency via progressive disclosure
 - Main table: clean, user-facing values
 - Popup (one click): full calculation chain for any cell
-- Future: deeper drill-down into sub-components (e.g., duration derivation, yield interpolation, CPI lookup)
+- Future: deeper drill-down into sub-components (e.g., duration derivation, yield interpolation, RefCPI lookup)
 
 ---
 

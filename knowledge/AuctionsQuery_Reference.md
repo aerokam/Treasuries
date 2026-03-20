@@ -74,7 +74,7 @@ No auth required. All values returned as strings (including nulls → `"null"`).
 | Field | Type | Notes |
 |---|---|---|
 | `adj_accrued_int_per1000` | decimal | Inflation-adjusted accrued interest per $1,000 |
-| `index_ratio_on_issue_date` | decimal | CPI index ratio on issue date |
+| `index_ratio_on_issue_date` | decimal | Reference CPI index ratio on issue date |
 | `ref_cpi_on_issue_date` | decimal | Reference CPI on issue date |
 
 ### Other
