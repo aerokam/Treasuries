@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>TIPS Seasonal Adjustments (TipsSA)</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; }
@@ -62,13 +63,13 @@
         <button id="resetZoom" style="padding: 4px 10px; font-size: 11px; background:#f1f5f9; color:#475569; border:1px solid #cbd5e1; border-radius:4px; font-weight:600; cursor:pointer;">Reset</button>
       </div>
     </div>
-    <div id="chartWrapper" style="overflow-x: auto; border: 1px solid #e2e8f0; border-radius: 6px; background: #fff;">
-      <div id="chartResizable" style="width: 100%; height: 400px; min-width: 100%;">
+    <div id="chartWrapper" style="border: 1px solid #e2e8f0; border-radius: 6px; background: #fff;">
+      <div style="height: 400px; width: 100%;">
         <canvas id="yieldChart"></canvas>
       </div>
     </div>
     <div style="font-size:10px; color:#94a3b8; margin-top:6px;">
-      Drag selection to zoom range (creates scrollbar) · Mouse wheel to zoom
+      Mouse wheel to zoom · Click-and-drag to pan
     </div>
   </div>
 

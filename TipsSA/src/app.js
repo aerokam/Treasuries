@@ -332,26 +332,20 @@ function renderChart(bonds) {
       },
       plugins: {
         zoom: {
+          limits: {
+            x: {
+              min: 'original',
+              max: 'original'
+            }
+          },
           pan: {
             enabled: true,
             mode: 'x',
-            onPan: ({chart}) => {
-              if (lockLeftEl.checked) {
-                chart.options.scales.x.min = 0;
-                chart.update('none');
-              }
-            }
           },
           zoom: {
             wheel: { enabled: true },
             pinch: { enabled: true },
             mode: 'x',
-            onZoom: ({chart}) => {
-              if (lockLeftEl.checked) {
-                chart.options.scales.x.min = 0;
-                chart.update('none');
-              }
-            }
           }
         },
         tooltip: {
@@ -365,10 +359,28 @@ function renderChart(bonds) {
     }
   });
 
+  // Handle Lock Left logic
+  function updateZoomLimits() {
+    if (lockLeftEl.checked) {
+      chart.options.plugins.zoom.limits.x.min = 0;
+      // If currently panned right, snap back to 0
+      if (chart.scales.x.min > 0) {
+        chart.options.scales.x.min = 0;
+        chart.update();
+      }
+    } else {
+      chart.options.plugins.zoom.limits.x.min = 'original';
+    }
+  }
+
+  lockLeftEl.addEventListener('change', updateZoomLimits);
+  updateZoomLimits();
+
   document.getElementById('resetZoom').addEventListener('click', () => {
     chart.resetZoom();
     chart.options.scales.x.min = undefined;
     chart.options.scales.x.max = undefined;
+    updateZoomLimits();
     chart.update();
   });
 }
