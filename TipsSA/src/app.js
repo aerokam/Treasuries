@@ -120,7 +120,7 @@ function yieldFromPrice(cleanPrice, coupon, settleDateStr, maturityStr) {
 
 let rawYieldsData = null;
 let rawRefCpiData = null;
-let schwabPrices = null;
+let brokerPrices = null;
 
 async function init() {
   const statusEl = document.getElementById('status');
@@ -146,21 +146,17 @@ async function init() {
   }
 }
 
-// Generalized Smoothing Algorithm for SAO
+// 1-2-1 Weighted Moving Average for SAO
 function calculateSAO(bonds) {
-  // We use a simple 3-point moving average to "fit" the curve.
-  // This naturally pulls outliers back toward the neighbors.
   return bonds.map((bond, i) => {
     const prev = bonds[i - 1];
     const next = bonds[i + 1];
-    
     if (prev && next) {
-      // Average of self and neighbors
-      return (prev.saYield + bond.saYield + next.saYield) / 3;
+      return (prev.saYield + (bond.saYield * 2) + next.saYield) / 4;
     } else if (prev) {
-      return (prev.saYield + bond.saYield) / 2;
+      return (prev.saYield + (bond.saYield * 2)) / 3;
     } else if (next) {
-      return (bond.saYield + next.saYield) / 2;
+      return ((bond.saYield * 2) + next.saYield) / 3;
     }
     return bond.saYield;
   });
@@ -172,18 +168,33 @@ function processAndRender() {
   const statusEl = document.getElementById('status');
   const infoEl = document.getElementById('info-strip');
   const priceSourceEl = document.getElementById('priceSource');
+  const sourceLabelEl = document.getElementById('priceSourceLabel');
 
-  const settleDateStr = rawYieldsData[0]?.settlementDate;
-  infoEl.textContent = `Prices as of ${settleDateStr} · Reference CPI / SA factors from R2`;
-  priceSourceEl.style.display = schwabPrices ? 'block' : 'none';
+  const fedSettleStr = rawYieldsData[0]?.settlementDate;
+  
+  if (brokerPrices) {
+    sourceLabelEl.textContent = "Using Broker Ask Prices (T+1 Settlement)";
+    priceSourceEl.style.display = 'flex';
+    infoEl.textContent = `Broker Prices as of today · Reference CPI / SA factors from R2`;
+  } else {
+    priceSourceEl.style.display = 'none';
+    infoEl.textContent = `FedInvest Prices as of ${fedSettleStr} · Reference CPI / SA factors from R2`;
+  }
 
-  // 1. Initial Processing (Calculate SA)
   const allProcessed = rawYieldsData.map(bond => {
     const coupon = parseFloat(bond.coupon);
     let price = parseFloat(bond.price);
-    if (schwabPrices && schwabPrices.has(bond.cusip)) price = schwabPrices.get(bond.cusip);
+    let settleDateStr = bond.settlementDate;
 
-    const mmddSettle = bond.settlementDate.slice(5, 10);
+    if (brokerPrices && brokerPrices.has(bond.cusip)) {
+      price = brokerPrices.get(bond.cusip);
+      const today = new Date();
+      const tPlus1 = new Date(today);
+      tPlus1.setDate(today.getDate() + 1);
+      settleDateStr = tPlus1.toISOString().split('T')[0];
+    }
+
+    const mmddSettle = settleDateStr.slice(5, 10);
     const mmddMature = bond.maturity.slice(5, 10);
 
     const saSettle = parseFloat(rawRefCpiData.find(r => r["Ref CPI Date"].includes(`-${mmddSettle}`))?.["SA Factor"]);
@@ -191,42 +202,31 @@ function processAndRender() {
 
     if (!saSettle || !saMature) return null;
 
-    const askYield = yieldFromPrice(price, coupon, bond.settlementDate, bond.maturity);
-    const saYield = yieldFromPrice(price * (saSettle / saMature), coupon, bond.settlementDate, bond.maturity);
+    const askYield = yieldFromPrice(price, coupon, settleDateStr, bond.maturity);
+    const saYield = yieldFromPrice(price * (saSettle / saMature), coupon, settleDateStr, bond.maturity);
 
-    return { 
-      ...bond, 
-      coupon, 
-      price, 
-      askYield, 
-      saYield, 
-      maturityDate: localDate(bond.maturity),
-      diffBps: (saYield - askYield) * 10000 
-    };
+    return { ...bond, coupon, price, askYield, saYield, maturityDate: localDate(bond.maturity) };
   }).filter(b => b !== null).sort((a, b) => a.maturityDate - b.maturityDate);
 
-  // 2. Generate SAO Yields (Smoothed SA)
   const smoothed = calculateSAO(allProcessed);
   allProcessed.forEach((b, i) => {
     b.saoYield = smoothed[i];
+    b.diffBps = (b.saYield - b.askYield) * 10000;
   });
 
-  // 3. Setup Range Filter Dropdowns (only once)
   const startSel = document.getElementById('startMaturity');
   const endSel = document.getElementById('endMaturity');
-  
   if (startSel.options.length === 0) {
     allProcessed.forEach((b, i) => {
-      const opt = (text, val, selected) => {
+      const opt = (selected) => {
         const o = document.createElement('option');
-        o.value = val; o.textContent = text;
+        o.value = b.maturity; o.textContent = fmtMMM(b.maturity);
         if (selected) o.selected = true;
         return o;
       };
-      startSel.appendChild(opt(fmtMMM(b.maturity), b.maturity, i === 0));
-      endSel.appendChild(opt(fmtMMM(b.maturity), b.maturity, i === allProcessed.length - 1));
+      startSel.appendChild(opt(i === 0));
+      endSel.appendChild(opt(i === allProcessed.length - 1));
     });
-    
     startSel.onchange = () => processAndRender();
     endSel.onchange = () => processAndRender();
   }
@@ -240,19 +240,13 @@ function processAndRender() {
   statusEl.textContent = `Successfully loaded ${filteredBonds.length} TIPS bonds.`;
 }
 
-document.getElementById('schwabFile').addEventListener('change', async (e) => {
-  if (!e.target.files.length) {
-    schwabPrices = null;
-    processAndRender();
-    return;
-  }
-
+document.getElementById('brokerFile').addEventListener('change', async (e) => {
+  if (!e.target.files.length) return;
   try {
     const text = await e.target.files[0].text();
     const rows = parseCsv(text);
     const priceMap = new Map();
     const seenCusips = new Set();
-
     rows.forEach(row => {
       const desc = row["Description"] || "";
       const cusipMatch = desc.match(/[A-Z0-9]{9}/);
@@ -265,19 +259,23 @@ document.getElementById('schwabFile').addEventListener('change', async (e) => {
         }
       }
     });
-
     if (priceMap.size === 0) {
-      alert("No valid prices found in the Schwab CSV.");
+      alert("No valid prices found in the CSV.");
       e.target.value = '';
       return;
     }
-
-    schwabPrices = priceMap;
+    brokerPrices = priceMap;
     processAndRender();
   } catch (err) {
-    alert("Error parsing Schwab CSV: " + err.message);
+    alert("Error parsing CSV: " + err.message);
   }
 });
+
+document.getElementById('resetFedInvest').onclick = () => {
+  brokerPrices = null;
+  document.getElementById('brokerFile').value = '';
+  processAndRender();
+};
 
 function fmtMMM(dateStr) {
   const [y, m, d] = dateStr.split('-').map(Number);
@@ -318,16 +316,16 @@ function renderChart(bonds) {
         {
           label: 'Ask Yield (%)',
           data: askYields,
-          borderColor: '#cbd5e1',
+          borderColor: '#64748b',
           backgroundColor: 'transparent',
-          borderWidth: 1,
+          borderWidth: 1.5,
           pointRadius: 2,
           tension: 0.1
         },
         {
           label: 'SA Yield (%)',
           data: saYields,
-          borderColor: '#94a3b8',
+          borderColor: '#475569',
           borderDash: [5, 5],
           backgroundColor: 'transparent',
           borderWidth: 1,
