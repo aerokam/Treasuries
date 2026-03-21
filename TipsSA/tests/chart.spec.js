@@ -32,7 +32,12 @@ test.describe('TipsSA Chart and UI', () => {
       }
     });
 
-    const response = await page.goto('http://127.0.0.1:8080/TipsSA/index.html');
+    const response = await page.goto('index.html');
+
+
+
+
+
 
     console.log('Final URL:', page.url());
     console.log('Page Title:', await page.title());

@@ -9,9 +9,10 @@ A project to analyze and adjust for CPI seasonality in TIPS payments and index r
 - **Web Interface**: Visualize Ask vs. SA yields in tabular and chart form.
 
 ## Web Interface
-To run the web interface locally:
-1. From the repository root, run `npx serve .`.
-2. Open `http://localhost:3000/TipsSA/` in your browser.
+- **Live Version**: [https://aerokam.github.io/TIPS/TipsSA/](https://aerokam.github.io/TIPS/TipsSA/)
+- **Local Development**:
+  1. From the repository root, run `npx serve .`.
+  2. Open `http://localhost:8080/TipsSA/` in your browser. (Note: Root serving is required for shared components).
 
 ## Scripts
 - `scripts/updateRefCpi.js`: Orchestrator to fetch CPI and calculate daily reference data.

@@ -9,5 +9,8 @@
   "scripts": {
     "test": "npm test -w TipsLadderBuilder",
     "test:e2e": "npm run test:e2e -w TipsLadderBuilder"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.2"
   }
 }

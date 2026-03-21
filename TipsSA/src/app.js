@@ -179,9 +179,11 @@ function calculateSAO(bonds) {
     const projected = intercept;
 
     // 3. Blend logic
-    let trendWeight = 0.5;
-    if (yearsToMat < 2) trendWeight = 0.9;
-    else if (yearsToMat < 4) trendWeight = 0.7;
+    // Refined weights: 2027 maturities (~1yr) should follow SA trend more (lower trendWeight)
+    let trendWeight = 0.3;
+    if (yearsToMat < 0.5) trendWeight = 0.9; // Very short end (e.g. Apr 2026) fits trend
+    else if (yearsToMat < 2) trendWeight = 0.5; // Medium-short (e.g. 2027) follows SA more
+    else if (yearsToMat < 5) trendWeight = 0.4;
 
     let candidate = (projected * trendWeight) + (bond.saYield * (1 - trendWeight));
 
@@ -189,6 +191,12 @@ function calculateSAO(bonds) {
     // If curve is positive (increasing to the right), shorter must be <= longer.
     if (i < n - 1) {
       candidate = Math.min(candidate, sao[i + 1]);
+      
+      // Specific fix for Apr 2026 vs Jul 2026: force a slight downward slope if very close
+      const diffDays = (bonds[i+1].maturityDate - bond.maturityDate) / 86400000;
+      if (yearsToMat < 0.6 && diffDays < 100) {
+        candidate = Math.min(candidate, sao[i+1] - 0.00005); // Force at least 0.5bps lower
+      }
     }
 
     sao[i] = candidate;
@@ -203,7 +211,6 @@ function processAndRender() {
   const infoEl = document.getElementById('info-strip');
   const priceSourceEl = document.getElementById('priceSource');
   const sourceLabelEl = document.getElementById('priceSourceLabel');
-  const yMinEl = document.getElementById('yMin');
 
   const fedSettleStr = rawYieldsData[0]?.settlementDate;
   
@@ -267,7 +274,6 @@ function processAndRender() {
     });
     startSel.onchange = () => processAndRender();
     endSel.onchange = () => processAndRender();
-    yMinEl.onchange = () => processAndRender();
   }
 
   const startDate = localDate(startSel.value);
@@ -275,7 +281,7 @@ function processAndRender() {
   const filteredBonds = allProcessed.filter(b => b.maturityDate >= startDate && b.maturityDate <= endDate);
 
   renderTable(filteredBonds);
-  renderChart(filteredBonds, parseFloat(yMinEl.value));
+  renderChart(filteredBonds);
   statusEl.textContent = `Successfully loaded ${filteredBonds.length} TIPS bonds.`;
 }
 
@@ -332,13 +338,14 @@ function renderTable(bonds) {
       <td>${b.price.toFixed(3)}</td>
       <td>${(b.askYield * 100).toFixed(3)}%</td>
       <td>${(b.saYield * 100).toFixed(3)}%</td>
+      <td style="font-weight:700; color:#1a56db;">${(b.saoYield * 100).toFixed(3)}%</td>
       <td class="${b.diffBps >= 0 ? 'pos' : 'neg'}">${b.diffBps.toFixed(1)}</td>
     </tr>
   `).join('');
 }
 
 let chart = null;
-function renderChart(bonds, yMin) {
+function renderChart(bonds) {
   const ctx = document.getElementById('yieldChart').getContext('2d');
   const labels = bonds.map(b => fmtMMM(b.maturity));
   const askYields = bonds.map(b => (b.askYield * 100).toFixed(3));
@@ -393,14 +400,20 @@ function renderChart(bonds, yMin) {
         x: { display: true, title: { display: true, text: 'Maturity' } },
         y: { 
           display: true, 
-          title: { display: true, text: 'Yield (%)' },
-          min: isNaN(yMin) ? undefined : yMin
+          title: { display: true, text: 'Yield (%)' }
         }
       },
       plugins: {
         zoom: {
-          pan: { enabled: true, mode: 'x' },
-          zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' }
+          pan: { 
+            enabled: true, 
+            mode: 'x',
+          },
+          zoom: { 
+            wheel: { enabled: true }, 
+            pinch: { enabled: true }, 
+            mode: 'xy' 
+          }
         },
         tooltip: {
           callbacks: {
@@ -413,10 +426,23 @@ function renderChart(bonds, yMin) {
 
   document.getElementById('resetZoom').onclick = () => {
     chart.resetZoom();
-    chart.options.scales.x.min = undefined;
-    chart.options.scales.x.max = undefined;
-    chart.update();
   };
 }
+
+// Dynamic Pan Mode: X by default, Y when Ctrl is held
+window.addEventListener('keydown', (e) => {
+  if (e.ctrlKey && chart) {
+    chart.options.plugins.zoom.pan.mode = 'y';
+    chart.update('none');
+  }
+});
+window.addEventListener('keyup', (e) => {
+  if (!e.ctrlKey && chart) {
+    chart.options.plugins.zoom.pan.mode = 'x';
+    chart.update('none');
+  }
+});
+
+init();
 
 init();
