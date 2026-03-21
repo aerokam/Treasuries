@@ -347,21 +347,21 @@ function renderTable(bonds) {
 let chart = null;
 function renderChart(bonds) {
   const ctx = document.getElementById('yieldChart').getContext('2d');
-  const labels = bonds.map(b => fmtMMM(b.maturity));
-  const askYields = bonds.map(b => (b.askYield * 100).toFixed(3));
-  const saYields = bonds.map(b => (b.saYield * 100).toFixed(3));
-  const saoYields = bonds.map(b => (b.saoYield * 100).toFixed(3));
+  
+  // Use {x: timestamp, y: yield} for continuous linear scaling (fixing the "category zoom" issue)
+  const askData = bonds.map(b => ({ x: b.maturityDate.getTime(), y: (b.askYield * 100).toFixed(3) }));
+  const saData = bonds.map(b => ({ x: b.maturityDate.getTime(), y: (b.saYield * 100).toFixed(3) }));
+  const saoData = bonds.map(b => ({ x: b.maturityDate.getTime(), y: (b.saoYield * 100).toFixed(3) }));
 
   if (chart) chart.destroy();
 
   chart = new Chart(ctx, {
     type: 'line',
     data: {
-      labels: labels,
       datasets: [
         {
           label: 'Ask Yield (%)',
-          data: askYields,
+          data: askData,
           borderColor: '#cbd5e1', // Light gray
           backgroundColor: 'transparent',
           borderWidth: 1,
@@ -371,7 +371,7 @@ function renderChart(bonds) {
         },
         {
           label: 'SA Yield (%)',
-          data: saYields,
+          data: saData,
           borderColor: '#475569', // Darker gray
           borderDash: [5, 5],
           backgroundColor: 'transparent',
@@ -382,7 +382,7 @@ function renderChart(bonds) {
         },
         {
           label: 'SAO Yield (%)',
-          data: saoYields,
+          data: saoData,
           borderColor: '#1a56db', // Bold Blue
           backgroundColor: 'transparent',
           borderWidth: 3,
@@ -397,17 +397,32 @@ function renderChart(bonds) {
       maintainAspectRatio: false,
       interaction: { mode: 'index', intersect: false },
       scales: {
-        x: { display: true, title: { display: true, text: 'Maturity' } },
+        x: { 
+          type: 'linear',
+          display: true, 
+          title: { display: true, text: 'Maturity' },
+          ticks: {
+            callback: (val) => {
+              const date = new Date(val);
+              return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+            }
+          }
+        },
         y: { 
+          type: 'linear',
           display: true, 
           title: { display: true, text: 'Yield (%)' }
         }
       },
       plugins: {
         zoom: {
+          limits: {
+            x: { min: 'original', max: 'original' },
+            y: { min: 'original', max: 'original' }
+          },
           pan: { 
             enabled: true, 
-            mode: 'x',
+            mode: 'x', // Toggle to 'y' on Ctrl
           },
           zoom: { 
             wheel: { enabled: true }, 
@@ -417,6 +432,10 @@ function renderChart(bonds) {
         },
         tooltip: {
           callbacks: {
+            title: (items) => {
+              const date = new Date(items[0].parsed.x);
+              return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+            },
             label: (context) => `${context.dataset.label}: ${context.parsed.y}%`
           }
         }
@@ -429,15 +448,15 @@ function renderChart(bonds) {
   };
 }
 
-// Dynamic Pan Mode: X by default, Y when Ctrl is held
+// Dynamic Pan Mode: X by default, Y when Control is held
 window.addEventListener('keydown', (e) => {
-  if (e.ctrlKey && chart) {
+  if (e.key === 'Control' && chart) {
     chart.options.plugins.zoom.pan.mode = 'y';
     chart.update('none');
   }
 });
 window.addEventListener('keyup', (e) => {
-  if (!e.ctrlKey && chart) {
+  if (e.key === 'Control' && chart) {
     chart.options.plugins.zoom.pan.mode = 'x';
     chart.update('none');
   }
