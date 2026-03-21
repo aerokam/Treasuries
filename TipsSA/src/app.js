@@ -410,7 +410,7 @@ function renderChart(bonds) {
           order: 2 // Drawn in the middle
         },
         {
-          label: 'SA with Outlier Factor (SAO)',
+          label: 'SA with Outlier Adjustment (SAO)',
           data: saoData,
           borderColor: '#1a56db', // Bold Blue
           backgroundColor: '#1a56db',
