@@ -444,5 +444,3 @@ window.addEventListener('keyup', (e) => {
 });
 
 init();
-
-init();
