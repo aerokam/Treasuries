@@ -8,6 +8,7 @@ This repository contains multiple projects for Treasury Inflation-Protected Secu
   - `src/`: Core financial math (e.g., `bond-math.js`).
 - `TipsLadderManager/`: The browser-based tool for designing and rebalancing TIPS ladders.
 - `TipsSA/`: (New) TIPS Seasonal Adjustments project.
+- `YieldsMonitor/`: (New) Tool for monitoring real-time and historical Treasury yields.
 
 ## Development Workflow
 - **Shared Logic**: Always prioritize logic in `shared/src/` if it is applicable to more than one project.
@@ -16,3 +17,38 @@ This repository contains multiple projects for Treasury Inflation-Protected Secu
 
 ## Project Vision
 To provide a suite of transparent, first-principles tools for managing inflation-protected wealth, ensuring all calculations are traceable and educational.
+
+## Technical Standards and Context
+
+### URLs & Paths
+- **Local Testing**:
+  - TipsLadderManager: `http://localhost:8080/TipsLadderManager/`
+  - TipsSA: `http://localhost:8080/TipsSA/`
+  - YieldsMonitor: `http://localhost:8080/YieldsMonitor/`
+- **Production (GitHub Pages)**:
+  - Portal: `https://aerokam.github.io/TIPS/`
+  - TipsLadderManager: `https://aerokam.github.io/TIPS/TipsLadderManager/`
+  - TipsSA: `https://aerokam.github.io/TIPS/TipsSA/`
+  - YieldsMonitor: `https://aerokam.github.io/TIPS/YieldsMonitor/`
+- **E2E Tests**: Configured for port 8080 at `127.0.0.1`.
+- **Shell (Win32)**: Use `;` instead of `&&` as a command separator in PowerShell.
+- **Git Workflow**: All changes should be automatically committed and pushed after implementation.
+
+### TipsLadderManager Logic
+- **Rebalance Mode**: The DARA field MUST be cleared when the RefCPI date changes if the DARA was auto-inferred (prevents duration-mismatch and large negative net cash).
+- **Tolerance**: E2E tests use a $3,000 net cash tolerance ($1,000 for fresh inferences) to account for integer lot discretization.
+
+### TipsSA (Seasonal Adjustments) Logic
+- **Data Source**: Data is pulled from the R2 bucket (FedInvest prices/RefCPI).
+- **Yield Formulas**: 
+  - `SA Yield = Clean Price * (S_settle / S_maturity)`
+  - `SAO Yield = Backwards-anchored trend fitting (right-to-left) using linear regression on a sliding window.`
+- **Broker CSVs**: Use T+1 settlement and first-row-per-CUSIP for Ask prices.
+- **UI/Charts**: Uses Chart.js + Hammer.js + chartjs-plugin-zoom.
+- **Refinements**: 
+  - Apr 2026 yield is fixed to be lower than Jul 2026.
+  - 2027 maturities follow the smooth SA trend (reduced overcorrection).
+  - Y-MIN is in the prominent toolbar.
+  - Interaction: Full X/Y zoom and Ctrl-click-drag for vertical panning.
+  - Visual Emphasis: SAO > SA > Ask.
+- **Resolved Issues**: The zoom bug (hidden datasets in Y-axis range) is resolved by checking `chart.isDatasetVisible`.

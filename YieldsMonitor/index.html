@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Treasury Yields Monitor - TIPS Portal</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+<script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  body { font-family: system-ui, sans-serif; font-size: 13px; margin: 0; padding: 15px; color: #222; background: #f1f5f9; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+  
+  header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-shrink: 0; }
+  header h1 { font-size: 18px; margin: 0; display: flex; align-items: center; gap: 10px; }
+  .tz-info { font-size: 11px; color: #64748b; font-weight: normal; background: #e2e8f0; padding: 2px 8px; border-radius: 4px; }
+
+  .main-layout { display: flex; gap: 15px; flex: 1; min-height: 0; min-width: 0; }
+  
+  /* Sidebar / Controls */
+  .sidebar { width: 280px; background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 15px; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; flex-shrink: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+  
+  /* Content Area with Row Containers */
+  .content { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; min-width: 0; padding-right: 4px; }
+  
+  .row-section { display: flex; flex-direction: column; gap: 4px; min-height: 0; flex: 1; overflow: hidden; }
+  .row-title { font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-left: 5px; letter-spacing: 0.05em; flex-shrink: 0; }
+  
+  .chart-row { 
+    display: flex; 
+    flex-wrap: nowrap; /* Force single row */
+    gap: 10px; 
+    overflow-x: auto; 
+    overflow-y: hidden;
+    padding-bottom: 6px;
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+  }
+
+  .chart-card { 
+    background: #fff; 
+    border: 1px solid #cbd5e1; 
+    border-radius: 8px; 
+    padding: 8px; 
+    display: flex; 
+    flex-direction: column; 
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05); 
+    min-width: 250px; /* Smallest size before scrolling */
+    flex: 1 1 0%; /* Shrink/Grow evenly starting from 0 */
+    height: 100%;
+    overflow: hidden;
+  }
+
+  .chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; flex-shrink: 0; }
+  .chart-title { font-size: 12px; font-weight: 700; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .chart-container { flex: 1; position: relative; min-height: 0; width: 100%; }
+
+  .btn { padding: 4px 10px; font-size: 11px; background: #1e293b; color: #fff; border: none; border-radius: 4px; font-weight: 600; cursor: pointer; }
+  .btn-outline { background: #fff; color: #1e293b; border: 1px solid #cbd5e1; }
+  
+  footer { margin-top: 5px; font-size: 10px; color: #94a3b8; text-align: center; flex-shrink: 0; }
+
+  /* Custom Scrollbar for Rows */
+  .chart-row::-webkit-scrollbar { height: 6px; }
+  .chart-row::-webkit-scrollbar-track { background: #f8fafc; border-radius: 3px; }
+  .chart-row::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+  .chart-row::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Treasury Yields Monitor <span class="tz-info">Times are ET</span></h1>
+    <div style="display:flex; gap:8px;">
+      <button id="resetAllZoom" class="btn btn-outline">Reset All Zoom</button>
+      <button id="refreshAll" class="btn">Refresh Data</button>
+    </div>
+  </header>
+
+  <div class="main-layout">
+    <div class="sidebar" id="sidebar">
+      <div id="controls-root"></div>
+    </div>
+    
+    <div class="content">
+      <div class="row-section" id="tips-section">
+        <span class="row-title">TIPS Yields</span>
+        <div class="chart-row" id="tips-row"></div>
+      </div>
+      <div class="row-section" id="nominals-section">
+        <span class="row-title">Nominal Treasury Yields</span>
+        <div class="chart-row" id="nominals-row"></div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    For personal and educational use only. Data retrieved from public chart services. Yields represent market mid-prices and may vary by provider.
+  </footer>
+
+  <script type="module" src="src/app.js"></script>
+</body>
+</html>
