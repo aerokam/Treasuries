@@ -9,6 +9,7 @@ This repository contains multiple projects for Treasury Inflation-Protected Secu
 - `TipsLadderManager/`: The browser-based tool for designing and rebalancing TIPS ladders.
 - `TipsSA/`: (New) TIPS Seasonal Adjustments project.
 - `YieldsMonitor/`: (New) Tool for monitoring real-time and historical Treasury yields.
+- `TreasuryAuctions/`: (New) Tool for monitoring Treasury auction results.
 
 ## Development Workflow
 - **Shared Logic**: Always prioritize logic in `shared/src/` if it is applicable to more than one project.
@@ -25,11 +26,13 @@ To provide a suite of transparent, first-principles tools for managing inflation
   - TipsLadderManager: `http://localhost:8080/TipsLadderManager/`
   - TipsSA: `http://localhost:8080/TipsSA/`
   - YieldsMonitor: `http://localhost:8080/YieldsMonitor/`
+  - TreasuryAuctions: `http://localhost:8080/TreasuryAuctions/`
 - **Production (GitHub Pages)**:
   - Portal: `https://aerokam.github.io/TIPS/`
   - TipsLadderManager: `https://aerokam.github.io/TIPS/TipsLadderManager/`
   - TipsSA: `https://aerokam.github.io/TIPS/TipsSA/`
   - YieldsMonitor: `https://aerokam.github.io/TIPS/YieldsMonitor/`
+  - TreasuryAuctions: `https://aerokam.github.io/TIPS/TreasuryAuctions/`
 - **E2E Tests**: Configured for port 8080 at `127.0.0.1`.
 - **Shell (Win32)**: Use `;` instead of `&&` as a command separator in PowerShell.
 - **Git Workflow**: All changes should be automatically committed and pushed after implementation.

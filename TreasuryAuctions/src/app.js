@@ -86,12 +86,13 @@ function fieldLabel(f) {
 
 // ── Format detection by field name ────────────────────────────────────────────
 function detectFmt(f) {
-  if (f.includes('cpi')) return 'num3';
+  if (f.includes('cpi')) return 'num5';
   if (f.endsWith('_date') || f.endsWith('_dt')) return 'date';
   if (f.includes('_rate') || f.includes('_yield')) return 'pct3';
-  if (f.includes('price')) return 'num4';
+  if (f.includes('price')) return 'num6';
   if (f === 'bid_to_cover_ratio') return 'num2';
-  if (f.includes('ratio') || f.includes('accrued')) return 'num6';
+  if (f.includes('ratio')) return 'num5';
+  if (f.includes('accrued')) return 'num6';
   if (f.includes('amt') || f.includes('accepted') || f.includes('tendered')) return 'amt';
   return null;
 }
@@ -105,6 +106,7 @@ function fmtVal(v, fmt) {
     case 'num2': return isNaN(n) ? v : n.toFixed(2);
     case 'num3': return isNaN(n) ? v : n.toFixed(3);
     case 'num4': return isNaN(n) ? v : n.toFixed(4);
+    case 'num5': return isNaN(n) ? v : n.toFixed(5);
     case 'num6': return isNaN(n) ? v : n.toFixed(6);
     case 'amt':  return isNaN(n) ? v : n.toLocaleString();
     default:     return v;
