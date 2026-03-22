@@ -648,7 +648,7 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
 
     details.unshift({
       cusip: h.cusip, maturityStr: fmtDate(h.maturity), fundedYear: h.year,
-      coupon: b.coupon, price: b.price, baseCpi: b.baseCpi, refCPI, indexRatio: ir,
+      coupon: b.coupon, yield: b.yield, price: b.price, baseCpi: b.baseCpi, refCPI, indexRatio: ir,
       principalPerBond: 1000 * ir, costPerBond: (b.price / 100 * ir * 1000),
       DARA: daraByYear?.get(h.year) ?? DARA,
       qtyBefore: h.qty, qtyAfter: tQ,

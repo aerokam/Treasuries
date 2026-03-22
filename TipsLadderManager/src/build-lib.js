@@ -234,6 +234,7 @@ export function runBuild({ dara, firstYear: firstYearOpt, lastYear, tipsMap, ref
       cusip: bond.cusip,
       maturityStr: fmtDate(bond.maturity),
       coupon: bond.coupon ?? 0,
+      yield: bond.yield ?? 0,
       price: bond.price ?? 0,
       baseCpi: bond.baseCpi ?? refCPI,
       refCPI,

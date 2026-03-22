@@ -36,6 +36,7 @@ function bondVarRows(d, nPeriods, principalPerBond, couponPct) {
     + row('Index ratio', fd(d.refCPI, 5) + ' / ' + fd(d.baseCpi, 5), fd(d.indexRatio, 5))
     + row('Principal per bond', '1,000 \xd7 index ratio', fd(principalPerBond, 2))
     + row('Coupon per period', 'annual coupon / 2', couponPct)
+    + row('Yield', '', fd(d.yield * 100, 3) + '%')
     + row('Coupon periods in FY', '', nPerLbl);
 }
 

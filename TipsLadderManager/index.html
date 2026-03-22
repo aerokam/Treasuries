@@ -87,6 +87,17 @@
 
   #output     { display: none; }
   #build-output { display: none; }
+
+  /* ── Resize handles ── */
+  .resize-handle { position: absolute; z-index: 10; }
+  .resize-handle.n { top: -6px; left: 0; right: 0; height: 12px; cursor: ns-resize; }
+  .resize-handle.s { bottom: -6px; left: 0; right: 0; height: 12px; cursor: ns-resize; }
+  .resize-handle.e { right: -6px; top: 0; bottom: 0; width: 12px; cursor: ew-resize; }
+  .resize-handle.w { left: -6px; top: 0; bottom: 0; width: 12px; cursor: ew-resize; }
+  .resize-handle.nw { left: -6px; top: -6px; width: 16px; height: 16px; cursor: nwse-resize; }
+  .resize-handle.ne { right: -6px; top: -6px; width: 16px; height: 16px; cursor: nesw-resize; }
+  .resize-handle.sw { left: -6px; bottom: -6px; width: 16px; height: 16px; cursor: nesw-resize; }
+  .resize-handle.se { right: -6px; bottom: -6px; width: 16px; height: 16px; cursor: nwse-resize; }
 </style>
 <script data-goatcounter="https://tipsladder.goatcounter.com/count"
         async src="//gc.zgo.at/count.js"></script>
@@ -1308,6 +1319,13 @@ function _showTipsRefPopup() {
   for (const b of bonds) {
     const ref = tipsRefMap?.get(b.cusip);
     const ir = activeRefCPI / b.baseCpi;
+    let termY = ref?.term ?? '—';
+    if (termY.includes('30-Year 6-Month')) termY = '30.5';
+    else if (termY.includes('5-Year')) termY = '5';
+    else if (termY.includes('10-Year')) termY = '10';
+    else if (termY.includes('20-Year')) termY = '20';
+    else if (termY.includes('30-Year')) termY = '30';
+
     rows +=
       '<tr>' +
       '<td>' + b.cusip + '</td>' +
@@ -1315,8 +1333,10 @@ function _showTipsRefPopup() {
       '<td>' + fmtDate(ref?.datedDate) + '</td>' +
       '<td>' + fmtDate(b.maturity?.toLocaleDateString('en-CA')) + '</td>' +
       '<td style="text-align:right">' + fd(b.coupon * 100, 3) + '%</td>' +
-      '<td>' + (ref?.term ?? '—') + '</td>' +
+      '<td style="text-align:right">' + fd(b.yield * 100, 3) + '%</td>' +
+      '<td style="text-align:right">' + fd(b.price, 4) + '</td>' +
       '<td style="text-align:right">' + fd(ir, 5) + '</td>' +
+      '<td style="text-align:center">' + termY + '</td>' +
       '</tr>';
   }
 
@@ -1328,8 +1348,73 @@ document.getElementById('tipsref-close').addEventListener('click', () => {
   document.getElementById('tipsref-overlay').style.display = 'none';
 });
 document.getElementById('tipsref-overlay').addEventListener('click', e => {
+  if (window._tipsRefInteracting) return;
   if (e.target === e.currentTarget) e.currentTarget.style.display = 'none';
 });
+
+// ─── Draggable & Sizable TIPS ref modal ────────────────────────────────────────────────────────────────────────────
+{
+  const _modal = document.getElementById('tipsref-modal');
+  const _title = document.getElementById('tipsref-title');
+  let _active = false, _mode = null, _offX = 0, _offY = 0, _startW = 0, _startH = 0, _startX = 0, _startY = 0, _startL = 0, _startT = 0;
+
+  const onDown = (e, mode) => {
+    _active = true; _mode = mode;
+    window._tipsRefInteracting = true;
+    const r = _modal.getBoundingClientRect();
+    _modal.style.transform = 'none';
+    _modal.style.maxHeight = 'none';
+    _modal.style.maxWidth  = 'none';
+    _modal.style.left = r.left + 'px';
+    _modal.style.top  = r.top  + 'px';
+    _modal.style.width  = r.width  + 'px';
+    _modal.style.height = r.height + 'px';
+    _startL = r.left; _startT = r.top;
+    _startW = r.width; _startH = r.height;
+    _startX = e.clientX; _startY = e.clientY;
+    _offX = e.clientX - r.left; _offY = e.clientY - r.top;
+    e.preventDefault(); e.stopPropagation();
+  };
+
+  _title.addEventListener('mousedown', e => onDown(e, 'move'));
+  _modal.querySelectorAll('.resize-handle').forEach(h => {
+    const cls = h.className.split(' ').find(c => c.length <= 2);
+    h.addEventListener('mousedown', e => onDown(e, cls));
+  });
+
+  _modal.addEventListener('click', e => e.stopPropagation());
+
+  document.addEventListener('mousemove', e => {
+    if (!_active) return;
+    const dx = e.clientX - _startX, dy = e.clientY - _startY;
+    if (_mode === 'move') {
+      _modal.style.left = (e.clientX - _offX) + 'px';
+      _modal.style.top  = Math.max(0, e.clientY - _offY) + 'px';
+    } else {
+      if (_mode.includes('e')) _modal.style.width  = Math.max(400, _startW + dx) + 'px';
+      if (_mode.includes('s')) _modal.style.height = Math.max(200, _startH + dy) + 'px';
+      if (_mode.includes('w')) {
+        const w = Math.max(400, _startW - dx);
+        _modal.style.left = (_startL + (_startW - w)) + 'px';
+        _modal.style.width = w + 'px';
+      }
+      if (_mode.includes('n')) {
+        const h = Math.max(200, _startH - dy);
+        const top = _startT + (_startH - h);
+        if (top >= 0) {
+          _modal.style.top = top + 'px';
+          _modal.style.height = h + 'px';
+        }
+      }
+    }
+  });
+  document.addEventListener('mouseup', () => {
+    if (_active) {
+      _active = false;
+      setTimeout(() => { window._tipsRefInteracting = false; }, 50);
+    }
+  });
+}
 
 loadData();
 </script>
@@ -1352,21 +1437,25 @@ loadData();
 
 <!-- TIPS Ref popup -->
 <div id="tipsref-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:150;overflow:hidden;">
-  <div style="background:#fff;max-width:720px;margin:60px auto;border-radius:8px;padding:20px 24px;position:relative;max-height:calc(100vh - 120px);display:flex;flex-direction:column;box-shadow:0 4px 18px rgba(0,0,0,.18);">
-    <button id="tipsref-close" style="position:absolute;top:10px;right:12px;background:none;border:none;font-size:22px;color:#888;cursor:pointer;padding:0;line-height:1;">×</button>
-    <div id="tipsref-title" style="font-size:13px;font-weight:700;color:#1e293b;margin-bottom:8px;padding-right:24px;"></div>
+  <div id="tipsref-modal" style="background:#fff;width:720px;min-width:400px;min-height:200px;border-radius:8px;padding:20px 24px;position:fixed;top:60px;left:50%;transform:translateX(-50%);max-height:calc(100vh - 120px);display:flex;flex-direction:column;box-shadow:0 4px 18px rgba(0,0,0,.18);overflow:visible;">
+    <div class="resize-handle n"></div><div class="resize-handle s"></div><div class="resize-handle e"></div><div class="resize-handle w"></div>
+    <div class="resize-handle nw"></div><div class="resize-handle ne"></div><div class="resize-handle sw"></div><div class="resize-handle se"></div>
+    <button id="tipsref-close" style="position:absolute;top:10px;right:12px;background:none;border:none;font-size:22px;color:#888;cursor:pointer;padding:0;line-height:1;z-index:20;">×</button>
+    <div id="tipsref-title" style="font-size:13px;font-weight:700;color:#1e293b;margin-bottom:8px;padding-right:24px;border-bottom:2px solid #1e293b;padding-bottom:6px;cursor:move;user-select:none;"></div>
     <div id="tipsref-warn" style="display:none;margin-bottom:8px;padding:6px 10px;background:#fee2e2;border:1px solid #fca5a5;border-radius:4px;font-size:12px;color:#991b1b;font-weight:600;"></div>
     <div style="overflow:auto;flex:1;">
       <table class="simple" style="width:100%;">
         <thead>
           <tr>
             <th style="text-align:left">CUSIP</th>
-            <th>RefCPI</th>
+            <th>Base CPI</th>
             <th style="text-align:left">Dated Date</th>
             <th style="text-align:left">Maturity</th>
             <th>Coupon</th>
-            <th style="text-align:left">Term</th>
+            <th>Yield</th>
+            <th>Price</th>
             <th>Index Ratio</th>
+            <th style="text-align:center">Term (y)</th>
           </tr>
         </thead>
         <tbody id="tipsref-tbody"></tbody>

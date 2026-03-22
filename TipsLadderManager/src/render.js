@@ -13,6 +13,7 @@ function fmtCell(v, fmt) {
     const r = Math.round(v);
     return (r > 0 ? '+' : '') + r.toLocaleString('en-US');
   }
+  if (fmt === 'yld') return typeof v === 'number' ? (v * 100).toFixed(3) + '%' : String(v ?? '');
   return typeof v === 'number' ? Math.round(v).toLocaleString('en-US') : String(v ?? '');
 }
 
@@ -29,6 +30,8 @@ export const COLS = [
     value: d => d.cusip,       subValue: d => d.cusip },
   { label: 'Maturity',    key: 'maturity',    fmt: 'str',
     value: d => d.maturityStr, subValue: d => d.maturityStr },
+  { label: 'Yield',       key: 'yield',       fmt: 'yld', buildOnly: true,
+    value: d => d.yield },
   { label: 'Funded Year', headerHTML: 'Funded<br>Year', key: 'fundedYear',  fmt: 'fy',
     value: (d, ri, details) => (ri === details.length - 1 || details[ri+1].fundedYear !== d.fundedYear) ? d.fundedYear : '',
     subValue: () => 'Gap' },
