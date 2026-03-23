@@ -48,6 +48,12 @@ const liveCache = {}; // symbol -> points (5D real-time tip)
 let activeSymbols = new Set(['US10YTIPS', 'US30YTIPS', 'US10Y', 'US30Y']);
 let activeRange = '2D';
 
+const SYMBOL_LABELS = {
+  'US1M': '1-Month', 'US2M': '2-Month', 'US3M': '3-Month', 'US6M': '6-Month',
+  'US1Y': '1-Year', 'US2Y': '2-Year', 'US5Y': '5-Year', 'US10Y': '10-Year', 'US30Y': '30-Year',
+  'US1YTIPS': '1-Year', 'US2YTIPS': '2-Year', 'US5YTIPS': '5-Year', 'US10YTIPS': '10-Year', 'US30YTIPS': '30-Year'
+};
+
 async function init() {
   setupUI();
   syncChartContainers();
@@ -77,11 +83,12 @@ function setupUI() {
   const createGrid = (syms) => syms.map(sym => {
     const idx = Object.keys(AVAILABLE_SYMBOLS).indexOf(sym);
     const color = COLORS[idx % COLORS.length];
+    const label = SYMBOL_LABELS[sym] || sym;
     return `
       <label class="sym-item-check" id="label-${sym}">
         <input type="checkbox" value="${sym}" ${activeSymbols.has(sym) ? 'checked' : ''}>
         <span class="color-dot" style="background:${color}"></span>
-        <span class="sym-code">${sym}</span>
+        <span class="sym-code">${label}</span>
         <span class="sym-yield" id="yield-${sym}">---</span>
         <span class="sym-change" id="change-${sym}"></span>
       </label>
@@ -93,7 +100,9 @@ function setupUI() {
       .range-picker { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 20px; }
       .range-btn { flex: 1; min-width: 45px; padding: 6px 0; border: 1px solid #cbd5e1; background: #fff; border-radius: 4px; cursor: pointer; font-weight: 600; font-size: 11px; color: #000; }
       .range-btn.active { background: #0f172a; color: #fff; border-color: #0f172a; }
-      .sym-group h4 { margin: 12px 0 6px; font-size: 10px; text-transform: uppercase; color: #000; font-weight: 800; letter-spacing: 0.05em; border-bottom: 1px solid #cbd5e1; padding-bottom: 2px; }
+      .sym-group h4 { display: flex; justify-content: space-between; align-items: center; margin: 12px 0 6px; font-size: 10px; text-transform: uppercase; color: #000; font-weight: 800; letter-spacing: 0.05em; border-bottom: 1px solid #cbd5e1; padding-bottom: 2px; }
+      .clear-btn { font-size: 9px; color: #64748b; cursor: pointer; text-transform: none; font-weight: 600; }
+      .clear-btn:hover { color: #0f172a; text-decoration: underline; }
       .sym-item-check { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 11px; cursor: pointer; color: #000; }
       .sym-item-check input { margin: 0; }
       .color-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
@@ -107,13 +116,29 @@ function setupUI() {
     </style>
     <div class="range-picker">${rangeHtml}</div>
     <div class="sym-group">
-      <h4>TIPS</h4>
+      <h4>TIPS <span class="clear-btn" data-type="TIPS">Clear All</span></h4>
       ${createGrid(tips)}
-      <h4>Nominal Treasuries</h4>
+      <h4>Nominal Treasuries <span class="clear-btn" data-type="Nominal">Clear All</span></h4>
       ${createGrid(nominals)}
     </div>
     <div id="fetchStatus">Ready</div>
   `;
+
+  document.querySelectorAll('.clear-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const isTips = e.target.dataset.type === 'TIPS';
+      Object.keys(AVAILABLE_SYMBOLS).forEach(sym => {
+        if (isTips && sym.endsWith('TIPS')) activeSymbols.delete(sym);
+        else if (!isTips && !sym.endsWith('TIPS')) activeSymbols.delete(sym);
+      });
+      document.querySelectorAll('.sym-item-check input').forEach(cb => {
+        const sym = cb.value;
+        cb.checked = activeSymbols.has(sym);
+      });
+      syncChartContainers();
+      updateAllData();
+    });
+  });
 
   document.querySelectorAll('.range-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
@@ -159,9 +184,11 @@ function syncChartContainers() {
       const card = document.createElement('div');
       card.className = 'chart-card';
       card.id = `card-${sym}`;
+      const groupLabel = sym.endsWith('TIPS') ? 'TIPS' : 'Nominal';
+      const maturityLabel = SYMBOL_LABELS[sym] || sym;
       card.innerHTML = `
         <div class="chart-header">
-          <span class="chart-title">${AVAILABLE_SYMBOLS[sym]} (${sym})</span>
+          <span class="chart-title">${maturityLabel} ${groupLabel} Yield</span>
         </div>
         <div class="chart-container"><canvas id="chart-${sym}"></canvas></div>
       `;
