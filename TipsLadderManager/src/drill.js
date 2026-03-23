@@ -128,12 +128,12 @@ export function buildDrillHTML(d, colKey, summary) {
       const mo = MONTHS[h.maturityMonth];
       const yr = String(h.maturityYear).slice(2);
       rows += row(mo + ' \u2019' + yr + ' \xd7 ' + h.qty, '<span class="drill-l3" data-l3="pipb-' + i + '" style="cursor:pointer;text-decoration:underline dotted #94a3b8;">' + fm2(piPB) + '/bond</span>', fm(hTotal));
-      }
-      rows += sep()
+    });
+    rows += sep()
       + row('Funded year TIPS subtotal', '', fm(ownSum))
       + row('Later maturity interest', 'from TIPS maturing after FY', fm(laterMatInt), false, undefined, 'lmi')
       + sep()
-      + row(isBef ? 'Amount Before' : 'Amount After', 'Funded year TIPS + <span class="formula-var" data-source="lmi">Later mat int</span>', fm(araTotal), true);
+      + row(isBef ? 'Amount Before' : 'Amount After', 'Funded year TIPS + <span class="formula-var" data-source="lmi">Later mat int</span>', fm(araTotal), true)
       + sep()
       + row('DARA', '', fm(DARA), false, undefined, 'dara')
       + row('Surplus / Deficit', (isBef ? 'Amount Before' : 'Amount After') + ' \u2212 <span class="formula-var" data-source="dara">DARA</span>',

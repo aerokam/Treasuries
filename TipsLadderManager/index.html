@@ -196,13 +196,7 @@
     <div class="fields">
       <div class="field" id="field-holdings">
         <label>Holdings CSV</label>
-        <div style="display:flex;flex-direction:column;gap:4px">
-          <div style="display:flex;align-items:center;gap:6px">
-            <button type="button" onclick="document.getElementById('holdings-file').click()" style="background:#64748b;padding:3px 10px;font-size:11px">Choose File</button>
-            <input type="file" id="holdings-file" accept=".csv" style="display:none">
-          </div>
-          <span id="holdings-filename" style="font-size:11px;color:#475569;font-weight:600;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1"></span>
-        </div>
+        <input type="file" id="holdings-file" accept=".csv">
       </div>
       <div class="field">
         <label>DARA ($)</label>
@@ -302,6 +296,8 @@ import { fetchTipsData, lookupRefCpi } from './src/data.js';
 window.lookupRefCpi = lookupRefCpi;
 import { parseBrokerCSV } from './src/broker-import.js';
 
+const toIso = d => d ? d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0') : '';
+
 const simpleEl = document.getElementById('simple-table');
 const tableEl  = document.getElementById('build-table');
 
@@ -320,16 +316,26 @@ document.getElementById('help-overlay').addEventListener('click', e => {
 let tipsMap = null, refCpiRows = null, settlementDate = null, tipsRefMap = null;
 
 async function loadData() {
+  console.log('loadData() started');
   const dataInfo = document.getElementById('info-strip');
   try {
+    console.log('Fetching market data from R2...');
     const { yieldsRows, refCpiRows: rows, tipsRefRows } = await fetchTipsData();
+    console.log('Market data fetched. yields:', yieldsRows.length, 'refCpi:', rows.length, 'tipsRef:', tipsRefRows.length);
+    
     refCpiRows = rows;
     _maxRefCpiDate = rows.length ? rows[rows.length - 1].date : null;
     tipsRefMap = new Map(tipsRefRows.map(r => [r.cusip, r]));
+    
     const settleDateStr = yieldsRows[0]?.settlementDate;
+    console.log('Settlement date from CSV:', settleDateStr);
     if (!settleDateStr) throw new Error('TipsYields.csv has no settlementDate');
+    
     settlementDate = localDate(settleDateStr);
+    console.log('Parsed settlement date:', settlementDate);
+    
     tipsMap = buildTipsMapFromYields(yieldsRows);
+    console.log('TipsMap built with', tipsMap.size, 'entries');
 
     // Compute TIPS years and gap years within the TIPS timeline
     const bfsYears = [...new Set(
@@ -337,6 +343,8 @@ async function loadData() {
         .filter(b => b.maturity && b.maturity > settlementDate)
         .map(b => b.maturity.getFullYear())
     )].sort((a, b) => a - b);
+    console.log('BFS Years:', bfsYears);
+    
     const _bfsYearSet = new Set(bfsYears);
     const _bfsMinY = bfsYears[0], _bfsMaxY = bfsYears[bfsYears.length - 1];
     const _bfsGapYears = new Set();
@@ -344,7 +352,7 @@ async function loadData() {
       if (!_bfsYearSet.has(y)) _bfsGapYears.add(y);
     }
 
-    // Populate last-year dropdown (TIPS years + gap years, labeled)
+    // Populate last-year dropdown
     const lastYearSel = document.getElementById('last-year');
     while (lastYearSel.options.length > 1) lastYearSel.remove(1);
     for (let y = _bfsMinY; y <= _bfsMaxY; y++) {
@@ -364,25 +372,29 @@ async function loadData() {
     });
     firstYearSel.value = bfsYears[0] || '';
 
-        const _matYears = new Set([...tipsMap.values()]
-          .filter(b => b.maturity > settlementDate).map(b => b.maturity.getFullYear()));
-        const _sortedYrs = [..._matYears].sort((a, b) => a - b);
-        const _gaps = [];
-        for (let y = _sortedYrs[0]; y <= _sortedYrs[_sortedYrs.length - 1]; y++)
-          if (!_matYears.has(y)) _gaps.push(y);
-        const _gapSuffix = _gaps.length
-          ? ', none for ' + _gaps[0] + '–' + _gaps[_gaps.length - 1] + ' (gap years)'
-          : '';
-        _staticInfoPrefix = 'Market data as of ' + settleDateStr;
-        _staticInfoSuffix = ' · <a class="info-link tips-ref-link">' + yieldsRows.length + ' TIPS</a>' + _gapSuffix;
-        _staticInfo = _buildStaticInfo();
-        dataInfo.innerHTML = '<div class="info-row">' + _staticInfo + '</div>';
+    const _matYears = new Set([...tipsMap.values()]
+      .filter(b => b.maturity > settlementDate).map(b => b.maturity.getFullYear()));
+    const _sortedYrs = [..._matYears].sort((a, b) => a - b);
+    const _gaps = [];
+    for (let y = _sortedYrs[0]; y <= _sortedYrs[_sortedYrs.length - 1]; y++)
+      if (!_matYears.has(y)) _gaps.push(y);
+    const _gapSuffix = _gaps.length
+      ? ', none for ' + _gaps[0] + '–' + _gaps[_gaps.length - 1] + ' (gap years)'
+      : '';
+    
+    _staticInfoPrefix = 'Market data as of ' + settleDateStr;
+    _staticInfoSuffix = ' · <a class="info-link tips-ref-link">' + yieldsRows.length + ' TIPS</a>' + _gapSuffix;
+    _staticInfo = _buildStaticInfo();
+    dataInfo.innerHTML = '<div class="info-row">' + _staticInfo + '</div>';
+    
+    console.log('Enabling run-btn');
     document.getElementById('run-btn').disabled = false;
 
     // Pre-populate sample holdings if no file already selected
     const fileInput = document.getElementById('holdings-file');
     if (!fileInput.files.length) {
       try {
+        console.log('Attempting to load sample CSV...');
         let samplePath = './tests/CusipQtyTestLumpy.csv';
         let sampleRes = await fetch(samplePath);
         if (!sampleRes.ok) {
@@ -397,14 +409,19 @@ async function loadData() {
           const dt = new DataTransfer();
           dt.items.add(file);
           fileInput.files = dt.files;
+          
+          // Use manual filename update since we reverted to native input
           const nameSpan = document.getElementById('holdings-filename');
           if (nameSpan) nameSpan.textContent = file.name;
+          
+          console.log('Dispatching change event for sample file');
           fileInput.dispatchEvent(new Event('change'));
           
           // Auto-run once data is settled
           let autoRunRetries = 0;
           const autoRun = () => {
             if (!document.getElementById('run-btn').disabled) {
+              console.log('Auto-running initial rebalance');
               document.getElementById('run-btn').click();
             } else if (autoRunRetries < 50) { // Cap at 5s
               autoRunRetries++;
@@ -413,9 +430,10 @@ async function loadData() {
           };
           autoRun();
         }
-      } catch (_) { /* sample load failure is non-fatal */ }
+      } catch (e) { console.warn('Sample load failed:', e); }
     }
   } catch (err) {
+    console.error('loadData fatal error:', err);
     dataInfo.textContent = '';
     _staticInfo = '';
     setStatus('Failed to load market data: ' + err.message, true);
@@ -972,7 +990,7 @@ document.getElementById('run-btn').addEventListener('click', async () => {
   setStatus('');
 
   try {
-    const settleDateStr = settlementDate.toLocaleDateString('en-CA');
+    const settleDateStr = toIso(settlementDate);
     const refCPI = lookupRefCpi(refCpiRows, activeRefCpiDateStr ?? settleDateStr);
 
     if (currentMode === 'build') {
@@ -1253,7 +1271,7 @@ function _parseMDY(s) {
   return yyyy + '-' + String(mm).padStart(2, '0') + '-' + String(dd).padStart(2, '0');
 }
 function _buildStaticInfo() {
-  const _date = activeRefCpiDateStr ?? (settlementDate ? settlementDate.toLocaleDateString('en-CA') : null);
+  const _date = activeRefCpiDateStr ?? (settlementDate ? toIso(settlementDate) : null);
   if (!_date || !refCpiRows) return _staticInfoPrefix + _staticInfoSuffix;
   let _val;
   try { _val = lookupRefCpi(refCpiRows, _date); } catch(e) { return _staticInfoPrefix + _staticInfoSuffix; }
@@ -1387,7 +1405,7 @@ document.getElementById('refcpi-reset-btn').addEventListener('click', () => {
 // ─── TIPS Ref popup ───────────────────────────────────────────────────────────
 function _showTipsRefPopup() {
   if (!tipsMap || !refCpiRows) return;
-  const dateStr = activeRefCpiDateStr ?? settlementDate.toLocaleDateString('en-CA');
+  const dateStr = activeRefCpiDateStr ?? toIso(settlementDate);
   const activeRefCPI = lookupRefCpi(refCpiRows, dateStr);
   const activeLabel = _fmtMDY(dateStr);
 
@@ -1420,7 +1438,7 @@ function _showTipsRefPopup() {
       '<td>' + b.cusip + '</td>' +
       '<td style="text-align:right">' + fd(b.baseCpi, 5) + '</td>' +
       '<td>' + fmtDate(ref?.datedDate) + '</td>' +
-      '<td>' + fmtDate(b.maturity?.toLocaleDateString('en-CA')) + '</td>' +
+      '<td>' + fmtDate(toIso(b.maturity)) + '</td>' +
       '<td style="text-align:right">' + fd(b.coupon * 100, 3) + '%</td>' +
       '<td style="text-align:right">' + fd(b.yield * 100, 3) + '%</td>' +
       '<td style="text-align:right">' + fd(b.price, 4) + '</td>' +

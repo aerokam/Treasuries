@@ -497,7 +497,7 @@ test('rebalance: no negative Qty After values at low DARA', async ({ page }) => 
   let qtyAfterIdx = -1;
   for (let i = 0; i < headerCount; i++) {
     const text = (await headers.nth(i).textContent() ?? '').replace(/\s+/g, ' ').trim().toLowerCase();
-    if (text.includes('qty') && text.includes('after')) { qtyAfterIdx = i; break; }
+    if ((text.includes('qty') || text.includes('quantity')) && text.includes('after')) { qtyAfterIdx = i; break; }
   }
   expect(qtyAfterIdx, 'Qty After column not found in table header').toBeGreaterThanOrEqual(0);
 
