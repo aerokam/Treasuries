@@ -61,10 +61,19 @@ async function fetchTipsPrices() {
   if (!csvRes.ok)  throw new Error(`FedInvest CSV HTTP ${csvRes.status}`);
   const [html, text] = await Promise.all([htmlRes.text(), csvRes.text()]);
 
-  // "Prices For: Mar 23, 2026" → YYYY-MM-DD
-  const m = html.match(/Prices For:\s+(\w{3})\s+(\d+),\s+(\d{4})/);
-  if (!m) throw new Error('Could not parse settlement date from FedInvest response');
-  const settleDateStr = new Date(+m[3], months[m[1]], +m[2]).toLocaleDateString('en-CA');
+  // Handle both "2026 Mar 23" and "Mar 23, 2026" formats
+  const m1 = html.match(/Prices For:\s+(\d{4})\s+(\w{3})\s+(\d+)/);
+  const m2 = html.match(/Prices For:\s+(\w{3})\s+(\d+),\s+(\d{4})/);
+
+  let y, mon, d;
+  if (m1) {
+    [ , y, mon, d] = m1;
+  } else if (m2) {
+    [ , mon, d, y] = m2;
+  } else {
+    throw new Error('Could not parse settlement date from FedInvest response');
+  }
+  const settleDateStr = new Date(+y, months[mon], +d).toLocaleDateString('en-CA');
 
   const rows = text.trim().split('\n')
     .filter(l => /^[A-Z0-9]{9},/.test(l))   // CUSIP data rows only
