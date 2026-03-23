@@ -124,15 +124,15 @@
 
     <h3 style="font-size:13px;margin:16px 0 6px;border-bottom:1px solid #eee;padding-bottom:4px;">Key Concepts</h3>
     <p><b>DARA</b> — Desired Annual Real Amount. Your target annual amount in today's (inflation-adjusted) dollars. Each rung is sized to produce this amount.</p>
-    <p><b>Gap Years</b> — Years with no issued TIPS (currently 2037–2039). The ladder holds excess bonds in <b>bracket</b> years flanking the gap to match the average duration of the missing maturities.</p>
-    <p><b>Bracket Years</b> — <i>Upper bracket</i>: always the Feb 2040 TIPS. <i>Lower bracket</i>: for Build and 2-bracket Rebalance, the latest issued 10-year TIPS before the gap; for Rebalance, defaults to the TIPS before the gap with the largest existing holdings (original lower). In <i>3-bracket mode</i>, the original lower bracket excess is held as-is; a second lower bracket (the Jan TIPS just before the gap — "new lower") is bought to supplement. Excess bonds in bracket years duration-match the gap.</p>
+    <p><b>Gap Years</b> — Years with no issued TIPS (currently 2037–2039). The ladder holds additional TIPS in <b>bracket</b> years flanking the gap to match the average duration of the missing maturities.</p>
+    <p><b>Bracket Years</b> — <i>Upper bracket</i>: always the Feb 2040 TIPS. <i>Lower bracket</i>: for Build and 2-bracket Rebalance, the latest issued 10-year TIPS before the gap; for Rebalance, defaults to the TIPS before the gap with the largest existing holdings (original lower). In <i>3-bracket mode</i>, the original lower bracket excess is held as-is; a second lower bracket (the Jan TIPS just before the gap — "new lower") is bought to supplement. Additional TIPS in bracket years duration-match the gap.</p>
     <p><b>Ref CPI</b> — Reference CPI value used for all inflation adjustments. Defaults to the settlement date. Click the Ref CPI value in the info strip to override the reference date (useful for projecting with a future or past CPI). Changing it clears any auto-inferred DARA.</p>
 
     <h3 style="font-size:13px;margin:16px 0 6px;border-bottom:1px solid #eee;padding-bottom:4px;">Traceability & Deep Drill</h3>
     <p>Every number in the UI is explainable. Click any underlined value (like Amount or Cost) to open a <b>Level 2</b> drill-down showing the calculation chain. Inside those popups, you can click variables like <b>Index Ratio</b> or <b>Ref CPI</b> for a <b>Level 3</b> breakdown of the underlying math and <b>Level 4</b> deep-links to the official Code of Federal Regulations.</p>
 
     <h3 style="font-size:13px;margin:16px 0 6px;border-bottom:1px solid #eee;padding-bottom:4px;">Mode: Rebalance</h3>
-    <p>For existing TIPS ladder holders. Sells excess bracket bonds and buys into newly available maturities (former gap years). Support for extending the ladder beyond 2040 is included.</p>
+    <p>For existing TIPS ladder holders. Sells excess bracket TIPS and buys into newly available maturities (former gap years). Support for extending the ladder beyond 2040 is included.</p>
     <p><b>Last Year</b> — Automatically detected from holdings. If your last maturity is 2040, it defaults to 2040 (or the last gap year, 2039). If your holdings end before 2040, that year is used. You can override this to extend the ladder to 2041+; the tool will identify the appropriate TIPS for those years automatically.</p>
     <p><b>Brackets</b> — <i>2-bracket</i>: standard lower + upper split (lower bracket = TIPS with most holdings before the gap). <i>3-bracket</i>: original lower bracket excess is frozen; a new lower bracket (latest Jan 10-year TIPS before the gap) is bought to supplement, allowing a more duration-efficient split. Use when the new lower TIPS now exists and you want to minimize disturbance to your existing lower holdings.</p>
     <p><b>Holdings CSV</b> — Two columns: <code>cusip</code> and <code>qty</code>. A sample is pre-filled when you click the file input.</p>
@@ -153,7 +153,7 @@
     <p><b>Total Cost</b> — full ladder purchase cost.</p>
 
     <h3 style="font-size:13px;margin:16px 0 6px;border-bottom:1px solid #eee;padding-bottom:4px;">Duration Matching</h3>
-    <p>Synthetic TIPS are created for gap years using yield interpolation between the bracket anchors. Excess bonds are split between brackets so their weighted duration matches the average duration of the gap years:</p>
+    <p>Synthetic TIPS are created for gap years using yield interpolation between the bracket anchors. Additional TIPS are split between brackets so their weighted duration matches the average duration of the gap years:</p>
     <pre style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:4px;padding:8px;font-size:12px;margin:6px 0;">2-bracket:  lowerWeight × lowerDur + upperWeight × upperDur = gapAvgDur
 3-bracket:  w1 (orig lower, fixed) + w2 (new lower) + w3 (upper) = 1
             w1×d1 + w2×d2 + w3×d3 = gapAvgDur  →  unique solution given w1</pre>
@@ -671,7 +671,7 @@ document.getElementById('holdings-file').addEventListener('change', async (e) =>
           const count = parsedAccounts[name].reduce((s, p) => s + p.qty, 0);
           return `<label style="display:flex;align-items:center;margin-bottom:8px;cursor:pointer;font-size:13px;">
             <input type="checkbox" value="${esc(name)}" checked style="margin-right:8px;width:16px;height:16px;">
-            <b>${esc(name)}</b> <span style="color:#64748b;margin-left:6px;font-size:12px;">(${pos} TIPS, ${count} bonds)</span>
+            <b>${esc(name)}</b> <span style="color:#64748b;margin-left:6px;font-size:12px;">(${pos} positions, ${count} units)</span>
           </label>`;
         }).join('');
         document.getElementById('account-overlay').style.display = 'block';
@@ -1123,20 +1123,20 @@ document.addEventListener('keydown', e => {
 // ─── Info-link + header click handler ──────────────────────────────
 const POPUP_TITLES = { range: 'Rebalance Range', duration: 'Duration Calculations' };
 const COL_HELP = {
-  cusip:      [{ label: '9-character bond identifier' }],
-  maturity:   [{ label: 'Bond maturity date' }],
-  fundedYear: [{ label: 'Calendar year this bond’s cash flows are designated to fund' }],
-  amtBefore:  [{ label: 'Annual Real Amount (ARA) — inflation-adjusted funded-year income', note: 'qty × (adjusted principal + own coupon) + coupon amount from longer-maturity bonds' }],
-  amtAfter:   [{ label: 'Annual Real Amount (ARA) after rebalance', note: 'qty × (adjusted principal + own coupon) + coupon amount from longer-maturity bonds' }],
-  costBefore: [{ label: 'Total purchase cost of current holdings', note: 'qty × cost per bond' }],
-  costAfter:  [{ label: 'Total purchase cost after rebalance', note: 'qty × cost per bond' }],
-  qtyBefore:  [{ label: 'Number of bonds currently held' }],
-  qtyAfter:   [{ label: 'Number of bonds after rebalance' }],
+  cusip:      [{ label: '9-character CUSIP identifier' }],
+  maturity:   [{ label: 'TIPS maturity date' }],
+  fundedYear: [{ label: 'Calendar year this TIPS’s cash flows are designated to fund' }],
+  amtBefore:  [{ label: 'Annual Real Amount (ARA) — inflation-adjusted funded-year income', note: 'Quantity × (Par Value + own coupon) + coupon amount from longer-maturity TIPS' }],
+  amtAfter:   [{ label: 'Annual Real Amount (ARA) after rebalance', note: 'Quantity × (Par Value + own coupon) + coupon amount from longer-maturity TIPS' }],
+  costBefore: [{ label: 'Total purchase cost of current holdings', note: 'Quantity × cost per TIPS' }],
+  costAfter:  [{ label: 'Total purchase cost after rebalance', note: 'Quantity × cost per TIPS' }],
+  qtyBefore:  [{ label: 'Quantity currently held (units of $1,000)' }],
+  qtyAfter:   [{ label: 'Quantity after rebalance (units of $1,000)' }],
   qtyDelta:   [{ label: 'Change in quantity (after − before)', note: 'Negative = sell, positive = buy' }],
-  cashDelta:  [{ label: 'Net cash flow from this rung', note: '−(qtyΔ × cost/bond). Negative = cash out.' }],
-  amount:     [{ label: 'Annual Real Amount (ARA) — inflation-adjusted funded-year income', note: 'qty × (adjusted principal + own coupon) + coupon amount from longer-maturity bonds' }],
-  cost:       [{ label: 'Total purchase cost for this rung', note: 'qty × cost per bond' }],
-  qty:        [{ label: 'Number of bonds to buy' }],
+  cashDelta:  [{ label: 'Net cash flow from this rung', note: '−(qtyΔ × cost per TIPS). Negative = cash out.' }],
+  amount:     [{ label: 'Annual Real Amount (ARA) — inflation-adjusted funded-year income', note: 'Quantity × (Par Value + own coupon) + coupon amount from longer-maturity TIPS' }],
+  cost:       [{ label: 'Total purchase cost for this rung', note: 'Quantity × cost per TIPS' }],
+  qty:        [{ label: 'Quantity to buy (units of $1,000)' }],
 };
 document.addEventListener('click', e => {
   // Close RefCPI picker on outside click

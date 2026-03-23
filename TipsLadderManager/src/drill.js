@@ -37,7 +37,7 @@ function bondVarRows(d, nPeriods, principalPerBond, couponPct) {
   return row('Ref CPI', '', fd(d.refCPI, 5), false, 'refCPI', 'refcpi')
     + row('Dated Ref CPI', '', fd(d.baseCpi, 5), false, undefined, 'basecpi')
     + row('Index ratio', '<span class="formula-var" data-source="refcpi">Ref CPI</span> \xf7 <span class="formula-var" data-source="basecpi">Dated Ref CPI</span>', fd(d.indexRatio, 5), false, 'indexRatio', 'ir')
-    + row('Principal per bond', '1,000 \xd7 <span class="formula-var" data-source="ir">index ratio</span>', fd(principalPerBond, 2), false, undefined, 'ppb')
+    + row('Par Value per TIPS', '1,000 \xd7 <span class="formula-var" data-source="ir">index ratio</span>', fd(principalPerBond, 2), false, undefined, 'ppb')
     + row('Coupon per period', 'annual coupon \xf7 2', couponPct, false, undefined, 'cpp')
     + row('Yield', '', fd(d.yield * 100, 3) + '%')
     + row('Coupon periods in FY', '', nPerLbl, false, undefined, 'cp');
@@ -58,13 +58,13 @@ export function buildDrillHTML(d, colKey, summary) {
       ? 'Principal + Coupons + <span class="formula-var" data-source="lmi">Later mat int</span> + Pre-ladder credit'
       : 'Principal + Coupons + <span class="formula-var" data-source="lmi">Later mat int</span>';
     rows =
-      row('Qty', '', d.fundedYearQty + ' bonds', false, undefined, 'qty') +
+      row('Quantity', '', d.fundedYearQty, false, undefined, 'qty') +
       sep() +
       bondVarRows(d, nPeriods, principalPerBond, couponPct) +
       sep() +
-      row('Principal', '<span class="formula-var" data-source="ppb">principal/bond</span> \xd7 <span class="formula-var" data-source="qty">qty</span>', fm(d.fundedYearPrincipalTotal)) +
-      row(couponLabel, '<span class="formula-var" data-source="ppb">principal/bond</span> \xd7 <span class="formula-var" data-source="cpp">coupon/period</span> \xd7 <span class="formula-var" data-source="cp">periods</span> \xd7 <span class="formula-var" data-source="qty">qty</span>', fm(d.fundedYearOwnRungInt)) +
-      row('Later maturity interest', 'from bonds maturing after ' + d.fundedYear, fm(d.fundedYearLaterMatInt), false, undefined, 'lmi') +
+      row('Principal', '<span class="formula-var" data-source="ppb">Par Value/TIPS</span> \xd7 <span class="formula-var" data-source="qty">Quantity</span>', fm(d.fundedYearPrincipalTotal)) +
+      row(couponLabel, '<span class="formula-var" data-source="ppb">Par Value/TIPS</span> \xd7 <span class="formula-var" data-source="cpp">coupon/period</span> \xd7 <span class="formula-var" data-source="cp">periods</span> \xd7 <span class="formula-var" data-source="qty">Quantity</span>', fm(d.fundedYearOwnRungInt)) +
+      row('Later maturity interest', 'from TIPS maturing after ' + d.fundedYear, fm(d.fundedYearLaterMatInt), false, undefined, 'lmi') +
       (_plCredit > 0 ? row('Pre-ladder credit', 'pre-ladder pool applied to this year', fm(_plCredit)) : '') +
       sep() +
       row('Funded Year Amount', _totalFmla, fm(d.fundedYearAmt), true) +
@@ -75,14 +75,14 @@ export function buildDrillHTML(d, colKey, summary) {
   // \u2500\u2500 Build: Cost \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
   } else if (colKey === 'cost') {
     rows =
-      row('Qty', '', d.fundedYearQty + ' bonds', false, undefined, 'qty') +
+      row('Quantity', '', d.fundedYearQty, false, undefined, 'qty') +
       sep() +
       row('Price (unadjusted)', '', fd(d.price, 4), false, undefined, 'price') +
       row('Ref CPI (settlement date)', '', fd(d.refCPI, 5), false, 'refCPI', 'refcpi') +
       row('Dated Ref CPI', '', fd(d.baseCpi, 5), false, undefined, 'basecpi') +      row('Index ratio', '<span class="formula-var" data-source="refcpi">Ref CPI</span> \xf7 <span class="formula-var" data-source="basecpi">Dated Ref CPI</span>', fd(d.indexRatio, 5), false, 'indexRatio', 'ir') +
-      row('Cost per bond', '<span class="formula-var" data-source="price">price/100</span> \xd7 <span class="formula-var" data-source="ir">index ratio</span> \xd7 1,000', fm2(d.costPerBond), false, undefined, 'cpb') +
+      row('Cost per TIPS', '<span class="formula-var" data-source="price">price/100</span> \xd7 <span class="formula-var" data-source="ir">index ratio</span> \xd7 1,000', fm2(d.costPerBond), false, undefined, 'cpb') +
       sep() +
-      row('Funded Year Cost', '<span class="formula-var" data-source="cpb">cost/bond</span> \xd7 <span class="formula-var" data-source="qty">qty</span>', fm(d.fundedYearCost), true);
+      row('Funded Year Cost', '<span class="formula-var" data-source="cpb">Cost per TIPS</span> \xd7 <span class="formula-var" data-source="qty">Quantity</span>', fm(d.fundedYearCost), true);
 
   // \u2500\u2500 Build: Gap Amount / Gap Cost \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
   } else if (colKey === 'gapAmount' || colKey === 'gapCost') {
@@ -98,18 +98,18 @@ export function buildDrillHTML(d, colKey, summary) {
         + row('Gap year total cost', '', fm(s.gapParams.totalCost))
         + row('Target excess cost', '<span class="formula-var" data-source="total">total cost</span> \xd7 ' + wLabel.toLowerCase(), fm(exCost))
         + sep()
-        + row('Cost per bond', '<span class="formula-var" data-source="price">price/100</span> \xd7 <span class="formula-var" data-source="ir">index ratio</span> \xd7 1,000', fm2(d.costPerBond), false, undefined, 'cpb')
-        + row('Excess qty', 'round(target cost \xf7 <span class="formula-var" data-source="cpb">cost/bond</span>)', d.excessQty + ' bonds');
+        + row('Cost per TIPS', '<span class="formula-var" data-source="price">price/100</span> \xd7 <span class="formula-var" data-source="ir">index ratio</span> \xd7 1,000', fm2(d.costPerBond), false, undefined, 'cpb')
+        + row('Excess Quantity', 'round(target cost \xf7 <span class="formula-var" data-source="cpb">Cost per TIPS</span>)', d.excessQty);
       if (isAmt) {
         rows += sep()
           + bondVarRows(d, nPeriods, principalPerBond, couponPct)
           + sep()
-          + row('P+I per bond', '<span class="formula-var" data-source="ppb">principal/bond</span> \xd7 (1 + <span class="formula-var" data-source="cpp">coupon/period</span> \xd7 <span class="formula-var" data-source="cp">periods</span>)', fm2(d.fundedYearPi), false, undefined, 'pipb')
+          + row('P+I per TIPS', '<span class="formula-var" data-source="ppb">Par Value/TIPS</span> \xd7 (1 + <span class="formula-var" data-source="cpp">coupon/period</span> \xd7 <span class="formula-var" data-source="cp">periods</span>)', fm2(d.fundedYearPi), false, undefined, 'pipb')
           + sep()
-          + row('Gap Amount', '<span class="formula-var" data-source="pipb">P+I/bond</span> \xd7 excess <span class="formula-var" data-source="qty">qty</span>', fm(d.excessAmt), true);
+          + row('Gap Amount', '<span class="formula-var" data-source="pipb">P+I/TIPS</span> \xd7 <span class="formula-var" data-source="qty">Excess Quantity</span>', fm(d.excessAmt), true);
       } else {
         rows += sep()
-          + row('Gap Cost', '<span class="formula-var" data-source="cpb">cost/bond</span> \xd7 excess <span class="formula-var" data-source="qty">qty</span>', fm(d.excessCost), true);
+          + row('Gap Cost', '<span class="formula-var" data-source="cpb">Cost per TIPS</span> \xd7 <span class="formula-var" data-source="qty">Excess Quantity</span>', fm(d.excessCost), true);
       }
     }
 
@@ -128,12 +128,12 @@ export function buildDrillHTML(d, colKey, summary) {
       const mo = MONTHS[h.maturityMonth];
       const yr = String(h.maturityYear).slice(2);
       rows += row(mo + ' \u2019' + yr + ' \xd7 ' + h.qty, '<span class="drill-l3" data-l3="pipb-' + i + '" style="cursor:pointer;text-decoration:underline dotted #94a3b8;">' + fm2(piPB) + '/bond</span>', fm(hTotal));
-    });
-    rows += sep()
-      + row('Funded year bonds subtotal', '', fm(ownSum))
-      + row('Later maturity interest', 'from bonds maturing after FY', fm(laterMatInt), false, undefined, 'lmi')
+      }
+      rows += sep()
+      + row('Funded year TIPS subtotal', '', fm(ownSum))
+      + row('Later maturity interest', 'from TIPS maturing after FY', fm(laterMatInt), false, undefined, 'lmi')
       + sep()
-      + row(isBef ? 'Amount Before' : 'Amount After', 'Funded year bonds + <span class="formula-var" data-source="lmi">Later mat int</span>', fm(araTotal), true)
+      + row(isBef ? 'Amount Before' : 'Amount After', 'Funded year TIPS + <span class="formula-var" data-source="lmi">Later mat int</span>', fm(araTotal), true);
       + sep()
       + row('DARA', '', fm(DARA), false, undefined, 'dara')
       + row('Surplus / Deficit', (isBef ? 'Amount Before' : 'Amount After') + ' \u2212 <span class="formula-var" data-source="dara">DARA</span>',
@@ -150,7 +150,7 @@ export function buildDrillHTML(d, colKey, summary) {
         + row('Funded Year target qty', 'from rebalance algorithm', d.fundedYearQty + ' bonds')
         + row('Excess cost to deploy', '', fm(d.excessQtyAfter * d.costPerBond))
         + row('Cost per bond', '', fm2(d.costPerBond), false, undefined, 'cpb')
-        + row('Excess bonds', 'round(excess cost \xf7 cost per bond)', d.excessQtyAfter + ' bonds')
+        + row('Excess bonds', 'round(excess cost \xf7 cost per $1k)', d.excessQtyAfter + ' bonds')
         + sep()
         + row('Total qty', 'FY target + excess bonds', totalQty + ' bonds', true);
     } else if (d.qtyAfter !== d.qtyBefore) {
@@ -160,14 +160,14 @@ export function buildDrillHTML(d, colKey, summary) {
       rows = row('Ref CPI', '', fd(d.refCPI, 5), false, 'refCPI', 'refcpi')
         + row('Dated Ref CPI', '', fd(d.baseCpi, 5), false, undefined, 'basecpi')
         + row('Index ratio', '<span class="formula-var" data-source="refcpi">Ref CPI</span> \xf7 <span class="formula-var" data-source="basecpi">Dated Ref CPI</span>', fd(d.indexRatio, 5), false, 'indexRatio', 'ir')
-        + row('Principal per bond', '1,000 \xd7 <span class="formula-var" data-source="ir">index ratio</span>', fd(principalPerBond, 2), false, undefined, 'ppb')
+        + row('Par Value per TIPS', '1,000 \xd7 <span class="formula-var" data-source="ir">index ratio</span>', fd(principalPerBond, 2), false, undefined, 'ppb')
         + row('Coupon per period', 'annual coupon / 2', couponPct, false, undefined, 'cpp')
         + row('Coupon periods in FY', '', nPeriods === 1 ? '1 semi-annual (' + MONTHS[new Date(d.maturityStr).getMonth()] + ')' : '2 (' + MONTHS[(new Date(d.maturityStr).getMonth() - 6 + 12) % 12] + ' + ' + MONTHS[new Date(d.maturityStr).getMonth()] + ')', false, undefined, 'cp')
         + sep()
-        + row('P+I per bond', '<span class="formula-var" data-source="ppb">principal/bond</span> \xd7 (1 + <span class="formula-var" data-source="cpp">coupon/period</span> \xd7 <span class="formula-var" data-source="cp">periods</span>)', fm2(piPB), false, undefined, 'pipb')
+        + row('P+I per bond', '<span class="formula-var" data-source="ppb">par value/bond</span> \xd7 (1 + <span class="formula-var" data-source="cpp">coupon/period</span> \xd7 <span class="formula-var" data-source="cp">periods</span>)', fm2(piPB), false, undefined, 'pipb')
         + sep()
         + row('DARA', '', fm(_DARA), false, undefined, 'dara')
-        + row('Later mat int', 'from bonds maturing after FY', fm(lmi), false, undefined, 'lmi')
+        + row('Later mat int', 'from TIPS maturing after FY', fm(lmi), false, undefined, 'lmi')
         + row('Net needed', '<span class="formula-var" data-source="dara">DARA</span> \u2212 <span class="formula-var" data-source="lmi">Later mat int</span>', fm(net))
         + sep()
         + row('Target FY qty', 'round(Net needed \xf7 <span class="formula-var" data-source="pipb">P+I per bond</span>)', totalQty + ' bonds', true);
@@ -183,33 +183,32 @@ export function buildDrillHTML(d, colKey, summary) {
     const qdSign    = qtyDelta >= 0 ? '+' : '';
     const cdSign    = cashDelta >= 0 ? '+' : '';
     rows =
-      row('Qty delta', 'Qty After \u2212 Qty Before', qdSign + qtyDelta + ' bonds', false, undefined, 'qty') +
+      row('Quantity delta', 'Quantity After \u2212 Quantity Before', qdSign + qtyDelta, false, undefined, 'qty') +
       sep() +
       row('Price (unadjusted)', '', fd(d.price, 4), false, undefined, 'price') +
       row('Ref CPI (settlement date)', '', fd(d.refCPI, 5), false, 'refCPI', 'refcpi') +
-      row('Dated Ref CPI', '', fd(d.baseCpi, 5), false, undefined, 'basecpi') +      
-      row('Index ratio', '<span class="formula-var" data-source="refcpi">Ref CPI</span> \xf7 <span class="formula-var" data-source="basecpi">Dated Ref CPI</span>', fd(d.indexRatio, 5), false, 'indexRatio', 'ir') +
-      row('Cost per bond', '<span class="formula-var" data-source="price">price/100</span> \xd7 <span class="formula-var" data-source="ir">index ratio</span> \xd7 1,000', fm2(d.costPerBond), false, undefined, 'cpb') +
+      row('Dated Ref CPI', '', fd(d.baseCpi, 5), false, undefined, 'basecpi') +      row('Index ratio', '<span class="formula-var" data-source="refcpi">Ref CPI</span> \xf7 <span class="formula-var" data-source="basecpi">Dated Ref CPI</span>', fd(d.indexRatio, 5), false, 'indexRatio', 'ir') +
+      row('Cost per TIPS', '<span class="formula-var" data-source="price">price/100</span> \xd7 <span class="formula-var" data-source="ir">index ratio</span> \xd7 1,000', fm2(d.costPerBond), false, undefined, 'cpb') +
       sep() +
-      row('Cash \u0394', '\u2212(<span class="formula-var" data-source="qty">Qty delta</span> \xd7 <span class="formula-var" data-source="cpb">cost/bond</span>)', cdSign + fm(Math.abs(cashDelta)), true);
+      row('Cash \u0394', '\u2212(<span class="formula-var" data-source="qty">Quantity delta</span> \xd7 <span class="formula-var" data-source="cpb">Cost per TIPS</span>)', cdSign + fm(Math.abs(cashDelta)), true);
 
   // \u2500\u2500 Rebalance: Cost Before / After \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
   } else if (colKey === 'costBefore' || colKey === 'costAfter') {
     const isBef    = colKey === 'costBefore';
     const isBT     = d.isBracketTarget;
     const qty      = isBef ? (isBT ? d.fundedYearQtyBefore : d.qtyBefore) : d.fundedYearQtyAfter;
-    const qtyLabel = isBef ? (isBT ? 'FY qty (before)' : 'Qty Before') : 'Qty After';
+    const qtyLabel = isBef ? (isBT ? 'FY quantity (before)' : 'Quantity Before') : 'Quantity After';
     const cost     = qty * d.costPerBond;
     rows =
-      row(qtyLabel, isBT ? 'FY-only (excluding gap excess)' : '', qty + ' bonds', false, undefined, 'qty') +
+      row(qtyLabel, isBT ? 'FY-only (excluding gap excess)' : '', qty, false, undefined, 'qty') +
       sep() +
       row('Price (unadjusted)', '', fd(d.price, 4), false, undefined, 'price') +
       row('Ref CPI (settlement date)', '', fd(d.refCPI, 5), false, 'refCPI', 'refcpi') +
       row('Dated Ref CPI', '', fd(d.baseCpi, 5), false, undefined, 'basecpi') +      
       row('Index ratio', '<span class="formula-var" data-source="refcpi">Ref CPI</span> \xf7 <span class="formula-var" data-source="basecpi">Dated Ref CPI</span>', fd(d.indexRatio, 5), false, 'indexRatio', 'ir') +
-      row('Cost per bond', '<span class="formula-var" data-source="price">price/100</span> \xd7 <span class="formula-var" data-source="ir">index ratio</span> \xd7 1,000', fm2(d.costPerBond), false, undefined, 'cpb') +
+      row('Cost per TIPS', '<span class="formula-var" data-source="price">price/100</span> \xd7 <span class="formula-var" data-source="ir">index ratio</span> \xd7 1,000', fm2(d.costPerBond), false, undefined, 'cpb') +
       sep() +
-      row(isBef ? 'Cost Before' : 'Cost After', '<span class="formula-var" data-source="qty">qty</span> \xd7 <span class="formula-var" data-source="cpb">cost/bond</span>', fm(cost), true);
+      row(isBef ? 'Cost Before' : 'Cost After', '<span class="formula-var" data-source="qty">Quantity</span> \xd7 <span class="formula-var" data-source="cpb">Cost per TIPS</span>', fm(cost), true);
 
   // \u2500\u2500 Rebalance: Gap Amt/Cost Before/After \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
   } else if (colKey === 'gapAmtBefore' || colKey === 'gapAmtAfter' || colKey === 'gapCostBefore' || colKey === 'gapCostAfter') {
@@ -219,17 +218,17 @@ export function buildDrillHTML(d, colKey, summary) {
     const piPerBond = principalPerBond * (1 + d.coupon / 2 * nPeriods);
     if (!isAfter) {
       const exQty = d.excessQtyBefore;
-      rows = row('Excess qty', 'current total \u2212 FY target', exQty + ' bonds', false, undefined, 'qty')
+      rows = row('Excess Quantity', 'Current total \u2212 FY target', exQty, false, undefined, 'qty')
         + sep()
         + bondVarRows(d, nPeriods, principalPerBond, couponPct) + sep();
       if (isAmt) {
-        rows += row('P+I per bond', '<span class="formula-var" data-source="ppb">principal/bond</span> \xd7 (1 + <span class="formula-var" data-source="cpp">coupon/period</span> \xd7 <span class="formula-var" data-source="cp">periods</span>)', fm2(piPerBond), false, undefined, 'pipb')
+        rows += row('P+I per TIPS', '<span class="formula-var" data-source="ppb">Par Value/TIPS</span> \xd7 (1 + <span class="formula-var" data-source="cpp">coupon/period</span> \xd7 <span class="formula-var" data-source="cp">periods</span>)', fm2(piPerBond), false, undefined, 'pipb')
           + sep()
-          + row('Excess Amount Before', '<span class="formula-var" data-source="pipb">P+I per bond</span> \xd7 <span class="formula-var" data-source="qty">excess qty</span>', fm(exQty * piPerBond), true);
+          + row('Excess Amount Before', '<span class="formula-var" data-source="pipb">P+I per TIPS</span> \xd7 <span class="formula-var" data-source="qty">Excess Quantity</span>', fm(exQty * piPerBond), true);
       } else {
-        rows += row('Cost per bond', '<span class="formula-var" data-source="price">price/100</span> \xd7 <span class="formula-var" data-source="ir">index ratio</span> \xd7 1,000', fm2(d.costPerBond), false, undefined, 'cpb')
+        rows += row('Cost per TIPS', '<span class="formula-var" data-source="price">price/100</span> \xd7 <span class="formula-var" data-source="ir">index ratio</span> \xd7 1,000', fm2(d.costPerBond), false, undefined, 'cpb')
           + sep()
-          + row('Excess Cost Before', '<span class="formula-var" data-source="cpb">cost/bond</span> \xd7 <span class="formula-var" data-source="qty">excess qty</span>', fm(exQty * d.costPerBond), true);
+          + row('Excess Cost Before', '<span class="formula-var" data-source="cpb">Cost per TIPS</span> \xd7 <span class="formula-var" data-source="qty">Excess Quantity</span>', fm(exQty * d.costPerBond), true);
       }
     } else if (s && s.brackets) {
       const isLower = d.cusip === s.brackets.lowerCUSIP;
@@ -240,22 +239,22 @@ export function buildDrillHTML(d, colKey, summary) {
       const wLabel  = isLower ? 'Orig lower weight' : isNewLower ? 'New lower weight' : 'Upper weight';
       const exCost  = s.gapParams.totalCost * weight;
       const exQty   = d.excessQtyAfter;
-      rows = row('Excess qty', 'round(target cost \xf7 <span class="formula-var" data-source="cpb">cost/bond</span>)', exQty + ' bonds', false, undefined, 'qty')
+      rows = row('Excess Quantity', 'round(target cost \xf7 <span class="formula-var" data-source="cpb">Cost per TIPS</span>)', exQty, false, undefined, 'qty')
         + sep()
         + row('Bracket weights', 'see Duration Calcs \u2197', fd(weight, 4))
         + sep()
         + row('Gap year total cost', '', fm(s.gapParams.totalCost), false, undefined, 'total')
         + row('Target excess cost', '<span class="formula-var" data-source="total">total cost</span> \xd7 ' + wLabel.toLowerCase(), fm(exCost))
         + sep()
-        + row('Cost per bond', '<span class="formula-var" data-source="price">price/100</span> \xd7 <span class="formula-var" data-source="ir">index ratio</span> \xd7 1,000', fm2(d.costPerBond), false, undefined, 'cpb')
+        + row('Cost per TIPS', '<span class="formula-var" data-source="price">price/100</span> \xd7 <span class="formula-var" data-source="ir">index ratio</span> \xd7 1,000', fm2(d.costPerBond), false, undefined, 'cpb')
         + sep();
       if (isAmt) {
         rows += bondVarRows(d, nPeriods, principalPerBond, couponPct) + sep()
-          + row('P+I per bond', '<span class="formula-var" data-source="ppb">principal/bond</span> \xd7 (1 + <span class="formula-var" data-source="cpp">coupon/period</span> \xd7 <span class="formula-var" data-source="cp">periods</span>)', fm2(piPerBond), false, undefined, 'pipb')
+          + row('P+I per TIPS', '<span class="formula-var" data-source="ppb">Par Value/TIPS</span> \xd7 (1 + <span class="formula-var" data-source="cpp">coupon/period</span> \xd7 <span class="formula-var" data-source="cp">periods</span>)', fm2(piPerBond), false, undefined, 'pipb')
           + sep()
-          + row('Excess Amount After', '<span class="formula-var" data-source="pipb">P+I/bond</span> \xd7 <span class="formula-var" data-source="qty">excess qty</span>', fm(exQty * piPerBond), true);
+          + row('Excess Amount After', '<span class="formula-var" data-source="pipb">P+I per TIPS</span> \xd7 <span class="formula-var" data-source="qty">Excess Quantity</span>', fm(exQty * piPerBond), true);
       } else {
-        rows += row('Excess Cost After', '<span class="formula-var" data-source="cpb">cost/bond</span> \xd7 <span class="formula-var" data-source="qty">excess qty</span>', fm(exQty * d.costPerBond), true);
+        rows += row('Excess Cost After', '<span class="formula-var" data-source="cpb">Cost per TIPS</span> \xd7 <span class="formula-var" data-source="qty">Excess Quantity</span>', fm(exQty * d.costPerBond), true);
       }
     }
   // ── Rebalance: Gap Cash Delta ─────────────────────────────────────────────────────
@@ -267,18 +266,18 @@ export function buildDrillHTML(d, colKey, summary) {
     const delSign   = exQtyDel >= 0 ? '+' : '';
     const cashSign  = gapCash  >= 0 ? '+' : '';
     rows =
-      row('Excess qty before', 'current total \u2212 FY target', exQtyBef + ' bonds') +
-      row('Excess qty after',  'rebalanced excess', exQtyAft + ' bonds') +
-      row('Excess qty delta',  'after \u2212 before', delSign + exQtyDel + ' bonds', false, undefined, 'qty') +
+      row('Excess Quantity before', 'Current total \u2212 FY target', exQtyBef) +
+      row('Excess Quantity after',  'Rebalanced excess', exQtyAft) +
+      row('Excess Quantity delta',  'After \u2212 before', delSign + exQtyDel, false, undefined, 'qty') +
       sep() +
       row('Price (unadjusted)', '', fd(d.price, 4), false, undefined, 'price') +
       row('Ref CPI (settlement date)', '', fd(d.refCPI, 5), false, 'refCPI', 'refcpi') +
       row('Dated Ref CPI', '', fd(d.baseCpi, 5), false, undefined, 'basecpi') +      
       row('Index ratio', '<span class="formula-var" data-source="refcpi">Ref CPI</span> \xf7 <span class="formula-var" data-source="basecpi">Dated Ref CPI</span>', fd(d.indexRatio, 5), false, 'indexRatio', 'ir') +
       sep() +
-      row('Cost per bond', '<span class="formula-var" data-source="price">price/100</span> \xd7 <span class="formula-var" data-source="ir">index ratio</span> \xd7 1,000', fm2(d.costPerBond), false, undefined, 'cpb') +
+      row('Cost per TIPS', '<span class="formula-var" data-source="price">price/100</span> \xd7 <span class="formula-var" data-source="ir">index ratio</span> \xd7 1,000', fm2(d.costPerBond), false, undefined, 'cpb') +
       sep() +
-      row('Gap Cash \u0394', '\u2212(<span class="formula-var" data-source="qty">excess qty delta</span> \xd7 <span class="formula-var" data-source="cpb">cost/bond</span>)', cashSign + fm(Math.abs(gapCash)), true);
+      row('Gap Cash \u0394', '\u2212(<span class="formula-var" data-source="qty">Excess Quantity delta</span> \xd7 <span class="formula-var" data-source="cpb">Cost per TIPS</span>)', cashSign + fm(Math.abs(gapCash)), true);
 
   }
 
@@ -295,10 +294,10 @@ export function buildPIPerBondDrill(h) {
   const couponNote = '$' + fd(h.principalPerBond, 2) + ' \u00d7 ' + fd(h.coupon / 2 * 100, 5) + '% \u00d7 ' + h.nPeriods + ' (' + periodLabel + ')';
   return [
     { label: 'Index ratio', note: 'Ref CPI \u00f7 Dated Ref CPI', value: fd(ir, 5) },
-    { label: 'Principal', note: '1,000 \u00d7 index ratio', value: '$' + fd(h.principalPerBond, 2) },
+    { label: 'Par Value', note: '1,000 \u00d7 index ratio', value: '$' + fd(h.principalPerBond, 2) },
     { label: 'Coupon interest', note: couponNote, value: '$' + fd(couponInterest, 2) },
     { sep: true },
-    { label: 'P+I per bond', value: '$' + fd(piPB, 2), total: true }
+    { label: 'P+I per TIPS', value: '$' + fd(piPB, 2), total: true }
   ];
 }
 

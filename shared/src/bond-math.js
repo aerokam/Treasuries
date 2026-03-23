@@ -1,5 +1,5 @@
-// bond-math.js — Pure per-bond calculations
-// No ladder state, no running pools, no side effects.
+// bond-math.js — Core financial math for TIPS and nominal Treasuries.
+// Pure per-unit calculations ($1,000 face value).
 // Spec: knowledge/2.1_TIPS_Basics.md, knowledge/5.0_Computation_Modules.md §bond-math.js
 
 // ─── Modified duration ────────────────────────────────────────────────────────
@@ -26,9 +26,9 @@ export function calculateMDuration(settlement, maturity, coupon, yld) {
   return calculateDuration(settlement, maturity, coupon, yld) / (1 + yld / 2);
 }
 
-// ─── Per-bond quantities ──────────────────────────────────────────────────────
+// ─── Per-unit quantities ($1,000 face) ──────────────────────────────────────
 // Spec: 2.1 TIPS Basics, 5.0 §bondCalcs
-// bond: { coupon, baseCpi, price, maturity: Date }
+// security: { coupon, baseCpi, price, maturity: Date }
 export function bondCalcs(bond, refCPI) {
   const coupon          = bond.coupon  ?? 0;
   const baseCpi         = bond.baseCpi ?? refCPI;

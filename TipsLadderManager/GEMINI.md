@@ -11,8 +11,8 @@ TipsLadderManager is a browser-based, privacy-first tool for designing and rebal
 ### Key Financial Concepts
 - **DARA (Desired Annual Real Amount)**: The target annual amount in inflation-adjusted dollars.
 - **Gap Years**: Years currently missing TIPS issuances (e.g., 2037–2039).
-- **Bracket Years**: TIPS (e.g., 2036, 2040) used to cover gap years by holding excess bonds that match the average duration of the missing maturities.
-- **Later Maturity Interest**: Interest from longer-dated bonds that cascades down to fund earlier rungs of the ladder.
+- **Bracket Years**: TIPS (e.g., 2036, 2040) used to cover gap years by holding additional TIPS that match the average duration of the missing maturities.
+- **Later Maturity Interest**: Interest from longer-dated TIPS that cascades down to fund earlier rungs of the ladder.
 
 ---
 
@@ -45,9 +45,9 @@ All ladder calculations **MUST** process maturities from **longest to shortest**
 
 ### 3. Naming Standards
 Adhere to the following variable mappings:
-- `fyQty` / `fy_qty`: Quantity of bonds needed for the funded year portion.
+- `fyQty` / `fy_qty`: Quantity of units ($1k face) needed for the funded year portion.
 - `costPerBond`: `(price/100) * indexRatio * 1000`.
-- `piPerBond`: The total Principal + Interest payout per bond at maturity.
+- `piPerBond`: The total Principal + Interest payout per $1,000 unit at maturity.
 - `indexRatio`: `refCPI / baseCPI`.
 
 ### 4. Testing & Validation

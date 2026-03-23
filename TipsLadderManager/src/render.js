@@ -65,18 +65,18 @@ export const COLS = [
     total: true, totalFn: d => (d.fundedYearQtyAfter * d.costPerBond) + (d.excessQtyAfter * d.costPerBond || 0),
     drill: true, drillCond: v => typeof v === 'number' && v > 0 },
 
-  { label: 'Qty Before',    headerHTML: 'Qty<br>Before', key: 'qtyBefore',  fmt: 'qty', rebalOnly: true,
+  { label: 'Quantity Before',    headerHTML: 'Quantity<br>Before', key: 'qtyBefore',  fmt: 'qty', rebalOnly: true,
     value:    d => d.fundedYearQtyBefore,
     subValue: d => d.excessQtyBefore,
     total: true, totalFn: d => d.qtyBefore || 0 },
 
-  { label: 'Qty After',     headerHTML: 'Qty<br>After', key: 'qtyAfter',   fmt: 'qty', rebalOnly: true,
+  { label: 'Quantity After',     headerHTML: 'Quantity<br>After', key: 'qtyAfter',   fmt: 'qty', rebalOnly: true,
     value:    d => d.fundedYearQtyAfter,
     subValue: d => d.excessQtyAfter,
     total: true, totalFn: d => d.qtyAfter || 0,
     drill: true, drillCond: v => typeof v === 'number' && v > 0 },
 
-  { label: 'Qty Delta',     headerHTML: 'Qty<br>Delta', key: 'qtyDelta',   fmt: 'sgn', rebalOnly: true,
+  { label: 'Quantity Delta',     headerHTML: 'Quantity<br>Delta', key: 'qtyDelta',   fmt: 'sgn', rebalOnly: true,
     value:    d => d.fundedYearQtyAfter - d.fundedYearQtyBefore,
     subValue: d => d.excessQtyAfter - d.excessQtyBefore,
     total: true, totalFn: d => (d.qtyAfter || 0) - (d.qtyBefore || 0) },
@@ -103,7 +103,7 @@ export const COLS = [
     total: true, totalFn: d => (d.fundedYearCost ?? 0) + (d.excessCost ?? 0),
     drill: true },
 
-  { label: 'Qty',    key: 'qty',    fmt: 'qty', buildOnly: true,
+  { label: 'Quantity',    key: 'qty',    fmt: 'qty', buildOnly: true,
     value:    d => d.fundedYearQty,
     subValue: d => d.excessQty,
     total: true, totalFn: d => (d.fundedYearQty || 0) + (d.excessQty || 0) },

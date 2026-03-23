@@ -25,7 +25,7 @@ Knowledge is layered. A user should be able to start at a high-level summary and
 
 ### 3. Multi-Level Education
 TIPS are notoriously counter-intuitive. We aim to explain concepts like **Seasonal Adjustments** at various levels:
-- **Common Sense**: "Prices change with the seasons. We flatten those waves so you can see the real value of the bond."
+- **Common Sense**: "Prices change with the seasons. We flatten those waves so you can see the real value of the TIPS."
 - **Institutional Logic**: Explaining why traders look at seasonally-adjusted yields to make "fair value" comparisons.
 - **The Math**: Using linear regression and backwards-anchored sliding windows to isolate idiosyncratic outliers.
 

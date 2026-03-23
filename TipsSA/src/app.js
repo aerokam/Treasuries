@@ -113,7 +113,7 @@ function _showDrillPopup(title, html) {
 const COL_HELP = {
   'maturity': {
     title: 'Maturity',
-    html: `<p>The maturity date of the TIPS bond — the date on which the Treasury repays principal.</p>
+    html: `<p>The maturity date of the TIPS — the date on which the Treasury repays principal.</p>
 <p>Most TIPS mature in <strong>January/February</strong> or <strong>July/October</strong>, which places them on opposite sides of the seasonal inflation cycle.</p>`
   },
   'cusip': {
@@ -123,7 +123,7 @@ const COL_HELP = {
   },
   'coupon': {
     title: 'Coupon',
-    html: `<p>The annual interest rate paid by the bond, expressed as a percentage of <strong>face value</strong>.</p>
+    html: `<p>The annual interest rate paid by the TIPS, expressed as a percentage of <strong>face value</strong>.</p>
 <p>TIPS coupons are paid semi-annually. Because the principal is inflation-adjusted, the actual dollar coupon payment grows (or shrinks) with CPI even though the coupon rate is fixed.</p>`
   },
   'price': {
@@ -134,22 +134,22 @@ const COL_HELP = {
   'ask-yield': {
     title: 'Ask Yield',
     html: `<p>Yield to maturity (YTM) calculated directly from the market price using standard Treasury bond math (semi-annual compounding).</p>
-<p>This is the <strong>quoted real yield</strong> — it includes any distortion from seasonal inflation patterns baked into the bond's price.</p>`
+<p>This is the <strong>quoted real yield</strong> — it includes any distortion from seasonal inflation patterns baked into the TIPS price.</p>`
   },
   'sa-yield': {
     title: 'SA Yield — Seasonal Adjustment',
     html: `<p>The market price is first multiplied by the ratio <code>S(settle) / S(maturity)</code> — the BLS seasonal factors at the settlement date and maturity date — before computing YTM.</p>
-<p>This strips out the predictable seasonal inflation carry so bonds can be compared across different maturity months on equal footing.</p>
-<ul style="margin:12px 0 0;padding-left:18px;">
-  <li style="margin-bottom:6px;"><strong>Ratio &lt; 1.0</strong> (settling in a low-factor month, maturing in a high-factor month): price is reduced → yield rises. The bond had a seasonal premium; adjustment removes it.</li>
-  <li style="margin-bottom:6px;"><strong>Ratio &gt; 1.0</strong> (settling in a high-factor month, maturing in a low-factor month): price is increased → yield falls. The bond had a seasonal discount; adjustment compensates for it.</li>
+<p>This strips out the predictable seasonal inflation carry so TIPS can be compared across different maturity months on equal footing.</p>
+<ul style="margin:0;padding-left:20px;font-size:13px;color:#475569;">
+  <li style="margin-bottom:6px;"><strong>Ratio &lt; 1.0</strong> (settling in a low-factor month, maturing in a high-factor month): price is reduced → yield rises. The TIPS had a seasonal premium; adjustment removes it.</li>
+  <li style="margin-bottom:6px;"><strong>Ratio &gt; 1.0</strong> (settling in a high-factor month, maturing in a low-factor month): price is increased → yield falls. The TIPS had a seasonal discount; adjustment compensates for it.</li>
 </ul>
 <p style="margin-top:12px;font-size:11px;color:#94a3b8;">Authority: 31 CFR § 356 Appendix B; Canty (1998)</p>`
   },
   'sao-yield': {
     title: 'SAO Yield — SA Ordinal (Trend-Fitted)',
-    html: `<p>SAO applies a backwards-anchored linear regression to the SA yields of the <strong>next 4 longer-maturity bonds</strong>, then blends the projected value with the bond's own SA yield.</p>
-<p>The blend weight tilts heavily toward the trend for short-maturity bonds, where residual seasonal distortions are largest, and tapers off for longer maturities.</p>
+    html: `<p>SAO applies a backwards-anchored linear regression to the SA yields of the <strong>next 4 longer-maturity TIPS</strong>, then blends the projected value with the TIPS's own SA yield.</p>
+<p>The blend weight tilts heavily toward the trend for short-maturity TIPS, where residual seasonal distortions are largest, and tapers off for longer maturities.</p>
 <ul style="margin:12px 0 0;padding-left:18px;">
   <li style="margin-bottom:6px;"><strong>Under 6 months:</strong> 90% trend projection, 10% raw SA yield</li>
   <li style="margin-bottom:6px;"><strong>6 months – 2 years:</strong> 50% trend</li>
@@ -161,7 +161,7 @@ const COL_HELP = {
   'diff': {
     title: 'Diff (bps)',
     html: `<p>The difference between <strong>SA Yield</strong> and <strong>Ask Yield</strong>, expressed in basis points (1 bp = 0.01%).</p>
-<p>A positive value means the seasonal adjustment raised the yield (the bond had a seasonal price premium that was stripped out). A negative value means the adjustment lowered the yield (the bond had a seasonal penalty that was compensated).</p>`
+<p>A positive value means the seasonal adjustment raised the yield (the TIPS had a seasonal price premium that was stripped out). A negative value means the adjustment lowered the yield (the TIPS had a seasonal penalty that was compensated).</p>`
   }
 };
 
@@ -194,7 +194,7 @@ function _showSaDrill(cusip) {
       </div>
     </div>
     <div style="font-size:12px;color:#64748b;">
-      <p>The <strong>SA Yield</strong> is calculated by finding the internal rate of return (IRR) of the bond using the <strong>Adjusted Price</strong> instead of the market price.</p>
+      <p>The <strong>SA Yield</strong> is calculated by finding the internal rate of return (IRR) of the TIPS using the <strong>Adjusted Price</strong> instead of the market price.</p>
       <p>A ratio &lt; 1.0 reduces the price (increasing yield), while a ratio &gt; 1.0 increases the price (decreasing yield).</p>
     </div>
   `;
