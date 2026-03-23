@@ -377,7 +377,12 @@ async function loadData() {
     const fileInput = document.getElementById('holdings-file');
     if (!fileInput.files.length) {
       try {
-        const sampleRes = await fetch('./tests/CusipQtyTestLumpy.csv');
+        let samplePath = './tests/CusipQtyTestLumpy.csv';
+        let sampleRes = await fetch(samplePath);
+        if (!sampleRes.ok) {
+          samplePath = 'tests/CusipQtyTestLumpy.csv';
+          sampleRes = await fetch(samplePath);
+        }
         if (sampleRes.ok) {
           const blob = await sampleRes.blob();
           const file = new File([blob], 'CusipQtyTestLumpy.csv', { type: 'text/csv' });
@@ -385,6 +390,16 @@ async function loadData() {
           dt.items.add(file);
           fileInput.files = dt.files;
           fileInput.dispatchEvent(new Event('change'));
+          
+          // Auto-run once data is settled
+          const autoRun = () => {
+            if (!document.getElementById('run-btn').disabled) {
+              document.getElementById('run-btn').click();
+            } else {
+              setTimeout(autoRun, 100);
+            }
+          };
+          autoRun();
         }
       } catch (_) { /* sample load failure is non-fatal */ }
     }
