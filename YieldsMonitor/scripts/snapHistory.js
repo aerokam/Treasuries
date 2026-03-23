@@ -118,18 +118,17 @@ async function snap() {
     let history = await getExistingFromR2(r2Key);
     
     if (!history || history.length === 0) {
-      console.log(`  Bootstrapping history (merging ALL, 5Y, 6M)...`);
+      console.log(`  Bootstrapping history (merging multiple ranges for resolution)...`);
       try {
         // Fetch ranges with decreasing resolution
-        const [all, fiveY, sixM] = await Promise.all([
-          fetchRange(sym, 'ALL'), // Monthly
-          fetchRange(sym, '5Y'),  // Weekly (for 10Y UI)
-          fetchRange(sym, '6M')   // Daily (for 3Y UI)
-        ]);
+        // 1D: 1m, 5D: 5m, 1M: 3d?, 3M: 3d?, 6M: 3d?, 1Y: 3d?, 5Y: 8d, ALL: Monthly
+        const ranges = ['ALL', '5Y', '1Y', '6M', '3M', '1M', '5D', '1D'];
+        const results = await Promise.all(ranges.map(r => fetchRange(sym, r).catch(() => [])));
         
-        history = mergePoints([], all);
-        history = mergePoints(history, fiveY);
-        history = mergePoints(history, sixM);
+        history = [];
+        results.forEach(pts => {
+          history = mergePoints(history, pts);
+        });
         console.log(`  Bootstrap complete. ${history.length} points total.`);
       } catch (err) {
         console.error(`  Bootstrap failed for ${sym}: ${err.message}`);

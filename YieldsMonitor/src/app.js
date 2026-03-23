@@ -32,7 +32,7 @@ const COLORS = [
 
 const TIME_RANGE_MAP = {
   '2D': '1D',
-  '10D': '5D',
+  '10D': '5D', // 5D is required for the 10-day lookback
   '1Y': '1M',
   '2Y': '3M',
   '3Y': '6M',
@@ -44,7 +44,7 @@ const TIME_RANGES = Object.keys(TIME_RANGE_MAP);
 
 const charts = {}; // symbol -> chartInstance
 const historyCache = {}; // symbol -> points (baseline from R2)
-const liveCache = {}; // symbol -> points (2D real-time tip)
+const liveCache = {}; // symbol -> points (5D real-time tip)
 let activeSymbols = new Set(['US10YTIPS', 'US30YTIPS', 'US10Y', 'US30Y']);
 let activeRange = '2D';
 
@@ -78,10 +78,12 @@ function setupUI() {
     const idx = Object.keys(AVAILABLE_SYMBOLS).indexOf(sym);
     const color = COLORS[idx % COLORS.length];
     return `
-      <label class="sym-item-check">
+      <label class="sym-item-check" id="label-${sym}">
         <input type="checkbox" value="${sym}" ${activeSymbols.has(sym) ? 'checked' : ''}>
         <span class="color-dot" style="background:${color}"></span>
         <span class="sym-code">${sym}</span>
+        <span class="sym-yield" id="yield-${sym}">---</span>
+        <span class="sym-change" id="change-${sym}"></span>
       </label>
     `;
   }).join('');
@@ -89,15 +91,19 @@ function setupUI() {
   root.innerHTML = `
     <style>
       .range-picker { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 20px; }
-      .range-btn { flex: 1; min-width: 45px; padding: 6px 0; border: 1px solid #cbd5e1; background: #fff; border-radius: 4px; cursor: pointer; font-weight: 600; font-size: 11px; }
-      .range-btn.active { background: #1e293b; color: #fff; border-color: #1e293b; }
-      .sym-group h4 { margin: 12px 0 6px; font-size: 10px; text-transform: uppercase; color: #64748b; letter-spacing: 0.05em; border-bottom: 1px solid #e2e8f0; padding-bottom: 2px; }
-      .sym-item-check { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 11px; cursor: pointer; }
+      .range-btn { flex: 1; min-width: 45px; padding: 6px 0; border: 1px solid #cbd5e1; background: #fff; border-radius: 4px; cursor: pointer; font-weight: 600; font-size: 11px; color: #000; }
+      .range-btn.active { background: #0f172a; color: #fff; border-color: #0f172a; }
+      .sym-group h4 { margin: 12px 0 6px; font-size: 10px; text-transform: uppercase; color: #000; font-weight: 800; letter-spacing: 0.05em; border-bottom: 1px solid #cbd5e1; padding-bottom: 2px; }
+      .sym-item-check { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 11px; cursor: pointer; color: #000; }
       .sym-item-check input { margin: 0; }
       .color-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-      .sym-code { font-weight: 700; color: #1e293b; }
-      #fetchStatus { font-size: 11px; color: #64748b; margin-top: 20px; font-style: italic; }
-      .no-data-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #94a3b8; background: rgba(255,255,255,0.85); pointer-events: none; }
+      .sym-code { font-weight: 800; color: #000; width: 65px; flex-shrink: 0; }
+      .sym-yield { font-family: monospace; font-weight: 700; font-size: 11px; color: #000; margin-left: auto; padding-right: 8px; }
+      .sym-change { font-family: monospace; font-weight: 700; font-size: 10px; min-width: 55px; text-align: right; }
+      .sym-change.up { color: #16a34a; }
+      .sym-change.down { color: #dc2626; }
+      #fetchStatus { font-size: 11px; color: #000; margin-top: 20px; font-weight: 700; }
+      .no-data-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #000; background: rgba(255,255,255,0.9); pointer-events: none; z-index: 10; }
     </style>
     <div class="range-picker">${rangeHtml}</div>
     <div class="sym-group">
@@ -216,11 +222,11 @@ function createChartInstance(sym) {
           type: 'time',
           time: { tooltipFormat: 'MM/dd/yy HH:mm:ss', displayFormats: { hour: 'MM/dd HH:mm', day: 'MMM dd' } },
           grid: { color: '#f1f5f9' },
-          ticks: { autoSkip: true, font: { size: 9 } }
+          ticks: { autoSkip: true, font: { size: 9, weight: 'bold' }, color: '#000' }
         },
         y: {
           grid: { color: '#f1f5f9' },
-          ticks: { font: { size: 9, family: 'monospace' }, callback: v => v.toFixed(3) + '%' }
+          ticks: { font: { size: 9, family: 'monospace', weight: 'bold' }, color: '#000', callback: v => v.toFixed(3) + '%' }
         }
       },
       plugins: {
@@ -229,15 +235,18 @@ function createChartInstance(sym) {
           zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'xy' },
           pan: { enabled: true, mode: 'xy' }
         },
+        annotation: {
+          annotations: {}
+        },
         tooltip: {
           backgroundColor: 'rgba(255, 255, 255, 0.95)',
-          titleColor: '#94a3b8',
-          titleFont: { size: 11 },
-          bodyColor: '#1e293b',
-          borderColor: '#e2e8f0',
+          titleColor: '#64748b',
+          titleFont: { size: 11, weight: 'bold' },
+          bodyColor: '#000',
+          borderColor: '#cbd5e1',
           borderWidth: 1,
           padding: 8,
-          bodyFont: { size: 12 },
+          bodyFont: { size: 12, weight: 'bold' },
           cornerRadius: 6,
           displayColors: false,
           callbacks: { label: ctx => `Yield: ${ctx.parsed.y.toFixed(3)}%` }
@@ -263,7 +272,8 @@ function buildUrl(symbol, timeRange) {
         version: 1,
         sha256Hash: "9e1670c29a10707c417a1efd327d4b2b1d456b77f1426e7e84fb7d399416bb6b"
       }
-    })
+    }),
+    _cb: Date.now() // Cache buster
   };
   return base + "?" + Object.entries(params).map(([k, v]) => k + "=" + encodeURIComponent(v)).join("&");
 }
@@ -271,14 +281,54 @@ function buildUrl(symbol, timeRange) {
 const R2_HISTORY_URL = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/TIPS/yield-history';
 
 function parseSourceTime(tt) {
-  if (!tt || tt.length !== 14) return null;
-  const year = parseInt(tt.substring(0, 4), 10);
-  const month = parseInt(tt.substring(4, 6), 10) - 1;
-  const day = parseInt(tt.substring(6, 8), 10);
-  const hour = parseInt(tt.substring(8, 10), 10);
-  const minute = parseInt(tt.substring(10, 12), 10);
-  const second = parseInt(tt.substring(12, 14), 10);
-  return new Date(year, month, day, hour, minute, second);
+  if (!tt) return null;
+  const s = String(tt);
+  if (s.length < 8) return null;
+  
+  const year = parseInt(s.substring(0, 4), 10);
+  const month = parseInt(s.substring(4, 6), 10) - 1;
+  const day = parseInt(s.substring(6, 8), 10);
+  
+  let hour = 0, minute = 0, second = 0;
+  if (s.length >= 10) hour = parseInt(s.substring(8, 10), 10);
+  if (s.length >= 12) minute = parseInt(s.substring(10, 12), 10);
+  if (s.length >= 14) second = parseInt(s.substring(12, 14), 10);
+  
+  // CNBC data is Eastern Time. Parse it correctly regardless of browser timezone.
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    hourCycle: 'h23',
+    year: 'numeric', month: 'numeric', day: 'numeric',
+    hour: 'numeric', minute: 'numeric', second: 'numeric'
+  });
+  
+  // Converge on the correct UTC moment. We want d such that wall-time in ET matches our parts.
+  let d = new Date(Date.UTC(year, month, day, hour, minute, second));
+  for (let i = 0; i < 2; i++) {
+    const p = formatter.formatToParts(d).reduce((acc, part) => ({ ...acc, [part.type]: part.value }), {});
+    // Calculate difference between what wall-time ET says it is, and what we want it to be.
+    const diff = Date.UTC(year, month, day, hour, minute, second) - Date.UTC(parseInt(p.year, 10), parseInt(p.month, 10) - 1, parseInt(p.day, 10), parseInt(p.hour, 10), parseInt(p.minute, 10), parseInt(p.second, 10));
+    if (diff === 0) break;
+    d = new Date(d.getTime() + diff);
+  }
+  return d;
+}
+
+async function fetchWithTimeout(url, options = {}, timeout = 8000) {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeout);
+  try {
+    const response = await fetch(url, { 
+      ...options, 
+      signal: controller.signal,
+      cache: 'no-cache' // Tell browser not to use cached version
+    });
+    clearTimeout(id);
+    return response;
+  } catch (e) {
+    clearTimeout(id);
+    throw e;
+  }
 }
 
 async function fetchOne(symbol, range) {
@@ -287,7 +337,16 @@ async function fetchOne(symbol, range) {
   if (isIntraday) {
     console.log(`%c[CNBC] %cFetching real-time ${range} for ${symbol}`, "color: #2563eb; font-weight: bold", "color: inherit");
     const live = await fetchLive(symbol, range);
-    if (range === '2D') liveCache[symbol] = live; // Update tip cache
+    
+    if (live && live.length > 0) {
+      if (range === '2D' || range === '10D') liveCache[symbol] = live; // Update tip cache
+      
+      // Filter live data to requested range for display
+      const cutoff = new Date();
+      if (range === '2D') cutoff.setDate(cutoff.getDate() - 2);
+      else if (range === '10D') cutoff.setDate(cutoff.getDate() - 10);
+      return live.filter(p => p.x >= cutoff);
+    }
     return live;
   } else {
     // Baseline from R2 + Live Tip from CNBC
@@ -297,8 +356,8 @@ async function fetchOne(symbol, range) {
     // Reuse live tip if available, else fetch once
     let liveTip = liveCache[symbol];
     if (!liveTip) {
-      console.log(`%c[CNBC] %cFetching 2D tip for ${symbol}...`, "color: #2563eb; font-weight: bold", "color: inherit");
-      liveTip = await fetchLive(symbol, '2D');
+      console.log(`%c[CNBC] %cFetching 5D tip for ${symbol}...`, "color: #2563eb; font-weight: bold", "color: inherit");
+      liveTip = await fetchLive(symbol, '2D'); // '2D' range in UI uses '5D' provider range
       liveCache[symbol] = liveTip;
     }
 
@@ -323,7 +382,7 @@ async function fetchOne(symbol, range) {
 async function fetchLive(symbol, range) {
   const url = buildUrl(symbol, range);
   try {
-    const response = await fetch(url);
+    const response = await fetchWithTimeout(url);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const json = await response.json();
     const priceBars = json?.data?.chartData?.priceBars || [];
@@ -346,8 +405,8 @@ async function fetchHistory(symbol) {
       const localUrl = `./data/yield-history/${fileName}`;
 
       try {
-        let response = await fetch(r2Url);
-        if (!response.ok) response = await fetch(localUrl);
+        let response = await fetchWithTimeout(r2Url).catch(() => null);
+        if (!response || !response.ok) response = await fetchWithTimeout(localUrl);
         if (!response.ok) throw new Error("History not found");
         
         const data = await response.json();
@@ -371,48 +430,154 @@ function updateDynamicTicks(chart, data) {
   const padding = range * 0.1 || 0.01;
   chart.options.scales.y.min = min - padding;
   chart.options.scales.y.max = max + padding;
+
+  // Add 8am/5pm annotations if intraday
+  if (activeRange === '2D' || activeRange === '10D') {
+    const annotations = {};
+    const days = [...new Set(data.map(p => p.x.toDateString()))].map(d => new Date(d));
+    
+    days.forEach((day, idx) => {
+      const am8 = new Date(day); am8.setHours(8, 0, 0, 0);
+      const pm5 = new Date(day); pm5.setHours(17, 0, 0, 0);
+
+      annotations[`am8-${idx}`] = {
+        type: 'line',
+        xMin: am8,
+        xMax: am8,
+        borderColor: 'rgba(15, 23, 42, 0.8)', // Much darker Slate-900
+        borderWidth: 1.5,
+        borderDash: [4, 4],
+        label: { display: false }
+      };
+      annotations[`pm5-${idx}`] = {
+        type: 'line',
+        xMin: pm5,
+        xMax: pm5,
+        borderColor: 'rgba(15, 23, 42, 0.8)', // Much darker Slate-900
+        borderWidth: 1.5,
+        borderDash: [4, 4],
+        label: { display: false }
+      };
+    });
+    chart.options.plugins.annotation.annotations = annotations;
+  } else {
+    chart.options.plugins.annotation.annotations = {};
+  }
 }
 
 async function updateAllData() {
   const statusEl = document.getElementById('fetchStatus');
-  statusEl.textContent = `Updating charts...`;
+  statusEl.textContent = `Updating data...`;
 
   const isIntraday = activeRange === '2D' || activeRange === '10D';
   const shouldSlant = activeRange === '2D';
 
-  const promises = Array.from(activeSymbols).map(async sym => {
+  const allSymbols = Object.keys(AVAILABLE_SYMBOLS);
+  let successCount = 0;
+  const currentFetchTimestamps = []; // Only use times from this specific update cycle
+  
+  const promises = allSymbols.map(async sym => {
     const data = await fetchOne(sym, activeRange);
     const chart = charts[sym];
     const card = document.getElementById(`card-${sym}`);
 
-    // Remove any existing no-data overlay
-    const existing = card?.querySelector('.no-data-overlay');
-    if (existing) existing.remove();
+    if (data && data.length > 0) {
+      successCount++;
+      const lastP = data[data.length - 1].x;
+      currentFetchTimestamps.push(lastP);
 
-    if (chart && data && data.length > 0) {
-      chart.data.datasets[0].data = data;
+      if (card) {
+        const existing = card.querySelector('.no-data-overlay');
+        if (existing) existing.remove();
+      }
 
-      chart.options.scales.x.time.tooltipFormat = isIntraday ? 'MM/dd/yy HH:mm:ss' : 'MM/dd/yy';
-      chart.options.scales.x.time.displayFormats = isIntraday
-        ? { hour: 'MM/dd HH:mm', minute: 'HH:mm:ss', day: 'MMM dd' }
-        : { day: 'MMM dd', month: 'MMM yyyy', year: 'yyyy' };
+      if (chart) {
+        chart.data.datasets[0].data = data;
+        chart.options.scales.x.time.tooltipFormat = isIntraday ? 'MM/dd/yy HH:mm:ss' : 'MM/dd/yy';
+        chart.options.scales.x.time.displayFormats = isIntraday
+          ? { hour: 'MM/dd HH:mm', minute: 'HH:mm:ss', day: 'MMM dd' }
+          : { day: 'MMM dd', month: 'MMM yyyy', year: 'yyyy' };
+        chart.options.scales.x.ticks.minRotation = shouldSlant ? 45 : 0;
+        chart.options.scales.x.ticks.maxRotation = shouldSlant ? 45 : 0;
+        updateDynamicTicks(chart, data);
+        chart.update('none');
+        chart.resetZoom();
+      }
 
-      chart.options.scales.x.ticks.minRotation = shouldSlant ? 45 : 0;
-      chart.options.scales.x.ticks.maxRotation = shouldSlant ? 45 : 0;
+      // Calculate change since close
+      const latestPoint = data[data.length - 1];
+      let closePoint = null;
+      const latestDay = latestPoint.x.toDateString();
+      const fullData = (isIntraday && liveCache[sym]) ? liveCache[sym] : data;
+      
+      for (let i = fullData.length - 1; i >= 0; i--) {
+        const p = fullData[i];
+        const phour = p.x.getHours();
+        const pmin = p.x.getMinutes();
+        const pday = p.x.toDateString();
+        if (pday !== latestDay) {
+          if (phour < 17 || (phour === 17 && pmin <= 5)) {
+            closePoint = p;
+            break;
+          }
+        }
+      }
 
-      updateDynamicTicks(chart, data);
-      chart.update();
-      chart.resetZoom();
+      const changeEl = document.getElementById(`change-${sym}`);
+      const yieldEl = document.getElementById(`yield-${sym}`);
+      if (yieldEl) {
+        yieldEl.textContent = `${latestPoint.y.toFixed(3)}%`;
+      }
+      if (changeEl) {
+        if (closePoint) {
+          const diff = latestPoint.y - closePoint.y;
+          const sign = diff >= 0 ? '+' : '';
+          changeEl.textContent = `${sign}${diff.toFixed(3)}%`;
+          changeEl.className = `sym-change ${diff >= 0 ? 'up' : 'down'}`;
+          changeEl.title = `Since ${closePoint.x.toLocaleString()} close (${closePoint.y.toFixed(3)}%)`;
+        } else {
+          changeEl.textContent = '---';
+        }
+      }
     } else if (card) {
-      const overlay = document.createElement('div');
-      overlay.className = 'no-data-overlay';
-      overlay.textContent = 'No data available for this range';
-      card.querySelector('.chart-container').appendChild(overlay);
+      if (chart) {
+        chart.data.datasets[0].data = [];
+        chart.update();
+      }
+      if (!card.querySelector('.no-data-overlay')) {
+        const overlay = document.createElement('div');
+        overlay.className = 'no-data-overlay';
+        overlay.textContent = 'No data available for this range';
+        card.querySelector('.chart-container').appendChild(overlay);
+      }
     }
   });
 
   await Promise.all(promises);
-  statusEl.textContent = `Updated: ${new Date().toLocaleTimeString()}`;
+
+  const now = new Date();
+  const formatTZ = (date, tz, label, includeDate = false) => {
+    const opts = { timeZone: tz, hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' };
+    if (includeDate) { opts.month = 'short'; opts.day = 'numeric'; }
+    return date.toLocaleString('en-US', opts) + ' ' + label;
+  };
+  
+  const latestDataTime = currentFetchTimestamps.length > 0 ? new Date(Math.max(...currentFetchTimestamps)) : null;
+
+  const fetchPT = formatTZ(now, 'America/Los_Angeles', 'PT');
+  const fetchET = formatTZ(now, 'America/New_York', 'ET');
+  
+  let statusHtml = `<div>Fetch: ${fetchPT} / ${fetchET}</div>`;
+  if (latestDataTime) {
+    const isToday = latestDataTime.toDateString() === now.toDateString();
+    const dataPT = formatTZ(latestDataTime, 'America/Los_Angeles', 'PT', !isToday);
+    const dataET = formatTZ(latestDataTime, 'America/New_York', 'ET', !isToday);
+    statusHtml += `<div style="margin-top:2px; color:#0f172a">Data: ${dataPT} / ${dataET} (${successCount}/${allSymbols.length} syms)</div>`;
+  } else {
+    statusHtml += `<div style="margin-top:2px; color:#dc2626">No data returned (${successCount}/${allSymbols.length} syms)</div>`;
+  }
+
+  statusEl.innerHTML = statusHtml;
 }
 
 window.addEventListener('DOMContentLoaded', init);

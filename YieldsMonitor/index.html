@@ -8,24 +8,25 @@
 <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
 <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; }
-  body { font-family: system-ui, sans-serif; font-size: 13px; margin: 0; padding: 15px; color: #222; background: #f1f5f9; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+  body { font-family: system-ui, sans-serif; font-size: 13px; margin: 0; padding: 15px; color: #000; background: #f1f5f9; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
   
   header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-shrink: 0; }
   header h1 { font-size: 18px; margin: 0; display: flex; align-items: center; gap: 10px; }
-  .tz-info { font-size: 11px; color: #64748b; font-weight: normal; background: #e2e8f0; padding: 2px 8px; border-radius: 4px; }
+  .tz-info { font-size: 11px; color: #334155; font-weight: 600; background: #e2e8f0; padding: 2px 8px; border-radius: 4px; }
 
   .main-layout { display: flex; gap: 15px; flex: 1; min-height: 0; min-width: 0; }
   
   /* Sidebar / Controls */
-  .sidebar { width: 280px; background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 15px; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; flex-shrink: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+  .sidebar { width: 300px; background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 15px; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; flex-shrink: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
   
   /* Content Area with Row Containers */
   .content { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; min-width: 0; padding-right: 4px; }
   
   .row-section { display: flex; flex-direction: column; gap: 4px; min-height: 0; flex: 1; overflow: hidden; }
-  .row-title { font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-left: 5px; letter-spacing: 0.05em; flex-shrink: 0; }
+  .row-title { font-size: 10px; font-weight: 800; color: #334155; text-transform: uppercase; margin-left: 5px; letter-spacing: 0.05em; flex-shrink: 0; }
   
   .chart-row { 
     display: flex; 
@@ -54,13 +55,13 @@
   }
 
   .chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; flex-shrink: 0; }
-  .chart-title { font-size: 12px; font-weight: 700; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .chart-title { font-size: 12px; font-weight: 800; color: #000; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .chart-container { flex: 1; position: relative; min-height: 0; width: 100%; }
 
-  .btn { padding: 4px 10px; font-size: 11px; background: #1e293b; color: #fff; border: none; border-radius: 4px; font-weight: 600; cursor: pointer; }
-  .btn-outline { background: #fff; color: #1e293b; border: 1px solid #cbd5e1; }
+  .btn { padding: 4px 10px; font-size: 11px; background: #0f172a; color: #fff; border: none; border-radius: 4px; font-weight: 600; cursor: pointer; }
+  .btn-outline { background: #fff; color: #0f172a; border: 1px solid #cbd5e1; }
   
-  footer { margin-top: 5px; font-size: 10px; color: #94a3b8; text-align: center; flex-shrink: 0; }
+  footer { margin-top: 5px; font-size: 10px; color: #475569; text-align: center; flex-shrink: 0; }
 
   /* Custom Scrollbar for Rows */
   .chart-row::-webkit-scrollbar { height: 6px; }
