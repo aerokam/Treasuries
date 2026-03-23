@@ -392,10 +392,12 @@ async function loadData() {
           fileInput.dispatchEvent(new Event('change'));
           
           // Auto-run once data is settled
+          let autoRunRetries = 0;
           const autoRun = () => {
             if (!document.getElementById('run-btn').disabled) {
               document.getElementById('run-btn').click();
-            } else {
+            } else if (autoRunRetries < 50) { // Cap at 5s
+              autoRunRetries++;
               setTimeout(autoRun, 100);
             }
           };
@@ -686,7 +688,7 @@ document.getElementById('holdings-file').addEventListener('change', async (e) =>
           const count = parsedAccounts[name].reduce((s, p) => s + p.qty, 0);
           return `<label style="display:flex;align-items:center;margin-bottom:8px;cursor:pointer;font-size:13px;">
             <input type="checkbox" value="${esc(name)}" checked style="margin-right:8px;width:16px;height:16px;">
-            <b>${esc(name)}</b> <span style="color:#64748b;margin-left:6px;font-size:12px;">(${pos} positions, ${count} units)</span>
+            <b>${esc(name)}</b> <span style="color:#64748b;margin-left:6px;font-size:12px;">(${pos} positions, ${count} TIPS)</span>
           </label>`;
         }).join('');
         document.getElementById('account-overlay').style.display = 'block';

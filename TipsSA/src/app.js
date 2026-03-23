@@ -208,29 +208,39 @@ async function init() {
   console.log("init() started");
   
   try {
+    console.log("Fetching market data...");
     const [yieldsRes, refCpiRes, holidayRes] = await Promise.all([
-      fetch(YIELDS_CSV_URL).catch(e => ({ ok: false, error: e })),
-      fetch(REF_CPI_CSV_URL).catch(e => ({ ok: false, error: e })),
-      fetch(HOLIDAYS_CSV_URL).catch(e => ({ ok: false, error: e }))
+      fetch(YIELDS_CSV_URL).then(r => { console.log("Yields fetched"); return r; }).catch(e => ({ ok: false, error: e })),
+      fetch(REF_CPI_CSV_URL).then(r => { console.log("RefCPI fetched"); return r; }).catch(e => ({ ok: false, error: e })),
+      fetch(HOLIDAYS_CSV_URL).then(r => { console.log("Holidays fetched"); return r; }).catch(e => ({ ok: false, error: e }))
     ]);
 
     if (!yieldsRes.ok) throw new Error(`Failed to fetch yields: ${yieldsRes.status || yieldsRes.error}`);
     if (!refCpiRes.ok) throw new Error(`Failed to fetch Ref CPI: ${refCpiRes.status || refCpiRes.error}`);
     if (!holidayRes.ok) throw new Error(`Failed to fetch bond holidays: ${holidayRes.status || holidayRes.error}`);
 
-    console.log("Fetches complete, parsing...");
-    rawYieldsData = parseCsv(await yieldsRes.text());
-    rawRefCpiData = parseCsv(await refCpiRes.text());
+    console.log("Fetches complete, parsing text...");
+    const [yieldsText, refCpiText, holidayText] = await Promise.all([
+      yieldsRes.text(),
+      refCpiRes.text(),
+      holidayRes.text()
+    ]);
+
+    console.log("Parsing CSVs...");
+    rawYieldsData = parseCsv(yieldsText);
+    rawRefCpiData = parseCsv(refCpiText);
     
     console.log(`Parsed ${rawYieldsData.length} yield rows and ${rawRefCpiData.length} RefCPI rows.`);
 
-    const holidayRows = parseCsv(await holidayRes.text(), false);
+    const holidayRows = parseCsv(holidayText, false);
     holidaySet = new Set();
-    holidayRows.forEach(row => {
+    holidayRows.forEach((row, i) => {
+      if (!row || !row[0]) return;
       const datePart = row[0].split(',').slice(1).join(',').trim(); 
       const d = new Date(datePart);
       if (!isNaN(d.getTime())) holidaySet.add(toIsoDate(d));
     });
+    console.log(`Holiday set populated with ${holidaySet.size} dates.`);
 
     processAndRender();
 
@@ -285,90 +295,102 @@ function calculateSAO(bonds) {
 
 function processAndRender() {
   console.log("processAndRender() started");
+  const statusEl = document.getElementById('status');
   if (!rawYieldsData || rawYieldsData.length === 0 || !rawRefCpiData) {
-    console.warn("No data to process.");
+    console.warn("No data to process. rawYieldsData:", rawYieldsData, "rawRefCpiData:", rawRefCpiData);
     return;
   }
 
-  const statusEl = document.getElementById('status');
-  const infoEl = document.getElementById('info-strip');
-  const priceSourceEl = document.getElementById('priceSource');
-  const sourceLabelEl = document.getElementById('priceSourceLabel');
+  try {
+    const infoEl = document.getElementById('info-strip');
+    const priceSourceEl = document.getElementById('priceSource');
+    const sourceLabelEl = document.getElementById('priceSourceLabel');
 
-  const fedSettleStr = rawYieldsData[0]?.settlementDate;
-  
-  if (brokerPrices) {
-    const uploadTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    sourceLabelEl.textContent = `Using Broker Ask Prices (Uploaded at ${uploadTime})`;
-    priceSourceEl.style.display = 'flex';
-    const fedSettleDate = localDate(fedSettleStr);
-    const tPlus1 = nextBusinessDay(fedSettleDate, holidaySet);
-    const displaySettle = toIsoDate(tPlus1);
-    infoEl.textContent = `Broker Prices · Settlement Date: ${displaySettle} (T+1)`;
-  } else {
-    priceSourceEl.style.display = 'none';
-    infoEl.textContent = `FedInvest market data · Settlement Date: ${fedSettleStr} (T)`;
-  }
-
-  console.log("Processing bonds...");
-  const allProcessed = rawYieldsData.map(bond => {
-    const coupon = parseFloat(bond.coupon);
-    let price = parseFloat(bond.price);
-    let settleDateStr = bond.settlementDate;
-
-    if (brokerPrices && brokerPrices.has(bond.cusip)) {
-      price = brokerPrices.get(bond.cusip);
-      const fedSettleDate = localDate(bond.settlementDate);
+    const fedSettleStr = rawYieldsData[0]?.settlementDate;
+    
+    if (brokerPrices) {
+      const uploadTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      sourceLabelEl.textContent = `Using Broker Ask Prices (Uploaded at ${uploadTime})`;
+      priceSourceEl.style.display = 'flex';
+      const fedSettleDate = localDate(fedSettleStr);
       const tPlus1 = nextBusinessDay(fedSettleDate, holidaySet);
-      settleDateStr = toIsoDate(tPlus1);
+      const displaySettle = toIsoDate(tPlus1);
+      infoEl.textContent = `Broker Prices \xb7 Settlement Date: ${displaySettle} (T+1)`;
+    } else {
+      priceSourceEl.style.display = 'none';
+      infoEl.textContent = `FedInvest market data \xb7 Settlement Date: ${fedSettleStr} (T)`;
     }
 
-    const mmddSettle = settleDateStr.slice(5, 10);
-    const mmddMature = bond.maturity.slice(5, 10);
+    console.log("Processing bonds...");
+    const allProcessed = rawYieldsData.map(bond => {
+      const coupon = parseFloat(bond.coupon);
+      let price = parseFloat(bond.price);
+      let settleDateStr = bond.settlementDate;
 
-    const saSettle = parseFloat(rawRefCpiData.find(r => r["Ref CPI Date"].includes(`-${mmddSettle}`))?.["SA Factor"]);
-    const saMature = parseFloat(rawRefCpiData.find(r => r["Ref CPI Date"].includes(`-${mmddMature}`))?.["SA Factor"]);
+      if (brokerPrices && brokerPrices.has(bond.cusip)) {
+        price = brokerPrices.get(bond.cusip);
+        const fedSettleDate = localDate(bond.settlementDate);
+        const tPlus1 = nextBusinessDay(fedSettleDate, holidaySet);
+        settleDateStr = toIsoDate(tPlus1);
+      }
 
-    if (!saSettle || !saMature) return null;
+      const mmddSettle = settleDateStr.slice(5, 10);
+      const mmddMature = bond.maturity.slice(5, 10);
 
-    const askYield = yieldFromPrice(price, coupon, localDate(settleDateStr), localDate(bond.maturity));
-    const saYield = yieldFromPrice(price * (saSettle / saMature), coupon, localDate(settleDateStr), localDate(bond.maturity));
+      const rSettle = rawRefCpiData.find(r => r["Ref CPI Date"] && r["Ref CPI Date"].includes(`-${mmddSettle}`));
+      const rMature = rawRefCpiData.find(r => r["Ref CPI Date"] && r["Ref CPI Date"].includes(`-${mmddMature}`));
+      const saSettle = parseFloat(rSettle?.["SA Factor"]);
+      const saMature = parseFloat(rMature?.["SA Factor"]);
 
-    return { ...bond, coupon, price, askYield, saYield, maturityDate: localDate(bond.maturity), settlementDate: settleDateStr };
-  }).filter(b => b !== null).sort((a, b) => a.maturityDate - b.maturityDate);
+      if (isNaN(saSettle) || isNaN(saMature)) {
+        console.warn(`Missing SA factor for bond ${bond.cusip}: settle ${mmddSettle} (${saSettle}), mature ${mmddMature} (${saMature})`);
+        return null;
+      }
 
-  console.log(`Processed ${allProcessed.length} bonds.`);
+      const askYield = yieldFromPrice(price, coupon, localDate(settleDateStr), localDate(bond.maturity));
+      const saYield = yieldFromPrice(price * (saSettle / saMature), coupon, localDate(settleDateStr), localDate(bond.maturity));
 
-  const smoothed = calculateSAO(allProcessed);
-  allProcessed.forEach((b, i) => {
-    b.saoYield = smoothed[i];
-    b.diffBps = (b.saYield - b.askYield) * 10000;
-  });
+      return { ...bond, coupon, price, askYield, saYield, maturityDate: localDate(bond.maturity), settlementDate: settleDateStr };
+    }).filter(b => b !== null).sort((a, b) => a.maturityDate - b.maturityDate);
 
-  const startSel = document.getElementById('startMaturity');
-  const endSel = document.getElementById('endMaturity');
-  if (startSel.options.length === 0) {
+    console.log(`Processed ${allProcessed.length} bonds.`);
+
+    const smoothed = calculateSAO(allProcessed);
     allProcessed.forEach((b, i) => {
-      const opt = (selected) => {
-        const o = document.createElement('option');
-        o.value = b.maturity; o.textContent = fmtMMM(b.maturity);
-        if (selected) o.selected = true;
-        return o;
-      };
-      startSel.appendChild(opt(i === 0));
-      endSel.appendChild(opt(i === allProcessed.length - 1));
+      b.saoYield = smoothed[i];
+      b.diffBps = (b.saYield - b.askYield) * 10000;
     });
-    startSel.onchange = () => processAndRender();
-    endSel.onchange = () => processAndRender();
+
+    const startSel = document.getElementById('startMaturity');
+    const endSel = document.getElementById('endMaturity');
+    if (startSel.options.length === 0 && allProcessed.length > 0) {
+      allProcessed.forEach((b, i) => {
+        const opt = (selected) => {
+          const o = document.createElement('option');
+          o.value = b.maturity; o.textContent = fmtMMM(b.maturity);
+          if (selected) o.selected = true;
+          return o;
+        };
+        startSel.appendChild(opt(i === 0));
+        endSel.appendChild(opt(i === allProcessed.length - 1));
+      });
+      startSel.onchange = () => processAndRender();
+      endSel.onchange = () => processAndRender();
+    }
+
+    const startDate = localDate(startSel.value);
+    const endDate = localDate(endSel.value);
+    const filteredBonds = allProcessed.filter(b => b.maturityDate >= startDate && b.maturityDate <= endDate);
+
+    renderTable(filteredBonds);
+    renderChart(filteredBonds);
+    statusEl.textContent = `Successfully loaded ${filteredBonds.length} TIPS.`;
+    statusEl.className = '';
+  } catch (err) {
+    statusEl.textContent = `Error in processing: ${err.message}`;
+    statusEl.className = 'error';
+    console.error('processAndRender failed:', err);
   }
-
-  const startDate = localDate(startSel.value);
-  const endDate = localDate(endSel.value);
-  const filteredBonds = allProcessed.filter(b => b.maturityDate >= startDate && b.maturityDate <= endDate);
-
-  renderTable(filteredBonds);
-  renderChart(filteredBonds);
-  statusEl.textContent = `Successfully loaded ${filteredBonds.length} TIPS.`;
 }
 
 function renderTable(bonds) {
