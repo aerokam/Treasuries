@@ -5,7 +5,7 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '../../');
 
-const TIPS_REF_PATH = path.join(ROOT, 'tests/e2e/TipsYields.csv');
+const TIPS_REF_PATH = path.join(ROOT, 'tests/e2e/Yields.csv');
 const TARGET_FILES = [
   'tests/dev/FidelityAllAccounts.csv',
   'tests/dev/Schwab all accounts.csv'
@@ -41,8 +41,8 @@ function getKnownTips() {
   const content = fs.readFileSync(TIPS_REF_PATH, 'utf8');
   const lines = content.trim().split('\n');
   const cusips = new Set();
-  // Skip header, col 1 is CUSIP
-  for (let i = 1; i < lines.length; i++) {
+  // Row 0 = settlement date, row 1 = header (type,cusip,...), rows 2+ = data; col 1 is CUSIP
+  for (let i = 2; i < lines.length; i++) {
     const cols = lines[i].split(',');
     if (cols.length > 1) cusips.add(cols[1].trim());
   }

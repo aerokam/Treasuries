@@ -42,16 +42,20 @@ function lookupRefCpi(refCpiRows, dateStr) {
 }
 
 // ── Load shared data ──────────────────────────────────────────────────────────
-const yieldsPath = path.resolve('TipsLadderManager/tests/e2e/TipsYields.csv');
-const refCpiPath = path.resolve('TipsLadderManager/tests/e2e/RefCPI.csv');
+const yieldsPath = path.resolve('tests/e2e/Yields.csv');
+const refCpiPath = path.resolve('tests/e2e/RefCPI.csv');
 
 console.log(`[Test Setup] Market Data:   ${yieldsPath}`);
-const yieldsRows = parseCsv(readFileSync(yieldsPath, 'utf8')).map(r => ({
-  settlementDate: r.settlementDate,
+// Yields.csv: row 1 = settlement date, row 2 = header, rows 3+ = data
+const yieldsText = readFileSync(yieldsPath, 'utf8');
+const yieldsLines = yieldsText.trim().split('\n');
+const yieldsCsvSettleDate = yieldsLines[0].trim();
+const yieldsRows = parseCsv(yieldsLines.slice(1).join('\n')).map(r => ({
+  settlementDate: yieldsCsvSettleDate,
   cusip:    r.cusip,
   maturity: r.maturity,
   coupon:   parseFloat(r.coupon),
-  baseCpi:  parseFloat(r.baseCpi),
+  baseCpi:  parseFloat(r.datedDateCpi),
   price:    parseFloat(r.price)  || null,
   yield:    parseFloat(r.yield)  || null,
 }));

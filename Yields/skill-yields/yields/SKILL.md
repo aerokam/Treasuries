@@ -1,4 +1,4 @@
-# TIPS Seasonal Adjustments (TipsSA)
+# Yields: TIPS Seasonal Adjustments
 
 This skill provides expertise in analyzing and applying seasonal factors to Treasury Inflation-Protected Securities (TIPS), primarily based on the methodology by Paul Canty.
 

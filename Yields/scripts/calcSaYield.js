@@ -37,6 +37,19 @@ function yieldFromPrice(cleanPrice, coupon, settleDate, matureDate) {
   const mature = matureDate;
   if (settle >= mature) return null;
 
+  const days = (a, b) => (b.getTime() - a.getTime()) / 86400000;
+  const daysToMat = days(settle, mature);
+
+  function hasLeapDayBetween(d1, d2) {
+    for (let yr = d1.getFullYear(); yr <= d2.getFullYear(); yr++) {
+      const feb29 = new Date(yr, 1, 29);
+      if (feb29.getMonth() === 1 && feb29 > d1 && feb29 <= d2) return true;
+    }
+    return false;
+  }
+  const leapSpan = hasLeapDayBetween(settle, mature);
+  const freq = daysToMat < (leapSpan ? 183 : 182.5) ? 1 : 2;
+
   const semiCoupon = (coupon / 2) * 100;
   const matMon = mature.getMonth() + 1;
   const cm1 = matMon <= 6 ? matMon : matMon - 6;
@@ -52,11 +65,38 @@ function yieldFromPrice(cleanPrice, coupon, settleDate, matureDate) {
     return candidates.find(c => c >= d && c <= mature) || null;
   }
 
+  // ── Freq=1: single-period annual yield ──
+  if (freq === 1) {
+    const daysInYear = leapSpan ? 366 : 365;
+    const w = daysToMat / daysInYear;
+    let dirtyPrice = cleanPrice;
+    if (semiCoupon > 0) {
+      const nextCoupon = nextCouponOnOrAfter(settle);
+      if (nextCoupon) {
+        const lastCoupon = new Date(nextCoupon.getFullYear(), nextCoupon.getMonth() - 6, 15);
+        const E = days(lastCoupon, nextCoupon);
+        const A = days(lastCoupon, settle);
+        dirtyPrice = cleanPrice + semiCoupon * (A / E);
+      }
+    }
+    const lastCF = semiCoupon + 100;
+    let y = coupon > 0.005 ? coupon : 0.02;
+    for (let i = 0; i < 200; i++) {
+      const pv = lastCF / Math.pow(1 + y, w);
+      const diff = pv - dirtyPrice;
+      if (Math.abs(diff) < 1e-10) break;
+      const dpv = -lastCF * w / Math.pow(1 + y, w + 1);
+      if (Math.abs(dpv) < 1e-15) break;
+      y -= diff / dpv;
+    }
+    return y;
+  }
+
+  // ── Freq=2: semi-annual BEY ──
   const nextCoupon = nextCouponOnOrAfter(settle);
   if (!nextCoupon) return null;
   const lastCoupon = new Date(nextCoupon.getFullYear(), nextCoupon.getMonth() - 6, 15);
 
-  const days = (a, b) => (b - a) / 86400000;
   const E = days(lastCoupon, nextCoupon);
   const A = days(lastCoupon, settle);
   const DSC = days(settle, nextCoupon);

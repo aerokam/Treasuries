@@ -10,14 +10,16 @@ if (existsSync(_envPath)) {
   });
 }
 
-// Fetch TIPS prices from FedInvest, merge with TipsRef.csv metadata, calculate yields.
-// Reads TipsRef.csv from R2 for base CPI / coupon metadata.
-// Writes TipsYields.csv to R2 with settlement date, price, and yield per CUSIP.
+// Fetch Treasury prices from FedInvest, merge TIPS with TipsRef.csv metadata, calculate yields.
+// Types written: TIPS, MARKET BASED BILL, MARKET BASED NOTE, MARKET BASED BOND (excludes FRN).
+// Writes Yields.csv to R2: row 1 = settlement date, row 2 = header, rows 3+ = data.
 //
 // Usage: node getTipsYields.js
 // Prices published once daily at ~1pm ET on FedInvest; scheduled job runs at 1:00 and 1:05 PM ET.
 
 const FEDINVEST_URL = 'https://www.treasurydirect.gov/GA-FI/FedInvest/todaySecurityPriceDetail';
+
+const INCLUDE_TYPES = new Set(['TIPS', 'MARKET BASED BILL', 'MARKET BASED NOTE', 'MARKET BASED BOND']);
 
 async function uploadToR2(key, body) {
   const { S3Client, PutObjectCommand } = await import('@aws-sdk/client-s3');
@@ -42,14 +44,20 @@ async function uploadToR2(key, body) {
   console.error(`Wrote ${body.trim().split('\n').length - 1} rows → R2 bucket "${R2_BUCKET}", key "${key}"`);
 }
 
-// ─── Date helper (used by yieldFromPrice) ────────────────────────────────────
+// ─── Date helpers ─────────────────────────────────────────────────────────────
 function localDate(str) {
   const [y, m, d] = str.split('-').map(Number);
   return new Date(y, m - 1, d);
 }
 
+// FedInvest maturity dates are MM/DD/YYYY → convert to YYYY-MM-DD
+function parseFedInvestDate(str) {
+  const [m, d, y] = str.split('/').map(Number);
+  return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}
+
 // ─── FedInvest price fetch ────────────────────────────────────────────────────
-async function fetchTipsPrices() {
+async function fetchPrices() {
   const months = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
 
   // GET HTML for settlement date + POST for CSV — run in parallel
@@ -89,17 +97,33 @@ async function fetchTipsPrices() {
         eod:  parseFloat(c[7]) || 0,
       };
     })
-    .filter(r => r.type === 'TIPS');
+    .filter(r => INCLUDE_TYPES.has(r.type));
 
   return { rows, settleDateStr };
 }
 
-// ─── Yield from price (actual/actual, matches Excel YIELD(...,2,1)) ───────────
+// ─── Yield from price ─────────────────────────────────────────────────────────
+// Actual/actual day count. Freq auto-detected: 1 if days(settle,mature) < half-year, else 2.
+// Freq=1: single-period annual discounting (bills, and any security within ~6 months of maturity).
+// Freq=2: standard semi-annual BEY (matches Excel YIELD(...,2,1)).
 function yieldFromPrice(cleanPrice, coupon, settleDateStr, maturityStr) {
   if (!cleanPrice || cleanPrice <= 0) return null;
   const settle = localDate(settleDateStr);
   const mature = localDate(maturityStr);
   if (settle >= mature) return null;
+
+  const days = (a, b) => (b - a) / 86400000;
+  const daysToMat = days(settle, mature);
+
+  function hasLeapDayBetween(d1, d2) {
+    for (let yr = d1.getFullYear(); yr <= d2.getFullYear(); yr++) {
+      const feb29 = new Date(yr, 1, 29);
+      if (feb29.getMonth() === 1 && feb29 > d1 && feb29 <= d2) return true;
+    }
+    return false;
+  }
+  const leapSpan = hasLeapDayBetween(settle, mature);
+  const freq = daysToMat < (leapSpan ? 183 : 182.5) ? 1 : 2;
 
   const semiCoupon = (coupon / 2) * 100;
   const matMon = mature.getMonth() + 1;
@@ -116,11 +140,38 @@ function yieldFromPrice(cleanPrice, coupon, settleDateStr, maturityStr) {
     return candidates.find(c => c >= d && c <= mature) || null;
   }
 
+  // ── Freq=1: single-period annual yield ──
+  if (freq === 1) {
+    const daysInYear = leapSpan ? 366 : 365;
+    const w = daysToMat / daysInYear;
+    let dirtyPrice = cleanPrice;
+    if (semiCoupon > 0) {
+      const nextCoupon = nextCouponOnOrAfter(settle);
+      if (nextCoupon) {
+        const lastCoupon = new Date(nextCoupon.getFullYear(), nextCoupon.getMonth() - 6, 15);
+        const E = days(lastCoupon, nextCoupon);
+        const A = days(lastCoupon, settle);
+        dirtyPrice = cleanPrice + semiCoupon * (A / E);
+      }
+    }
+    const lastCF = semiCoupon + 100;
+    let y = coupon > 0.005 ? coupon : 0.02;
+    for (let i = 0; i < 200; i++) {
+      const pv = lastCF / Math.pow(1 + y, w);
+      const diff = pv - dirtyPrice;
+      if (Math.abs(diff) < 1e-10) break;
+      const dpv = -lastCF * w / Math.pow(1 + y, w + 1);
+      if (Math.abs(dpv) < 1e-15) break;
+      y -= diff / dpv;
+    }
+    return y;
+  }
+
+  // ── Freq=2: semi-annual BEY ──
   const nextCoupon = nextCouponOnOrAfter(settle);
   if (!nextCoupon) return null;
   const lastCoupon = new Date(nextCoupon.getFullYear(), nextCoupon.getMonth() - 6, 15);
 
-  const days = (a, b) => (b - a) / 86400000;
   const E = days(lastCoupon, nextCoupon);
   const A = days(lastCoupon, settle);
   const DSC = days(settle, nextCoupon);
@@ -171,7 +222,7 @@ function yieldFromPrice(cleanPrice, coupon, settleDateStr, maturityStr) {
 async function main() {
   const R2_BASE_URL = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/TIPS';
 
-  // Read TipsRef.csv for base CPI / coupon / maturity metadata
+  // Read TipsRef.csv for TIPS dated-date CPI / coupon / maturity metadata
   console.error('Fetching TipsRef.csv from R2...');
   const refRes = await fetch(`${R2_BASE_URL}/TipsRef.csv`);
   if (!refRes.ok) throw new Error(`Failed to fetch TipsRef.csv from R2: ${refRes.status}`);
@@ -187,37 +238,51 @@ async function main() {
   const refMap = new Map(refRows.map(r => [r.cusip, r]));
 
   // Fetch FedInvest prices (today's latest available)
-  console.error('Fetching TIPS prices from FedInvest...');
-  const { rows: priceRows, settleDateStr } = await fetchTipsPrices();
-  if (priceRows.length === 0) throw new Error('No TIPS price data found from FedInvest');
+  console.error('Fetching prices from FedInvest...');
+  const { rows: priceRows, settleDateStr } = await fetchPrices();
+  if (priceRows.length === 0) throw new Error('No price data found from FedInvest');
   console.error(`Settlement date: ${settleDateStr}`);
 
   // Merge prices with metadata and calculate yields
   const rows = [];
   for (const p of priceRows) {
-    const ref = refMap.get(p.cusip);
-    if (!ref) continue; // no metadata for this CUSIP — skip
-
     const price = p.buy || p.sell || p.eod || null;
-    const yld   = price ? yieldFromPrice(price, ref.coupon, settleDateStr, ref.maturity) : null;
+    let maturity, coupon, datedDateCpi;
+
+    if (p.type === 'TIPS') {
+      const ref = refMap.get(p.cusip);
+      if (!ref) continue; // no TipsRef metadata — skip
+      maturity = ref.maturity;
+      coupon = ref.coupon;
+      datedDateCpi = ref.baseCpi;
+    } else {
+      maturity = parseFedInvestDate(p.maturity);
+      coupon = p.coupon;
+      datedDateCpi = '';
+    }
+
+    const yld = price ? yieldFromPrice(price, coupon, settleDateStr, maturity) : null;
 
     rows.push({
-      settlementDate: settleDateStr,
-      cusip:    p.cusip,
-      maturity: ref.maturity,
-      coupon:   ref.coupon,
-      baseCpi:  ref.baseCpi,
-      price:    price ?? '',
-      yield:    yld != null ? yld.toFixed(8) : '',
+      type:         p.type,
+      cusip:        p.cusip,
+      maturity,
+      coupon,
+      datedDateCpi,
+      price:        price ?? '',
+      yield:        yld != null ? yld.toFixed(8) : '',
     });
   }
 
-  // Write TipsYields.csv to R2
-  const header = 'settlementDate,cusip,maturity,coupon,baseCpi,price,yield';
+  // Write Yields.csv to R2: row 1 = settlement date, row 2 = header, rows 3+ = data
+  const header = 'type,cusip,maturity,coupon,datedDateCpi,price,yield';
   const lines = rows.map(r =>
-    `${r.settlementDate},${r.cusip},${r.maturity},${r.coupon},${r.baseCpi},${r.price},${r.yield}`
+    `${r.type},${r.cusip},${r.maturity},${r.coupon},${r.datedDateCpi},${r.price},${r.yield}`
   );
-  await uploadToR2('TIPS/TipsYields.csv', [header, ...lines].join('\n') + '\n');
+  await uploadToR2('TIPS/Yields.csv', [settleDateStr, header, ...lines].join('\n') + '\n');
+
+  const typeCounts = rows.reduce((acc, r) => { acc[r.type] = (acc[r.type] || 0) + 1; return acc; }, {});
+  for (const [type, count] of Object.entries(typeCounts)) console.error(`  ${type}: ${count}`);
 }
 
 main().catch(err => { console.error(err); process.exit(1); });

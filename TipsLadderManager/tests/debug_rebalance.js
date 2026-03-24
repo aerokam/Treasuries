@@ -2,24 +2,13 @@
 import { buildTipsMapFromYields, runRebalance, localDate } from './src/rebalance-lib.js';
 import { readFileSync } from 'fs';
 
-const yieldsRaw = JSON.parse(readFileSync('tests/e2e/TipsYields.csv', 'utf8').split('\n').slice(1).map(line => {
-    const parts = line.split(',');
-    return {
-        settlementDate: parts[0],
-        cusip: parts[1],
-        maturity: parts[2],
-        coupon: parseFloat(parts[3]),
-        baseCpi: parseFloat(parts[4]),
-        price: parseFloat(parts[5]),
-        yield: parseFloat(parts[6])
-    };
-}).filter(r => r.cusip).map(r => JSON.stringify(r)).join('\n'));
-// Wait, my JSON.parse logic above is wrong for CSV. Let's do it properly.
-
-const yieldsText = readFileSync('tests/e2e/TipsYields.csv', 'utf8');
-const yieldsRows = yieldsText.trim().split('\n').slice(1).map(line => {
+// Yields.csv: row 1 = settlement date, row 2 = header (type,cusip,...,datedDateCpi,...), rows 3+ = data
+const yieldsText = readFileSync('tests/e2e/Yields.csv', 'utf8');
+const yieldsAllLines = yieldsText.trim().split('\n');
+const yieldsCsvSettle = yieldsAllLines[0].trim();
+const yieldsRows = yieldsAllLines.slice(2).map(line => {
     const p = line.split(',');
-    return { settlementDate: p[0], cusip: p[1], maturity: p[2], coupon: parseFloat(p[3]), baseCpi: parseFloat(p[4]), price: parseFloat(p[5]), yield: parseFloat(p[6]) };
+    return { settlementDate: yieldsCsvSettle, cusip: p[1], maturity: p[2], coupon: parseFloat(p[3]), baseCpi: parseFloat(p[4]), price: parseFloat(p[5]), yield: parseFloat(p[6]) };
 });
 
 const tipsMap = buildTipsMapFromYields(yieldsRows);

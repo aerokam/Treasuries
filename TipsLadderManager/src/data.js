@@ -15,7 +15,7 @@ export function parseCsv(text) {
   });
 }
 
-// Fetches TipsYields.csv and RefCPI.csv from R2, parses and types the rows.
+// Fetches Yields.csv and RefCPI.csv from R2, parses and types the rows.
 // Returns: { yieldsRows, refCpiRows }
 // Throws on HTTP errors.
 
@@ -29,23 +29,29 @@ export function lookupRefCpi(refCpiRows, dateStr) {
 
 export async function fetchTipsData() {
   const [yieldsRes, refCpiRes, tipsRefRes] = await Promise.all([
-    fetch(BASE_URL + '/TipsYields.csv'),
+    fetch(BASE_URL + '/Yields.csv'),
     fetch(BASE_URL + '/RefCPI.csv'),
     fetch(BASE_URL + '/TipsRef.csv'),
   ]);
-  if (!yieldsRes.ok) throw new Error('TipsYields.csv: HTTP ' + yieldsRes.status);
+  if (!yieldsRes.ok) throw new Error('Yields.csv: HTTP ' + yieldsRes.status);
   if (!refCpiRes.ok) throw new Error('RefCPI.csv: HTTP ' + refCpiRes.status);
   if (!tipsRefRes.ok) throw new Error('TipsRef.csv: HTTP ' + tipsRefRes.status);
 
-  const yieldsRows = parseCsv(await yieldsRes.text()).map(r => ({
-    settlementDate: r.settlementDate,
-    cusip:    r.cusip,
-    maturity: r.maturity,
-    coupon:   parseFloat(r.coupon),
-    baseCpi:  parseFloat(r.baseCpi),
-    price:    parseFloat(r.price)  || null,
-    yield:    parseFloat(r.yield)  || null,
-  }));
+  // Yields.csv: row 1 = settlement date, row 2 = header, rows 3+ = data
+  const yieldsText = await yieldsRes.text();
+  const yieldsLines = yieldsText.trim().split('\n');
+  const settlementDate = yieldsLines[0].trim();
+  const yieldsRows = parseCsv(yieldsLines.slice(1).join('\n'))
+    .filter(r => r.type === 'TIPS')
+    .map(r => ({
+      settlementDate,
+      cusip:    r.cusip,
+      maturity: r.maturity,
+      coupon:   parseFloat(r.coupon),
+      baseCpi:  parseFloat(r.datedDateCpi),
+      price:    parseFloat(r.price)  || null,
+      yield:    parseFloat(r.yield)  || null,
+    }));
 
   const refCpiRows = parseCsv(await refCpiRes.text()).map(r => ({
     date:   r.date,

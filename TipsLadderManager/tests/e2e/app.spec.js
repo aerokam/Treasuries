@@ -1,6 +1,6 @@
 // E2E regression tests — guards against GUI breakage (inop buttons, broken table render, drill popups)
 // Run: npx playwright test
-// Mocks R2 fetches with local data/TipsYields.csv and data/RefCPI.csv
+// Mocks R2 fetches with local data/Yields.csv and data/RefCPI.csv
 
 import { test, expect } from 'playwright/test';
 import { readFileSync } from 'fs';
@@ -15,8 +15,8 @@ const csv = name => readFileSync(path.join(FIXTURES, name), 'utf8');
 const HOLDINGS_PATH = path.join(ROOT, 'tests', 'CusipQtyTestLumpy.csv');
 
 test.beforeEach(async ({ page }) => {
-  await page.route('**/TIPS/TipsYields.csv', r =>
-    r.fulfill({ body: csv('TipsYields.csv'), contentType: 'text/csv' }));
+  await page.route('**/TIPS/Yields.csv', r =>
+    r.fulfill({ body: csv('Yields.csv'), contentType: 'text/csv' }));
   await page.route('**/TIPS/RefCPI.csv', r =>
     r.fulfill({ body: csv('RefCPI.csv'), contentType: 'text/csv' }));
   await page.route('**/TIPS/TipsRef.csv', r =>

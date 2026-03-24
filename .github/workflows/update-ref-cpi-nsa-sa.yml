@@ -28,7 +28,7 @@ jobs:
       - name: Check if today is a CPI Release Day
         # If it's manual trigger (workflow_dispatch), skip the check and run anyway
         if: github.event_name != 'workflow_dispatch'
-        run: node TipsSA/scripts/checkReleaseDate.js
+        run: node Yields/scripts/checkReleaseDate.js
 
       - name: Run Update Script
         env:
@@ -36,4 +36,4 @@ jobs:
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           R2_BUCKET: ${{ secrets.R2_BUCKET }}
-        run: node TipsSA/scripts/updateRefCpi.js
+        run: node Yields/scripts/updateRefCpi.js

@@ -1,16 +1,17 @@
 import { test, expect } from '@playwright/test';
 
-test.describe('TipsSA Chart and UI', () => {
+test.describe('Yield Curves Chart and UI', () => {
   test.beforeEach(async ({ page }) => {
     // Intercept CSV fetches to use mock data
-    await page.route('**/TIPS/TipsYields.csv', async route => {
+    await page.route('**/TIPS/Yields.csv', async route => {
       await route.fulfill({
         status: 200,
         contentType: 'text/csv',
-        body: 'settlementDate,cusip,maturity,coupon,baseCpi,price,yield\n' +
-              '2026-03-19,91282CCA7,2026-04-15,0.00125,262.25027,100.0625,-0.00715670\n' +
-              '2026-03-19,912828S50,2026-07-15,0.00125,239.70132,101.4375,-0.04207774\n' +
-              '2026-03-19,91282CDC2,2026-10-15,0.00125,273.25771,100.96875,-0.01548122\n'
+        body: '2026-03-19\n' +
+              'type,cusip,maturity,coupon,datedDateCpi,price,yield\n' +
+              'TIPS,91282CCA7,2026-04-15,0.00125,262.25027,100.0625,-0.00715670\n' +
+              'TIPS,912828S50,2026-07-15,0.00125,239.70132,101.4375,-0.04207774\n' +
+              'TIPS,91282CDC2,2026-10-15,0.00125,273.25771,100.96875,-0.01548122\n'
       });
     });
 

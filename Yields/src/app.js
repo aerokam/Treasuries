@@ -1,11 +1,11 @@
-// TIPS Seasonal Adjustment (TipsSA) Frontend Logic
+// Yield Curves — Frontend Logic
 import { yieldFromPrice } from '../../shared/src/bond-math.js';
 import { handleChartKeydown } from '../../shared/src/chart-keys.js';
 
-console.log("TipsSA app.js loading...");
+console.log("Yields app.js loading...");
 
 const R2_BASE_URL = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev';
-const YIELDS_CSV_URL = `${R2_BASE_URL}/TIPS/TipsYields.csv`;
+const YIELDS_CSV_URL = `${R2_BASE_URL}/TIPS/Yields.csv`;
 const REF_CPI_CSV_URL = `${R2_BASE_URL}/TIPS/RefCpiNsaSa.csv`;
 const HOLIDAYS_CSV_URL = `${R2_BASE_URL}/misc/BondHolidaysSifma.csv`;
 
@@ -152,8 +152,8 @@ const COL_HELP = {
 <p>The blend weight tilts heavily toward the trend for short-maturity TIPS, where residual seasonal distortions are largest, and tapers off for longer maturities.</p>
 <ul style="margin:12px 0 0;padding-left:18px;">
   <li style="margin-bottom:6px;"><strong>Under 6 months:</strong> 90% trend projection, 10% raw SA yield</li>
-  <li style="margin-bottom:6px;"><strong>6 months – 2 years:</strong> 50% trend</li>
-  <li style="margin-bottom:6px;"><strong>2 – 5 years:</strong> 40% trend</li>
+  <li style="margin-bottom:6px;"><strong>6 months – 2 years:</strong> 15% trend</li>
+  <li style="margin-bottom:6px;"><strong>2 – 5 years:</strong> 25% trend</li>
   <li style="margin-bottom:6px;"><strong>Over 7 years:</strong> equals SA yield (no adjustment)</li>
 </ul>
 <p>The result is a <strong>smoothed yield curve</strong> that reveals where the short end should price relative to the longer end, independent of residual seasonal noise.</p>`
@@ -201,6 +201,61 @@ function _showSaDrill(cusip) {
   _showDrillPopup(`SA Drill-down: ${bond.cusip} (${fmtMMM(bond.maturity)})`, html);
 }
 
+function _showSaoDrill(cusip) {
+  const bond = window._currentBonds.find(b => b.cusip === cusip);
+  if (!bond) return;
+
+  const now = new Date();
+  const yearsToMat = (bond.maturityDate - now) / 31557600000;
+  
+  // Find the index in the sorted array to show the window
+  const idx = window._currentBonds.indexOf(bond);
+  const n = window._currentBonds.length;
+  
+  let logicHtml = '';
+  let trendWeight = 0.2;
+  if (yearsToMat < 0.5) trendWeight = 0.9; 
+  else if (yearsToMat < 2) trendWeight = 0.15; 
+  else if (yearsToMat < 5) trendWeight = 0.25;
+
+  if (yearsToMat > 7 || idx > n - 4) {
+    logicHtml = `
+      <div style="background:#f0f9ff;padding:12px;border-radius:6px;border:1px solid #bae6fd;margin-bottom:16px;">
+        <p style="margin:0;color:#0369a1;font-weight:600;">Anchor Region (Long End)</p>
+        <p style="margin:8px 0 0;font-size:12px;">This TIPS matures in > 7 years (or is among the last 4). At this maturity, the curve is considered stable enough that the <strong>SAO Yield equals the SA Yield</strong>.</p>
+      </div>
+    `;
+  } else {
+    logicHtml = `
+      <div style="background:#f8fafc;padding:12px;border-radius:6px;border:1px solid #e2e8f0;margin-bottom:16px;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+          <span>Trend Weight (Maturity ${yearsToMat.toFixed(1)}y)</span>
+          <strong>${(trendWeight * 100).toFixed(0)}%</strong>
+        </div>
+        <div style="font-size:12px;color:#64748b;margin-bottom:12px;">
+          The <strong>Outlier (O)</strong> factor is approximated by established institutional smoothing. 
+          We use a sliding window of the <strong>next 4 longer-dated TIPS</strong> to establish a linear trend.
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+          <span>Raw SA Yield</span>
+          <span>${(bond.saYield * 100).toFixed(3)}%</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+          <span>Projected Trend Yield</span>
+          <span>${(((bond.saoYield - bond.saYield * (1 - trendWeight)) / trendWeight) * 100).toFixed(3)}%</span>
+        </div>
+        <div style="border-top:1px dashed #cbd5e1;margin:8px 0;padding-top:8px;display:flex;justify-content:space-between;color:#1a56db;font-weight:700;">
+          <span>Blended SAO Yield</span>
+          <span>${(bond.saoYield * 100).toFixed(3)}%</span>
+        </div>
+      </div>
+      <p style="font-size:11px;color:#94a3b8;margin:0;">* Projecting a smooth curve removes residual "wiggles" caused by specific maturity-month anomalies that standard SA factors may miss.</p>
+    `;
+  }
+
+  _showDrillPopup(`SAO Drill-down: ${bond.cusip} (Outlier Adjustment)`, logicHtml);
+}
+
 // ─── Main Logic ──────────────────────────────────────────────────────────────
 
 async function init() {
@@ -227,7 +282,12 @@ async function init() {
     ]);
 
     console.log("Parsing CSVs...");
-    rawYieldsData = parseCsv(yieldsText);
+    // Yields.csv: row 1 = settlement date, row 2 = header, rows 3+ = data
+    const yieldsLines = yieldsText.split(/\r?\n/).filter(l => l.trim());
+    const yieldsSettleDate = yieldsLines[0].trim();
+    rawYieldsData = parseCsv(yieldsLines.slice(1).join('\n'))
+      .filter(r => r.type === 'TIPS')
+      .map(r => ({ ...r, settlementDate: yieldsSettleDate }));
     rawRefCpiData = parseCsv(refCpiText);
     
     console.log(`Parsed ${rawYieldsData.length} yield rows and ${rawRefCpiData.length} RefCPI rows.`);
@@ -245,6 +305,10 @@ async function init() {
     processAndRender();
 
     window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        const ov = document.getElementById('drill-overlay');
+        if (ov) ov.style.display = 'none';
+      }
       if (chart) handleChartKeydown(e, chart, { onAction: ({chart}) => updateDynamicTicks(chart) });
     });
 
@@ -283,10 +347,10 @@ function calculateSAO(bonds) {
     const intercept = (sumY - slope * sumX) / actualWindow;
     const projected = intercept;
 
-    let trendWeight = 0.3;
+    let trendWeight = 0.2;
     if (yearsToMat < 0.5) trendWeight = 0.9; 
-    else if (yearsToMat < 2) trendWeight = 0.5; 
-    else if (yearsToMat < 5) trendWeight = 0.4;
+    else if (yearsToMat < 2) trendWeight = 0.15; 
+    else if (yearsToMat < 5) trendWeight = 0.25;
 
     sao[i] = (projected * trendWeight) + (bond.saYield * (1 - trendWeight));
   }
@@ -585,24 +649,43 @@ document.getElementById('brokerFile').addEventListener('change', async (e) => {
     const priceMap = new Map();
     const seenCusips = new Set();
     
+    // Robust cleaner for ="TEXT", "TEXT", =TEXT, or TEXT
+    const clean = (val) => (val || "").replace(/^=?["']*/, '').replace(/["']*$/, '').trim();
+
     rows.forEach(row => {
-      const desc = row["Description"] || "";
+      // Normalize row keys to lowercase/trimmed
+      const normalizedRow = {};
+      for (const key in row) {
+        normalizedRow[key.toLowerCase().trim()] = row[key];
+      }
+
       let cusip = null;
       let priceStr = null;
-      const cusipMatch = desc.match(/[A-Z0-9]{9}/);
-      if (cusipMatch) {
-        cusip = cusipMatch[0];
-        priceStr = row["Price"];
-      } else if (row["Cusip"]) {
-        cusip = row["Cusip"];
-        priceStr = row["Price Ask"];
+
+      // 1. Identify CUSIP
+      if (normalizedRow["cusip"]) {
+        cusip = clean(normalizedRow["cusip"]);
+      } else if (normalizedRow["description"]) {
+        const desc = normalizedRow["description"];
+        const match = desc.match(/[A-Z0-9]{9}/);
+        if (match) cusip = match[0];
       }
-      if (cusip && !seenCusips.has(cusip)) {
-        const price = parseFloat((priceStr || "").replace(/,/g, ''));
-        if (!isNaN(price)) priceMap.set(cusip, price);
+
+      // 2. Identify Price (Prefer Ask for yield curve, fallback to generic or Bid)
+      priceStr = normalizedRow["price ask"] || normalizedRow["ask price"] || 
+                 normalizedRow["price"] || 
+                 normalizedRow["price bid"] || normalizedRow["bid price"];
+
+      if (cusip && priceStr && !seenCusips.has(cusip)) {
+        const price = parseFloat(clean(priceStr).replace(/,/g, ''));
+        if (!isNaN(price)) {
+          priceMap.set(cusip, price);
+        }
         seenCusips.add(cusip);
       }
     });
+
+    console.log(`Broker CSV: Found ${priceMap.size} valid prices.`);
 
     if (priceMap.size === 0) {
       alert("No valid prices found in the CSV. (Supported: Schwab Brokerage, Fidelity Quotes)");
@@ -625,7 +708,13 @@ document.getElementById('resetFedInvest').onclick = () => {
 document.getElementById('tableBody').addEventListener('click', (e) => {
   const td = e.target.closest('td.drillable');
   if (!td) return;
-  _showSaDrill(td.dataset.cusip);
+  
+  // Use cellIndex to distinguish columns (SA is 5, SAO is 6)
+  if (td.cellIndex === 5) {
+    _showSaDrill(td.dataset.cusip);
+  } else if (td.cellIndex === 6) {
+    _showSaoDrill(td.dataset.cusip);
+  }
 });
 
 document.addEventListener('click', (e) => {

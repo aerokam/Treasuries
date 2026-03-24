@@ -4,7 +4,7 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REF_CPI_PATH = path.join(__dirname, '../data/RefCpiNsaSa.csv');
-const YIELDS_PATH = path.join(__dirname, '../data/TipsYields.csv');
+const YIELDS_PATH = path.join(__dirname, '../data/Yields.csv');
 
 // --- Helpers ---
 function loadRefCpi() {
@@ -17,15 +17,18 @@ function loadRefCpi() {
 
 function loadTipsYields() {
   const content = fs.readFileSync(YIELDS_PATH, 'utf8');
-  return content.trim().split('\n').slice(1).map(line => {
-    const [settlementDate, cusip, maturity, coupon, baseCpi, price, yieldVal] = line.split(',');
-    return { 
-      settlementDate, 
-      cusip, 
-      maturity, 
-      coupon: parseFloat(coupon), 
-      price: parseFloat(price), 
-      marketYield: parseFloat(yieldVal) 
+  const lines = content.trim().split('\n');
+  const settlementDate = lines[0].trim();
+  // lines[1] = header, lines[2+] = data (type,cusip,maturity,coupon,datedDateCpi,price,yield)
+  return lines.slice(2).map(line => {
+    const [, cusip, maturity, coupon, , price, yieldVal] = line.split(',');
+    return {
+      settlementDate,
+      cusip,
+      maturity,
+      coupon: parseFloat(coupon),
+      price: parseFloat(price),
+      marketYield: parseFloat(yieldVal)
     };
   });
 }
@@ -48,6 +51,19 @@ function yieldFromPrice(cleanPrice, coupon, settleDateStr, maturityStr) {
   const mature = localDate(maturityStr);
   if (settle >= mature) return null;
 
+  const days = (a, b) => (b.getTime() - a.getTime()) / 86400000;
+  const daysToMat = days(settle, mature);
+
+  function hasLeapDayBetween(d1, d2) {
+    for (let yr = d1.getFullYear(); yr <= d2.getFullYear(); yr++) {
+      const feb29 = new Date(yr, 1, 29);
+      if (feb29.getMonth() === 1 && feb29 > d1 && feb29 <= d2) return true;
+    }
+    return false;
+  }
+  const leapSpan = hasLeapDayBetween(settle, mature);
+  const freq = daysToMat < (leapSpan ? 183 : 182.5) ? 1 : 2;
+
   const semiCoupon = (coupon / 2) * 100;
   const matMon = mature.getMonth() + 1;
   const cm1 = matMon <= 6 ? matMon : matMon - 6;
@@ -63,11 +79,38 @@ function yieldFromPrice(cleanPrice, coupon, settleDateStr, maturityStr) {
     return candidates.find(c => c >= d && c <= mature) || null;
   }
 
+  // ── Freq=1: single-period annual yield ──
+  if (freq === 1) {
+    const daysInYear = leapSpan ? 366 : 365;
+    const w = daysToMat / daysInYear;
+    let dirtyPrice = cleanPrice;
+    if (semiCoupon > 0) {
+      const nextCoupon = nextCouponOnOrAfter(settle);
+      if (nextCoupon) {
+        const lastCoupon = new Date(nextCoupon.getFullYear(), nextCoupon.getMonth() - 6, 15);
+        const E = days(lastCoupon, nextCoupon);
+        const A = days(lastCoupon, settle);
+        dirtyPrice = cleanPrice + semiCoupon * (A / E);
+      }
+    }
+    const lastCF = semiCoupon + 100;
+    let y = coupon > 0.005 ? coupon : 0.02;
+    for (let i = 0; i < 200; i++) {
+      const pv = lastCF / Math.pow(1 + y, w);
+      const diff = pv - dirtyPrice;
+      if (Math.abs(diff) < 1e-10) break;
+      const dpv = -lastCF * w / Math.pow(1 + y, w + 1);
+      if (Math.abs(dpv) < 1e-15) break;
+      y -= diff / dpv;
+    }
+    return y;
+  }
+
+  // ── Freq=2: semi-annual BEY ──
   const nextCoupon = nextCouponOnOrAfter(settle);
   if (!nextCoupon) return null;
   const lastCoupon = new Date(nextCoupon.getFullYear(), nextCoupon.getMonth() - 6, 15);
 
-  const days = (a, b) => (b - a) / 86400000;
   const E = days(lastCoupon, nextCoupon);
   const A = days(lastCoupon, settle);
   const DSC = days(settle, nextCoupon);
@@ -160,7 +203,7 @@ function main() {
     ...results.map(row => row.join(","))
   ].join("\n");
 
-  const outputPath = path.join(__dirname, '../data/TipsSaYields.csv');
+  const outputPath = path.join(__dirname, '../data/YieldsSa.csv');
   fs.writeFileSync(outputPath, csvContent);
   
   console.log(`Successfully processed ${results.length} bonds.`);

@@ -8,7 +8,7 @@
 ## Technical Standards
 - **Settlement Logic**:
   - `TipsLadderManager`: Always uses **T** (publication date) for market consistency.
-  - `TipsSA`: Uses **T+1 business day** for broker prices. Implementation fetches `BondHolidaysSifma.csv` from R2 and uses `nextBusinessDay` logic to skip weekends and official bond holidays.
+  - `Yields`: Uses **T+1 business day** for broker prices. Implementation fetches `BondHolidaysSifma.csv` from R2 and uses `nextBusinessDay` logic to skip weekends and official bond holidays.
 - **Shared Math**: `yieldFromPrice` (Actual/Actual) is centralized in `shared/src/bond-math.js`.
 - **Infrastructure**: Served via GitHub Pages from the monorepo root. E2E tests must account for the Yield column shift in the Build table (Amount is now column index 4).
 

@@ -4,7 +4,7 @@
   "type": "module",
   "workspaces": [
     "TipsLadderManager",
-    "TipsSA"
+    "Yields"
   ],
   "scripts": {
     "test": "npm test -w TipsLadderManager",

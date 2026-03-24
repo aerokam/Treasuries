@@ -333,7 +333,7 @@ async function loadData() {
     
     const settleDateStr = yieldsRows[0]?.settlementDate;
     console.log('Settlement date from CSV:', settleDateStr);
-    if (!settleDateStr) throw new Error('TipsYields.csv has no settlementDate');
+    if (!settleDateStr) throw new Error('Yields.csv has no settlementDate');
     
     settlementDate = localDate(settleDateStr);
     console.log('Parsed settlement date:', settlementDate);
@@ -1192,6 +1192,16 @@ const COL_HELP = {
   cost:       [{ label: 'Total purchase cost for this rung', note: 'Quantity × cost per TIPS' }],
   qty:        [{ label: 'Quantity to buy (units of $1,000)' }],
 };
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    const ids = ['help-overlay', 'tipsref-overlay', 'refcpi-picker'];
+    ids.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = 'none';
+    });
+    // popup.js has its own listener, but redundant call here is safe
+  }
+});
 document.addEventListener('click', e => {
   // Close RefCPI picker on outside click
   const _rp = document.getElementById('refcpi-picker');

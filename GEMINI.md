@@ -7,7 +7,7 @@ This repository contains multiple projects for Treasury Inflation-Protected Secu
   - `knowledge/`: Fundamental TIPS and Bond concepts (1.0, 2.1).
   - `src/`: Core financial math (e.g., `bond-math.js`).
 - `TipsLadderManager/`: The browser-based tool for designing and rebalancing TIPS ladders.
-- `TipsSA/`: (New) TIPS Seasonal Adjustments project.
+- `Yields/`: (New) TIPS Seasonal Adjustments project.
 - `YieldsMonitor/`: (New) Tool for monitoring real-time and historical Treasury yields.
 - `TreasuryAuctions/`: (New) Tool for monitoring Treasury auction results.
 
@@ -21,16 +21,16 @@ To provide a suite of transparent, first-principles tools for managing inflation
 
 ## Technical Standards and Context
 
-### URLs & Paths
+- `Yields/`: (New) TIPS Seasonal Adjustments project.
 - **Local Testing**:
   - TipsLadderManager: `http://localhost:8080/TipsLadderManager/`
-  - TipsSA: `http://localhost:8080/TipsSA/`
+  - Yields: `http://localhost:8080/Yields/`
   - YieldsMonitor: `http://localhost:8080/YieldsMonitor/`
   - TreasuryAuctions: `http://localhost:8080/TreasuryAuctions/`
 - **Production (GitHub Pages)**:
   - Portal: `https://aerokam.github.io/TIPS/`
   - TipsLadderManager: `https://aerokam.github.io/TIPS/TipsLadderManager/`
-  - TipsSA: `https://aerokam.github.io/TIPS/TipsSA/`
+  - Yields: `https://aerokam.github.io/TIPS/Yields/`
   - YieldsMonitor: `https://aerokam.github.io/TIPS/YieldsMonitor/`
   - TreasuryAuctions: `https://aerokam.github.io/TIPS/TreasuryAuctions/`
 - **E2E Tests**: Configured for port 8080 at `127.0.0.1`.
@@ -41,7 +41,7 @@ To provide a suite of transparent, first-principles tools for managing inflation
 - **Rebalance Mode**: The DARA field MUST be cleared when the RefCPI date changes if the DARA was auto-inferred (prevents duration-mismatch and large negative net cash).
 - **Tolerance**: E2E tests use a $3,000 net cash tolerance ($1,000 for fresh inferences) to account for integer lot discretization.
 
-### TipsSA (Seasonal Adjustments) Logic
+### Yields (Seasonal Adjustments) Logic
 - **Data Source**: Data is pulled from the R2 bucket (FedInvest prices/RefCPI).
 - **Yield Formulas**: 
   - `SA Yield = Clean Price * (S_settle / S_maturity)`
@@ -55,3 +55,4 @@ To provide a suite of transparent, first-principles tools for managing inflation
   - Interaction: Full X/Y zoom and Ctrl-click-drag for vertical panning.
   - Visual Emphasis: SAO > SA > Ask.
 - **Resolved Issues**: The zoom bug (hidden datasets in Y-axis range) is resolved by checking `chart.isDatasetVisible`.
+

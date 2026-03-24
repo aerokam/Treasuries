@@ -34,6 +34,9 @@ function _build() {
   document.addEventListener('click', e => {
     if (_el.style.display !== 'none' && !_el.contains(e.target)) hidePopup();
   }, true);
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') hidePopup();
+  });
 }
 
 export function hidePopup() { if (_el) _el.style.display = 'none'; }
