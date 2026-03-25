@@ -13,10 +13,14 @@ const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
 
 // --- State ---
 let rawYieldsData = null;
+let rawNominalsData = null;
 let rawRefCpiData = null;
 let holidaySet = new Set();
 let brokerPrices = null;
 let chart = null;
+let activeTab = 'tips';
+let nominalsTypeFilters = new Set(['MARKET BASED BILL', 'MARKET BASED NOTE', 'MARKET BASED BOND']);
+let nominalsSort = { col: 'maturity', dir: 'asc' };
 window._currentBonds = [];
 
 // --- Helpers ---
@@ -78,6 +82,39 @@ function nextBusinessDay(date, holidaySet) {
     d.setDate(d.getDate() + 1);
   } while (d.getDay() === 0 || d.getDay() === 6 || holidaySet.has(toIsoDate(d)));
   return d;
+}
+
+// ── Date range input helpers ──────────────────────────────────────────────────
+// Convert YYYY-MM-DD → MM/DD/YYYY for display in text inputs
+function isoToMDY(iso) {
+  if (!iso) return '';
+  const [y, m, d] = iso.split('-');
+  return `${m}/${d}/${y}`;
+}
+// Parse MM/DD/YYYY text input → Date (or null if incomplete/invalid)
+function parseDateInput(s) {
+  const digits = (s || '').replace(/\D/g, '');
+  if (digits.length !== 8) return null;
+  const dt = new Date(+digits.slice(4), +digits.slice(0, 2) - 1, +digits.slice(2, 4));
+  return isNaN(dt) ? null : dt;
+}
+// Wire up auto-slash formatting + calendar sync for a text/date input pair
+function setupDateInput(textEl, calEl, onChange) {
+  textEl.addEventListener('input', () => {
+    const raw = textEl.value;
+    const digits = raw.replace(/\D/g, '').slice(0, 8);
+    let fmt = digits;
+    if (digits.length >= 3) fmt = digits.slice(0, 2) + '/' + digits.slice(2);
+    if (digits.length >= 5) fmt = digits.slice(0, 2) + '/' + digits.slice(2, 4) + '/' + digits.slice(4);
+    const isNaturalSlash = raw === digits.slice(0, 2) + '/' || raw === digits.slice(0, 2) + '/' + digits.slice(2, 4) + '/';
+    if (raw !== fmt && !isNaturalSlash) textEl.value = fmt;
+    const dt = parseDateInput(fmt);
+    textEl.classList.toggle('invalid', fmt.length === 10 && !dt);
+    if (dt) { calEl.value = toIsoDate(dt); onChange(); }
+  });
+  calEl.addEventListener('change', () => {
+    if (calEl.value) { textEl.value = isoToMDY(calEl.value); textEl.classList.remove('invalid'); onChange(); }
+  });
 }
 
 function fmtMMM(dateStr) {
@@ -285,9 +322,10 @@ async function init() {
     // Yields.csv: row 1 = settlement date, row 2 = header, rows 3+ = data
     const yieldsLines = yieldsText.split(/\r?\n/).filter(l => l.trim());
     const yieldsSettleDate = yieldsLines[0].trim();
-    rawYieldsData = parseCsv(yieldsLines.slice(1).join('\n'))
-      .filter(r => r.type === 'TIPS')
+    const allYieldsRows = parseCsv(yieldsLines.slice(1).join('\n'))
       .map(r => ({ ...r, settlementDate: yieldsSettleDate }));
+    rawYieldsData = allYieldsRows.filter(r => r.type === 'TIPS');
+    rawNominalsData = allYieldsRows.filter(r => r.type !== 'TIPS');
     rawRefCpiData = parseCsv(refCpiText);
     
     console.log(`Parsed ${rawYieldsData.length} yield rows and ${rawRefCpiData.length} RefCPI rows.`);
@@ -358,7 +396,217 @@ function calculateSAO(bonds) {
 }
 
 function processAndRender() {
-  console.log("processAndRender() started");
+  if (activeTab === 'treasuries') {
+    processAndRenderNominals();
+  } else {
+    processAndRenderTips();
+  }
+}
+
+function switchTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tab === tab);
+  });
+  document.getElementById('saTable').style.display = tab === 'tips' ? '' : 'none';
+  document.getElementById('nominalsTable').style.display = tab === 'treasuries' ? '' : 'none';
+  document.getElementById('brokerFileRow').style.display = tab === 'tips' ? '' : 'none';
+  const ctrl = document.getElementById('nominalsControls');
+  ctrl.style.display = tab === 'treasuries' ? 'flex' : 'none';
+  document.getElementById('startMaturity').value = '';
+  document.getElementById('endMaturity').value = '';
+  document.getElementById('startMaturityCal').value = '';
+  document.getElementById('endMaturityCal').value = '';
+  processAndRender();
+}
+
+function processAndRenderNominals() {
+  const statusEl = document.getElementById('status');
+  if (!rawNominalsData || rawNominalsData.length === 0) {
+    statusEl.textContent = 'No nominal Treasury data available.';
+    return;
+  }
+  try {
+    const source = rawNominalsData.filter(r => nominalsTypeFilters.has(r.type));
+
+    const processed = source.map(r => {
+      const price = parseFloat(r.price);
+      const coupon = parseFloat(r.coupon);
+      const maturityDate = localDate(r.maturity);
+      const yld = yieldFromPrice(price, coupon, localDate(r.settlementDate), maturityDate);
+      if (yld === null || isNaN(yld)) return null;
+      return { ...r, coupon, price, yield: yld, maturityDate };
+    }).filter(b => b !== null).sort((a, b) => a.maturityDate - b.maturityDate);
+
+    const startEl = document.getElementById('startMaturity');
+    const endEl = document.getElementById('endMaturity');
+    const startCalEl = document.getElementById('startMaturityCal');
+    const endCalEl = document.getElementById('endMaturityCal');
+    if (!startEl.value && processed.length > 0) {
+      startEl.value = isoToMDY(processed[0].maturity);
+      endEl.value = isoToMDY(processed[processed.length - 1].maturity);
+      startCalEl.value = processed[0].maturity;
+      endCalEl.value = processed[processed.length - 1].maturity;
+      setupDateInput(startEl, startCalEl, () => processAndRender());
+      setupDateInput(endEl, endCalEl, () => processAndRender());
+    }
+
+    const startDate = parseDateInput(startEl.value) || new Date(0);
+    const endDate = parseDateInput(endEl.value) || new Date(9999, 0);
+    const filtered = processed.filter(b => b.maturityDate >= startDate && b.maturityDate <= endDate);
+
+    renderNominalsTable(filtered);
+    renderNominalsChart(filtered);
+
+    const infoEl = document.getElementById('info-strip');
+    infoEl.textContent = `FedInvest market data \xb7 Settlement Date: ${rawNominalsData[0]?.settlementDate} (T)`;
+    statusEl.textContent = `Loaded ${filtered.length} Treasury securities.`;
+    statusEl.className = '';
+  } catch (err) {
+    statusEl.textContent = `Error in processing: ${err.message}`;
+    statusEl.className = 'error';
+    console.error('processAndRenderNominals failed:', err);
+  }
+}
+
+function renderNominalsTable(bonds) {
+  // Apply sort
+  const sorted = [...bonds].sort((a, b) => {
+    const va = nominalsSort.col === 'maturity' ? a.maturityDate
+             : nominalsSort.col === 'cusip'    ? a.cusip
+             : nominalsSort.col === 'coupon'   ? a.coupon
+             : nominalsSort.col === 'price'    ? a.price
+             :                                   a.yield;
+    const vb = nominalsSort.col === 'maturity' ? b.maturityDate
+             : nominalsSort.col === 'cusip'    ? b.cusip
+             : nominalsSort.col === 'coupon'   ? b.coupon
+             : nominalsSort.col === 'price'    ? b.price
+             :                                   b.yield;
+    if (va < vb) return nominalsSort.dir === 'asc' ? -1 : 1;
+    if (va > vb) return nominalsSort.dir === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  // Update sort indicators on headers
+  document.querySelectorAll('#nominalsTable th[data-sort]').forEach(th => {
+    th.classList.remove('sort-asc', 'sort-desc');
+    if (th.dataset.sort === nominalsSort.col) th.classList.add(`sort-${nominalsSort.dir}`);
+  });
+
+  const shortType = (t) => t === 'MARKET BASED BILL' ? 'Bill' : t === 'MARKET BASED NOTE' ? 'Note' : t === 'MARKET BASED BOND' ? 'Bond' : t;
+  const fmtFull = (s) => {
+    if (!s) return '';
+    const [y, m, d] = s.split('-').map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+  document.getElementById('nominalsTableBody').innerHTML = sorted.map(b => `
+    <tr>
+      <td>${fmtFull(b.maturity)}</td>
+      <td>${b.cusip}</td>
+      <td>${shortType(b.type)}</td>
+      <td>${(b.coupon * 100).toFixed(3)}%</td>
+      <td>${isNaN(b.price) ? '—' : b.price.toFixed(3)}</td>
+      <td>${(b.yield * 100).toFixed(3)}%</td>
+    </tr>
+  `).join('');
+}
+
+function renderNominalsChart(bonds) {
+  const ctx = document.getElementById('yieldChart').getContext('2d');
+  if (bonds.length === 0) { if (chart) { chart.destroy(); chart = null; } return; }
+
+  const toPoint = b => ({ x: b.maturityDate.getTime(), y: parseFloat((b.yield * 100).toFixed(3)) });
+  const billData  = bonds.filter(b => b.type === 'MARKET BASED BILL').map(toPoint);
+  const noteData  = bonds.filter(b => b.type === 'MARKET BASED NOTE').map(toPoint);
+  const bondData  = bonds.filter(b => b.type === 'MARKET BASED BOND').map(toPoint);
+  const allPoints = [...billData, ...noteData, ...bondData];
+  const minDate = new Date(Math.min(...allPoints.map(d => d.x)));
+  const maxDate = new Date(Math.max(...allPoints.map(d => d.x)));
+  const minX = new Date(minDate.getFullYear(), minDate.getMonth(), 1).getTime();
+  const maxX = new Date(maxDate.getFullYear(), maxDate.getMonth() + 1, 1).getTime();
+  const spanMonths = (maxDate.getFullYear() - minDate.getFullYear()) * 12 + (maxDate.getMonth() - minDate.getMonth());
+  const timeUnit = spanMonths <= 18 ? 'month' : 'year';
+  const allY = allPoints.map(d => d.y);
+  const minYRaw = Math.min(...allY), maxYRaw = Math.max(...allY);
+  const minY = Math.floor(minYRaw * 20) / 20;   // nearest 0.05 below
+  const maxY = Math.ceil(maxYRaw * 20) / 20;    // nearest 0.05 above
+  const dataRange = maxY - minY;
+  const step = dataRange <= 0.5 ? 0.05 : dataRange <= 1.0 ? 0.1 : 0.25;
+
+  const seriesDef = [
+    { label: 'Bills',  data: billData,  color: '#0ea5e9', pointRadius: 2, width: 1.5 },
+    { label: 'Notes',  data: noteData,  color: '#1a56db', pointRadius: 0, width: 2.5 },
+    { label: 'Bonds',  data: bondData,  color: '#7c3aed', pointRadius: 0, width: 2.5 },
+  ];
+
+  if (chart) chart.destroy();
+  chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      datasets: seriesDef.map(s => ({
+        label: s.label,
+        data: s.data,
+        borderColor: s.color,
+        backgroundColor: s.color,
+        borderWidth: s.width,
+        pointRadius: s.pointRadius,
+        pointHoverRadius: s.pointRadius > 0 ? s.pointRadius + 2 : 3,
+        tension: 0.1
+      }))
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      interaction: { mode: 'index', intersect: false },
+      scales: {
+        x: {
+          type: 'time',
+          min: minX, max: maxX,
+          time: { unit: timeUnit, displayFormats: { year: 'MMM yyyy', month: 'MMM yyyy' } },
+          grid: { color: 'rgba(0,0,0,0.05)' },
+          ticks: { autoSkip: true, maxRotation: 0 }
+        },
+        y: {
+          type: 'linear',
+          title: { display: true, text: 'Yield (%)' },
+          min: minY, max: maxY,
+          ticks: { stepSize: step, callback: (val) => val.toFixed(2) }
+        }
+      },
+      plugins: {
+        legend: {
+          labels: { usePointStyle: true, boxWidth: 8, padding: 15, font: { size: 12, weight: '500' } },
+          onClick: (e, legendItem, legend) => { Chart.defaults.plugins.legend.onClick(e, legendItem, legend); rescaleToVisible(legend.chart); }
+        },
+        zoom: {
+          pan: { enabled: true, mode: 'xy', onPanComplete: ({chart}) => updateDynamicTicks(chart) },
+          zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'xy', onZoomComplete: ({chart}) => updateDynamicTicks(chart) }
+        },
+        tooltip: {
+          backgroundColor: 'rgba(255,255,255,0.95)', titleColor: '#1e293b', bodyColor: '#475569',
+          borderColor: '#e2e8f0', borderWidth: 1, padding: 8,
+          titleFont: { size: 11, weight: '700' }, bodyFont: { size: 11 },
+          cornerRadius: 6, displayColors: false,
+          callbacks: {
+            title: (items) => new Date(items[0].parsed.x).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+            label: (context) => `${context.dataset.label}: ${context.parsed.y.toFixed(3)}%`
+          }
+        }
+      }
+    }
+  });
+
+  document.getElementById('resetZoom').onclick = () => {
+    chart.options.scales.x.min = minX;
+    chart.options.scales.x.max = maxX;
+    chart.update('none');
+    rescaleToVisible(chart);
+  };
+}
+
+function processAndRenderTips() {
+  console.log("processAndRenderTips() started");
   const statusEl = document.getElementById('status');
   if (!rawYieldsData || rawYieldsData.length === 0 || !rawRefCpiData) {
     console.warn("No data to process. rawYieldsData:", rawYieldsData, "rawRefCpiData:", rawRefCpiData);
@@ -425,25 +673,21 @@ function processAndRender() {
       b.diffBps = (b.saYield - b.askYield) * 10000;
     });
 
-    const startSel = document.getElementById('startMaturity');
-    const endSel = document.getElementById('endMaturity');
-    if (startSel.options.length === 0 && allProcessed.length > 0) {
-      allProcessed.forEach((b, i) => {
-        const opt = (selected) => {
-          const o = document.createElement('option');
-          o.value = b.maturity; o.textContent = fmtMMM(b.maturity);
-          if (selected) o.selected = true;
-          return o;
-        };
-        startSel.appendChild(opt(i === 0));
-        endSel.appendChild(opt(i === allProcessed.length - 1));
-      });
-      startSel.onchange = () => processAndRender();
-      endSel.onchange = () => processAndRender();
+    const startEl = document.getElementById('startMaturity');
+    const endEl = document.getElementById('endMaturity');
+    const startCalEl = document.getElementById('startMaturityCal');
+    const endCalEl = document.getElementById('endMaturityCal');
+    if (!startEl.value && allProcessed.length > 0) {
+      startEl.value = isoToMDY(allProcessed[0].maturity);
+      endEl.value = isoToMDY(allProcessed[allProcessed.length - 1].maturity);
+      startCalEl.value = allProcessed[0].maturity;
+      endCalEl.value = allProcessed[allProcessed.length - 1].maturity;
+      setupDateInput(startEl, startCalEl, () => processAndRender());
+      setupDateInput(endEl, endCalEl, () => processAndRender());
     }
 
-    const startDate = localDate(startSel.value);
-    const endDate = localDate(endSel.value);
+    const startDate = parseDateInput(startEl.value) || new Date(0);
+    const endDate = parseDateInput(endEl.value) || new Date(9999, 0);
     const filteredBonds = allProcessed.filter(b => b.maturityDate >= startDate && b.maturityDate <= endDate);
 
     renderTable(filteredBonds);
@@ -453,7 +697,7 @@ function processAndRender() {
   } catch (err) {
     statusEl.textContent = `Error in processing: ${err.message}`;
     statusEl.className = 'error';
-    console.error('processAndRender failed:', err);
+    console.error('processAndRenderTips failed:', err);
   }
 }
 
@@ -723,6 +967,37 @@ document.addEventListener('click', (e) => {
     e.preventDefault();
     _showColHelp(link.dataset.col);
   }
+});
+
+document.getElementById('tab-bar').addEventListener('click', (e) => {
+  const btn = e.target.closest('.tab-btn');
+  if (btn) switchTab(btn.dataset.tab);
+});
+
+const typeCheckboxMap = {
+  'filterBills': 'MARKET BASED BILL',
+  'filterNotes': 'MARKET BASED NOTE',
+  'filterBonds': 'MARKET BASED BOND',
+};
+document.getElementById('nominalsTable').querySelector('thead').addEventListener('click', (e) => {
+  const th = e.target.closest('th[data-sort]');
+  if (!th) return;
+  const col = th.dataset.sort;
+  if (nominalsSort.col === col) {
+    nominalsSort.dir = nominalsSort.dir === 'asc' ? 'desc' : 'asc';
+  } else {
+    nominalsSort.col = col;
+    nominalsSort.dir = col === 'yield' ? 'desc' : 'asc';
+  }
+  processAndRenderNominals();
+});
+
+document.getElementById('nominalsControls').addEventListener('change', (e) => {
+  const type = typeCheckboxMap[e.target.id];
+  if (!type) return;
+  if (e.target.checked) nominalsTypeFilters.add(type);
+  else nominalsTypeFilters.delete(type);
+  processAndRenderNominals();
 });
 
 init();

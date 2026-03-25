@@ -43,6 +43,19 @@ export function bondCalcs(bond, refCPI) {
   return { indexRatio, principalPerBond, costPerBond, nPeriods, couponPerPeriod, ownRungInt, piPerBond, annualInt };
 }
 
+// ─── Semi-annual date arithmetic (end-of-month safe) ─────────────────────────
+// addSemiannualPeriods(date, n, matureDay)
+// Moves date by n*6 months without overflow (e.g. Mar 31 + 6 → Sep 30, not Oct 1).
+// matureDay is the maturity day-of-month used for coupon dates.
+function addSemiannualPeriods(date, n, matureDay) {
+  const d = new Date(date);
+  d.setDate(1); // pin to 1st to prevent month overflow during setMonth
+  d.setMonth(d.getMonth() + n * 6);
+  const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  d.setDate(Math.min(matureDay, lastDay));
+  return d;
+}
+
 // ─── Yield from price (actual/actual, matches Excel YIELD(...,2,1)) ───────────
 // Spec: 2.1 TIPS Basics (yield calculations)
 // cleanPrice: percentage of par (e.g. 99.5)
@@ -72,48 +85,39 @@ export function yieldFromPrice(cleanPrice, coupon, settle, mature) {
   const cm2 = cm1 + 6;
 
   function nextCouponOnOrAfter(d) {
+    const mDay = mature.getDate(); // use maturity day, not hardcoded 15
     const candidates = [];
     for (let y = d.getFullYear() - 1; y <= d.getFullYear() + 1; y++) {
-      candidates.push(new Date(y, cm1 - 1, 15));
-      candidates.push(new Date(y, cm2 - 1, 15));
+      for (const mon of [cm1, cm2]) {
+        const lastDay = new Date(y, mon, 0).getDate(); // last day of that month
+        candidates.push(new Date(y, mon - 1, Math.min(mDay, lastDay)));
+      }
     }
     candidates.sort((a, b) => a - b);
     return candidates.find(c => c >= d && c <= mature) || null;
   }
 
-  // ── Freq=1: single-period annual yield ──
+  // ── Freq=1: last coupon period ──
   if (freq === 1) {
-    const daysInYear = leapSpan ? 366 : 365;
-    const w = daysToMat / daysInYear;
-    let dirtyPrice = cleanPrice;
-    if (semiCoupon > 0) {
-      const nextCoupon = nextCouponOnOrAfter(settle);
-      if (nextCoupon) {
-        const lastCoupon = new Date(nextCoupon.getTime());
-        lastCoupon.setMonth(lastCoupon.getMonth() - 6);
-        const E = days(lastCoupon, nextCoupon);
-        const A = days(lastCoupon, settle);
-        dirtyPrice = cleanPrice + semiCoupon * (A / E);
-      }
-    }
-    const lastCF = semiCoupon + 100;
-    let y = coupon > 0.005 ? coupon : 0.02;
-    for (let i = 0; i < 200; i++) {
-      const pv = lastCF / Math.pow(1 + y, w);
-      const diff = pv - dirtyPrice;
-      if (Math.abs(diff) < 1e-10) break;
-      const dpv = -lastCF * w / Math.pow(1 + y, w + 1);
-      if (Math.abs(dpv) < 1e-15) break;
-      y -= diff / dpv;
-    }
-    return y;
+    // Zero-coupon bills: simple investment rate 365/d (matches market convention)
+    if (semiCoupon === 0) return (100 / cleanPrice - 1) * 365 / daysToMat;
+    const nextCoupon = nextCouponOnOrAfter(settle);
+    if (!nextCoupon) return null;
+    const lastCoupon = addSemiannualPeriods(nextCoupon, -1, mature.getDate());
+    const E = days(lastCoupon, nextCoupon);
+    const A = days(lastCoupon, settle);
+    const DSC = days(settle, nextCoupon);
+    const accrued = semiCoupon * (A / E);
+    const dirtyPrice = cleanPrice + accrued;
+    const w = DSC / E;
+    // Linear formula: dirty * (1 + y/2 * w) = semiCoupon + 100
+    return 2 * ((semiCoupon + 100) / dirtyPrice - 1) / w;
   }
 
   // ── Freq=2: semi-annual BEY ──
   const nextCoupon = nextCouponOnOrAfter(settle);
   if (!nextCoupon) return null;
-  const lastCoupon = new Date(nextCoupon.getTime());
-  lastCoupon.setMonth(lastCoupon.getMonth() - 6);
+  const lastCoupon = addSemiannualPeriods(nextCoupon, -1, mature.getDate());
 
   const E = days(lastCoupon, nextCoupon);
   const A = days(lastCoupon, settle);
@@ -123,11 +127,10 @@ export function yieldFromPrice(cleanPrice, coupon, settle, mature) {
   const w = DSC / E;
 
   const coupons = [];
-  let d = new Date(nextCoupon);
-  while (d <= mature) {
-    coupons.push(new Date(d));
-    d = new Date(d.getTime());
-    d.setMonth(d.getMonth() + 6);
+  for (let k = 0; ; k++) {
+    const d = addSemiannualPeriods(nextCoupon, k, mature.getDate());
+    if (d > mature) break;
+    coupons.push(d);
   }
   const N = coupons.length;
   if (N === 0) return null;
@@ -178,10 +181,13 @@ export function priceFromYield(yld, coupon, settle, mature) {
   const cm2 = cm1 + 6;
 
   function nextCouponOnOrAfter(d) {
+    const mDay = mature.getDate();
     const candidates = [];
     for (let y = d.getFullYear() - 1; y <= d.getFullYear() + 1; y++) {
-      candidates.push(new Date(y, cm1 - 1, 15));
-      candidates.push(new Date(y, cm2 - 1, 15));
+      for (const mon of [cm1, cm2]) {
+        const lastDay = new Date(y, mon, 0).getDate();
+        candidates.push(new Date(y, mon - 1, Math.min(mDay, lastDay)));
+      }
     }
     candidates.sort((a, b) => a - b);
     return candidates.find(c => c >= d && c <= mature) || null;
@@ -189,8 +195,7 @@ export function priceFromYield(yld, coupon, settle, mature) {
 
   const nextCoupon = nextCouponOnOrAfter(settle);
   if (!nextCoupon) return null;
-  const lastCoupon = new Date(nextCoupon.getTime());
-  lastCoupon.setMonth(lastCoupon.getMonth() - 6);
+  const lastCoupon = addSemiannualPeriods(nextCoupon, -1, mature.getDate());
 
   const days = (a, b) => (b.getTime() - a.getTime()) / 86400000;
   const E = days(lastCoupon, nextCoupon);
@@ -200,11 +205,10 @@ export function priceFromYield(yld, coupon, settle, mature) {
   const w = DSC / E;
 
   const coupons = [];
-  let d = new Date(nextCoupon);
-  while (d <= mature) {
-    coupons.push(new Date(d));
-    d = new Date(d.getTime());
-    d.setMonth(d.getMonth() + 6);
+  for (let k = 0; ; k++) {
+    const d = addSemiannualPeriods(nextCoupon, k, mature.getDate());
+    if (d > mature) break;
+    coupons.push(d);
   }
   const N = coupons.length;
 
