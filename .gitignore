@@ -18,4 +18,14 @@ YieldsMonitor/data/yield-history/
 
 Yields/FidelityTreasuries.csv
 Yields/FidelityTips.csv
+Yields/.browser-profile/
+Yields/.chrome-profile/
+Yields/.browser-profile-patch/
+Yields/logs/
+Yields/scripts/fidelityDownload.js
+Yields/scripts/uploadFidelityDownload.js
+Yields/scripts/testLogin.js
+Yields/scripts/testCdpLogin.js
+Yields/scripts/run-fidelity.cmd
+Yields/scripts/setup-tasks.ps1
 
