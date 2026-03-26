@@ -641,7 +641,12 @@ function processAndRenderNominals() {
       parts.push(`Market ${fmtBrokerTime(fidelityNominalsDate)} ET · settle ${isoToMDY(toIsoDate(t1))} (T+1)`);
     }
     infoEl.textContent = parts.join(' \xb7 ');
-    statusEl.textContent = `Loaded ${(fedFiltered?.length || 0) + (fidFiltered?.length || 0)} securities.`;
+    const fedCount = fedFiltered?.length || 0;
+    const fidCount = fidFiltered?.length || 0;
+    const parts2 = [];
+    if (showFed) parts2.push(`FedInvest: ${fedCount}`);
+    if (showFid) parts2.push(`Market: ${fidCount}`);
+    statusEl.textContent = parts2.join(' · ');
     statusEl.className = '';
   } catch (err) {
     statusEl.textContent = `Error: ${err.message}`;
@@ -924,7 +929,12 @@ function processAndRenderTips() {
       parts.push(`Market ${timeStr} ET · settle ${isoToMDY(toIsoDate(t1))} (T+1)`);
     }
     infoEl.textContent = parts.join(' \xb7 ');
-    statusEl.textContent = `Loaded ${(fedFiltered?.length || 0) + (brokerFiltered?.length || 0)} TIPS.`;
+    const fedCount = fedFiltered?.length || 0;
+    const brokerCount = brokerFiltered?.length || 0;
+    const parts2 = [];
+    if (showFed) parts2.push(`FedInvest: ${fedCount}`);
+    if (showBroker) parts2.push(`Market: ${brokerCount}`);
+    statusEl.textContent = parts2.join(' · ');
     statusEl.className = '';
   } catch (err) {
     statusEl.textContent = `Error: ${err.message}`;
