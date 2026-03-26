@@ -582,7 +582,7 @@ function processAndRenderNominals() {
   const showFed = document.getElementById('chkFedInvest').checked;
   const showFid = document.getElementById('chkFidelity').checked && !!fidelityNominalsData;
 
-  if (!showFed && !showFid) { statusEl.textContent = 'No data source selected.'; return; }
+  if (!showFed && !showFid) { statusEl.textContent = ''; if (chart) { chart.destroy(); chart = null; } return; }
 
   try {
     let fedProcessed = null;
@@ -846,7 +846,7 @@ function processAndRenderTips() {
   const showFed = document.getElementById('chkTipsFed').checked;
   const showBroker = document.getElementById('chkTipsBroker').checked && !!brokerPrices;
 
-  if (!showFed && !showBroker) { statusEl.textContent = 'No data source selected.'; return; }
+  if (!showFed && !showBroker) { statusEl.textContent = ''; if (chart) { chart.destroy(); chart = null; } return; }
   if (!rawYieldsData || rawYieldsData.length === 0 || !rawRefCpiData) return;
 
   try {
