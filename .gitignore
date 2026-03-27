@@ -15,18 +15,21 @@ lerna-debug.log*
 /TipsSA/data/*.csv
 
 YieldsMonitor/data/yield-history/
-
-Yields/FidelityTreasuries.csv
-Yields/FidelityTips.csv
-Yields/.browser-profile/
-Yields/.chrome-profile/
-Yields/.browser-profile-patch/
-Yields/logs/
-Yields/knowledge/0.0_Data_Pipeline.md
-Yields/scripts/fidelityDownload.js
-Yields/scripts/uploadFidelityDownload.js
-Yields/scripts/testLogin.js
-Yields/scripts/testCdpLogin.js
-Yields/scripts/run-fidelity.cmd
-Yields/scripts/setup-tasks.ps1
+# Yield Curves project folder
+YieldCurves/FidelityTreasuries.csv
+YieldCurves/FidelityTips.csv
+YieldCurves/.browser-profile/
+YieldCurves/.chrome-profile/
+YieldCurves/.browser-profile-patch/
+logs/
+YieldCurves/logs/
+YieldCurves/knowledge/0.0_Data_Pipeline.md
+YieldCurves/scripts/fidelityDownload.js
+YieldCurves/scripts/uploadFidelityDownload.js
+YieldCurves/scripts/testLogin.js
+YieldCurves/scripts/testCdpLogin.js
+scripts/run-yields-fedinvest.cmd
+scripts/setup-yields-fedinvest-task.ps1
+YieldCurves/scripts/run-fidelity.cmd
+YieldCurves/scripts/setup-tasks.ps1
 

@@ -14,8 +14,10 @@ if (existsSync(_envPath)) {
 // Types written: TIPS, MARKET BASED BILL, MARKET BASED NOTE, MARKET BASED BOND (excludes FRN).
 // Writes Yields.csv to R2: row 1 = settlement date, row 2 = header, rows 3+ = data.
 //
-// Usage: node getTipsYields.js
-// Prices published once daily at ~1pm ET on FedInvest; scheduled job runs at 1:00 and 1:05 PM ET.
+// Usage: node getYieldsFedInvest.js
+// Prices published once daily at ~1pm ET on FedInvest; scheduled jobs run at noon and 1:00 PM EDT
+// (UTC 16:00 and 17:00). Due to GH Actions lag (~60 min), they fire around 1 PM and 2 PM EDT.
+// If the noon job fires before FedInvest updates, it exits cleanly; the 1 PM fallback catches it.
 
 const FEDINVEST_URL = 'https://www.treasurydirect.gov/GA-FI/FedInvest/todaySecurityPriceDetail';
 
@@ -45,6 +47,11 @@ async function uploadToR2(key, body) {
 }
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
+// Today's date in ET (handles EDT/EST automatically)
+function todayET() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' }); // YYYY-MM-DD
+}
+
 function localDate(str) {
   const [y, m, d] = str.split('-').map(Number);
   return new Date(y, m - 1, d);
@@ -242,6 +249,14 @@ async function main() {
   const { rows: priceRows, settleDateStr } = await fetchPrices();
   if (priceRows.length === 0) throw new Error('No price data found from FedInvest');
   console.error(`Settlement date: ${settleDateStr}`);
+
+  // Guard: if FedInvest hasn't updated yet (still showing yesterday), skip upload.
+  // The fallback cron will retry ~1 hour later when today's prices are available.
+  const today = todayET();
+  if (settleDateStr !== today) {
+    console.error(`FedInvest still showing ${settleDateStr} (today is ${today} ET) — skipping upload.`);
+    return;
+  }
 
   // Merge prices with metadata and calculate yields
   const rows = [];
