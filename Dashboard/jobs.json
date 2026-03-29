@@ -20,5 +20,12 @@
     "cmd": "node YieldCurves/scripts/uploadFidelityDownload.js",
     "cwd": ".",
     "apps": ["yieldcurves"]
+  },
+  {
+    "id": "bond-holidays-update",
+    "label": "Update Bond Holidays (SIFMA)",
+    "cmd": "node BondHolidays/updateHolidaysSifma.js",
+    "cwd": ".",
+    "apps": []
   }
 ]
