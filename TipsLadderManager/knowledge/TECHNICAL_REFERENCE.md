@@ -1,6 +1,6 @@
 # TipsLadderManager Technical Reference
 
-This document maps conceptual definitions from the [Master Glossary](../../shared/knowledge/GLOSSARY.md) to specific implementation variables and constants within the TipsLadderManager project.
+This document maps conceptual definitions from the [Master Glossary](../../knowledge/DATA_DICTIONARY.md) to specific implementation variables and constants within the TipsLadderManager project.
 
 ---
 
@@ -17,13 +17,13 @@ This document maps conceptual definitions from the [Master Glossary](../../share
 
 | Concept ID | Code Symbol (rebalance-lib.js) | Code Symbol (build-lib.js) |
 |---|---|---|
-| [#index-ratio] | `d.indexRatio` | `d.indexRatio` |
-| [#par-value-adjusted] | `d.principalPerBond` | `d.principalPerBond` |
-| [#cost-per-tips] | `d.costPerBond` | `d.costPerBond` |
-| [#pi-per-tips] | `d.piPerBond` | `d.fundedYearPi` |
-| [#dara] | `d.DARA` | `summary.dara` |
-| [#ara] | `d.araAfterTotal` | `d.fundedYearAmt` |
-| [#lmi] | `d.araAfterLaterMatInt` | `d.laterMatInt` |
+| [Index Ratio](../../knowledge/DATA_DICTIONARY.md#index-ratio) | `d.indexRatio` | `d.indexRatio` |
+| [Par Value (Adjusted)](../../knowledge/DATA_DICTIONARY.md#par-value-adjusted) | `d.principalPerBond` | `d.principalPerBond` |
+| [Cost per TIPS](../../knowledge/DATA_DICTIONARY.md#cost-per-tips) | `d.costPerBond` | `d.costPerBond` |
+| [P+I per TIPS](../../knowledge/DATA_DICTIONARY.md#pi-per-tips) | `d.piPerBond` | `d.fundedYearPi` |
+| [DARA](../../knowledge/DATA_DICTIONARY.md#dara) | `d.DARA` | `summary.dara` |
+| [ARA](../../knowledge/DATA_DICTIONARY.md#ara) | `d.araAfterTotal` | `d.fundedYearAmt` |
+| [LMI](../../knowledge/DATA_DICTIONARY.md#lmi) | `d.araAfterLaterMatInt` | `d.laterMatInt` |
 
 ---
 
@@ -31,8 +31,8 @@ This document maps conceptual definitions from the [Master Glossary](../../share
 
 | Concept ID | Code Symbol (rebalance-lib.js) | Code Symbol (build-lib.js) |
 |---|---|---|
-| [#quantity] (Current) | `d.qtyBefore` | N/A |
-| [#quantity] (Target) | `d.qtyAfter` | `d.fundedYearQty + d.excessQty` |
+| [Quantity](../../knowledge/DATA_DICTIONARY.md#quantity) (Current) | `d.qtyBefore` | N/A |
+| [Quantity](../../knowledge/DATA_DICTIONARY.md#quantity) (Target) | `d.qtyAfter` | `d.fundedYearQty + d.excessQty` |
 | Funded Year Qty | `d.fyQty` | `d.fundedYearQty` |
 | Excess Qty | `d.excessQtyAfter` | `d.excessQty` |
 
