@@ -7,8 +7,8 @@ Tracks remaining phases of the knowledge base restructure. Delete when complete.
 ## Status
 
 - [x] Phase 1 — Fix gitignore + split Data_Pipeline *(done 2026-03-29)*
-- [ ] Phase 2 — Rename/renumber files + update cross-references
-- [ ] Phase 3 — Build KNOWLEDGE_MAP.md
+- [x] Phase 2 — Rename/renumber files + update cross-references *(done 2026-03-29)*
+- [x] Phase 3 — Build KNOWLEDGE_MAP.md *(done 2026-03-29)*
 - [ ] Phase 4 — DD completeness audit + link strategy
 
 ---
