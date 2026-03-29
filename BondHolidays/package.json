@@ -1,0 +1,16 @@
+{
+  "name": "bondholidays",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Scrape SIFMA bond market holiday schedule and upload to Cloudflare R2.",
+  "scripts": {
+    "update": "node updateHolidaysSifma.js",
+    "update:marketbeat": "node updateHolidaysMarketBeat.js"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.948.0",
+    "cheerio": "^1.1.2",
+    "node-fetch": "^3.3.2",
+    "puppeteer": "^24.34.0"
+  }
+}

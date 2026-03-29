@@ -5,6 +5,12 @@ test-results/
 Dashboard/.env
 Dashboard/logs/
 Dashboard/node_modules/
+bls/data/
+bls/logs/
+bls/node_modules/
+BondHolidays/data/
+BondHolidays/logs/
+BondHolidays/node_modules/
 .idea/
 .vscode/
 npm-debug.log*

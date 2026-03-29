@@ -1,0 +1,14 @@
+{
+  "name": "bls",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Scrape BLS.gov CPI release schedules and upload to Cloudflare R2.",
+  "scripts": {
+    "update": "node updateCpiReleaseSchedules.js"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.948.0",
+    "cheerio": "^1.1.2",
+    "node-fetch": "^3.3.2"
+  }
+}
