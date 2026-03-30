@@ -50,6 +50,7 @@ flowchart LR
 
     subgraph YM["YieldsMonitor/"]
         direction TB
+        YM10["1.0_Operation.md"]
         YMAPI["API_Mapping.md"]
     end
 
@@ -87,6 +88,9 @@ flowchart LR
 
     %% YieldsMonitor
     DD --> YMAPI
+    YMAPI --> YM10
+    TIPSBasics --> YM10
+    BondBasics --> YM10
 
     %% Links
     click DD "./DATA_DICTIONARY.md" _self
@@ -116,6 +120,7 @@ flowchart LR
     click TLMTR "../TipsLadderManager/knowledge/TECHNICAL_REFERENCE.md" _self
 
     click TADP "../TreasuryAuctions/knowledge/Data_Pipeline.md" _self
+    click YM10 "../YieldsMonitor/knowledge/1.0_Operation.md" _self
     click YMAPI "../YieldsMonitor/knowledge/API_Mapping.md" _self
 
     %% Styling
