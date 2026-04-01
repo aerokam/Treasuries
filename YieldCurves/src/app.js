@@ -1,6 +1,6 @@
 // Yield Curves — Frontend Logic
 import { yieldFromPrice } from '../../shared/src/bond-math.js';
-import { handleChartKeydown, setupAxisWheelZoom } from '../../shared/src/chart-keys.js';
+import { handleChartKeydown, setupAxisWheelZoom, snapYBounds, snapYAfterZoom } from '../../shared/src/chart-keys.js';
 
 console.log("YieldCurves app.js loading...");
 
@@ -836,7 +836,7 @@ function renderNominalsChart(fedBonds, fidBonds) {
           onClick: (e, legendItem, legend) => { Chart.defaults.plugins.legend.onClick(e, legendItem, legend); rescaleToVisible(legend.chart); }
         },
         zoom: {
-          pan: { enabled: true, mode: 'xy', onPanComplete: ({chart}) => rescaleToVisible(chart) },
+          pan: { enabled: true, mode: 'xy' },
           zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'xy', onZoomComplete: ({chart}) => rescaleToVisible(chart) }
         },
         tooltip: {
@@ -861,7 +861,7 @@ function renderNominalsChart(fedBonds, fidBonds) {
     chart.update('none');
   }
 
-  setupAxisWheelZoom(chart.canvas, ({chart}) => rescaleToVisible(chart), ({chart, factor}) => snapYZoom(chart, factor));
+  setupAxisWheelZoom(chart.canvas, ({chart}) => rescaleToVisible(chart), ({chart, factor}) => snapYAfterZoom(chart, factor));
 
   document.getElementById('resetZoom').onclick = () => {
     savedZoom['treasuries'] = null;
@@ -1109,7 +1109,7 @@ function renderChart(fedBonds, brokerBonds) {
           onClick: (e, item, legend) => { Chart.defaults.plugins.legend.onClick(e, item, legend); rescaleToVisible(legend.chart); }
         },
         zoom: {
-          pan: { enabled: true, mode: 'xy', onPanComplete: ({chart}) => rescaleToVisible(chart) },
+          pan: { enabled: true, mode: 'xy' },
           zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'xy', onZoomComplete: ({chart}) => rescaleToVisible(chart) }
         },
         tooltip: {
@@ -1131,7 +1131,7 @@ function renderChart(fedBonds, brokerBonds) {
     chart.update('none');
   }
 
-  setupAxisWheelZoom(chart.canvas, ({chart}) => rescaleToVisible(chart), ({chart, factor}) => snapYZoom(chart, factor));
+  setupAxisWheelZoom(chart.canvas, ({chart}) => rescaleToVisible(chart), ({chart, factor}) => snapYAfterZoom(chart, factor));
 
   document.getElementById('resetZoom').onclick = () => {
     savedZoom['tips'] = null;
@@ -1171,45 +1171,13 @@ function rescaleToVisible(chart) {
 
   const visibleMinY = Math.min(...allVisibleY);
   const visibleMaxY = Math.max(...allVisibleY);
-  const range = visibleMaxY - visibleMinY;
-  let newStep = 0.25;
-  if (range > 3) newStep = 0.50;
-  if (range > 7) newStep = 1.00;
-  if (range < 0.6) newStep = 0.10;
-  if (range < 0.3) newStep = 0.05;
-  const snap = v => Math.round(v / newStep * 1e9) / 1e9;
-
-  chart.options.scales.y.min = Math.floor(snap(visibleMinY)) * newStep;
-  chart.options.scales.y.max = Math.ceil(snap(visibleMaxY)) * newStep;
-  chart.options.scales.y.ticks.stepSize = newStep;
+  const bounds = snapYBounds(visibleMinY, visibleMaxY);
+  chart.options.scales.y.min = bounds.min;
+  chart.options.scales.y.max = bounds.max;
+  chart.options.scales.y.ticks.stepSize = bounds.step;
   chart.update('none');
 }
 
-function snapYZoom(chart, factor) {
-  // Direction-aware snap: zoom-in snaps inward, zoom-out snaps outward
-  const yMin = chart.scales.y.min;
-  const yMax = chart.scales.y.max;
-  const range = yMax - yMin;
-  let step = 0.25;
-  if (range > 3) step = 0.50;
-  if (range > 7) step = 1.00;
-  if (range < 0.6) step = 0.10;
-  if (range < 0.3) step = 0.05;
-  const s = v => Math.round(v / step * 1e9) / 1e9;
-  let min, max;
-  if (factor < 1) { // zooming in: snap inward so range actually shrinks
-    min = Math.ceil(s(yMin)) * step;
-    max = Math.floor(s(yMax)) * step;
-    if (min >= max) { min = Math.floor(s(yMin)) * step; max = Math.ceil(s(yMax)) * step; }
-  } else { // zooming out: snap outward
-    min = Math.floor(s(yMin)) * step;
-    max = Math.ceil(s(yMax)) * step;
-  }
-  chart.options.scales.y.min = min;
-  chart.options.scales.y.max = max;
-  chart.options.scales.y.ticks.stepSize = step;
-  chart.update('none');
-}
 
 // ─── Interaction Handlers ────────────────────────────────────────────────────
 
