@@ -301,6 +301,23 @@ function getActiveRows() {
   return { displayRows, totalRows, capped };
 }
 
+// ── Sticky Header Helpers ───────────────────────────────────────────────────
+function updateFilterRowSticky() {
+  const thead = document.getElementById('mainThead');
+  if (!thead) return;
+  const hdr = thead.querySelector('tr:first-child');
+  const filterRow = thead.querySelector('.filter-row');
+  if (hdr && filterRow) {
+    const h = hdr.offsetHeight;
+    filterRow.querySelectorAll('td').forEach(td => {
+      td.style.top = h + 'px';
+    });
+  }
+}
+
+// Global ResizeObserver to handle header wrapping
+const headerObserver = new ResizeObserver(() => updateFilterRowSticky());
+
 // ── Render table ──────────────────────────────────────────────────────────────
 function renderTable() {
   const cols = (orderedColumns[activeView] || []).filter(f => viewCols[activeView].has(f));
@@ -308,6 +325,8 @@ function renderTable() {
 
   // Header row + filter row
   const thead = document.getElementById('mainThead');
+  headerObserver.disconnect();
+
   thead.innerHTML = `
     <tr>
       ${cols.map(f => {
@@ -329,15 +348,13 @@ function renderTable() {
     </tr>
   `;
 
+  // Start observing the new header row for height changes
+  const firstRow = thead.querySelector('tr:first-child');
+  if (firstRow) headerObserver.observe(firstRow);
+
   // Fix filter row sticky top after header renders
   requestAnimationFrame(() => {
-    const hdr = thead.querySelector('tr:first-child');
-    const filterRow = thead.querySelector('.filter-row');
-    if (hdr && filterRow) {
-      filterRow.querySelectorAll('td').forEach(td => {
-        td.style.top = hdr.offsetHeight + 'px';
-      });
-    }
+    updateFilterRowSticky();
     initResizing();
   });
 
