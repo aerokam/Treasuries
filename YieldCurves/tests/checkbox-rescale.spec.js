@@ -33,18 +33,18 @@ const HOLIDAYS_CSV = '"Wednesday, January 1, 2025",New Year\'s Day\n';
 // Same CUSIPs as FedInvest so parseFidelityNominals accepts them
 const FID_TREASURIES_CSV = [
   'Cusip,State,Description,Coupon,Maturity Date,Moody\'s Rating,S&P Rating,Price Bid,Price Ask,Yield Bid,Ask Yield to Worst,Ask Yield to Maturity,Quantity Bid(min),Quantity Ask(min),Attributes',
-  '="912797TB3","N/A","UNITED STATES TREAS BILLS ZERO CPN 0.00000% 06/26/2026","0.000","06/26/2026","--","--","99.040","99.060","3.820","3.810","3.810","1000","1000",CP D ',
-  '="91282CBT7","N/A","UNITED STATES TREAS SER W-2028 4.25000% 03/25/2028 NTS NOTE","4.250","03/25/2028","AA1","--","99.900","100.000","4.310","4.300","4.300","1000","1000",CP D ',
-  '="91282CKH3","N/A","UNITED STATES TREAS SER AZ-2031 4.35000% 03/25/2031 NTS NOTE","4.350","03/25/2031","AA1","--","99.900","100.000","4.410","4.400","4.400","1000","1000",CP D ',
-  '="912810PS1","N/A","UNITED STATES TREAS BDS 4.75000% 03/25/2036","4.750","03/25/2036","AA1","--","99.900","100.000","4.810","4.800","4.800","1000","1000",CP D ',
-  '="912810XX1","N/A","UNITED STATES TREAS BDS 4.85000% 03/25/2056","4.850","03/25/2056","AA1","--","99.900","100.000","4.910","4.900","4.900","1000","1000",CP D ',
+  '912797TB3,"N/A","UNITED STATES TREAS BILLS ZERO CPN 0.00000% 06/26/2026","0.000","06/26/2026","--","--","99.040","99.060","3.820","3.810","3.810","1000","1000",CP D ',
+  '91282CBT7,"N/A","UNITED STATES TREAS SER W-2028 4.25000% 03/25/2028 NTS NOTE","4.250","03/25/2028","AA1","--","99.900","100.000","4.310","4.300","4.300","1000","1000",CP D ',
+  '91282CKH3,"N/A","UNITED STATES TREAS SER AZ-2031 4.35000% 03/25/2031 NTS NOTE","4.350","03/25/2031","AA1","--","99.900","100.000","4.410","4.400","4.400","1000","1000",CP D ',
+  '912810PS1,"N/A","UNITED STATES TREAS BDS 4.75000% 03/25/2036","4.750","03/25/2036","AA1","--","99.900","100.000","4.810","4.800","4.800","1000","1000",CP D ',
+  '912810XX1,"N/A","UNITED STATES TREAS BDS 4.85000% 03/25/2056","4.850","03/25/2056","AA1","--","99.900","100.000","4.910","4.900","4.900","1000","1000",CP D ',
 ].join('\n');
 
 const FID_TIPS_CSV = [
   'Cusip,State,Description,Coupon,Maturity Date,Moody\'s Rating,S&P Rating,Price Bid,Price Ask,Yield Bid,Ask Yield to Worst,Ask Yield to Maturity,Inflation Factor,Adjusted Price Bid,Adjusted Price Ask,Attributes',
-  '="91282CCA7","N/A","UNITED STATES TREAS NTS SER X-2026 0.12500% 04/15/2026","0.125","04/15/2026","AA1","--","100.062","100.132","-1.019","-2.274","-2.274","1.23935","124.011839","124.098594",CP D ',
-  '="912828S50","N/A","UNITED STATES TREAS NTS 0.12500% 07/15/2026 TIPS","0.125","07/15/2026","AA1","--","101.231","101.284","-3.842","-4.011","-4.011","1.35594","137.263162","137.335026",CP D ',
-  '="91282CDC2","N/A","UNITED STATES TREAS NTS SER AE-2026 0.12500% 10/15/2026","0.125","10/15/2026","AA1","--","100.680","100.738","-1.095","-1.197","-1.197","1.18943","119.751812","119.820799",CP D ',
+  '91282CCA7,"N/A","UNITED STATES TREAS NTS SER X-2026 0.12500% 04/15/2026","0.125","04/15/2026","AA1","--","100.062","100.132","-1.019","-2.274","-2.274","1.23935","124.011839","124.098594",CP D ',
+  '912828S50,"N/A","UNITED STATES TREAS NTS 0.12500% 07/15/2026 TIPS","0.125","07/15/2026","AA1","--","101.231","101.284","-3.842","-4.011","-4.011","1.35594","137.263162","137.335026",CP D ',
+  '91282CDC2,"N/A","UNITED STATES TREAS NTS SER AE-2026 0.12500% 10/15/2026","0.125","10/15/2026","AA1","--","100.680","100.738","-1.095","-1.197","-1.197","1.18943","119.751812","119.820799",CP D ',
 ].join('\n');
 
 // ─── Outlier mock: 52 nominals including 2 extreme low-yield notes ─────────────
@@ -324,5 +324,25 @@ test.describe('Treasuries tab — outlier clipping: bonds+notes combined', () =>
     const bounds = await getYBounds(page);
     // Clip Outliers default on; with 1×IQR: lo≈3.63%, extreme notes at 1.5% and 2.0% excluded
     expect(bounds.min).toBeGreaterThan(2.5);
+  });
+
+  test('long-dated high-yield bonds remain visible when Clip Outliers is enabled', async ({ page }) => {
+    // Setup: Start with default (all checked, Clip Outliers enabled)
+    // The mock data includes bonds at ~5.17% (BNDX00019 maturing in 2095)
+    // and notes at ~4.00-4.58%.
+    const bounds = await getYBounds(page);
+    
+    // The max Y bound should be high enough to include the 5.17% bond
+    expect(bounds.max).toBeGreaterThan(5.1);
+    
+    // Toggle clipping off and then on again to ensure it doesn't accidentally 
+    // clip the high end during rescale
+    await page.click('#clipOutliers'); // off
+    const unclipped = await getYBounds(page);
+    await page.click('#clipOutliers'); // on
+    const clipped = await getYBounds(page);
+    
+    expect(clipped.max).toBeCloseTo(unclipped.max, 1);
+    expect(clipped.max).toBeGreaterThan(5.1);
   });
 });

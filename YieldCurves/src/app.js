@@ -211,11 +211,13 @@ const COL_HELP = {
   'price': {
     title: 'Price',
     html: `<p>The market price per <strong>$100 face value</strong>, sourced from FedInvest mid-market data or uploaded broker ask quotes.</p>
+<p><strong>FedInvest Note:</strong> FedInvest prices represent the midpoint of market bid and ask. This is typically lower than a broker's Ask Price, meaning the resulting yield is higher than a commercial Ask Yield.</p>
 <p>TIPS prices are quoted on the <em>real</em> (inflation-adjusted) principal. The actual dollar amount paid at settlement is: <code>Price / 100 × Index Ratio × Face Value</code>.</p>`
   },
   'ask-yield': {
     title: 'Ask Yield',
     html: `<p>Yield to maturity (YTM) calculated directly from the market price using standard Treasury bond math (semi-annual compounding).</p>
+<p>For broker quotes (solid lines), this is the yield from the <strong>Ask Price</strong>. For FedInvest data (dotted lines), the price is the <strong>midpoint of bid and ask</strong>, so the yield will be higher than a true market ask yield. This is especially evident for short-dated Bills.</p>
 <p>This is the <strong>quoted real yield</strong> — it includes any distortion from seasonal inflation patterns baked into the TIPS price.</p>`
   },
   'sa-yield': {
@@ -748,24 +750,24 @@ function renderNominalsChart(fedBonds, fidBonds) {
   const toPoint = b => ({ x: b.maturityDate.getTime(), y: parseFloat((b.yield * 100).toFixed(3)) });
   const bothShown = fedBonds && fidBonds;
 
-  // FedInvest: cool blues/purple — Fidelity: warm orange/red/teal (all solid)
+  // FedInvest: cool blues/purple (dotted) — Fidelity: warm orange/red/teal (solid)
   const seriesDef = [];
   if (fedBonds) {
     const sfx = bothShown ? ' (FedInvest)' : '';
     seriesDef.push(
-      { label: `Bills${sfx}`,  data: fedBonds.filter(b => b.type === 'MARKET BASED BILL' && !isStrip(b.cusip)).map(toPoint), color: '#0ea5e9', r: 2, w: 1.5 },
-      { label: `Notes${sfx}`,  data: fedBonds.filter(b => b.type === 'MARKET BASED NOTE' && !isStrip(b.cusip)).map(toPoint), color: '#1a56db', r: 0, w: 2.5 },
-      { label: `Bonds${sfx}`,  data: fedBonds.filter(b => b.type === 'MARKET BASED BOND' && !isStrip(b.cusip)).map(toPoint), color: '#7c3aed', r: 0, w: 2.5 },
-      { label: `STRIPS${sfx}`, data: fedBonds.filter(b => isStrip(b.cusip)).map(toPoint), color: '#64748b', r: 0, w: 2.2 }
+      { label: `Bills${sfx}`,  data: fedBonds.filter(b => b.type === 'MARKET BASED BILL' && !isStrip(b.cusip)).map(toPoint), color: '#0ea5e9', r: 2, w: 1.5, dash: [4, 4] },
+      { label: `Notes${sfx}`,  data: fedBonds.filter(b => b.type === 'MARKET BASED NOTE' && !isStrip(b.cusip)).map(toPoint), color: '#1a56db', r: 2, w: 2.5, dash: [4, 4] },
+      { label: `Bonds${sfx}`,  data: fedBonds.filter(b => b.type === 'MARKET BASED BOND' && !isStrip(b.cusip)).map(toPoint), color: '#7c3aed', r: 2, w: 2.5, dash: [4, 4] },
+      { label: `STRIPS${sfx}`, data: fedBonds.filter(b => isStrip(b.cusip)).map(toPoint), color: '#64748b', r: 2, w: 2.2, dash: [4, 4] }
     );
   }
   if (fidBonds) {
     const sfx = bothShown ? ' (Market)' : '';
     seriesDef.push(
-      { label: `Bills${sfx}`,  data: fidBonds.filter(b => b.type === 'MARKET BASED BILL' && !isStrip(b.cusip)).map(toPoint), color: '#f97316', r: 2, w: 1.5 },
-      { label: `Notes${sfx}`,  data: fidBonds.filter(b => b.type === 'MARKET BASED NOTE' && !isStrip(b.cusip)).map(toPoint), color: '#dc2626', r: 0, w: 2.5 },
-      { label: `Bonds${sfx}`,  data: fidBonds.filter(b => b.type === 'MARKET BASED BOND' && !isStrip(b.cusip)).map(toPoint), color: '#059669', r: 0, w: 2.5 },
-      { label: `STRIPS${sfx}`, data: fidBonds.filter(b => isStrip(b.cusip)).map(toPoint), color: '#78350f', r: 0, w: 2.2 }
+      { label: `Bills${sfx}`,  data: fidBonds.filter(b => b.type === 'MARKET BASED BILL' && !isStrip(b.cusip)).map(toPoint), color: '#f97316', r: 2, w: 1.5, dash: [] },
+      { label: `Notes${sfx}`,  data: fidBonds.filter(b => b.type === 'MARKET BASED NOTE' && !isStrip(b.cusip)).map(toPoint), color: '#dc2626', r: 2, w: 2.5, dash: [] },
+      { label: `Bonds${sfx}`,  data: fidBonds.filter(b => b.type === 'MARKET BASED BOND' && !isStrip(b.cusip)).map(toPoint), color: '#059669', r: 2, w: 2.5, dash: [] },
+      { label: `STRIPS${sfx}`, data: fidBonds.filter(b => isStrip(b.cusip)).map(toPoint), color: '#78350f', r: 2, w: 2.2, dash: [] }
     );
   }
 
@@ -799,7 +801,7 @@ function renderNominalsChart(fedBonds, fidBonds) {
     if (notesYPos.length >= 4) {
       const bounds = iqrClipBounds(notesYPos);
       if (bounds) {
-        const clipped = allY.filter(y => y >= bounds.lo && y <= bounds.hi);
+        const clipped = allY.filter(y => y >= bounds.lo);
         if (clipped.length > 0) scaleY = clipped;
       }
     }
@@ -826,6 +828,7 @@ function renderNominalsChart(fedBonds, fidBonds) {
         borderColor: s.color,
         backgroundColor: s.color,
         borderWidth: s.w,
+        borderDash: s.dash,
         pointRadius: s.r,
         pointHoverRadius: s.r > 0 ? s.r + 2 : 3,
         tension: 0.1
@@ -1076,17 +1079,17 @@ function renderChart(fedBonds, brokerBonds) {
   if (fedBonds) {
     const sfx = both ? ' (Fed)' : '';
     seriesDef.push(
-      { label: `Ask${sfx}`, data: fedBonds.map(b => toPt(b, 'askYield')), color: '#94a3b8', style: 'rect', w: 1.5, r: 3.5 },
-      { label: `SA${sfx}`,  data: fedBonds.map(b => toPt(b, 'saYield')),  color: '#475569', style: 'crossRot', w: 1.8, r: 4 },
-      { label: `SAO${sfx}`, data: fedBonds.map(b => toPt(b, 'saoYield')), color: '#1a56db', style: 'circle', w: 2.2, r: 2.5 }
+      { label: `Ask${sfx}`, data: fedBonds.map(b => toPt(b, 'askYield')), color: '#94a3b8', style: 'circle', w: 1.5, r: 2.5, dash: [4, 4] },
+      { label: `SA${sfx}`,  data: fedBonds.map(b => toPt(b, 'saYield')),  color: '#475569', style: 'circle', w: 1.8, r: 2.5, dash: [4, 4] },
+      { label: `SAO${sfx}`, data: fedBonds.map(b => toPt(b, 'saoYield')), color: '#1a56db', style: 'circle', w: 2.2, r: 2.5, dash: [4, 4] }
     );
   }
   if (brokerBonds) {
     const sfx = both ? ' (Market)' : '';
     seriesDef.push(
-      { label: `Ask${sfx}`, data: brokerBonds.map(b => toPt(b, 'askYield')), color: '#f97316', style: 'rect', w: 1.5, r: 3.5 },
-      { label: `SA${sfx}`,  data: brokerBonds.map(b => toPt(b, 'saYield')),  color: '#dc2626', style: 'crossRot', w: 1.8, r: 4 },
-      { label: `SAO${sfx}`, data: brokerBonds.map(b => toPt(b, 'saoYield')), color: '#059669', style: 'circle', w: 2.2, r: 2.5 }
+      { label: `Ask${sfx}`, data: brokerBonds.map(b => toPt(b, 'askYield')), color: '#f97316', style: 'circle', w: 1.5, r: 2.5, dash: [] },
+      { label: `SA${sfx}`,  data: brokerBonds.map(b => toPt(b, 'saYield')),  color: '#dc2626', style: 'circle', w: 1.8, r: 2.5, dash: [] },
+      { label: `SAO${sfx}`, data: brokerBonds.map(b => toPt(b, 'saoYield')), color: '#059669', style: 'circle', w: 2.2, r: 2.5, dash: [] }
     );
   }
 
@@ -1124,6 +1127,7 @@ function renderChart(fedBonds, brokerBonds) {
         borderColor: s.color,
         backgroundColor: s.color,
         borderWidth: s.w,
+        borderDash: s.dash,
         pointRadius: s.r,
         pointStyle: s.style,
         tension: 0.1,
@@ -1270,23 +1274,13 @@ document.getElementById('nominalsShowNone').onclick = (e) => {
 // Unified Source Change Handlers
 ['chkTipsFed', 'chkTipsBroker'].forEach(id => {
   document.getElementById(id).addEventListener('change', () => {
-    if (chart && chartTab === 'tips') {
-      savedZoom['tips'] = {
-        xMin: chart.scales.x.min, xMax: chart.scales.x.max,
-        yMin: chart.scales.y.min, yMax: chart.scales.y.max
-      };
-    }
+    savedZoom['tips'] = null;
     processAndRender();
   });
 });
 ['chkFedInvest', 'chkFidelity'].forEach(id => {
   document.getElementById(id).addEventListener('change', () => {
-    if (chart && chartTab === 'treasuries') {
-      savedZoom['treasuries'] = {
-        xMin: chart.scales.x.min, xMax: chart.scales.x.max,
-        yMin: chart.scales.y.min, yMax: chart.scales.y.max
-      };
-    }
+    savedZoom['treasuries'] = null;
     processAndRender();
   });
 });
