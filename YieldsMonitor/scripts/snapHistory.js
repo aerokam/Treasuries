@@ -106,10 +106,10 @@ async function snap() {
     const r2KeyOld = `TIPS/yield-history/${sym}_history.json`;
     console.log(`Updating ${sym}...`);
 
-    // 1. Get Live 2D data (the "tip")
+    // 1. Get Live 10D data (the "tip" with 5 trading days of overlap)
     let liveData = [];
     try {
-      liveData = await fetchRange(sym, '1D');
+      liveData = await fetchRange(sym, '5D');
     } catch (err) {
       console.error(`  Live fetch failed for ${sym}: ${err.message}`);
       continue;
@@ -122,8 +122,8 @@ async function snap() {
       console.log(`  Bootstrapping history (merging multiple ranges for resolution)...`);
       try {
         // Fetch ranges with decreasing resolution
-        // 1D: 1m, 5D: 5m, 1M: 3d?, 3M: 3d?, 6M: 3d?, 1Y: 3d?, 5Y: 8d, ALL: Monthly
-        const ranges = ['ALL', '5Y', '1Y', '6M', '3M', '1M', '5D', '1D'];
+        // 5D: 5m, 1M: 3d?, 3M: 3d?, 6M: 3d?, 1Y: 3d?, 5Y: 8d, ALL: Monthly
+        const ranges = ['ALL', '5Y', '1Y', '6M', '3M', '1M', '5D'];
         const results = await Promise.all(ranges.map(r => fetchRange(sym, r).catch(() => [])));
         
         history = [];
@@ -137,14 +137,34 @@ async function snap() {
       }
     }
 
-    // 3. Increment (Tack on latest data)
+    // 3. Increment (Tack on latest closing data)
+    // We only want to add the 17:00-17:05 ET close for each day that isn't in history yet.
     const lastHistTime = history[history.length - 1].x;
-    const newPoints = liveData.filter(p => p.x > lastHistTime);
     
-    if (newPoints.length > 0) {
-      // Merge all new points found in the live pull
-      history = mergePoints(history, newPoints);
-      console.log(`  Appended ${newPoints.length} new points for ${sym}.`);
+    // Identify closes in the liveData
+    const newCloses = [];
+    const closesByDay = new Map();
+
+    liveData.forEach(p => {
+      if (p.x <= lastHistTime) return;
+      
+      // Check if this is a "close" point (between 17:00 and 17:05 ET)
+      // The CNBC tradeTime is usually in "2026-03-30T17:00:00" format
+      const datePart = p.x.split('T')[0];
+      const timePart = p.x.split('T')[1];
+      if (timePart >= "17:00:00" && timePart <= "17:05:00") {
+        // For each day, keep the latest available close point in the window
+        closesByDay.set(datePart, p);
+      }
+    });
+
+    Array.from(closesByDay.values()).sort((a, b) => a.x.localeCompare(b.x)).forEach(p => {
+      newCloses.push(p);
+    });
+    
+    if (newCloses.length > 0) {
+      history = mergePoints(history, newCloses);
+      console.log(`  Appended ${newCloses.length} new closes for ${sym}.`);
       
       await uploadToR2(r2Key, history);
       await uploadToR2(r2KeyOld, history);

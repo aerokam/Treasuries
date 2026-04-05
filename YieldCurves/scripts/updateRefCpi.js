@@ -1,18 +1,10 @@
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { execSync } from 'child_process';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, '../../.env') });
-// We'll just import the functions and run them.
-// But they are currently standalone scripts with top-level await/calls.
-// I'll refactor them to export functions if needed, or just use child_process.
-
-import { execSync } from 'child_process';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 async function main() {
   try {
@@ -21,6 +13,9 @@ async function main() {
     
     console.log("\nStep 2: Calculating daily Reference CPI...");
     execSync(`node "${path.join(__dirname, 'calcRefCpi.js')}"`, { stdio: 'inherit' });
+    
+    console.log("\nStep 3: Refreshing SA/SAO Yields...");
+    execSync(`node "${path.join(__dirname, 'updateSaSaoYields.js')}"`, { stdio: 'inherit' });
     
     console.log("\nUpdate complete.");
   } catch (error) {

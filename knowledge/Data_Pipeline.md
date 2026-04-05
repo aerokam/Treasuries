@@ -1,51 +1,49 @@
 # Data Pipeline
 
-Project-wide data acquisition architecture. See `Data_Pipeline_Local.md` (gitignored) for local automation details.
+Project-wide data acquisition architecture. This document tracks the sources, schedules, and ownership (GitHub vs. Local) of all ingestion jobs.
 
 ---
 
-## Data Sources
+## 1.0 External Data Sources
 
-### FedInvest (`Yields.csv`, `RefCpiNsaSa.csv`)
-- Fetched daily by GitHub Actions (`scripts/getYieldsFedInvest.js`, `YieldCurves/scripts/updateRefCpi.js`)
-- Uploaded to R2 under `Treasuries/`
-- FedInvest prices settle T
+All data enters the system from these 6 external entities. Click the **Drill-down Schema** to see exactly which fields are provided by each source.
 
-### Market Broker Quotes (`FidelityTreasuries.csv`, `FidelityTips.csv`)
-- Source: Fidelity Fixed Income search (Treasuries + TIPS pages)
-- Broker quotes settle T+1
-- Downloaded manually and uploaded to R2 under `Treasuries/`
+| ID | Source | Data Provided | Method | Drill-down Schema |
+|---|---|---|---|---|
+| **E1** | **FedInvest** | Daily mid-market reference prices | Automated Scrape | [E1 Schema](./DATA_DICTIONARY.md#e1) |
+| **E2** | **TreasuryDirect** | Daily interpolated RefCPI | REST API | [E2 Schema](./DATA_DICTIONARY.md#e2) |
+| **E3** | **FiscalData** | Auction results & TIPS metadata | REST API | [E3 Schema](./DATA_DICTIONARY.md#e3) |
+| **E4** | **BLS API** | Monthly CPI-U (NSA/SA) factors | REST API | [E4 Schema](./DATA_DICTIONARY.md#e4) |
+| **E5** | **CNBC** | Real-time market yields | GraphQL | [E5 Schema](./DATA_DICTIONARY.md#e5) |
+| **E6** | **Fidelity** | Broker ask/bid quotes | Automated Download | [E6 Schema](./DATA_DICTIONARY.md#e6) |
 
 ---
 
-## GitHub Actions / Scheduled Tasks
+## 2.0 Ingestion Jobs (Ownership & Schedule)
 
-| Workflow | Schedule (PT) | Script | Notes |
+We have migrated several unreliable GitHub Actions to **Local Windows Scheduled Tasks** to ensure precision. **If a job is marked [LOCAL], it runs on the host machine.**
+
+### [LOCAL] Local Scheduled Tasks (Windows)
+These jobs are the primary ingestion engine. They run on the owner's machine via Windows Task Scheduler.
+
+| Task Name | Schedule | Script | Primary Output |
 |---|---|---|---|
-| `get-yields-fedinvest.yml` | Weekdays 11:05am | `scripts/getYieldsFedInvest.js` | Handles holiday skipping internally |
-| `update-yield-history.yml` | Weekdays 11am | `YieldsMonitor/scripts/snapHistory.js` | |
-| `get-auctions.yml` | Weekdays 8:05am + 10:35am | `scripts/getAuctions.js` | 2 triggers |
-| `fetch-tips-ref.yml` | Mondays 7am | `scripts/fetchTipsRef.js` | |
-| `fetch-ref-cpi.yml` | Per-month specific dates ~5:35am | `scripts/fetchRefCpi.js --write` | See CPI Release Schedule below |
-| `update-ref-cpi-nsa-sa.yml` | Daily 6:35am | `YieldCurves/scripts/updateRefCpi.js` | Uses `checkReleaseDate.js` guard |
+| **FedInvest Download** | Weekdays 1:05pm ET | `scripts/getYieldsFedInvest.js` | `Yields.csv` |
+| **Fidelity Quotes** | 3× Daily | *(Windows Task)* | `FidelityTreasuries.csv` |
+| **CPI Refresh** | Monthly (Release Day) | `scripts/fetchRefCpi.js` | `RefCPI.csv` |
+| **SA Factor Update** | Daily 6:35am | `YieldCurves/scripts/updateRefCpi.js` | `RefCpiNsaSa.csv` |
 
-### CPI Release Schedule
-- `fetch-ref-cpi.yml` runs on specific per-month dates matching the BLS CPI release schedule
-- Source: https://www.bls.gov/schedule/news_release/cpi.htm
-- Dates are hardcoded in the workflow (one cron entry per month)
-- **Annual maintenance:** After the December 10 run each year, the next year's schedule is published on the BLS page. Update `fetch-ref-cpi.yml` with the new dates before year-end.
-- `update-ref-cpi-nsa-sa.yml` uses `YieldCurves/scripts/checkReleaseDate.js` for the same gate — keep both in sync when updating dates.
+### [CLOUD] Active GitHub Actions
+These jobs still run on GitHub's infrastructure.
+
+| Workflow | Schedule | Script | Primary Output |
+|---|---|---|---|
+| `get-auctions.yml` | Weekdays 8:05/10:35am PT | `scripts/getAuctions.js` | `Auctions.csv` |
+| `fetch-tips-ref.yml` | Mondays 7am PT | `scripts/fetchTipsRef.js` | `TipsRef.csv` |
+| `update-yield-history.yml` | Weekdays 11am PT | `YieldsMonitor/scripts/snapHistory.js` | `yield-history/` |
 
 ---
 
-## R2 Bucket
-
-Base URL: `https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev`
-
-| File | Description |
-|------|-------------|
-| `Treasuries/Yields.csv` | FedInvest prices (TIPS + nominals) |
-| `Treasuries/RefCpiNsaSa.csv` | Daily reference CPI with SA factors |
-| `Treasuries/FidelityTreasuries.csv` | Broker nominal Treasury quotes |
-| `Treasuries/FidelityTips.csv` | Broker TIPS quotes |
-| `misc/BondHolidaysSifma.csv` | SIFMA bond holidays |
+## 3.0 R2 Data Store
+All jobs above upload their results to the central Cloudflare R2 bucket.
+- **Reference**: See [DataStores.md](./DataStores.md) for the full file manifest and live previews.

@@ -10,6 +10,7 @@ This document maps conceptual definitions from the [Master Glossary](../../knowl
 |---|---|---|
 | REFCPI_CUSIP | `REFCPI_CUSIP` | `912810FD5` (used for fetching daily RefCPI) |
 | MIN_BRACKET_YEAR | `LOWEST_LOWER_BRACKET_YEAR` | `2032` (defines the search range for the lower bracket) |
+| MAX_LAST_YEAR | `MAX_LAST_YEAR` | `2066` (UI upper bound for lastYear; years 2057–2066 are future years covered by 2056 bracket) |
 
 ---
 

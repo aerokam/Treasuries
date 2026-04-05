@@ -177,7 +177,7 @@ const NODES = [
   // External entities (cx, cy = center)
   {id:'E1',type:'external',label:'FedInvest',    sub:'E1',cx:82,cy:65,
    url:'https://www.treasurydirect.gov/GA-FI/FedInvest/todaySecurityPriceDetail',
-   desc:'Daily settlement prices — bills, notes, bonds, TIPS (no STRIPS)'},
+   desc:'Daily mid-market reference prices — bills, notes, bonds, TIPS (no STRIPS)'},
   {id:'E2',type:'external',label:'TreasuryDirect',sub:'E2',cx:82,cy:175,
    url:'https://www.treasurydirect.gov/TA_WS/secindex/search',
    desc:'Daily interpolated RefCPI values'},
@@ -274,7 +274,7 @@ const NODES = [
 
 const EDGES = [
   // E → P ingestion (solid)
-  {id:'eE1P1',from:'E1',to:'P1',style:'solid',  desc:'Daily settlement prices'},
+  {id:'eE1P1',from:'E1',to:'P1',style:'solid',  desc:'Daily market prices'},
   {id:'eE2P2',from:'E2',to:'P2',style:'solid',  desc:'Daily RefCPI values'},
   {id:'eE3P3',from:'E3',to:'P3',style:'solid',  desc:'TIPS metadata'},
   {id:'eE4P4',from:'E4',to:'P4',style:'solid',  desc:'CPI NSA/SA time series'},

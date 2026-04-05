@@ -2,208 +2,251 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Knowledge Map</title>
+<title>Treasuries Ecosystem Context</title>
 <style>
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body {
-  background: #0d0d1a;
-  color: #c0c0d0;
-  font-family: 'Segoe UI', sans-serif;
-  font-size: 13px;
-  padding: 24px 28px;
-}
-h1 {
-  color: #7070cc;
-  font-size: 14px;
-  font-weight: normal;
-  letter-spacing: 1px;
-  margin-bottom: 18px;
-}
-.layout {
-  display: flex;
-  gap: 0;
-  align-items: flex-start;
-  position: relative;
-}
-.col-left  { flex: 0 0 230px; }
-.col-mid   { flex: 0 0 56px; }   /* arrow lane */
-.col-right { flex: 1; display: flex; flex-direction: column; gap: 14px; }
+  :root {
+    --bg: #0d0d1a;
+    --panel: #16162a;
+    --border: #2a2a4a;
+    --text: #c0c8e0;
+    --accent: #7070cc;
+    --entity: #1a1a2e;
+    --process: #1a2a4e;
+    --store: #1a2e1a;
+    --foundation: #2e1a2e;
+    --font: 'Segoe UI', system-ui, sans-serif;
+  }
+  
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    margin: 0;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+  }
 
-.group {
-  border: 1px solid #2a2a4a;
-  border-radius: 6px;
-  padding: 10px 12px 12px;
-  background: #10101f;
-}
-.group-title {
-  font-size: 10px;
-  color: #5555aa;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  margin-bottom: 8px;
-  padding-bottom: 6px;
-  border-bottom: 1px solid #1e1e36;
-}
-a.node {
-  display: block;
-  padding: 4px 8px;
-  margin: 2px 0;
-  border-radius: 4px;
-  color: #9090bb;
-  text-decoration: none;
-  border: 1px solid transparent;
-  transition: background 0.12s, border-color 0.12s, color 0.12s;
-  font-size: 12px;
-  white-space: nowrap;
-}
-a.node:hover {
-  background: #1a1a35;
-  border-color: #4444aa;
-  color: #e0e0ff;
-}
-a.node.foundation {
-  background: #141428;
-  color: #b0b0ee;
-  border-color: #2e2e5a;
-}
-a.node.gitignored {
-  color: #555568;
-  border-style: dashed;
-  border-color: #333344;
-  font-style: italic;
-}
-a.node.authority {
-  background: #141f14;
-  color: #77bb77;
-  border-color: #2a4a2a;
-}
+  .nav-header {
+    width: 100%;
+    max-width: 1200px;
+    display: flex;
+    justify-content: center;
+    gap: 50px;
+    padding: 25px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 40px;
+  }
+  .nav-header a {
+    color: var(--accent);
+    text-decoration: none;
+    font-size: 1.2rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .nav-header a:hover { color: #aaaaff; text-decoration: underline; }
 
-/* SVG arrow lane */
-.col-mid svg {
-  display: block;
-  width: 56px;
-  overflow: visible;
-}
+  h1 {
+    font-size: 1.8rem;
+    font-weight: 300;
+    letter-spacing: 4px;
+    color: var(--accent);
+    margin-bottom: 50px;
+    text-transform: uppercase;
+  }
+
+  .dfd-container {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+    position: relative;
+  }
+
+  .column {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    z-index: 2;
+  }
+
+  .label {
+    font-size: 11px;
+    color: #666699;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin-bottom: -5px;
+    text-align: center;
+    font-weight: 700;
+  }
+
+  /* Shapes */
+  .entity { /* Rectangle - External Source */
+    border: 1px solid var(--border);
+    background: var(--entity);
+    padding: 12px 15px;
+    border-radius: 4px;
+    width: 140px;
+    text-align: center;
+    font-size: 0.85rem;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    cursor: pointer;
+    text-decoration: none;
+    color: inherit;
+  }
+  .entity:hover { border-color: var(--accent); transform: scale(1.02); }
+
+  .foundation { /* Hexagon-ish */
+    border: 1px solid #8a4a8a;
+    background: var(--foundation);
+    padding: 12px 15px;
+    border-radius: 15px 0 15px 0;
+    width: 140px;
+    text-align: center;
+    font-size: 0.85rem;
+    color: #ffccff;
+    text-decoration: none;
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+  }
+  .foundation:hover { background: #4a2a4a; border-color: #ff00ff; }
+
+  .process { /* Circle */
+    border: 2px solid var(--accent);
+    background: var(--process);
+    padding: 15px;
+    border-radius: 50%;
+    width: 125px;
+    height: 125px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    text-decoration: none;
+    color: white;
+    font-weight: 600;
+    font-size: 0.85rem;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+  }
+  .process:hover { transform: translateY(-5px); box-shadow: 0 10px 25px rgba(112, 112, 204, 0.5); }
+  .process span { font-size: 0.65rem; font-weight: normal; margin-top: 5px; opacity: 0.8; }
+
+  .store { /* Open Box */
+    border-left: 4px solid #4a8a4a;
+    border-top: 1px solid #2a4a2a;
+    border-bottom: 1px solid #2a4a2a;
+    background: var(--store);
+    padding: 15px 20px;
+    width: 150px;
+    text-align: center;
+    font-size: 1rem;
+    color: #aaffaa;
+    cursor: pointer;
+    text-decoration: none;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+  }
+  .store:hover { background: #203520; transform: scale(1.02); }
+
+  /* Arrows */
+  .arrow-lane { width: 25px; display: flex; align-items: center; align-self: center; }
+  .arrow { width: 100%; height: 2px; background: #2a2a4a; position: relative; }
+  .arrow::after {
+    content: ''; position: absolute; right: -2px; top: -4px;
+    border-left: 6px solid #2a2a4a; border-top: 5px solid transparent; border-bottom: 5px solid transparent;
+  }
+
 </style>
 </head>
 <body>
-<h1>Knowledge Map — click any node to read</h1>
 
-<div class="layout" id="layout">
+<div class="nav-header">
+  <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md">Data Dictionary</a>
+  <a href="viewer.html#/md/knowledge/DataStores.md">Data Stores</a>
+  <a href="viewer.html#/md/knowledge/Admin_Dashboard.md">Admin Dashboard</a>
+  <a href="viewer.html#/md/knowledge/VERIFICATION_SUITE.md">Verify Setup</a>
+</div>
 
-  <div class="col-left">
-    <div class="group" id="g-core">
-      <div class="group-title">Core Knowledge · knowledge/</div>
-      <a class="node foundation" id="n-DD"        href="viewer.html#/md/knowledge/DATA_DICTIONARY.md">DATA_DICTIONARY.md</a>
-      <a class="node foundation" id="n-BB"        href="viewer.html#/md/knowledge/Bond_Basics.md">Bond_Basics.md</a>
-      <a class="node foundation" id="n-TB"        href="viewer.html#/md/knowledge/TIPS_Basics.md">TIPS_Basics.md</a>
-      <a class="node"            id="n-CR"        href="viewer.html#/md/knowledge/Treasury_CUSIP_Reference.md">Treasury_CUSIP_Reference.md</a>
-      <a class="node"            id="n-AQ"        href="viewer.html#/md/knowledge/AuctionsQuery_Reference.md">AuctionsQuery_Reference.md</a>
-      <a class="node"            id="n-DF"        href="viewer.html#/md/knowledge/DataFlow.md">DataFlow.md</a>
-      <a class="node"            id="n-DP"        href="viewer.html#/md/knowledge/Data_Pipeline.md">Data_Pipeline.md</a>
-    </div>
+<h1>Treasuries Ecosystem Context</h1>
+
+<div class="dfd-container">
+  
+  <!-- Column 1: Sources -->
+  <div class="column">
+    <div class="label">External Sources</div>
+    <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#e1" class="entity">FedInvest</a>
+    <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#e2" class="entity">TreasuryDirect</a>
+    <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#e3" class="entity">FiscalData API</a>
+    <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#e4" class="entity">BLS Public API</a>
+    <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#e5" class="entity">CNBC Market</a>
+    <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#e6" class="entity">Fidelity Market</a>
   </div>
 
-  <div class="col-mid">
-    <svg id="arrow-svg" height="1"></svg>
+  <div class="arrow-lane"><div class="arrow"></div></div>
+
+  <!-- Column 2: Ingestion -->
+  <div class="column">
+    <div class="label">Ingestion</div>
+    <a href="viewer.html#/md/knowledge/Data_Pipeline.md" class="process">
+      Ingestion Jobs
+      <span>GH Actions &<br>Local Windows Tasks</span>
+    </a>
   </div>
 
-  <div class="col-right">
-    <div class="group" id="g-tlm">
-      <div class="group-title">TipsLadderManager/</div>
-      <a class="node" href="viewer.html#/md/TipsLadderManager/knowledge/1.0_Bond_Ladders.md">1.0_Bond_Ladders.md</a>
-      <a class="node" href="viewer.html#/md/TipsLadderManager/knowledge/2.0_TIPS_Ladders.md">2.0_TIPS_Ladders.md</a>
-      <a class="node" href="viewer.html#/md/TipsLadderManager/knowledge/2.1_Broker_Import.md">2.1_Broker_Import.md</a>
-      <a class="node" href="viewer.html#/md/TipsLadderManager/knowledge/3.0_TIPS_Ladder_Rebalancing.md">3.0_TIPS_Ladder_Rebalancing.md</a>
-      <a class="node" href="viewer.html#/md/TipsLadderManager/knowledge/3.1_Data_Pipeline.md">3.1_Data_Pipeline.md</a>
-      <a class="node" href="viewer.html#/md/TipsLadderManager/knowledge/4.0_Computation_Modules.md">4.0_Computation_Modules.md</a>
-      <a class="node" href="viewer.html#/md/TipsLadderManager/knowledge/5.0_UI_Schema.md">5.0_UI_Schema.md</a>
-      <a class="node" href="viewer.html#/md/TipsLadderManager/knowledge/PROJECT_VISION.md">PROJECT_VISION.md</a>
-      <a class="node" href="viewer.html#/md/TipsLadderManager/knowledge/TECHNICAL_REFERENCE.md">TECHNICAL_REFERENCE.md</a>
-    </div>
+  <div class="arrow-lane"><div class="arrow"></div></div>
 
-    <div class="group" id="g-yc">
-      <div class="group-title">YieldCurves/</div>
-      <a class="node" href="viewer.html#/md/YieldCurves/knowledge/1.0_Seasonal_Adjustments.md">1.0_Seasonal_Adjustments.md</a>
-      <a class="node" href="viewer.html#/md/YieldCurves/knowledge/2.0_SAO_Adjustment.md">2.0_SAO_Adjustment.md</a>
-      <a class="node" href="viewer.html#/md/YieldCurves/knowledge/2.1_SA_Intuition.md">2.1_SA_Intuition.md</a>
-      <a class="node" href="viewer.html#/md/YieldCurves/knowledge/3.0_Visual_Standards.md">3.0_Visual_Standards.md</a>
-      <a class="node authority" href="viewer.html#/md/YieldCurves/knowledge/Canty.md">Canty.md (authority)</a>
-    </div>
+  <!-- Column 3: Storage -->
+  <div class="column">
+    <div class="label">Storage</div>
+    <a href="viewer.html#/md/knowledge/DataStores.md" class="store">
+      Cloudflare R2
+      <span>Central Truth<br>(CSV / JSON)</span>
+    </a>
+  </div>
 
-    <div class="group" id="g-ta">
-      <div class="group-title">TreasuryAuctions/</div>
-      <a class="node" href="viewer.html#/md/TreasuryAuctions/knowledge/Data_Pipeline.md">Data_Pipeline.md</a>
-    </div>
+  <div class="arrow-lane"><div class="arrow"></div></div>
 
-    <div class="group" id="g-ym">
-      <div class="group-title">YieldsMonitor/</div>
-      <a class="node" href="viewer.html#/md/YieldsMonitor/knowledge/1.0_Operation.md">1.0_Operation.md</a>
-      <a class="node" href="viewer.html#/md/YieldsMonitor/knowledge/API_Mapping.md">API_Mapping.md</a>
-    </div>
+  <!-- Column 4: Applications -->
+  <div class="column">
+    <div class="label">Applications</div>
+    <a href="viewer.html#/md/knowledge/TipsLadderManager.md" class="process">
+      TipsLadder<br>Manager
+      <span>Ladder Planning</span>
+    </a>
+    <a href="viewer.html#/md/knowledge/YieldCurves.md" class="process">
+      YieldCurves
+      <span>Seasonal Analysis</span>
+    </a>
+    <a href="viewer.html#/md/knowledge/YieldsMonitor.md" class="process">
+      YieldsMonitor
+      <span>Market Tracking</span>
+    </a>
+    <a href="viewer.html#/md/knowledge/TreasuryAuctions.md" class="process">
+      TreasuryAuctions
+      <span>Auction Data</span>
+    </a>
+  </div>
+
+  <!-- Column 5: Foundations (Connected to Apps) -->
+  <div class="column" style="margin-left: 20px; border-left: 1px dashed #444; padding-left: 20px;">
+    <div class="label">Knowledge Base</div>
+    <a href="viewer.html#/md/knowledge/Bond_Basics.md" class="foundation">Bond Basics</a>
+    <a href="viewer.html#/md/knowledge/TIPS_Basics.md" class="foundation">TIPS Basics</a>
+    <a href="viewer.html#/md/knowledge/Treasury_CUSIP_Reference.md" class="foundation">CUSIP Ref</a>
+    
+    <div style="height: 15px;"></div>
+    <div class="label">Internal Specs</div>
+    <a href="viewer.html#/md/TipsLadderManager/knowledge/1.0_Bond_Ladders.md" class="foundation" style="font-size: 0.75rem;">Bond Ladders</a>
+    <a href="viewer.html#/md/TipsLadderManager/knowledge/2.0_TIPS_Ladders.md" class="foundation" style="font-size: 0.75rem;">TIPS Ladders</a>
+    <a href="viewer.html#/md/TipsLadderManager/knowledge/3.0_TIPS_Ladder_Rebalancing.md" class="foundation" style="font-size: 0.75rem;">Rebalancing</a>
+    <a href="viewer.html#/md/YieldCurves/knowledge/1.0_Seasonal_Adjustments.md" class="foundation" style="font-size: 0.75rem;">SA Logic</a>
   </div>
 
 </div>
 
-<script>
-// Draw curved arrows in the SVG lane between col-left and col-right.
-// Each arrow goes from a specific source node (right edge) to a target group (left edge, vertically centered).
-window.addEventListener('load', () => {
-  const svg = document.getElementById('arrow-svg');
-  const lane = svg.parentElement;       // col-mid div
-  const laneBounds = lane.getBoundingClientRect();
-  const laneScrollY = window.scrollY;
-
-  // Compute absolute-document Y center of an element
-  const midY = el => {
-    const r = el.getBoundingClientRect();
-    return r.top + laneScrollY + r.height / 2;
-  };
-  const laneTop = laneBounds.top + laneScrollY;
-
-  const arrows = [
-    { from: 'n-BB',  to: 'g-tlm', color: '#3a5a8a' },
-    { from: 'n-TB',  to: 'g-yc',  color: '#3a5a8a' },
-    { from: 'n-AQ',  to: 'g-ta',  color: '#3a5a8a' },
-    { from: 'n-DD',  to: 'g-ym',  color: '#3a5a8a' },
-  ];
-
-  // SVG will span from first to last arrow endpoint
-  let minY = Infinity, maxY = -Infinity;
-  const pts = arrows.map(a => {
-    const y1 = midY(document.getElementById(a.from));
-    const y2 = midY(document.getElementById(a.to));
-    minY = Math.min(minY, y1, y2);
-    maxY = Math.max(maxY, y1, y2);
-    return { ...a, y1, y2 };
-  });
-
-  const svgH = maxY - laneTop + 20;
-  svg.setAttribute('height', svgH);
-  svg.setAttribute('width', 56);
-
-  // Arrowhead marker
-  svg.innerHTML = `
-    <defs>
-      <marker id="ah" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
-        <path d="M0,0 L7,3.5 L0,7 Z" fill="#3a5a8a"/>
-      </marker>
-    </defs>`;
-
-  const W = 56;
-  pts.forEach(({ y1, y2, color }) => {
-    const ry1 = y1 - laneTop;
-    const ry2 = y2 - laneTop;
-    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    // Cubic bezier: start at left edge (x=0), end at right edge (x=W)
-    path.setAttribute('d', `M0,${ry1} C${W*0.5},${ry1} ${W*0.5},${ry2} ${W},${ry2}`);
-    path.setAttribute('fill', 'none');
-    path.setAttribute('stroke', color);
-    path.setAttribute('stroke-width', '1.5');
-    path.setAttribute('marker-end', 'url(#ah)');
-    svg.appendChild(path);
-  });
-});
-</script>
 </body>
 </html>
