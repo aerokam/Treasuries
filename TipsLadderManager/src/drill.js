@@ -479,9 +479,10 @@ function renderDurationBeam(lowerDur, upperDur, avgDur, lowerWeight, upperWeight
   const lp = px(lowerDur), up = px(upperDur), ap = px(avgDur);
   const lw = Math.round(lowerWeight * 100), uw = Math.round(upperWeight * 100);
 
-  return '<div style="margin:16px 0 8px;padding:24px 10px 32px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;position:relative;user-select:none;">'
-    + '<div style="position:absolute;top:10px;left:0;right:0;text-align:center;font-size:10px;color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;">Duration Balance (Mod. Duration)</div>'
-    // Beam
+  return '<div style="margin:16px 0 8px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;user-select:none;">'
+    + '<div style="text-align:center;font-size:10px;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;padding:8px 10px 0;">Duration Balance</div>'
+    // Beam area — padding-top reserves room for the above-beam weight labels
+    + '<div style="padding:30px 10px 28px;position:relative;">'
     + '<div style="height:4px;background:#cbd5e1;border-radius:2px;position:relative;margin:0 20px;">'
       // Tick marks
       + [min, max].map(v => '<div style="position:absolute;top:8px;left:' + px(v) + '%;transform:translateX(-50%);font-size:9px;color:#94a3b8">' + v + 'y</div>').join('')
@@ -503,6 +504,7 @@ function renderDurationBeam(lowerDur, upperDur, avgDur, lowerWeight, upperWeight
         + '<div style="font-size:9px;color:#64748b">' + upperLabel + '</div>'
         + '<div style="width:2px;height:24px;background:#3b82f6;margin:2px auto 0;opacity:0.4;"></div>'
       + '</div>'
+    + '</div>'
     + '</div>'
     + '</div>';
 }
