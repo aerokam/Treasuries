@@ -42,7 +42,7 @@ function calcGapParams(gapYears, tipsMap, settlementDate, refCPI, dara, prelim) 
     }
 
     const piPerBond = 1000 + 1000 * synCpn * 0.5;
-    const qty = Math.round((dara - laterMatInt) / (piPerBond / 1000));
+    const qty = Math.round((dara - laterMatInt) / piPerBond);
     totalCost += qty * 1000;
     breakdown.push({ year, qty, piPerBond, laterMatInt });
     count++;
