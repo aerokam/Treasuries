@@ -33,8 +33,8 @@
   *Consumer Price Index (CPI-U) monthly data. Used to derive SA factors by comparing NSA vs. SA values.*
 - <a id="e5"></a>**E5: CNBC GraphQL** = `Symbol + Timestamp + Price + Change + Yield`
   *Market mid-price feed for live monitoring. Symbols include US10Y, US30Y, etc.*
-- <a id="e6"></a>**E6: Fidelity Fixed Income** = `CUSIP + Maturity + Coupon + Ask_Price + Bid_Price + Ask_Yield + Bid_Yield + Quantity`
-  *Broker-specific quotes. Used for "Market Price" comparisons.*
+- <a id="e6"></a>**E6: Fidelity Fixed Income** = `CUSIP + Maturity + Coupon + Price_Bid + Price_Ask + Yield_Bid + Ask_Yield_to_Maturity + ( Inflation_Factor + Adjusted_Price_Bid + Adjusted_Price_Ask ) + Quantity`
+  *Broker bid/ask quotes. Used for "Market Price" comparisons and bid/ask spread analysis. Two files: one for TIPS (includes inflation-adjustment columns), one for Nominals (includes quantity columns). Column names are as they appear in the exported CSV header row (used verbatim for parsing).*
 
 ---
 
@@ -48,7 +48,13 @@
 - <a id="s4"></a>**S4: RefCpiNsaSa.csv** = `{ @Date + CPI_NSA + CPI_SA + SA_Factor }`
 - <a id="s5"></a>**S5: Auctions.csv** = `{ @CUSIP + @Auction_Date + Security_Type + High_Yield + Bid_to_Cover + Primary_Dealer_Accepted + ... }`
 - <a id="s6"></a>**S6: YieldHistory** = `{ @Symbol + { [ Timestamp + Yield_Value ] } }`
-- <a id="s7"></a>**S7: FidelityQuotes** = `{ @CUSIP + Maturity + Coupon + Ask_Price + Bid_Price + Ask_Yield + Bid_Yield }`
+- <a id="s7a"></a>**S7a: FidelityTips.csv** — TIPS bid/ask quotes. Local drop path: `YieldCurves/data/FidelityTips.csv` (gitignored). R2 key: `Treasuries/FidelityTips.csv`.
+  CSV columns (exact header names): `Cusip, State, Description, Coupon, Maturity Date, Moody's Rating, S&P Rating, Price Bid, Price Ask, Yield Bid, Ask Yield to Worst, Ask Yield to Maturity, Inflation Factor, Adjusted Price Bid, Adjusted Price Ask, Attributes`
+  *Parser normalises headers to lowercase. Key fields used: `cusip`, `price ask` (ask clean real price), `price bid` (bid clean real price), `inflation factor`, `adjusted price bid`, `adjusted price ask`. Bid yield is computed from `price bid` via `yieldFromPrice` (not from `yield bid`) to ensure consistency with ask yield method. Price spread uses adjusted prices (actual dollar cost). Footer line `Date downloaded MM/DD/YYYY HH:MM AM/PM` supplies the download timestamp.*
+
+- <a id="s7b"></a>**S7b: FidelityTreasuries.csv** — Nominal Treasury bid/ask quotes. Local drop path: `YieldCurves/data/FidelityTreasuries.csv` (gitignored). R2 key: `Treasuries/FidelityTreasuries.csv`.
+  CSV columns (exact header names): `Cusip, State, Description, Coupon, Maturity Date, Moody's Rating, S&P Rating, Price Bid, Price Ask, Yield Bid, Ask Yield to Worst, Ask Yield to Maturity, Quantity Bid(min), Quantity Ask(min), Attributes`
+  *Parser normalises headers to lowercase. Key fields used: `cusip`, `price ask`, `price bid`, `yield bid` (bid yield, percentage form — divide by 100), `ask yield to maturity` (ask yield, percentage form). Spread: `yield_spread_bps = (yield_bid − ask_ytm) × 10000`; `price_spread_pct = (price_ask − price_bid) / price_ask × 100`. Footer line `Date downloaded ...` supplies the download timestamp.*
 
 ---
 

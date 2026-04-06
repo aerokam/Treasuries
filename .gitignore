@@ -25,8 +25,7 @@ lerna-debug.log*
 
 YieldsMonitor/data/yield-history/
 # Yield Curves project folder
-YieldCurves/FidelityTreasuries.csv
-YieldCurves/FidelityTips.csv
+YieldCurves/data/
 YieldCurves/.browser-profile/
 YieldCurves/.chrome-profile/
 YieldCurves/.browser-profile-patch/
