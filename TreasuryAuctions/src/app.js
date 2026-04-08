@@ -463,8 +463,8 @@ async function loadData() {
   setStatus('Fetching data...');
 
   const [csvResult, upcomingResult] = await Promise.allSettled([
-    fetch(R2_CSV_URL).then(r => { if (!r.ok) throw new Error(`R2 HTTP ${r.status}`); return r.text(); }),
-    fetch(upcomingUrl()).then(r => { if (!r.ok) throw new Error(`Upcoming HTTP ${r.status}`); return r.text(); }),
+    fetch(R2_CSV_URL, { cache: 'no-cache' }).then(r => { if (!r.ok) throw new Error(`R2 HTTP ${r.status}`); return r.text(); }),
+    fetch(upcomingUrl(), { cache: 'no-cache' }).then(r => { if (!r.ok) throw new Error(`Upcoming HTTP ${r.status}`); return r.text(); }),
   ]);
 
   if (csvResult.status === 'fulfilled') {

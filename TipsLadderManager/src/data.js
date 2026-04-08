@@ -59,9 +59,9 @@ export function lookupRefCpi(refCpiRows, dateStr) {
 
 export async function fetchTipsData() {
   const [yieldsRes, refCpiRes, tipsRefRes] = await Promise.all([
-    fetch(BASE_URL + '/Yields.csv'),
-    fetch(BASE_URL + '/RefCPI.csv'),
-    fetch(BASE_URL + '/TipsRef.csv'),
+    fetch(BASE_URL + '/Yields.csv', { cache: 'no-cache' }),
+    fetch(BASE_URL + '/RefCPI.csv', { cache: 'no-cache' }),
+    fetch(BASE_URL + '/TipsRef.csv', { cache: 'no-cache' }),
   ]);
   if (!yieldsRes.ok) throw new Error('Yields.csv: HTTP ' + yieldsRes.status);
   if (!refCpiRes.ok) throw new Error('RefCPI.csv: HTTP ' + refCpiRes.status);

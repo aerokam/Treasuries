@@ -353,11 +353,11 @@ async function init() {
   try {
     console.log("Fetching market data...");
     const [yieldsRes, refCpiRes, holidayRes, fidTreasuriesRes, fidTipsRes] = await Promise.all([
-      fetch(YIELDS_CSV_URL).then(r => { console.log("Yields fetched"); return r; }).catch(e => ({ ok: false, error: e })),
-      fetch(REF_CPI_CSV_URL).then(r => { console.log("RefCPI fetched"); return r; }).catch(e => ({ ok: false, error: e })),
-      fetch(HOLIDAYS_CSV_URL).then(r => { console.log("Holidays fetched"); return r; }).catch(e => ({ ok: false, error: e })),
-      fetch(FIDELITY_TREASURIES_URL).then(r => { console.log("Fidelity Treasuries fetched"); return r; }).catch(e => ({ ok: false, error: e })),
-      fetch(FIDELITY_TIPS_URL).then(r => { console.log("Fidelity TIPS fetched"); return r; }).catch(e => ({ ok: false, error: e })),
+      fetch(YIELDS_CSV_URL, { cache: 'no-cache' }).then(r => { console.log("Yields fetched"); return r; }).catch(e => ({ ok: false, error: e })),
+      fetch(REF_CPI_CSV_URL, { cache: 'no-cache' }).then(r => { console.log("RefCPI fetched"); return r; }).catch(e => ({ ok: false, error: e })),
+      fetch(HOLIDAYS_CSV_URL, { cache: 'no-cache' }).then(r => { console.log("Holidays fetched"); return r; }).catch(e => ({ ok: false, error: e })),
+      fetch(FIDELITY_TREASURIES_URL, { cache: 'no-cache' }).then(r => { console.log("Fidelity Treasuries fetched"); return r; }).catch(e => ({ ok: false, error: e })),
+      fetch(FIDELITY_TIPS_URL, { cache: 'no-cache' }).then(r => { console.log("Fidelity TIPS fetched"); return r; }).catch(e => ({ ok: false, error: e })),
     ]);
 
     if (!yieldsRes.ok) throw new Error(`Failed to fetch yields: ${yieldsRes.status || yieldsRes.error}`);

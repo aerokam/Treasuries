@@ -38,7 +38,7 @@ This tool is designed for **transparency first**. Every number in the UI is trac
 
 **Bracket Years** — Maturity years used to cover gaps or future years. *Upper bracket*: always the Feb 2040 TIPS. *Lower bracket*: usually the latest 10-year TIPS before the gap. In **3-bracket mode**, the tool uses both your original lower holdings and a second "new lower" bracket for more efficient matching.
 
-**Role Playing (LMI)** — When actual bonds substitute for missing maturities, they "role play" as the future rungs by contributing their annual coupon interest to the current year's budget. This prevents "funding holes" when maturities don't perfectly align.
+**Role Playing (LMI)** — When bracket or cover TIPS of a given maturity substitute for TIPS that haven't yet been issued (gap years or future 30-year rungs), they "role play" by contributing their annual interest to the funded year amount for that maturity. Example: If excess Feb 2056s are held to cover future 30-year rungs (e.g., 2057–2066), the interest from those excess 2056 TIPS contributes to the 2056 funded year amount, which could reduce the quantity of 2056 TIPS required for the 2056 funded year.
 
 ---
 

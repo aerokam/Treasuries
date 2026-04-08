@@ -190,8 +190,8 @@
 
 <a id="role-playing-lmi"></a>
 ### Role Playing LMI
-`Role_Playing_LMI` = `Σ Annual_Interest_Real for bracket excess bonds maturing in Current_Year`
-*Interest from additional bonds held in the current year to cover future rungs (gaps or future years). In the sizing phase, these bonds 'role play' as the future rungs they replace, contributing their full annual coupon to the current year's ARA.*
+`Role_Playing_LMI` = `Σ Annual_Interest_Real for bracket or cover excess bonds maturing in Current_Year`
+*When bracket or cover TIPS of a given maturity substitute for TIPS that haven't yet been issued (gap years or future 30-year rungs), they "role play" by contributing their annual interest to the funded year amount for that maturity. Example: If excess Feb 2056s are held to cover future 30-year rungs (e.g., 2057–2066), the interest from those excess 2056 TIPS contributes to the 2056 funded year amount, which could reduce the quantity of 2056 TIPS required for the 2056 funded year.*
 
 <a id="gap-years"></a>
 ### Gap Years
