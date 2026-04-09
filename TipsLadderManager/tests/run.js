@@ -177,27 +177,27 @@ console.log('\nBuild — DARA=50000, lastYear=2040');
   console.log(`        weights:       ${summary.lowerWeight.toFixed(4)} / ${summary.upperWeight.toFixed(4)}`);
 }
 
-// ── Test: Build — future years (lastYear > maxRealYear) ───────────────────────
-console.log('\nBuild — DARA=50000, lastYear=2060 (future years)');
+// ── Test: Build — Future 30Y years (lastYear > maxRealYear) ───────────────────────
+console.log('\nBuild — DARA=50000, lastYear=2060 (Future 30Y years)');
 {
   const dara = 50000, lastYear = 2060;
   const { summary } = runBuild({ dara, lastYear, tipsMap, refCPI, settlementDate });
-  assert('futureYears.length > 0', (summary.futureYears?.length ?? 0) > 0, true);
-  assert('futureLowerYear === 2056', summary.futureLowerYear, 2056);
-  assert('futureUpperYear === 2052', summary.futureUpperYear, 2052);
-  assert('futureLowerWeight + futureUpperWeight ≈ 1',
-    (summary.futureLowerWeight ?? 0) + (summary.futureUpperWeight ?? 0), 1, 0.0001);
+  assert('future30yYears.length > 0', (summary.future30yYears?.length ?? 0) > 0, true);
+  assert('future30yLowerYear === 2056', summary.future30yLowerYear, 2056);
+  assert('future30yUpperYear === 2052', summary.future30yUpperYear, 2052);
+  assert('future30yLowerWeight + future30yUpperWeight ≈ 1',
+    (summary.future30yLowerWeight ?? 0) + (summary.future30yUpperWeight ?? 0), 1, 0.0001);
   assert('avgDuration between lower and upper',
-    summary.futureParams?.avgDuration > summary.futureLowerDuration &&
-    summary.futureParams?.avgDuration < summary.futureUpperDuration, true);
-  assert('futureFellBack === false', summary.futureFellBack, false);
+    summary.future30yParams?.avgDuration > summary.future30yLowerDuration &&
+    summary.future30yParams?.avgDuration < summary.future30yUpperDuration, true);
+  assert('future30yFellBack === false', summary.future30yFellBack, false);
   assert('totalBuyCost > 0', summary.totalBuyCost > 0, true);
-  console.log(`        futureYears:         ${JSON.stringify(summary.futureYears)}`);
-  console.log(`        d_lower(2056):       ${summary.futureLowerDuration?.toFixed(4)}`);
-  console.log(`        d_avg(future):       ${summary.futureParams?.avgDuration?.toFixed(4)}`);
-  console.log(`        d_upper(2052):       ${summary.futureUpperDuration?.toFixed(4)}`);
-  console.log(`        weights 2056/2052:   ${summary.futureLowerWeight?.toFixed(4)} / ${summary.futureUpperWeight?.toFixed(4)}`);
-  console.log(`        exQty  2056/2052:    ${summary.futureLowerExQty} / ${summary.futureUpperExQty}`);
+  console.log(`        future30yYears:      ${JSON.stringify(summary.future30yYears)}`);
+  console.log(`        d_lower(2056):       ${summary.future30yLowerDuration?.toFixed(4)}`);
+  console.log(`        d_avg(Future 30Y):   ${summary.future30yParams?.avgDuration?.toFixed(4)}`);
+  console.log(`        d_upper(2052):       ${summary.future30yUpperDuration?.toFixed(4)}`);
+  console.log(`        weights 2056/2052:   ${summary.future30yLowerWeight?.toFixed(4)} / ${summary.future30yUpperWeight?.toFixed(4)}`);
+  console.log(`        exQty  2056/2052:    ${summary.future30yLowerExQty} / ${summary.future30yUpperExQty}`);
   console.log(`        totalBuyCost:        ${Math.round(summary.totalBuyCost).toLocaleString()}`);
 }
 

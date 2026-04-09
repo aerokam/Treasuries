@@ -43,10 +43,10 @@ function bondVarRows(d, nPeriods, principalPerBond, couponPct) {
     + row('Coupon periods in FY', '', nPerLbl, false, undefined, 'cp');
 }
 
-function futureBreakdownRows(futureParams) {
-  if (!futureParams?.breakdown) return '';
+function future30yBreakdownRows(future30yParams) {
+  if (!future30yParams?.breakdown) return '';
   let rows = '';
-  futureParams.breakdown.forEach((g, i) => {
+  future30yParams.breakdown.forEach((g, i) => {
     const id = 'fut' + i;
     const fmla = 'round((DARA \u2212 <span class="formula-var" data-source="' + id + 'lmi">LMI</span>) \u00f7 <span class="formula-var" data-source="' + id + 'pi">P+I</span>)';
     rows += row(g.year + ' quantity', fmla, g.qty, false, undefined, id + 'qty')
@@ -65,7 +65,7 @@ function gapBreakdownRows(gapParams, dara) {
     const fmla = 'round((DARA \u2212 <span class="formula-var" data-source="' + id + 'lmi">LMI</span>) \u00f7 <span class="formula-var" data-source="' + id + 'pi">P+I</span>)';
     rows += row(g.year + ' quantity', fmla, g.qty, false, undefined, id + 'qty')
           + row('\u21b3 P+I per synthetic', '', fm2(g.piPerBond), false, undefined, id + 'pi')
-          + row('\u21b3 Later mat int (Real)', 'Total real coupon interest from future rungs', fm(g.laterMatInt), false, undefined, id + 'lmi')
+          + row('\u21b3 Later mat int (Real)', 'Total real coupon interest from Future 30Y rungs', fm(g.laterMatInt), false, undefined, id + 'lmi')
           + row('\u21b3 Theoretical cost', '<span class="formula-var" data-source="' + id + 'qty">Quantity</span> \xd7 $1,000', fm(g.qty * 1000));
   });
   return rows;
@@ -147,19 +147,19 @@ export function buildDrillHTML(d, colKey, summary) {
       }
     }
 
-  // ── Build: Future Amount / Future Cost ───────────────────────────────────────
-  } else if (colKey === 'futureAmt' || colKey === 'futureCost') {
+  // ── Build: Future 30Y Amount / Future 30Y Cost ───────────────────────────────────────
+  } else if (colKey === 'future30yAmt' || colKey === 'future30yCost') {
     const s = summary;
-    const isAmt = colKey === 'futureAmt';
+    const isAmt = colKey === 'future30yAmt';
     if (s) {
-      const isLower = d.fundedYear === s.futureLowerYear;
-      const weight  = isLower ? s.futureLowerWeight : s.futureUpperWeight;
+      const isLower = d.fundedYear === s.future30yLowerYear;
+      const weight  = isLower ? s.future30yLowerWeight : s.future30yUpperWeight;
       const wLabel  = isLower ? 'Lower weight' : 'Upper weight';
-      const exCost  = (s.futureParams?.futureTotalCost ?? 0) * weight;
-      rows = row('Cover weights', 'see Future Duration Calcs \u2197', fd(weight, 4))
+      const exCost  = (s.future30yParams?.future30yTotalCost ?? 0) * weight;
+      rows = row('Cover weights', 'see Future 30Y Duration Calcs \u2197', fd(weight, 4))
         + sep()
-        + futureBreakdownRows(s.futureParams)
-        + row('Future total cost (Real)', 'Sum of hypothetical future year costs', fm(s.futureParams?.futureTotalCost ?? 0), true, undefined, 'ftc')
+        + future30yBreakdownRows(s.future30yParams)
+        + row('Future 30Y total cost (Real)', 'Sum of hypothetical Future 30Y year costs', fm(s.future30yParams?.future30yTotalCost ?? 0), true, undefined, 'ftc')
         + row('Target excess cost', '<span class="formula-var" data-source="ftc">total cost</span> \xd7 ' + wLabel.toLowerCase(), fm(exCost), false, undefined, 'tec')
         + sep()
         + row('Cost per TIPS', '<span class="formula-var" data-source="price">price/100</span> \xd7 <span class="formula-var" data-source="ir">index ratio</span> \xd7 1,000', fm2(d.costPerBond), false, undefined, 'cpb')
@@ -170,10 +170,10 @@ export function buildDrillHTML(d, colKey, summary) {
           + sep()
           + row('P+I per TIPS', '<span class="formula-var" data-source="ppb">Par Value/TIPS</span> \xd7 (1 + <span class="formula-var" data-source="cpp">coupon/period</span> \xd7 <span class="formula-var" data-source="cp">periods</span>)', fm2(d.fundedYearPi), false, undefined, 'pipb')
           + sep()
-          + row('Future Cover Amount', '<span class="formula-var" data-source="pipb">P+I/TIPS</span> \xd7 <span class="formula-var" data-source="qty">Excess Quantity</span>', fm(d.excessAmt), true);
+          + row('Future 30Y Cover Amount', '<span class="formula-var" data-source="pipb">P+I/TIPS</span> \xd7 <span class="formula-var" data-source="qty">Excess Quantity</span>', fm(d.excessAmt), true);
       } else {
         rows += sep()
-          + row('Future Cover Cost', '<span class="formula-var" data-source="cpb">Cost per TIPS</span> \xd7 <span class="formula-var" data-source="qty">Excess Quantity</span>', fm(d.excessCost), true);
+          + row('Future 30Y Cover Cost', '<span class="formula-var" data-source="cpb">Cost per TIPS</span> \xd7 <span class="formula-var" data-source="qty">Excess Quantity</span>', fm(d.excessCost), true);
       }
     }
 
@@ -197,7 +197,7 @@ export function buildDrillHTML(d, colKey, summary) {
       + row('Interest from longer-dated bonds', 'from bonds maturing after ' + d.fundedYear, fm(laterMatInt), false, undefined, 'lmi');
     const excessLMI = isBef ? d.excessLMI_Before : d.excessLMI_After;
     if (excessLMI > 0) {
-    rows += row('Interest from same-year excess (bracket)', 'from additional ' + d.fundedYear + ' bonds held to cover future rungs', fm(excessLMI), false, undefined, 'exlmi');
+    rows += row('Interest from same-year excess (bracket)', 'from additional ' + d.fundedYear + ' bonds held to cover Future 30Y rungs', fm(excessLMI), false, undefined, 'exlmi');
     }
     const totalFmla = excessLMI > 0
       ? 'Funded year TIPS + <span class="formula-var" data-source="lmi">Longer-dated int</span> + <span class="formula-var" data-source="exlmi">Same-year excess int</span>'
@@ -326,11 +326,11 @@ export function buildDrillHTML(d, colKey, summary) {
         rows += row('Excess Cost After', '<span class="formula-var" data-source="cpb">Cost per TIPS</span> \xd7 <span class="formula-var" data-source="qty">Excess Quantity</span>', fm(exQty * d.costPerBond), true);
       }
     }
-  // ── Rebalance: Future Amt/Cost Before/After ─────────────────────────────────────────
-  } else if (colKey === 'futureAmtBefore' || colKey === 'futureAmtAfter' || colKey === 'futureCostBefore' || colKey === 'futureCostAfter') {
+  // ── Rebalance: Future 30Y Amt/Cost Before/After ─────────────────────────────────────────
+  } else if (colKey === 'future30yAmtBefore' || colKey === 'future30yAmtAfter' || colKey === 'future30yCostBefore' || colKey === 'future30yCostAfter') {
     const s       = summary;
-    const isAfter = colKey === 'futureAmtAfter' || colKey === 'futureCostAfter';
-    const isAmt   = colKey === 'futureAmtBefore' || colKey === 'futureAmtAfter';
+    const isAfter = colKey === 'future30yAmtAfter' || colKey === 'future30yCostAfter';
+    const isAmt   = colKey === 'future30yAmtBefore' || colKey === 'future30yAmtAfter';
     const piPerBond = principalPerBond * (1 + d.coupon / 2 * nPeriods);
     if (!isAfter) {
       const exQty = d.excessQtyBefore;
@@ -340,24 +340,24 @@ export function buildDrillHTML(d, colKey, summary) {
       if (isAmt) {
         rows += row('P+I per TIPS', '<span class="formula-var" data-source="ppb">Par Value/TIPS</span> \xd7 (1 + <span class="formula-var" data-source="cpp">coupon/period</span> \xd7 <span class="formula-var" data-source="cp">periods</span>)', fm2(piPerBond), false, undefined, 'pipb')
           + sep()
-          + row('Future Cover Amount Before', '<span class="formula-var" data-source="pipb">P+I per TIPS</span> \xd7 <span class="formula-var" data-source="qty">Excess Quantity</span>', fm(exQty * piPerBond), true);
+          + row('Future 30Y Cover Amount Before', '<span class="formula-var" data-source="pipb">P+I per TIPS</span> \xd7 <span class="formula-var" data-source="qty">Excess Quantity</span>', fm(exQty * piPerBond), true);
       } else {
         rows += row('Cost per TIPS', '<span class="formula-var" data-source="price">price/100</span> \xd7 <span class="formula-var" data-source="ir">index ratio</span> \xd7 1,000', fm2(d.costPerBond), false, undefined, 'cpb')
           + sep()
-          + row('Future Cover Cost Before', '<span class="formula-var" data-source="cpb">Cost per TIPS</span> \xd7 <span class="formula-var" data-source="qty">Excess Quantity</span>', fm(exQty * d.costPerBond), true);
+          + row('Future 30Y Cover Cost Before', '<span class="formula-var" data-source="cpb">Cost per TIPS</span> \xd7 <span class="formula-var" data-source="qty">Excess Quantity</span>', fm(exQty * d.costPerBond), true);
       }
     } else if (s) {
-      const isLower = d.cusip === s.futureLowerCoverCUSIP;
-      const weight  = isLower ? s.futureLowerWeight : s.futureUpperWeight;
+      const isLower = d.cusip === s.future30yLowerCoverCUSIP;
+      const weight  = isLower ? s.future30yLowerWeight : s.future30yUpperWeight;
       const wLabel  = isLower ? 'Lower weight' : 'Upper weight';
-      const exCost  = (s.futureParams?.futureTotalCost ?? 0) * weight;
+      const exCost  = (s.future30yParams?.future30yTotalCost ?? 0) * weight;
       const exQty   = d.excessQtyAfter;
       rows = row('Excess Quantity', 'round(target cost \xf7 <span class="formula-var" data-source="cpb">Cost per TIPS</span>)', exQty, false, undefined, 'qty')
         + sep()
         + row('Cost per TIPS', '<span class="formula-var" data-source="price">price/100</span> \xd7 <span class="formula-var" data-source="ir">index ratio</span> \xd7 1,000', fm2(d.costPerBond), false, undefined, 'cpb')
         + sep()
-        + futureBreakdownRows(s.futureParams)
-        + row('Future total cost', 'Sum of hypothetical future year costs', fm(s.futureParams?.futureTotalCost ?? 0), true, undefined, 'ftc')
+        + future30yBreakdownRows(s.future30yParams)
+        + row('Future 30Y total cost', 'Sum of hypothetical Future 30Y year costs', fm(s.future30yParams?.future30yTotalCost ?? 0), true, undefined, 'ftc')
         + row('Target excess cost', '<span class="formula-var" data-source="ftc">total cost</span> \xd7 ' + wLabel.toLowerCase(), fm(exCost));
       if (isAmt) {
         rows += sep()
@@ -365,10 +365,10 @@ export function buildDrillHTML(d, colKey, summary) {
           + sep()
           + row('P+I per TIPS', '<span class="formula-var" data-source="ppb">Par Value/TIPS</span> \xd7 (1 + <span class="formula-var" data-source="cpp">coupon/period</span> \xd7 <span class="formula-var" data-source="cp">periods</span>)', fm2(piPerBond), false, undefined, 'pipb')
           + sep()
-          + row('Future Cover Amount After', '<span class="formula-var" data-source="pipb">P+I per TIPS</span> \xd7 <span class="formula-var" data-source="qty">Excess Quantity</span>', fm(exQty * piPerBond), true);
+          + row('Future 30Y Cover Amount After', '<span class="formula-var" data-source="pipb">P+I per TIPS</span> \xd7 <span class="formula-var" data-source="qty">Excess Quantity</span>', fm(exQty * piPerBond), true);
       } else {
         rows += sep()
-          + row('Future Cover Cost After', '<span class="formula-var" data-source="cpb">Cost per TIPS</span> \xd7 <span class="formula-var" data-source="qty">Excess Quantity</span>', fm(exQty * d.costPerBond), true);
+          + row('Future 30Y Cover Cost After', '<span class="formula-var" data-source="cpb">Cost per TIPS</span> \xd7 <span class="formula-var" data-source="qty">Excess Quantity</span>', fm(exQty * d.costPerBond), true);
       }
     }
 
@@ -601,7 +601,7 @@ export function buildDurationPopupRows(summary, mode) {
     gapParams.breakdown.forEach(g => {
       rows.push({ label: g.year + ' qty', note: 'round((DARA \u2212 ' + Math.round(g.laterMatInt) + ') \u00f7 ' + g.piPerBond.toFixed(2) + ')', value: String(g.qty) });
     });
-    rows.push({ label: 'Future gap cost (Total)', note: 'Sum of individual gap theoretical costs', value: '$' + Math.round(gapParams.totalCost).toLocaleString(), total: true });
+    rows.push({ label: 'Theoretical gap cost (Total)', note: 'Sum of individual gap theoretical costs', value: '$' + Math.round(gapParams.totalCost).toLocaleString(), total: true });
     const totalEx = summary.totalExcessCostReal || summary.totalExcessCost;
     if (totalEx) {
       rows.push({ label: 'Total excess cost', note: 'real cost of excess bonds now held in brackets', value: '$' + Math.round(totalEx).toLocaleString() });
@@ -612,62 +612,62 @@ export function buildDurationPopupRows(summary, mode) {
   return rows;
 }
 
-export function buildFutureDurationPopupRows(summary) {
-  const { futureYears, futureParams, futureLowerYear, futureUpperYear,
-          futureLowerDuration, futureUpperDuration, futureUpperWeight, futureLowerWeight,
-          futureFellBack, futureLowerMonth, futureUpperMonth } = summary;
-  if (!futureYears?.length || !futureParams) {
-    return [{ label: 'No future years', note: 'Future cover matching not applicable', total: true }];
+export function buildFuture30yDurationPopupRows(summary) {
+  const { future30yYears, future30yParams, future30yLowerYear, future30yUpperYear,
+          future30yLowerDuration, future30yUpperDuration, future30yUpperWeight, future30yLowerWeight,
+          future30yFellBack, future30yLowerMonth, future30yUpperMonth } = summary;
+  if (!future30yYears?.length || !future30yParams) {
+    return [{ label: 'No Future 30Y years', note: 'Future 30Y cover matching not applicable', total: true }];
   }
-  const lowerLabel = (futureLowerMonth ? futureLowerMonth + ' ' : '') + futureLowerYear;
-  const upperLabel = (futureUpperMonth ? futureUpperMonth + ' ' : '') + futureUpperYear;
-  const avg = futureParams.avgDuration;
+  const lowerLabel = (future30yLowerMonth ? future30yLowerMonth + ' ' : '') + future30yLowerYear;
+  const upperLabel = (future30yUpperMonth ? future30yUpperMonth + ' ' : '') + future30yUpperYear;
+  const avg = future30yParams.avgDuration;
   const wFml = '(avg dur \u2212 lower dur) / (upper dur \u2212 lower dur)';
-  const match = futureLowerWeight.toFixed(4) + ' \u00d7 ' + futureLowerDuration.toFixed(2)
-              + ' + ' + futureUpperWeight.toFixed(4) + ' \u00d7 ' + futureUpperDuration.toFixed(2)
+  const match = future30yLowerWeight.toFixed(4) + ' \u00d7 ' + future30yLowerDuration.toFixed(2)
+              + ' + ' + future30yUpperWeight.toFixed(4) + ' \u00d7 ' + future30yUpperDuration.toFixed(2)
               + ' = ' + avg.toFixed(2);
 
   const rows = [
-    { label: 'Future average duration', value: avg.toFixed(2) + ' yr' },
+    { label: 'Future 30Y average duration', value: avg.toFixed(2) + ' yr' },
     { sep: true },
   ];
 
-  if (futureParams.breakdown?.length) {
+  if (future30yParams.breakdown?.length) {
     rows.push({ heading: 'Hypothetical TIPS Durations' });
-    const durSum = futureParams.breakdown.reduce((s, b) => s + (b.dur ?? 0), 0);
-    futureParams.breakdown.forEach(b => {
+    const durSum = future30yParams.breakdown.reduce((s, b) => s + (b.dur ?? 0), 0);
+    future30yParams.breakdown.forEach(b => {
       rows.push({ label: b.year + ' (Feb 15)', note: 'mod. duration', value: b.dur != null ? b.dur.toFixed(2) + ' yr' : '\u2014' });
     });
-    rows.push({ label: 'Avg (' + durSum.toFixed(2) + ' \u00f7 ' + futureParams.breakdown.length + ')', value: avg.toFixed(2) + ' yr', total: true });
+    rows.push({ label: 'Avg (' + durSum.toFixed(2) + ' \u00f7 ' + future30yParams.breakdown.length + ')', value: avg.toFixed(2) + ' yr', total: true });
     rows.push({ sep: true });
   }
 
   rows.push(
-    { label: 'Lower cover (' + lowerLabel + ')', note: 'mod. duration', value: futureLowerDuration.toFixed(2) + ' yr' },
-    { label: 'Upper cover (' + upperLabel + ')', note: 'mod. duration', value: futureUpperDuration.toFixed(2) + ' yr' },
+    { label: 'Lower cover (' + lowerLabel + ')', note: 'mod. duration', value: future30yLowerDuration.toFixed(2) + ' yr' },
+    { label: 'Upper cover (' + upperLabel + ')', note: 'mod. duration', value: future30yUpperDuration.toFixed(2) + ' yr' },
     { sep: true },
-    { label: 'Lower weight', note: wFml,                    value: futureLowerWeight.toFixed(4) },
-    { label: 'Upper weight', note: '1 \u2212 lower weight', value: futureUpperWeight.toFixed(4) },
+    { label: 'Lower weight', note: wFml,                    value: future30yLowerWeight.toFixed(4) },
+    { label: 'Upper weight', note: '1 \u2212 lower weight', value: future30yUpperWeight.toFixed(4) },
     { sep: true },
     { label: 'Duration match', note: match, total: true },
     { sep: true },
     { heading: 'Duration Balance (Mod. Duration)' },
     { html: renderDurationBeam([
-        { dur: futureLowerDuration, weight: futureLowerWeight, label: lowerLabel },
-        { dur: futureUpperDuration, weight: futureUpperWeight, label: upperLabel }
+        { dur: future30yLowerDuration, weight: future30yLowerWeight, label: lowerLabel },
+        { dur: future30yUpperDuration, weight: future30yUpperWeight, label: upperLabel }
       ], avg) },
   );
 
-  if (futureFellBack) {
+  if (future30yFellBack) {
     rows.push({ sep: true }, { label: 'Fallback applied', note: 'Avg duration exceeds upper cover duration; all weight assigned to upper cover.' });
   }
 
-  if (futureParams.breakdown?.length) {
-    rows.push({ sep: true }, { heading: 'Future Year Breakdown (hypothetical qty)' });
-    futureParams.breakdown.forEach(b => {
+  if (future30yParams.breakdown?.length) {
+    rows.push({ sep: true }, { heading: 'Future 30Y Year Breakdown (hypothetical qty)' });
+    future30yParams.breakdown.forEach(b => {
       rows.push({ label: b.year + ' qty', note: 'round((DARA \u2212 ' + Math.round(b.laterMatInt) + ') \u00f7 ' + b.piPerBond.toFixed(2) + ')', value: String(b.qty) });
     });
-    rows.push({ label: 'Total future cost', value: '$' + Math.round(futureParams.futureTotalCost).toLocaleString(), total: true });
+    rows.push({ label: 'Total Future 30Y cost', value: '$' + Math.round(future30yParams.future30yTotalCost).toLocaleString(), total: true });
   }
 
   return rows;

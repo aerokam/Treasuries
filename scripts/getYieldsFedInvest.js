@@ -1,5 +1,5 @@
 // Load .env from repo root if present (local dev); does not override GH Actions env vars
-import { existsSync, readFileSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 const _envPath = resolve(dirname(fileURLToPath(import.meta.url)), '../.env');
@@ -327,6 +327,11 @@ async function main() {
   
   await uploadToR2('Treasuries/YieldsFromFedInvestPrices.csv', content);
   await uploadToR2('TIPS/YieldsFromFedInvestPrices.csv', content);
+
+  // Write sentinel so the retry wrapper knows today's fetch succeeded
+  const logsDir = resolve(dirname(fileURLToPath(import.meta.url)), '../logs');
+  if (!existsSync(logsDir)) mkdirSync(logsDir, { recursive: true });
+  writeFileSync(resolve(logsDir, 'fedinvest-success-date.txt'), today);
 
   const typeCounts = rows.reduce((acc, r) => { acc[r.type] = (acc[r.type] || 0) + 1; return acc; }, {});
   for (const [type, count] of Object.entries(typeCounts)) console.error(`  ${type}: ${count}`);

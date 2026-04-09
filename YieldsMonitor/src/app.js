@@ -306,7 +306,7 @@ async function updateAllData(force = false) {
       }
       const calculationData = (liveCache[`${sym}_5D`] || liveCache[`${sym}_1D`] || data), latest = calculationData[calculationData.length-1];
       let closeP = null; const latestDayET = getEtDateStr(latest.x);
-      for (let i = calculationData.length-1; i >= 0; i--) { const p = calculationData[i], etStr = getEtDateStr(p.x); if (etStr !== latestDayET) { const pts = ET_FULL_FMT.formatToParts(p.x).reduce((a, pt) => ({ ...a, [pt.type]: pt.value }), {}), ph = +pts.hour; if (ph < 17 || (ph === 17 && +pts.minute <= 5)) { closeP = p; break; } } }
+      for (let i = calculationData.length-1; i >= 0; i--) { const p = calculationData[i], etStr = getEtDateStr(p.x); if (etStr !== latestDayET) { const pts = ET_FULL_FMT.formatToParts(p.x).reduce((a, pt) => ({ ...a, [pt.type]: pt.value }), {}), ph = +pts.hour; if (ph < 17 || (ph === 17 && +pts.minute === 0)) { closeP = p; break; } } }
       const changeEl = document.getElementById(`change-${sym}`), yieldEl = document.getElementById(`yield-${sym}`);
       if (yieldEl) yieldEl.textContent = `${latest.y.toFixed(3)}%`;
       if (changeEl) { if (closeP) { const diff = latest.y - closeP.y; changeEl.textContent = `${diff>=0?'+':''}${diff.toFixed(3)}%`; changeEl.className = `sym-change ${diff>=0?'up':'down'}`; changeEl.title = `Since ${ET_HM_FMT.format(closeP.x)} ET close (${closeP.y.toFixed(3)}%)`; } else changeEl.textContent = '---'; }

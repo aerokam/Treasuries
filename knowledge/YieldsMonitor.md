@@ -64,4 +64,4 @@ Intraday and historical charts featuring market-state annotations.
 
 - **[Operation Manual (1.0)](../YieldsMonitor/knowledge/1.0_Operation.md)**: Exhaustive details on timezone handling, shading colors, and API fallback logic.
 - **[API Mapping](../YieldsMonitor/knowledge/API_Mapping.md)**: Technical mapping of CNBC symbols and R2 file paths.
-- **[Data Pipeline](../../knowledge/Data_Pipeline.md)**: Details on the `update-yield-history.yml` workflow that snapshots daily closes.
+- **[Data Pipeline](../../knowledge/Data_Pipeline.md)**: Details on the local **Yield History Snap** job that snapshots daily closes.

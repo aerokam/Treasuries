@@ -21,27 +21,21 @@ All data enters the system from these 6 external entities. Click the **Drill-dow
 
 ## 2.0 Ingestion Jobs (Ownership & Schedule)
 
-We have migrated several unreliable GitHub Actions to **Local Windows Scheduled Tasks** to ensure precision. **If a job is marked [LOCAL], it runs on the host machine.**
+All ingestion jobs have been migrated to **Local Windows Scheduled Tasks** to ensure precision and reliability.
 
 ### [LOCAL] Local Scheduled Tasks (Windows)
-These jobs are the primary ingestion engine. They run on the owner's machine via Windows Task Scheduler.
+These jobs run on the host machine via Windows Task Scheduler.
 
 | Task Name | Schedule | Script | Primary Output |
 |---|---|---|---|
 | **FedInvest Download** | Weekdays 1:05pm ET | `scripts/getYieldsFedInvest.js` | `YieldsFromFedInvestPrices.csv` |
 | **Fidelity Quotes** | 3× Daily | *(Windows Task)* | `FidelityTreasuries.csv` |
-| **CPI Refresh** | Monthly (Release Day) | `scripts/fetchRefCpi.js` | `RefCPI.csv` |
+| **Auction Refresh** | Weekdays 8:05/10:35am PT | `scripts/getAuctions.js` | `Auctions.csv` |
+| **TIPS Ref Refresh** | Mondays 7am PT | `scripts/fetchTipsRef.js` | `TipsRef.csv` |
+| **Yield History Snap** | Weekdays 11am PT | `YieldsMonitor/scripts/snapHistory.js` | `yield-history/` |
+| **Ref CPI Refresh** | Monthly (Release Day) | `scripts/fetchRefCpi.js` | `RefCPI.csv` |
 | **SA Factor Update** | Daily 6:35am | `YieldCurves/scripts/updateRefCpi.js` | `RefCpiNsaSa.csv` |
 | **CPI History Refresh** | Monthly (Release Day) | `scripts/fetchCpiHistory.js` | `bls/CPI_history.csv` |
-
-### [CLOUD] Active GitHub Actions
-These jobs still run on GitHub's infrastructure.
-
-| Workflow | Schedule | Script | Primary Output |
-|---|---|---|---|
-| `get-auctions.yml` | Weekdays 8:05/10:35am PT | `scripts/getAuctions.js` | `Auctions.csv` |
-| `fetch-tips-ref.yml` | Mondays 7am PT | `scripts/fetchTipsRef.js` | `TipsRef.csv` |
-| `update-yield-history.yml` | Weekdays 11am PT | `YieldsMonitor/scripts/snapHistory.js` | `yield-history/` |
 
 ---
 

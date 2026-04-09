@@ -87,7 +87,7 @@ body{font-family:system-ui,sans-serif;font-size:13px;margin:0;background:#f1f5f9
 .pi-btn.run:hover{background:#15803d}
 .pi-btn.run:disabled{background:#94a3b8;border-color:#94a3b8;cursor:not-allowed}
 
-/* ── Workflow chip ── */
+/* ── Local job chip ── */
 .wf-chip{border:1px solid #e2e8f0;border-radius:6px;padding:7px 10px;margin-bottom:8px;font-size:11px}
 .wf-chip-top{display:flex;align-items:center;gap:6px;margin-bottom:5px}
 .wf-label{font-weight:700;flex:1}
@@ -136,7 +136,7 @@ body{font-family:system-ui,sans-serif;font-size:13px;margin:0;background:#f1f5f9
 
 <div id="main">
   <div id="dfd-container">
-    <svg id="dfd" viewBox="0 0 820 780" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;min-width:580px"></svg>
+    <svg id="dfd" viewBox="0 0 820 900" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;min-width:580px"></svg>
     <div id="legend">
       <b>Legend</b>
       <div class="leg-row"><div class="leg-shape"><svg width="20" height="14"><rect x="1" y="2" width="18" height="10" rx="1" fill="#dbeafe" stroke="#3b82f6" stroke-width="1.2"/></svg></div>External source</div>
@@ -177,46 +177,51 @@ const NODES = [
   // External entities (cx, cy = center)
   {id:'E1',type:'external',label:'FedInvest',    sub:'E1',cx:82,cy:65,
    url:'https://www.treasurydirect.gov/GA-FI/FedInvest/todaySecurityPriceDetail',
-   desc:'Daily market prices — bills, notes, bonds, TIPS (no STRIPS)'},
-
+   desc:'Daily mid-market reference prices — bills, notes, bonds, TIPS (no STRIPS)'},
   {id:'E2',type:'external',label:'TreasuryDirect',sub:'E2',cx:82,cy:175,
    url:'https://www.treasurydirect.gov/TA_WS/secindex/search',
    desc:'Daily interpolated RefCPI values'},
   {id:'E3',type:'external',label:'FiscalData',   sub:'E3',cx:82,cy:385,
    url:'https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v1/accounting/od/auctions_query',
    desc:'Auction results and TIPS reference metadata'},
-  {id:'E4',type:'external',label:'BLS API',      sub:'E4',cx:82,cy:480,
-   url:'https://api.bls.gov/publicAPI/v2/timeseries/data/CUUR0000SA0',
-   desc:'Monthly NSA and SA CPI-U time series'},
+  {id:'E4',type:'external',label:'BLS.gov',       sub:'E4',cx:82,cy:480,
+   url:'https://www.bls.gov/',
+   desc:'Two data paths: (1) BLS public API — monthly NSA (not seasonally adjusted) and SA (seasonally adjusted) CPI-U time series; (2) BLS.gov schedule pages — scraped CPI release dates for previous, current, and next year'},
   {id:'E5',type:'external',label:'CNBC',         sub:'E5',cx:82,cy:575,
    url:'https://www.cnbc.com/quotes/US10Y',
    desc:'Market mid-price yields via GraphQL API'},
-  {id:'E6',type:'external',label:'Fidelity',     sub:'E6',cx:82,cy:665,
+  {id:'E6',type:'external',label:'Fidelity',     sub:'E6',cx:82,cy:690,
    url:'https://fixedincome.fidelity.com',
    desc:'Broker ask/bid quotes including STRIPS'},
+  {id:'E7',type:'external',label:'SIFMA',        sub:'E7',cx:82,cy:815,
+   url:'https://www.sifma.org/resources/guides-playbooks/holiday-schedule',
+   desc:'Official US bond market holiday schedule — full and early-close dates for all US bond market holidays'},
 
   // Processes
   {id:'P1',type:'process',label:'getYieldsFedInvest',short:'FedInvest\nYields',sub:'P1',cx:265,cy:65,
-   script:'scripts/getYieldsFedInvest.js',workflow:'get-yields-fedinvest.yml',localJobId:'fedinvest-download',
+   script:'scripts/getYieldsFedInvest.js',localJobId:'fedinvest-download',
    reads:['E1','S2'],writes:['S1']},
   {id:'P2',type:'process',label:'fetchRefCpi',   short:'Fetch\nRefCPI',  sub:'P2',cx:265,cy:175,
-   script:'scripts/fetchRefCpi.js',workflow:'fetch-ref-cpi.yml',localJobId:null,
+   script:'scripts/fetchRefCpi.js',localJobId:'fetch-ref-cpi',
    reads:['E2'],writes:['S3']},
   {id:'P3',type:'process',label:'fetchTipsRef',  short:'Fetch\nTIPSRef', sub:'P3',cx:265,cy:280,
-   script:'scripts/fetchTipsRef.js',workflow:'fetch-tips-ref.yml',localJobId:null,
+   script:'scripts/fetchTipsRef.js',localJobId:'fetch-tips-ref',
    reads:['E3'],writes:['S2']},
   {id:'P4',type:'process',label:'updateRefCpi',  short:'Update\nCPI SA', sub:'P4',cx:265,cy:385,
-   script:'YieldCurves/scripts/updateRefCpi.js',workflow:'update-ref-cpi-nsa-sa.yml',localJobId:null,
+   script:'YieldCurves/scripts/updateRefCpi.js',localJobId:'update-ref-cpi-nsa-sa',
    reads:['E4'],writes:['S4']},
   {id:'P5',type:'process',label:'getAuctions',   short:'Get\nAuctions',  sub:'P5',cx:265,cy:480,
-   script:'scripts/getAuctions.js',workflow:'get-auctions.yml',localJobId:null,
+   script:'scripts/getAuctions.js',localJobId:'get-auctions',
    reads:['E3'],writes:['S5']},
   {id:'P6',type:'process',label:'snapHistory',   short:'Snap\nHistory',  sub:'P6',cx:265,cy:575,
-   script:'YieldsMonitor/scripts/snapHistory.js',workflow:'update-yield-history.yml',localJobId:null,
+   script:'YieldsMonitor/scripts/snapHistory.js',localJobId:'yield-history-snap',
    reads:['E5','S6'],writes:['S6']},
-  {id:'P7',type:'process',label:'fidelityDownload',short:'Fidelity\nDL', sub:'P7',cx:265,cy:665,
-   script:'YieldCurves/scripts/fidelityDownload.js',workflow:null,localJobId:'fidelity-download',
-   reads:['E6'],writes:['S7']},
+  {id:'P7',type:'process',label:'fidelityDownload',short:'Fidelity\nDL', sub:'P7',cx:265,cy:690,
+   script:'YieldCurves/scripts/fidelityDownload.js',localJobId:'fidelity-download',
+   reads:['E6'],writes:['S7a','S7b']},
+  {id:'P8',type:'process',label:'updateHolidaysSifma',short:'Bond\nHolidays',sub:'P8',cx:265,cy:815,
+   script:'BondHolidays/updateHolidaysSifma.js',localJobId:'bond-holidays-update',
+   reads:['E7'],writes:['S8']},
 
   // Data stores
   {id:'S1',type:'store',label:'YieldsFromFedInvestPrices.csv',sub:'S1',cx:468,cy:65,
@@ -230,18 +235,27 @@ const NODES = [
    schema:'{CUSIP + Maturity + DatedDate + Coupon + BaseCPI + Term}'},
   {id:'S4',type:'store',label:'RefCpiNsaSa.csv', sub:'S4',cx:468,cy:385,
    r2Key:'Treasuries/RefCpiNsaSa.csv',
-   schema:'{Date + CPI_NSA + CPI_SA + SA_Factor}'},
+   schema:'{Date + CPI_NSA + CPI_SA + SA_Factor}',
+   r2Note:'NSA = not seasonally adjusted (raw BLS series); SA = seasonally adjusted (NSA \xd7 SA_Factor). Both columns stored; YieldCurves uses SA for the CPI overlay.'},
   {id:'S5',type:'store',label:'Auctions.csv',    sub:'S5',cx:468,cy:480,
    r2Key:'Treasuries/Auctions.csv',
-   schema:'{CUSIP + Auction_Date + Security_Type + … + High_Yield}'},
+   schema:'{CUSIP + Auction_Date + Security_Type + \u2026 + High_Yield}'},
   {id:'S6',type:'store',label:'yield-history/',  sub:'S6',cx:468,cy:575,
    r2Key:'Treasuries/yield-history/US10Y_history.json',
    schema:'{Symbol + [{Timestamp + Yield_Value}]}',
    r2Note:'14 symbol files; US10Y shown as representative'},
-  {id:'S7',type:'store',label:'FidelityQuotes',  sub:'S7',cx:468,cy:665,
+  {id:'S7a',type:'store',label:'FidelityTreasuries',sub:'S7a',cx:468,cy:660,
    r2Key:'Treasuries/FidelityTreasuries.csv',
    schema:'{CUSIP + Maturity + Coupon + Ask_Price + Bid_Price + Ask_Yield + Bid_Yield}',
-   r2Note:'FidelityTreasuries.csv + FidelityTips.csv'},
+   r2Note:'Nominal Treasuries broker quotes (bills, notes, bonds, STRIPS)'},
+  {id:'S7b',type:'store',label:'FidelityTips',   sub:'S7b',cx:468,cy:725,
+   r2Key:'Treasuries/FidelityTips.csv',
+   schema:'{CUSIP + Maturity + Coupon + Ask_Price + Bid_Price + Ask_Yield + Bid_Yield}',
+   r2Note:'TIPS broker quotes (all maturities)'},
+  {id:'S8',type:'store',label:'BondHolidaysSifma',sub:'S8',cx:468,cy:815,
+   r2Key:'misc/BondHolidaysSifma.csv',
+   schema:'{Date + Holiday_Name}',
+   r2Note:'Annual bond market holidays from SIFMA; updated once per year. Used for business-day calculations.'},
 
   // Apps
   {id:'A1',type:'app',label:'YieldCurves',  short:'Yield\nCurves', sub:'A1',cx:672,cy:175,
@@ -259,51 +273,55 @@ const NODES = [
 ];
 
 const EDGES = [
-  // E → P ingestion (solid)
-  {id:'eE1P1',from:'E1',to:'P1',style:'solid',  desc:'Daily settlement prices'},
+  // E \u2192 P ingestion (solid)
+  {id:'eE1P1',from:'E1',to:'P1',style:'solid',  desc:'Daily market prices'},
   {id:'eE2P2',from:'E2',to:'P2',style:'solid',  desc:'Daily RefCPI values'},
   {id:'eE3P3',from:'E3',to:'P3',style:'solid',  desc:'TIPS metadata'},
   {id:'eE4P4',from:'E4',to:'P4',style:'solid',  desc:'CPI NSA/SA time series'},
   {id:'eE3P5',from:'E3',to:'P5',style:'solid',  desc:'Auction results'},
   {id:'eE5P6',from:'E5',to:'P6',style:'solid',  desc:'Market yields'},
   {id:'eE6P7',from:'E6',to:'P7',style:'solid',  desc:'Broker quotes'},
+  {id:'eE7P8',from:'E7',to:'P8',style:'solid',  desc:'Bond market holiday schedule'},
   // dependencies (dashed, backward)
-  {id:'eS2P1',from:'S2',to:'P1',style:'dashed', desc:'TipsRef lookup — P1 reads TIPS coupon + maturity from S2 (FedInvest omits these fields for TIPS)'},
-  {id:'eS6P6',from:'S6',to:'P6',style:'dashed', desc:'Existing history — P6 reads prior snapshots before appending new data point'},
-  // P → S storage (solid)
+  {id:'eS2P1',from:'S2',to:'P1',style:'dashed', desc:'TipsRef lookup \u2014 P1 reads TIPS coupon + maturity from S2 (FedInvest omits these fields for TIPS)'},
+  {id:'eS6P6',from:'S6',to:'P6',style:'dashed', desc:'Existing history \u2014 P6 reads prior snapshots before appending new data point'},
+  // P \u2192 S storage (solid)
   {id:'eP1S1',from:'P1',to:'S1',style:'solid',  desc:'Writes YieldsFromFedInvestPrices.csv'},
   {id:'eP2S3',from:'P2',to:'S3',style:'solid',  desc:'Writes RefCPI.csv'},
   {id:'eP3S2',from:'P3',to:'S2',style:'solid',  desc:'Writes TipsRef.csv'},
   {id:'eP4S4',from:'P4',to:'S4',style:'solid',  desc:'Writes RefCpiNsaSa.csv'},
   {id:'eP5S5',from:'P5',to:'S5',style:'solid',  desc:'Writes Auctions.csv'},
   {id:'eP6S6',from:'P6',to:'S6',style:'solid',  desc:'Appends to yield-history/'},
-  {id:'eP7S7',from:'P7',to:'S7',style:'solid',  desc:'Writes FidelityQuotes'},
-  // S → A consumption (solid)
-  {id:'eS1A1',from:'S1',to:'A1',style:'solid',  desc:'YieldsFromFedInvestPrices.csv → all yield curves'},
-  {id:'eS1A2',from:'S1',to:'A2',style:'solid',  desc:'YieldsFromFedInvestPrices.csv → ladder pricing'},
-  {id:'eS2A2',from:'S2',to:'A2',style:'solid',  desc:'TipsRef.csv → coupon + dated-date lookups'},
-  {id:'eS3A2',from:'S3',to:'A2',style:'solid',  desc:'RefCPI.csv → index ratio calculations'},
-  {id:'eS4A1',from:'S4',to:'A1',style:'solid',  desc:'RefCpiNsaSa.csv → CPI seasonal adjustment overlay'},
-  {id:'eS7A1',from:'S7',to:'A1',style:'solid',  desc:'FidelityQuotes → Market tab (nominals + TIPS)'},
-  {id:'eS5A4',from:'S5',to:'A4',style:'solid',  desc:'Auctions.csv → all auction tabs'},
-  {id:'eS6A3',from:'S6',to:'A3',style:'solid',  desc:'yield-history/ → history charts (14 symbols)'},
+  {id:'eP7S7a',from:'P7',to:'S7a',style:'solid', desc:'Writes FidelityTreasuries.csv'},
+  {id:'eP7S7b',from:'P7',to:'S7b',style:'solid', desc:'Writes FidelityTips.csv'},
+  {id:'eP8S8', from:'P8',to:'S8', style:'solid', desc:'Writes BondHolidaysSifma.csv'},
+  // S \u2192 A consumption (solid)
+  {id:'eS1A1',from:'S1',to:'A1',style:'solid',  desc:'YieldsFromFedInvestPrices.csv \u2192 all yield curves'},
+  {id:'eS1A2',from:'S1',to:'A2',style:'solid',  desc:'YieldsFromFedInvestPrices.csv \u2192 ladder pricing'},
+  {id:'eS2A2',from:'S2',to:'A2',style:'solid',  desc:'TipsRef.csv \u2192 coupon + dated-date lookups'},
+  {id:'eS3A2',from:'S3',to:'A2',style:'solid',  desc:'RefCPI.csv \u2192 index ratio calculations'},
+  {id:'eS4A1',from:'S4',to:'A1',style:'solid',  desc:'RefCpiNsaSa.csv \u2192 CPI seasonal adjustment overlay'},
+  {id:'eS7aA1',from:'S7a',to:'A1',style:'solid', desc:'FidelityTreasuries.csv \u2192 Market tab (nominals)'},
+  {id:'eS7bA1',from:'S7b',to:'A1',style:'solid', desc:'FidelityTips.csv \u2192 Market tab (TIPS)'},
+  {id:'eS8A1', from:'S8', to:'A1',style:'dashed',desc:'BondHolidaysSifma.csv \u2192 business-day calculations in YieldCurves'},
+  {id:'eS5A4',from:'S5',to:'A4',style:'solid',  desc:'Auctions.csv \u2192 all auction tabs'},
+  {id:'eS6A3',from:'S6',to:'A3',style:'solid',  desc:'yield-history/ \u2192 history charts (14 symbols)'},
   // live browser fetches (dashed, long-range)
-  {id:'eE5A3',from:'E5',to:'A3',style:'dashed', desc:'Live CNBC GraphQL fetch — YieldsMonitor calls CNBC directly in the browser on page load (no R2 intermediary)'},
-  {id:'eE3A4',from:'E3',to:'A4',style:'dashed', desc:'Live FiscalData fetch — TreasuryAuctions fetches upcoming auctions from FiscalData API directly in the browser'},
+  {id:'eE5A3',from:'E5',to:'A3',style:'dashed', desc:'Live CNBC GraphQL fetch \u2014 YieldsMonitor calls CNBC directly in the browser on page load (no R2 intermediary)'},
+  {id:'eE3A4',from:'E3',to:'A4',style:'dashed', desc:'Live FiscalData fetch \u2014 TreasuryAuctions fetches upcoming auctions from FiscalData API directly in the browser'},
 ];
 
-// ── Mappings for status overlay ──
-const WF_TO_NODE  = {'get-yields-fedinvest.yml':'P1','fetch-ref-cpi.yml':'P2','fetch-tips-ref.yml':'P3','update-ref-cpi-nsa-sa.yml':'P4','get-auctions.yml':'P5','update-yield-history.yml':'P6'};
-const R2_TO_NODE  = {'Treasuries/YieldsFromFedInvestPrices.csv':'S1','Treasuries/RefCPI.csv':'S3','Treasuries/TipsRef.csv':'S2','Treasuries/RefCpiNsaSa.csv':'S4','Treasuries/Auctions.csv':'S5','Treasuries/yield-history/US10Y_history.json':'S6','Treasuries/FidelityTreasuries.csv':'S7'};
+// \u2500\u2500 Mappings for status overlay \u2500\u2500
+const R2_TO_NODE  = {'Treasuries/YieldsFromFedInvestPrices.csv':'S1','Treasuries/RefCPI.csv':'S3','Treasuries/TipsRef.csv':'S2','Treasuries/RefCpiNsaSa.csv':'S4','Treasuries/Auctions.csv':'S5','Treasuries/yield-history/US10Y_history.json':'S6','Treasuries/FidelityTreasuries.csv':'S7a','Treasuries/FidelityTips.csv':'S7b','misc/BondHolidaysSifma.csv':'S8'};
 const APPID_TO_NODE = {'yieldcurves':'A1','tipsladder':'A2','auctions':'A4','yieldsmonitor':'A3'};
 
 const nodeMap = Object.fromEntries(NODES.map(n=>[n.id,n]));
 let statusData = null;
 let selectedId = null;
 
-// ─────────────────────────────────────────────
+// \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 // SVG RENDERING
-// ─────────────────────────────────────────────
+// \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 const SVG_NS = 'http://www.w3.org/2000/svg';
 function el(tag, attrs={}, ...children){
   const e = document.createElementNS(SVG_NS, tag);
@@ -346,20 +364,32 @@ function edgePath(edge){
   const fn=nodeMap[edge.from], tn=nodeMap[edge.to];
   // special backward / long-range routes
   if(edge.id==='eS2P1'){
-    // TipsRef(468,280) → P1(265,65): route through top-left corridor
+    // TipsRef(468,280) \u2192 P1(265,65): route through top-left corridor
     return `M 422,268 C 380,230 340,95 295,65`;
   }
   if(edge.id==='eS6P6'){
-    // self-read: S6(468,575) → P6(265,575): same y, curve above
+    // self-read: S6(468,575) \u2192 P6(265,575): same y, curve above
     return `M 422,563 C 385,542 310,542 295,563`;
   }
   if(edge.id==='eE5A3'){
-    // live fetch: E5(82,575) → A3(672,610): arc below all nodes
-    return `M 82,593 C 200,765 560,765 639,628`;
+    // live fetch: E5(82,575) \u2192 A3(672,610): arc below all nodes
+    return `M 82,593 C 200,875 560,875 639,628`;
   }
   if(edge.id==='eE3A4'){
-    // live fetch: E3(82,385) → A4(672,480): arc below all nodes
-    return `M 82,403 C 200,748 560,748 639,495`;
+    // live fetch: E3(82,385) \u2192 A4(672,480): arc below all nodes
+    return `M 82,403 C 200,865 560,865 639,495`;
+  }
+  if(edge.id==='eS7aA1'){
+    // FidelityTreasuries(468,660) \u2192 A1(672,175): arc up right side
+    return `M 514,650 C 620,480 650,280 639,205`;
+  }
+  if(edge.id==='eS7bA1'){
+    // FidelityTips(468,725) \u2192 A1(672,175): arc up right side
+    return `M 514,715 C 630,500 655,285 639,205`;
+  }
+  if(edge.id==='eS8A1'){
+    // BondHolidaysSifma(468,815) \u2192 A1(672,175): arc up right side
+    return `M 514,805 C 645,600 660,300 639,205`;
   }
   // normal left-to-right
   const [x1,y1] = ptFor(fn, fn.cx<tn.cx?'right':'left');
@@ -392,7 +422,7 @@ function drawNode(svg, node){
     g.appendChild(el('polygon',{class:'node-hit',points:`${cx},${cy-30} ${cx+33},${cy} ${cx},${cy+30} ${cx-33},${cy}`}));
   }
 
-  // Label text — handle two-line labels
+  // Label text \u2014 handle two-line labels
   const lines = (node.short || node.label).split('\n');
   const fontSize = node.type==='process'?9:10;
   if(lines.length===2){
@@ -413,7 +443,7 @@ function drawNode(svg, node){
   sub.textContent=node.sub;
   g.appendChild(sub);
 
-  // Status dot — visible circle + larger invisible hit target
+  // Status dot \u2014 visible circle + larger invisible hit target
   const dotX = node.type==='store'?node.cx+50 : node.cx+32;
   const dotY = node.cy-22;
   const dot = el('circle',{class:'status-dot','data-dot':node.id,cx:dotX,cy:dotY,r:5,fill:'transparent'});
@@ -467,16 +497,22 @@ function renderDFD(){
   svg.addEventListener('click', ()=> closePanel());
 }
 
-// ─────────────────────────────────────────────
+// \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 // STATUS LOADING
-// ─────────────────────────────────────────────
+// \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 async function loadStatus(){
-  document.getElementById('fetched-at').textContent='Fetching…';
+  document.getElementById('fetched-at').textContent='Fetching\u2026';
   try{
     const r = await fetch('/api/status');
     statusData = await r.json();
     document.getElementById('fetched-at').textContent='Updated '+fmtAge(statusData.fetchedAt);
     applyStatusDots();
+    // Re-render open drill panel so last-run info reflects fresh data
+    const drillView = document.getElementById('drill-view');
+    if(drillView.classList.contains('open') && selectedId){
+      const node = nodeMap[selectedId];
+      if(node) openDrill(node);
+    }
   }catch(e){
     document.getElementById('fetched-at').textContent='Status unavailable';
   }
@@ -487,27 +523,21 @@ function applyStatusDots(){
   const nodeStatus={};
   for(const app of statusData.apps){
     const appNode = APPID_TO_NODE[app.id];
-    // Recompute app status locally — weekday-aware + lastSuccessAt-based (same as tooltip)
+    // Recompute app status locally \u2014 weekday-aware (same as tooltip)
     let appStatus='fresh';
-    outer: for(const p of app.pipelines){
-      for(const wf of p.ghWorkflows||[]){
-        const isErr = p.r2?.lastModified
-          ? (!wf.lastSuccessAt || new Date(wf.lastSuccessAt) < new Date(p.r2.lastModified))
-          : wf.conclusion==='failure';
-        if(isErr){ appStatus='error'; break outer; }
-      }
+    for(const p of app.pipelines){
       const s=pipelineStatus(p);
       if(s==='error'){ appStatus='error'; break; }
       if(s==='stale'&&appStatus!=='error') appStatus='stale';
     }
     if(appNode) nodeStatus[appNode]=appStatus;
     for(const p of app.pipelines){
-      // workflows → process node
-      for(const wf of p.ghWorkflows||[]){
-        const pNode = WF_TO_NODE[wf.workflow];
-        if(pNode) nodeStatus[pNode] = wfStatus(wf);
+      // local jobs \u2192 process node
+      for(const lj of p.localJobs||[]){
+        const pNode = NODES.find(n=>n.localJobId===lj.id)?.id;
+        if(pNode) nodeStatus[pNode] = lj.lastExitCode===0 ? 'fresh' : 'error';
       }
-      // r2 key → store node
+      // r2 key \u2192 store node
       if(p.r2Key){
         const sNode = R2_TO_NODE[p.r2Key];
         if(sNode){
@@ -527,12 +557,6 @@ function applyStatusDots(){
   }
 }
 
-function wfStatus(wf){
-  if(wf.conclusion==='failure') return 'error';
-  if(wf.status==='in_progress'||wf.status==='queued') return 'fresh';
-  if(wf.conclusion==='success') return 'fresh';
-  return 'stale';
-}
 function weekendHoursElapsed(iso){
   if(!iso) return 0;
   let extra=0;
@@ -558,9 +582,9 @@ function mergeStatus(a,b){
   return ra<rb?a:b;
 }
 
-// ─────────────────────────────────────────────
+// \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 // PANEL / DRILL INTERACTIONS
-// ─────────────────────────────────────────────
+// \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 function setSelected(id){
   document.querySelectorAll('.node.selected,.edge.selected').forEach(e=>e.classList.remove('selected'));
   if(id){
@@ -588,7 +612,7 @@ function onEdgeClick(id){
   openEdgePanel(edge);
 }
 
-// ── Side Panel ──
+// \u2500\u2014 Side Panel \u2500\u2014
 const BADGE_COLORS = {
   external:['#dbeafe','#1d4ed8'],
   process: ['#ede9fe','#6d28d9'],
@@ -622,11 +646,8 @@ function buildNodePanel(node){
       <div class="pi-mono"><a href="${node.url}" target="_blank">${node.url}</a></div>
     </div>
     <div class="pi-section">
-      <div class="pi-links"><a class="pi-btn primary" href="${node.url}" target="_blank">Visit Source ↗</a></div>
-    </div>
-    <div class="pi-section">
       <div class="pi-label">Consumed by processes</div>
-      <div class="pi-value">${EDGES.filter(e=>e.from===node.id&&nodeMap[e.to]?.type==='process').map(e=>`<code>${nodeMap[e.to].label}</code>`).join(', ')||'—'}</div>
+      <div class="pi-value">${EDGES.filter(e=>e.from===node.id&&nodeMap[e.to]?.type==='process').map(e=>`<code>${nodeMap[e.to].label}</code>`).join(', ')||'\u2014'}</div>
     </div>`;
 
   if(node.type==='store'){
@@ -645,7 +666,7 @@ function buildNodePanel(node){
     <div class="pi-section">
       <div class="pi-label">File Preview</div>
       <div class="pi-links"><button class="pi-btn" data-preview-key="${node.r2Key}">Load Preview</button>
-      <a class="pi-btn" href="${R2_BASE}/${node.r2Key}" target="_blank">View Full ↗</a></div>
+      <a class="pi-btn" href="${R2_BASE}/${node.r2Key}" target="_blank">View Full \u2197</a></div>
       <div class="preview-container"></div>
     </div>`;
   }
@@ -672,7 +693,7 @@ function getStorePipelineInfo(node){
 }
 
 async function loadPreview(r2Key, container){
-  container.innerHTML='<div style="font-size:11px;color:#94a3b8;margin-top:6px">Loading…</div>';
+  container.innerHTML='<div style="font-size:11px;color:#94a3b8;margin-top:6px">Loading\u2026</div>';
   try{
     const r = await fetch(`/api/preview?source=r2&key=${encodeURIComponent(r2Key)}&lines=12`);
     const d = await r.json();
@@ -687,13 +708,10 @@ function openEdgePanel(edge){
   const badge=document.getElementById('panel-type-badge');
   badge.style.cssText='background:#f1f5f9;color:#475569';
   badge.textContent='Flow';
-  document.getElementById('panel-title').textContent=`${edge.from} → ${edge.to}`;
+  document.getElementById('panel-title').textContent=`${edge.from} \u2192 ${edge.to}`;
   document.getElementById('panel-body').innerHTML=buildEdgePanel(edge);
   document.getElementById('side-panel').classList.add('open');
   // wire run buttons
-  document.querySelectorAll('[data-run-wf]').forEach(btn=>{
-    btn.addEventListener('click',()=>runWorkflow(btn.dataset.runWf, btn));
-  });
   document.querySelectorAll('[data-run-job]').forEach(btn=>{
     btn.addEventListener('click',()=>runJob(btn.dataset.runJob, btn));
   });
@@ -719,10 +737,6 @@ function buildEdgePanel(edge){
 
 function getProcessChipHtml(pNode){
   let html='';
-  if(pNode.workflow&&statusData){
-    const wf = findWorkflow(pNode.workflow);
-    html+=renderWfChip(wf||{workflow:pNode.workflow,label:pNode.label,status:'unknown'});
-  }
   if(pNode.localJobId&&statusData){
     const job=findLocalJob(pNode.localJobId);
     if(job) html+=renderLocalJobChip(job);
@@ -730,14 +744,6 @@ function getProcessChipHtml(pNode){
   return html;
 }
 
-function findWorkflow(wfName){
-  if(!statusData) return null;
-  for(const app of statusData.apps)
-    for(const p of app.pipelines)
-      for(const wf of p.ghWorkflows||[])
-        if(wf.workflow===wfName) return wf;
-  return null;
-}
 function findLocalJob(jobId){
   if(!statusData) return null;
   for(const app of statusData.apps)
@@ -747,36 +753,24 @@ function findLocalJob(jobId){
   return null;
 }
 
-function renderWfChip(wf){
-  const dot = wf.conclusion==='failure'?'error':wf.conclusion==='success'?'fresh':wf.status==='in_progress'?'fresh':'stale';
-  const runAt=wf.runAt?'ran '+fmtAge(wf.runAt):'never run';
-  const nextRun=wf.nextRunAt?'next '+fmtRelTime(wf.nextRunAt):'';
-  return `<div class="wf-chip">
-    <div class="wf-chip-top">
-      <div class="wf-dot ${dot}"></div>
-      <div class="wf-label">${wf.label||wf.workflow}</div>
-      ${wf.htmlUrl?`<a class="pi-btn" href="${wf.htmlUrl}" target="_blank" style="padding:1px 6px;font-size:10px">Log ↗</a>`:''}
-    </div>
-    <div class="wf-meta">
-      <span>${runAt}</span>
-      ${nextRun?`<span>${nextRun}</span>`:''}
-    </div>
-    <div class="wf-actions">
-      <button class="pi-btn run" data-run-wf="${wf.workflow}">▶ Run workflow</button>
-    </div>
-  </div>`;
-}
-
 function renderLocalJobChip(job){
   const nextRun=job.nextRunAt?'next '+fmtRelTime(job.nextRunAt):'';
+  let lastRunHtml='';
+  if(job.lastRunAt){
+    const ok=job.lastExitCode===0;
+    const dot=ok?'#22c55e':'#ef4444';
+    const label=ok?'OK':'Failed (code '+job.lastExitCode+')';
+    lastRunHtml=`<div class="wf-meta" style="gap:5px"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${dot};flex-shrink:0"></span><span>Last run ${fmtAge(job.lastRunAt)} \u2014 ${label}</span></div>`;
+  }
   return `<div class="wf-chip">
     <div class="wf-chip-top">
       <div class="wf-dot"></div>
       <div class="wf-label">${job.label}</div>
     </div>
+    ${lastRunHtml}
     ${nextRun?`<div class="wf-meta"><span>${nextRun}</span></div>`:''}
     <div class="wf-actions">
-      <button class="pi-btn run" data-run-job="${job.id}">▶ Run locally</button>
+      <button class="pi-btn run" data-run-job="${job.id}">\u25b6 Run locally</button>
     </div>
   </div>`;
 }
@@ -786,7 +780,7 @@ function closePanel(){
   setSelected(null);
 }
 
-// ── Drill-down ──
+// \u2500\u2014 Drill-down \u2500\u2014
 function openDrill(node){
   document.getElementById('drill-breadcrumb').textContent=node.label;
   document.getElementById('drill-body').innerHTML='';
@@ -794,7 +788,6 @@ function openDrill(node){
   else if(node.type==='process') buildProcessDrill(node);
   document.getElementById('drill-view').classList.add('open');
   // wire buttons
-  document.querySelectorAll('[data-run-wf]').forEach(btn=>btn.addEventListener('click',()=>runWorkflow(btn.dataset.runWf,btn)));
   document.querySelectorAll('[data-run-job]').forEach(btn=>btn.addEventListener('click',()=>runJob(btn.dataset.runJob,btn)));
   document.querySelectorAll('[data-preview-key]').forEach(btn=>{
     btn.addEventListener('click',()=>loadPreview(btn.dataset.previewKey,btn.parentElement.nextElementSibling));
@@ -809,7 +802,7 @@ function buildAppDrill(node){
       <div style="font-size:16px;font-weight:800">${node.label}</div>
       <div style="font-size:12px;color:#475569;margin-top:2px">${node.desc}</div>
     </div>
-    <a class="pi-btn primary" href="${node.url}" target="_blank" style="margin-left:auto">Open App ↗</a>
+    <a class="pi-btn primary" href="${node.url}" target="_blank" style="margin-left:auto">Open App \u2197</a>
   </div>`;
   if(app){
     html+=`<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:8px">Pipelines</div>`;
@@ -819,7 +812,7 @@ function buildAppDrill(node){
     }
     html+='</div>';
   } else {
-    html+='<div style="color:#94a3b8;font-size:12px">Status data not available — server may be loading</div>';
+    html+='<div style="color:#94a3b8;font-size:12px">Status data not available \u2014 server may be loading</div>';
   }
   body.innerHTML=html;
 }
@@ -828,23 +821,22 @@ function buildPipelineRow(p){
   const r2Age = p.r2?.lastModified?fmtAge(p.r2.lastModified):null;
   const ageClass = !r2Age?'na': r2Age.includes('d ')||r2Age.includes('w ')?'old': r2Age.includes('h ')&&parseInt(r2Age)>12?'stale':'fresh';
   let html=`<div class="pipe-card">
-    <div class="pipe-card-title">${p.label} <span style="font-weight:400;color:#64748b;font-size:10px">→ ${p.feeds}</span></div>`;
+    <div class="pipe-card-title">${p.label} <span style="font-weight:400;color:#64748b;font-size:10px">\u2192 ${p.feeds}</span></div>`;
 
   if(p.liveNote){
-    html+=`<div style="font-size:11px;color:#0369a1;margin-bottom:6px">⬤ ${p.liveNote}</div>`;
+    html+=`<div style="font-size:11px;color:#0369a1;margin-bottom:6px">\u2b24 ${p.liveNote}</div>`;
   } else if(p.r2){
     html+=`<div class="pipe-row"><div class="pipe-row-hdr">
       <span class="pipe-lbl">${p.r2.shortName||p.r2Key}</span>
-      <span class="pipe-age ${ageClass}">${r2Age||'—'}</span>
+      <span class="pipe-age ${ageClass}">${r2Age||'\u2014'}</span>
     </div>
     ${p.r2Note?`<div style="font-size:10px;color:#94a3b8;margin-top:2px">${p.r2Note}</div>`:''}
     <div style="margin-top:4px"><button class="pi-btn" style="font-size:10px" data-preview-key="${p.r2Key}">Preview</button>
-    <a class="pi-btn" style="font-size:10px" href="${R2_BASE}/${p.r2Key}" target="_blank">View ↗</a></div>
+    <a class="pi-btn" style="font-size:10px" href="${R2_BASE}/${p.r2Key}" target="_blank">View \u2197</a></div>
     <div class="preview-container"></div>
     </div>`;
   }
 
-  for(const wf of p.ghWorkflows||[]) html+=renderWfChip(wf);
   for(const lj of p.localJobs||[])   html+=renderLocalJobChip(lj);
   if(p.alsoUsedBy?.length) html+=`<div style="font-size:10px;color:#64748b;margin-top:4px">Also used by: ${p.alsoUsedBy.join(', ')}</div>`;
 
@@ -854,7 +846,6 @@ function buildPipelineRow(p){
 
 function buildProcessDrill(node){
   const body=document.getElementById('drill-body');
-  const wf=node.workflow?findWorkflow(node.workflow):null;
   const lj=node.localJobId?findLocalJob(node.localJobId):null;
 
   let html=`<div style="display:flex;gap:12px;align-items:flex-start;margin-bottom:16px">
@@ -865,17 +856,15 @@ function buildProcessDrill(node){
   </div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
     <div>
-      <div class="pi-label" style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:8px">Script & Workflow</div>
+      <div class="pi-label" style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:8px">Script</div>
       <div class="pi-mono" style="margin-bottom:8px">${node.script}</div>
       <div class="pi-links">
-        <a class="pi-btn" href="${GH_BASE}/${node.script}" target="_blank">View Script ↗</a>
-        ${node.workflow?`<a class="pi-btn" href="${GH_BASE}/.github/workflows/${node.workflow}" target="_blank">View Workflow ↗</a>`:''}
+        <a class="pi-btn" href="${GH_BASE}/${node.script}" target="_blank">View Script \u2197</a>
       </div>
     </div>
     <div>
-      <div class="pi-label" style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:8px">Job Status & Controls</div>
-      ${wf?renderWfChip(wf):'<div style="font-size:11px;color:#94a3b8">No GH workflow</div>'}
-      ${lj?renderLocalJobChip(lj):''}
+      <div class="pi-label" style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:8px">Local Job Status & Controls</div>
+      ${lj?renderLocalJobChip(lj):'<div style="font-size:11px;color:#94a3b8">No local job defined</div>'}
     </div>
   </div>
   <div style="margin-top:16px">
@@ -883,11 +872,11 @@ function buildProcessDrill(node){
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:8px 12px;font-size:11px">
         <div style="font-weight:700;margin-bottom:4px;color:#475569">Reads</div>
-        ${node.reads.map(id=>`<div style="color:#1e293b">← ${nodeMap[id]?.label||id}</div>`).join('')}
+        ${node.reads.map(id=>`<div style="color:#1e293b">\u2190 ${nodeMap[id]?.label||id}</div>`).join('')}
       </div>
       <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:8px 12px;font-size:11px">
         <div style="font-weight:700;margin-bottom:4px;color:#475569">Writes</div>
-        ${node.writes.map(id=>`<div style="color:#1e293b">→ ${nodeMap[id]?.label||id}</div>`).join('')}
+        ${node.writes.map(id=>`<div style="color:#1e293b">\u2192 ${nodeMap[id]?.label||id}</div>`).join('')}
       </div>
     </div>
   </div>`;
@@ -900,21 +889,11 @@ function closeDrill(){
   setSelected(null);
 }
 
-// ─────────────────────────────────────────────
+// \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 // JOB EXECUTION
-// ─────────────────────────────────────────────
-async function runWorkflow(workflow, btn){
-  btn.disabled=true; btn.textContent='Dispatching…';
-  try{
-    const r=await fetch(`/api/gh/dispatch/${encodeURIComponent(workflow)}`,{method:'POST'});
-    const d=await r.json();
-    if(d.ok){ btn.textContent='✓ Dispatched'; setTimeout(()=>{btn.disabled=false;btn.textContent='▶ Run workflow';},3000); }
-    else { btn.textContent='Error: '+d.error; btn.disabled=false; }
-  }catch(e){ btn.textContent='Error'; btn.disabled=false; }
-}
-
+// \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 async function runJob(jobId, btn){
-  btn.disabled=true; btn.textContent='Running…';
+  btn.disabled=true; btn.textContent='Running\u2026';
   let logEl=btn.closest('.wf-chip')?.querySelector('.run-log');
   if(!logEl){
     logEl=document.createElement('div');
@@ -930,15 +909,15 @@ async function runJob(jobId, btn){
       const {type,text}=JSON.parse(e.data);
       pre.textContent+=text;
       logEl.scrollTop=logEl.scrollHeight;
-      if(type==='exit'){ es.close(); btn.disabled=false; btn.textContent='▶ Run locally'; }
+      if(type==='exit'){ es.close(); btn.disabled=false; btn.textContent='\u25b6 Run locally'; loadStatus(); }
     };
-    es.onerror=()=>{ es.close(); btn.disabled=false; btn.textContent='▶ Run locally'; };
-  }catch(e){ btn.disabled=false; btn.textContent='▶ Run locally'; }
+    es.onerror=()=>{ es.close(); btn.disabled=false; btn.textContent='\u25b6 Run locally'; };
+  }catch(e){ btn.disabled=false; btn.textContent='\u25b6 Run locally'; }
 }
 
-// ─────────────────────────────────────────────
+// \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 // UTILITIES
-// ─────────────────────────────────────────────
+// \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 function fmtAge(iso){
   const ms=Date.now()-new Date(iso);
   const h=ms/3600000, m=ms/60000;
@@ -958,15 +937,15 @@ function fmtRelTime(iso){
 }
 function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
-// ─────────────────────────────────────────────
+// \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 // STATUS TOOLTIP
-// ─────────────────────────────────────────────
+// \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 function showStatusTip(nodeId, evt){
   const tip = document.getElementById('status-tip');
   const node = nodeMap[nodeId];
   if(!node){ return; }
   if(!statusData){
-    tip.innerHTML=`<div class="tip-label">${node.label}</div><div class="tip-row"><div class="tip-dot" style="background:#64748b"></div><span>Status not loaded — try Refresh</span></div>`;
+    tip.innerHTML=`<div class="tip-label">${node.label}</div><div class="tip-row"><div class="tip-dot" style="background:#64748b"></div><span>Status not loaded \u2014 try Refresh</span></div>`;
     tip.style.left=Math.min(evt.clientX+12,window.innerWidth-280)+'px';
     tip.style.top=(evt.clientY-10)+'px';
     tip.classList.add('visible');
@@ -974,7 +953,7 @@ function showStatusTip(nodeId, evt){
   }
 
   const lines = buildStatusLines(node);
-  tip.innerHTML = `<div class="tip-label">${node.label} — status</div>` +
+  tip.innerHTML = `<div class="tip-label">${node.label} \u2014 status</div>` +
     lines.map(({text,status})=>{
       const c = status==='fresh'?'#22c55e':status==='stale'?'#f59e0b':status==='error'?'#ef4444':'#64748b';
       return `<div class="tip-row"><div class="tip-dot" style="background:${c}"></div><span>${text}</span></div>`;
@@ -996,7 +975,7 @@ function buildStatusLines(node){
       if(p.liveNote){
         lines.push({text:`${p.label}: live`, status:'fresh'});
       } else {
-        lines.push({text:`${p.label}${age?' · '+age:''}`, status:s||'unknown'});
+        lines.push({text:`${p.label}${age?' \xb7 '+age:''}`, status:s||'unknown'});
       }
     }
   } else if(node.type==='store'){
@@ -1015,13 +994,13 @@ function buildStatusLines(node){
     }
     if(!lines.length) lines.push({text:'No status data',status:'unknown'});
   } else if(node.type==='process'){
-    const wf=node.workflow?findWorkflow(node.workflow):null;
-    if(wf){
-      const s=wfStatus(wf);
-      lines.push({text:`${wf.conclusion||wf.status||'unknown'}${wf.runAt?' · '+fmtAge(wf.runAt):''}`,status:s});
-      if(wf.nextRunAt) lines.push({text:'Next: '+fmtRelTime(wf.nextRunAt),status:'fresh'});
+    const lj=node.localJobId?findLocalJob(node.localJobId):null;
+    if(lj){
+      const s = lj.lastExitCode===0 ? 'fresh' : 'error';
+      lines.push({text:`${lj.label}${lj.lastRunAt?' \xb7 '+fmtAge(lj.lastRunAt):''}`,status:s});
+      if(lj.nextRunAt) lines.push({text:'Next: '+fmtRelTime(lj.nextRunAt),status:'fresh'});
     } else {
-      lines.push({text:'No workflow data',status:'unknown'});
+      lines.push({text:'No local job data',status:'unknown'});
     }
   }
   return lines.length?lines:[{text:'No status data',status:'unknown'}];
@@ -1029,9 +1008,9 @@ function buildStatusLines(node){
 
 document.addEventListener('click', ()=> document.getElementById('status-tip').classList.remove('visible'));
 
-// ─────────────────────────────────────────────
+// \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 // INIT
-// ─────────────────────────────────────────────
+// \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 document.getElementById('drill-back').addEventListener('click', closeDrill);
 document.getElementById('panel-close').addEventListener('click', closePanel);
 document.getElementById('refresh-btn').addEventListener('click', loadStatus);

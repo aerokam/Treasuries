@@ -131,9 +131,9 @@
     <h3 style="font-size:13px;margin:16px 0 6px;border-bottom:1px solid #eee;padding-bottom:4px;">Key Concepts</h3>
     <p><b>DARA</b> — Desired Annual Real Amount. Your target annual amount in today's (inflation-adjusted) dollars. Each rung is sized to produce this amount.</p>
     <p><b>Gap Years</b> — Years with no issued TIPS (currently 2037–2039). The ladder holds additional TIPS in <b>bracket</b> years flanking the gap to match the average duration of the missing maturities.</p>
-    <p><b>Future Years</b> — Years beyond the currently issued TIPS (e.g. 2057–2066). Like gaps, these are covered by <b>duration-matched excess</b> in existing long-dated bonds (currently the 2052/2056 pair).</p>
-    <p><b>Bracket Years</b> — Maturity years used to cover gaps or future years. <i>Upper bracket</i>: always Feb 2040. <i>Lower bracket</i>: usually the latest 10-year TIPS before the gap. In <i>3-bracket mode</i>, your original lower bracket is preserved, and a second "new lower" is bought to supplement.</p>
-    <p><b>Role Playing (LMI)</b> — When bracket or cover TIPS of a given maturity substitute for TIPS that haven't yet been issued (gap years or future 30-year rungs), they "role play" by contributing their annual interest to the funded year amount for that maturity. Example: If excess Feb 2056s are held to cover future 30-year rungs (e.g., 2057–2066), the interest from those excess 2056 TIPS contributes to the 2056 funded year amount, which could reduce the quantity of 2056 TIPS required for the 2056 funded year.</p>
+    <p><b>Future 30Y Rungs</b> — Years beyond the currently issued TIPS (e.g. 2057–2066). Like gaps, these are covered by <b>duration-matched excess</b> in existing long-dated bonds (currently the 2052/2056 pair).</p>
+    <p><b>Bracket Years</b> — Maturity years used to cover gaps or Future 30Y rungs. <i>Upper bracket</i>: always Feb 2040. <i>Lower bracket</i>: usually the latest 10-year TIPS before the gap. In <i>3-bracket mode</i>, your original lower bracket is preserved, and a second "new lower" is bought to supplement.</p>
+    <p><b>Role Playing (LMI)</b> — When bracket or cover TIPS of a given maturity substitute for TIPS that haven't yet been issued (gap years or Future 30Y rungs), they "role play" by contributing their annual interest to the funded year amount for that maturity. Example: If excess Feb 2056s are held to cover Future 30Y rungs (e.g., 2057–2066), the interest from those excess 2056 TIPS contributes to the 2056 funded year amount, which could reduce the quantity of 2056 TIPS required for the 2056 funded year.</p>
     <p><b>Ref CPI</b> — Reference CPI value used for all inflation adjustments. Defaults to the settlement date. Click the Ref CPI value in the info strip to override the reference date (useful for projecting with a future or past CPI). Changing it clears any auto-inferred DARA.</p>
 
     <h3 style="font-size:13px;margin:16px 0 6px;border-bottom:1px solid #eee;padding-bottom:4px;">Traceability & Deep Drill</h3>
@@ -302,7 +302,7 @@
 import { buildTipsMapFromYields, localDate, runRebalance, inferDARAFromCash, yieldFromPrice } from './src/rebalance-lib.js';
 import { runBuild, MAX_LAST_YEAR } from './src/build-lib.js';
 import { renderTable } from './src/render.js';
-import { buildDrillHTML, buildDurationPopupRows, buildFutureDurationPopupRows, buildIndexRatioDrill, buildRefCpiDrill, buildPIPerBondDrill } from './src/drill.js';
+import { buildDrillHTML, buildDurationPopupRows, buildFuture30yDurationPopupRows, buildIndexRatioDrill, buildRefCpiDrill, buildPIPerBondDrill } from './src/drill.js';
 import { showPopup, hidePopup } from './src/popup.js';
 import { fetchTipsData, lookupRefCpi, nextBondTradingDay } from './src/data.js';
 window.lookupRefCpi = lookupRefCpi;
@@ -374,7 +374,7 @@ async function loadData() {
     for (let y = _bfsMinY; y <= MAX_LAST_YEAR; y++) {
       const opt = document.createElement('option');
       opt.value = y;
-      opt.textContent = _bfsGapYears.has(y) ? `${y} (gap)` : y > _bfsMaxY ? `${y} (future)` : String(y);
+      opt.textContent = _bfsGapYears.has(y) ? `${y} (gap)` : y > _bfsMaxY ? `${y} (Future 30Y)` : String(y);
       lastYearSel.appendChild(opt);
     }
     if (_bfsYearSet.has(2047)) lastYearSel.value = 2047;
@@ -493,7 +493,7 @@ let _maxRefCpiDate = null;
 let _daraRebal = '', _daraBuild = '40000';
 const _infoPopups = {};
 let _rebalDurationRows = null, _buildDurationRows = null;
-let _rebalFutureDurationRows = null, _buildFutureDurationRows = null;
+let _rebalFuture30yDurationRows = null, _buildFuture30yDurationRows = null;
 
 document.querySelectorAll('.mode-btn').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -531,7 +531,8 @@ document.querySelectorAll('.mode-btn').forEach(btn => {
     const _runInfo = isRebalance ? _rebalRunInfo : _buildRunInfo;
     _renderInfoStrip(_runInfo || '');
     _infoPopups.duration = isRebalance ? _rebalDurationRows : _buildDurationRows;
-    _infoPopups.futureDuration = isRebalance ? _rebalFutureDurationRows : _buildFutureDurationRows;
+    _infoPopups.future30yDuration = isRebalance ? _rebalFuture30yDurationRows : _buildFuture30yDurationRows;
+
     setStatus('');
   });
 });
@@ -564,12 +565,12 @@ function renderOutput({ results, HDR, summary, details }, portfolioCash = null) 
   ];
     _rebalDurationRows = buildDurationPopupRows(summary, 'rebal');
     _infoPopups.duration = _rebalDurationRows;
-    if (summary.futureYears?.length > 0) {
-      _rebalFutureDurationRows = buildFutureDurationPopupRows(summary);
-      _infoPopups.futureDuration = _rebalFutureDurationRows;
+    if (summary.future30yYears?.length > 0) {
+      _rebalFuture30yDurationRows = buildFuture30yDurationPopupRows(summary);
+      _infoPopups.future30yDuration = _rebalFuture30yDurationRows;
     } else {
-      _rebalFutureDurationRows = null;
-      _infoPopups.futureDuration = null;
+      _rebalFuture30yDurationRows = null;
+      _infoPopups.future30yDuration = null;
     }
     const _bracketInfo = summary.bracketMode === '3bracket' && summary.newLowerCUSIP
       ? ' · New lower: ' + summary.newLowerCUSIP + ' (' + summary.newLowerYear + ')'
@@ -582,7 +583,7 @@ function renderOutput({ results, HDR, summary, details }, portfolioCash = null) 
       + _bracketInfo
       + ' <a class="info-link" data-popup="range">ⓘ</a>'
       + ' · <a class="info-link info-link-btn" data-popup="duration">Duration calcs</a>'
-      + (summary.futureYears?.length > 0 ? ' · <a class="info-link info-link-btn" data-popup="futureDuration">Future Duration calcs</a>' : '');
+      + (summary.future30yYears?.length > 0 ? ' · <a class="info-link info-link-btn" data-popup="future30yDuration">Future 30Y Duration calcs</a>' : '');
     _renderInfoStrip(_rebalRunInfo, _ncStrip);
   
   rebalDetails = details;
@@ -613,7 +614,7 @@ function renderBuildOutput({ results, HDR, summary, details }) {
     document.getElementById('nc-label').textContent = 'Total Cost';
     document.getElementById('net-cash-inline').style.display = '';
     const _hasGaps   = gapYears && gapYears.length > 0;
-    const _hasFuture = summary.futureYears?.length > 0;
+    const _hasFuture = summary.future30yYears?.length > 0;
     if (_hasGaps) {
       _buildDurationRows = buildDurationPopupRows(summary, 'build');
       _infoPopups.duration = _buildDurationRows;
@@ -621,11 +622,11 @@ function renderBuildOutput({ results, HDR, summary, details }) {
       _infoPopups.duration = null;
     }
     if (_hasFuture) {
-      _buildFutureDurationRows = buildFutureDurationPopupRows(summary);
-      _infoPopups.futureDuration = _buildFutureDurationRows;
+      _buildFuture30yDurationRows = buildFuture30yDurationPopupRows(summary);
+      _infoPopups.future30yDuration = _buildFuture30yDurationRows;
     } else {
-      _buildFutureDurationRows = null;
-      _infoPopups.futureDuration = null;
+      _buildFuture30yDurationRows = null;
+      _infoPopups.future30yDuration = null;
     }
     const _plNote = (preLadderYears > 0 && zeroedFundedYears && zeroedFundedYears.length)
       ? ' · <span style="color:#854d0e">Pre-ladder: ' + zeroedFundedYears.length + ' yr' + (zeroedFundedYears.length > 1 ? 's' : '') + ' zeroed (' + zeroedFundedYears.join(', ') + ')</span>'
@@ -635,7 +636,7 @@ function renderBuildOutput({ results, HDR, summary, details }) {
       + ' · FY ' + firstYear + '–' + lastYear
       + _plNote
       + (_hasGaps   ? ' · <a class="info-link info-link-btn" data-popup="duration">Duration calcs</a>' : '')
-      + (_hasFuture ? ' · <a class="info-link info-link-btn" data-popup="futureDuration">Future Duration calcs</a>' : '');
+      + (_hasFuture ? ' · <a class="info-link info-link-btn" data-popup="future30yDuration">Future 30Y Duration calcs</a>' : '');
     _renderInfoStrip(_buildRunInfo, _bncStrip);
     buildDetails = details;
   buildSummary  = summary;
@@ -709,7 +710,7 @@ function updateRebalLastYearDropdown() {
   for (let y = _firstY; y <= _maxDropY; y++) {
     const opt = document.createElement('option');
     opt.value = y;
-    opt.textContent = _gapSet.has(y) ? `${y} (gap)` : y > _maxTipsY ? `${y} (future)` : String(y);
+    opt.textContent = _gapSet.has(y) ? `${y} (gap)` : y > _maxTipsY ? `${y} (Future 30Y)` : String(y);
     if (y === _selVal) opt.selected = true;
     sel.appendChild(opt);
   }
@@ -1112,8 +1113,8 @@ document.getElementById('build-table').addEventListener('click', e => {
   const d   = buildDetails[ri];
   if (!d) return;
   currentDrillData = d; currentDrillColKey = key;
-  const colNames = { amount: 'Amount', cost: 'Cost', gapAmount: 'Gap Amount', gapCost: 'Gap Cost', futureAmt: 'Future Amount', futureCost: 'Future Cost' };
-  const suffix   = (key === 'gapAmount' || key === 'gapCost') ? ' (bracket)' : (key === 'futureAmt' || key === 'futureCost') ? ' (future)' : '';
+  const colNames = { amount: 'Amount', cost: 'Cost', gapAmount: 'Gap Amount', gapCost: 'Gap Cost', future30yAmt: 'Future 30Y Amount', future30yCost: 'Future 30Y Cost' };
+  const suffix   = (key === 'gapAmount' || key === 'gapCost') ? ' (bracket)' : (key === 'future30yAmt' || key === 'future30yCost') ? ' (Future 30Y)' : '';
   document.getElementById('drill-title').textContent =
     colNames[key] + ' — Funded Year ' + d.fundedYear + suffix + ' · ' + d.cusip + ' · ' + d.maturityStr;
   document.getElementById('drill-content').innerHTML = buildDrillHTML(d, key, buildSummary);
@@ -1139,8 +1140,8 @@ document.getElementById('simple-table').addEventListener('click', e => {
     gapAmtBefore: 'Gap Amount Before', gapAmtAfter: 'Gap Amount After',
     gapCostBefore: 'Gap Cost Before', gapCostAfter: 'Gap Cost After',
     gapCashDelta: 'Gap Cash Δ',
-    futureAmtBefore: 'Future Amt Before', futureAmtAfter: 'Future Amt After',
-    futureCostBefore: 'Future Cost Before', futureCostAfter: 'Future Cost After' };
+    future30yAmtBefore: 'Future 30Y Amount Before', future30yAmtAfter: 'Future 30Y Amount After',
+    future30yCostBefore: 'Future 30Y Cost Before', future30yCostAfter: 'Future 30Y Cost After' };
   document.getElementById('drill-title').textContent =
     colNames[key] + ' — FY ' + d.fundedYear + ' · ' + d.cusip + ' · ' + d.maturityStr;
   document.getElementById('drill-content').innerHTML = buildDrillHTML(d, key, rebalSummary);
@@ -1210,7 +1211,8 @@ document.addEventListener('keydown', e => {
 
 
 // ─── Info-link + header click handler ──────────────────────────────
-const POPUP_TITLES = { range: 'Rebalance Range', duration: 'Duration Calculations', futureDuration: 'Future Duration Calculations' };
+const POPUP_TITLES = { range: 'Rebalance Range', duration: 'Duration Calculations', future30yDuration: 'Future 30Y Duration Calculations' };
+
 const COL_HELP = {
   cusip:      [{ label: '9-character CUSIP identifier' }],
   maturity:   [{ label: 'TIPS maturity date' }],

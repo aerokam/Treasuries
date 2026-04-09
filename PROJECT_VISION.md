@@ -34,5 +34,6 @@ TIPS are notoriously counter-intuitive. We aim to explain concepts like **Season
 ## Community Commitment
 
 - **Always Free, Always Open**: No accounts, no tracking, and no hidden logic. All calculations run locally in your browser.
+- **Local-First Infrastructure**: Our data pipeline is transparent and owner-operated. All data ingestion jobs run as local Windows tasks, ensuring full visibility into the source-to-R2 flow without reliance on opaque cloud CI/CD black boxes.
 - **Bogleheads-First**: Designed by and for the Bogleheads community. The goal is to simplify the complex without removing the rigor.
 - **Educational First Principles**: If you can't drill into a value to understand where it came from, we haven't finished building it.

@@ -62,41 +62,41 @@ Each app has a set of named pipelines. The server's `APP_CONFIGS` is the authori
 
 ### YieldCurves
 
-| Pipeline label | R2 file | GH workflow | Local job | Feeds |
-|---|---|---|---|---|
-| FedInvest daily prices | `YieldsFromFedInvestPrices.csv` | `get-yields-fedinvest.yml` | FedInvest Download | All yield curves |
-| Broker quotes — Treasuries | `FidelityTreasuries.csv` | — | Fidelity Download + Upload to R2 | Market tab (nominals) |
-| Broker quotes — TIPS | `FidelityTips.csv` | — | Fidelity Download + Upload to R2 | Market tab (TIPS) |
-| CPI seasonal adjustment factors | `RefCpiNsaSa.csv` | `fetch-ref-cpi.yml`, `update-ref-cpi-nsa-sa.yml` | — | CPI overlay |
-| SIFMA bond market holidays | `misc/BondHolidaysSifma.csv` | — | — | Business-day calculations |
+| Pipeline label | R2 file | Local job | Feeds |
+|---|---|---|---|
+| FedInvest daily prices | `YieldsFromFedInvestPrices.csv` | FedInvest Download | All yield curves |
+| Broker quotes — Treasuries | `FidelityTreasuries.csv` | Fidelity Download + Upload to R2 | Market tab (nominals) |
+| Broker quotes — TIPS | `FidelityTips.csv` | Fidelity Download + Upload to R2 | Market tab (TIPS) |
+| CPI seasonal adjustment factors | `RefCpiNsaSa.csv` | SA Factor Update | CPI overlay |
+| SIFMA bond market holidays | `misc/BondHolidaysSifma.csv` | *(Manual Upload)* | Business-day calculations |
 
 ### YieldsMonitor
 
-| Pipeline label | R2 file | GH workflow | Local job | Feeds |
-|---|---|---|---|---|
-| Daily yield history snapshots | `yield-history/US10Y_history.json` *(representative)* | `update-yield-history.yml` | — | History charts — 14 symbols |
-| Live Treasury yields | *(none — live browser fetch)* | — | — | Live yield display + intraday charts |
+| Pipeline label | R2 file | Local job | Feeds |
+|---|---|---|---|
+| Daily yield history snapshots | `yield-history/US10Y_history.json` *(representative)* | Yield History Snap | History charts — 14 symbols |
+| Live Treasury yields | *(none — live browser fetch)* | — | Live yield display + intraday charts |
 
 Note: YieldsMonitor does **not** read `YieldsFromFedInvestPrices.csv`. Its only R2 dependency is the 14 `yield-history/*.json` files. Live data comes from CNBC GraphQL fetched directly in the browser.
 
 ### TipsLadderManager
 
-| Pipeline label | R2 file | GH workflow | Local job | Feeds |
-|---|---|---|---|---|
-| FedInvest daily prices | `YieldsFromFedInvestPrices.csv` | `get-yields-fedinvest.yml` | — | Ladder pricing — all TIPS |
-| TIPS reference metadata | `TipsRef.csv` | `fetch-tips-ref.yml` | — | Coupon + dated-date lookups |
-| Reference CPI index | `RefCPI.csv` | `fetch-ref-cpi.yml` | — | Index ratio calculations |
+| Pipeline label | R2 file | Local job | Feeds |
+|---|---|---|---|
+| FedInvest daily prices | `YieldsFromFedInvestPrices.csv` | FedInvest Download | Ladder pricing — all TIPS |
+| TIPS reference metadata | `TipsRef.csv` | TIPS Ref Refresh | Coupon + dated-date lookups |
+| Reference CPI index | `RefCPI.csv` | Ref CPI Refresh | Index ratio calculations |
 
 ### TreasuryAuctions
 
-| Pipeline label | R2 file | GH workflow | Local job | Feeds |
-|---|---|---|---|---|
-| Historical auction results | `Auctions.csv` | `get-auctions.yml` | — | All, Bills, Notes/Bonds, TIPS tabs |
-| Upcoming auctions | *(none — live fetch)* | — | — | Calendar view |
+| Pipeline label | R2 file | Local job | Feeds |
+|---|---|---|---|
+| Historical auction results | `Auctions.csv` | Auction Refresh | All, Bills, Notes/Bonds, TIPS tabs |
+| Upcoming auctions | *(none — live fetch)* | — | Calendar view |
 
 **Shared files:**
-- `YieldsFromFedInvestPrices.csv` is shared by YieldCurves and TipsLadderManager. Both read the same R2 key (`Treasuries/YieldsFromFedInvestPrices.csv`) written by `get-yields-fedinvest.yml`. Running the workflow or the local FedInvest Download refreshes both.
-- `fetch-ref-cpi.yml` is shared: used by YieldCurves (indirectly, triggers `update-ref-cpi-nsa-sa.yml` chain) and TipsLadderManager (writes `RefCPI.csv` directly).
+- `YieldsFromFedInvestPrices.csv` is shared by YieldCurves and TipsLadderManager. Both read the same R2 key (`Treasuries/YieldsFromFedInvestPrices.csv`) written by the local **FedInvest Download** task.
+- `RefCPI.csv` is shared: written by the local **Ref CPI Refresh** task and used by TipsLadderManager and YieldCurves.
 
 ---
 
@@ -108,7 +108,7 @@ Note: YieldsMonitor does **not** read `YieldsFromFedInvestPrices.csv`. Its only 
 | TreasuryAuctions — `Auctions.csv` | 12 hours |
 | Monthly data (CPI files, TipsRef) | 720 hours (30 days) |
 
-Card border: green = all r2 files within threshold · amber = any stale · red = any error or failed workflow.
+Card border: green = all r2 files within threshold · amber = any stale · red = any error.
 
 ---
 
@@ -119,7 +119,6 @@ Card border: green = all r2 files within threshold · amber = any stale · red =
 | `GET` | `/api/status` | Returns full pipeline status for all apps |
 | `GET` | `/api/preview` | Returns first N lines of a local file or R2 key |
 | `POST` | `/api/run/:jobId` | Executes a registered local script; streams output via SSE |
-| `POST` | `/api/gh/dispatch/:workflow` | Triggers `workflow_dispatch` via GitHub API |
 | `GET` | `/api/health` | Returns `{ ok: true }` |
 
 ### `/api/status` response shape
@@ -134,7 +133,6 @@ Card border: green = all r2 files within threshold · amber = any stale · red =
       id, label, feeds,
       r2Key: string | null,
       r2: { key, lastModified, status, shortName } | null,
-      ghWorkflows: [{ workflow, label, status, conclusion, runAt, htmlUrl, nextRunAt }],
       localJobs: [{ id, label, cmd, windowsTaskName?: string, nextRunAt?: string | null }],
       alsoUsedBy: string[],   // other app labels sharing this r2Key
       stalenessHours: number | null,
@@ -145,7 +143,7 @@ Card border: green = all r2 files within threshold · amber = any stale · red =
 }
 ```
 
-R2 HEAD requests and GH API calls are deduplicated per status request — shared files/workflows are fetched once.
+R2 HEAD requests are deduplicated per status request — shared files are fetched once.
 
 ---
 
@@ -153,15 +151,8 @@ R2 HEAD requests and GH API calls are deduplicated per status request — shared
 
 | Constant | Value |
 |---|---|
-| GitHub owner | `aerokam` |
-| GitHub repo | `Treasuries` |
 | R2 public base URL | `https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev` |
 | Portal URL | `https://aerokam.github.io/Treasuries/` |
-
-`Dashboard/.env` (gitignored) — required for write operations:
-```
-GH_TOKEN=<PAT with workflow scope>
-```
 
 `Dashboard/jobs.json` — local script registry (committed, no secrets):
 ```json

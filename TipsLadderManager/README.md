@@ -34,11 +34,11 @@ This tool is designed for **transparency first**. Every number in the UI is trac
 
 **Gap Years** — Years within the current TIPS timeline (e.g. 2037–2039) where Treasury has not issued securities. These are covered by holding excess bonds in surrounding *bracket* years to match the average duration of the missing maturities.
 
-**Future Years** — Years beyond the currently issued TIPS (e.g. 2057–2066). Like gap years, these are handled via duration-matched excess in existing long-dated cover pairs (currently the 2052 and 2056 TIPS).
+**Future 30Y Rungs** — Years beyond the currently issued TIPS (e.g. 2057–2066). Like gap years, these are handled via duration-matched excess in existing long-dated cover pairs (currently the 2052 and 2056 TIPS).
 
-**Bracket Years** — Maturity years used to cover gaps or future years. *Upper bracket*: always the Feb 2040 TIPS. *Lower bracket*: usually the latest 10-year TIPS before the gap. In **3-bracket mode**, the tool uses both your original lower holdings and a second "new lower" bracket for more efficient matching.
+**Bracket Years** — Maturity years used to cover gaps or Future 30Y rungs. *Upper bracket*: always the Feb 2040 TIPS. *Lower bracket*: usually the latest 10-year TIPS before the gap. In **3-bracket mode**, the tool uses both your original lower holdings and a second "new lower" bracket for more efficient matching.
 
-**Role Playing (LMI)** — When bracket or cover TIPS of a given maturity substitute for TIPS that haven't yet been issued (gap years or future 30-year rungs), they "role play" by contributing their annual interest to the funded year amount for that maturity. Example: If excess Feb 2056s are held to cover future 30-year rungs (e.g., 2057–2066), the interest from those excess 2056 TIPS contributes to the 2056 funded year amount, which could reduce the quantity of 2056 TIPS required for the 2056 funded year.
+**Role Playing (LMI)** — When bracket or cover TIPS of a given maturity substitute for TIPS that haven't yet been issued (gap years or Future 30Y rungs), they "role play" by contributing their annual interest to the funded year amount for that maturity. Example: If excess Feb 2056s are held to cover Future 30Y rungs (e.g., 2057–2066), the interest from those excess 2056 TIPS contributes to the 2056 funded year amount, which could reduce the quantity of 2056 TIPS required for the 2056 funded year.
 
 ---
 

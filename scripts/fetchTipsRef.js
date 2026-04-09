@@ -1,3 +1,15 @@
+// Load .env from repo root if present (local dev); does not override GH Actions env vars
+import { existsSync, readFileSync } from 'fs';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
+const _envPath = resolve(dirname(fileURLToPath(import.meta.url)), '../.env');
+if (existsSync(_envPath)) {
+  readFileSync(_envPath, 'utf8').split('\n').forEach(line => {
+    const m = line.match(/^\s*([^#\s][^=]*?)\s*=\s*(.*?)\s*$/);
+    if (m && !process.env[m[1]]) process.env[m[1]] = m[2].replace(/^["']|["']$/g, '');
+  });
+}
+
 // Fetch per-bond base CPI (ref_cpi_on_dated_date) for all TIPS from Treasury FiscalData
 // Usage: node fetchTipsRef.js [CUSIP]
 //   No arg  → prints all TIPS sorted by maturity
