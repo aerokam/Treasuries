@@ -201,6 +201,28 @@ console.log('\nBuild — DARA=50000, lastYear=2060 (Future 30Y years)');
   console.log(`        totalBuyCost:        ${Math.round(summary.totalBuyCost).toLocaleString()}`);
 }
 
+// ── Test: Build — firstYear=2036, lastYear=2056, preLadderInterest=true ───────
+// Regression for bug: inflated prelim LMI in calcGapParams caused totalCost→0,
+// collapsing bracket excess quantities to 0 even while gap breakdown showed non-zero.
+console.log('\nBuild — firstYear=2036, lastYear=2056, preLadderInterest=true');
+{
+  const dara = 20000, firstYear = 2036, lastYear = 2056;
+  const { summary, results } = runBuild({ dara, firstYear, lastYear, tipsMap, refCPI, settlementDate, preLadderInterest: true });
+  const lower = results.find(r => r[2] === summary.lowerYear);
+  const upper = results.find(r => r[2] === summary.upperYear);
+  const lowerTotalQty = (lower?.[3] ?? 0) + (lower?.[4] ?? 0); // fundedYearQty + excessQty
+  const upperTotalQty = (upper?.[3] ?? 0) + (upper?.[4] ?? 0);
+  assert('gap totalCost > 0', (summary.gapParams?.totalCost ?? 0) > 0, true);
+  assert('lowerExQty > 0', summary.lowerExQty > 0, true);
+  assert('upperExQty > 0', summary.upperExQty > 0, true);
+  assert('lower bracket total qty > 0', lowerTotalQty > 0, true);
+  assert('upper bracket total qty > 0', upperTotalQty > 0, true);
+  console.log(`        lowerYear: ${summary.lowerYear}, upperYear: ${summary.upperYear}`);
+  console.log(`        lowerExQty: ${summary.lowerExQty}, upperExQty: ${summary.upperExQty}`);
+  console.log(`        zeroedFundedYears: [${summary.zeroedFundedYears?.join(', ')}]`);
+  console.log(`        gapTotalCost: ${Math.round(summary.gapParams?.totalCost ?? 0).toLocaleString()}`);
+}
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 console.log(`\n${passed + failed} tests: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

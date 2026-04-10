@@ -75,6 +75,20 @@ Before touching any displayed value: read the relevant knowledge doc first.
 - `fundedYear` (not `fy`) everywhere: `d.fundedYear`, `fundedYearQty`, `fundedYearAmt`, `fundedYearCost`; column header "Funded Year"
 - `runBuild` (not `runBuildFromScratch`), `renderBuildOutput`, `buildSummary`, `buildDetails`, `build-table`
 
+### Terminology (read every session — do not infer, do not substitute)
+
+Derived from `knowledge/1.0_Bond_Ladders.md` → `knowledge/TIPS_Basics.md` → `knowledge/2.0_TIPS_Ladders.md`. If you see any of these used incorrectly in specs or code comments, flag it.
+
+| Use this | Not this | Why |
+|---|---|---|
+| **TIPS** | bond, note, security | TIPS is a distinct Treasury category; use it in prose everywhere. Code variable names (`piPerBond`, `costPerBond`) are legacy — acceptable in code, never in spec prose or agent commentary. |
+| **actual TIPS** | real bond, real TIPS | "real" means inflation-adjusted (e.g., DARA = Desired Annual *Real* Amount). Never use "real" to mean "existing/purchased." |
+| **funded year** | real year, actual year | All years are real. A funded year is a ladder rung — a calendar year bucket that delivers ARA. |
+| **bracket year** | *(no bad term, just define it)* | A funded year that *also* holds excess TIPS for duration matching gap years. Same maturity, dual role. |
+| **gap year** | *(no bad term)* | A calendar year with no TIPS issuance (currently 2037–2039). |
+| **synthetic TIPS** | synthetic bond | Hypothetical TIPS constructed for gap years to enable duration matching. Never purchased. |
+| **LMI** | *(no bad term)* | Later Maturity Interest — annual coupon from ALL TIPS maturing after the funded year. Identical concept whether the rung is actual or synthetic. |
+
 ### Windows / Tooling Note
 
 The Edit tool may fail with `EEXIST` on project files (Windows path bug). Use node scripts via Bash to patch files when Edit fails.
