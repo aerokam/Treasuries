@@ -617,9 +617,11 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
     bracketTargetFundedYearQtyBefore[bYear] = Math.max(0, Math.round((bDara - laterMatIntBefore - nonPI) / piB));
   }
 
-  // Future cover pair: compute bracketTargetFundedYearQtyBefore for 2056 and 2052
+  // Future cover pair: compute bracketTargetFundedYearQtyBefore for 2056 and 2052.
+  // Must subtract excessLMI from the cover bonds (same as build-lib corrected sweep),
+  // otherwise the before-state funded qty is overstated causing phantom fy/cover display deltas.
   if (future30yYears.length > 0) {
-    for (const fcBond of [future30yLowerCoverBond, future30yUpperCoverBond]) {
+    for (const [fcBond, fcExQty] of [[future30yLowerCoverBond, future30yLowerExQty], [future30yUpperCoverBond, future30yUpperExQty]]) {
       const bYear = fcBond.maturity.getFullYear();
       if (!yearInfo[bYear]) yearInfo[bYear] = { holdings: [] };
       let laterMatIntBefore = 0;
@@ -630,8 +632,10 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
       const piB = calculatePIPerBond(fcBond.cusip, fcBond.maturity, refCPI, tipsMap);
       let nonPI = 0;
       for (const h of yh) { if (h.cusip !== fcBond.cusip) nonPI += h.qty * calculatePIPerBond(h.cusip, h.maturity, refCPI, tipsMap); }
+      const ir = refCPI / (fcBond.baseCpi ?? refCPI);
+      const excessLMIBefore = fcExQty * 1000 * ir * (fcBond.coupon ?? 0);
       const bDara = daraByYear?.get(bYear) ?? DARA;
-      bracketTargetFundedYearQtyBefore[bYear] = Math.max(0, Math.round((bDara - laterMatIntBefore - nonPI) / piB));
+      bracketTargetFundedYearQtyBefore[bYear] = Math.max(0, Math.round((bDara - laterMatIntBefore - nonPI - excessLMIBefore) / piB));
     }
   }
 

@@ -299,7 +299,7 @@ console.log('\nBuild→Rebalance symmetry — firstYear=2036, lastYear=2065, PLI
     .filter(h => h.qty > 0);
 
   // 3. Rebalance with Full method
-  const { summary: rebalSummaryFull, results: rebalResultsFull } = runRebalance({
+  const { summary: rebalSummaryFull, results: rebalResultsFull, details: rebalDetailsFull } = runRebalance({
     dara: DARA,
     method: 'Full',
     bracketMode: '3bracket',
@@ -315,6 +315,15 @@ console.log('\nBuild→Rebalance symmetry — firstYear=2036, lastYear=2065, PLI
   const totalAbsQtyDeltaFull = rebalResultsFull.reduce((s, r) => s + Math.abs(r[9] ?? 0), 0);
   assert('Build→Rebalance Full: zero total |qtyDelta|', totalAbsQtyDeltaFull, 0);
   assert('Build→Rebalance Full: zero net cash', Math.round(rebalSummaryFull.costDeltaSum), 0);
+
+  // Cover-year split: fundedYearQtyBefore must equal fundedYearQtyAfter (no phantom fy/cover trades)
+  const coverYears = new Set([buildSummaryFull.future30yLowerYear, buildSummaryFull.future30yUpperYear].filter(Boolean));
+  for (const d of (rebalDetailsFull ?? [])) {
+    if (coverYears.has(d.fundedYear)) {
+      assert(`FY ${d.fundedYear} cover-year funded split stable (before==after)`,
+        d.fundedYearQtyBefore, d.fundedYearQtyAfter);
+    }
+  }
 
   if (totalAbsQtyDeltaFull > 0) {
     const changed = rebalResultsFull.filter(r => (r[9] ?? 0) !== 0);
