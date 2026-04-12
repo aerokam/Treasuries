@@ -465,6 +465,7 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
       preLadderPool = preLadderYears * totalAnnualInt;
 
       const gapYearSetForPLI = new Set(gapYears);
+      const future30yYearSetForPLI = new Set(future30yYears);
       let remaining = preLadderPool;
       for (let year = firstYear; year <= lastYear; year++) {
         if (remaining <= 0) break;
@@ -481,8 +482,10 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
             pliCreditByGapYear[year] = remaining;
             remaining = 0;
           }
-        } else if (yearInfo[year]) {
-          // Funded year: need = DARA - funded-LMI-from-above (matches build-lib's prelim[y].laterMatInt)
+        } else if (!future30yYearSetForPLI.has(year)) {
+          // Funded year (with or without current holdings): need = DARA - funded-LMI-from-above.
+          // Must NOT restrict to yearInfo[year] — years zeroed in Build have no holdings when
+          // loaded into Rebalance, but the PLI pool should still zero them.
           const laterMatInt = Object.entries(prelimFundedAnnualInt)
             .filter(([y]) => parseInt(y) > year)
             .reduce((s, [, v]) => s + v, 0);
