@@ -47,6 +47,7 @@ let activeRange = '2D';
 let activeTab = 'timeseries';
 let syncXAxis = true;
 let isSyncing = false;
+let isUpdatingData = false;
 
 const ET_YMD_FMT = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' });
 const ET_FULL_FMT = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric' });
@@ -96,7 +97,7 @@ function setupTabs() {
 }
 
 function syncAllChartsX(sourceChart) {
-  if (!syncXAxis || isSyncing) return;
+  if (!syncXAxis || isSyncing || isUpdatingData) return;
   isSyncing = true;
   const xMin = sourceChart.scales.x.min;
   const xMax = sourceChart.scales.x.max;
@@ -236,18 +237,26 @@ async function fetchOne(symbol, range, force = false) {
   const is2D = range === '2D', is10D = range === '10D';
   if (is2D || is10D) {
     const providerRange = is2D ? '1D' : '5D', cacheKey = `${symbol}_${providerRange}`;
+    const tipKey = `${symbol}_5D`;
+    
+    const fetchTasks = [];
     if (!force && liveCache[cacheKey]) {
-      const cutoff = new Date(); if (is2D) cutoff.setDate(cutoff.getDate() - 2); else cutoff.setDate(cutoff.getDate() - 10);
-      return liveCache[cacheKey].filter(p => p.x >= cutoff);
+      // Use cache
+    } else {
+      console.log(`%c[CNBC] %cFetching real-time ${providerRange} for ${symbol}`, "color: #2563eb; font-weight: bold", "color: inherit");
+      fetchTasks.push(fetchLive(symbol, providerRange).then(live => { if (live) liveCache[cacheKey] = live; }));
     }
-    console.log(`%c[CNBC] %cFetching real-time ${providerRange} for ${symbol}`, "color: #2563eb; font-weight: bold", "color: inherit");
-    const live = await fetchLive(symbol, providerRange);
-    if (live && live.length > 0) {
-      liveCache[cacheKey] = live;
-      const cutoff = new Date(); if (is2D) cutoff.setDate(cutoff.getDate() - 2); else cutoff.setDate(cutoff.getDate() - 10);
-      return live.filter(p => p.x >= cutoff);
+    
+    if (is2D && (force || !liveCache[tipKey])) {
+      console.log(`%c[CNBC] %cFetching 5D tip for metrics: ${symbol}`, "color: #2563eb; font-weight: bold", "color: inherit");
+      fetchTasks.push(fetchLive(symbol, '5D').then(live => { if (live) liveCache[tipKey] = live; }));
     }
-    return live || [];
+    
+    if (fetchTasks.length > 0) await Promise.all(fetchTasks);
+
+    const data = liveCache[cacheKey] || [];
+    const cutoff = new Date(); if (is2D) cutoff.setDate(cutoff.getDate() - 2); else cutoff.setDate(cutoff.getDate() - 10);
+    return data.filter(p => p.x >= cutoff);
   } else {
     console.log(`%c[R2] %cLoading history for ${symbol}...`, "color: #ea580c; font-weight: bold", "color: inherit");
     const history = await fetchHistory(symbol);
@@ -305,6 +314,7 @@ function updateDynamicTicks(chart, data) {
 }
 
 async function updateAllData(force = false) {
+  isUpdatingData = true;
   const statusEl = document.getElementById('fetchStatus'); statusEl.textContent = `Updating...`;
   const allSyms = Object.keys(AVAILABLE_SYMBOLS); let successCount = 0; const tsList = [];
   await Promise.all(allSyms.map(async sym => {
@@ -366,6 +376,7 @@ async function updateAllData(force = false) {
   if (latestDataT) statusHtml += `<div style="margin-top:2px; color:#0f172a">Data: ${fmt(latestDataT, 'America/Los_Angeles', 'PT', getEtDateStr(latestDataT) !== getEtDateStr(now))} / ${fmt(latestDataT, 'America/New_York', 'ET', getEtDateStr(latestDataT) !== getEtDateStr(now))} (${successCount}/${allSyms.length} syms)</div>`;
   else statusHtml += `<div style="margin-top:2px; color:#dc2626">No data returned (${successCount}/${allSyms.length} syms)</div>`;
   statusEl.innerHTML = statusHtml;
+  isUpdatingData = false;
 }
 
 const TIPS_SYMBOLS = Object.keys(AVAILABLE_SYMBOLS).filter(s => s.endsWith('TIPS')).sort((a, b) => MATURITY_ORDER[a] - MATURITY_ORDER[b]);
