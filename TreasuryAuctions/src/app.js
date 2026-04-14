@@ -551,7 +551,9 @@ async function loadData() {
         floating_rate: node.getElementsByTagName('FloatingRate')[0]?.textContent === 'Y' ? 'Yes' : 'No',
         announcement_date: node.getElementsByTagName('AnnouncementDate')[0]?.textContent || '',
         settlement_date: node.getElementsByTagName('SettlementDate')[0]?.textContent || '',
-      }));
+      }))
+      .filter(a => a.auction_date.trim() !== '') // Remove blank rows
+      .sort((a, b) => a.auction_date < b.auction_date ? -1 : a.auction_date > b.auction_date ? 1 : 0); // Sort by date
     } catch (err) {
       console.warn('Error parsing tentative XML:', err);
     }
