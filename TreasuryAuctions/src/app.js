@@ -696,15 +696,19 @@ function init() {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
     
+    const tabName = btn.dataset.tab;
     btn.classList.add('active');
-    const tabId = `tab-${btn.dataset.tab}`;
-    document.getElementById(tabId).classList.add('active');
+    document.getElementById(`tab-${tabName}`).classList.add('active');
     
-    if (btn.dataset.tab === 'tentative') {
+    if (tabName === 'tentative') {
       renderTentative();
       document.getElementById('row-count').textContent = '';
+    } else if (tabName === 'upcoming') {
+      // For upcoming tab, we update the row count from the upcoming table
+      const count = document.getElementById('upcoming-tbody').querySelectorAll('tr').length;
+      document.getElementById('row-count').textContent = `${count} upcoming auctions`;
     } else {
-      renderTable(); // This updates row-count correctly for historical/upcoming
+      renderTable(); // Updates row-count for historical
     }
   });
 
