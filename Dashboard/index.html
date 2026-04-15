@@ -1031,5 +1031,6 @@ document.getElementById('refresh-btn').addEventListener('click', loadStatus);
 renderDFD();
 loadStatus();
 </script>
+<script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js');</script>
 </body>
 </html>
