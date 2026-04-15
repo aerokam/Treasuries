@@ -27,6 +27,9 @@
   /* Borders */
   --border-light: #cbd5e1;
   --border-med: #94a3b8;
+
+  /* Surfaces */
+  --chip-bg: #e2e8f0;
 }
 
 /* ── Base ── */
@@ -60,7 +63,7 @@ button:disabled { background: var(--btn-disabled-bg); color: var(--btn-disabled-
 button:hover:not(:disabled) { background: var(--btn-hover-bg); transform: translateY(-1px); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.2); }
 
 /* ── Portal link (← Portal chip) ── */
-.portal-link { font-size: 11px; font-weight: 700; color: var(--portal-text-muted); background: #e2e8f0; border: 1px solid var(--border-light); border-radius: 4px; padding: 2px 10px; text-decoration: none; letter-spacing: 0.02em; }
+.portal-link { font-size: 11px; font-weight: 700; color: var(--portal-text-muted); background: var(--chip-bg); border: 1px solid var(--border-light); border-radius: 4px; padding: 2px 10px; text-decoration: none; letter-spacing: 0.02em; }
 .portal-link:hover { background: var(--portal-text-main); color: var(--portal-text-on-dark); border-color: var(--portal-text-main); }
 
 /* ── Help button ── */

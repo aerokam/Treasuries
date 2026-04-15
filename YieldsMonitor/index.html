@@ -9,44 +9,39 @@
 <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1"></script>
+<link rel="stylesheet" href="../shared/src/portal-theme.css">
 <style>
-  *, *::before, *::after { box-sizing: border-box; }
-  body { font-family: system-ui, sans-serif; font-size: 13px; margin: 0; padding: 15px; color: #000; background: #f1f5f9; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
-  
+  /* App-specific overrides — shared base, vars, tabs, buttons, portal-link: portal-theme.css */
+  body { font-size: 13px; padding: 15px; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
   header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-shrink: 0; }
   header h1 { font-size: 18px; margin: 0; display: flex; align-items: center; gap: 10px; }
-  .portal-link { font-size: 11px; font-weight: 700; color: #475569; background: #e2e8f0; border: 1px solid #cbd5e1; border-radius: 4px; padding: 2px 10px; text-decoration: none; letter-spacing: 0.02em; }
-  .portal-link:hover { background: #1e293b; color: #fff; border-color: #1e293b; }
-  .tz-info { font-size: 11px; color: #334155; font-weight: 600; background: #e2e8f0; padding: 2px 8px; border-radius: 4px; }
+  .tz-info { font-size: 11px; color: var(--portal-text-muted); font-weight: 600; background: var(--chip-bg); padding: 2px 8px; border-radius: 4px; }
 
   .main-layout { display: flex; gap: 15px; flex: 1; min-height: 0; min-width: 0; }
-  
+
   /* Sidebar / Controls */
-  .sidebar { width: 300px; background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 15px; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; flex-shrink: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-  
+  .sidebar { width: 300px; background: #fff; border: 1px solid var(--border-light); border-radius: 8px; padding: 15px; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; flex-shrink: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+
   /* Content Area with Row Containers */
   .content { flex: 1; display: flex; flex-direction: column; gap: 0; min-width: 0; padding-right: 4px; min-height: 0; }
 
-  .tab-bar { display: flex; gap: 2px; flex-shrink: 0; border-bottom: 2px solid #b6c3d4; padding: 0 2px; align-items: flex-end; }
-  .tab-btn { padding: 5px 20px 6px; font-size: 12px; font-weight: 600; border: 2px solid transparent; border-bottom: none; background: #d1dce9; color: #64748b; cursor: pointer; border-radius: 7px 7px 0 0; position: relative; bottom: -2px; white-space: nowrap; transition: background 0.1s, color 0.1s; }
-  .tab-btn.active { background: #f1f5f9; color: #0f172a; font-weight: 700; border-color: #b6c3d4; border-bottom-color: #f1f5f9; }
-  .tab-btn:hover:not(.active) { background: #c4d1e0; color: #334155; }
   .tab-panel { display: none; flex: 1; min-height: 0; flex-direction: column; gap: 10px; padding-top: 10px; overflow-y: auto; }
   .tab-panel.active { display: flex; }
 
   .yield-curve-section { display: flex; gap: 10px; flex: 1; min-height: 0; min-width: 0; }
-  .yield-curve-card { background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; flex: 1; min-height: 0; min-width: 0; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
-  .yield-curve-card .yc-title { font-size: 12px; font-weight: 800; color: #000; margin-bottom: 6px; flex-shrink: 0; }
+  .yield-curve-card { background: #fff; border: 1px solid var(--border-light); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; flex: 1; min-height: 0; min-width: 0; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+  .yield-curve-card .yc-title { font-size: 12px; font-weight: 800; color: var(--portal-text-main); margin-bottom: 6px; flex-shrink: 0; }
   .yield-curve-container { flex: 1; position: relative; min-height: 0; min-width: 0; }
-  
+
   .row-section { display: flex; flex-direction: column; gap: 4px; min-height: 0; flex: 1; overflow: hidden; }
-  .row-title { font-size: 10px; font-weight: 800; color: #334155; text-transform: uppercase; margin-left: 5px; letter-spacing: 0.05em; flex-shrink: 0; }
-  
-  .chart-row { 
-    display: flex; 
+  .row-title { font-size: 10px; font-weight: 800; color: var(--portal-text-muted); text-transform: uppercase; margin-left: 5px; letter-spacing: 0.05em; flex-shrink: 0; }
+
+  .chart-row {
+    display: flex;
     flex-wrap: nowrap; /* Force single row */
-    gap: 10px; 
-    overflow-x: auto; 
+    gap: 10px;
+    overflow-x: auto;
     overflow-y: hidden;
     padding-bottom: 6px;
     flex: 1;
@@ -54,14 +49,14 @@
     width: 100%;
   }
 
-  .chart-card { 
-    background: #fff; 
-    border: 1px solid #cbd5e1; 
-    border-radius: 8px; 
-    padding: 8px; 
-    display: flex; 
-    flex-direction: column; 
-    box-shadow: 0 1px 2px rgba(0,0,0,0.05); 
+  .chart-card {
+    background: #fff;
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
     min-width: 250px; /* Smallest size before scrolling */
     flex: 1 1 0%; /* Shrink/Grow evenly starting from 0 */
     height: 100%;
@@ -69,19 +64,22 @@
   }
 
   .chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; flex-shrink: 0; }
-  .chart-title { font-size: 12px; font-weight: 800; color: #000; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .chart-title { font-size: 12px; font-weight: 800; color: var(--portal-text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .chart-container { flex: 1; position: relative; min-height: 0; width: 100%; }
 
-  .btn { padding: 4px 10px; font-size: 11px; background: #0f172a; color: #fff; border: none; border-radius: 4px; font-weight: 600; cursor: pointer; }
-  .btn-outline { background: #fff; color: #0f172a; border: 1px solid #cbd5e1; }
-  
-  footer { margin-top: 5px; font-size: 10px; color: #475569; text-align: center; flex-shrink: 0; }
+  /* Size-variant override — portal-theme `button` provides color/hover; these set compact sizing */
+  .btn { padding: 4px 10px; font-size: 11px; }
+  .btn:hover:not(:disabled) { transform: none; box-shadow: none; }
+  .btn-outline { background: #fff; color: var(--portal-text-main); border: 1px solid var(--border-light); }
+  .btn-outline:hover:not(:disabled) { background: #f8fafc; transform: none; box-shadow: none; }
+
+  footer { margin-top: 5px; font-size: 10px; color: var(--portal-text-muted); text-align: center; flex-shrink: 0; }
 
   /* Custom Scrollbar for Rows */
   .chart-row::-webkit-scrollbar { height: 6px; }
   .chart-row::-webkit-scrollbar-track { background: #f8fafc; border-radius: 3px; }
-  .chart-row::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
-  .chart-row::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+  .chart-row::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 3px; }
+  .chart-row::-webkit-scrollbar-thumb:hover { background: var(--border-med); }
 </style>
 </head>
 <body>
@@ -100,9 +98,11 @@
     
     <div class="content">
       <div class="tab-bar">
-        <button class="tab-btn active" data-tab="timeseries">Time Series</button>
-        <button class="tab-btn" data-tab="yieldcurves">Yield Curves</button>
-        <button class="tab-btn" data-tab="breakeven">Breakeven Inflation</button>
+        <div class="tab-group">
+          <button class="tab-btn active" data-tab="timeseries">Time Series</button>
+          <button class="tab-btn" data-tab="yieldcurves">Yield Curves</button>
+          <button class="tab-btn" data-tab="breakeven">Breakeven Inflation</button>
+        </div>
       </div>
       <div id="tab-timeseries" class="tab-panel active">
         <div class="row-section" id="tips-section">
