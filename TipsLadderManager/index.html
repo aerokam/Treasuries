@@ -52,12 +52,12 @@
   .net.pos { color: #16a34a; } .net.neg { color: #dc2626; }
 
   /* ── Drillable cells ── */
-  td.drillable { cursor: pointer; text-decoration: underline dotted #94a3b8; }
-  td.drillable:hover { background: #fef9c3 !important; text-decoration: underline solid #475569; }
+  td.drillable { cursor: pointer; text-decoration: underline dotted var(--tab-active-bg); }
+  td.drillable:hover { background: #e8f5f5 !important; text-decoration: underline solid var(--tab-active-bg); }
 
   /* ── Formula inspector ── */
-  .source-highlight { background: #fef9c3 !important; transition: background 0.15s; }
-  .drill-l3:hover { background: #fef9c3 !important; }
+  .source-highlight { background: #d4edec !important; transition: background 0.15s; }
+  .drill-l3:hover { background: #e8f5f5 !important; }
   .formula-var { cursor: help; border-bottom: 1px dashed #94a3b8; }
   .formula-var:hover { color: #1a56db; border-bottom-style: solid; }
 
@@ -73,10 +73,10 @@
   table.simple td:not(:first-child):not(:nth-child(2)):not(:nth-child(3)) { text-align: right; }
   table.simple td:nth-child(3) { text-align: center; }
   table.simple tr.no-change td { color: #94a3b8; }
-  table.simple tr.excess-subrow td { background: #fef9c3; color: #854d0e; font-size: 12px; }
-  table.simple tr.bracket:not(.excess-subrow) td { background: #bfdbfe; }
-  table.simple tr:hover td { background: #fffde7; }
-  table.simple tfoot td { font-weight: 600; border-top: 2px solid var(--border-med); background: #f8fafc; padding: 6px 12px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  table.simple tr.excess-subrow td { background: #e2f3f3; color: #1e4f4f; font-size: 12px; font-style: italic; }
+  table.simple tr.bracket:not(.excess-subrow) td { background: #c0e0e0; }
+  table.simple tr:hover td { background: #afd9d9; }
+  table.simple tfoot td { font-weight: 700; border-top: 2px solid var(--portal-text-main); background: var(--portal-text-main); color: var(--portal-text-on-dark); padding: 6px 12px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 
 
   /* ── Info strip ── */
