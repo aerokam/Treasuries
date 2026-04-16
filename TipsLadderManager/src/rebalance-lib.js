@@ -459,6 +459,7 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
   const pliCreditByFundedYear = {};
   const pliCreditByGapYear = {};
   let preLadderPool = 0;
+  let partialCreditYear = null, partialCredit = 0;
 
   if (preLadderInterest) {
     const preLadderYears = Math.max(0, firstYear - settlementDate.getFullYear());
@@ -521,7 +522,12 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
             pliCreditByFundedYear[year] = need;
             remaining -= need;
           } else {
-            break; // pool exhausted
+            // Pool covers this year partially — reduce its qty but don't zero it
+            pliCreditByFundedYear[year] = remaining;
+            partialCreditYear = year;
+            partialCredit = remaining;
+            remaining = 0;
+            break;
           }
         }
       }
@@ -799,7 +805,8 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
       const excessLMI = excessQtyTarget * 1000 * ir * (tBond?.coupon ?? 0);
 
       // 3. Calculate needed P+I, subtracting both incoming LMI and current year excess LMI
-      const needed = yearDara - rebuildLaterMatInt - excessLMI;
+      const effectivePartialCredit = (year === partialCreditYear) ? partialCredit : 0;
+      const needed = yearDara - rebuildLaterMatInt - excessLMI - effectivePartialCredit;
 
       if (zeroedFundedYears.has(year)) {
         // PLI covers this year's funded need — zero funded qty
