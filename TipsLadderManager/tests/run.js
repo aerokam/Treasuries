@@ -133,7 +133,36 @@ function runFullRebalanceTest(name, filePath) {
 // 1. Standard public test file
 runFullRebalanceTest('CusipQtyTestLumpy', './tests/CusipQtyTestLumpy.csv');
 
-// 2. Specific test for 3-bracket logic and multi-year aggregation (Fix for bug reported Mar 23)
+// 2. Regression: portfolio with no 2040 holding — lastYear must stop at 2035, not extend to 2045
+//    (Bug: lastYear derivation incorrectly reached into >2040 holdings when 2040 not held,
+//     causing spurious gap/bracket rows and rebuilding 2045/2051 as funded rungs.)
+{
+  console.log('\nMarisTOD — lastYear regression (no 2040 in holdings)');
+  const holdings = parseHoldings(readFileSync('./tests/MarisTOD.csv', 'utf8'));
+  const { dara } = inferDARAFromCash({ holdings, tipsMap, refCPI, settlementDate });
+  const { summary, details } = runRebalance({ dara, method: 'Full', holdings, tipsMap, refCPI, settlementDate });
+
+  assert('lastYear === 2035',       summary.lastYear, 2035);
+  assert('firstYear === 2027',      summary.firstYear, 2027);
+  assert('rungCount === 9',         summary.rungCount, 9);
+  assert('gapYears is empty',       summary.gapYears.length, 0);
+  assert('no 2040 funded rung',     details.some(d => d.fundedYear === 2040), false);
+  assert('no 2036 funded rung',     details.some(d => d.fundedYear === 2036), false);
+  // 2045 and 2051 must be untouched (LMI contributors only, not ladder rungs).
+  // If those CUSIPs aren't in test market data, no detail row is generated — also correct.
+  const d2045 = details.find(d => d.cusip === '912810RL4');
+  const d2051 = details.find(d => d.cusip === '912810SV1');
+  const delta2045 = d2045 ? (d2045.qtyAfter - d2045.qtyBefore) : 0;
+  const delta2051 = d2051 ? (d2051.qtyAfter - d2051.qtyBefore) : 0;
+  assert('2045 not rebuilt (qtyDelta 0 or absent)', delta2045, 0);
+  assert('2051 not rebuilt (qtyDelta 0 or absent)', delta2051, 0);
+  console.log(`        lastYear:      ${summary.lastYear}`);
+  console.log(`        rungCount:     ${summary.rungCount}`);
+  console.log(`        inferredDARA:  ${Math.round(dara).toLocaleString()}`);
+  console.log(`        netCash:       ${Math.round(summary.costDeltaSum).toLocaleString()}`);
+}
+
+// 3. Specific test for 3-bracket logic and multi-year aggregation (Fix for bug reported Mar 23)
 {
   const filePath = './tests/dev/TipsLadderCom.csv';
   if (existsSync(path.resolve('TipsLadderManager', filePath))) {

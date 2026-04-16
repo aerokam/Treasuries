@@ -735,10 +735,12 @@ function updateRebalLastYearDropdown() {
   if (!_hYears.length) { fieldDiv.style.display = 'none'; return; }
 
   const _firstY = _hYears[0];
+  const _has2040 = _hYears.includes(2040);
   let _derivedLY = _firstY;
   for (let i = 0; i < _hYears.length; i++) {
     const y = _hYears[i];
     if (y <= 2040) { _derivedLY = y; continue; }
+    if (!_has2040) break;
     if (_hYears[i + 1] === y + 1) { _derivedLY = _hYears[i + 1]; }
     else { _derivedLY = y; break; }
   }

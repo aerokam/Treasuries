@@ -359,10 +359,13 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
   const holdingsYears = Object.keys(yearInfo).map(Number).sort((a, b) => a - b);
   const derivedFirstYear = holdingsYears[0];
   let firstYear = holdingsYears[0];
+  const has2040 = holdingsYears.includes(2040);
   let lastYear = firstYear;
   for (let i = 0; i < holdingsYears.length; i++) {
     const year = holdingsYears[i];
     if (year <= 2040) { lastYear = year; continue; }
+    // year > 2040: only extend if 2040 is held (structural gap doesn't break contiguity)
+    if (!has2040) break;
     const nextExpected   = year + 1;
     const nextInHoldings = holdingsYears[i + 1];
     if (nextInHoldings && nextInHoldings === nextExpected) { lastYear = nextInHoldings; }

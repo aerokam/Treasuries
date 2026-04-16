@@ -8,6 +8,7 @@ memory/
 tests/**/*.csv
 !tests/e2e/TipsYields.csv
 !tests/CusipQtyTestLumpy.csv
+!tests/MarisTOD.csv
 
 # Legacy data folder (ensure ignored if present)
 data/
