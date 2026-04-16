@@ -44,7 +44,7 @@ body {
 /* ── Tab bar ── */
 .tab-bar { display: flex; align-items: flex-end; background: var(--tab-bar-bg); border-radius: 8px 8px 0 0; padding: 8px 12px 0 8px; height: 42px; }
 .tab-group { display: flex; align-items: flex-end; gap: 4px; flex: 1; }
-.tab-bar-title { display: flex; align-items: center; justify-content: center; gap: 8px; padding-bottom: 5px; color: var(--portal-card-text); flex: 1; }
+.tab-bar-title { display: flex; align-items: center; justify-content: flex-start; gap: 8px; padding-bottom: 5px; color: var(--portal-card-text); flex: 1; }
 .tab-bar-right { display: flex; align-items: center; gap: 8px; padding-bottom: 5px; flex: 1; justify-content: flex-end; }
 .app-title { font-size: 15px; font-weight: 700; color: var(--portal-card-text); }
 

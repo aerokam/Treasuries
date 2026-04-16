@@ -14,7 +14,7 @@
   body { font-size: 14px; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
 
   header { padding: 16px 20px 8px; flex-shrink: 0; }
-  h1 { font-size: 18px; margin: 0 0 12px; display: flex; justify-content: space-between; align-items: center; }
+  h1 { font-size: 18px; margin: 0 0 12px; display: flex; align-items: center; gap: 12px; }
 
   /* ── Layout ── */
   #main-container { display: flex; flex-direction: column; flex: 1; min-height: 0; }
@@ -91,7 +91,7 @@
 </head>
 <body>
   <header>
-    <h1>Yield Curves <a href="../" class="portal-link">&#8592; Portal</a></h1>
+    <h1><a href="../" class="portal-link">&#8592; Portal</a>Yield Curves</h1>
     <div id="tab-bar" class="tab-bar">
       <div class="tab-group">
         <button class="tab-btn active" data-tab="tips">TIPS</button>

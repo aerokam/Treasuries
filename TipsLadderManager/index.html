@@ -7,6 +7,8 @@
 <link rel="stylesheet" href="../shared/src/portal-theme.css">
 <style>
   body { font-size: 13px; padding: 20px; }
+  /* ── Tab bar overrides ── */
+  .tab-group { justify-content: center; }
   /* ── Layout ── */
   .app-container { display: table; width: auto; margin: 0; }
   /* ── Card rows ── */
@@ -14,18 +16,18 @@
   .card-info { display: flex; gap: 12px; align-items: center; margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,0.12); flex-wrap: nowrap; }
   #duration-links { display: flex; gap: 8px; align-items: center; flex-wrap: nowrap; }
   /* ── Info strip ── */
-  .info-muted { font-size: 11px; color: var(--portal-card-text); opacity: 0.85; white-space: nowrap; }
-  .info-sep { font-size: 11px; color: var(--portal-card-text); opacity: 0.4; }
-  .info-pipe { font-size: 11px; color: var(--portal-card-text); opacity: 0.3; margin: 0 2px; }
-  #info-tips-count { font-size: 13px; font-weight: 700; color: #fff; white-space: nowrap; }
-  .info-stat { font-size: 11px; color: var(--portal-card-text); white-space: nowrap; }
-  .info-stat-val { font-size: 13px; font-weight: 700; color: #fff; }
+  .info-muted { font-size: 13px; color: var(--portal-card-text); opacity: 0.85; white-space: nowrap; }
+  .info-sep { font-size: 13px; color: var(--portal-card-text); opacity: 0.4; }
+  .info-pipe { font-size: 13px; color: var(--portal-card-text); opacity: 0.3; margin: 0 2px; }
+  #info-tips-count { font-size: 15px; font-weight: 700; color: #fff; white-space: nowrap; }
+  .info-stat { font-size: 13px; color: var(--portal-card-text); white-space: nowrap; }
+  .info-stat-val { font-size: 15px; font-weight: 700; color: #fff; }
 
   /* ── Top row ── */
   #top-row { display: flex; flex-direction: column; margin-bottom: 16px; position: sticky; top: 0; z-index: 20; background: var(--portal-bg); padding-bottom: 4px; width: fit-content; }
 
   /* ── Form card ── */
-  .form-card { width: fit-content; min-width: 845px; background: var(--portal-card-bg); border: 1px solid var(--portal-header-bg); border-radius: 0 0 8px 8px; padding: 10px 24px; color: var(--portal-card-text); box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.4); position: relative; transition: width 0.2s ease-out; }
+  .form-card { width: fit-content; min-width: 845px; background: var(--portal-card-bg); border: 1px solid var(--portal-header-bg); border-radius: 0 0 8px 8px; padding: 10px 24px 8px; color: var(--portal-card-text); box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.4); position: relative; transition: width 0.2s ease-out; }
   /* .fields/.break removed — replaced by .card-inputs */
   .field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
   /* .val-display removed — term/range now in .card-info as .info-stat-val */
@@ -36,7 +38,8 @@
   .field input[type="file"] { padding: 4px; font-size: 11px; }
 
   /* ── Status ── */
-  #status { margin: 10px 0 0; font-size: 12px; color: #fff; min-height: 1.2em; font-weight: 500; }
+  #run-btn { padding: 5px 18px; }
+  #status { margin: 3px 0 0; font-size: 12px; color: #fff; font-weight: 500; }
   #status.error { color: #f87171; font-weight: 700; }
 
   /* ── Main table ── */
@@ -85,8 +88,8 @@
   .info-link-btn:hover { background:#334155; }
   
   #net-cash-inline { display:none; flex-direction:row; gap:5px; align-items:baseline; white-space:nowrap; }
-  #net-cash-inline .nc-label { font-size:10px; font-weight:700; color: var(--portal-card-text); text-transform:uppercase; letter-spacing:.06em; }
-  #net-cash-inline .nc-val { font-size:14px; font-weight:800; color:#fff; }
+  #net-cash-inline .nc-label { font-size:13px; font-weight:700; color: var(--portal-card-text); text-transform:uppercase; letter-spacing:.06em; }
+  #net-cash-inline .nc-val { font-size:16px; font-weight:800; color:#fff; }
 
   #output     { display: none; }
   #build-output { display: none; }
@@ -189,15 +192,15 @@
 
 <div id="top-row">
   <div class="tab-bar">
+    <div class="tab-bar-title">
+      <a href="../" class="portal-link">&#8592; Portal</a>
+      <span class="app-title">TIPS Ladder Manager</span>
+    </div>
     <div class="tab-group">
       <button class="tab-btn active" data-mode="rebalance">Rebalance</button>
       <button class="tab-btn" data-mode="build">Build</button>
     </div>
-    <div class="tab-bar-title">
-      <span class="app-title">TIPS Ladder Manager</span>
-    </div>
     <div class="tab-bar-right">
-      <a href="../" class="portal-link">&#8592; Portal</a>
       <button id="help-btn" title="Help" class="help-btn">?</button>
     </div>
   </div>
@@ -264,7 +267,7 @@
       </div>
     </div>
     <!-- Row 2: Run + post-run actions -->
-    <div class="card-inputs">
+    <div class="card-inputs" style="margin-top:8px">
       <button id="run-btn" disabled style="align-self:flex-end">Run Rebalance</button>
       <button id="export-csv-btn" style="display:none;padding:2px 10px;font-size:11px;align-self:flex-end" title="Export table to CSV">Export CSV</button>
       <button id="export-cusip-qty-btn" style="display:none;padding:2px 10px;font-size:11px;align-self:flex-end" title="Export CUSIP/Qty for Rebalance import">Export CUSIP/Qty</button>
