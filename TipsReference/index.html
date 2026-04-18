@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TIPS Reference - Treasury Investors Portal</title>
+<link rel="stylesheet" href="../shared/src/portal-theme.css">
+<style>
+  body { font-size: 13px; padding: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+  /* ── Header ── */
+  header { padding: 9px 14px; background: var(--portal-card-bg); color: var(--portal-card-text); border-bottom: 1px solid var(--portal-header-bg); display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+  header h1 { font-size: 17px; margin: 0; color: var(--portal-card-text); }
+  #header-meta { display: none; gap: 18px; }
+  .meta-item { display: flex; flex-direction: column; }
+  .meta-label { font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--tab-inactive-text); opacity: 0.7; }
+  .meta-val { font-size: 12px; font-weight: 700; color: var(--portal-card-text); font-variant-numeric: tabular-nums; }
+  #status { font-size: 11px; color: var(--tab-inactive-text); font-style: italic; margin-left: auto; }
+  #status.error { color: #f87171; font-style: normal; font-weight: 600; }
+  .btn { padding: 4px 10px; font-size: 11px; }
+  .btn:hover:not(:disabled) { transform: none; box-shadow: none; }
+
+  /* ── Row count bar ── */
+  #row-count { font-size: 11px; color: var(--portal-text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; padding: 5px 14px; border-bottom: 1px solid #f1f5f9; background: #fff; flex-shrink: 0; display: none; }
+
+  /* ── Table wrap ── */
+  .table-wrap { flex: 1; overflow: auto; min-height: 0; background: #fff; }
+
+  /* ── Table ── */
+  table { border-collapse: separate; border-spacing: 0; font-size: 11px; width: 100%; background: #fff; }
+
+  thead th, thead td {
+    position: sticky;
+    z-index: 20;
+    background-clip: padding-box;
+  }
+
+  /* Row 1 — sortable headers */
+  thead tr:first-child th {
+    top: 0;
+    z-index: 22;
+    background: var(--portal-text-main);
+    color: var(--portal-text-on-dark);
+    padding: 5px 8px;
+    text-align: right;
+    font-weight: 600;
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+    border-bottom: 1px solid var(--portal-header-bg);
+  }
+  thead tr:first-child th.left { text-align: left; }
+  thead tr:first-child th:hover { background: #2d3f57; }
+  thead th.sort-asc::after  { content: ' \2191'; }
+  thead th.sort-desc::after { content: ' \2193'; }
+
+  /* Row 2 — filter inputs */
+  thead tr.filter-row td {
+    top: 29px; /* adjusted by JS after render */
+    z-index: 21;
+    background: #f1f5f9;
+    padding: 2px 4px;
+    border-bottom: 2px solid var(--border-light);
+  }
+
+  .filter-input { display: block; width: 100%; padding: 2px 5px; font-size: 11px; border: 1px solid var(--border-light); border-radius: 3px; outline: none; background: #fff; min-width: 40px; box-sizing: border-box; }
+  .filter-input:focus { border-color: #1a56db; }
+  .filter-input.active { border-color: #f59e0b; background: #fffbeb; }
+
+  /* Body rows */
+  tbody td { padding: 4px 8px; border-bottom: 1px solid #f1f5f9; font-variant-numeric: tabular-nums; white-space: nowrap; background: #fff; }
+  tbody td.right { text-align: right; }
+  tbody tr:hover td { background: #fffde7; }
+</style>
+</head>
+<body>
+
+<header>
+  <a href="../" class="portal-link">&#8592; Portal</a>
+  <h1>TIPS Reference</h1>
+  <div id="header-meta">
+    <div class="meta-item">
+      <span class="meta-label">Settlement Date</span>
+      <span class="meta-val" id="meta-sett-date">—</span>
+    </div>
+    <div class="meta-item">
+      <span class="meta-label">Settlement Ref CPI</span>
+      <span class="meta-val" id="meta-sett-cpi">—</span>
+    </div>
+  </div>
+  <span id="status" style="margin-left:auto;">Loading…</span>
+  <button id="export-btn" class="btn" disabled>Export CSV</button>
+</header>
+
+<div id="row-count"></div>
+
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr id="header-row"></tr>
+      <tr class="filter-row" id="filter-row"></tr>
+    </thead>
+    <tbody id="main-tbody"></tbody>
+  </table>
+</div>
+
+<script>
+const R2_ROOT = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev';
+const BASE_URL = R2_ROOT + '/Treasuries';
+const TIPS_URL = R2_ROOT + '/TIPS';
+
+var allRows = [];
+var settlementDateStr = '';
+var sortCol = 'maturity';
+var sortDir = 'asc';
+var filters = {};
+
+var COLS = [
+  { key: 'cusip',      label: 'CUSIP',             align: 'left',  sortType: 'str',
+    fmt: function(v) { return v != null ? String(v) : ''; } },
+  { key: 'maturity',   label: 'Maturity',           align: 'left',  sortType: 'str',
+    fmt: function(v) { return fmtDate(v); } },
+  { key: 'coupon',     label: 'Coupon',             align: 'right', sortType: 'num',
+    fmt: function(v) { return v != null ? (v * 100).toFixed(3) + '%' : '—'; } },
+  { key: 'datedDate',  label: 'Dated Date',         align: 'left',  sortType: 'str',
+    fmt: function(v) { return v != null ? String(v) : ''; } },
+  { key: 'baseCpi',    label: 'Dated Date Ref CPI', align: 'right', sortType: 'num',
+    fmt: function(v) { return v != null ? v.toFixed(5) : '—'; } },
+  { key: 'price',      label: 'Price',              align: 'right', sortType: 'num',
+    fmt: function(v) { return v != null ? v.toFixed(3) : '—'; } },
+  { key: 'indexRatio', label: 'Index Ratio',        align: 'right', sortType: 'num',
+    fmt: function(v) { return v != null ? v.toFixed(5) : '—'; } },
+  { key: 'adjPrice',   label: 'Adj Price',          align: 'right', sortType: 'num',
+    fmt: function(v) { return v != null ? v.toFixed(3) : '—'; } },
+  { key: 'yield',      label: 'Yield',              align: 'right', sortType: 'num',
+    fmt: function(v) { return v != null ? (v * 100).toFixed(3) + '%' : '—'; } },
+];
+
+function parseCsv(text) {
+  var lines = text.trim().split('\n').filter(function(l) { return l.trim(); });
+  if (lines.length < 2) return [];
+  var headers = lines[0].split(',').map(function(s) { return s.trim(); });
+  return lines.slice(1).map(function(line) {
+    var vals = line.split(',').map(function(s) { return s.trim(); });
+    var obj = {};
+    headers.forEach(function(h, i) { obj[h] = vals[i] !== undefined ? vals[i] : ''; });
+    return obj;
+  });
+}
+
+function lookupRefCpi(refCpiRows, dateStr) {
+  var matches = refCpiRows.filter(function(r) { return r.date <= dateStr; });
+  if (!matches.length) return null;
+  return matches[matches.length - 1].refCpi;
+}
+
+function fmtDate(isoStr) {
+  if (!isoStr) return '';
+  var parts = isoStr.split('-');
+  if (parts.length !== 3) return isoStr;
+  return parts[1] + '/' + parts[2] + '/' + parts[0];
+}
+
+function cellDisplay(row, col) {
+  return col.fmt(row[col.key]);
+}
+
+function getFilteredSorted() {
+  var rows = allRows.slice();
+  Object.keys(filters).forEach(function(key) {
+    var val = filters[key].toLowerCase();
+    var col = COLS.find(function(c) { return c.key === key; });
+    if (!col) return;
+    rows = rows.filter(function(r) {
+      return cellDisplay(r, col).toLowerCase().indexOf(val) !== -1;
+    });
+  });
+  var col = COLS.find(function(c) { return c.key === sortCol; });
+  if (col) {
+    rows.sort(function(a, b) {
+      var av = a[sortCol], bv = b[sortCol];
+      var cmp;
+      if (col.sortType === 'num') {
+        cmp = (av != null ? av : -Infinity) - (bv != null ? bv : -Infinity);
+      } else {
+        cmp = String(av != null ? av : '').localeCompare(String(bv != null ? bv : ''));
+      }
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+  }
+  return rows;
+}
+
+function buildHeader() {
+  var headerRow = document.getElementById('header-row');
+  var filterRow = document.getElementById('filter-row');
+  headerRow.innerHTML = '';
+  filterRow.innerHTML = '';
+
+  COLS.forEach(function(col) {
+    var th = document.createElement('th');
+    th.textContent = col.label;
+    if (col.align === 'left') th.classList.add('left');
+    if (sortCol === col.key) th.classList.add(sortDir === 'asc' ? 'sort-asc' : 'sort-desc');
+    th.addEventListener('click', function() {
+      if (sortCol === col.key) {
+        sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+      } else {
+        sortCol = col.key;
+        sortDir = 'asc';
+      }
+      buildHeader();
+      renderTable();
+    });
+    headerRow.appendChild(th);
+
+    var td = document.createElement('td');
+    var inp = document.createElement('input');
+    inp.type = 'text';
+    inp.className = 'filter-input';
+    inp.placeholder = '\u2026';
+    inp.value = filters[col.key] || '';
+    if (filters[col.key]) inp.classList.add('active');
+    (function(colKey, input) {
+      input.addEventListener('input', function() {
+        var v = input.value.trim();
+        if (v) { filters[colKey] = v; input.classList.add('active'); }
+        else { delete filters[colKey]; input.classList.remove('active'); }
+        renderTable();
+      });
+    })(col.key, inp);
+    td.appendChild(inp);
+    filterRow.appendChild(td);
+  });
+
+  // Sync filter row top to actual header height
+  var headerHeight = document.querySelector('thead tr:first-child').offsetHeight;
+  document.querySelectorAll('thead tr.filter-row td').forEach(function(td) {
+    td.style.top = headerHeight + 'px';
+  });
+}
+
+function renderTable() {
+  var rows = getFilteredSorted();
+  var tbody = document.getElementById('main-tbody');
+  var rc = document.getElementById('row-count');
+
+  var html = '';
+  rows.forEach(function(r) {
+    html += '<tr>';
+    COLS.forEach(function(col) {
+      var cls = col.align === 'right' ? ' class="right"' : '';
+      html += '<td' + cls + '>' + cellDisplay(r, col) + '</td>';
+    });
+    html += '</tr>';
+  });
+  tbody.innerHTML = html;
+  rc.textContent = rows.length + ' of ' + allRows.length + ' TIPS';
+  rc.style.display = 'block';
+}
+
+async function loadData() {
+  var statusEl = document.getElementById('status');
+  try {
+    var responses = await Promise.all([
+      fetch(BASE_URL + '/YieldsFromFedInvestPrices.csv', { cache: 'no-cache' }),
+      fetch(TIPS_URL + '/RefCPI.csv', { cache: 'no-cache' }),
+      fetch(BASE_URL + '/TipsRef.csv', { cache: 'no-cache' }),
+    ]);
+    if (!responses[0].ok) throw new Error('YieldsFromFedInvestPrices.csv: HTTP ' + responses[0].status);
+    if (!responses[1].ok) throw new Error('RefCPI.csv: HTTP ' + responses[1].status);
+    if (!responses[2].ok) throw new Error('TipsRef.csv: HTTP ' + responses[2].status);
+
+    var yieldsText = await responses[0].text();
+    var yieldsLines = yieldsText.trim().split('\n');
+    settlementDateStr = yieldsLines[0].trim();
+
+    var yieldsRows = parseCsv(yieldsLines.slice(1).join('\n'))
+      .filter(function(r) { return r.type === 'TIPS'; })
+      .map(function(r) {
+        return {
+          cusip:    r.cusip,
+          maturity: r.maturity,
+          coupon:   parseFloat(r.coupon),
+          price:    parseFloat(r.price) || null,
+          yield:    parseFloat(r.yield) || null,
+        };
+      });
+
+    var refCpiRows = parseCsv(await responses[1].text()).map(function(r) {
+      return { date: r.date, refCpi: parseFloat(r.refCpi) };
+    });
+
+    var tipsRefRows = parseCsv(await responses[2].text()).map(function(r) {
+      return { cusip: r.cusip, datedDate: r.datedDate, baseCpi: parseFloat(r.baseCpi) };
+    });
+    var tipsRefMap = {};
+    tipsRefRows.forEach(function(r) { tipsRefMap[r.cusip] = r; });
+
+    var settlementRefCpi = lookupRefCpi(refCpiRows, settlementDateStr);
+
+    allRows = yieldsRows.map(function(r) {
+      var ref = tipsRefMap[r.cusip];
+      var baseCpi = ref ? ref.baseCpi : null;
+      var indexRatio = (baseCpi && settlementRefCpi) ? settlementRefCpi / baseCpi : null;
+      var adjPrice = (indexRatio != null && r.price != null) ? r.price * indexRatio : null;
+      return {
+        cusip:       r.cusip,
+        maturity:    r.maturity,
+        coupon:      r.coupon,
+        datedDate:   ref ? ref.datedDate : '',
+        baseCpi:     baseCpi,
+        price:       r.price,
+        indexRatio:  indexRatio,
+        adjPrice:    adjPrice,
+        yield:       r.yield,
+      };
+    });
+
+    document.getElementById('meta-sett-date').textContent = fmtDate(settlementDateStr);
+    document.getElementById('meta-sett-cpi').textContent = settlementRefCpi != null ? settlementRefCpi.toFixed(5) : '—';
+    document.getElementById('header-meta').style.display = 'flex';
+    statusEl.textContent = '';
+    document.getElementById('export-btn').disabled = false;
+
+    buildHeader();
+    renderTable();
+  } catch (err) {
+    statusEl.textContent = err.message;
+    statusEl.classList.add('error');
+  }
+}
+
+document.getElementById('export-btn').addEventListener('click', function() {
+  var rows = getFilteredSorted();
+  var headerLine = COLS.map(function(c) { return c.label; }).join(',');
+  var dataLines = rows.map(function(r) {
+    return COLS.map(function(col) {
+      var v = cellDisplay(r, col);
+      return v.indexOf(',') !== -1 ? '"' + v + '"' : v;
+    }).join(',');
+  });
+  var csv = [headerLine].concat(dataLines).join('\n');
+  var blob = new Blob([csv], { type: 'text/csv' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'tips-reference' + (settlementDateStr ? '-' + settlementDateStr : '') + '.csv';
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+
+loadData();
+</script>
+<script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js');</script>
+</body>
+</html>
