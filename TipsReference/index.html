@@ -125,7 +125,7 @@ var COLS = [
   { key: 'cusip',      label: 'CUSIP',             align: 'left',  sortType: 'str',
     fmt: function(v) { return v != null ? String(v) : ''; } },
   { key: 'maturity',   label: 'Maturity',           align: 'left',  sortType: 'str',
-    fmt: function(v) { return fmtDate(v); } },
+    fmt: function(v) { return v != null ? String(v) : ''; } },
   { key: 'coupon',     label: 'Coupon',             align: 'right', sortType: 'num',
     fmt: function(v) { return v != null ? (v * 100).toFixed(3) + '%' : '—'; } },
   { key: 'datedDate',  label: 'Dated Date',         align: 'left',  sortType: 'str',
