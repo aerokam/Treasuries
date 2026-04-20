@@ -50,6 +50,7 @@ const isStrip = cusip => STRIPS_PREFIXES.has((cusip || '').slice(0, 6));
 let activeTab = 'tips';
 let nominalsTypeFilters = new Set(['MARKET BASED BILL', 'MARKET BASED NOTE', 'MARKET BASED BOND']);
 let nominalsSort = { col: 'maturity', dir: 'asc' };
+let xAxisMode = 'maturity';
 window._currentBonds = [];
 
 // --- Helpers ---
@@ -133,6 +134,17 @@ function fmtDateMDY(date) {
   return String(date.getMonth() + 1).padStart(2, '0') + '/' +
          String(date.getDate()).padStart(2, '0') + '/' +
          date.getFullYear();
+}
+
+// Format a millisecond timestamp as term-to-maturity label.
+// < 1 year → integer weeks ("26w"); ≥ 1 year → integer years ("10y")
+function ttmLabel(ms) {
+  const days = (ms - Date.now()) / 86400000;
+  if (days < 365.25) {
+    const w = Math.round(days / 7);
+    return w <= 0 ? '<1w' : `${w}w`;
+  }
+  return `${Math.round(days / 365.25)}y`;
 }
 
 // Broker timestamp "MM/DD/YYYY HH:MM AM/PM" → "MM/DD HH:MM AM/PM" (drop year)
@@ -457,6 +469,10 @@ async function init() {
 
     setupDateInput(startEl, startCalEl, () => { savedZoom[activeTab] = null; processAndRender(); });
     setupDateInput(endEl, endCalEl, () => { savedZoom[activeTab] = null; processAndRender(); });
+
+    document.querySelectorAll('input[name="xAxisMode"]').forEach(r => {
+      r.addEventListener('change', () => { xAxisMode = r.value; processAndRender(); });
+    });
 
     document.getElementById('resetZoom').onclick = () => {
       savedZoom[activeTab] = null;
@@ -871,7 +887,7 @@ function renderNominalsChart(fedBonds, fidBonds) {
           min: minX, max: maxX,
           time: { unit: timeUnit, displayFormats: { year: 'MMM yyyy', month: 'MMM yyyy' } },
           grid: { color: 'rgba(0,0,0,0.05)' },
-          ticks: { autoSkip: true, maxRotation: 0 }
+          ticks: { autoSkip: true, maxRotation: 0, ...(xAxisMode === 'ttm' ? { callback: (val) => ttmLabel(val) } : {}) }
         },
         y: {
           type: 'linear',
@@ -895,7 +911,10 @@ function renderNominalsChart(fedBonds, fidBonds) {
           titleFont: { size: 11, weight: '700' }, bodyFont: { size: 11 },
           cornerRadius: 6, displayColors: false,
           callbacks: {
-            title: (items) => fmtDateMDY(new Date(items[0].parsed.x)),
+            title: (items) => {
+              const ms = items[0].parsed.x;
+              return `${fmtDateMDY(new Date(ms))} (${ttmLabel(ms)})`;
+            },
             label: (context) => `${context.dataset.label}: ${context.parsed.y.toFixed(3)}%`
           }
         }
@@ -1184,7 +1203,7 @@ function renderChart(fedBonds, brokerBonds) {
       animation: false,
       interaction: { mode: 'nearest', axis: 'x', intersect: false },
       scales: {
-        x: { type: 'time', min: minX, max: maxX, time: { unit: timeUnit, displayFormats: { year: 'MMM yyyy', month: 'MMM yyyy' } }, grid: { color: 'rgba(0,0,0,0.05)' } },
+        x: { type: 'time', min: minX, max: maxX, time: { unit: timeUnit, displayFormats: { year: 'MMM yyyy', month: 'MMM yyyy' } }, grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { autoSkip: true, maxRotation: 0, ...(xAxisMode === 'ttm' ? { callback: (val) => ttmLabel(val) } : {}) } },
         y: { type: 'linear', title: { display: true, text: 'Yield (%)' }, min: minY, max: maxY, ticks: { stepSize: 0.25, callback: (v) => v.toFixed(2) } }
       },
       plugins: {
@@ -1199,7 +1218,10 @@ function renderChart(fedBonds, brokerBonds) {
         tooltip: {
           backgroundColor: 'rgba(255,255,255,0.95)', titleColor: '#1e293b', bodyColor: '#475569', borderColor: '#e2e8f0', borderWidth: 1, padding: 8, cornerRadius: 6, displayColors: false,
           callbacks: {
-            title: (items) => fmtDateMDY(new Date(items[0].parsed.x)),
+            title: (items) => {
+              const ms = items[0].parsed.x;
+              return `${fmtDateMDY(new Date(ms))} (${ttmLabel(ms)})`;
+            },
             label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y}%`
           }
         }
@@ -1378,7 +1400,7 @@ function _makeSpreadChart(ctx, seriesDef, yAxisLabel, yUnit, shouldClip) {
         x: {
           type: 'time', min: minX, max: maxX,
           time: { unit: timeUnit, displayFormats: { year: 'MMM yyyy', month: 'MMM yyyy' } },
-          grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { autoSkip: true, maxRotation: 0 }
+          grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { autoSkip: true, maxRotation: 0, ...(xAxisMode === 'ttm' ? { callback: (val) => ttmLabel(val) } : {}) }
         },
         y: {
           type: 'linear', title: { display: true, text: yAxisLabel },
@@ -1402,7 +1424,10 @@ function _makeSpreadChart(ctx, seriesDef, yAxisLabel, yUnit, shouldClip) {
           backgroundColor: 'rgba(255,255,255,0.95)', titleColor: '#1e293b', bodyColor: '#475569',
           borderColor: '#e2e8f0', borderWidth: 1, padding: 8, cornerRadius: 6, displayColors: false,
           callbacks: {
-            title: items => fmtDateMDY(new Date(items[0].parsed.x)),
+            title: items => {
+              const ms = items[0].parsed.x;
+              return `${fmtDateMDY(new Date(ms))} (${ttmLabel(ms)})`;
+            },
             label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(3)}${yUnit}`
           }
         }
