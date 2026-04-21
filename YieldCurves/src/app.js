@@ -864,10 +864,25 @@ function renderNominalsChart(fedBonds, fidBonds) {
           scale.ticks = tickVals.filter(v => v >= scale.min && v <= scale.max).map(v => ({ value: v }));
         } else {
           const span = scale.max - scale.min;
-          const interval = span > 260 ? 52 : span > 130 ? 26 : span > 52 ? 13 : span > 12 ? 4 : 1;
-          const start = Math.ceil(Math.max(scale.min, 0) / interval) * interval;
           const ticks = [];
-          for (let v = start; v <= scale.max; v += interval) ticks.push({ value: v });
+          if (span > 260) {
+            const start = Math.ceil(Math.max(scale.min, 0) / 52) * 52;
+            for (let v = start; v <= scale.max; v += 52) ticks.push({ value: v });
+          } else if (span > 130) {
+            const start = Math.ceil(Math.max(scale.min, 0) / 26) * 26;
+            for (let v = start; v <= scale.max; v += 26) ticks.push({ value: v });
+          } else if (span > 52) {
+            const start = Math.ceil(Math.max(scale.min, 0) / 13) * 13;
+            for (let v = start; v <= scale.max; v += 13) ticks.push({ value: v });
+          } else if (span > 12) {
+            // Align to calendar months (52/12 weeks each) to avoid duplicate labels
+            const startM = Math.ceil(scale.min * 12 / 52);
+            const endM = Math.floor(scale.max * 12 / 52);
+            for (let m = startM; m <= endM; m++) ticks.push({ value: m * 52 / 12 });
+          } else {
+            const start = Math.ceil(Math.max(scale.min, 0));
+            for (let v = start; v <= scale.max; v += 1) ticks.push({ value: v });
+          }
           scale.ticks = ticks;
         }
       },
