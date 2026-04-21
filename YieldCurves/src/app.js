@@ -476,12 +476,17 @@ async function init() {
     });
 
     document.getElementById('resetZoom').onclick = () => {
-      savedZoom[activeTab] = null;
-      document.getElementById('startMaturity').value = '';
-      document.getElementById('endMaturity').value = '';
-      document.getElementById('startMaturityCal').value = '';
-      document.getElementById('endMaturityCal').value = '';
-      processAndRender();
+      if (spreadModeActive) {
+        if (spreadChart1) { spreadChart1.resetZoom('none'); _rescaleSpread(spreadChart1); }
+        if (spreadChart2) { spreadChart2.resetZoom('none'); _rescaleSpread(spreadChart2); }
+      } else {
+        savedZoom[activeTab] = null;
+        document.getElementById('startMaturity').value = '';
+        document.getElementById('endMaturity').value = '';
+        document.getElementById('startMaturityCal').value = '';
+        document.getElementById('endMaturityCal').value = '';
+        processAndRender();
+      }
     };
 
     processAndRender();
@@ -967,11 +972,6 @@ function renderNominalsChart(fedBonds, fidBonds) {
 
   setupAxisWheelZoom(chart.canvas, ({chart}) => rescaleToVisible(chart), ({chart, factor}) => snapYAfterZoom(chart, factor));
 
-  document.getElementById('resetZoom').onclick = () => {
-    savedZoom['treasuries'] = null;
-    chart.resetZoom('none');
-    rescaleToVisible(chart);
-  };
 }
 
 function processAndRenderTips() {
@@ -1274,11 +1274,6 @@ function renderChart(fedBonds, brokerBonds) {
 
   setupAxisWheelZoom(chart.canvas, ({chart}) => rescaleToVisible(chart), ({chart, factor}) => snapYAfterZoom(chart, factor));
 
-  document.getElementById('resetZoom').onclick = () => {
-    savedZoom['tips'] = null;
-    chart.resetZoom('none');
-    rescaleToVisible(chart);
-  };
 }
 
 function rescaleToVisible(chart) {
@@ -1514,10 +1509,6 @@ function renderSpreadCharts(bonds, tab) {
     if (spreadChart2) spreadChart2.resize();
   });
 
-  document.getElementById('resetZoom').onclick = () => {
-    if (spreadChart1) { spreadChart1.resetZoom('none'); _rescaleSpread(spreadChart1); }
-    if (spreadChart2) { spreadChart2.resetZoom('none'); _rescaleSpread(spreadChart2); }
-  };
 }
 
 function renderSpreadTable(bonds, tab) {
