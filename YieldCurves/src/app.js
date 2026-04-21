@@ -145,7 +145,7 @@ const TERM_LABEL_MINOR = new Set([6,13,17,26]);
 function ttmLabel(ms) {
   const days = (ms - Date.now()) / 86400000;
   if (days < 365.25) return `${(days / 7).toFixed(1)}w`;
-  return `${(days / 365.25).toFixed(1)}y`;
+  return `${Math.round(days / 365.25)}y`;
 }
 
 // Broker timestamp "MM/DD/YYYY HH:MM AM/PM" → "MM/DD HH:MM AM/PM" (drop year)
@@ -360,6 +360,7 @@ function _showSaoDrill(cusip) {
 // ─── Main Logic ──────────────────────────────────────────────────────────────
 
 Chart.defaults.font.size = 13;
+Chart.defaults.color = '#334155';
 
 async function init() {
   const statusEl = document.getElementById('status');
@@ -839,15 +840,31 @@ function renderNominalsChart(fedBonds, fidBonds) {
       tickCb = val => (TERM_LABEL_4W.has(val) || TERM_LABEL_MINOR.has(val)) ? `${val}w` : '';
       tickFont = ctx => TERM_LABEL_MINOR.has(ctx.tick?.value) ? { size: 9 } : { size: 11 };
     } else {
-      // Year-based ticks: every 52 weeks (1yr interval)
-      tickVals = Array.from({ length: Math.ceil(maxW / 52) + 1 }, (_, i) => i * 52);
-      tickCb = val => val % 52 === 0 ? `${val / 52}y` : '';
+      // Adaptive ticks: years when zoomed out, months/weeks when zoomed in
+      tickCb = (val, idx, ticks) => {
+        if (!ticks || ticks.length < 2) return `${Math.round(val / 52)}y`;
+        const interval = ticks[1].value - ticks[0].value;
+        if (interval >= 52) return `${Math.round(val / 52)}y`;
+        if (interval >= 4) return `${Math.round(val / 4.348)}m`;
+        return `${val}w`;
+      };
       tickFont = () => ({ size: 11 });
     }
     xScale = {
       type: 'linear',
       min: 0, max: maxW,
-      afterBuildTicks: scale => { scale.ticks = tickVals.filter(v => v >= scale.min && v <= scale.max).map(v => ({ value: v })); },
+      afterBuildTicks: scale => {
+        if (isBillsOnly) {
+          scale.ticks = tickVals.filter(v => v >= scale.min && v <= scale.max).map(v => ({ value: v }));
+        } else {
+          const span = scale.max - scale.min;
+          const interval = span > 104 ? 52 : span > 26 ? 13 : span > 8 ? 4 : 1;
+          const start = Math.ceil(Math.max(scale.min, 0) / interval) * interval;
+          const ticks = [];
+          for (let v = start; v <= scale.max; v += interval) ticks.push({ value: v });
+          scale.ticks = ticks;
+        }
+      },
       grid: { color: 'rgba(0,0,0,0.05)' },
       ticks: { maxRotation: 0, callback: tickCb, font: tickFont }
     };
@@ -1238,7 +1255,7 @@ function renderChart(fedBonds, brokerBonds) {
       animation: false,
       interaction: { mode: 'nearest', axis: 'x', intersect: false },
       scales: {
-        x: { type: 'time', min: minX, max: maxX, time: { unit: timeUnit, displayFormats: { year: 'MMM yyyy', month: 'MMM yyyy' } }, grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { autoSkip: true, maxRotation: 0, ...(xAxisMode === 'ttm' ? { callback: (val) => ttmLabel(val) } : {}) } },
+        x: { type: 'time', min: minX, max: maxX, time: xAxisMode === 'ttm' ? { displayFormats: {} } : { unit: timeUnit, displayFormats: { year: 'MMM yyyy', month: 'MMM yyyy' } }, grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { autoSkip: true, maxRotation: 0, ...(xAxisMode === 'ttm' ? { callback: (val, idx, ticks) => { if (!ticks || ticks.length < 2) return ttmLabel(val); const spanDays = (ticks[ticks.length-1].value - ticks[0].value) / 86400000; const days = (val - Date.now()) / 86400000; if (days <= 0) return ''; if (spanDays <= 91) return `${Math.round(days / 7)}w`; if (spanDays <= 365) return `${Math.round(days / 30.44)}m`; return `${Math.round(days / 365.25)}y`; } } : {}) } },
         y: { type: 'linear', title: { display: true, text: 'Yield (%)' }, min: minY, max: maxY, ticks: { stepSize: 0.25, callback: (v) => v.toFixed(2) } }
       },
       plugins: {
@@ -1429,8 +1446,8 @@ function _makeSpreadChart(ctx, seriesDef, yAxisLabel, yUnit, shouldClip) {
       scales: {
         x: {
           type: 'time', min: minX, max: maxX,
-          time: { unit: timeUnit, displayFormats: { year: 'MMM yyyy', month: 'MMM yyyy' } },
-          grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { autoSkip: true, maxRotation: 0, ...(xAxisMode === 'ttm' ? { callback: (val) => ttmLabel(val) } : {}) }
+          time: xAxisMode === 'ttm' ? { displayFormats: {} } : { unit: timeUnit, displayFormats: { year: 'MMM yyyy', month: 'MMM yyyy' } },
+          grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { autoSkip: true, maxRotation: 0, ...(xAxisMode === 'ttm' ? { callback: (val, idx, ticks) => { if (!ticks || ticks.length < 2) return ttmLabel(val); const spanDays = (ticks[ticks.length-1].value - ticks[0].value) / 86400000; const days = (val - Date.now()) / 86400000; if (days <= 0) return ''; if (spanDays <= 91) return `${Math.round(days / 7)}w`; if (spanDays <= 365) return `${Math.round(days / 30.44)}m`; return `${Math.round(days / 365.25)}y`; } } : {}) }
         },
         y: {
           type: 'linear', title: { display: true, text: yAxisLabel },
@@ -1617,14 +1634,12 @@ document.getElementById('nominalsShowNone').onclick = (e) => {
 // Unified Source Change Handlers
 ['chkTipsFed', 'chkTipsBroker'].forEach(id => {
   document.getElementById(id).addEventListener('change', () => {
-    savedZoom['tips'] = null;
     updateModeToggle();
     processAndRender();
   });
 });
 ['chkFedInvest', 'chkFidelity'].forEach(id => {
   document.getElementById(id).addEventListener('change', () => {
-    savedZoom['treasuries'] = null;
     updateModeToggle();
     processAndRender();
   });
