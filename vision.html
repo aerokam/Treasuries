@@ -3,18 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Treasury Investors Portal — Project Vision</title>
+  <title>Treasury Investors Portal — Vision and Principles</title>
   <style>
     body { font-family: system-ui, sans-serif; line-height: 1.6; max-width: 800px; margin: 0 auto; padding: 40px 20px; background: #fafafa; color: #1e293b; }
     h1 { font-size: 28px; border-bottom: 2px solid #1a56db; padding-bottom: 12px; margin-bottom: 32px; color: #1a56db; }
     h2 { font-size: 22px; margin-top: 40px; color: #334155; }
-    h3 { font-size: 18px; margin-top: 24px; color: #475569; }
     p { margin-bottom: 16px; }
     ul { margin-bottom: 24px; padding-left: 20px; }
     li { margin-bottom: 8px; }
     code { background: #f1f5f9; padding: 2px 4px; border-radius: 4px; font-family: monospace; font-size: 0.9em; }
-    .mission-box { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; margin-bottom: 32px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
-    .mission-box p { font-style: italic; color: #64748b; margin-top: 12px; }
+    em { color: #64748b; }
     hr { border: none; border-top: 1px solid #e2e8f0; margin: 40px 0; }
     .back-link { display: inline-block; margin-bottom: 24px; text-decoration: none; color: #64748b; font-weight: 600; font-size: 14px; }
     .back-link:hover { color: #1a56db; }
@@ -23,56 +21,36 @@
 </head>
 <body>
   <a href="./index.html" class="back-link">← Back to Portal</a>
-  
-  <h1>Treasury Investors Portal — Project Vision</h1>
 
-  <div class="mission-box">
-    <h2>The Mission</h2>
-    <p>To provide the community with clear, free, and transparent tools for managing Treasury portfolios, with a specialized focus on TIPS (Treasury Inflation-Protected Securities). This is a contribution to the <strong>Bogleheads</strong> tradition of evidence-based investing, intended to replace "black box" financial tools with open, educational infrastructure.</p>
-    <p>We don't just show results; we show the <strong>work</strong>.</p>
-  </div>
+  <h1>Treasury Investors Portal — Vision and Principles</h1>
+
+  <h2>1. Productivity</h2>
+  <p>Replace spreadsheet-based workflows with tools that are faster, more powerful, and easier to use. A user should be able to accomplish in seconds what would take minutes in a spreadsheet — with fewer errors and no manual maintenance.</p>
 
   <hr>
 
-  <h2>Core Principles</h2>
-
-  <h3>1. The Understandability Reward</h3>
-  <p>Understandability is our primary metric. Every UI adjustment and logic decision should be a positive reward for improving the clarity of the information displayed. If a change makes the tool more powerful but more opaque, it doesn't belong here.</p>
+  <h2>2. Transparency and Understanding</h2>
+  <p>Every number on screen must be explainable and verifiable. A user new to TIPS should be able to understand what a number means and where it comes from. An experienced user should be able to confirm that a number is being calculated correctly — without having to trust a black box.</p>
+  <p>Both goals are served by the same mechanisms: pop-up explanations that show the calculation behind a value, and CSV export so numbers can be independently analyzed in a spreadsheet. Terms align with market convention (e.g., "Ref CPI", "Dated Date Ref CPI").</p>
+  <p>Knowledge is layered. Users can stay at the surface or drill deeper:</p>
   <ul>
-    <li><strong>Traceability</strong>: Every number on screen must be explainable.</li>
-    <li><strong>Visual Intuition</strong>: Use charts and grids to make complex relationships (like duration matching) feel obvious.</li>
-    <li><strong>Language Alignment</strong>: Adhere to market-standard terms (e.g., "Ref CPI", "Dated Ref CPI") to build real-world financial literacy.</li>
+    <li><strong>Level 1 — The UI</strong>: Clean, actionable, and distraction-free. Numbers are front and center.</li>
+    <li><strong>Level 2 — Pop-up Help</strong>: Explanations of what a value means, what drives it, and how to interpret it. Accessible in context, without leaving the page.</li>
+    <li><strong>Level 3 — Multi-level Explanations</strong>: For genuinely complex topics (e.g., seasonal adjustment, index ratios), plain-language, institutional, and mathematical explanations are available in layers.</li>
+    <li><strong>Level 4 — The Specification</strong>: Internal knowledge documents (<code>knowledge/</code>) define the implementation in detail.</li>
+    <li><strong>Level 5 — The Authority</strong>: Direct references to the source of truth — CFR Title 31 Money and Finance: Treasury, BLS methodology, or official Treasury documentation.</li>
   </ul>
-
-  <h3>2. "Drill Baby Drill" (in a good way) — Progressive Disclosure</h3>
-  <p>Knowledge is layered. A user should be able to start at a high-level summary and "drill" all the way down to the legal authority.</p>
-  <ul>
-    <li><strong>Level 1: The UI</strong>: Clean, actionable, and distraction-free.</li>
-    <li><strong>Level 2: The Drill-Down</strong>: Interactive popups showing the exact calculation chain.</li>
-    <li><strong>Level 3: The Specification</strong>: Internal knowledge documents that define our implementation.</li>
-    <li><strong>Level 4: The Authority</strong>: Direct references to the source of truth, such as the <strong>Code of Federal Regulations (CFR)</strong> or official BLS/Treasury methodology.
-      <ul>
-        <li><em>Example</em>: Explaining that Ref CPI for the 1st of the month is equal to the CPI-U (NSA) from three months prior, per 31 CFR § 356.</li>
-      </ul>
-    </li>
-  </ul>
-
-  <h3>3. Multi-Level Education</h3>
-  <p>TIPS are notoriously counter-intuitive. We aim to explain concepts like <strong>Seasonal Adjustments</strong> at various levels:</p>
-  <ul>
-    <li><strong>Common Sense</strong>: "Prices change with the seasons. We flatten those waves so you can see the real value of the TIPS."</li>
-    <li><strong>Institutional Logic</strong>: Explaining why traders look at seasonally-adjusted yields to make "fair value" comparisons.</li>
-    <li><strong>The Math</strong>: Using linear regression and backwards-anchored sliding windows to isolate idiosyncratic outliers.</li>
-  </ul>
+  <p><em>This principle is most fully realized in the Ladder Manager, which supports drill-down traceability from ladder totals all the way to the official CFR Title 31 calculation chain.</em></p>
 
   <hr>
 
-  <h2>Community Commitment</h2>
-  <ul>
-    <li><strong>Always Free, Always Open</strong>: No accounts, no tracking, and no hidden logic. All calculations run locally in your browser.</li>
-    <li><strong>Community-First</strong>: Designed by and for those who value transparency and rigor. The goal is to simplify the complex without removing the rigor.</li>
-    <li><strong>Educational First Principles</strong>: If you can't drill into a value to understand where it came from, we haven't finished building it.</li>
-  </ul>
+  <h2>3. Maintainability</h2>
+  <p>Each concept is defined in exactly one place. The data pipeline is transparent and owner-operated. All data ingestion jobs run as local Windows scheduled tasks, with full visibility into the source-to-storage flow.</p>
+
+  <hr>
+
+  <h2>4. Privacy</h2>
+  <p>All code runs locally in the browser. No portfolio data, inputs, or calculations are uploaded to any server.</p>
 
   <footer>
     A free contribution to the <a href="https://www.bogleheads.org/" style="color: #94a3b8; text-decoration: none; border-bottom: 1px dotted #cbd5e1;">Bogleheads</a> community.
