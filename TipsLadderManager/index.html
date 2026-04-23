@@ -516,13 +516,12 @@ document.getElementById('export-csv-btn').addEventListener('click', () => {
   const filename = `tips-ladder-${currentMode}-${new Date().toISOString().split('T')[0]}.csv`;
 
   const q = s => '"' + String(s ?? '').replace(/"/g, '""') + '"';
-  const fmt2 = v => typeof v === 'number' ? v.toFixed(2) : '';
   const fmtRaw = (v, fmt) => {
     if (v == null || v === '') return '';
-    if (fmt === 'qty' || fmt === 'sgn') return typeof v === 'number' ? String(Math.round(v)) : String(v);
-    if (fmt === 'yld') return typeof v === 'number' ? (v * 100).toFixed(3) + '%' : String(v);
-    if (fmt === 'amt') return fmt2(v);
-    return String(v);
+    if (fmt === 'qty') return typeof v === 'number' ? String(Math.round(v)) : String(v);
+    if (fmt === 'sgn') return typeof v === 'number' ? String(v) : String(v);
+    if (fmt === 'yld') return typeof v === 'number' ? String(v * 100) : String(v);
+    return typeof v === 'number' ? String(v) : String(v);
   };
 
   const cols = COLS.filter(c => mode === 'rebal' ? !c.buildOnly : !c.rebalOnly);
@@ -539,7 +538,8 @@ document.getElementById('export-csv-btn').addEventListener('click', () => {
     const hof           = d.halfOrFull ?? (d.nPeriods === 1 ? 0.5 : 1.0);
     const lmi           = d.longerDatedLMI ?? d.araAfterLaterMatInt;
     const intFromExcess = (typeof d.excessLMI_After === 'number' && d.excessLMI_After > 0) ? d.excessLMI_After : null;
-    const extraVals     = ['', fmt2(principal), fmt2(principal * d.coupon * hof), fmt2(lmi), fmt2(d.costPerBond), fmt2(principal * d.coupon), fmt2(intFromExcess)];
+    const xv            = v => v == null ? '' : String(v);
+    const extraVals     = ['', xv(principal), xv(principal * d.coupon * hof), xv(lmi), xv(d.costPerBond), xv(principal * d.coupon), xv(intFromExcess)];
 
     const mainCells = cols.map(col => {
       const v = col.key === 'fundedYear' ? d.fundedYear : col.value(d, ri, details);
@@ -549,7 +549,7 @@ document.getElementById('export-csv-btn').addEventListener('click', () => {
 
     if (isBT) {
       const subCells = cols.map(col => q(col.subValue ? fmtRaw(col.subValue(d, ri, details), col.fmt) : ''));
-      const subExtra = ['', fmt2(principal), fmt2(principal * d.coupon * hof), '', '', '', ''];
+      const subExtra = ['', xv(principal), xv(principal * d.coupon * hof), '', '', '', ''];
       csvData.push([...subCells, ...subExtra.map(q)].join(','));
     }
   }
