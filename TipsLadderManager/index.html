@@ -525,7 +525,7 @@ document.getElementById('export-csv-btn').addEventListener('click', () => {
   };
 
   const cols = COLS.filter(c => mode === 'rebal' ? !c.buildOnly : !c.rebalOnly);
-  const EXTRA_LABELS = ['', 'Principal per TIPS', 'Last Cpn Per TIPS', 'LMI', 'Cost per TIPS', 'Annual Int per TIPS', 'Int from excess'];
+  const EXTRA_LABELS = ['', 'Principal per TIPS', 'Last Cpn Per TIPS', 'LMI', 'Cost per TIPS', 'Annual Int per TIPS', 'Int from excess', 'PLI'];
 
   const csvData = [];
   csvData.push([...cols.map(c => q(c.label.replace(/\bQuantity\b/g, 'Qty'))), ...EXTRA_LABELS.map(q)].join(','));
@@ -539,7 +539,8 @@ document.getElementById('export-csv-btn').addEventListener('click', () => {
     const lmi           = d.longerDatedLMI ?? d.araAfterLaterMatInt;
     const intFromExcess = (typeof d.excessLMI_After === 'number' && d.excessLMI_After > 0) ? d.excessLMI_After : null;
     const xv            = v => v == null ? '' : String(v);
-    const extraVals     = ['', xv(principal), xv(principal * d.coupon * hof), xv(lmi), xv(d.costPerBond), xv(principal * d.coupon), xv(intFromExcess)];
+    const pli           = (d.preLadderCreditForYear != null && d.preLadderCreditForYear > 0) ? d.preLadderCreditForYear : null;
+    const extraVals     = ['', xv(principal), xv(principal * d.coupon * hof), xv(lmi), xv(d.costPerBond), xv(principal * d.coupon), xv(intFromExcess), xv(pli)];
 
     const mainCells = cols.map(col => {
       const v = col.key === 'fundedYear' ? d.fundedYear : col.value(d, ri, details);
@@ -549,7 +550,7 @@ document.getElementById('export-csv-btn').addEventListener('click', () => {
 
     if (isBT) {
       const subCells = cols.map(col => q(col.subValue ? fmtRaw(col.subValue(d, ri, details), col.fmt) : ''));
-      const subExtra = ['', xv(principal), xv(principal * d.coupon * hof), '', '', '', ''];
+      const subExtra = ['', xv(principal), xv(principal * d.coupon * hof), '', '', '', '', ''];
       csvData.push([...subCells, ...subExtra.map(q)].join(','));
     }
   }
