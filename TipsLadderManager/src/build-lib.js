@@ -58,7 +58,8 @@ function calcGapParams(gapYears, tipsMap, settlementDate, refCPI, dara, prelim, 
     count++;
   }
 
-  return { avgDuration: totalDuration / count, totalCost, breakdown };
+  const gapLMITotal = breakdown.reduce((s, g) => s + g.laterMatInt + g.pliCredit, 0);
+  return { avgDuration: totalDuration / count, totalCost, breakdown, gapLMITotal };
 }
 
 // ─── Future 30Y parameters for build-from-scratch ──────────────────────────────
@@ -396,7 +397,10 @@ export function runBuild({ dara, firstYear: firstYearOpt, lastYear, tipsMap, ref
       ? Math.max(0, yearDara - (corr_lmi + excessLMI))
       : year === partialCreditYear ? partialCredit : 0;
     const fundedYearAmt = year > lastYear ? 0 : fundedYearQty * prelim_pi + corr_lmi + excessLMI + preLadderCreditForYear;
-    const exAmt  = isBracket ? excessQty * prelim_pi : '';
+    const gapLMIAlloc = gapExQty > 0
+      ? (year === lowerYear ? lowerWeight : upperWeight) * (gapParams?.gapLMITotal ?? 0)
+      : 0;
+    const exAmt  = isBracket ? excessQty * prelim_pi + gapLMIAlloc : '';
     const fundedYearCost = fundedYearQty * cpb;
     const exCost = isBracket ? excessQty * cpb : '';
     totalBuyCost += totQty * cpb;
@@ -438,7 +442,8 @@ export function runBuild({ dara, firstYear: firstYearOpt, lastYear, tipsMap, ref
       excessQty: excessQty,
       excessPrincipalTotal: excessQty * principalPerBond,
       excessOwnRungInt: excessQty * ownRungCouponPerBond,
-      excessAmt: isBracket ? excessQty * prelim_pi : 0,
+      excessAmt: isBracket ? excessQty * prelim_pi + gapLMIAlloc : 0,
+      gapLMIAlloc,
       excessCost: isBracket ? excessQty * cpb : 0,
     });
   }

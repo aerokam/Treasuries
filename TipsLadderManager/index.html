@@ -550,7 +550,8 @@ document.getElementById('export-csv-btn').addEventListener('click', () => {
 
     if (isBT) {
       const subCells = cols.map(col => q(col.subValue ? fmtRaw(col.subValue(d, ri, details), col.fmt) : ''));
-      const subExtra = ['', xv(principal), xv(principal * d.coupon * hof), '', '', '', '', ''];
+      const subLMI = (d.gapLMIAlloc != null && d.gapLMIAlloc > 0) ? d.gapLMIAlloc : null;
+      const subExtra = ['', xv(principal), xv(principal * d.coupon * hof), xv(subLMI), '', '', '', ''];
       csvData.push([...subCells, ...subExtra.map(q)].join(','));
     }
   }

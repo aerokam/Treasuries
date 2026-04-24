@@ -140,12 +140,16 @@ export function buildDrillHTML(d, colKey, summary) {
         + row('Cost per TIPS', '<span class="formula-var" data-source="price">price/100</span> \xd7 <span class="formula-var" data-source="ir">index ratio</span> \xd7 1,000', fm2(d.costPerBond), false, undefined, 'cpb')
         + row('Excess Quantity', 'round(<span class="formula-var" data-source="tec">target cost</span> \xf7 <span class="formula-var" data-source="cpb">Cost per TIPS</span>)', d.excessQty);
       if (isAmt) {
+        const gapLMIAlloc = d.gapLMIAlloc ?? 0;
         rows += sep()
           + bondVarRows(d, nPeriods, principalPerBond, couponPct)
           + sep()
           + row('P+I per TIPS', '<span class="formula-var" data-source="ppb">Par Value/TIPS</span> \xd7 (1 + <span class="formula-var" data-source="cpp">coupon/period</span> \xd7 <span class="formula-var" data-source="cp">periods</span>)', fm2(d.fundedYearPi), false, undefined, 'pipb')
           + sep()
-          + row('Gap Amount', '<span class="formula-var" data-source="pipb">P+I/TIPS</span> \xd7 <span class="formula-var" data-source="qty">Excess Quantity</span>', fm(d.excessAmt), true);
+          + row('P+I from excess TIPS', '<span class="formula-var" data-source="pipb">P+I/TIPS</span> \xd7 <span class="formula-var" data-source="qty">Excess Qty</span>', fm(d.excessQty * d.fundedYearPi), false, undefined, 'pix')
+          + (gapLMIAlloc > 0 ? row('Gap LMI credit', 'Bracket weight \xd7 LMI into gap years (actual funded year interest + inter-gap synthetic interest)', fm(gapLMIAlloc), false, undefined, 'glmi') : '')
+          + sep()
+          + row('Gap Amount', '<span class="formula-var" data-source="pix">P+I from excess</span>' + (gapLMIAlloc > 0 ? ' + <span class="formula-var" data-source="glmi">Gap LMI credit</span>' : ''), fm(d.excessAmt), true);
       } else {
         rows += row('Gap Cost', '<span class="formula-var" data-source="cpb">Cost per TIPS</span> \xd7 <span class="formula-var" data-source="qty">Excess Quantity</span>', fm(d.excessCost), true);
       }
