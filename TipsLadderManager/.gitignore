@@ -9,6 +9,8 @@ tests/**/*.csv
 !tests/e2e/TipsYields.csv
 !tests/CusipQtyTestLumpy.csv
 !tests/MarisTOD.csv
+!tests/dev/TipsLadderCom.csv
+!tests/dev/CusipQtyExcess.csv
 
 # Legacy data folder (ensure ignored if present)
 data/

@@ -613,7 +613,7 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
   const upperDuration = brackets.upperMaturity ? calculateMDuration(settlementDate, brackets.upperMaturity, upperBond?.coupon ?? 0, upperBond?.yield ?? 0) : 0;
   
   const minGapYear = gapYears.length > 0 ? Math.min(...gapYears) : Infinity;
-  const is3Bracket = (bracketMode === '3bracket');
+  let is3Bracket = (bracketMode === '3bracket');
   let newLowerYear = null, newLowerCUSIP = null, newLowerMaturity = null, newLowerDuration = 0;
   if (is3Bracket && gapYears.length > 0) {
     for (const [_cusip, _bond] of tipsMap.entries()) {
@@ -625,6 +625,12 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
     if (!newLowerCUSIP) throw new Error('3-bracket: no Jan TIPS for ' + (minGapYear - 1));
     const _nlBond = tipsMap.get(newLowerCUSIP);
     newLowerDuration = calculateMDuration(settlementDate, newLowerMaturity, _nlBond?.coupon ?? 0, _nlBond?.yield ?? 0);
+    // When orig lower and new lower resolve to the same year, 3-bracket is a no-op:
+    // the "new lower" bond is already the orig lower. Fall back to standard 2-bracket.
+    if (newLowerYear === brackets.lowerYear) {
+      is3Bracket = false;
+      newLowerYear = null; newLowerCUSIP = null; newLowerMaturity = null; newLowerDuration = 0;
+    }
   }
 
   const future30yCoverYearSet = future30yYears.length > 0 ? new Set([future30yLowerYear, future30yUpperYear]) : new Set();

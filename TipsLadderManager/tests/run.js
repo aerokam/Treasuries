@@ -6,6 +6,7 @@ import { readFileSync, readdirSync, existsSync } from 'fs';
 import path from 'path';
 import { buildTipsMapFromYields, localDate, runRebalance, inferDARAFromCash } from '../src/rebalance-lib.js';
 import { runBuild } from '../src/build-lib.js';
+import { parseBrokerCSV } from '../src/broker-import.js';
 
 // ── CSV helpers (match index.html exactly) ────────────────────────────────────
 function parseCsv(text) {
@@ -21,7 +22,7 @@ function parseCsv(text) {
 }
 
 // Multi-format holdings parser — mirrors index.html logic for Formats 3, 4, 5.
-// Formats 1/2 (broker CSV) are browser-only and not tested here.
+// Formats 1/2 (broker CSV) tested separately via parseBrokerCSV below.
 function parseHoldingsCSV(text, tipsMap) {
   const CUSIP_RE = /^[A-Z0-9]{9}$/i;
   const rawLines = text.trim().split('\n').filter(l => l.trim());
@@ -239,8 +240,10 @@ runFullRebalanceTest('CusipQtyTestLumpy', './tests/CusipQtyTestLumpy.csv');
     const { summary, details } = runRebalance({ dara, method: 'Gap', bracketMode: '3bracket', holdings, tipsMap, refCPI, settlementDate });
 
     assert('F4: origLower IS Jan 2036', summary.brackets.lowerCUSIP === '91282CPU9', true);
-    assert('F4: newLower IS Jan 2036',  summary.newLowerCUSIP === '91282CPU9', true);
-    assert('F4: origLowerWeight >= 0',  (summary.origLowerWeight ?? 0) >= 0, true);
+    // When orig lower == new lower (both Jan 2036), 3-bracket falls back to 2-bracket.
+    // newLowerCUSIP is null; the standard 2-bracket weights apply.
+    assert('F4: newLowerCUSIP null (fell back to 2-bracket)', summary.newLowerCUSIP, null);
+    assert('F4: origLowerWeight is null (2-bracket path)',    summary.origLowerWeight, null);
 
     const jan2036 = details.find(d => d.cusip === '91282CPU9' && d.isBracketTarget);
     assert('F4: CPU9 excessQtyBefore === 12', jan2036?.excessQtyBefore, 12);
@@ -299,7 +302,59 @@ runFullRebalanceTest('CusipQtyTestLumpy', './tests/CusipQtyTestLumpy.csv');
   }
 }
 
-// 3. All other local CSVs in tests/dev/
+// ── Test: Format 1 (Fidelity) — inline fixture ───────────────────────────────
+{
+  console.log('\nFormat 1 (Fidelity) — broker import parsing');
+  const csv1 = [
+    'Account Number,Account Name,Symbol,Description,Quantity,Last Price,Current Value,Type',
+    'X11111111,Kevin IRA,91282CPU9,TIPS 0.125% 01/15/2031,5000,$100.00,$500000,Cash',
+    'X11111111,Kevin IRA,912810QF8,TIPS 0.25% 02/15/2040,8000,$100.00,$800000,Cash',
+    'X11111111,Kevin IRA,FDLXX,FIDELITY MONEY MARKET,1234.56,$1.00,$1234.56,Cash',
+    'X22222222,Amy IRA,91282CPU9,TIPS 0.125% 01/15/2031,3000,$100.00,$300000,Cash',
+    'X22222222,Amy IRA,VTI,VANGUARD TOTAL STOCK,50,$200.00,$10000,Cash',
+  ].join('\n');
+  const accounts = parseBrokerCSV(csv1, tipsMap);
+
+  assert('F1: Kevin IRA has 2 TIPS', accounts['Kevin IRA']?.length, 2);
+  const cpu9 = accounts['Kevin IRA']?.find(h => h.cusip === '91282CPU9');
+  assert('F1: CPU9 qty === 5', cpu9?.qty, 5);
+  const qf8 = accounts['Kevin IRA']?.find(h => h.cusip === '912810QF8');
+  assert('F1: QF8 qty === 8', qf8?.qty, 8);
+  assert('F1: FDLXX filtered out', accounts['Kevin IRA']?.find(h => h.cusip === 'FDLXX'), undefined);
+  assert('F1: Amy IRA CPU9 qty === 3', accounts['Amy IRA']?.find(h => h.cusip === '91282CPU9')?.qty, 3);
+  assert('F1: VTI filtered out', accounts['Amy IRA']?.find(h => h.cusip === 'VTI'), undefined);
+  console.log(`        accounts: ${Object.keys(accounts).join(', ')}`);
+}
+
+// ── Test: Format 2 (Schwab) — inline fixture ─────────────────────────────────
+{
+  console.log('\nFormat 2 (Schwab) — broker import parsing');
+  const csv2 = [
+    '"Positions for All-Accounts as of 10:00 AM ET, 04/26/2026"',
+    '',
+    '"Kevin IRA ...1234"',
+    '"Symbol","Description","Qty (Quantity)","Price","Mkt Val (Market Value)","Asset Type"',
+    '"91282CPU9","TIPS 0.125% 01/15/2031","5,000","100.00","$500,000.00","Fixed Income"',
+    '"912810QF8","TIPS 0.25% 02/15/2040","8,000","100.00","$800,000.00","Fixed Income"',
+    '"SCHZ","SCHWAB AGG BOND ETF","100","50.00","$5,000.00","ETFs"',
+    '"Account Total","","","","$1,305,000.00",""',
+    '',
+    '"Amy IRA ...5678"',
+    '"Symbol","Description","Qty (Quantity)","Price","Mkt Val (Market Value)","Asset Type"',
+    '"91282CPU9","TIPS 0.125% 01/15/2031","3,000","100.00","$300,000.00","Fixed Income"',
+    '"Account Total","","","","$300,000.00",""',
+  ].join('\n');
+  const accounts = parseBrokerCSV(csv2, tipsMap);
+
+  assert('F2: Kevin IRA has 2 TIPS', accounts['Kevin IRA']?.length, 2);
+  const cpu9 = accounts['Kevin IRA']?.find(h => h.cusip === '91282CPU9');
+  assert('F2: CPU9 qty === 5 (comma-qty parsed)', cpu9?.qty, 5);
+  const qf8 = accounts['Kevin IRA']?.find(h => h.cusip === '912810QF8');
+  assert('F2: QF8 qty === 8', qf8?.qty, 8);
+  assert('F2: SCHZ filtered out', accounts['Kevin IRA']?.find(h => h.cusip === 'SCHZ'), undefined);
+  assert('F2: Amy IRA CPU9 qty === 3', accounts['Amy IRA']?.find(h => h.cusip === '91282CPU9')?.qty, 3);
+  console.log(`        accounts: ${Object.keys(accounts).join(', ')}`);
+}
 
 // ── Test: Build from scratch — deterministic output ───────────────────────────
 console.log('\nBuild — DARA=50000, lastYear=2040');
