@@ -284,9 +284,9 @@ console.log('\nBuild→Rebalance symmetry — firstYear=2036, lastYear=2065, PLI
     preLadderInterest: true,
   });
 
-  // 2. Construct holdings (mirrors "Export CUSIP/Qty" button: fundedYearQty + excessQty)
+  // 2. Construct holdings — mirrors the 3-column "Export CUSIP/Qty" CSV (Format 5)
   const holdings = buildDetails
-    .map(d => ({ cusip: d.cusip, qty: d.fundedYearQty + d.excessQty }))
+    .map(d => ({ cusip: d.cusip, qty: d.fundedYearQty + d.excessQty, excessQty: d.excessQty }))
     .filter(h => h.qty > 0);
 
   // 3. Rebalance with identical params
@@ -333,9 +333,9 @@ console.log('\nBuild→Rebalance symmetry — firstYear=2036, lastYear=2065, PLI
     preLadderInterest: true,
   });
 
-  // 2. Holdings from build export
+  // 2. Holdings from build export — mirrors the 3-column "Export CUSIP/Qty" CSV (Format 5)
   const holdingsFull = buildDetailsFull
-    .map(d => ({ cusip: d.cusip, qty: d.fundedYearQty + d.excessQty }))
+    .map(d => ({ cusip: d.cusip, qty: d.fundedYearQty + d.excessQty, excessQty: d.excessQty }))
     .filter(h => h.qty > 0);
 
   // 3. Rebalance with Full method
@@ -394,10 +394,9 @@ console.log('\nBuild→Rebalance DARA inference — firstYear=2035→2036, lastY
     preLadderInterest: true,
   });
 
-  // 2. Export CUSIP/qty — mirror "Export CUSIP/Qty" button behaviour:
-  //    include all rows (fundedYearQty + excessQty), including PLI-zeroed rows (qty=0).
+  // 2. Export CUSIP/qty — mirrors the 3-column "Export CUSIP/Qty" CSV (Format 5).
   const inferHoldings = inferBuildDetails
-    .map(d => ({ cusip: d.cusip, qty: d.fundedYearQty + d.excessQty }));
+    .map(d => ({ cusip: d.cusip, qty: d.fundedYearQty + d.excessQty, excessQty: d.excessQty }));
 
   // 3. Rebalance with no explicit DARA — shift to firstYear=2036, lastYear=2065
   const { summary: inferRebalSummary } = runRebalance({

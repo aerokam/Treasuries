@@ -341,10 +341,11 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
     const bond = tipsMap.get(h.cusip);
     if (!bond) continue;
     holdings.push({
-      cusip:    h.cusip,
-      qty:      h.qty,
-      maturity: bond.maturity,
-      year:     bond.maturity.getFullYear(),
+      cusip:     h.cusip,
+      qty:       h.qty,
+      excessQty: h.excessQty,
+      maturity:  bond.maturity,
+      year:      bond.maturity.getFullYear(),
     });
   }
   holdings.sort((a, b) => a.maturity - b.maturity);
@@ -649,6 +650,14 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
     for (const h of yh) { if (h.cusip !== bCUSIP) nonPI += h.qty * calculatePIPerBond(h.cusip, h.maturity, refCPI, tipsMap); }
     const bDara = bYear > lastYear ? 0 : (daraByYear?.get(bYear) ?? DARA);
     bracketTargetFundedYearQtyBefore[bYear] = Math.max(0, Math.round((bDara - laterMatIntBefore - nonPI) / piB));
+  }
+
+  // When excessQty is provided by the import (Formats 4 or 5), it encodes the funded/excess split
+  // from the prior build/rebalance. Use it for ALL bracket years, overriding the DARA-derived estimate.
+  for (const h of holdings) {
+    if (h.excessQty != null && bracketYearSet.has(h.year)) {
+      bracketTargetFundedYearQtyBefore[h.year] = h.qty - h.excessQty;
+    }
   }
 
   // PLI-zeroed bracket years: funded qty need is 0, so all current holdings are excess
@@ -1033,11 +1042,13 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
 
     const isBT = !!(bst_loop?.isBracket && h.cusip === bst_loop.targetCUSIP);
     const cpbHere = (b.price ?? 0) / 100 * ir * 1000;
-    // exB: prior excess at this bracket year. Use cost-based formula for future30y cover years
-    // (which had excess allocated in the prior build) and for pure bracket years above lastYear.
-    // Gap bracket years ≤ lastYear were plain funded-year rungs before the rebalance — no prior excess.
-    const exB = isBT && cpbHere > 0 && (h.year > lastYear || future30yCoverYearSet.has(h.year))
-      ? Math.round((bracketExcessTargetCost[h.year] || 0) / cpbHere)
+    // exB: prior excess at this bracket year.
+    // - future30y cover and years > lastYear: cost-based formula (no import data for these).
+    // - standard gap brackets ≤ lastYear: use h.excessQty from the import (Format 4/5); 0 if absent.
+    const exB = isBT && cpbHere > 0
+      ? (h.year > lastYear || future30yCoverYearSet.has(h.year))
+        ? Math.round((bracketExcessTargetCost[h.year] || 0) / cpbHere)
+        : (h.excessQty ?? 0)
       : 0;
     const exA = isBT ? tQ - tFundedYearQty : 0;
     

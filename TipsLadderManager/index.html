@@ -571,16 +571,18 @@ document.getElementById('export-csv-btn').addEventListener('click', () => {
 document.getElementById('export-cusip-qty-btn').addEventListener('click', () => {
   const details = currentMode === 'build' ? buildDetails : rebalDetails;
   if (!details) return;
-  const rows = ['cusip,qty'];
+  const rows = ['cusip,qty,excess'];
   const zeroedSet = currentMode === 'build'
     ? new Set(buildSummary?.zeroedFundedYears ?? [])
     : new Set();
   for (const d of details) {
-    const totalQty = currentMode === 'build' ? (d.fundedYearQty + d.excessQty) : d.qtyAfter;
+    const fundedQty = currentMode === 'build' ? d.fundedYearQty : (d.fundedYearQtyAfter ?? d.qtyAfter);
+    const excessQty = currentMode === 'build' ? d.excessQty : (d.excessQtyAfter ?? 0);
+    const totalQty = fundedQty + excessQty;
     if (totalQty > 0) {
-      rows.push(d.cusip + ',' + totalQty);
+      rows.push(`${d.cusip},${fundedQty},${excessQty}`);
     } else if (currentMode === 'build' && zeroedSet.has(d.fundedYear)) {
-      rows.push(d.cusip + ',0');
+      rows.push(`${d.cusip},0,0`);
     }
   }
   const filename = `cusip-qty-${new Date().toISOString().split('T')[0]}.csv`;
@@ -832,18 +834,63 @@ document.getElementById('holdings-file').addEventListener('change', async (e) =>
     const parsedAccounts = parseBrokerCSV(text, tipsMap);
     const acctNames = Object.keys(parsedAccounts);
     if (acctNames.length === 0) {
-      // Try simple CUSIP,QTY format
       const CUSIP_RE = /^[A-Z0-9]{9}$/i;
-      const startIdx = CUSIP_RE.test(rawLines[0].split(',')[0].trim()) ? 0 : 1;
+      const firstLineLower = rawLines[0].replace(/\s/g, '').toLowerCase();
       const arr = [];
-      for (let i = startIdx; i < rawLines.length; i++) {
-        const parts   = rawLines[i].split(',').map(s => s.trim());
-        if (parts.length < 2) continue;
-        const [cusip, qtyStr] = parts;
-        if (!CUSIP_RE.test(cusip)) continue;
-        const qty = parseInt(qtyStr, 10);
-        if (!isNaN(qty) && qty >= 0) arr.push({ cusip, qty });
+
+      if (firstLineLower === 'cusip,qty,excess') {
+        // Format 5: Build Export — header row; qty=fundedYearQty, excess=excessQty
+        for (let i = 1; i < rawLines.length; i++) {
+          const parts = rawLines[i].split(',').map(s => s.trim());
+          if (parts.length < 2) continue;
+          const [cusip, qtyStr] = parts;
+          if (!CUSIP_RE.test(cusip)) continue;
+          const fundedQty = parseInt(qtyStr, 10);
+          if (isNaN(fundedQty) || fundedQty < 0) continue;
+          const excessQty = parts.length >= 3 ? (parseInt(parts[2], 10) || 0) : 0;
+          arr.push({ cusip, qty: fundedQty + excessQty, excessQty });
+        }
+      } else {
+        // Detect Format 3 vs 4 by first data row
+        const startIdx = CUSIP_RE.test(rawLines[0].split(',')[0].trim()) ? 0 : 1;
+        const sampleParts = (rawLines[startIdx] ?? '').split(',').map(s => s.trim());
+        const isFormat4 = sampleParts.length >= 3 && parseInt(sampleParts[2], 10) >= 2000;
+
+        if (isFormat4) {
+          // Format 4: TipsLadderCom — no header; bracket CUSIPs appear once per funded year covered
+          const cusipMap = new Map(); // cusip → { fundedQty, excessQty }
+          for (const line of rawLines) {
+            const parts = line.split(',').map(s => s.trim());
+            if (parts.length < 3) continue;
+            const [cusip, qtyStr, yearStr] = parts;
+            if (!CUSIP_RE.test(cusip)) continue;
+            const bond = tipsMap.get(cusip);
+            if (!bond?.maturity) continue;
+            const qty = parseInt(qtyStr, 10);
+            const year = parseInt(yearStr, 10);
+            if (isNaN(qty) || qty < 0 || isNaN(year)) continue;
+            if (!cusipMap.has(cusip)) cusipMap.set(cusip, { fundedQty: 0, excessQty: 0 });
+            const entry = cusipMap.get(cusip);
+            if (year === bond.maturity.getFullYear()) entry.fundedQty += qty;
+            else entry.excessQty += qty;
+          }
+          for (const [cusip, { fundedQty, excessQty }] of cusipMap) {
+            const total = fundedQty + excessQty;
+            if (total > 0) arr.push({ cusip, qty: total, excessQty });
+          }
+        } else {
+          // Format 3: simple cusip,qty
+          for (let i = startIdx; i < rawLines.length; i++) {
+            const parts = rawLines[i].split(',').map(s => s.trim());
+            if (parts.length < 2) continue;
+            const [cusip, qtyStr] = parts;
+            if (!CUSIP_RE.test(cusip)) continue;
+            const qty = parseInt(qtyStr, 10);
+            if (!isNaN(qty) && qty >= 0) arr.push({ cusip, qty });
+          }
+        }
       }
+
       if (arr.length === 0) { setStatus('Holdings CSV has no valid data rows.', true); return; }
       currentHoldingsArray = arr;
     } else if (acctNames.length === 1) {
