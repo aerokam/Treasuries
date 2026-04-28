@@ -36,7 +36,8 @@
   .field input, .field select { padding: 7px 10px; background: var(--portal-header-bg); border: 1px solid var(--portal-header-bg); border-radius: 4px; font-size: 13px; color: var(--portal-text-on-dark); width: 100%; }
   .field input::placeholder { color: rgba(255,255,255,0.4); }
   .field input:focus, .field select:focus { outline: none; border-color: var(--tab-active-bg); box-shadow: 0 0 0 2px rgba(91,164,164,0.4); }
-  .field input[type="file"] { padding: 4px; font-size: 11px; }
+  .field input[type="file"] { display: none; }
+  #holdings-file-btn { padding: 5px 10px; font-size: 12px; max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
 
   /* ── Status ── */
   #run-btn { padding: 5px 18px; }
@@ -211,6 +212,7 @@
       <div class="field" id="field-holdings" style="width:180px">
         <label>Holdings CSV</label>
         <input type="file" id="holdings-file" accept=".csv">
+        <button type="button" id="holdings-file-btn">Choose File</button>
       </div>
       <div class="field" id="field-dara">
         <label>DARA ($)</label>
@@ -835,8 +837,13 @@ function updateRebalLastYearDropdown() {
 // ─── File Parsing & State ─────────────────────────────────────────────────────
 let currentHoldingsArray = null;
 
+document.getElementById('holdings-file-btn').addEventListener('click', () => {
+  document.getElementById('holdings-file').click();
+});
+
 document.getElementById('holdings-file').addEventListener('change', async (e) => {
   const file = e.target.files[0];
+  document.getElementById('holdings-file-btn').textContent = file ? file.name : 'Choose File';
   currentHoldingsArray = null;
   setStatus('');
   _clearAutoDara();
@@ -957,6 +964,7 @@ document.getElementById('holdings-file').addEventListener('change', async (e) =>
     setStatus('Account selection cancelled.', true);
     currentHoldingsArray = null;
     document.getElementById('holdings-file').value = '';
+    document.getElementById('holdings-file-btn').textContent = 'Choose File';
   });
 
 // ─── Draggable drill modal ───────────────────────────────────────────────────
