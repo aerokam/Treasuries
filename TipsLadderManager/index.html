@@ -37,7 +37,9 @@
   .field input::placeholder { color: rgba(255,255,255,0.4); }
   .field input:focus, .field select:focus { outline: none; border-color: var(--tab-active-bg); box-shadow: 0 0 0 2px rgba(91,164,164,0.4); }
   .field input[type="file"] { display: none; }
-  #holdings-file-btn { padding: 5px 10px; font-size: 12px; max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
+  #holdings-file-btn { padding: 5px 10px; font-size: 12px; flex-shrink: 0; }
+  #holdings-file-row { display: flex; align-items: center; gap: 6px; overflow: hidden; }
+  #holdings-file-name { font-size: 11px; color: rgba(255,255,255,0.55); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 
   /* ── Status ── */
   #run-btn { padding: 5px 18px; }
@@ -212,7 +214,10 @@
       <div class="field" id="field-holdings" style="width:180px">
         <label>Holdings CSV</label>
         <input type="file" id="holdings-file" accept=".csv">
-        <button type="button" id="holdings-file-btn">Choose File</button>
+        <div id="holdings-file-row">
+          <button type="button" id="holdings-file-btn">Browse</button>
+          <span id="holdings-file-name">No file chosen</span>
+        </div>
       </div>
       <div class="field" id="field-dara">
         <label>DARA ($)</label>
@@ -843,7 +848,7 @@ document.getElementById('holdings-file-btn').addEventListener('click', () => {
 
 document.getElementById('holdings-file').addEventListener('change', async (e) => {
   const file = e.target.files[0];
-  document.getElementById('holdings-file-btn').textContent = file ? file.name : 'Choose File';
+  document.getElementById('holdings-file-name').textContent = file ? file.name : 'No file chosen';
   currentHoldingsArray = null;
   setStatus('');
   _clearAutoDara();
@@ -964,7 +969,7 @@ document.getElementById('holdings-file').addEventListener('change', async (e) =>
     setStatus('Account selection cancelled.', true);
     currentHoldingsArray = null;
     document.getElementById('holdings-file').value = '';
-    document.getElementById('holdings-file-btn').textContent = 'Choose File';
+    document.getElementById('holdings-file-name').textContent = 'No file chosen';
   });
 
 // ─── Draggable drill modal ───────────────────────────────────────────────────
