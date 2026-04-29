@@ -752,26 +752,35 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
   const gapYearSet    = new Set(gapYears);
   const future30yYearSet = new Set(future30yYears);
 
-  // LMI-based FY estimate for the 3-bracket original lower only.
-  // Used exclusively to compute originalLowerExcessCost → w1 below. Not used for Phase 4 display.
+  // LMI-based FY estimate for ALL standard gap bracket years.
+  // Used for: (a) 3-bracket w1 weight via originalLowerExcessCost; (b) exB fallback for broker CSVs.
+  // Future30y cover years skipped — they have no funded-year component.
   const bracketTargetFundedYearQtyBefore = {};
-  if (is3Bracket && gapYears.length > 0) {
-    const bYear = brackets.lowerYear, bCUSIP = brackets.lowerCUSIP, bMat = brackets.lowerMaturity;
-    if (!yearInfo[bYear]) yearInfo[bYear] = { holdings: [] };
-    let laterMatIntBefore = 0;
-    for (const y in araLaterMaturityInterestByYear) {
-      if (parseInt(y) > bYear) laterMatIntBefore += araLaterMaturityInterestByYear[y];
+  if (gapYears.length > 0) {
+    for (const bYear of bracketYearSet) {
+      if (future30yCoverYearSet.has(bYear)) continue;
+      let bCUSIP = null, bMat = null;
+      if (bYear === brackets.lowerYear) { bCUSIP = brackets.lowerCUSIP; bMat = brackets.lowerMaturity; }
+      else if (bYear === brackets.upperYear) { bCUSIP = brackets.upperCUSIP; bMat = brackets.upperMaturity; }
+      else if (is3Bracket && bYear === newLowerYear) { bCUSIP = newLowerCUSIP; bMat = newLowerMaturity; }
+      if (!bCUSIP) continue;
+      if (!yearInfo[bYear]) yearInfo[bYear] = { holdings: [] };
+      const yh = yearInfo[bYear].holdings;
+      let laterMatIntBefore = 0;
+      for (const y in araLaterMaturityInterestByYear) {
+        if (parseInt(y) > bYear) laterMatIntBefore += araLaterMaturityInterestByYear[y];
+      }
+      const piB = calculatePIPerBond(bCUSIP, bMat, refCPI, tipsMap);
+      let nonPI = 0;
+      for (const h of yh) { if (h.cusip !== bCUSIP) nonPI += h.qty * calculatePIPerBond(h.cusip, h.maturity, refCPI, tipsMap); }
+      const bDara = bYear > lastYear ? 0 : (daraByYear?.get(bYear) ?? DARA);
+      bracketTargetFundedYearQtyBefore[bYear] = piB > 0 ? Math.max(0, Math.round((bDara - laterMatIntBefore - nonPI) / piB)) : 0;
     }
-    const yh = yearInfo[bYear].holdings;
-    const piB = calculatePIPerBond(bCUSIP, bMat, refCPI, tipsMap);
-    let nonPI = 0;
-    for (const h of yh) { if (h.cusip !== bCUSIP) nonPI += h.qty * calculatePIPerBond(h.cusip, h.maturity, refCPI, tipsMap); }
-    const bDara = bYear > lastYear ? 0 : (daraByYear?.get(bYear) ?? DARA);
-    bracketTargetFundedYearQtyBefore[bYear] = Math.max(0, Math.round((bDara - laterMatIntBefore - nonPI) / piB));
   }
 
   // When excessQty is provided by the import (Formats 4 or 5), it encodes the funded/excess split
   // from the prior build/rebalance. Use it for ALL bracket years, overriding the DARA-derived estimate.
+  // Broker CSVs (Formats 1–3) have no excessQty: the LMI estimate above is used as the fallback.
   for (const h of holdings) {
     if (h.excessQty != null && bracketYearSet.has(h.year)) {
       bracketTargetFundedYearQtyBefore[h.year] = h.qty - h.excessQty;
@@ -1163,12 +1172,19 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
     const isBT = !!(bst_loop?.isBracket && h.cusip === bst_loop.targetCUSIP);
     const cpbHere = (b.price ?? 0) / 100 * ir * 1000;
     // exB: prior excess at this bracket year.
-    // - future30y cover and years > lastYear: cost-based formula (no import data for these).
-    // - standard gap brackets ≤ lastYear: use h.excessQty from the import (Format 4/5); 0 if absent.
+    // - future30y cover years: cost-based formula (pure excess, no funded component).
+    // - Format 4/5 (h.excessQty present): use explicit CSV value directly.
+    // - 3-bracket orig lower (no h.excessQty): bracketTargetFundedYearQtyBefore → preserves freeze (exB = exA).
+    // - all other bracket years (no h.excessQty): funded-after rule — exB = h.qty - tFundedYearQty,
+    //   so fyQtyBefore equals the after target and no funded-year buy+sell appears.
     const exB = isBT && cpbHere > 0
-      ? (h.year > lastYear || future30yCoverYearSet.has(h.year))
+      ? future30yCoverYearSet.has(h.year)
         ? Math.round((bracketExcessTargetCost[h.year] || 0) / cpbHere)
-        : (h.excessQty ?? 0)
+        : h.excessQty != null
+          ? h.excessQty
+          : (is3Bracket && h.year === brackets?.lowerYear)
+            ? Math.max(0, h.qty - (bracketTargetFundedYearQtyBefore[h.year] ?? 0))
+            : Math.max(0, h.qty - (bst_loop?.targetFundedYearQty ?? h.qty))
       : 0;
     const exA = isBT ? tQ - tFundedYearQty : 0;
     

@@ -150,6 +150,22 @@ function assert(name, actual, expected, tolerance = 0) {
   }
 }
 
+// ── Helper: assert no simultaneous buy+sell on the same TIPS at any bracket year ─
+function assertNoBuySell(details, label) {
+  const violations = details.filter(d => {
+    if (!d.isBracketTarget) return false;
+    const fDelta = (d.fundedYearQtyAfter ?? 0) - (d.fundedYearQtyBefore ?? 0);
+    const eDelta = (d.excessQtyAfter ?? 0) - (d.excessQtyBefore ?? 0);
+    return (fDelta > 0 && eDelta < 0) || (fDelta < 0 && eDelta > 0);
+  });
+  assert(`${label}: no simultaneous buy+sell at any bracket year`, violations.length, 0);
+  for (const v of violations) {
+    const fD = (v.fundedYearQtyAfter ?? 0) - (v.fundedYearQtyBefore ?? 0);
+    const eD = (v.excessQtyAfter ?? 0) - (v.excessQtyBefore ?? 0);
+    console.error(`        violation FY ${v.fundedYear}: fundedDelta=${fD} excessDelta=${eD}`);
+  }
+}
+
 // ── Helper: Run Full Rebalance on a holdings file ─────────────────────────────
 function runFullRebalanceTest(name, filePath) {
   const fullPath = path.resolve(filePath);
@@ -157,16 +173,16 @@ function runFullRebalanceTest(name, filePath) {
 
   console.log(`\n${name} — Full rebalance`);
   console.log(`  Input: ${fullPath}`);
-  
+
   const holdings = parseHoldings(readFileSync(fullPath, 'utf8'));
   const { dara, portfolioCash } = inferDARAFromCash({ holdings, tipsMap, refCPI, settlementDate });
-  const { summary } = runRebalance({ dara, method: 'Full', holdings, tipsMap, refCPI, settlementDate });
-  
+  const { summary, details } = runRebalance({ dara, method: 'Full', holdings, tipsMap, refCPI, settlementDate });
+
   // Net cash should be effectively non-negative (surplus) and < cost of ~two bonds (~$3000).
   // (Allowing > -50 to account for binary search tolerance in inferDARA)
   const netCash = summary.costDeltaSum;
   const ok = netCash > -50 && netCash < 3000;
-  
+
   if (ok) {
     console.log(`  PASS  net cash within (-50, 3000)`);
     passed++;
@@ -175,6 +191,7 @@ function runFullRebalanceTest(name, filePath) {
     console.error(`        actual:   ${netCash}`);
     failed++;
   }
+  assertNoBuySell(details, name);
   console.log(`        inferred DARA: ${Math.round(dara).toLocaleString()}`);
   console.log(`        net cash:      ${Math.round(netCash).toLocaleString()}`);
   console.log(`        surplus check: ${Math.round(summary.gapCoverageSurplus).toLocaleString()}`);
@@ -235,7 +252,7 @@ runFullRebalanceTest('CusipQtyTestLumpy', './tests/CusipQtyTestLumpy.csv');
     const cfr7 = holdings.find(h => h.cusip === '91282CFR7');
     assert('F4: CFR7 excessQty === 0',    cfr7?.excessQty ?? 0, 0);
 
-    // Run rebalance — excessQtyBefore should reflect imported excess for bracket CUSIPs
+    // Run rebalance — excessQtyBefore uses funded-first rule (LMI formula), not h.excessQty
     const dara = 20000;
     const { summary, details } = runRebalance({ dara, method: 'Gap', bracketMode: '3bracket', holdings, tipsMap, refCPI, settlementDate });
 
@@ -246,6 +263,7 @@ runFullRebalanceTest('CusipQtyTestLumpy', './tests/CusipQtyTestLumpy.csv');
     assert('F4: origLowerWeight is null (2-bracket path)',    summary.origLowerWeight, null);
 
     const jan2036 = details.find(d => d.cusip === '91282CPU9' && d.isBracketTarget);
+    // Format 4 has explicit excessQty=12 — the import value is used for the funded/excess split.
     assert('F4: CPU9 excessQtyBefore === 12', jan2036?.excessQtyBefore, 12);
     assert('F4: CPU9 fundedYearQtyBefore === 8', jan2036?.fundedYearQtyBefore, 8);
     console.log(`        CPU9 before:   funded=${jan2036?.fundedYearQtyBefore} excess=${jan2036?.excessQtyBefore}`);
@@ -294,7 +312,7 @@ runFullRebalanceTest('CusipQtyTestLumpy', './tests/CusipQtyTestLumpy.csv');
     const { summary, details } = runRebalance({ dara, method: 'Gap', holdings, tipsMap, refCPI, settlementDate });
     const bracketTargets = details.filter(d => d.isBracketTarget);
     const hasImportedExcess = bracketTargets.some(d => d.excessQtyBefore > 0);
-    assert('F5 file: bracket excessQtyBefore > 0 (from import)', hasImportedExcess, true);
+    assert('F5 file: bracket excessQtyBefore > 0 (from import or LMI fallback)', hasImportedExcess, true);
     console.log(`        bracket rows:  ${bracketTargets.length}`);
     for (const d of bracketTargets) {
       console.log(`        FY ${d.fundedYear}  exBefore=${d.excessQtyBefore}  exAfter=${d.excessQtyAfter}`);
