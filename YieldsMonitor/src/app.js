@@ -1,5 +1,6 @@
 // Treasury Yields Monitor - app.js
 import { handleChartKeydown, setupAxisWheelZoom, snapYBounds, snapYAfterZoom, applyLockRight } from '../../shared/src/chart-keys.js';
+import { applyXTimeUnit } from '../../shared/src/chart-time-axis.js';
 
 const AVAILABLE_SYMBOLS = {
   // TIPS
@@ -110,6 +111,7 @@ function syncAllChartsX(sourceChart) {
     if (chart === sourceChart) return;
     chart.options.scales.x.min = xMin;
     chart.options.scales.x.max = xMax;
+    if (activeRange !== '2D' && activeRange !== '10D') applyXTimeUnit(chart);
     if (!yOverrideSyms.has(sym)) rescaleYToVisible(chart, sym);
     else chart.update('none');
   });
@@ -223,14 +225,15 @@ function createChartInstance(sym) {
     options: {
       animation: false, responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
       scales: {
-        x: { type: 'time', time: { tooltipFormat: 'MM/dd/yy HH:mm:ss', displayFormats: { hour: 'MM/dd HH:mm', day: 'MMM dd', month: 'MMM yyyy', year: 'yyyy' } }, grid: { color: '#f1f5f9' }, ticks: { autoSkip: true, font: { size: 9, weight: 'bold' }, color: '#000', callback(value) { const d = new Date(value); if (activeRange === '2D') { const p = ET_HM_FMT.formatToParts(d).reduce((a, pt) => ({...a, [pt.type]: pt.value}), {}); return `${p.month}/${p.day} ${p.hour}:${p.minute}`; } if (activeRange === '10D') return ET_TICK_DAY_FMT.format(d); return ET_TICK_MON_FMT.format(d); } } },
+        x: { type: 'time', time: { tooltipFormat: 'MM/dd/yy HH:mm:ss', displayFormats: { hour: 'MM/dd HH:mm', day: 'MMM dd', month: 'MMM yyyy', year: 'yyyy' } }, grid: { color: '#f1f5f9' }, ticks: { autoSkip: true, font: { size: 9, weight: 'bold' }, color: '#000', callback(value, index, ticks) { const d = new Date(value); if (activeRange === '2D') { const p = ET_HM_FMT.formatToParts(d).reduce((a, pt) => ({...a, [pt.type]: pt.value}), {}); return `${p.month}/${p.day} ${p.hour}:${p.minute}`; } if (activeRange === '10D') return ET_TICK_DAY_FMT.format(d); if ((this.max - this.min) < 90 * 86400000) { const label = ET_TICK_DAY_FMT.format(d); if (index > 0 && ET_TICK_DAY_FMT.format(new Date(ticks[index - 1].value)) === label) return ''; return label; } const label = ET_TICK_MON_FMT.format(d); if (index > 0 && ET_TICK_MON_FMT.format(new Date(ticks[index - 1].value)) === label) return ''; return label; } } },
         y: { grid: { color: '#f1f5f9' }, ticks: { font: { size: 9, family: 'monospace', weight: 'bold' }, color: '#000', callback: v => v.toFixed(3) + '%' } }
       },
-      plugins: { legend: { display: false }, zoom: { zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'xy', onZoom: ({chart}) => { if (lockRight) applyLockRight(chart, xMaxAnchors[sym]); if (syncXAxis) syncAllChartsX(chart); }, onZoomComplete: ({chart}) => { if (lockRight) applyLockRight(chart, xMaxAnchors[sym]); rescaleYToVisible(chart, sym); if (syncXAxis) syncAllChartsX(chart); } }, pan: { enabled: true, mode: 'xy', onPanStart: ({chart}) => { Object.entries(charts).forEach(([s, c]) => { panStartY[s] = { min: c.scales.y.min, max: c.scales.y.max }; }); }, onPan: ({chart}) => { if (syncXAxis) syncAllCharts(chart); }, onPanComplete: ({chart}) => { if (syncXAxis) syncAllCharts(chart); Object.keys(panStartY).forEach(k => delete panStartY[k]); } } }, annotation: { annotations: {} }, tooltip: { backgroundColor: 'rgba(255, 255, 255, 0.95)', titleColor: '#64748b', titleFont: { size: 11, weight: 'bold' }, bodyColor: '#000', borderColor: '#cbd5e1', borderWidth: 1, padding: 8, bodyFont: { size: 12, weight: 'bold' }, cornerRadius: 6, displayColors: false, callbacks: { title: (items) => { if (!items.length) return ''; const date = new Date(items[0].parsed.x); return date.toLocaleString('en-US', { timeZone: 'America/New_York', hourCycle: 'h23', month: '2-digit', day: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' ET'; }, label: ctx => `Yield: ${ctx.parsed.y.toFixed(3)}%` } } }
+      plugins: { legend: { display: false }, zoom: { zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'xy', onZoom: ({chart}) => { if (lockRight) applyLockRight(chart, xMaxAnchors[sym]); if (syncXAxis) syncAllChartsX(chart); }, onZoomComplete: ({chart}) => { if (lockRight) applyLockRight(chart, xMaxAnchors[sym]); if (activeRange !== '2D' && activeRange !== '10D') applyXTimeUnit(chart); rescaleYToVisible(chart, sym); if (syncXAxis) syncAllChartsX(chart); } }, pan: { enabled: true, mode: 'xy', onPanStart: ({chart}) => { Object.entries(charts).forEach(([s, c]) => { panStartY[s] = { min: c.scales.y.min, max: c.scales.y.max }; }); }, onPan: ({chart}) => { if (syncXAxis) syncAllCharts(chart); }, onPanComplete: ({chart}) => { if (activeRange !== '2D' && activeRange !== '10D') applyXTimeUnit(chart); rescaleYToVisible(chart, sym); if (syncXAxis) syncAllCharts(chart); Object.keys(panStartY).forEach(k => delete panStartY[k]); } } }, annotation: { annotations: {} }, tooltip: { backgroundColor: 'rgba(255, 255, 255, 0.95)', titleColor: '#64748b', titleFont: { size: 11, weight: 'bold' }, bodyColor: '#000', borderColor: '#cbd5e1', borderWidth: 1, padding: 8, bodyFont: { size: 12, weight: 'bold' }, cornerRadius: 6, displayColors: false, callbacks: { title: (items) => { if (!items.length) return ''; const date = new Date(items[0].parsed.x); return date.toLocaleString('en-US', { timeZone: 'America/New_York', hourCycle: 'h23', month: '2-digit', day: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' ET'; }, label: ctx => `Yield: ${ctx.parsed.y.toFixed(3)}%` } } }
     }
   });
   setupAxisWheelZoom(ctx.canvas, ({chart}) => {
     if (lockRight) applyLockRight(chart, xMaxAnchors[sym]);
+    if (activeRange !== '2D' && activeRange !== '10D') applyXTimeUnit(chart);
     rescaleYToVisible(chart, sym);
     if (syncXAxis) syncAllChartsX(chart);
   }, ({chart, factor}) => { snapYAfterZoom(chart, factor); yOverrideSyms.add(sym); if (syncXAxis) syncAllChartsYZoom(chart, factor); });
@@ -350,6 +353,7 @@ function applyDefaultBounds(sym, chart, data) {
     chart.options.scales.x.min = null;
   }
   chart.options.scales.x.max = xMaxAnchors[sym] ?? snapXMax(data[data.length-1].x).getTime();
+  if (activeRange !== '2D' && activeRange !== '10D') applyXTimeUnit(chart);
   chart.update('none');
   rescaleYToVisible(chart, sym);
 }
