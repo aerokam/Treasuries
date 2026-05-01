@@ -39,7 +39,6 @@ YieldCurves/scripts/testLogin.js
 YieldCurves/scripts/testCdpLogin.js
 scripts/*.cmd
 scripts/*.ps1
-YieldCurves/scripts/*.cmd
-YieldCurves/scripts/*.ps1
+
 Dashboard/*.cmd
 
