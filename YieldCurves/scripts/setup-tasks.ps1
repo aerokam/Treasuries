@@ -101,37 +101,24 @@ Register-ScheduledTask `
   -Settings    (New-ScheduledTaskSettingsSet -ExecutionTimeLimit $execLimit72h -MultipleInstances IgnoreNew) `
   -Principal   $principal -Force
 
-# ── UPDATE CPI RELEASE SCHEDULE (Mondays noon PT — elevated, wakes from sleep) ─
-# Registered with Password logon so it can run when the user is not logged in.
+# ── UPDATE CPI RELEASE SCHEDULE (Mondays noon PT — elevated) ─────────────────
 
-Write-Host ""
-Write-Host "The 'Update CPI release schedule' task requires RunLevel Highest + Password logon."
-$secPwd   = Read-Host -AsSecureString "Enter your Windows password for this task (press Enter to skip)"
-$bstr     = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($secPwd)
-$plainPwd = [System.Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)
-[System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
+$principalElev = New-ScheduledTaskPrincipal `
+  -UserId    $user `
+  -LogonType Interactive `
+  -RunLevel  Highest
 
-if ($plainPwd.Length -gt 0) {
-  $principalElev = New-ScheduledTaskPrincipal `
-    -UserId    $user `
-    -LogonType Password `
-    -RunLevel  Highest
-
-  Register-ScheduledTask `
-    -TaskName    "Update CPI release schedule" `
-    -Description "Fetch BLS CPI release schedule via bash script (Mondays noon PT)" `
-    -Action      (New-ScheduledTaskAction `
-                    -Execute  "`"C:\Program Files\Git\usr\bin\bash.exe`"" `
-                    -Argument "-lc `"/c/Users/aerok/projects/bls/updateCpiReleaseSchedules.sh`"") `
-    -Trigger     (New-MondayTrigger "12:00PM") `
-    -Settings    (New-ScheduledTaskSettingsSet -ExecutionTimeLimit $execLimit1h `
-                    -WakeToRun -StartWhenAvailable) `
-    -Principal   $principalElev `
-    -Password    $plainPwd `
-    -Force
-} else {
-  Write-Warning "Skipped 'Update CPI release schedule'. Register manually with RunLevel Highest + Password logon."
-}
+Register-ScheduledTask `
+  -TaskName    "Update CPI release schedule" `
+  -Description "Fetch BLS CPI release schedule via bash script (Mondays noon PT)" `
+  -Action      (New-ScheduledTaskAction `
+                  -Execute  "`"C:\Program Files\Git\usr\bin\bash.exe`"" `
+                  -Argument "-lc `"/c/Users/aerok/projects/bls/updateCpiReleaseSchedules.sh`"") `
+  -Trigger     (New-MondayTrigger "12:00PM") `
+  -Settings    (New-ScheduledTaskSettingsSet -ExecutionTimeLimit $execLimit1h `
+                  -WakeToRun -StartWhenAvailable) `
+  -Principal   $principalElev `
+  -Force
 
 # ── CPI TASKS (RefCPI + FetchCpiHistory + RefreshCpiTasks) ───────────────────
 # setup-cpi-release-tasks.ps1 reads R2 for BLS release dates and builds
