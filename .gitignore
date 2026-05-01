@@ -37,8 +37,6 @@ YieldCurves/scripts/fidelityDownload.js
 YieldCurves/scripts/uploadFidelityDownload.js
 YieldCurves/scripts/testLogin.js
 YieldCurves/scripts/testCdpLogin.js
-scripts/*.cmd
-scripts/*.ps1
 
 Dashboard/*.cmd
 
