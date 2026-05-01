@@ -1,91 +1,156 @@
 # setup-tasks.ps1
-# Run once from an elevated PowerShell prompt to register the three scheduled tasks.
+# Run once from an elevated PowerShell prompt to register ALL data pipeline scheduled tasks.
 # Usage: powershell -ExecutionPolicy Bypass -File setup-tasks.ps1
 
-$wrapper = "C:\Users\aerok\projects\Treasuries\YieldCurves\scripts\run-fidelity.cmd"
-$user    = "$env:USERDOMAIN\$env:USERNAME"
+$REPO = "C:\Users\aerok\projects\Treasuries"
+$user = "$env:USERDOMAIN\$env:USERNAME"
 
-# Run as logged-in user (headed browser requires an interactive session)
 $principal = New-ScheduledTaskPrincipal `
-  -UserId $user `
+  -UserId    $user `
   -LogonType Interactive `
-  -RunLevel Limited
+  -RunLevel  Limited
 
-$execLimit = (New-TimeSpan -Minutes 25)
+$execLimit25m = New-TimeSpan -Minutes 25
+$execLimit1h  = New-TimeSpan -Hours 1
+$execLimit72h = New-TimeSpan -Hours 72
 
-# ── Morning: 5:05 AM PT (8:05 AM ET) ──────────────────────────────────────────
-# Retries every 30 min, up to 9 times → covers through 9:30 AM PT
-$actionMorning  = New-ScheduledTaskAction -Execute "cmd.exe" -Argument "/c `"$wrapper`""
-$triggerMorning = New-ScheduledTaskTrigger -Daily -At "5:05AM"
-$settingsMorning = New-ScheduledTaskSettingsSet `
-  -ExecutionTimeLimit $execLimit `
-  -RestartCount 9 `
-  -RestartInterval (New-TimeSpan -Minutes 30) `
-  -MultipleInstances IgnoreNew
+function New-WeekdayTrigger($time) {
+  New-ScheduledTaskTrigger -Weekly -WeeksInterval 1 `
+    -DaysOfWeek Monday,Tuesday,Wednesday,Thursday,Friday -At $time
+}
+function New-MondayTrigger($time) {
+  New-ScheduledTaskTrigger -Weekly -WeeksInterval 1 -DaysOfWeek Monday -At $time
+}
+
+# ── FIDELITY (headed CDP browser — 3 daily windows) ──────────────────────────
+
+$wrapperFidelity = "$REPO\YieldCurves\scripts\run-fidelity.cmd"
 
 Register-ScheduledTask `
   -TaskName    "FidelityDownload-Morning" `
   -Description "Fidelity bond download at market open (8:05 AM ET)" `
-  -Action      $actionMorning `
-  -Trigger     $triggerMorning `
-  -Settings    $settingsMorning `
-  -Principal   $principal `
-  -Force
-
-# ── Midday: 10:00 AM PT (1 PM ET) ─────────────────────────────────────────────
-$actionMidday  = New-ScheduledTaskAction -Execute "cmd.exe" -Argument "/c `"$wrapper`""
-$triggerMidday = New-ScheduledTaskTrigger -Daily -At "10:00AM"
-$settingsMidday = New-ScheduledTaskSettingsSet `
-  -ExecutionTimeLimit $execLimit `
-  -MultipleInstances IgnoreNew
+  -Action      (New-ScheduledTaskAction -Execute "cmd.exe" -Argument "/c `"$wrapperFidelity`"") `
+  -Trigger     (New-ScheduledTaskTrigger -Daily -At "5:05AM") `
+  -Settings    (New-ScheduledTaskSettingsSet -ExecutionTimeLimit $execLimit25m `
+                  -RestartCount 9 -RestartInterval (New-TimeSpan -Minutes 30) `
+                  -MultipleInstances IgnoreNew) `
+  -Principal   $principal -Force
 
 Register-ScheduledTask `
   -TaskName    "FidelityDownload-Midday" `
   -Description "Fidelity bond download at FedInvest price load (1 PM ET)" `
-  -Action      $actionMidday `
-  -Trigger     $triggerMidday `
-  -Settings    $settingsMidday `
-  -Principal   $principal `
-  -Force
-
-# ── Close: 2:00 PM PT (5 PM ET) ───────────────────────────────────────────────
-$actionClose  = New-ScheduledTaskAction -Execute "cmd.exe" -Argument "/c `"$wrapper`""
-$triggerClose = New-ScheduledTaskTrigger -Daily -At "2:00PM"
-$settingsClose = New-ScheduledTaskSettingsSet `
-  -ExecutionTimeLimit $execLimit `
-  -MultipleInstances IgnoreNew
+  -Action      (New-ScheduledTaskAction -Execute "cmd.exe" -Argument "/c `"$wrapperFidelity`"") `
+  -Trigger     (New-ScheduledTaskTrigger -Daily -At "10:00AM") `
+  -Settings    (New-ScheduledTaskSettingsSet -ExecutionTimeLimit $execLimit25m -MultipleInstances IgnoreNew) `
+  -Principal   $principal -Force
 
 Register-ScheduledTask `
   -TaskName    "FidelityDownload-Close" `
   -Description "Fidelity bond download at market close (5 PM ET)" `
-  -Action      $actionClose `
-  -Trigger     $triggerClose `
-  -Settings    $settingsClose `
-  -Principal   $principal `
-  -Force
+  -Action      (New-ScheduledTaskAction -Execute "cmd.exe" -Argument "/c `"$wrapperFidelity`"") `
+  -Trigger     (New-ScheduledTaskTrigger -Daily -At "2:00PM") `
+  -Settings    (New-ScheduledTaskSettingsSet -ExecutionTimeLimit $execLimit25m -MultipleInstances IgnoreNew) `
+  -Principal   $principal -Force
 
-# ── FedInvest Yields: 9:00 AM PT (noon ET) ────────────────────────────────────
-# Retries every 30 min × 1 → covers through 9:30 AM PT (12:30 PM ET)
-# Script exits cleanly if FedInvest hasn't updated yet; retry catches it.
-$wrapperFed  = "C:\Users\aerok\projects\Treasuries\YieldCurves\scripts\run-fedinvest.cmd"
-$actionFed   = New-ScheduledTaskAction -Execute "cmd.exe" -Argument "/c `"$wrapperFed`""
-$triggerFed  = New-ScheduledTaskTrigger -Daily -At "9:00AM"
-$settingsFed = New-ScheduledTaskSettingsSet `
-  -ExecutionTimeLimit $execLimit `
-  -RestartCount 1 `
-  -RestartInterval (New-TimeSpan -Minutes 30) `
-  -MultipleInstances IgnoreNew
+# ── FEDINVEST PRICES (weekdays noon ET = 9 AM PT) ────────────────────────────
+# Sentinel file logs/fedinvest-success-date.txt prevents double-fetch on retries.
 
 Register-ScheduledTask `
-  -TaskName    "FedInvestYields" `
-  -Description "Fetch FedInvest yields at noon ET (9 AM PT), retry at 12:30 PM ET" `
-  -Action      $actionFed `
-  -Trigger     $triggerFed `
-  -Settings    $settingsFed `
-  -Principal   $principal `
-  -Force
+  -TaskName    "FedInvestPrices" `
+  -Description "Fetch FedInvest TIPS yields/prices at noon ET (9 AM PT)" `
+  -Action      (New-ScheduledTaskAction -Execute "cmd.exe" -Argument "/c `"$REPO\scripts\run-fedinvest-prices.cmd`"") `
+  -Trigger     (New-WeekdayTrigger "9:00AM") `
+  -Settings    (New-ScheduledTaskSettingsSet -ExecutionTimeLimit $execLimit72h -MultipleInstances IgnoreNew) `
+  -Principal   $principal -Force
+
+# ── TREASURY AUCTIONS (weekdays — two windows: after 11:30 AM ET and 1 PM ET) ─
+
+Register-ScheduledTask `
+  -TaskName    "TreasuryAuctions-Morning" `
+  -Description "Fetch Treasury auction results after 11:30 AM ET comp close (8:35 AM PT)" `
+  -Action      (New-ScheduledTaskAction -Execute "cmd.exe" -Argument "/c `"$REPO\scripts\run-auctions.cmd`"") `
+  -Trigger     (New-WeekdayTrigger "8:35AM") `
+  -Settings    (New-ScheduledTaskSettingsSet -ExecutionTimeLimit $execLimit72h -MultipleInstances IgnoreNew) `
+  -Principal   $principal -Force
+
+Register-ScheduledTask `
+  -TaskName    "TreasuryAuctions-Afternoon" `
+  -Description "Fetch Treasury auction results after 1 PM ET comp close (10:05 AM PT)" `
+  -Action      (New-ScheduledTaskAction -Execute "cmd.exe" -Argument "/c `"$REPO\scripts\run-auctions.cmd`"") `
+  -Trigger     (New-WeekdayTrigger "10:05AM") `
+  -Settings    (New-ScheduledTaskSettingsSet -ExecutionTimeLimit $execLimit72h -MultipleInstances IgnoreNew) `
+  -Principal   $principal -Force
+
+# ── SNAP YIELD HISTORY (weekdays 11:00 AM PT) ────────────────────────────────
+
+Register-ScheduledTask `
+  -TaskName    "SnapYieldHistory" `
+  -Description "Snapshot daily yield history from FedInvest to R2" `
+  -Action      (New-ScheduledTaskAction -Execute "cmd.exe" -Argument "/c `"$REPO\scripts\run-snap-history.cmd`"") `
+  -Trigger     (New-WeekdayTrigger "11:00AM") `
+  -Settings    (New-ScheduledTaskSettingsSet -ExecutionTimeLimit $execLimit72h -MultipleInstances IgnoreNew) `
+  -Principal   $principal -Force
+
+# ── TIPS REF (Mondays 7:00 AM PT) ────────────────────────────────────────────
+
+Register-ScheduledTask `
+  -TaskName    "TipsRef" `
+  -Description "Fetch TIPS reference data (issue dates, CUSIP, etc.) from TreasuryDirect" `
+  -Action      (New-ScheduledTaskAction -Execute "cmd.exe" -Argument "/c `"$REPO\scripts\run-tips-ref.cmd`"") `
+  -Trigger     (New-MondayTrigger "7:00AM") `
+  -Settings    (New-ScheduledTaskSettingsSet -ExecutionTimeLimit $execLimit72h -MultipleInstances IgnoreNew) `
+  -Principal   $principal -Force
+
+# ── UPDATE CPI RELEASE SCHEDULE (Mondays noon PT — elevated, wakes from sleep) ─
+# Registered with Password logon so it can run when the user is not logged in.
+
+Write-Host ""
+Write-Host "The 'Update CPI release schedule' task requires RunLevel Highest + Password logon."
+$secPwd   = Read-Host -AsSecureString "Enter your Windows password for this task (press Enter to skip)"
+$bstr     = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($secPwd)
+$plainPwd = [System.Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)
+[System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
+
+if ($plainPwd.Length -gt 0) {
+  $principalElev = New-ScheduledTaskPrincipal `
+    -UserId    $user `
+    -LogonType Password `
+    -RunLevel  Highest
+
+  Register-ScheduledTask `
+    -TaskName    "Update CPI release schedule" `
+    -Description "Fetch BLS CPI release schedule via bash script (Mondays noon PT)" `
+    -Action      (New-ScheduledTaskAction `
+                    -Execute  "`"C:\Program Files\Git\usr\bin\bash.exe`"" `
+                    -Argument "-lc `"/c/Users/aerok/projects/bls/updateCpiReleaseSchedules.sh`"") `
+    -Trigger     (New-MondayTrigger "12:00PM") `
+    -Settings    (New-ScheduledTaskSettingsSet -ExecutionTimeLimit $execLimit1h `
+                    -WakeToRun -StartWhenAvailable) `
+    -Principal   $principalElev `
+    -Password    $plainPwd `
+    -Force
+} else {
+  Write-Warning "Skipped 'Update CPI release schedule'. Register manually with RunLevel Highest + Password logon."
+}
+
+# ── CPI TASKS (RefCPI + FetchCpiHistory + RefreshCpiTasks) ───────────────────
+# setup-cpi-release-tasks.ps1 reads R2 for BLS release dates and builds
+# date-specific triggers. It also self-schedules RefreshCpiTasks for Dec 29.
+
+Write-Host ""
+Write-Host "Registering CPI tasks via setup-cpi-release-tasks.ps1..."
+& "$REPO\scripts\setup-cpi-release-tasks.ps1"
+
+# ── Summary ───────────────────────────────────────────────────────────────────
 
 Write-Host ""
 Write-Host "Tasks registered:"
-Get-ScheduledTask | Where-Object { $_.TaskName -like "FidelityDownload-*" -or $_.TaskName -eq "FedInvestYields" } |
-  Select-Object TaskName, State | Format-Table -AutoSize
+$names = @(
+  "FidelityDownload-Morning","FidelityDownload-Midday","FidelityDownload-Close",
+  "FedInvestPrices",
+  "TreasuryAuctions-Morning","TreasuryAuctions-Afternoon",
+  "SnapYieldHistory","TipsRef","Update CPI release schedule",
+  "RefCPI","FetchCpiHistory","RefreshCpiTasks"
+)
+Get-ScheduledTask | Where-Object { $_.TaskName -in $names } |
+  Select-Object TaskName, State | Sort-Object TaskName | Format-Table -AutoSize
