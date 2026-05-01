@@ -2,7 +2,7 @@
 # Run once from an elevated PowerShell prompt to register ALL data pipeline scheduled tasks.
 # Usage: powershell -ExecutionPolicy Bypass -File setup-tasks.ps1
 
-$REPO = "C:\Users\aerok\projects\Treasuries"
+$REPO = Split-Path (Split-Path $PSScriptRoot)
 $user = "$env:USERDOMAIN\$env:USERNAME"
 
 $principal = New-ScheduledTaskPrincipal `
@@ -113,7 +113,7 @@ Register-ScheduledTask `
   -Description "Fetch BLS CPI release schedule via bash script (Mondays noon PT)" `
   -Action      (New-ScheduledTaskAction `
                   -Execute  "`"C:\Program Files\Git\usr\bin\bash.exe`"" `
-                  -Argument "-lc `"/c/Users/aerok/projects/bls/updateCpiReleaseSchedules.sh`"") `
+                  -Argument "-lc `"/c/Users/$env:USERNAME/projects/bls/updateCpiReleaseSchedules.sh`"") `
   -Trigger     (New-MondayTrigger "12:00PM") `
   -Settings    (New-ScheduledTaskSettingsSet -ExecutionTimeLimit $execLimit1h `
                   -WakeToRun -StartWhenAvailable) `

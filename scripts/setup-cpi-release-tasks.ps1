@@ -15,7 +15,7 @@
 
 $ErrorActionPreference = 'Stop'
 $R2_BASE = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev'
-$REPO    = 'C:\Users\aerok\projects\Treasuries'
+$REPO    = Split-Path $PSScriptRoot
 
 # BLS releases at 8:30 AM ET; run 5 minutes later.
 # Machine is Pacific time. ET is always 3 hours ahead of PT.

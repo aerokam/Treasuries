@@ -6,7 +6,7 @@
 # StartWhenAvailable: if the PC was asleep at trigger time, runs as soon as it wakes.
 
 $taskName = "YieldsFedInvest"
-$repoRoot = "C:\Users\aerok\projects\Treasuries"
+$repoRoot = Split-Path $PSScriptRoot
 $cmd      = "$repoRoot\scripts\run-yields-fedinvest.cmd"
 
 $action   = New-ScheduledTaskAction -Execute "cmd.exe" -Argument "/c `"$cmd`""
