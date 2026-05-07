@@ -1195,6 +1195,7 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
     const excessLMI_A = exA * annIntPerBond;
 
     const piPB = calculatePIPerBond(h.cusip, h.maturity, refCPI, tipsMap);
+    const mDuration = (b?.yield != null) ? calculateMDuration(settlementDate, h.maturity, b.coupon ?? 0, b.yield) : 0;
 
     details.unshift({
       cusip: h.cusip, maturityStr: fmtDate(h.maturity), fundedYear: h.year,
@@ -1217,7 +1218,8 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
       araAfterLaterMatInt:  isLast ? (postARABreakdown[h.year]?.laterMatInt  ?? 0) : null,
       araAfterHoldings:     isLast ? (postARABreakdown[h.year]?.holdings     ?? []) : null,
       preLadderCreditForYear: isLast ? (postARABreakdown[h.year]?.pliCredit ?? 0) : null,
-      nPeriods: (h.maturity.getMonth() + 1 < 7 ? 1 : 2)
+      nPeriods: (h.maturity.getMonth() + 1 < 7 ? 1 : 2),
+      mDuration,
     });
     const rowDARA = daraByYear?.get(h.year) ?? DARA;
     const fundedPI_A = tFundedYearQty * piPB;
@@ -1276,6 +1278,7 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
       araAfterHoldings: holdingsAfterSyn,
       preLadderCreditForYear: pliCreditByFundedYear[bYear] ?? 0,
       nPeriods: m < 7 ? 1 : 2,
+      mDuration: (tb?.yield != null) ? calculateMDuration(settlementDate, tb.maturity, tb.coupon ?? 0, tb.yield) : 0,
     };
     const fundedPI_A = bst.targetFundedYearQty * piPB;
     const newResult = [
@@ -1296,7 +1299,15 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
   const costForNewRungs = Object.values(buySellTargets).reduce((s, bst) => s + (bst.isBracket ? 0 : Math.max(0, bst.targetCost)), 0);
   const gapCoverageSurplus = totalPreviousExcessCost - costForNewRungs - (gapParams.totalCost || 0);
 
+  let _wadNum = 0, _wadDen = 0;
+  for (const d of details) {
+    const mv = d.qtyAfter * d.costPerBond;
+    _wadNum += mv * (d.mDuration ?? 0);
+    _wadDen += mv;
+  }
+  const weightedAvgDuration = _wadDen > 0 ? _wadNum / _wadDen : 0;
+
   const HDR = ['CUSIP','Qty','Maturity','FY','Principal','Interest','ARA','Cost','Target Qty','Qty Delta','Target Cost','Cost Delta','ARA (Before)','ARA-DARA Before','ARA (After)','ARA-DARA After','Excess ARA Before','Excess ARA After','Incoming LMI','Excess Interest','Funded PI'];
-  
-  return { results, HDR, summary: { settleDateDisp, refCPI, DARA, inferredDARA, daraIsInferred: dara === null, method, firstYear, lastYear, derivedFirstYear, rungCount, gapYears, future30yYears, brackets, lowerWeight, upperWeight, costDeltaSum, costForNewRungs, gapCoverageSurplus, gapParams, bracketMode, lowerDuration, upperDuration, newLowerYear, newLowerCUSIP, newLowerDuration, newLowerWeight3, origLowerWeight, bracketFellBack3to2, beforeLowerWeight, beforeUpperWeight, beforeNewLowerWeight, afterLowerWeight, afterUpperWeight, afterNewLowerWeight, totalPreviousExcessCost, totalExcessCost, araByYear, future30yLowerYear, future30yUpperYear, future30yLowerCoverCUSIP: future30yLowerCoverBond?.cusip, future30yUpperCoverCUSIP: future30yUpperCoverBond?.cusip, future30yParams, future30yLowerDuration, future30yUpperDuration, future30yUpperWeight, future30yLowerWeight, future30yUpperExQty, future30yLowerExQty, future30yFellBack, preLadderInterest, preLadderPool, zeroedFundedYears: [...zeroedFundedYears].sort((a, b) => a - b) }, details };
+
+  return { results, HDR, summary: { settleDateDisp, refCPI, DARA, inferredDARA, daraIsInferred: dara === null, method, firstYear, lastYear, derivedFirstYear, rungCount, gapYears, future30yYears, brackets, lowerWeight, upperWeight, costDeltaSum, costForNewRungs, gapCoverageSurplus, gapParams, bracketMode, lowerDuration, upperDuration, newLowerYear, newLowerCUSIP, newLowerDuration, newLowerWeight3, origLowerWeight, bracketFellBack3to2, beforeLowerWeight, beforeUpperWeight, beforeNewLowerWeight, afterLowerWeight, afterUpperWeight, afterNewLowerWeight, totalPreviousExcessCost, totalExcessCost, araByYear, future30yLowerYear, future30yUpperYear, future30yLowerCoverCUSIP: future30yLowerCoverBond?.cusip, future30yUpperCoverCUSIP: future30yUpperCoverBond?.cusip, future30yParams, future30yLowerDuration, future30yUpperDuration, future30yUpperWeight, future30yLowerWeight, future30yUpperExQty, future30yLowerExQty, future30yFellBack, preLadderInterest, preLadderPool, zeroedFundedYears: [...zeroedFundedYears].sort((a, b) => a - b), weightedAvgDuration }, details };
 }

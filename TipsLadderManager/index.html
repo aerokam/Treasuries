@@ -281,6 +281,7 @@
       <button id="export-csv-btn" style="display:none;padding:2px 10px;font-size:11px;align-self:flex-end" title="Export table to CSV">Export CSV</button>
       <button id="export-cusip-qty-btn" style="display:none;padding:2px 10px;font-size:11px;align-self:flex-end" title="Export CUSIP/Qty for Rebalance import">Export CUSIP/Qty</button>
       <div id="duration-links" style="align-self:flex-end"></div>
+      <span id="wad-display" style="display:none;align-self:flex-end" class="info-stat">Wtd Mod Dur <span id="wad-val" class="info-stat-val"></span></span>
     </div>
     <!-- Info row -->
     <div class="card-info">
@@ -337,7 +338,6 @@ import { showPopup, hidePopup } from './src/popup.js';
 import { fetchTipsData, lookupRefCpi, nextBondTradingDay } from './src/data.js';
 window.lookupRefCpi = lookupRefCpi;
 import { parseBrokerCSV } from './src/broker-import.js';
-import { calculateMDuration } from '../shared/src/bond-math.js';
 
 const toIso = d => d ? d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0') : '';
 
@@ -516,6 +516,8 @@ document.querySelectorAll('.tab-bar .tab-btn').forEach(btn => {
     _infoPopups.duration = isRebalance ? _rebalDurationRows : _buildDurationRows;
     _infoPopups.future30yDuration = isRebalance ? _rebalFuture30yDurationRows : _buildFuture30yDurationRows;
     _renderDurationLinks();
+    const _activeSummary = isRebalance ? rebalSummary : buildSummary;
+    _renderWAD(_activeSummary?.weightedAvgDuration ?? 0);
 
     setStatus('');
   });
@@ -643,7 +645,8 @@ function renderOutput({ results, HDR, summary, details }, portfolioCash = null) 
     }
     const _ncColor = costDeltaSum >= 0 ? '#16a34a' : '#dc2626';
     _renderDurationLinks();
-  
+    _renderWAD(summary.weightedAvgDuration);
+
   rebalDetails = details;
   rebalSummary = summary;
 
@@ -688,6 +691,7 @@ function renderBuildOutput({ results, HDR, summary, details }) {
       _infoPopups.future30yDuration = null;
     }
     _renderDurationLinks();
+    _renderWAD(summary.weightedAvgDuration);
     buildDetails = details;
   buildSummary  = summary;
 
@@ -700,11 +704,21 @@ function renderBuildOutput({ results, HDR, summary, details }) {
   document.getElementById('export-cusip-qty-btn').style.display = 'block';
 }
 
+function _renderWAD(wad) {
+  const el = document.getElementById('wad-display');
+  if (wad) {
+    document.getElementById('wad-val').textContent = wad.toFixed(2);
+    el.style.display = 'inline';
+  } else {
+    el.style.display = 'none';
+  }
+}
+
 function _renderDurationLinks() {
   const el = document.getElementById('duration-links');
   let html = '';
   if (currentMode === 'rebalance' ? _rebalDurationRows : _buildDurationRows) {
-    html += '<a class="info-link info-link-btn" data-popup="duration">Duration calcs</a>';
+    html += '<a class="info-link info-link-btn" data-popup="duration">Gap Dur</a>';
   }
   if (currentMode === 'rebalance' ? _rebalFuture30yDurationRows : _buildFuture30yDurationRows) {
     html += '<a class="info-link info-link-btn" data-popup="future30yDuration">Future 30Y Dur</a>';
@@ -1428,6 +1442,7 @@ function _clearOutput() {
   document.getElementById('export-csv-btn').style.display = 'none';
   document.getElementById('export-cusip-qty-btn').style.display = 'none';
   document.getElementById('net-cash-inline').style.display = 'none';
+  document.getElementById('wad-display').style.display = 'none';
   _clearAutoDara();
 }
 

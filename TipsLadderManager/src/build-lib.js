@@ -416,6 +416,7 @@ export function runBuild({ dara, firstYear: firstYearOpt, lastYear, tipsMap, ref
     const { indexRatio: ir, costPerBond: cpb } = bondCalcs(bond, refCPI);
     const excessLMI   = excessQty * 1000 * ir * (bond.coupon ?? 0);
     
+    const mDuration = calculateMDuration(settlementDate, bond.maturity, bond.coupon ?? 0, bond.yield ?? 0);
     const isBracket    = excessQty > 0;
     const isFuture30yCover = future30yExQty > 0;
     const monthF    = bond.maturity.getMonth() + 1;
@@ -475,8 +476,17 @@ export function runBuild({ dara, firstYear: firstYearOpt, lastYear, tipsMap, ref
       excessAmt: isBracket ? excessQty * prelim_pi + gapLMIAlloc : 0,
       gapLMIAlloc,
       excessCost: isBracket ? excessQty * cpb : 0,
+      mDuration,
     });
   }
+
+  let _wadNum = 0, _wadDen = 0;
+  for (const d of details) {
+    const mv = (d.fundedYearQty + d.excessQty) * d.costPerBond;
+    _wadNum += mv * d.mDuration;
+    _wadDen += mv;
+  }
+  const weightedAvgDuration = _wadDen > 0 ? _wadNum / _wadDen : 0;
 
   const HDR = ['CUSIP', 'Maturity', 'Funded Year', 'Funded Year Qty', 'Excess Qty', 'Total Qty', 'Funded Year Amount', 'Funded Year Cost', 'Excess Amount', 'Excess Cost'];
 
@@ -492,6 +502,7 @@ export function runBuild({ dara, firstYear: firstYearOpt, lastYear, tipsMap, ref
     future30yLowerMonth, future30yUpperMonth,
     future30yParams,
     totalBuyCost,
+    weightedAvgDuration,
     preLadderInterest, preLadderYears, preLadderPool,
     zeroedFundedYears: [...zeroedFundedYears].sort((a, b) => a - b),
   };

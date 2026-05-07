@@ -2,28 +2,62 @@
 // Pure per-unit calculations ($1,000 face value).
 // Spec: ../knowledge/TIPS_Basics.md, knowledge/4.0_Computation_Modules.md §bond-math.js
 
-// ─── Modified duration ────────────────────────────────────────────────────────
-// Spec: 5.0 §calculateMDuration
-export function getNumPeriods(settlement, maturity) {
-  const months = (maturity.getFullYear() - settlement.getFullYear()) * 12 +
-                 (maturity.getMonth() - settlement.getMonth());
-  return Math.ceil(months / 6);
+// ─── Macaulay / Modified duration ────────────────────────────────────────────
+// Matches Google Sheets DURATION/MDURATION (Actual/Actual, semi-annual).
+// Uses fractional first coupon period w = DSC/E to avoid the ±0.5y error
+// that ceil(months/6) produces for bonds mid-period.
+
+function _nextCouponOnOrAfter(settle, mature) {
+  const matMon  = mature.getMonth() + 1; // 1-indexed
+  const cm1 = matMon <= 6 ? matMon : matMon - 6;
+  const cm2 = cm1 + 6;
+  const mDay = mature.getDate();
+  const candidates = [];
+  for (let y = settle.getFullYear() - 1; y <= settle.getFullYear() + 1; y++) {
+    for (const mon of [cm1, cm2]) {
+      const lastDay = new Date(y, mon, 0).getDate();
+      candidates.push(new Date(y, mon - 1, Math.min(mDay, lastDay)));
+    }
+  }
+  candidates.sort((a, b) => a - b);
+  return candidates.find(c => c >= settle && c <= mature) || null;
 }
 
+// Returns Macaulay duration in years, or null if inputs are degenerate.
 export function calculateDuration(settlement, maturity, coupon, yld) {
-  const periods = getNumPeriods(settlement, maturity);
-  let weightedSum = 0, pvSum = 0;
-  for (let i = 1; i <= periods; i++) {
-    const cashflow = i === periods ? 1000 + coupon * 1000 / 2 : coupon * 1000 / 2;
-    const pv = cashflow / Math.pow(1 + yld / 2, i);
-    weightedSum += i * pv;
+  if (settlement >= maturity || yld <= -2) return null;
+  const nextCpn = _nextCouponOnOrAfter(settlement, maturity);
+  if (!nextCpn) return null;
+  const mDay   = maturity.getDate();
+  const lastCpn = addSemiannualPeriods(nextCpn, -1, mDay);
+  const days = (a, b) => (b - a) / 86400000;
+  const E   = days(lastCpn, nextCpn);
+  const DSC = days(settlement, nextCpn);
+  const w   = DSC / E;
+  const coupons = [];
+  for (let k = 0; ; k++) {
+    const d = addSemiannualPeriods(nextCpn, k, mDay);
+    if (d > maturity) break;
+    coupons.push(d);
+  }
+  const N = coupons.length;
+  if (N === 0) return null;
+  const semiCpn = coupon / 2 * 1000;
+  const r = yld / 2;
+  let wSum = 0, pvSum = 0;
+  for (let j = 0; j < N; j++) {
+    const cf = j === N - 1 ? semiCpn + 1000 : semiCpn;
+    const t  = w + j;
+    const pv = cf / Math.pow(1 + r, t);
+    wSum  += t * pv;
     pvSum += pv;
   }
-  return weightedSum / pvSum / 2;
+  return wSum / pvSum / 2;
 }
 
 export function calculateMDuration(settlement, maturity, coupon, yld) {
-  return calculateDuration(settlement, maturity, coupon, yld) / (1 + yld / 2);
+  const mac = calculateDuration(settlement, maturity, coupon, yld);
+  return mac != null ? mac / (1 + yld / 2) : null;
 }
 
 // ─── Per-unit quantities ($1,000 face) ──────────────────────────────────────

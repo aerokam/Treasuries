@@ -262,29 +262,61 @@ function buildTipsMap(baseCpiRows, priceRows, settleDateStr) {
   return map;
 }
 
-// ─── Duration calculations (ported verbatim) ──────────────────────────────────
-function getNumPeriods(settlement, maturity) {
-  const months = (maturity.getFullYear() - settlement.getFullYear()) * 12 +
-                 (maturity.getMonth() - settlement.getMonth());
-  return Math.ceil(months / 6);
+// ─── Duration calculations — kept in sync with shared/src/bond-math.js ───────
+function _addSemiannualPeriods(date, n, matureDay) {
+  const d = new Date(date);
+  d.setDate(1);
+  d.setMonth(d.getMonth() + n * 6);
+  const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  d.setDate(Math.min(matureDay, lastDay));
+  return d;
 }
 
 function calculateDuration(settlement, maturity, coupon, yld) {
-  const settle = new Date(settlement);
-  const mature = new Date(maturity);
-  const periods = getNumPeriods(settle, mature);
-  let weightedSum = 0, pvSum = 0;
-  for (let i = 1; i <= periods; i++) {
-    const cashflow = i === periods ? 1000 + coupon * 1000 / 2 : coupon * 1000 / 2;
-    const pv = cashflow / Math.pow(1 + yld / 2, i);
-    weightedSum += i * pv;
+  if (settlement >= maturity || yld <= -2) return null;
+  const matMon = maturity.getMonth() + 1;
+  const cm1 = matMon <= 6 ? matMon : matMon - 6;
+  const cm2 = cm1 + 6;
+  const mDay = maturity.getDate();
+  const candidates = [];
+  for (let y = settlement.getFullYear() - 1; y <= settlement.getFullYear() + 1; y++) {
+    for (const mon of [cm1, cm2]) {
+      const lastDay = new Date(y, mon, 0).getDate();
+      candidates.push(new Date(y, mon - 1, Math.min(mDay, lastDay)));
+    }
+  }
+  candidates.sort((a, b) => a - b);
+  const nextCpn = candidates.find(c => c >= settlement && c <= maturity);
+  if (!nextCpn) return null;
+  const lastCpn = _addSemiannualPeriods(nextCpn, -1, mDay);
+  const days = (a, b) => (b - a) / 86400000;
+  const E   = days(lastCpn, nextCpn);
+  const DSC = days(settlement, nextCpn);
+  const w   = DSC / E;
+  const coupons = [];
+  for (let k = 0; ; k++) {
+    const d = _addSemiannualPeriods(nextCpn, k, mDay);
+    if (d > maturity) break;
+    coupons.push(d);
+  }
+  const N = coupons.length;
+  if (N === 0) return null;
+  const semiCpn = coupon / 2 * 1000;
+  const r = yld / 2;
+  let wSum = 0, pvSum = 0;
+  for (let j = 0; j < N; j++) {
+    const cf = j === N - 1 ? semiCpn + 1000 : semiCpn;
+    const t  = w + j;
+    const pv = cf / Math.pow(1 + r, t);
+    wSum  += t * pv;
     pvSum += pv;
   }
-  return weightedSum / pvSum / 2;
+  return wSum / pvSum / 2;
 }
 
 function calculateMDuration(settlement, maturity, coupon, yld) {
-  return calculateDuration(settlement, maturity, coupon, yld) / (1 + yld / 2);
+  const mac = calculateDuration(settlement, maturity, coupon, yld);
+  return mac != null ? mac / (1 + yld / 2) : null;
 }
 
 // ─── PI per bond ──────────────────────────────────────────────────────────────
