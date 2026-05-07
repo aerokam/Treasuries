@@ -110,3 +110,25 @@ TIPS yield-to-maturity (YTM) follows the standard U.S. Treasury convention for n
     where $DaysInYear$ is 365 (or 366 if a leap day is involved).
 
 This dual-mode calculation ensures that the application's yield curve aligns with official Treasury (FedInvest) and institutional broker data.
+
+---
+
+## Duration
+
+**Macaulay Duration:** The present-value–weighted average time to receive a bond's cash flows, measured in years.
+
+Uses the same convention as yield-to-maturity: **Actual/Actual day count, semi-annual compounding** (frequency = 2). Matches Google Sheets `DURATION(settlement, maturity, coupon, yld, 2, 1)`.
+
+The fractional first coupon period `w = DSC/E` (where DSC = days from settlement to next coupon, E = length of that coupon period in days) is used to avoid the ±0.5 y error that arises from rounding to the nearest whole coupon period. See `4.0 §calculateDuration` for the full formula.
+
+**Modified Duration:** Exact first derivative of price with respect to yield, normalized by price:
+
+```
+MD = -(1/P) · dP/dy = macaulayDuration / (1 + yld/2)
+```
+
+This is an exact result for semi-annual compounding, derived directly from differentiating the present-value sum. It measures price sensitivity: a bond with modified duration 8 loses approximately 8% of price for a +1% parallel shift in yield (first-order; convexity is a second-order correction).
+
+**Guard conditions (both `calculateDuration` and `calculateMDuration`):**
+- Return `null` if `settlement >= maturity`
+- Return `null` if `yld ≤ −2`; negative yields between −2 and 0 are **valid** and are not filtered out
