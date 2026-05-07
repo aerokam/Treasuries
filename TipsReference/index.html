@@ -140,7 +140,73 @@ var COLS = [
     fmt: function(v) { return v != null ? v.toFixed(3) : '—'; } },
   { key: 'yield',      label: 'Yield',              align: 'right', sortType: 'num',
     fmt: function(v) { return v != null ? (v * 100).toFixed(3) + '%' : '—'; } },
+  { key: 'term',        label: 'Term',               align: 'right', sortType: 'num',
+    fmt: function(v) { return v != null ? v.toFixed(2) + 'y' : '—'; } },
+  { key: 'macDuration', label: 'Mac Duration',        align: 'right', sortType: 'num',
+    fmt: function(v) { return v != null ? v.toFixed(2) : '—'; } },
+  { key: 'modDuration', label: 'Mod Duration',        align: 'right', sortType: 'num',
+    fmt: function(v) { return v != null ? v.toFixed(2) : '—'; } },
 ];
+
+// Duration helpers — inline copy of shared/src/bond-math.js (must stay in sync)
+function _addSemiannualPeriods(date, n, matureDay) {
+  var d = new Date(date);
+  d.setDate(1);
+  d.setMonth(d.getMonth() + n * 6);
+  var lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  d.setDate(Math.min(matureDay, lastDay));
+  return d;
+}
+
+function _nextCouponOnOrAfter(settle, mature) {
+  var matMon = mature.getMonth() + 1;
+  var cm1 = matMon <= 6 ? matMon : matMon - 6;
+  var cm2 = cm1 + 6;
+  var mDay = mature.getDate();
+  var candidates = [];
+  for (var y = settle.getFullYear() - 1; y <= settle.getFullYear() + 1; y++) {
+    [cm1, cm2].forEach(function(mon) {
+      var lastDay = new Date(y, mon, 0).getDate();
+      candidates.push(new Date(y, mon - 1, Math.min(mDay, lastDay)));
+    });
+  }
+  candidates.sort(function(a, b) { return a - b; });
+  for (var i = 0; i < candidates.length; i++) {
+    if (candidates[i] >= settle && candidates[i] <= mature) return candidates[i];
+  }
+  return null;
+}
+
+function calculateDuration(settlement, maturity, coupon, yld) {
+  if (settlement >= maturity || yld <= -2) return null;
+  var nextCpn = _nextCouponOnOrAfter(settlement, maturity);
+  if (!nextCpn) return null;
+  var mDay = maturity.getDate();
+  var lastCpn = _addSemiannualPeriods(nextCpn, -1, mDay);
+  var days = function(a, b) { return (b - a) / 86400000; };
+  var E   = days(lastCpn, nextCpn);
+  var DSC = days(settlement, nextCpn);
+  var w   = DSC / E;
+  var coupons = [];
+  for (var k = 0; ; k++) {
+    var d = _addSemiannualPeriods(nextCpn, k, mDay);
+    if (d > maturity) break;
+    coupons.push(d);
+  }
+  var N = coupons.length;
+  if (N === 0) return null;
+  var semiCpn = coupon / 2 * 1000;
+  var r = yld / 2;
+  var wSum = 0, pvSum = 0;
+  for (var j = 0; j < N; j++) {
+    var cf = j === N - 1 ? semiCpn + 1000 : semiCpn;
+    var t  = w + j;
+    var pv = cf / Math.pow(1 + r, t);
+    wSum  += t * pv;
+    pvSum += pv;
+  }
+  return wSum / pvSum / 2;
+}
 
 // Observed US Treasury market closure dates (bond market holidays)
 var BOND_HOLIDAYS = new Set([
@@ -330,11 +396,18 @@ async function loadData() {
 
     var settlementRefCpi = lookupRefCpi(refCpiRows, settlementDateStr);
 
+    var settlDate = new Date(settlementDateStr + 'T12:00:00Z');
+
     allRows = yieldsRows.map(function(r) {
       var ref = tipsRefMap[r.cusip];
       var baseCpi = ref ? ref.baseCpi : null;
       var indexRatio = (baseCpi && settlementRefCpi) ? settlementRefCpi / baseCpi : null;
       var adjPrice = (indexRatio != null && r.price != null) ? r.price * indexRatio : null;
+      var matDate = r.maturity ? new Date(r.maturity + 'T12:00:00Z') : null;
+      var term = (matDate && matDate > settlDate) ? (matDate - settlDate) / (365.25 * 86400000) : null;
+      var macDur = (matDate && r.coupon != null && r.yield != null && !isNaN(r.yield))
+        ? calculateDuration(settlDate, matDate, r.coupon, r.yield) : null;
+      var modDur = (macDur != null) ? macDur / (1 + r.yield / 2) : null;
       return {
         cusip:       r.cusip,
         maturity:    r.maturity,
@@ -345,6 +418,9 @@ async function loadData() {
         indexRatio:  indexRatio,
         adjPrice:    adjPrice,
         yield:       r.yield,
+        term:        term,
+        macDuration: macDur,
+        modDuration: modDur,
       };
     });
 
