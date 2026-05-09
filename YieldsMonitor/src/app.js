@@ -37,8 +37,7 @@ const TIME_RANGE_MAP = {
 
 const TIME_RANGES = Object.keys(TIME_RANGE_MAP);
 
-const charts = {}; 
-const historyCache = {}; 
+const charts = {};
 const liveCache = {}; 
 const liveCacheTime = {}; // symbol_range -> timestamp
 const rangeData = {}; 
@@ -248,8 +247,6 @@ function buildUrl(symbol, range) {
   return "https://webql-redesign.cnbcfm.com/graphql?" + Object.entries(params).map(([k, v]) => k + "=" + encodeURIComponent(v)).join("&");
 }
 
-const R2_HISTORY_URL = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/yield-history';
-
 function parseSourceTime(tt) {
   if (!tt) return null; const s = String(tt); if (s.length < 8) return null;
   const year = parseInt(s.substring(0, 4), 10), month = parseInt(s.substring(4, 6), 10) - 1, day = parseInt(s.substring(6, 8), 10);
@@ -316,12 +313,6 @@ async function fetchOne(symbol, range, force = false) {
 async function fetchLive(symbol, range) {
   try { const response = await fetchWithTimeout(buildUrl(symbol, range)); if (!response.ok) throw new Error(`HTTP ${response.status}`); const json = await response.json(); const priceBars = json?.data?.chartData?.priceBars || []; return priceBars.map(bar => { let v = bar.close; if (typeof v === "string" && v.endsWith("%")) v = v.slice(0, -1); return { x: parseSourceTime(bar.tradeTime), y: parseFloat(v) }; }).filter(p => p.x && !isNaN(p.y)); } catch (err) { console.warn(`Live fetch failed for ${symbol}:`, err); return null; }
 }
-
-async function fetchHistory(symbol) {
-  if (!historyCache[symbol]) { historyCache[symbol] = (async () => { try { let response = await fetchWithTimeout(`${R2_HISTORY_URL}/${symbol}_history.json`).catch(() => null); if (!response || !response.ok) response = await fetchWithTimeout(`./data/yield-history/${symbol}_history.json`); if (!response.ok) throw new Error("History not found"); const data = await response.json(); return data.map(p => ({ x: parseSourceTime(p.x), y: p.y })); } catch (err) { console.error(`History load failed for ${symbol}:`, err); delete historyCache[symbol]; return null; } })(); }
-  return await historyCache[symbol];
-}
-
 
 function snapXMax(date) {
   const d = new Date(date);
