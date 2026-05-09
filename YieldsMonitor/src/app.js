@@ -290,7 +290,7 @@ async function fetchOne(symbol, range, force = false) {
     fetchTasks.push(fetchLive(symbol, providerRange).then(live => { if (live) liveCache[cacheKey] = live; }));
   }
 
-  if (range !== '10D' && (force || !liveCache[tipKey])) {
+  if (range !== '2D' && range !== '10D' && (force || !liveCache[tipKey])) {
     console.log(`%c[CNBC] %cFetching 5D tip for metrics: ${symbol}`, "color: #2563eb; font-weight: bold", "color: inherit");
     fetchTasks.push(fetchLive(symbol, '5D').then(live => { if (live) liveCache[tipKey] = live; }));
   }
