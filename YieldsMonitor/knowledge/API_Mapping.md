@@ -43,14 +43,24 @@ The following symbols are currently supported and grouped by security type:
 - `US10YTIPS`: 10-Year TIPS
 - `US30YTIPS`: 30-Year TIPS
 
-## CNBC API (2D, 10D ranges only)
+## CNBC API
 
-Intraday ranges use CNBC GraphQL. The `timeRange` parameter **must** use the mapped values in the table above, not the UI labels.
+**2D, 10D ranges**: Use CNBC GraphQL with mapped `timeRange` (1D, 5D).
+
+**1Y+ ranges (current workaround)**: Currently fetch from CNBC due to R2 CORS limitation. The `timeRange` parameter uses mapped values in the table above.
+
+**5D latest yields**: All ranges (except 10D) append CNBC 5D data for current market context.
 
 - **Base URL**: `https://webql-redesign.cnbcfm.com/graphql`
 - **Operation**: `getQuoteChartData`
 - **Persisted Query Hash**: `9e1670c29a10707c417a1efd327d4b2b1d456b77f1426e7e84fb7d399416bb6b`
-- **5D tip**: Also fetched from CNBC for all ranges (appended to R2 baseline for 1Y+)
+
+## R2 Historical Baseline
+
+**Intended for 1Y+ ranges**: R2 provides daily closing yields for long-term ranges. **Current blocker**: R2 lacks CORS headers for direct browser access. Enable CORS or add backend proxy to use this baseline instead of CNBC workaround.
+
+- **Base URL**: `https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/yield-history/`
+- **Files**: `{SYMBOL}_history.json` (array of {x: timestamp, y: yield})
 
 ## No Local Fallbacks
 
