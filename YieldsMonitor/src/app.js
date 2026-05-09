@@ -40,7 +40,8 @@ const TIME_RANGES = Object.keys(TIME_RANGE_MAP);
 const charts = {};
 const liveCache = {};
 const historyCache = {};
-const rangeData = {}; 
+const rangeData = {};
+let latestDataTime = null; 
 const yieldCurveCharts = {}; 
 let activeSymbols = new Set(['US10YTIPS', 'US30YTIPS', 'US10Y', 'US30Y']);
 let activeRange = '2D';
@@ -393,56 +394,103 @@ function updateDynamicTicks(chart, data) {
   } else { chart.options.plugins.annotation.annotations = {}; }
 }
 
-async function updateAllData(force = false) {
-  yOverrideSyms.clear();
-  isUpdatingData = true;
-  const statusEl = document.getElementById('fetchStatus'); statusEl.textContent = `Updating...`;
-  const allSyms = Object.keys(AVAILABLE_SYMBOLS); let successCount = 0; const tsList = [];
+async function fetchAllData(force = false) {
+  const statusEl = document.getElementById('fetchStatus');
+  statusEl.textContent = `Updating...`;
+  const allSyms = Object.keys(AVAILABLE_SYMBOLS);
+  const tsList = [];
+
   await Promise.all(allSyms.map(async sym => {
-    const data = await fetchOne(sym, activeRange, force), chart = charts[sym], card = document.getElementById(`card-${sym}`);
+    const data = await fetchOne(sym, activeRange, force);
     rangeData[sym] = data;
     if (data && data.length > 0) {
-      successCount++; tsList.push(data[data.length-1].x);
-      if (card) { const ov = card.querySelector('.no-data-overlay'); if (ov) ov.remove(); }
-      if (chart) {
-        chart.data.datasets[0].data = data;
-        if (activeRange === '2D') {
-          chart.options.scales.x.time.unit = 'hour';
-          chart.options.scales.x.time.tooltipFormat = 'MM/dd/yy HH:mm:ss';
-          chart.options.scales.x.time.displayFormats = { hour: 'MM/dd HH:mm', minute: 'HH:mm:ss', day: 'MMM dd' };
-        } else if (activeRange === '10D') {
-          chart.options.scales.x.time.unit = 'day';
-          chart.options.scales.x.time.tooltipFormat = 'MM/dd/yy HH:mm:ss';
-          chart.options.scales.x.time.displayFormats = { day: 'MMM dd' };
-        } else {
-          chart.options.scales.x.time.unit = undefined;
-          chart.options.scales.x.time.tooltipFormat = 'MM/dd/yy';
-          chart.options.scales.x.time.displayFormats = { month: 'MMM yyyy', year: 'yyyy' };
-        }
-        updateDynamicTicks(chart, data);
-        chart.resetZoom();
-        xMaxAnchors[sym] = snapXMax(data[data.length-1].x).getTime();
-        applyDefaultBounds(sym, chart, data);
-      }
-      const calculationData = (liveCache[`${sym}_5D`] || liveCache[`${sym}_1D`] || data), latest = calculationData[calculationData.length-1];
-      let closeP = null; const latestDayET = getEtDateStr(latest.x);
-      for (let i = calculationData.length-1; i >= 0; i--) { const p = calculationData[i], etStr = getEtDateStr(p.x); if (etStr !== latestDayET) { const pts = ET_FULL_FMT.formatToParts(p.x).reduce((a, pt) => ({ ...a, [pt.type]: pt.value }), {}), ph = +pts.hour; if (ph < 17 || (ph === 17 && +pts.minute === 0)) { closeP = p; break; } } }
-      const changeEl = document.getElementById(`change-${sym}`), yieldEl = document.getElementById(`yield-${sym}`);
-      if (yieldEl) yieldEl.textContent = `${latest.y.toFixed(3)}%`;
-      if (changeEl) { if (closeP) { const diff = latest.y - closeP.y; changeEl.textContent = `${diff>=0?'+':''}${diff.toFixed(3)}%`; changeEl.className = `sym-change ${diff>=0?'up':'down'}`; changeEl.title = `Since ${ET_HM_FMT.format(closeP.x)} ET close (${closeP.y.toFixed(3)}%)`; } else changeEl.textContent = '---'; }
-    } else if (card) {
-      if (chart) { chart.data.datasets[0].data = []; chart.update(); }
-      if (!card.querySelector('.no-data-overlay')) { const overlay = document.createElement('div'); overlay.className = 'no-data-overlay'; overlay.textContent = 'No data available for this range'; card.querySelector('.chart-container').appendChild(overlay); }
+      tsList.push(data[data.length - 1].x);
     }
   }));
-  if (activeTab === 'yieldcurves' || activeTab === 'breakeven') updateYieldCurves();
-  const now = new Date(), fmt = d => d.toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }) + ' ET';
-  const latestDataT = tsList.length > 0 ? new Date(Math.max(...tsList)) : null;
-  let statusHtml = `<span class="fs-label">Fetch:</span><span class="fs-val">${fmt(now)}</span>`;
-  if (latestDataT) statusHtml += `<span class="fs-label">Data:</span><span class="fs-val">${fmt(latestDataT)}</span>`;
-  else statusHtml += `<span class="fs-label">Data:</span><span class="fs-val" style="color:#dc2626">No data returned</span>`;
+
+  latestDataTime = tsList.length > 0 ? new Date(Math.max(...tsList.map(d => d.getTime()))) : null;
+  updateStatusMessage();
+}
+
+function updateStatusMessage() {
+  const statusEl = document.getElementById('fetchStatus');
+  const fmt = d => d.toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }) + ' ET';
+  const now = new Date();
+  let statusHtml = `<span class="fs-label">Data:</span><span class="fs-val">${latestDataTime ? fmt(latestDataTime) : 'No data'}</span>`;
   statusEl.innerHTML = statusHtml;
+}
+
+function updateCharts() {
+  yOverrideSyms.clear();
+  isUpdatingData = true;
+
+  Object.keys(charts).forEach(sym => {
+    const data = rangeData[sym], chart = charts[sym], card = document.getElementById(`card-${sym}`);
+    if (!data || data.length === 0) {
+      if (chart) { chart.data.datasets[0].data = []; chart.update(); }
+      if (card && !card.querySelector('.no-data-overlay')) {
+        const overlay = document.createElement('div');
+        overlay.className = 'no-data-overlay';
+        overlay.textContent = 'No data available for this range';
+        card.querySelector('.chart-container').appendChild(overlay);
+      }
+      return;
+    }
+
+    if (card) { const ov = card.querySelector('.no-data-overlay'); if (ov) ov.remove(); }
+
+    if (chart) {
+      chart.data.datasets[0].data = data;
+      if (activeRange === '2D') {
+        chart.options.scales.x.time.unit = 'hour';
+        chart.options.scales.x.time.tooltipFormat = 'MM/dd/yy HH:mm:ss';
+        chart.options.scales.x.time.displayFormats = { hour: 'MM/dd HH:mm', minute: 'HH:mm:ss', day: 'MMM dd' };
+      } else if (activeRange === '10D') {
+        chart.options.scales.x.time.unit = 'day';
+        chart.options.scales.x.time.tooltipFormat = 'MM/dd/yy HH:mm:ss';
+        chart.options.scales.x.time.displayFormats = { day: 'MMM dd' };
+      } else {
+        chart.options.scales.x.time.unit = undefined;
+        chart.options.scales.x.time.tooltipFormat = 'MM/dd/yy';
+        chart.options.scales.x.time.displayFormats = { month: 'MMM yyyy', year: 'yyyy' };
+      }
+      updateDynamicTicks(chart, data);
+      chart.resetZoom();
+      xMaxAnchors[sym] = snapXMax(data[data.length - 1].x).getTime();
+      applyDefaultBounds(sym, chart, data);
+    }
+
+    const calculationData = (liveCache[`${sym}_5D`] || liveCache[`${sym}_1D`] || data), latest = calculationData[calculationData.length - 1];
+    let closeP = null;
+    const latestDayET = getEtDateStr(latest.x);
+    for (let i = calculationData.length - 1; i >= 0; i--) {
+      const p = calculationData[i], etStr = getEtDateStr(p.x);
+      if (etStr !== latestDayET) {
+        const pts = ET_FULL_FMT.formatToParts(p.x).reduce((a, pt) => ({ ...a, [pt.type]: pt.value }), {}), ph = +pts.hour;
+        if (ph < 17 || (ph === 17 && +pts.minute === 0)) { closeP = p; break; }
+      }
+    }
+    const changeEl = document.getElementById(`change-${sym}`), yieldEl = document.getElementById(`yield-${sym}`);
+    if (yieldEl) yieldEl.textContent = `${latest.y.toFixed(3)}%`;
+    if (changeEl) {
+      if (closeP) {
+        const diff = latest.y - closeP.y;
+        changeEl.textContent = `${diff >= 0 ? '+' : ''}${diff.toFixed(3)}%`;
+        changeEl.className = `sym-change ${diff >= 0 ? 'up' : 'down'}`;
+        changeEl.title = `Since ${ET_HM_FMT.format(closeP.x)} ET close (${closeP.y.toFixed(3)}%)`;
+      } else {
+        changeEl.textContent = '---';
+      }
+    }
+  });
+
+  if (activeTab === 'yieldcurves' || activeTab === 'breakeven') updateYieldCurves();
   isUpdatingData = false;
+}
+
+async function updateAllData(force = false) {
+  await fetchAllData(force);
+  updateCharts();
 }
 
 const TIPS_SYMBOLS = Object.keys(AVAILABLE_SYMBOLS).filter(s => s.endsWith('TIPS')).sort((a, b) => MATURITY_ORDER[a] - MATURITY_ORDER[b]);

@@ -5,15 +5,11 @@
 
 import dotenv from 'dotenv';
 import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
-import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, '../../.env') });
-
-const DATA_DIR = path.join(__dirname, '../data/yield-history');
-if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 
 const SYMBOLS = [
   'US1YTIPS', 'US2YTIPS', 'US5YTIPS', 'US10YTIPS', 'US30YTIPS',
@@ -165,10 +161,9 @@ async function snap() {
     if (newCloses.length > 0) {
       history = mergePoints(history, newCloses);
       console.log(`  Appended ${newCloses.length} new closes for ${sym}.`);
-      
+
       await uploadToR2(r2Key, history);
       await uploadToR2(r2KeyOld, history);
-      fs.writeFileSync(path.join(DATA_DIR, `${sym}_history.json`), JSON.stringify(history, null, 2));
     } else {
       console.log(`  No new data to append.`);
     }
