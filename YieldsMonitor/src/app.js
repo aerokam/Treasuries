@@ -28,10 +28,10 @@ const COLORS = [
 const TIME_RANGE_MAP = {
   '2D': '1D',
   '10D': '5D',
-  '1Y': '1Y',
-  '2Y': '2Y',
-  '3Y': '3Y',
-  '10Y': '10Y',
+  '1Y': '1M',
+  '2Y': '3M',
+  '3Y': '6M',
+  '10Y': '5Y',
   'ALL': 'ALL'
 };
 
@@ -282,40 +282,35 @@ async function fetchWithTimeout(url, options = {}, timeout = 8000) {
 }
 
 async function fetchOne(symbol, range, force = false) {
-  const is2D = range === '2D', is10D = range === '10D';
-  if (is2D || is10D) {
-    const providerRange = is2D ? '1D' : '5D', cacheKey = `${symbol}_${providerRange}`;
-    const tipKey = `${symbol}_5D`;
-    
-    const fetchTasks = [];
-    if (!force && liveCache[cacheKey]) {
-      // Use cache
-    } else {
-      console.log(`%c[CNBC] %cFetching real-time ${providerRange} for ${symbol}`, "color: #2563eb; font-weight: bold", "color: inherit");
-      fetchTasks.push(fetchLive(symbol, providerRange).then(live => { if (live) liveCache[cacheKey] = live; }));
-    }
-    
-    if (is2D && (force || !liveCache[tipKey])) {
-      console.log(`%c[CNBC] %cFetching 5D tip for metrics: ${symbol}`, "color: #2563eb; font-weight: bold", "color: inherit");
-      fetchTasks.push(fetchLive(symbol, '5D').then(live => { if (live) liveCache[tipKey] = live; }));
-    }
-    
-    if (fetchTasks.length > 0) await Promise.all(fetchTasks);
+  const providerRange = TIME_RANGE_MAP[range] || range || '1D';
+  const cacheKey = `${symbol}_${providerRange}`;
+  const tipKey = `${symbol}_5D`;
 
-    const data = liveCache[cacheKey] || [];
-    const cutoff = new Date(); if (is2D) cutoff.setDate(cutoff.getDate() - 2); else cutoff.setDate(cutoff.getDate() - 10);
-    return data.filter(p => p.x >= cutoff);
+  const fetchTasks = [];
+  if (!force && liveCache[cacheKey]) {
+    // Use cache
   } else {
-    console.log(`%c[R2] %cLoading history for ${symbol}...`, "color: #ea580c; font-weight: bold", "color: inherit");
-    const history = await fetchHistory(symbol);
-    const tipKey = `${symbol}_5D`; let liveTip = liveCache[tipKey];
-    if (!liveTip || force) { console.log(`%c[CNBC] %cFetching 5D tip for ${symbol}...`, "color: #2563eb; font-weight: bold", "color: inherit"); liveTip = await fetchLive(symbol, '5D'); if (liveTip) liveCache[tipKey] = liveTip; }
-    const cutoff = new Date();
-    if (range === '1Y') cutoff.setFullYear(cutoff.getFullYear() - 1); else if (range === '2Y') cutoff.setFullYear(cutoff.getFullYear() - 2); else if (range === '3Y') cutoff.setFullYear(cutoff.getFullYear() - 3); else if (range === '10Y') cutoff.setFullYear(cutoff.getFullYear() - 10); else if (range === 'ALL') cutoff.setFullYear(cutoff.getFullYear() - 50);
-    let combined = (history || []).filter(p => p.x >= cutoff);
-    if (liveTip && liveTip.length > 0) { const lastHistTime = combined.length > 0 ? combined[combined.length - 1].x.getTime() : 0; const newPoints = liveTip.filter(p => p.x.getTime() > lastHistTime); combined = [...combined, ...newPoints]; }
-    return combined;
+    console.log(`%c[CNBC] %cFetching ${providerRange} for ${symbol}`, "color: #2563eb; font-weight: bold", "color: inherit");
+    fetchTasks.push(fetchLive(symbol, providerRange).then(live => { if (live) liveCache[cacheKey] = live; }));
   }
+
+  if ((range === '2D' || range === '1Y') && (force || !liveCache[tipKey])) {
+    console.log(`%c[CNBC] %cFetching 5D tip for metrics: ${symbol}`, "color: #2563eb; font-weight: bold", "color: inherit");
+    fetchTasks.push(fetchLive(symbol, '5D').then(live => { if (live) liveCache[tipKey] = live; }));
+  }
+
+  if (fetchTasks.length > 0) await Promise.all(fetchTasks);
+
+  const data = liveCache[cacheKey] || [];
+  const cutoff = new Date();
+  if (range === '2D') cutoff.setDate(cutoff.getDate() - 2);
+  else if (range === '10D') cutoff.setDate(cutoff.getDate() - 10);
+  else if (range === '1Y') cutoff.setFullYear(cutoff.getFullYear() - 1);
+  else if (range === '2Y') cutoff.setFullYear(cutoff.getFullYear() - 2);
+  else if (range === '3Y') cutoff.setFullYear(cutoff.getFullYear() - 3);
+  else if (range === '10Y') cutoff.setFullYear(cutoff.getFullYear() - 10);
+  else if (range === 'ALL') cutoff.setFullYear(cutoff.getFullYear() - 50);
+  return data.filter(p => p.x >= cutoff);
 }
 
 async function fetchLive(symbol, range) {
