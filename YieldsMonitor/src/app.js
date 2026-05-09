@@ -416,7 +416,7 @@ function updateStatusMessage() {
   const statusEl = document.getElementById('fetchStatus');
   const fmt = d => d.toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }) + ' ET';
   const now = new Date();
-  let statusHtml = `<span class="fs-label">Data:</span><span class="fs-val">${latestDataTime ? fmt(latestDataTime) : 'No data'}</span>`;
+  let statusHtml = `<span class="fs-label">Latest data:</span><span class="fs-val">${latestDataTime ? fmt(latestDataTime) : 'No data'}</span>`;
   statusEl.innerHTML = statusHtml;
 }
 
