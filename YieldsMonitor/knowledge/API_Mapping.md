@@ -43,12 +43,16 @@ The following symbols are currently supported and grouped by security type:
 - `US10YTIPS`: 10-Year TIPS
 - `US30YTIPS`: 30-Year TIPS
 
-## CNBC API Requirements (App Data Source)
+## CNBC API (2D, 10D ranges only)
 
-All YieldsMonitor app data comes from CNBC. The `timeRange` parameter **must** use the mapped values in the table above, not the UI labels.
+Intraday ranges use CNBC GraphQL. The `timeRange` parameter **must** use the mapped values in the table above, not the UI labels.
 
 - **Base URL**: `https://webql-redesign.cnbcfm.com/graphql`
 - **Operation**: `getQuoteChartData`
 - **Persisted Query Hash**: `9e1670c29a10707c417a1efd327d4b2b1d456b77f1426e7e84fb7d399416bb6b`
-- **No fallbacks**: App requires CNBC connectivity. No local files, no R2, no degraded mode.
+- **5D tip**: Also fetched from CNBC for all ranges (appended to R2 baseline for 1Y+)
+
+## No Local Fallbacks
+
+App fetches only from remote sources (CNBC, R2). Never falls back to local files.
 

@@ -278,36 +278,58 @@ async function fetchWithTimeout(url, options = {}, timeout = 8000) {
   try { const response = await fetch(url, { ...options, signal: controller.signal, cache: 'no-cache' }); clearTimeout(id); return response; } catch (e) { clearTimeout(id); throw e; }
 }
 
+const R2_HISTORY_URL = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/yield-history';
+const historyCache = {};
+
+async function fetchHistory(symbol) {
+  if (!historyCache[symbol]) {
+    historyCache[symbol] = (async () => {
+      try {
+        const response = await fetchWithTimeout(`${R2_HISTORY_URL}/${symbol}_history.json`);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        return data.map(p => ({ x: parseSourceTime(p.x), y: p.y }));
+      } catch (err) {
+        console.error(`R2 history fetch failed for ${symbol}:`, err);
+        delete historyCache[symbol];
+        return null;
+      }
+    })();
+  }
+  return await historyCache[symbol];
+}
+
 async function fetchOne(symbol, range, force = false) {
-  const providerRange = TIME_RANGE_MAP[range] || range || '1D';
-  const cacheKey = `${symbol}_${providerRange}`;
-  const tipKey = `${symbol}_5D`;
-
-  const fetchTasks = [];
-  if (!force && liveCache[cacheKey]) {
-    // Use cache
+  const is2D = range === '2D', is10D = range === '10D';
+  if (is2D || is10D) {
+    const providerRange = is2D ? '1D' : '5D', cacheKey = `${symbol}_${providerRange}`;
+    const tipKey = `${symbol}_5D`;
+    const fetchTasks = [];
+    if (!force && liveCache[cacheKey]) {
+      // Use cache
+    } else {
+      console.log(`%c[CNBC] %cFetching ${providerRange} for ${symbol}`, "color: #2563eb; font-weight: bold", "color: inherit");
+      fetchTasks.push(fetchLive(symbol, providerRange).then(live => { if (live) liveCache[cacheKey] = live; }));
+    }
+    if (is2D && (force || !liveCache[tipKey])) {
+      console.log(`%c[CNBC] %cFetching 5D tip for metrics: ${symbol}`, "color: #2563eb; font-weight: bold", "color: inherit");
+      fetchTasks.push(fetchLive(symbol, '5D').then(live => { if (live) liveCache[tipKey] = live; }));
+    }
+    if (fetchTasks.length > 0) await Promise.all(fetchTasks);
+    const data = liveCache[cacheKey] || [];
+    const cutoff = new Date(); if (is2D) cutoff.setDate(cutoff.getDate() - 2); else cutoff.setDate(cutoff.getDate() - 10);
+    return data.filter(p => p.x >= cutoff);
   } else {
-    console.log(`%c[CNBC] %cFetching ${providerRange} for ${symbol}`, "color: #2563eb; font-weight: bold", "color: inherit");
-    fetchTasks.push(fetchLive(symbol, providerRange).then(live => { if (live) liveCache[cacheKey] = live; }));
+    console.log(`%c[R2] %cLoading history for ${symbol}...`, "color: #ea580c; font-weight: bold", "color: inherit");
+    const history = await fetchHistory(symbol);
+    const tipKey = `${symbol}_5D`; let liveTip = liveCache[tipKey];
+    if (!liveTip || force) { console.log(`%c[CNBC] %cFetching 5D tip for ${symbol}...`, "color: #2563eb; font-weight: bold", "color: inherit"); liveTip = await fetchLive(symbol, '5D'); if (liveTip) liveCache[tipKey] = liveTip; }
+    const cutoff = new Date();
+    if (range === '1Y') cutoff.setFullYear(cutoff.getFullYear() - 1); else if (range === '2Y') cutoff.setFullYear(cutoff.getFullYear() - 2); else if (range === '3Y') cutoff.setFullYear(cutoff.getFullYear() - 3); else if (range === '10Y') cutoff.setFullYear(cutoff.getFullYear() - 10); else if (range === 'ALL') cutoff.setFullYear(cutoff.getFullYear() - 50);
+    let combined = (history || []).filter(p => p.x >= cutoff);
+    if (liveTip && liveTip.length > 0) { const lastHistTime = combined.length > 0 ? combined[combined.length - 1].x.getTime() : 0; const newPoints = liveTip.filter(p => p.x.getTime() > lastHistTime); combined = [...combined, ...newPoints]; }
+    return combined;
   }
-
-  if ((range === '2D' || range === '1Y') && (force || !liveCache[tipKey])) {
-    console.log(`%c[CNBC] %cFetching 5D tip for metrics: ${symbol}`, "color: #2563eb; font-weight: bold", "color: inherit");
-    fetchTasks.push(fetchLive(symbol, '5D').then(live => { if (live) liveCache[tipKey] = live; }));
-  }
-
-  if (fetchTasks.length > 0) await Promise.all(fetchTasks);
-
-  const data = liveCache[cacheKey] || [];
-  const cutoff = new Date();
-  if (range === '2D') cutoff.setDate(cutoff.getDate() - 2);
-  else if (range === '10D') cutoff.setDate(cutoff.getDate() - 10);
-  else if (range === '1Y') cutoff.setFullYear(cutoff.getFullYear() - 1);
-  else if (range === '2Y') cutoff.setFullYear(cutoff.getFullYear() - 2);
-  else if (range === '3Y') cutoff.setFullYear(cutoff.getFullYear() - 3);
-  else if (range === '10Y') cutoff.setFullYear(cutoff.getFullYear() - 10);
-  else if (range === 'ALL') cutoff.setFullYear(cutoff.getFullYear() - 50);
-  return data.filter(p => p.x >= cutoff);
 }
 
 async function fetchLive(symbol, range) {

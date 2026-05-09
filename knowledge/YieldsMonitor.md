@@ -44,9 +44,9 @@ graph LR
 ## 2.0 Core Processes
 
 ### [1.0 Data Blending (The "Live Tip")](../YieldsMonitor/knowledge/1.0_Operation.md#data-blending-live-tip)
-Fetches all data from CNBC API using the correct `timeRange` parameters per API Mapping spec.
-- **Goal**: Ensure consistent data delivery across all time ranges and always current to latest CNBC feed.
-- **Method**: Fetch with mapped provider ranges (e.g., 1Y UI range → 1M provider range). All data sources are remote only; no local fallbacks.
+Combines historical data from R2 (1Y+) with real-time CNBC feeds (all ranges).
+- **Goal**: Ensure the "Latest Yield" is always up-to-the-second regardless of chart range.
+- **Method**: 2D/10D fetch from CNBC. 1Y+ fetch from R2, then append latest CNBC 5D data. No local fallbacks ever.
 
 ### [2.0 Yield Change Logic](../YieldsMonitor/knowledge/1.0_Operation.md#yield-change-calculation)
 Calculates the difference between the latest yield and the previous market close (17:00 ET).
@@ -64,6 +64,6 @@ Intraday and historical charts featuring market-state annotations.
 
 ## 3.0 Foundational Logic (The Engine Room)
 
-- **[Operation Manual (1.0)](../YieldsMonitor/knowledge/1.0_Operation.md)**: Exhaustive details on timezone handling, shading colors, and API integration.
-- **[API Mapping](../YieldsMonitor/knowledge/API_Mapping.md)**: Required mapping of UI time ranges to CNBC `timeRange` parameters. App fetches from CNBC only.
-- **[Data Pipeline](../../knowledge/Data_Pipeline.md)**: Details on the **Yield History Snap** automation script (not the app)—snapshots daily closes for reference/analysis only.
+- **[Operation Manual (1.0)](../YieldsMonitor/knowledge/1.0_Operation.md)**: Exhaustive details on timezone handling, shading colors, and data source architecture.
+- **[API Mapping](../YieldsMonitor/knowledge/API_Mapping.md)**: CNBC `timeRange` parameters for 2D/10D ranges. R2 endpoints for 1Y+.
+- **[Data Pipeline](../../knowledge/Data_Pipeline.md)**: Details on the **Yield History Snap** automation script (supplies R2 data). No local fallbacks in app.
