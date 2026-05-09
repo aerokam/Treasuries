@@ -306,7 +306,16 @@ async function fetchOne(symbol, range, force = false) {
   else if (range === '3Y') cutoff.setFullYear(cutoff.getFullYear() - 3);
   else if (range === '10Y') cutoff.setFullYear(cutoff.getFullYear() - 10);
   else if (range === 'ALL') cutoff.setFullYear(cutoff.getFullYear() - 50);
-  return data.filter(p => p.x >= cutoff);
+  let filtered = data.filter(p => p.x >= cutoff);
+  if (range !== '2D' && range !== '10D') {
+    const liveTip = liveCache[tipKey];
+    if (liveTip && liveTip.length > 0) {
+      const lastHistTime = filtered.length > 0 ? filtered[filtered.length - 1].x.getTime() : 0;
+      const newPoints = liveTip.filter(p => p.x.getTime() > lastHistTime);
+      filtered = [...filtered, ...newPoints];
+    }
+  }
+  return filtered;
 }
 
 async function fetchLive(symbol, range) {
