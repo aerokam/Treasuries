@@ -27,7 +27,12 @@ const COLORS = [
 
 const TIME_RANGE_MAP = {
   '2D': '1D',
-  '10D': '5D'
+  '10D': '5D',
+  '1Y': '1M',
+  '2Y': '3M',
+  '3Y': '6M',
+  '10Y': '5Y',
+  'ALL': 'ALL'
 };
 
 const TIME_RANGES = Object.keys(TIME_RANGE_MAP);
