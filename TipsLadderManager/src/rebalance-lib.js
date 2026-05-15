@@ -1156,6 +1156,7 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
   const afterNewLowerWeight = is3Bracket && totalExcessCost > 0 ? newLowerExcessCost3 / totalExcessCost : null;
 
   const details = [], results = [], outLMI = {};
+  const costDeltaProcessed = new Set(); // Track (CUSIP, year) pairs to avoid double-counting cost deltas from multiple accounts
   for (let i = holdings.length - 1; i >= 0; i--) {
     const h = holdings[i];
     const isLast = (yearInfo[h.year].lastIdx === i);
@@ -1179,11 +1180,16 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
     const b = tipsMap.get(h.cusip);
     const ir = refCPI / (b?.baseCpi ?? refCPI);
     const bst_loop = buySellTargets[h.year];
+    const cusipYearKey = h.cusip + '|' + h.year;
+    const isCostDeltaLeading = !costDeltaProcessed.has(cusipYearKey);
+
     let tFundedYearQty = 0;
     if (bst_loop && h.cusip === bst_loop.targetCUSIP) {
-      tQ = bst_loop.targetQty; qD = bst_loop.qtyDelta; tC = bst_loop.targetCost; cD = bst_loop.costDelta; tFundedYearQty = bst_loop.targetFundedYearQty;
+      tQ = bst_loop.targetQty; qD = bst_loop.qtyDelta; tC = bst_loop.targetCost; cD = isCostDeltaLeading ? bst_loop.costDelta : 0; tFundedYearQty = bst_loop.targetFundedYearQty;
+      if (isCostDeltaLeading) costDeltaProcessed.add(cusipYearKey);
     } else if (nonTargetSells[h.cusip]) {
-      const s = nonTargetSells[h.cusip]; tQ = s.newQty; qD = s.qtyDelta; tC = s.targetCost; cD = s.costDelta; tFundedYearQty = s.newQty;
+      const s = nonTargetSells[h.cusip]; tQ = s.newQty; qD = s.qtyDelta; tC = s.targetCost; cD = isCostDeltaLeading ? s.costDelta : 0; tFundedYearQty = s.newQty;
+      if (isCostDeltaLeading) costDeltaProcessed.add(cusipYearKey);
     } else {
       tQ = h.qty; qD = 0; tC = h.qty * (b.price / 100 * ir * 1000); cD = 0; tFundedYearQty = h.qty;
     }
