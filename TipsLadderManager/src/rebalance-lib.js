@@ -451,8 +451,21 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
   }
   holdings.sort((a, b) => a.maturity - b.maturity);
 
+  // Consolidate multiple holdings with same CUSIP/year from different accounts
+  const consolidatedMap = new Map();
+  for (const h of holdings) {
+    const key = h.cusip + '|' + h.year;
+    if (consolidatedMap.has(key)) {
+      const existing = consolidatedMap.get(key);
+      existing.qty += h.qty;
+    } else {
+      consolidatedMap.set(key, { ...h });
+    }
+  }
+  const consolidatedHoldings = Array.from(consolidatedMap.values()).sort((a, b) => a.maturity - b.maturity);
+
   const yearInfo = {};
-  holdings.forEach((h, idx) => {
+  consolidatedHoldings.forEach((h, idx) => {
     if (!yearInfo[h.year]) yearInfo[h.year] = { firstIdx: idx, lastIdx: idx, holdings: [] };
     yearInfo[h.year].lastIdx = idx;
     yearInfo[h.year].holdings.push(h);
@@ -1138,9 +1151,8 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
   const afterNewLowerWeight = is3Bracket && totalExcessCost > 0 ? newLowerExcessCost3 / totalExcessCost : null;
 
   const details = [], results = [], outLMI = {};
-  const costDeltaProcessed = new Set(); // Track (CUSIP, year) pairs to avoid double-counting cost deltas from multiple accounts
-  for (let i = holdings.length - 1; i >= 0; i--) {
-    const h = holdings[i];
+  for (let i = consolidatedHoldings.length - 1; i >= 0; i--) {
+    const h = consolidatedHoldings[i];
     const isLast = (yearInfo[h.year].lastIdx === i);
     let lmi = 0;
     for (const y in outLMI) if (parseInt(y) > h.year) lmi += outLMI[y];
@@ -1162,19 +1174,12 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
     const b = tipsMap.get(h.cusip);
     const ir = refCPI / (b?.baseCpi ?? refCPI);
     const bst_loop = buySellTargets[h.year];
-    const cusipYearKey = h.cusip + '|' + h.year;
-    const isCostDeltaLeading = !costDeltaProcessed.has(cusipYearKey);
-
     let tFundedYearQty = 0;
-    if (bst_loop && h.cusip === bst_loop.targetCUSIP && isCostDeltaLeading) {
-      // Only the first holding of each (CUSIP, year) gets the aggregate target and delta; others stay unchanged
+    if (bst_loop && h.cusip === bst_loop.targetCUSIP) {
       tQ = bst_loop.targetQty; qD = bst_loop.qtyDelta; tC = bst_loop.targetCost; cD = bst_loop.costDelta; tFundedYearQty = bst_loop.targetFundedYearQty;
-      costDeltaProcessed.add(cusipYearKey);
-    } else if (nonTargetSells[h.cusip] && isCostDeltaLeading) {
+    } else if (nonTargetSells[h.cusip]) {
       const s = nonTargetSells[h.cusip]; tQ = s.newQty; qD = s.qtyDelta; tC = s.targetCost; cD = s.costDelta; tFundedYearQty = s.newQty;
-      costDeltaProcessed.add(cusipYearKey);
     } else {
-      // Subsequent holdings with same CUSIP/year, or no target: leave unchanged
       tQ = h.qty; qD = 0; tC = h.qty * (b.price / 100 * ir * 1000); cD = 0; tFundedYearQty = h.qty;
     }
 
