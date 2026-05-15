@@ -992,7 +992,6 @@ document.getElementById('holdings-file').addEventListener('change', async (e) =>
 
     const parsedAccounts = parseBrokerCSV(text, tipsMap);
     const acctNames = Object.keys(parsedAccounts);
-    console.log('[CSV IMPORT] Parsed accounts:', { acctNames, parsedAccounts });
     if (acctNames.length === 0) {
       const CUSIP_RE = /^[A-Z0-9]{9}$/i;
       const firstLineLower = rawLines[0].replace(/\s/g, '').toLowerCase();
