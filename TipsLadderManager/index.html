@@ -189,6 +189,7 @@
     <p style="margin:0 0 16px;font-size:13px;color:#555;">We found TIPS in multiple accounts. Select which to include in the ladder:</p>
     <div id="account-list" style="margin-bottom:20px;max-height:300px;overflow-y:auto;border:1px solid #e2e8f0;padding:12px;border-radius:6px;background:#f8fafc;"></div>
     <div style="text-align:right;">
+      <button id="account-clear-all" style="background:#f1f5f9;color:#475569;margin-right:8px;border:1px solid #cbd5e1;">Clear all</button>
       <button id="account-cancel" style="background:#f1f5f9;color:#475569;margin-right:8px;border:1px solid #cbd5e1;">Cancel</button>
       <button id="account-confirm">Import Selected</button>
     </div>
@@ -979,6 +980,12 @@ document.getElementById('holdings-file').addEventListener('change', async (e) =>
     updateRebalFirstYearDropdown();
     renderDaraByYearPanel();
   });
+  const clearAllBtn = document.getElementById('account-clear-all');
+  if (clearAllBtn) {
+    clearAllBtn.addEventListener('click', () => {
+      document.querySelectorAll('#account-list input').forEach(cb => cb.checked = false);
+    });
+  }
   document.getElementById('account-cancel').addEventListener('click', () => {
     document.getElementById('account-overlay').style.display = 'none';
     setStatus('Account selection cancelled.', true);
