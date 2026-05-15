@@ -1,7 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "PowerShell(schtasks *)"
+      "PowerShell(schtasks *)",
+      "Bash(npm test *)",
+      "Bash(git add *)",
+      "Bash(git push *)"
     ]
   }
 }

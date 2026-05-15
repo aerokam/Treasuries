@@ -29,10 +29,18 @@ export function parseBrokerCSV(csvText, tipsMap) {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
 
-    const schwabMatch = line.match(/^"?([^",\n]+?)\s*\.{3}(\d+)"?/);
+    // Schwab account header: "Positions for account [Name] ...[Last 4 Digits] as of ..."
+    // Extract text before the "...DIGITS" pattern
+    const schwabMatch = line.match(/\.\.\.\d+/);
     if (schwabMatch) {
-      currentSchwabAccount = schwabMatch[1].trim();
-      continue;
+      // Find what comes before the "...DIGITS" part
+      const beforeDots = line.substring(0, line.indexOf('...'));
+      // Extract account name (remove "Positions for account" prefix and quotes)
+      const acctName = beforeDots.replace(/^["']?Positions\s+for\s+account\s+/, '').replace(/["']?\s*$/, '').trim();
+      if (acctName) {
+        currentSchwabAccount = acctName;
+        continue;
+      }
     }
     if (line.startsWith('"Account Total"') || line.startsWith('Account Total')) {
       currentSchwabAccount = null;

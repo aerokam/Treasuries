@@ -1,7 +1,7 @@
 # Spec Next Steps — Duration Algorithm Coverage
 
 ## Status
-Open — identified at end of duration algorithm fix session (May 2026).
+Closed — all four items implemented (May 2026).
 
 ## What Prompted This
 The duration fix session corrected `shared/src/bond-math.js` to use the fractional first coupon period algorithm (matching Google Sheets DURATION/MDURATION). During that work it became clear the specs were not sufficient to have guided or validated the fix — you would need to read the code to know what the correct algorithm was.

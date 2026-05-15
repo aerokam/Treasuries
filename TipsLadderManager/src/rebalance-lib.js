@@ -886,14 +886,33 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
       else if (future30yYears.length > 0 && year === future30yLowerYear) targetCUSIP = future30yLowerCoverBond.cusip;
       else if (future30yYears.length > 0 && year === future30yUpperYear) targetCUSIP = future30yUpperCoverBond.cusip;
     } else {
-      const sortedH = [...yi.holdings].sort((a, b) => b.maturity - a.maturity);
+      if (year === 2027) {
+        console.log(`\n[DEBUG 2027 SORT] Found ${yi.holdings.length} holdings for 2027:`);
+        yi.holdings.forEach((h, i) => {
+          const dateStr = h.maturity?.toISOString?.().split('T')[0] || 'NO_DATE';
+          console.log(`  [${i}] ${h.cusip} qty=${h.qty} maturity=${dateStr}`);
+        });
+      }
+      const sortedH = [...yi.holdings].sort((a, b) => {
+        const aTime = a.maturity?.getTime?.() ?? 0;
+        const bTime = b.maturity?.getTime?.() ?? 0;
+        return bTime - aTime; // Latest (highest time) comes first
+      });
+      if (year === 2027) {
+        console.log(`[DEBUG 2027 SORT] After sorting by latest maturity first:`);
+        sortedH.forEach((h, i) => {
+          const dateStr = h.maturity?.toISOString?.().split('T')[0] || 'NO_DATE';
+          console.log(`  [${i}] ${h.cusip} qty=${h.qty} maturity=${dateStr}`);
+        });
+        console.log(`[DEBUG 2027 SORT] Picking target: ${sortedH[0]?.cusip}`);
+      }
       targetCUSIP = sortedH[0]?.cusip;
       if (!targetCUSIP && isRebal) {
         // Fallback: pick latest maturity for this year from tipsMap
         const yearBonds = [...tipsMap.values()].filter(b => b.maturity && b.maturity.getFullYear() === year);
         if (yearBonds.length > 0) {
-          yearBonds.sort((a, b) => a.maturity - b.maturity);
-          targetCUSIP = yearBonds[yearBonds.length - 1].cusip;
+          yearBonds.sort((a, b) => (b.maturity?.getTime?.() ?? 0) - (a.maturity?.getTime?.() ?? 0));
+          targetCUSIP = yearBonds[0].cusip;
         }
       }
     }
@@ -949,7 +968,7 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
         tFundedYearQty = 0;
       } else if (isFullMode) {
         const sortedH = [...yi.holdings].sort((a, b) => b.maturity - a.maturity);
-        const nonTarget = sortedH.filter(h => h.cusip !== targetCUSIP);
+        const nonTarget = sortedH.filter(h => h.cusip !== targetCUSIP).reverse();
         let curPI = yi.holdings.reduce((s, h) => s + h.qty * piMap[h.cusip], 0);
         for (const h of nonTarget) {
           const sell = Math.min(h.qty, Math.max(0, Math.floor((curPI - needed) / piMap[h.cusip])));
@@ -972,6 +991,9 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
         tFundedYearQty = Math.max(0, Math.round((needed - ntPI) / piMap[targetCUSIP]));
       }
       postQ = tFundedYearQty + excessQtyTarget;
+      if (year === 2027) {
+        console.log(`[DEBUG 2027 BUY/SELL] Target=${targetCUSIP} before=${targetCurrentQty} after=${postQ} delta=${postQ - targetCurrentQty}`);
+      }
       buySellTargets[year] = { targetCUSIP, targetFundedYearQty: tFundedYearQty, targetQty: postQ, postRebalQty: postQ, qtyDelta: postQ - targetCurrentQty, targetCost: tFundedYearQty * costPerBond, costDelta: -((postQ - targetCurrentQty) * costPerBond), costPerBond, isBracket };
     } else if (year > lastYear && year <= derivedLastYear && yi.holdings.length > 0) {
       // Year was contiguous with original ladder but is now above lastYearOverride — sell all
