@@ -91,6 +91,20 @@
   .info-link:hover { color: #fff; border-bottom-style: solid; }
   .info-link-btn { display:inline-block; background:#1e293b; color:#fff !important; padding:1px 8px; border-radius:4px; border-bottom:none !important; font-weight:700; font-size:11px; letter-spacing:.02em; }
   .info-link-btn:hover { background:#334155; }
+
+  /* ── Purchase List modal ── */
+  #purchase-list-modal { background:#fff;max-width:460px;margin:60px auto;border-radius:8px;padding:24px 28px;position:relative;font-size:13px;line-height:1.5; }
+  #purchase-list-modal table { border-collapse:collapse;width:100%;font-size:13px; }
+  #purchase-list-modal th { text-align:left;padding:4px 10px 4px 0;border-bottom:2px solid #334155;color:#334155;font-weight:600;white-space:nowrap; }
+  #purchase-list-modal th:last-child { text-align:right;padding-right:0; }
+  #purchase-list-modal td { padding:3px 10px 3px 0;border-bottom:1px solid #eee;white-space:nowrap;font-variant-numeric:tabular-nums; }
+  #purchase-list-modal td:last-child { text-align:right;padding-right:0; }
+  #purchase-list-modal tfoot td { font-weight:700;border-top:2px solid #334155;border-bottom:none;padding-top:5px; }
+  #purchase-list-modal td.pl-cusip { font-family:monospace;font-size:12px; }
+  .pl-section-head { font-weight:700;margin-bottom:6px;font-size:13px; }
+  .pl-section-head + table { margin-bottom:0; }
+  .pl-buys { color:#16a34a; }
+  .pl-sells { color:#dc2626; }
   
   #net-cash-inline { display:none; flex-direction:row; gap:5px; align-items:baseline; white-space:nowrap; }
   #net-cash-inline .nc-label { font-size:13px; font-weight:700; color: var(--portal-card-text); text-transform:uppercase; letter-spacing:.06em; }
@@ -196,6 +210,19 @@
   </div>
 </div>
 
+<!-- Purchase List modal -->
+<div id="purchase-list-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;overflow-y:auto;">
+  <div id="purchase-list-modal">
+    <button id="purchase-list-close" style="position:absolute;top:12px;right:14px;background:none;border:none;font-size:22px;color:#888;cursor:pointer;padding:0;line-height:1;">×</button>
+    <div style="font-size:14px;font-weight:700;margin-bottom:4px;color:#1e293b;border-bottom:2px solid #1e293b;padding-bottom:6px;">Purchase List</div>
+    <div style="font-size:11px;color:#94a3b8;margin-bottom:14px;" id="purchase-list-subtitle"></div>
+    <div id="purchase-list-content"></div>
+    <div style="margin-top:16px;text-align:right;">
+      <button id="purchase-list-copy" style="padding:3px 12px;font-size:11px;" title="Copy CUSIP and Qty as CSV">Copy CSV</button>
+    </div>
+  </div>
+</div>
+
 <div id="top-row">
   <div class="tab-bar">
     <div class="tab-bar-title">
@@ -281,6 +308,7 @@
       <button id="run-btn" disabled style="align-self:flex-end">Run Rebalance</button>
       <button id="export-csv-btn" style="display:none;padding:2px 10px;font-size:11px;align-self:flex-end" title="Export table to CSV">Export CSV</button>
       <button id="export-cusip-qty-btn" style="display:none;padding:2px 10px;font-size:11px;align-self:flex-end" title="Export CUSIP/Qty for Rebalance import">Export CUSIP/Qty</button>
+      <button id="purchase-list-btn" style="display:none;padding:2px 10px;font-size:11px;align-self:flex-end" title="Show consolidated order quantities">Purchase List</button>
       <div id="duration-links" style="align-self:flex-end"></div>
       <span id="wad-display" style="display:none;align-self:flex-end" class="info-stat">Wtd Mod Dur <span id="wad-val" class="info-stat-val"></span></span>
     </div>
@@ -504,6 +532,7 @@ document.querySelectorAll('.tab-bar .tab-btn').forEach(btn => {
     document.getElementById('build-output').style.display = !isRebalance && buildRendered     ? 'block' : 'none';
     document.getElementById('export-csv-btn').style.display = (isRebalance ? rebalanceRendered : buildRendered) ? 'block' : 'none';
     document.getElementById('export-cusip-qty-btn').style.display = (isRebalance ? rebalanceRendered : buildRendered) ? 'block' : 'none';
+    document.getElementById('purchase-list-btn').style.display = (isRebalance ? rebalanceRendered : buildRendered) ? 'inline-block' : 'none';
     
     const _nci = document.getElementById('net-cash-inline');
     _nci.style.display = (isRebalance ? rebalanceRendered : buildRendered) ? 'flex' : 'none';
@@ -609,6 +638,90 @@ document.getElementById('export-cusip-qty-btn').addEventListener('click', () => 
   window.URL.revokeObjectURL(url);
 });
 
+// ─── Purchase List modal ──────────────────────────────────────────────────────
+function _plTable(rows, totalLabel, qtyClass) {
+  let html = '<table><thead><tr><th>CUSIP</th><th>Maturity</th><th>Qty</th></tr></thead><tbody>';
+  for (const r of rows) {
+    html += `<tr><td class="pl-cusip">${esc(r.cusip)}</td><td>${esc(r.maturity)}</td>`
+          + `<td class="${qtyClass}">${r.qty}</td></tr>`;
+  }
+  const total = rows.reduce((s, r) => s + Math.abs(r.rawQty), 0);
+  html += `</tbody><tfoot><tr><td colspan="2">${totalLabel}</td><td class="${qtyClass}">${total}</td></tr></tfoot></table>`;
+  return html;
+}
+
+function buildPurchaseListHTML(mode) {
+  const details = mode === 'build' ? buildDetails : rebalDetails;
+  if (!details) return { html: '', csvRows: [] };
+
+  const csvRows = [];
+  let html = '';
+
+  if (mode === 'build') {
+    const rows = details
+      .map(d => ({ cusip: d.cusip, maturity: d.maturityStr, rawQty: (d.fundedYearQty || 0) + (d.excessQty || 0) }))
+      .filter(r => r.rawQty > 0)
+      .map(r => ({ ...r, qty: String(r.rawQty) }));
+    rows.forEach(r => csvRows.push(`${r.cusip},${r.rawQty}`));
+    html = _plTable(rows, 'Total', '');
+  } else {
+    const buys = [], sells = [];
+    for (const d of details) {
+      const delta = (d.qtyAfter || 0) - (d.qtyBefore || 0);
+      if (delta === 0) continue;
+      const row = { cusip: d.cusip, maturity: d.maturityStr, rawQty: delta, qty: delta > 0 ? String(delta) : String(delta) };
+      (delta > 0 ? buys : sells).push(row);
+    }
+    buys.forEach(r => csvRows.push(`${r.cusip},${r.rawQty}`));
+    sells.forEach(r => csvRows.push(`${r.cusip},${r.rawQty}`));
+
+    if (buys.length) {
+      html += '<div class="pl-section-head pl-buys">Buys</div>' + _plTable(buys, 'Total', 'pl-buys');
+    }
+    if (sells.length) {
+      html += (buys.length ? '<div style="height:16px"></div>' : '')
+            + '<div class="pl-section-head pl-sells">Sells</div>'
+            + _plTable(sells, 'Total', 'pl-sells');
+    }
+    if (!html) html = '<p style="color:#94a3b8;margin:0">No trades.</p>';
+  }
+
+  return { html, csvRows };
+}
+
+let _plCsvRows = [];
+
+document.getElementById('purchase-list-btn').addEventListener('click', () => {
+  const mode = currentMode === 'build' ? 'build' : 'rebal';
+  const { html, csvRows } = buildPurchaseListHTML(mode);
+  _plCsvRows = csvRows;
+  const summary = mode === 'build' ? buildSummary : rebalSummary;
+  const subtitle = summary
+    ? (mode === 'build'
+        ? `Build · ${summary.firstYear}–${summary.lastYear}`
+        : `Rebalance · ${summary.firstYear}–${summary.lastYear}`)
+    : '';
+  document.getElementById('purchase-list-subtitle').textContent = subtitle;
+  document.getElementById('purchase-list-content').innerHTML = html;
+  document.getElementById('purchase-list-overlay').style.display = 'block';
+});
+
+document.getElementById('purchase-list-close').addEventListener('click', () => {
+  document.getElementById('purchase-list-overlay').style.display = 'none';
+});
+document.getElementById('purchase-list-overlay').addEventListener('click', e => {
+  if (e.target === e.currentTarget) e.currentTarget.style.display = 'none';
+});
+document.getElementById('purchase-list-copy').addEventListener('click', () => {
+  const text = 'cusip,qty\n' + _plCsvRows.join('\n');
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('purchase-list-copy');
+    const prev = btn.textContent;
+    btn.textContent = 'Copied!';
+    setTimeout(() => { btn.textContent = prev; }, 1500);
+  });
+});
+
 // ─── Render rebalance output ──────────────────────────────────────────────────
 function renderOutput({ results, HDR, summary, details }, portfolioCash = null) {
   lastHDR = HDR; lastResults = results;
@@ -658,6 +771,7 @@ function renderOutput({ results, HDR, summary, details }, portfolioCash = null) 
   document.getElementById('output').style.display = 'block';
   document.getElementById('export-csv-btn').style.display = 'block';
   document.getElementById('export-cusip-qty-btn').style.display = 'block';
+  document.getElementById('purchase-list-btn').style.display = 'inline-block';
 }
 
 // ─── Render Build from Scratch output ────────────────────────────────────────
@@ -703,6 +817,7 @@ function renderBuildOutput({ results, HDR, summary, details }) {
   document.getElementById('build-output').style.display = 'block';
   document.getElementById('export-csv-btn').style.display = 'block';
   document.getElementById('export-cusip-qty-btn').style.display = 'block';
+  document.getElementById('purchase-list-btn').style.display = 'inline-block';
 }
 
 function _renderWAD(wad) {

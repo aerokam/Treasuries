@@ -18,7 +18,7 @@
 
   /* ── Layout ── */
   #main-container { display: flex; flex-direction: column; flex: 1; min-height: 0; }
-  #pane-top { flex: 0 0 450px; min-height: 100px; display: flex; flex-direction: column; padding: 0 20px; }
+  #pane-top { flex: 0 1 450px; min-height: 100px; display: flex; flex-direction: column; padding: 0 20px; }
   #pane-bottom { flex: 1; min-height: 100px; display: flex; flex-direction: column; padding: 0 20px 20px; }
   
   /* ── Splitter ── */
@@ -27,6 +27,7 @@
   #divider::after { content: ""; width: 32px; height: 2px; background: #94a3b8; border-radius: 1px; }
 
   .card { background: #fff; border: 1px solid #ddd; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: flex; flex-direction: column; flex: 1; min-height: 0; }
+  #tipsControls, #nominalsControls { position: relative; z-index: 20; }
   .card-header { display:flex; justify-content: space-between; align-items: center; background: #f8fafc; padding: 8px 12px; border-radius: 8px 8px 0 0; border-bottom: 1px solid #e2e8f0; flex-shrink: 0; }
   
   /* ── Status ── */
