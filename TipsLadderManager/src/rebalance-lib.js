@@ -1184,13 +1184,15 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
     const isCostDeltaLeading = !costDeltaProcessed.has(cusipYearKey);
 
     let tFundedYearQty = 0;
-    if (bst_loop && h.cusip === bst_loop.targetCUSIP) {
-      tQ = bst_loop.targetQty; qD = bst_loop.qtyDelta; tC = bst_loop.targetCost; cD = isCostDeltaLeading ? bst_loop.costDelta : 0; tFundedYearQty = bst_loop.targetFundedYearQty;
-      if (isCostDeltaLeading) costDeltaProcessed.add(cusipYearKey);
-    } else if (nonTargetSells[h.cusip]) {
-      const s = nonTargetSells[h.cusip]; tQ = s.newQty; qD = s.qtyDelta; tC = s.targetCost; cD = isCostDeltaLeading ? s.costDelta : 0; tFundedYearQty = s.newQty;
-      if (isCostDeltaLeading) costDeltaProcessed.add(cusipYearKey);
+    if (bst_loop && h.cusip === bst_loop.targetCUSIP && isCostDeltaLeading) {
+      // Only the first holding of each (CUSIP, year) gets the aggregate target and delta; others stay unchanged
+      tQ = bst_loop.targetQty; qD = bst_loop.qtyDelta; tC = bst_loop.targetCost; cD = bst_loop.costDelta; tFundedYearQty = bst_loop.targetFundedYearQty;
+      costDeltaProcessed.add(cusipYearKey);
+    } else if (nonTargetSells[h.cusip] && isCostDeltaLeading) {
+      const s = nonTargetSells[h.cusip]; tQ = s.newQty; qD = s.qtyDelta; tC = s.targetCost; cD = s.costDelta; tFundedYearQty = s.newQty;
+      costDeltaProcessed.add(cusipYearKey);
     } else {
+      // Subsequent holdings with same CUSIP/year, or no target: leave unchanged
       tQ = h.qty; qD = 0; tC = h.qty * (b.price / 100 * ir * 1000); cD = 0; tFundedYearQty = h.qty;
     }
 
