@@ -331,7 +331,8 @@ runFullRebalanceTest('CusipQtyTestLumpy', './tests/CusipQtyTestLumpy.csv');
     'X22222222,Amy IRA,91282CPU9,TIPS 0.125% 01/15/2031,3000,$100.00,$300000,Cash',
     'X22222222,Amy IRA,VTI,VANGUARD TOTAL STOCK,50,$200.00,$10000,Cash',
   ].join('\n');
-  const accounts = parseBrokerCSV(csv1, tipsMap);
+  const { holdings, tipsValues, totalAccountValues } = parseBrokerCSV(csv1, tipsMap);
+  const accounts = holdings;
 
   assert('F1: Kevin IRA has 2 TIPS', accounts['Kevin IRA']?.length, 2);
   const cpu9 = accounts['Kevin IRA']?.find(h => h.cusip === '91282CPU9');
@@ -362,7 +363,8 @@ runFullRebalanceTest('CusipQtyTestLumpy', './tests/CusipQtyTestLumpy.csv');
     '"91282CPU9","TIPS 0.125% 01/15/2031","3,000","100.00","$300,000.00","Fixed Income"',
     '"Account Total","","","","$300,000.00",""',
   ].join('\n');
-  const accounts = parseBrokerCSV(csv2, tipsMap);
+  const { holdings, tipsValues, totalAccountValues } = parseBrokerCSV(csv2, tipsMap);
+  const accounts = holdings;
 
   assert('F2: Kevin IRA has 2 TIPS', accounts['Kevin IRA']?.length, 2);
   const cpu9 = accounts['Kevin IRA']?.find(h => h.cusip === '91282CPU9');

@@ -25,7 +25,8 @@ export function parseBrokerCSV(csvText, tipsMap) {
   let map = { accountNum: -1, accountName: -1, symbol: -1, quantity: -1, currentValue: -1 };
   let currentSchwabAccount = null;
   const accounts = {}; // Key: AccountName -> Map<cusip, qty>
-  const accountValues = {}; // Key: AccountName -> total current value
+  const tipsValues = {}; // Key: AccountName -> sum of current value for TIPS only
+  const totalAccountValues = {}; // Key: AccountName -> total current value (all positions)
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -37,7 +38,7 @@ export function parseBrokerCSV(csvText, tipsMap) {
       // Find what comes before the "...DIGITS" part
       const beforeDots = line.substring(0, line.indexOf('...'));
       // Extract account name (remove "Positions for account" prefix and quotes)
-      const acctName = beforeDots.replace(/^["']?Positions\s+for\s+account\s+/, '').replace(/["']?\s*$/, '').trim();
+      const acctName = beforeDots.replace(/^["']/, '').replace(/^Positions\s+for\s+account\s+/, '').replace(/\s*$/, '').trim();
       if (acctName) {
         currentSchwabAccount = acctName;
         continue;
@@ -69,6 +70,27 @@ export function parseBrokerCSV(csvText, tipsMap) {
     const rawSym = cols[map.symbol];
     if (!rawSym || rawSym.includes('Total')) continue;
 
+    // Determine account key first (needed for both TIPS and all positions)
+    let acctKey = 'Unknown Account';
+    if (currentSchwabAccount) {
+      acctKey = currentSchwabAccount;
+    } else if (map.accountNum > -1 && cols[map.accountNum]) {
+      acctKey = cols[map.accountNum];
+      if (map.accountName > -1 && cols[map.accountName]) {
+        const name = cols[map.accountName];
+        if (name && name !== 'nan') acctKey = name;
+      }
+    }
+
+    // Track total account value for ALL positions
+    if (map.currentValue > -1 && cols[map.currentValue]) {
+      const valueStr = cols[map.currentValue].replace(/[^0-9.-]/g, '');
+      const value = parseFloat(valueStr);
+      if (!isNaN(value) && value > 0) {
+        totalAccountValues[acctKey] = (totalAccountValues[acctKey] || 0) + value;
+      }
+    }
+
     // Validate CUSIP against our loaded TIPS map
     if (tipsMap.has(rawSym)) {
       const rawQtyStr = cols[map.quantity].replace(/[^0-9.-]/g, ''); // Remove non-numeric chars
@@ -78,26 +100,15 @@ export function parseBrokerCSV(csvText, tipsMap) {
       const qty = Math.round(faceValue / 1000);
       if (qty <= 0) continue;
 
-      let acctKey = 'Unknown Account';
-      if (currentSchwabAccount) {
-        acctKey = currentSchwabAccount;
-      } else if (map.accountNum > -1 && cols[map.accountNum]) {
-        acctKey = cols[map.accountNum];
-        if (map.accountName > -1 && cols[map.accountName]) {
-          const name = cols[map.accountName];
-          if (name && name !== 'nan') acctKey = name;
-        }
-      }
-
       if (!accounts[acctKey]) accounts[acctKey] = new Map();
       accounts[acctKey].set(rawSym, (accounts[acctKey].get(rawSym) || 0) + qty);
 
-      // Extract and sum current value for this account
+      // Track TIPS value for this account
       if (map.currentValue > -1 && cols[map.currentValue]) {
-        const valueStr = cols[map.currentValue].replace(/[^0-9.-]/g, ''); // Remove non-numeric chars (commas, $, etc)
+        const valueStr = cols[map.currentValue].replace(/[^0-9.-]/g, '');
         const value = parseFloat(valueStr);
         if (!isNaN(value) && value > 0) {
-          accountValues[acctKey] = (accountValues[acctKey] || 0) + value;
+          tipsValues[acctKey] = (tipsValues[acctKey] || 0) + value;
         }
       }
     }
@@ -107,5 +118,5 @@ export function parseBrokerCSV(csvText, tipsMap) {
   for (const [acct, posMap] of Object.entries(accounts)) {
     result[acct] = Array.from(posMap, ([cusip, qty]) => ({ cusip, qty }));
   }
-  return { holdings: result, accountValues };
+  return { holdings: result, tipsValues, totalAccountValues };
 }
