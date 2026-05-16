@@ -391,7 +391,6 @@ import { parseBrokerCSV } from './src/broker-import.js';
 import { detectAccountType } from './src/account-allocation.js';
 
 const toIso = d => d ? d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0') : '';
-const esc = s => (s ?? '').toString().replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 const simpleEl = document.getElementById('simple-table');
 const tableEl  = document.getElementById('build-table');
