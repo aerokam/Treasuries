@@ -391,6 +391,7 @@ import { parseBrokerCSV } from './src/broker-import.js';
 import { detectAccountType } from './src/account-allocation.js';
 
 const toIso = d => d ? d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0') : '';
+const esc = s => (s ?? '').toString().replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 const simpleEl = document.getElementById('simple-table');
 const tableEl  = document.getElementById('build-table');
@@ -1548,9 +1549,10 @@ document.getElementById('run-btn').addEventListener('click', async () => {
       // Check if multi-account mode is enabled
       const useMultiAccountMode = document.getElementById('multi-account-mode')?.checked && currentHoldingsWithAccounts && Object.keys(detectedAccounts).length > 1;
 
+      let result;
       if (useMultiAccountMode) {
         // Run multi-account rebalance
-        const result = runMultiAccountRebalance({
+        result = runMultiAccountRebalance({
           dara: finalDara,
           method: document.getElementById('method').value,
           bracketMode: document.getElementById('bracket-mode').value,
@@ -1569,7 +1571,7 @@ document.getElementById('run-btn').addEventListener('click', async () => {
         document.getElementById('multi-account-panel').style.display = 'block';
       } else {
         // Run standard blended rebalance
-        const result = runRebalance({
+        result = runRebalance({
           dara: finalDara,
           method: document.getElementById('method').value,
           bracketMode: document.getElementById('bracket-mode').value,
@@ -1587,8 +1589,10 @@ document.getElementById('run-btn').addEventListener('click', async () => {
         document.getElementById('multi-account-panel').style.display = 'none';
       }
 
-      document.getElementById('val-range').textContent = result?.summary?.firstYear + '–' + result?.summary?.lastYear;
-      document.getElementById('val-term').textContent = (result?.summary?.lastYear - result?.summary?.firstYear + 1) + ' years';
+      if (result?.summary) {
+        document.getElementById('val-range').textContent = result.summary.firstYear + '–' + result.summary.lastYear;
+        document.getElementById('val-term').textContent = (result.summary.lastYear - result.summary.firstYear + 1) + ' years';
+      }
     }
     document.getElementById('dara-by-year').style.display = 'none';
     updateDaraInput();
