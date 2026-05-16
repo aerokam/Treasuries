@@ -22,9 +22,10 @@ function parseCSVLine(str) {
 
 export function parseBrokerCSV(csvText, tipsMap) {
   const lines = csvText.split(/\r?\n/).filter(l => l.trim().length > 0);
-  let map = { accountNum: -1, accountName: -1, symbol: -1, quantity: -1 };
+  let map = { accountNum: -1, accountName: -1, symbol: -1, quantity: -1, currentValue: -1 };
   let currentSchwabAccount = null;
   const accounts = {}; // Key: AccountName -> Map<cusip, qty>
+  const accountValues = {}; // Key: AccountName -> total current value
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -58,6 +59,7 @@ export function parseBrokerCSV(csvText, tipsMap) {
       map.symbol = sIdx;
       map.accountNum = lowerCols.findIndex(c => c.includes('account number') || c === 'account');
       map.accountName = lowerCols.findIndex(c => c.includes('account name'));
+      map.currentValue = lowerCols.findIndex(c => c.includes('current value'));
       continue;
     }
 
@@ -89,6 +91,15 @@ export function parseBrokerCSV(csvText, tipsMap) {
 
       if (!accounts[acctKey]) accounts[acctKey] = new Map();
       accounts[acctKey].set(rawSym, (accounts[acctKey].get(rawSym) || 0) + qty);
+
+      // Extract and sum current value for this account
+      if (map.currentValue > -1 && cols[map.currentValue]) {
+        const valueStr = cols[map.currentValue].replace(/[^0-9.-]/g, ''); // Remove non-numeric chars (commas, $, etc)
+        const value = parseFloat(valueStr);
+        if (!isNaN(value) && value > 0) {
+          accountValues[acctKey] = (accountValues[acctKey] || 0) + value;
+        }
+      }
     }
   }
 
@@ -96,5 +107,5 @@ export function parseBrokerCSV(csvText, tipsMap) {
   for (const [acct, posMap] of Object.entries(accounts)) {
     result[acct] = Array.from(posMap, ([cusip, qty]) => ({ cusip, qty }));
   }
-  return result;
+  return { holdings: result, accountValues };
 }

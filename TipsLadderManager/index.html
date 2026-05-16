@@ -1012,7 +1012,9 @@ document.getElementById('holdings-file').addEventListener('change', async (e) =>
     const rawLines = text.trim().split('\n').filter(l => l.trim());
     if (rawLines.length === 0) { setStatus('Holdings CSV is empty.', true); return; }
 
-    const parsedAccounts = parseBrokerCSV(text, tipsMap);
+    const brokerResult = parseBrokerCSV(text, tipsMap);
+    const parsedAccounts = brokerResult.holdings || brokerResult; // Handle both old and new format
+    const brokerAccountValues = brokerResult.accountValues || {}; // New: extract account values
     const acctNames = Object.keys(parsedAccounts);
     if (acctNames.length === 0) {
       const CUSIP_RE = /^[A-Z0-9]{9}$/i;
@@ -1115,7 +1117,8 @@ document.getElementById('holdings-file').addEventListener('change', async (e) =>
     for (const name of selected) {
       const acctHoldings = window._pendingBrokerAccounts[name];
       const acctType = detectAccountType(name);
-      detectedAccounts[name] = { type: acctType, holdings: acctHoldings, sizeInDollars: 50000 };
+      const acctValue = brokerAccountValues[name] || 50000; // Use extracted value or default
+      detectedAccounts[name] = { type: acctType, holdings: acctHoldings, sizeInDollars: acctValue, maxSizeInDollars: acctValue };
       for (const h of acctHoldings) {
         currentHoldingsWithAccounts.push({ ...h, account: name });
         combined.push(h);
@@ -1367,9 +1370,15 @@ function updateMultiAccountUI() {
   document.getElementById('field-multi-account-mode').style.display = hasMultipleAccounts ? '' : 'none';
 
   if (hasMultipleAccounts) {
+    // Auto-check the checkbox when multiple accounts are detected
+    const checkbox = document.getElementById('multi-account-mode');
+    checkbox.checked = true;
     renderAccountSizes();
+    document.getElementById('multi-account-panel').style.display = 'block';
   } else {
     document.getElementById('multi-account-panel').style.display = 'none';
+    const checkbox = document.getElementById('multi-account-mode');
+    checkbox.checked = false;
   }
 }
 
@@ -1382,29 +1391,54 @@ function renderAccountSizes() {
     return;
   }
 
-  let html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;">';
+  let html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;">';
   for (const [accName, accInfo] of Object.entries(detectedAccounts)) {
     const type = accInfo.type;
     const typeLabel = type === 'roth_ira' ? 'Roth IRA' : type === 'traditional_ira' ? 'Traditional IRA' : 'Taxable';
     const size = accInfo.sizeInDollars || 50000;
+    const maxSize = accInfo.maxSizeInDollars || 50000;
+    const displayMax = Math.max(maxSize, size);
+
     html += `
-      <div style="padding:10px;background:#fff;border:1px solid #d1d5db;border-radius:6px;">
-        <div style="font-size:12px;font-weight:600;margin-bottom:6px;">${esc(accName)}</div>
+      <div style="padding:12px;background:#fff;border:1px solid #d1d5db;border-radius:6px;">
+        <div style="font-size:12px;font-weight:600;margin-bottom:4px;">${esc(accName)}</div>
         <div style="font-size:11px;color:#666;margin-bottom:8px;">${typeLabel}</div>
-        <label style="display:block;font-size:11px;margin-bottom:4px;">Size ($)</label>
-        <input type="number" class="account-size-input" data-account="${esc(accName)}" value="${size}" style="width:100%;padding:4px;font-size:11px;border:1px solid #cbd5e1;border-radius:4px;" min="1000" step="1000">
+        <div style="font-size:10px;color:#999;margin-bottom:8px;">Actual: $${(maxSize || 0).toLocaleString()}</div>
+        <label style="display:block;font-size:11px;margin-bottom:4px;">Allocation ($)</label>
+        <input type="range" class="account-size-slider" data-account="${esc(accName)}" value="${size}" min="0" max="${displayMax}" step="1000" style="width:100%;margin-bottom:6px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">
+          <input type="number" class="account-size-input" data-account="${esc(accName)}" value="${size}" style="flex:1;padding:4px;font-size:11px;border:1px solid #cbd5e1;border-radius:4px;" min="0" max="${displayMax}" step="1000">
+          <span style="font-size:11px;color:#666;">/ $${displayMax.toLocaleString()}</span>
+        </div>
       </div>
     `;
   }
   html += '</div>';
   panel.innerHTML = html;
 
-  // Wire up input changes
-  document.querySelectorAll('.account-size-input').forEach(input => {
-    input.addEventListener('change', (e) => {
-      const accName = e.target.dataset.account;
+  // Wire up slider and input changes
+  document.querySelectorAll('.account-size-slider').forEach(slider => {
+    const accName = slider.dataset.account;
+    const inputEl = document.querySelector(`.account-size-input[data-account="${CSS.escape(accName)}"]`);
+
+    slider.addEventListener('input', (e) => {
+      const val = parseInt(e.target.value, 10);
+      if (inputEl) inputEl.value = val;
       if (detectedAccounts[accName]) {
-        detectedAccounts[accName].sizeInDollars = parseInt(e.target.value, 10) || 50000;
+        detectedAccounts[accName].sizeInDollars = val;
+      }
+    });
+  });
+
+  document.querySelectorAll('.account-size-input').forEach(input => {
+    const accName = input.dataset.account;
+    const sliderEl = document.querySelector(`.account-size-slider[data-account="${CSS.escape(accName)}"]`);
+
+    input.addEventListener('change', (e) => {
+      const val = parseInt(e.target.value, 10) || 0;
+      if (sliderEl) sliderEl.value = val;
+      if (detectedAccounts[accName]) {
+        detectedAccounts[accName].sizeInDollars = val;
       }
     });
   });
