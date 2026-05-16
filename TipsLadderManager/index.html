@@ -994,6 +994,7 @@ function updateRebalLastYearDropdown() {
 
 // ─── File Parsing & State ─────────────────────────────────────────────────────
 let currentHoldingsArray = null;
+let brokerAccountValues = {}; // { accountName: totalValue }
 
 document.getElementById('holdings-file-btn').addEventListener('click', () => {
   document.getElementById('holdings-file').click();
