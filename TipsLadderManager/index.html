@@ -288,6 +288,13 @@
           <option value="3bracket" selected>3-bracket</option>
         </select>
       </div>
+      <div class="field" id="field-multi-account-mode" style="display:none">
+        <label style="white-space:nowrap" title="Allocate ladder across multiple accounts by tax preference">Multi-Acct</label>
+        <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
+          <input type="checkbox" id="multi-account-mode" style="width:auto;margin:0">
+          <span style="font-size:10px;font-weight:800;color:#fff;text-transform:uppercase;letter-spacing:.08em">Enable</span>
+        </label>
+      </div>
       <div class="field" id="field-build-maturity" style="display:none">
         <label>Maturity pick</label>
         <select id="build-maturity">
@@ -358,8 +365,22 @@
   </div>
 </div>
 
+<!-- Multi-Account Rebalance Panel -->
+<div id="multi-account-panel" style="display:none;margin-top:20px;padding:16px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;">
+  <h3 style="margin:0 0 12px;font-size:14px;font-weight:600;">Multi-Account Rebalance</h3>
+  <div id="multi-account-accounts" style="margin-bottom:16px;"></div>
+  <div id="multi-account-feasibility" style="margin-bottom:16px;padding:12px;border-radius:6px;"></div>
+  <div id="multi-account-results">
+    <div class="table-wrap">
+      <div class="table-scroll-wrap">
+        <table class="simple" id="multi-account-table"></table>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script type="module">
-import { buildTipsMapFromYields, localDate, runRebalance, inferDARAFromCash, inferFirstYearFromHoldings, yieldFromPrice } from './src/rebalance-lib.js';
+import { buildTipsMapFromYields, localDate, runRebalance, runMultiAccountRebalance, inferDARAFromCash, inferFirstYearFromHoldings, yieldFromPrice } from './src/rebalance-lib.js';
 import { runBuild, MAX_LAST_YEAR } from './src/build-lib.js';
 import { renderTable, COLS } from './src/render.js';
 import { buildDrillHTML, buildDurationPopupRows, buildFuture30yDurationPopupRows, buildIndexRatioDrill, buildRefCpiDrill, buildPIPerBondDrill } from './src/drill.js';
@@ -367,6 +388,7 @@ import { showPopup, hidePopup } from './src/popup.js';
 import { fetchTipsData, lookupRefCpi, nextBondTradingDay } from './src/data.js';
 window.lookupRefCpi = lookupRefCpi;
 import { parseBrokerCSV } from './src/broker-import.js';
+import { detectAccountType } from './src/account-allocation.js';
 
 const toIso = d => d ? d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0') : '';
 
@@ -1086,14 +1108,26 @@ document.getElementById('holdings-file').addEventListener('change', async (e) =>
     const selected = Array.from(document.querySelectorAll('#account-list input:checked')).map(cb => cb.value);
     if (selected.length === 0) { setStatus('No accounts selected.', true); return; }
 
+    // Store account-aware holdings and build account metadata
+    currentHoldingsWithAccounts = [];
+    detectedAccounts = {};
     let combined = [];
-    for (const name of selected) combined = combined.concat(window._pendingBrokerAccounts[name]);
+    for (const name of selected) {
+      const acctHoldings = window._pendingBrokerAccounts[name];
+      const acctType = detectAccountType(name);
+      detectedAccounts[name] = { type: acctType, holdings: acctHoldings, sizeInDollars: 50000 };
+      for (const h of acctHoldings) {
+        currentHoldingsWithAccounts.push({ ...h, account: name });
+        combined.push(h);
+      }
+    }
     currentHoldingsArray = combined;
     document.getElementById('rebal-last-year').value = '';
     document.getElementById('rebal-first-year').value = '';
     updateRebalLastYearDropdown();
     updateRebalFirstYearDropdown();
     renderDaraByYearPanel();
+    updateMultiAccountUI();
   });
   const clearAllBtn = document.getElementById('account-clear-all');
   if (clearAllBtn) {
@@ -1324,6 +1358,142 @@ document.getElementById('dara-dec').addEventListener('click', () => { _daraStep(
 
 document.getElementById('dara').addEventListener('input', () => { _daraAutoInferred = false; renderDaraByYearPanel(); });
 
+// ─── Multi-Account Mode ──────────────────────────────────────────────────────
+let currentHoldingsWithAccounts = null; // [ { cusip, qty, account }, ... ]
+let detectedAccounts = {}; // { accountName: { type, holdings: [...] } }
+
+function updateMultiAccountUI() {
+  const hasMultipleAccounts = currentHoldingsWithAccounts && Object.keys(detectedAccounts).length > 1;
+  document.getElementById('field-multi-account-mode').style.display = hasMultipleAccounts ? '' : 'none';
+
+  if (hasMultipleAccounts) {
+    renderAccountSizes();
+  } else {
+    document.getElementById('multi-account-panel').style.display = 'none';
+  }
+}
+
+function renderAccountSizes() {
+  const checkbox = document.getElementById('multi-account-mode');
+  const panel = document.getElementById('multi-account-accounts');
+
+  if (!checkbox.checked) {
+    panel.innerHTML = '';
+    return;
+  }
+
+  let html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;">';
+  for (const [accName, accInfo] of Object.entries(detectedAccounts)) {
+    const type = accInfo.type;
+    const typeLabel = type === 'roth_ira' ? 'Roth IRA' : type === 'traditional_ira' ? 'Traditional IRA' : 'Taxable';
+    const size = accInfo.sizeInDollars || 50000;
+    html += `
+      <div style="padding:10px;background:#fff;border:1px solid #d1d5db;border-radius:6px;">
+        <div style="font-size:12px;font-weight:600;margin-bottom:6px;">${esc(accName)}</div>
+        <div style="font-size:11px;color:#666;margin-bottom:8px;">${typeLabel}</div>
+        <label style="display:block;font-size:11px;margin-bottom:4px;">Size ($)</label>
+        <input type="number" class="account-size-input" data-account="${esc(accName)}" value="${size}" style="width:100%;padding:4px;font-size:11px;border:1px solid #cbd5e1;border-radius:4px;" min="1000" step="1000">
+      </div>
+    `;
+  }
+  html += '</div>';
+  panel.innerHTML = html;
+
+  // Wire up input changes
+  document.querySelectorAll('.account-size-input').forEach(input => {
+    input.addEventListener('change', (e) => {
+      const accName = e.target.dataset.account;
+      if (detectedAccounts[accName]) {
+        detectedAccounts[accName].sizeInDollars = parseInt(e.target.value, 10) || 50000;
+      }
+    });
+  });
+}
+
+document.getElementById('multi-account-mode').addEventListener('change', (e) => {
+  renderAccountSizes();
+  document.getElementById('multi-account-panel').style.display = e.target.checked ? 'block' : 'none';
+});
+
+function renderMultiAccountOutput(maResult) {
+  const panel = document.getElementById('multi-account-panel');
+  const feasEl = document.getElementById('multi-account-feasibility');
+  const tableEl = document.getElementById('multi-account-table');
+
+  // ─── Feasibility Report ───
+  const feasRpt = maResult.feasibility;
+  let feasHtml = feasRpt.feasible
+    ? '<div style="background:#dcfce7;border:1px solid #86efac;border-radius:6px;padding:10px;color:#166534;font-size:12px;"><strong>✓ Feasible</strong> — All accounts can independently balance their trades.</div>'
+    : '<div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:6px;padding:10px;color:#991b1b;font-size:12px;"><strong>✗ Infeasible</strong> — Some accounts cannot balance:<br>';
+
+  if (!feasRpt.feasible) {
+    for (const acc of feasRpt.infeasibleAccounts) {
+      feasHtml += `<div style="margin-top:6px;">• <strong>${esc(acc.account)}</strong>: shortfall of $${acc.shortfall.toFixed(0)}</div>`;
+    }
+    feasHtml += '</div>';
+  }
+  feasEl.innerHTML = feasHtml;
+
+  // ─── Account Cash Flows ───
+  let acctHtml = '<div style="font-size:12px;margin-bottom:12px;"><strong>Account Summary:</strong><br>';
+  for (const [name, flows] of Object.entries(maResult.accountCashFlows)) {
+    const typeInfo = detectedAccounts[name];
+    const typeLabel = typeInfo?.type === 'roth_ira' ? 'Roth IRA' : typeInfo?.type === 'traditional_ira' ? 'Traditional IRA' : 'Taxable';
+    acctHtml += `<div style="margin:6px 0;padding:8px;background:#fff;border:1px solid #ddd;border-radius:4px;">`;
+    acctHtml += `<div><strong>${esc(name)}</strong> <span style="color:#666;font-size:11px;">(${typeLabel})</span></div>`;
+    acctHtml += `<div style="font-size:11px;margin-top:4px;">Sell: $${flows.sellProceeds.toFixed(0)} | Buy: $${flows.buyNeeds.toFixed(0)} | Net: $${flows.netCash.toFixed(0)} ${flows.feasible ? '✓' : '✗'}</div>`;
+    acctHtml += `</div>`;
+  }
+  acctHtml += '</div>';
+  document.getElementById('multi-account-accounts').innerHTML = acctHtml;
+
+  // ─── Results Table ───
+  const alloc = maResult.accountAllocation;
+  const maturities = maResult.maturityTiers || {};
+  const rows = [];
+
+  for (const [accountName, cusipData] of Object.entries(alloc)) {
+    for (const [cusip, yearData] of Object.entries(cusipData)) {
+      for (const [yearStr, allocQty] of Object.entries(yearData)) {
+        const year = parseInt(yearStr);
+        const tier = maturities[year] || '?';
+        const typeInfo = detectedAccounts[accountName];
+        const typeLabel = typeInfo?.type === 'roth_ira' ? 'R' : typeInfo?.type === 'traditional_ira' ? 'T' : 'X';
+        const bond = tipsMap.get(cusip);
+        const matStr = bond?.maturity ? fmtDate(bond.maturity) : '?';
+
+        rows.push([accountName, typeLabel, cusip, year, matStr, tier, allocQty]);
+      }
+    }
+  }
+
+  rows.sort((a, b) => {
+    if (a[0] !== b[0]) return a[0].localeCompare(b[0]);
+    if (a[3] !== b[3]) return a[3] - b[3];
+    return a[2].localeCompare(b[2]);
+  });
+
+  tableEl.innerHTML = '';
+  const hdr = tableEl.insertRow();
+  ['Account', 'Type', 'CUSIP', 'Year', 'Maturity', 'Tier', 'Qty'].forEach(h => {
+    const th = document.createElement('th');
+    th.textContent = h;
+    th.style.cssText = 'padding:6px;text-align:left;font-weight:600;font-size:11px;border-bottom:2px solid #ddd;';
+    hdr.appendChild(th);
+  });
+
+  rows.forEach(r => {
+    const tr = tableEl.insertRow();
+    r.forEach((cell, idx) => {
+      const td = tr.insertCell();
+      td.textContent = cell;
+      td.style.cssText = `padding:6px;font-size:11px;border-bottom:1px solid #f0f0f0;${idx === 1 ? 'text-align:center;' : ''}`;
+    });
+  });
+
+  panel.style.display = 'block';
+}
+
 // ─── Run handler ──────────────────────────────────────────────────────────────
 document.getElementById('run-btn').addEventListener('click', async () => {
   setStatus('');
@@ -1374,24 +1544,51 @@ document.getElementById('run-btn').addEventListener('click', async () => {
         document.getElementById('dara').value = finalDara;
         _daraAutoInferred = true;
       }
-      const result = runRebalance({
-        dara: finalDara,
-        method: document.getElementById('method').value,
-        bracketMode: document.getElementById('bracket-mode').value,
-        holdings: currentHoldingsArray,
-        tipsMap,
-        refCPI,
-        settlementDate,
-        daraByYear: getDaraByYear(),
-        lastYearOverride: parseInt(document.getElementById('rebal-last-year').value),
-        preLadderInterest: document.getElementById('pre-ladder-interest').checked,
-        firstYearOverride: parseInt(document.getElementById('rebal-first-year').value)
-      });
-      _lastKnownDara = finalDara;
-      renderOutput(result);
 
-      document.getElementById('val-range').textContent = result.summary.firstYear + '–' + result.summary.lastYear;
-      document.getElementById('val-term').textContent = (result.summary.lastYear - result.summary.firstYear + 1) + ' years';
+      // Check if multi-account mode is enabled
+      const useMultiAccountMode = document.getElementById('multi-account-mode')?.checked && currentHoldingsWithAccounts && Object.keys(detectedAccounts).length > 1;
+
+      if (useMultiAccountMode) {
+        // Run multi-account rebalance
+        const result = runMultiAccountRebalance({
+          dara: finalDara,
+          method: document.getElementById('method').value,
+          bracketMode: document.getElementById('bracket-mode').value,
+          holdings: currentHoldingsWithAccounts,
+          tipsMap,
+          refCPI,
+          settlementDate,
+          daraByYear: getDaraByYear(),
+          lastYearOverride: parseInt(document.getElementById('rebal-last-year').value),
+          preLadderInterest: document.getElementById('pre-ladder-interest').checked,
+          firstYearOverride: parseInt(document.getElementById('rebal-first-year').value),
+          accountSizes: detectedAccounts
+        });
+        _lastKnownDara = finalDara;
+        renderMultiAccountOutput(result);
+        document.getElementById('multi-account-panel').style.display = 'block';
+      } else {
+        // Run standard blended rebalance
+        const result = runRebalance({
+          dara: finalDara,
+          method: document.getElementById('method').value,
+          bracketMode: document.getElementById('bracket-mode').value,
+          holdings: currentHoldingsArray,
+          tipsMap,
+          refCPI,
+          settlementDate,
+          daraByYear: getDaraByYear(),
+          lastYearOverride: parseInt(document.getElementById('rebal-last-year').value),
+          preLadderInterest: document.getElementById('pre-ladder-interest').checked,
+          firstYearOverride: parseInt(document.getElementById('rebal-first-year').value)
+        });
+        _lastKnownDara = finalDara;
+        renderOutput(result);
+        document.getElementById('multi-account-panel').style.display = 'none';
+      }
+
+      document.getElementById('val-range').textContent = result?.summary?.firstYear + '–' + result?.summary?.lastYear;
+      document.getElementById('val-term').textContent = (result?.summary?.lastYear - result?.summary?.firstYear + 1) + ' years';
     }
     document.getElementById('dara-by-year').style.display = 'none';
     updateDaraInput();
