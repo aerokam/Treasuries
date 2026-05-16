@@ -1,9 +1,10 @@
 // rebalance-lib.js -- Core logic for TIPS ladder rebalancing (4.0_TIPS_Ladder_Rebalancing.md)
-// Exports: buildTipsMapFromYields, runRebalance, localDate, inferDARAFromCash
+// Exports: buildTipsMapFromYields, runRebalance, localDate, inferDARAFromCash, runMultiAccountRebalance
 
 import { bondCalcs, calculateMDuration, yieldFromPrice } from '../../shared/src/bond-math.js';
 export { yieldFromPrice };
 import { interpolateYield, syntheticCoupon } from './gap-math.js';
+import { detectAccountType, computeAccountCapacity, allocateToAccounts, computeAccountCashFlows, generateFeasibilityReport } from './account-allocation.js';
 
 export function localDate(str) {
   if (!str) return null;
@@ -1327,4 +1328,153 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
   const HDR = ['CUSIP','Qty','Maturity','FY','Principal','Interest','ARA','Cost','Target Qty','Qty Delta','Target Cost','Cost Delta','ARA (Before)','ARA-DARA Before','ARA (After)','ARA-DARA After','Excess ARA Before','Excess ARA After','Incoming LMI','Excess Interest','Funded PI'];
 
   return { results, HDR, summary: { settleDateDisp, refCPI, DARA, inferredDARA, daraIsInferred: dara === null, method, firstYear, lastYear, derivedFirstYear, rungCount, gapYears, future30yYears, brackets, lowerWeight, upperWeight, costDeltaSum, costForNewRungs, gapCoverageSurplus, gapParams, bracketMode, lowerDuration, upperDuration, newLowerYear, newLowerCUSIP, newLowerDuration, newLowerWeight3, origLowerWeight, bracketFellBack3to2, beforeLowerWeight, beforeUpperWeight, beforeNewLowerWeight, afterLowerWeight, afterUpperWeight, afterNewLowerWeight, totalPreviousExcessCost, totalExcessCost, araByYear, future30yLowerYear, future30yUpperYear, future30yLowerCoverCUSIP: future30yLowerCoverBond?.cusip, future30yUpperCoverCUSIP: future30yUpperCoverBond?.cusip, future30yParams, future30yLowerDuration, future30yUpperDuration, future30yUpperWeight, future30yLowerWeight, future30yUpperExQty, future30yLowerExQty, future30yFellBack, preLadderInterest, preLadderPool, zeroedFundedYears: [...zeroedFundedYears].sort((a, b) => a - b), weightedAvgDuration }, details };
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Multi-Account Rebalancing (Layer 1 + Layer 2)
+// Implements 3.2_Multi_Account_Rebalancing.md
+
+/**
+ * Multi-account rebalance: optimal allocation across taxable/IRA accounts
+ *
+ * @param {Object} params - same as runRebalance, plus:
+ *   - holdings: array with account metadata: { cusip, qty, excessQty, account }
+ *   - accountSizes: { [accountName]: { sizeInDollars, ... } }
+ *
+ * @returns {Object} - { rebalanceResult, accountAllocation, accountCashFlows, feasibility }
+ */
+export function runMultiAccountRebalance({
+  dara,
+  method,
+  bracketMode = '2bracket',
+  holdings: holdingsRaw,
+  tipsMap,
+  refCPI,
+  settlementDate,
+  daraByYear = null,
+  lastYearOverride = null,
+  preLadderInterest = false,
+  firstYearOverride = null,
+  accountSizes = {},
+}) {
+  // ──── Phase 1-4: Run standard blended rebalance ────
+  const layer1Result = runRebalance({
+    dara,
+    method,
+    bracketMode,
+    holdings: holdingsRaw,
+    tipsMap,
+    refCPI,
+    settlementDate,
+    daraByYear,
+    lastYearOverride,
+    preLadderInterest,
+    firstYearOverride,
+  });
+
+  // ──── Phase 5: Build metadata and current holdings by account ────
+  const accountMetadata = {};
+  const currentHoldingsByAccount = {};
+
+  for (const h of holdingsRaw) {
+    const accountName = h.account || 'Unknown';
+    const accountType = detectAccountType(accountName);
+
+    if (!accountMetadata[accountName]) {
+      const size = accountSizes[accountName]?.sizeInDollars || 50000; // default $50k if not specified
+      accountMetadata[accountName] = {
+        name: accountName,
+        type: accountType,
+        sizeInDollars: size,
+        capacityInTIPS: 0, // will compute below
+      };
+    }
+
+    if (!currentHoldingsByAccount[accountName]) {
+      currentHoldingsByAccount[accountName] = {};
+    }
+
+    const key = `${h.cusip}|${tipsMap.get(h.cusip)?.maturity?.getFullYear() || '?'}`;
+    const year = tipsMap.get(h.cusip)?.maturity?.getFullYear();
+    if (year) {
+      if (!currentHoldingsByAccount[accountName][h.cusip]) {
+        currentHoldingsByAccount[accountName][h.cusip] = {};
+      }
+      currentHoldingsByAccount[accountName][h.cusip][year] =
+        (currentHoldingsByAccount[accountName][h.cusip][year] || 0) + h.qty;
+    }
+  }
+
+  // Compute account capacities (use average cost across all details)
+  let totalCost = 0,
+    totalQty = 0;
+  for (const d of layer1Result.details) {
+    totalCost += d.costPerBond * d.qtyAfter;
+    totalQty += d.qtyAfter;
+  }
+  const avgCostPerTIPS = totalQty > 0 ? totalCost / totalQty : 1000;
+
+  for (const acc of Object.values(accountMetadata)) {
+    acc.capacityInTIPS = computeAccountCapacity(acc.sizeInDollars, avgCostPerTIPS);
+  }
+
+  // ──── Build target quantities from Layer 1 details ────
+  const targetQuantities = {};
+  for (const d of layer1Result.details) {
+    if (!targetQuantities[d.cusip]) {
+      targetQuantities[d.cusip] = {};
+    }
+    targetQuantities[d.cusip][d.fundedYear] = d.qtyAfter;
+  }
+
+  // ──── Maturity tiers ────
+  const maturityTiers = new Map();
+  const fundedYears = Array.from(
+    new Set(layer1Result.details.map((d) => d.fundedYear))
+  ).sort((a, b) => a - b);
+
+  const thirdSize = Math.ceil(fundedYears.length / 3);
+  fundedYears.forEach((year, idx) => {
+    if (idx < thirdSize) {
+      maturityTiers.set(year, 'short');
+    } else if (idx < 2 * thirdSize) {
+      maturityTiers.set(year, 'medium');
+    } else {
+      maturityTiers.set(year, 'long');
+    }
+  });
+
+  // ──── Build cost per bond map ────
+  const costPerBond = {};
+  for (const d of layer1Result.details) {
+    costPerBond[d.cusip] = d.costPerBond;
+  }
+
+  // ──── Phase 5: Account-aware allocation ────
+  const allocationResult = allocateToAccounts({
+    accountMetadata,
+    targetQuantities,
+    maturityTiers,
+    costPerBond,
+  });
+
+  // ──── Compute cash flows per account ────
+  const cashFlows = computeAccountCashFlows({
+    allocation: allocationResult.allocation,
+    currentHoldings: currentHoldingsByAccount,
+    costPerBond,
+  });
+
+  // ──── Feasibility report ────
+  const feasibilityReport = generateFeasibilityReport(cashFlows);
+
+  return {
+    rebalanceResult: layer1Result,
+    accountAllocation: allocationResult.allocation,
+    accountMetadata,
+    maturityTiers: Object.fromEntries(maturityTiers),
+    accountCashFlows: cashFlows,
+    feasibility: feasibilityReport,
+    allocationInfeasibilities: allocationResult.infeasibilities,
+  };
 }
