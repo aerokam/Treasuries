@@ -994,7 +994,8 @@ function updateRebalLastYearDropdown() {
 
 // ─── File Parsing & State ─────────────────────────────────────────────────────
 let currentHoldingsArray = null;
-let brokerAccountValues = {}; // { accountName: totalValue }
+let brokerTipsValues = {}; // { accountName: valueOfTipsOnly }
+let brokerTotalAccountValues = {}; // { accountName: totalAccountValue }
 
 document.getElementById('holdings-file-btn').addEventListener('click', () => {
   document.getElementById('holdings-file').click();
@@ -1004,8 +1005,20 @@ document.getElementById('holdings-file').addEventListener('change', async (e) =>
   const file = e.target.files[0];
   document.getElementById('holdings-file-name').textContent = file ? file.name : 'No file chosen';
   currentHoldingsArray = null;
+  currentHoldingsWithAccounts = null;
+  detectedAccounts = {};
+  window._pendingBrokerAccounts = null; // Clear any stale account data
+  brokerTipsValues = {};
+  brokerTotalAccountValues = {};
   setStatus('');
-  _clearAutoDara();
+  // Clear all form fields to force re-inference from new holdings
+  document.getElementById('dara').value = '';
+  _daraAutoInferred = false;
+  document.getElementById('rebal-last-year').value = '';
+  document.getElementById('rebal-first-year').value = '';
+  document.getElementById('last-year').value = '';
+  document.getElementById('first-year').value = '';
+  document.getElementById('account-list').innerHTML = ''; // Clear account modal content
   if (!e.target.files.length) return;
   
   try {
@@ -1015,7 +1028,8 @@ document.getElementById('holdings-file').addEventListener('change', async (e) =>
 
     const brokerResult = parseBrokerCSV(text, tipsMap);
     const parsedAccounts = brokerResult.holdings || brokerResult; // Handle both old and new format
-    const brokerAccountValues = brokerResult.accountValues || {}; // New: extract account values
+    brokerTipsValues = brokerResult.tipsValues || {}; // TIPS value only (for default size)
+    brokerTotalAccountValues = brokerResult.totalAccountValues || {}; // Total account value (for max slider)
     const acctNames = Object.keys(parsedAccounts);
     if (acctNames.length === 0) {
       const CUSIP_RE = /^[A-Z0-9]{9}$/i;
@@ -1118,8 +1132,9 @@ document.getElementById('holdings-file').addEventListener('change', async (e) =>
     for (const name of selected) {
       const acctHoldings = window._pendingBrokerAccounts[name];
       const acctType = detectAccountType(name);
-      const acctValue = brokerAccountValues[name] || 50000; // Use extracted value or default
-      detectedAccounts[name] = { type: acctType, holdings: acctHoldings, sizeInDollars: acctValue, maxSizeInDollars: acctValue };
+      const tipsValue = brokerTipsValues[name] || 50000; // Default allocation size (TIPS value only)
+      const maxValue = brokerTotalAccountValues[name] || tipsValue; // Max slider value (total account value)
+      detectedAccounts[name] = { type: acctType, holdings: acctHoldings, sizeInDollars: tipsValue, maxSizeInDollars: maxValue };
       for (const h of acctHoldings) {
         currentHoldingsWithAccounts.push({ ...h, account: name });
         combined.push(h);
@@ -1396,20 +1411,20 @@ function renderAccountSizes() {
   for (const [accName, accInfo] of Object.entries(detectedAccounts)) {
     const type = accInfo.type;
     const typeLabel = type === 'roth_ira' ? 'Roth IRA' : type === 'traditional_ira' ? 'Traditional IRA' : 'Taxable';
-    const size = accInfo.sizeInDollars || 50000;
-    const maxSize = accInfo.maxSizeInDollars || 50000;
+    const size = Math.round((accInfo.sizeInDollars || 50000) / 1000) * 1000;
+    const maxSize = Math.round((accInfo.maxSizeInDollars || 50000) / 1000) * 1000;
     const displayMax = Math.max(maxSize, size);
 
     html += `
       <div style="padding:12px;background:#fff;border:1px solid #d1d5db;border-radius:6px;">
         <div style="font-size:12px;font-weight:600;margin-bottom:4px;">${esc(accName)}</div>
         <div style="font-size:11px;color:#666;margin-bottom:8px;">${typeLabel}</div>
-        <div style="font-size:10px;color:#999;margin-bottom:8px;">Actual: $${(maxSize || 0).toLocaleString()}</div>
+        <div style="font-size:10px;color:#999;margin-bottom:8px;">TIPS Value: $${displayMax.toLocaleString('en-US', {maximumFractionDigits: 0})}</div>
         <label style="display:block;font-size:11px;margin-bottom:4px;">Allocation ($)</label>
         <input type="range" class="account-size-slider" data-account="${esc(accName)}" value="${size}" min="0" max="${displayMax}" step="1000" style="width:100%;margin-bottom:6px;">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">
-          <input type="number" class="account-size-input" data-account="${esc(accName)}" value="${size}" style="flex:1;padding:4px;font-size:11px;border:1px solid #cbd5e1;border-radius:4px;" min="0" max="${displayMax}" step="1000">
-          <span style="font-size:11px;color:#666;">/ $${displayMax.toLocaleString()}</span>
+          <input type="number" class="account-size-input" data-account="${esc(accName)}" value="${size}" style="flex:1;padding:4px;font-size:11px;border:1px solid #cbd5e1;border-radius:4px;" min="0" max="${displayMax}" step="1000" data-formatted="${size.toLocaleString('en-US', {maximumFractionDigits: 0})}">
+          <span style="font-size:11px;color:#666;">/ $${displayMax.toLocaleString('en-US', {maximumFractionDigits: 0})}</span>
         </div>
       </div>
     `;
@@ -1424,7 +1439,10 @@ function renderAccountSizes() {
 
     slider.addEventListener('input', (e) => {
       const val = parseInt(e.target.value, 10);
-      if (inputEl) inputEl.value = val;
+      if (inputEl) {
+        inputEl.value = val;
+        inputEl.dataset.formatted = val.toLocaleString('en-US', {maximumFractionDigits: 0});
+      }
       if (detectedAccounts[accName]) {
         detectedAccounts[accName].sizeInDollars = val;
       }
@@ -1436,8 +1454,11 @@ function renderAccountSizes() {
     const sliderEl = document.querySelector(`.account-size-slider[data-account="${CSS.escape(accName)}"]`);
 
     input.addEventListener('change', (e) => {
-      const val = parseInt(e.target.value, 10) || 0;
+      let val = parseInt(e.target.value, 10) || 0;
+      val = Math.round(val / 1000) * 1000; // Round to nearest 1000
       if (sliderEl) sliderEl.value = val;
+      input.value = val;
+      input.dataset.formatted = val.toLocaleString('en-US', {maximumFractionDigits: 0});
       if (detectedAccounts[accName]) {
         detectedAccounts[accName].sizeInDollars = val;
       }
@@ -1453,14 +1474,12 @@ document.getElementById('multi-account-mode').addEventListener('change', (e) => 
 function renderMultiAccountOutput(maResult) {
   const panel = document.getElementById('multi-account-panel');
   const feasEl = document.getElementById('multi-account-feasibility');
-  const tableEl = document.getElementById('multi-account-table');
 
   // ─── Feasibility Report ───
   const feasRpt = maResult.feasibility;
   let feasHtml = feasRpt.feasible
-    ? '<div style="background:#dcfce7;border:1px solid #86efac;border-radius:6px;padding:10px;color:#166534;font-size:12px;"><strong>✓ Feasible</strong> — All accounts can independently balance their trades.</div>'
-    : '<div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:6px;padding:10px;color:#991b1b;font-size:12px;"><strong>✗ Infeasible</strong> — Some accounts cannot balance:<br>';
-
+    ? '<div style="background:#dcfce7;border:1px solid #86efac;border-radius:6px;padding:10px;color:#166534;font-size:12px;"><strong>✓ Feasible</strong> — All account allocations fit within their budgets.</div>'
+    : '<div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:6px;padding:10px;color:#991b1b;font-size:12px;"><strong>✗ Infeasible</strong> — Some accounts exceed their budget:<br>';
   if (!feasRpt.feasible) {
     for (const acc of feasRpt.infeasibleAccounts) {
       feasHtml += `<div style="margin-top:6px;">• <strong>${esc(acc.account)}</strong>: shortfall of $${acc.shortfall.toFixed(0)}</div>`;
@@ -1469,61 +1488,138 @@ function renderMultiAccountOutput(maResult) {
   }
   feasEl.innerHTML = feasHtml;
 
-  // ─── Account Cash Flows ───
+  // ─── Account Summary ───
   let acctHtml = '<div style="font-size:12px;margin-bottom:12px;"><strong>Account Summary:</strong><br>';
   for (const [name, flows] of Object.entries(maResult.accountCashFlows)) {
     const typeInfo = detectedAccounts[name];
     const typeLabel = typeInfo?.type === 'roth_ira' ? 'Roth IRA' : typeInfo?.type === 'traditional_ira' ? 'Traditional IRA' : 'Taxable';
     acctHtml += `<div style="margin:6px 0;padding:8px;background:#fff;border:1px solid #ddd;border-radius:4px;">`;
     acctHtml += `<div><strong>${esc(name)}</strong> <span style="color:#666;font-size:11px;">(${typeLabel})</span></div>`;
-    acctHtml += `<div style="font-size:11px;margin-top:4px;">Sell: $${flows.sellProceeds.toFixed(0)} | Buy: $${flows.buyNeeds.toFixed(0)} | Net: $${flows.netCash.toFixed(0)} ${flows.feasible ? '✓' : '✗'}</div>`;
-    acctHtml += `</div>`;
+    acctHtml += `<div style="font-size:11px;margin-top:4px;">Current: $${flows.currentValue.toFixed(0)} | New: $${flows.newAllocationCost.toFixed(0)} | Budget: $${flows.budget.toFixed(0)}${flows.feasible ? ' ✓' : ` ✗ (shortfall: $${flows.shortfall.toFixed(0)})`}</div>`;
+    acctHtml += '</div>';
   }
   acctHtml += '</div>';
   document.getElementById('multi-account-accounts').innerHTML = acctHtml;
 
-  // ─── Results Table ───
+  // ─── Color palette ───
+  const colorPalette = ['#fce7f3','#dbeafe','#dcfce7','#fef3c7','#ede9fe','#e0e7ff','#f3e8ff','#fce4ec'];
+  const accountNames = Object.keys(maResult.accountAllocation).sort();
+  const accountColors = {};
+  accountNames.forEach((name, idx) => { accountColors[name] = colorPalette[idx % colorPalette.length]; });
+
+  // ─── Legend + expand/collapse controls in panel ───
+  let legendHtml = '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:11px;">';
+  legendHtml += '<strong>Legend:</strong>';
+  accountNames.forEach(name => {
+    legendHtml += `<span style="display:flex;align-items:center;gap:4px;">` +
+      `<span style="display:inline-block;width:11px;height:11px;background:${accountColors[name]};border:1px solid #aaa;border-radius:2px;"></span>` +
+      `${esc(name)}</span>`;
+  });
+  legendHtml += `<span style="margin-left:auto;display:flex;gap:6px;">` +
+    `<button id="ma-expand-all" style="padding:2px 8px;font-size:11px;cursor:pointer;border:1px solid #cbd5e1;border-radius:3px;background:#f8fafc;">Expand All</button>` +
+    `<button id="ma-collapse-all" style="padding:2px 8px;font-size:11px;cursor:pointer;border:1px solid #cbd5e1;border-radius:3px;background:#f8fafc;">Collapse All</button>` +
+    `</span></div>`;
+  document.getElementById('multi-account-results').innerHTML = legendHtml;
+
+  // ─── Clear previous sub-rows and rebuild ───
+  simpleEl.querySelectorAll('tr.acct-subrow').forEach(tr => tr.remove());
+  simpleEl.querySelectorAll('.acct-toggle').forEach(el => el.remove());
+  simpleEl.querySelectorAll('tr[data-ri]').forEach(tr => { tr.style.backgroundColor = ''; });
+
   const alloc = maResult.accountAllocation;
-  const maturities = maResult.maturityTiers || {};
-  const rows = [];
+  const currentByAcct = maResult.currentHoldingsByAccount || {};
+  const details = maResult.rebalanceResult?.details || [];
+  const colCount = simpleEl.querySelector('thead tr')?.childElementCount || 11;
+  const allAccountNames = [...new Set([...Object.keys(alloc), ...Object.keys(currentByAcct)])].sort();
+  const allSubRows = [];
 
-  for (const [accountName, cusipData] of Object.entries(alloc)) {
-    for (const [cusip, yearData] of Object.entries(cusipData)) {
-      for (const [yearStr, allocQty] of Object.entries(yearData)) {
-        const year = parseInt(yearStr);
-        const tier = maturities[year] || '?';
-        const typeInfo = detectedAccounts[accountName];
-        const typeLabel = typeInfo?.type === 'roth_ira' ? 'R' : typeInfo?.type === 'traditional_ira' ? 'T' : 'X';
-        const bond = tipsMap.get(cusip);
-        const matStr = bond?.maturity ? fmtDate(bond.maturity) : '?';
+  for (const mainTr of simpleEl.querySelectorAll('tr[data-ri]:not([data-sub])')) {
+    const ri = parseInt(mainTr.dataset.ri);
+    const d = details[ri];
+    if (!d) continue;
+    const { cusip, fundedYear } = d;
 
-        rows.push([accountName, typeLabel, cusip, year, matStr, tier, allocQty]);
-      }
+    // Per-account before/after for this CUSIP/year
+    const acctData = [];
+    for (const accountName of allAccountNames) {
+      const qtyBefore = currentByAcct[accountName]?.[cusip]?.[fundedYear] || 0;
+      const qtyAfter = alloc[accountName]?.[cusip]?.[fundedYear] || 0;
+      if (qtyBefore === 0 && qtyAfter === 0) continue;
+      acctData.push({ accountName, qtyBefore, qtyAfter, qtyDelta: qtyAfter - qtyBefore });
+    }
+    if (acctData.length === 0) continue;
+
+    // Dominant account color on the main row
+    const dominant = acctData.reduce((best, a) => a.qtyAfter > (best?.qtyAfter ?? -1) ? a : best, null);
+    if (dominant) mainTr.style.backgroundColor = accountColors[dominant.accountName] || '';
+
+    // Toggle indicator on first cell
+    const firstTd = mainTr.querySelector('td:first-child');
+    if (firstTd) {
+      const toggle = document.createElement('span');
+      toggle.className = 'acct-toggle';
+      toggle.textContent = ' ▼';
+      toggle.style.cssText = 'font-size:9px;color:#94a3b8;user-select:none;pointer-events:none;';
+      firstTd.appendChild(toggle);
+      firstTd.style.cursor = 'pointer';
+    }
+
+    // Insert sub-rows after this row (or after its excess sub-row if present)
+    let insertAfter = mainTr;
+    const next = mainTr.nextElementSibling;
+    if (next?.dataset?.sub === '1' && next.dataset.ri === mainTr.dataset.ri) {
+      insertAfter = next;
+    }
+
+    const subRowEls = [];
+    for (const { accountName, qtyBefore, qtyAfter, qtyDelta } of acctData) {
+      const typeInfo = detectedAccounts[accountName];
+      const typeLabel = typeInfo?.type === 'roth_ira' ? 'R' : typeInfo?.type === 'traditional_ira' ? 'T' : 'X';
+      const actionText = qtyDelta > 0 ? `BUY +${qtyDelta}` : qtyDelta < 0 ? `SELL ${qtyDelta}` : 'HOLD';
+      const actionColor = qtyDelta > 0 ? '#166534' : qtyDelta < 0 ? '#991b1b' : '#64748b';
+      const bg = accountColors[accountName] || '#f9fafb';
+
+      const subTr = document.createElement('tr');
+      subTr.className = 'acct-subrow';
+      subTr.dataset.parentRi = ri;
+
+      const td = document.createElement('td');
+      td.colSpan = colCount;
+      td.style.cssText = `padding:2px 8px 2px 30px;background:${bg};border-bottom:1px solid rgba(0,0,0,0.06);font-size:11px;`;
+      td.innerHTML =
+        `<span style="font-weight:600;margin-right:8px;">${esc(accountName)}</span>` +
+        `<span style="background:#e2e8f0;border-radius:3px;padding:1px 5px;font-size:10px;margin-right:12px;">${typeLabel}</span>` +
+        `<span style="color:#64748b;margin-right:10px;">Before: <b>${qtyBefore}</b></span>` +
+        `<span style="color:#64748b;margin-right:12px;">After: <b>${qtyAfter}</b></span>` +
+        `<span style="color:${actionColor};font-weight:700;">${actionText}</span>`;
+
+      subTr.appendChild(td);
+      insertAfter.after(subTr);
+      insertAfter = subTr;
+      subRowEls.push(subTr);
+      allSubRows.push(subTr);
+    }
+
+    // Per-row collapse on click of first cell
+    if (firstTd) {
+      firstTd.addEventListener('click', e => {
+        e.stopPropagation();
+        const expanded = subRowEls[0]?.style.display !== 'none';
+        subRowEls.forEach(sr => { sr.style.display = expanded ? 'none' : ''; });
+        const toggleEl = firstTd.querySelector('.acct-toggle');
+        if (toggleEl) toggleEl.textContent = expanded ? ' ▶' : ' ▼';
+      });
     }
   }
 
-  rows.sort((a, b) => {
-    if (a[0] !== b[0]) return a[0].localeCompare(b[0]);
-    if (a[3] !== b[3]) return a[3] - b[3];
-    return a[2].localeCompare(b[2]);
+  // ─── Expand / Collapse All ───
+  document.getElementById('ma-expand-all')?.addEventListener('click', () => {
+    allSubRows.forEach(sr => { sr.style.display = ''; });
+    simpleEl.querySelectorAll('.acct-toggle').forEach(t => { t.textContent = ' ▼'; });
   });
-
-  tableEl.innerHTML = '';
-  const hdr = tableEl.insertRow();
-  ['Account', 'Type', 'CUSIP', 'Year', 'Maturity', 'Tier', 'Qty'].forEach(h => {
-    const th = document.createElement('th');
-    th.textContent = h;
-    th.style.cssText = 'padding:6px;text-align:left;font-weight:600;font-size:11px;border-bottom:2px solid #ddd;';
-    hdr.appendChild(th);
-  });
-
-  rows.forEach(r => {
-    const tr = tableEl.insertRow();
-    r.forEach((cell, idx) => {
-      const td = tr.insertCell();
-      td.textContent = cell;
-      td.style.cssText = `padding:6px;font-size:11px;border-bottom:1px solid #f0f0f0;${idx === 1 ? 'text-align:center;' : ''}`;
-    });
+  document.getElementById('ma-collapse-all')?.addEventListener('click', () => {
+    allSubRows.forEach(sr => { sr.style.display = 'none'; });
+    simpleEl.querySelectorAll('.acct-toggle').forEach(t => { t.textContent = ' ▶'; });
   });
 
   panel.style.display = 'block';
@@ -1601,6 +1697,7 @@ document.getElementById('run-btn').addEventListener('click', async () => {
           accountSizes: detectedAccounts
         });
         _lastKnownDara = finalDara;
+        renderOutput(result.rebalanceResult);
         renderMultiAccountOutput(result);
         document.getElementById('multi-account-panel').style.display = 'block';
       } else {

@@ -4,7 +4,7 @@
 import { bondCalcs, calculateMDuration, yieldFromPrice } from '../../shared/src/bond-math.js';
 export { yieldFromPrice };
 import { interpolateYield, syntheticCoupon } from './gap-math.js';
-import { detectAccountType, computeAccountCapacity, allocateToAccounts, computeAccountCashFlows, generateFeasibilityReport } from './account-allocation.js';
+import { detectAccountType, allocateToAccounts, computeAccountCashFlows, generateFeasibilityReport } from './account-allocation.js';
 
 export function localDate(str) {
   if (!str) return null;
@@ -488,8 +488,8 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
     else { lastYear = year; break; }
   }
   const derivedLastYear = lastYear;  // save before override for sell-above-lastYear logic
-  if (lastYearOverride != null) lastYear = lastYearOverride;
-  if (firstYearOverride != null) firstYear = firstYearOverride;
+  if (lastYearOverride != null && !isNaN(lastYearOverride)) lastYear = lastYearOverride;
+  if (firstYearOverride != null && !isNaN(firstYearOverride)) firstYear = firstYearOverride;
 
   const tipsMapYears = new Set();
   let maxTipsYear = 0;
@@ -1386,7 +1386,6 @@ export function runMultiAccountRebalance({
         name: accountName,
         type: accountType,
         sizeInDollars: size,
-        capacityInTIPS: 0, // will compute below
       };
     }
 
@@ -1403,19 +1402,6 @@ export function runMultiAccountRebalance({
       currentHoldingsByAccount[accountName][h.cusip][year] =
         (currentHoldingsByAccount[accountName][h.cusip][year] || 0) + h.qty;
     }
-  }
-
-  // Compute account capacities (use average cost across all details)
-  let totalCost = 0,
-    totalQty = 0;
-  for (const d of layer1Result.details) {
-    totalCost += d.costPerBond * d.qtyAfter;
-    totalQty += d.qtyAfter;
-  }
-  const avgCostPerTIPS = totalQty > 0 ? totalCost / totalQty : 1000;
-
-  for (const acc of Object.values(accountMetadata)) {
-    acc.capacityInTIPS = computeAccountCapacity(acc.sizeInDollars, avgCostPerTIPS);
   }
 
   // ──── Build target quantities from Layer 1 details ────
@@ -1458,11 +1444,18 @@ export function runMultiAccountRebalance({
     costPerBond,
   });
 
+  // ──── Build accountSizes map ────
+  const accountSizesMap = {};
+  for (const acc of Object.values(accountMetadata)) {
+    accountSizesMap[acc.name] = acc.sizeInDollars;
+  }
+
   // ──── Compute cash flows per account ────
   const cashFlows = computeAccountCashFlows({
     allocation: allocationResult.allocation,
     currentHoldings: currentHoldingsByAccount,
     costPerBond,
+    accountSizes: accountSizesMap,
   });
 
   // ──── Feasibility report ────
@@ -1476,5 +1469,6 @@ export function runMultiAccountRebalance({
     accountCashFlows: cashFlows,
     feasibility: feasibilityReport,
     allocationInfeasibilities: allocationResult.infeasibilities,
+    currentHoldingsByAccount,
   };
 }

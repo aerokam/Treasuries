@@ -14,18 +14,6 @@ export function detectAccountType(accountName) {
   return 'taxable';
 }
 
-/**
- * Compute account capacity (in TIPS) given account size in dollars
- * Accounts for average cost per TIPS (including index ratio markup)
- *
- * @param {number} sizeInDollars - e.g., 50000
- * @param {number} avgCostPerTIPS - e.g., 1005 (accounts for index ratio)
- * @returns {number} - estimated capacity in TIPS
- */
-export function computeAccountCapacity(sizeInDollars, avgCostPerTIPS) {
-  if (avgCostPerTIPS <= 0) return 0;
-  return Math.round(sizeInDollars / avgCostPerTIPS);
-}
 
 /**
  * Assign each (CUSIP, year) in the target ladder to a maturity tier
@@ -86,119 +74,139 @@ export function allocateToAccounts({
 }) {
   const accounts = Object.values(accountMetadata);
   const allocation = {}; // { [accountName][cusip][year] = qty }
-  const accountCapacitiesUsed = {}; // track how many TIPS allocated to each account
+  const accountDollarsSpent = {}; // track dollars allocated to each account
   const infeasibilities = [];
 
   // Initialize allocation structure
   for (const acc of accounts) {
     allocation[acc.name] = {};
-    accountCapacitiesUsed[acc.name] = 0;
+    accountDollarsSpent[acc.name] = 0;
   }
 
-  // Get all funded years and assign tiers
-  const fundedYears = Array.from(maturityTiers.keys()).sort((a, b) => a - b);
+  // Compute fallback avgCostPerTIPS from costPerBond values
+  const allCosts = Object.values(costPerBond);
+  const avgCostPerTIPS = allCosts.length > 0
+    ? allCosts.reduce((s, c) => s + c, 0) / allCosts.length
+    : 1000;
 
-  // For each CUSIP and each year in target, allocate to accounts by preference
+  // Greedy fill: create flat list of all target TIPS, sorted by maturity (longest first)
+  const allTargets = [];
   for (const cusip in targetQuantities) {
     for (const yearStr in targetQuantities[cusip]) {
       const year = parseInt(yearStr);
-      const targetQty = targetQuantities[cusip][year];
-      if (targetQty <= 0) continue;
+      const qty = targetQuantities[cusip][year];
+      if (qty > 0) {
+        allTargets.push({ cusip, year, qty });
+      }
+    }
+  }
 
-      const tier = maturityTiers.get(year) || 'medium';
-      const preference = getTierPreference(tier);
+  // Sort by maturity year descending (longest maturity first)
+  allTargets.sort((a, b) => b.year - a.year);
 
-      let remaining = targetQty;
+  // Account type preference order: Traditional IRA first (gets longest TIPS), then Roth, then Taxable
+  const typePreferenceOrder = ['traditional_ira', 'roth_ira', 'taxable'];
 
-      // Try to allocate in preference order
-      for (const accountType of preference) {
-        if (remaining <= 0) break;
+  // Greedy allocation: fill accounts in type preference order
+  for (const { cusip, year, qty } of allTargets) {
+    let remaining = qty;
 
-        // Find first account of this type with available capacity
-        for (const acc of accounts) {
-          if (acc.type !== accountType || remaining <= 0) continue;
+    // Try each account type in preference order
+    for (const accountType of typePreferenceOrder) {
+      if (remaining <= 0) break;
 
-          const availableCapacity = acc.capacityInTIPS - (accountCapacitiesUsed[acc.name] || 0);
-          const toAllocate = Math.min(remaining, availableCapacity);
+      // Find first account of this type with available capacity
+      for (const acc of accounts) {
+        if (acc.type !== accountType || remaining <= 0) continue;
 
-          if (toAllocate > 0) {
-            if (!allocation[acc.name][cusip]) {
-              allocation[acc.name][cusip] = {};
-            }
-            allocation[acc.name][cusip][year] = toAllocate;
-            accountCapacitiesUsed[acc.name] =
-              (accountCapacitiesUsed[acc.name] || 0) + toAllocate;
-            remaining -= toAllocate;
+        const costThisCusip = costPerBond[cusip] ?? avgCostPerTIPS;
+        const remainingBudget = acc.sizeInDollars - (accountDollarsSpent[acc.name] || 0);
+        const maxAffordable = Math.floor(remainingBudget / costThisCusip);
+        const toAllocate = Math.min(remaining, maxAffordable);
+
+        if (toAllocate > 0) {
+          if (!allocation[acc.name][cusip]) {
+            allocation[acc.name][cusip] = {};
           }
+          allocation[acc.name][cusip][year] = toAllocate;
+          accountDollarsSpent[acc.name] = (accountDollarsSpent[acc.name] || 0) + toAllocate * costThisCusip;
+          remaining -= toAllocate;
         }
       }
+    }
 
-      // If there's still remaining qty, record as overflow (infeasible if any account overflows)
-      if (remaining > 0) {
-        infeasibilities.push({
-          cusip,
-          year,
-          remainingQty: remaining,
-          reason: 'Insufficient account capacity across all accounts for this maturity',
-        });
-      }
+    // If still remaining after all accounts, record as infeasible
+    if (remaining > 0) {
+      infeasibilities.push({
+        cusip,
+        year,
+        remainingQty: remaining,
+        reason: 'Insufficient total account capacity to accommodate all target TIPS',
+      });
     }
   }
 
   return {
     allocation,
-    accountCapacitiesUsed,
+    accountDollarsSpent,
     infeasibilities,
   };
 }
 
 /**
- * Compute per-account cash flows (sell proceeds vs. buy needs)
+ * Compute per-account allocation feasibility (liquidate-and-rebuild model)
  *
  * @param {Object} params
  * @param {Object} params.allocation - { [accountName][cusip][year] = allocatedQty }
  * @param {Object} params.currentHoldings - { [accountName][cusip][year] = currentQty }
  * @param {Object} params.costPerBond - { [cusip] = cost }
- * @returns {Object} - { [accountName]: { sellProceeds, buyNeeds, netCash } }
+ * @param {Object} params.accountSizes - { [accountName]: sizeInDollars }
+ * @returns {Object} - { [accountName]: { currentValue, newAllocationCost, budget, shortfall, feasible } }
  */
 export function computeAccountCashFlows({
   allocation,
   currentHoldings,
   costPerBond,
+  accountSizes,
 }) {
   const accountCashFlows = {};
   const accounts = Object.keys(allocation);
 
   for (const accountName of accounts) {
-    let sellProceeds = 0;
-    let buyNeeds = 0;
+    const budget = accountSizes[accountName] ?? 0;
 
     const accountAlloc = allocation[accountName] || {};
     const accountCurrent = currentHoldings[accountName] || {};
 
-    for (const cusip in accountAlloc) {
-      for (const yearStr in accountAlloc[cusip]) {
-        const year = parseInt(yearStr);
-        const allocatedQty = accountAlloc[cusip][year];
-        const currentQty = accountCurrent[cusip]?.[year] || 0;
-        const qtyDelta = allocatedQty - currentQty;
-
+    // Informational: current value of TIPS in this account
+    let currentValue = 0;
+    for (const cusip in accountCurrent) {
+      for (const yearStr in accountCurrent[cusip]) {
+        const qty = accountCurrent[cusip][yearStr];
         const cost = costPerBond[cusip] || 0;
-
-        if (qtyDelta < 0) {
-          sellProceeds += Math.abs(qtyDelta) * cost;
-        } else if (qtyDelta > 0) {
-          buyNeeds += qtyDelta * cost;
-        }
+        currentValue += qty * cost;
       }
     }
 
-    const netCash = sellProceeds - buyNeeds;
+    // Feasibility check: does new allocation cost fit within budget?
+    let newAllocationCost = 0;
+    for (const cusip in accountAlloc) {
+      for (const yearStr in accountAlloc[cusip]) {
+        const qty = accountAlloc[cusip][yearStr];
+        const cost = costPerBond[cusip] || 0;
+        newAllocationCost += qty * cost;
+      }
+    }
+
+    const shortfall = Math.max(0, newAllocationCost - budget);
+    const feasible = shortfall === 0;
+
     accountCashFlows[accountName] = {
-      sellProceeds: Math.round(sellProceeds * 100) / 100,
-      buyNeeds: Math.round(buyNeeds * 100) / 100,
-      netCash: Math.round(netCash * 100) / 100,
-      feasible: netCash >= 0,
+      currentValue: Math.round(currentValue * 100) / 100,
+      newAllocationCost: Math.round(newAllocationCost * 100) / 100,
+      budget: Math.round(budget * 100) / 100,
+      shortfall: Math.round(shortfall * 100) / 100,
+      feasible,
     };
   }
 
@@ -220,9 +228,10 @@ export function generateFeasibilityReport(accountCashFlows) {
       feasible = false;
       infeasibleAccounts.push({
         account: accountName,
-        netCash: flows.netCash,
-        shortfall: Math.abs(flows.netCash),
-        reason: `Account would need $${Math.abs(flows.netCash).toFixed(2)} to complete rebalance but only generates $${flows.sellProceeds.toFixed(2)} in sales.`,
+        shortfall: flows.shortfall,
+        newAllocationCost: flows.newAllocationCost,
+        budget: flows.budget,
+        reason: `Allocation costs $${flows.newAllocationCost.toFixed(2)} but budget is $${flows.budget.toFixed(2)} (shortfall: $${flows.shortfall.toFixed(2)}).`,
       });
     }
   }
