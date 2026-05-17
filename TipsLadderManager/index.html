@@ -79,8 +79,14 @@
   table.simple td { padding: 6px 8px; border-bottom: 1px solid #eee; white-space: nowrap; font-variant-numeric: tabular-nums; }
   table.simple tr.no-change td { color: #94a3b8; }
   table.simple tr.excess-subrow td { background: #e2f3f3; color: #1e4f4f; font-size: 12px; font-style: italic; }
-  table.simple tr.bracket:not(.excess-subrow) td { background: #c0e0e0; }
+  table.simple tr.bracket:not(.excess-subrow):not(.fy-group-header) td { background: #c0e0e0; }
   table.simple tfoot td { font-weight: 700; border-top: 2px solid var(--portal-text-main); background: var(--portal-text-main); color: var(--portal-text-on-dark); padding: 6px 8px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  table.simple tr.fy-group-header td { background: #dce8e8; font-weight: 700; cursor: pointer; border-top: 2px solid #aac8c8; }
+  table.simple tr.fy-group-header.bracket td { background: #c0d8d8; border-top-color: #88b8b8; }
+  table.simple tr.fy-group-header:hover td { background: #ccdede !important; }
+  table.simple tr.fy-group-header.bracket:hover td { background: #b0cccc !important; }
+  table.simple tr.fy-group-header td:first-child::before { content: '▼\00a0\00a0'; font-size: 10px; }
+  table.simple tr.fy-group-header[data-expanded="false"] td:first-child::before { content: '▶\00a0\00a0'; }
   /* All cols fit their content */
   #build-table th { width: 1px; }
 
@@ -309,6 +315,8 @@
       <button id="export-csv-btn" style="display:none;padding:2px 10px;font-size:11px;align-self:flex-end" title="Export table to CSV">Export CSV</button>
       <button id="export-cusip-qty-btn" style="display:none;padding:2px 10px;font-size:11px;align-self:flex-end" title="Export CUSIP/Qty for Rebalance import">Export CUSIP/Qty</button>
       <button id="purchase-list-btn" style="display:none;padding:2px 10px;font-size:11px;align-self:flex-end" title="Show consolidated order quantities">Purchase List</button>
+      <button id="expand-all-btn" style="display:none;padding:2px 10px;font-size:11px;align-self:flex-end" title="Expand all funded year groups">Expand All</button>
+      <button id="collapse-all-btn" style="display:none;padding:2px 10px;font-size:11px;align-self:flex-end" title="Collapse all funded year groups">Collapse All</button>
       <div id="duration-links" style="align-self:flex-end"></div>
       <span id="wad-display" style="display:none;align-self:flex-end" class="info-stat">Wtd Mod Dur <span id="wad-val" class="info-stat-val"></span></span>
     </div>
@@ -533,6 +541,8 @@ document.querySelectorAll('.tab-bar .tab-btn').forEach(btn => {
     document.getElementById('export-csv-btn').style.display = (isRebalance ? rebalanceRendered : buildRendered) ? 'block' : 'none';
     document.getElementById('export-cusip-qty-btn').style.display = (isRebalance ? rebalanceRendered : buildRendered) ? 'block' : 'none';
     document.getElementById('purchase-list-btn').style.display = (isRebalance ? rebalanceRendered : buildRendered) ? 'inline-block' : 'none';
+    document.getElementById('expand-all-btn').style.display = (isRebalance ? rebalanceRendered : buildRendered) ? 'inline-block' : 'none';
+    document.getElementById('collapse-all-btn').style.display = (isRebalance ? rebalanceRendered : buildRendered) ? 'inline-block' : 'none';
     
     const _nci = document.getElementById('net-cash-inline');
     _nci.style.display = (isRebalance ? rebalanceRendered : buildRendered) ? 'flex' : 'none';
@@ -637,6 +647,36 @@ document.getElementById('export-cusip-qty-btn').addEventListener('click', () => 
   document.body.removeChild(a);
   window.URL.revokeObjectURL(url);
 });
+
+// ─── Collapsible funded-year groups ──────────────────────────────────────────
+function _activeTable() {
+  return currentMode === 'build' ? tableEl : simpleEl;
+}
+
+function _setGroupExpanded(tbl, fy, expanded) {
+  const hdr = tbl.querySelector(`tr.fy-group-header[data-fy="${fy}"]`);
+  if (!hdr) return;
+  hdr.dataset.expanded = expanded ? 'true' : 'false';
+  tbl.querySelectorAll(`tr.fy-child[data-fy="${fy}"]`).forEach(tr => { tr.hidden = !expanded; });
+}
+
+function _setAllGroupsExpanded(expanded) {
+  const tbl = _activeTable();
+  tbl.querySelectorAll('tr.fy-group-header').forEach(hdr => {
+    _setGroupExpanded(tbl, hdr.dataset.fy, expanded);
+  });
+}
+
+[simpleEl, tableEl].forEach(tbl => {
+  tbl.addEventListener('click', e => {
+    const hdr = e.target.closest('tr.fy-group-header');
+    if (!hdr) return;
+    _setGroupExpanded(tbl, hdr.dataset.fy, hdr.dataset.expanded !== 'true');
+  });
+});
+
+document.getElementById('expand-all-btn').addEventListener('click', () => _setAllGroupsExpanded(true));
+document.getElementById('collapse-all-btn').addEventListener('click', () => _setAllGroupsExpanded(false));
 
 // ─── Purchase List modal ──────────────────────────────────────────────────────
 function _plTable(rows, totalLabel, qtyClass) {
@@ -772,6 +812,8 @@ function renderOutput({ results, HDR, summary, details }, portfolioCash = null) 
   document.getElementById('export-csv-btn').style.display = 'block';
   document.getElementById('export-cusip-qty-btn').style.display = 'block';
   document.getElementById('purchase-list-btn').style.display = 'inline-block';
+  document.getElementById('expand-all-btn').style.display = 'inline-block';
+  document.getElementById('collapse-all-btn').style.display = 'inline-block';
 }
 
 // ─── Render Build from Scratch output ────────────────────────────────────────
@@ -818,6 +860,8 @@ function renderBuildOutput({ results, HDR, summary, details }) {
   document.getElementById('export-csv-btn').style.display = 'block';
   document.getElementById('export-cusip-qty-btn').style.display = 'block';
   document.getElementById('purchase-list-btn').style.display = 'inline-block';
+  document.getElementById('expand-all-btn').style.display = 'inline-block';
+  document.getElementById('collapse-all-btn').style.display = 'inline-block';
 }
 
 function _renderWAD(wad) {
@@ -982,7 +1026,20 @@ document.getElementById('holdings-file').addEventListener('change', async (e) =>
   document.getElementById('holdings-file-name').textContent = file ? file.name : 'No file chosen';
   currentHoldingsArray = null;
   setStatus('');
-  _clearAutoDara();
+  // Clear stale output and reset all inference state when a new file is loaded
+  simpleEl.innerHTML = '';
+  document.getElementById('output').style.display = 'none';
+  document.getElementById('expand-all-btn').style.display = 'none';
+  document.getElementById('collapse-all-btn').style.display = 'none';
+  document.getElementById('export-csv-btn').style.display = 'none';
+  document.getElementById('export-cusip-qty-btn').style.display = 'none';
+  document.getElementById('purchase-list-btn').style.display = 'none';
+  document.getElementById('dara').value = '';
+  _daraAutoInferred = false;
+  document.getElementById('rebal-last-year').value = '';
+  document.getElementById('rebal-first-year').value = '';
+  document.getElementById('last-year').value = '';
+  document.getElementById('first-year').value = '';
   if (!e.target.files.length) return;
   
   try {

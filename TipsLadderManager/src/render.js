@@ -32,10 +32,6 @@ export const COLS = [
     value: d => d.maturityStr, subValue: d => d.maturityStr },
   { label: 'Yield',       key: 'yield',       fmt: 'yld', buildOnly: true,
     value: d => d.yield },
-  { label: 'Funded Year', headerHTML: 'Funded<br>Year', key: 'fundedYear',  fmt: 'fy',
-    value: (d, ri, details) => (ri === details.length - 1 || details[ri+1].fundedYear !== d.fundedYear) ? d.fundedYear : '',
-    subValue: d => d.isFuture30yCover ? 'Future 30Y' : 'Excess' },
-
   // Rebalance-only
   { label: 'Amount Before', headerHTML: 'Amt<br>Before', key: 'amtBefore', fmt: 'amt', rebalOnly: true,
     value:          d => d.araBeforeTotal,
@@ -120,6 +116,28 @@ function isUpperBracket(d, summary, mode) {
     : d.fundedYear === summary.upperYear;
 }
 
+function renderGroupHeader(cols, fy, groupRows, isBracketGroup) {
+  const labelCount = cols.filter(c => c.fmt === 'str' || c.fmt === 'yld').length;
+  const valueCols  = cols.filter(c => c.fmt !== 'str' && c.fmt !== 'yld');
+  const cls = 'fy-group-header' + (isBracketGroup ? ' bracket' : '');
+  const label = String(fy) + (isBracketGroup ? '*' : '');
+
+  let html = `<tr class="${cls}" data-fy="${fy}" data-expanded="true">`;
+  html += `<td colspan="${labelCount}">${esc(label)}</td>`;
+  for (const col of valueCols) {
+    const sum = groupRows.reduce((acc, d) => {
+      const v = col.value(d, 0, groupRows);
+      return acc + (typeof v === 'number' ? v : 0);
+    }, 0);
+    const s   = fmtCell(sum, col.fmt);
+    const cls2 = fmtCls(sum, col.fmt);
+    const attr = cls2 ? ` class="${cls2}"` : '';
+    html += `<td${attr} style="text-align:right">${esc(s)}</td>`;
+  }
+  html += '</tr>';
+  return html;
+}
+
 function cellHtml(col, v, ri, drillKey) {
   const s   = fmtCell(v, col.fmt);
   const cls = fmtCls(v, col.fmt);
@@ -140,36 +158,55 @@ export function renderTable({ details, mode, summary }) {
     cols.map(c => '<th data-col="' + c.key + '" style="cursor:help">' + (c.headerHTML || esc(c.label)) + '</th>').join('') +
     '</tr></thead>';
 
-  const bodyRows = details.map((d, ri) => {
-    const bt    = isBracket(d, mode);
-    const upper = bt && isUpperBracket(d, summary, mode);
-    const noChg = mode === 'rebal' && d.qtyAfter === d.qtyBefore && d.excessQtyAfter === d.excessQtyBefore;
+  // Group consecutive rows by fundedYear
+  const groups = [];
+  for (const [ri, d] of details.entries()) {
+    if (!groups.length || groups[groups.length - 1].fy !== d.fundedYear) {
+      groups.push({ fy: d.fundedYear, rows: [{ d, ri }] });
+    } else {
+      groups[groups.length - 1].rows.push({ d, ri });
+    }
+  }
 
-    const mainCells = cols.map(col => {
-      const v = col.value(d, ri, details);
-      let drillKey = null;
-      if (col.drill) {
-        const ok = col.drillCond ? col.drillCond(v, d) : (v != null && v !== 0);
-        if (ok) drillKey = col.key;
-      }
-      return cellHtml(col, v, ri, drillKey);
-    }).join('');
-    let html = '<tr data-ri="' + ri + '" class="' + (bt ? 'bracket ' : '') + (noChg ? 'no-change' : '') + '">' + mainCells + '</tr>';
+  const bodyRows = groups.map(({ fy, rows }) => {
+    const isBracketGroup = rows.some(({ d }) => isBracket(d, mode));
+    let html = renderGroupHeader(cols, fy, rows.map(r => r.d), isBracketGroup);
 
-    if (bt) {
-      const subCells = cols.map(col => {
-        const sv = col.subValue ? col.subValue(d, ri, details) : null;
-        const sdk = col.subDrillKeyFn ? col.subDrillKeyFn(d) : (col.subDrillKey ?? null);
-        return cellHtml(col, sv, ri, sdk);
+    for (const { d, ri } of rows) {
+      const bt    = isBracket(d, mode);
+      const upper = bt && isUpperBracket(d, summary, mode);
+      const noChg = mode === 'rebal' && d.qtyAfter === d.qtyBefore && d.excessQtyAfter === d.excessQtyBefore;
+
+      const mainCells = cols.map(col => {
+        const v = col.value(d, ri, details);
+        let drillKey = null;
+        if (col.drill) {
+          const ok = col.drillCond ? col.drillCond(v, d) : (v != null && v !== 0);
+          if (ok) drillKey = col.key;
+        }
+        return cellHtml(col, v, ri, drillKey);
       }).join('');
-      const subRow = '<tr data-ri="' + ri + '" data-sub="1" class="excess-subrow bracket">' + subCells + '</tr>';
-      html = upper ? subRow + html : html + subRow;
+
+      const rowCls = 'fy-child' + (bt ? ' bracket' : '') + (noChg ? ' no-change' : '');
+      let rowHtml = `<tr data-ri="${ri}" data-fy="${fy}" class="${rowCls}">${mainCells}</tr>`;
+
+      if (bt) {
+        const subCells = cols.map(col => {
+          const sv = col.subValue ? col.subValue(d, ri, details) : null;
+          const sdk = col.subDrillKeyFn ? col.subDrillKeyFn(d) : (col.subDrillKey ?? null);
+          return cellHtml(col, sv, ri, sdk);
+        }).join('');
+        const subRow = `<tr data-ri="${ri}" data-sub="1" data-fy="${fy}" class="fy-child excess-subrow bracket">${subCells}</tr>`;
+        rowHtml = upper ? subRow + rowHtml : rowHtml + subRow;
+      }
+
+      html += rowHtml;
     }
     return html;
   }).join('');
 
   const tfootCells = cols.map(col => {
-    const align = col.fmt === 'fy' ? ' style="text-align:center"' : col.fmt !== 'str' ? ' style="text-align:right"' : '';
+    const align = col.fmt !== 'str' ? ' style="text-align:right"' : '';
     let s = '';
     if (col.key === 'cusip') {
       s = 'Total';
