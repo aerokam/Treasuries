@@ -14,136 +14,229 @@ export function detectAccountType(accountName) {
   return 'taxable';
 }
 
-
 /**
- * Assign each (CUSIP, year) in the target ladder to a maturity tier
- * @param {number[]} fundedYears - all funded years in the ladder, sorted
- * @returns {Map<number, string>} - year → "short" | "medium" | "long"
- */
-function assignMaturityTiers(fundedYears) {
-  const tierMap = new Map();
-  if (fundedYears.length === 0) return tierMap;
-
-  const thirdSize = Math.ceil(fundedYears.length / 3);
-  fundedYears.forEach((year, idx) => {
-    if (idx < thirdSize) {
-      tierMap.set(year, 'short');
-    } else if (idx < 2 * thirdSize) {
-      tierMap.set(year, 'medium');
-    } else {
-      tierMap.set(year, 'long');
-    }
-  });
-
-  return tierMap;
-}
-
-/**
- * Get preference order for allocating a given maturity tier
+ * Get buy preference order for a maturity tier
  * @param {string} tier - "short" | "medium" | "long"
- * @returns {string[]} - account types in preference order
+ * @returns {string[]} - account types in preference order (most preferred first)
  */
 function getTierPreference(tier) {
   switch (tier) {
-    case 'short':
-      return ['taxable', 'roth_ira', 'traditional_ira'];
-    case 'medium':
-      return ['roth_ira', 'traditional_ira', 'taxable'];
-    case 'long':
-      return ['traditional_ira', 'roth_ira', 'taxable'];
-    default:
-      return ['taxable', 'roth_ira', 'traditional_ira'];
+    case 'short':  return ['taxable', 'roth_ira', 'traditional_ira'];
+    case 'medium': return ['roth_ira', 'traditional_ira', 'taxable'];
+    case 'long':   return ['traditional_ira', 'roth_ira', 'taxable'];
+    default:       return ['taxable', 'roth_ira', 'traditional_ira'];
   }
 }
 
 /**
- * Allocate target quantities to accounts respecting tax preferences and capacity
+ * Allocate target quantities to accounts using direction-preserving algorithm.
+ *
+ * Core constraint: within a single account, for any funded year, all transactions
+ * must be in one direction (buy OR sell, never both). Cross-account sell+buy of the
+ * same TIPS is allowed.
  *
  * @param {Object} params
- * @param {Map<string, Object>} params.accountMetadata - { name, type, sizeInDollars, capacityInTIPS }
- * @param {Object} params.targetQuantities - { [cusip][year] = qty }
- * @param {Map<number, string>} params.maturityTiers - year → tier
+ * @param {Object} params.accountMetadata - { [name]: { name, type, sizeInDollars } }
+ * @param {Object} params.targetQuantities - { [cusip][year] = targetQty }
+ * @param {Map<number, string>} params.maturityTiers - year → "short" | "medium" | "long"
  * @param {Object} params.costPerBond - { [cusip] = cost }
- * @returns {Object} - { allocation, accountCapacitiesUsed, infeasible }
+ * @param {Object} [params.rmdByAccount] - { [tIRAaccountName]: rmdAnnualAmountDollars }
+ * @param {Object} [params.currentHoldingsByAccount] - { [accountName][cusip][year] = qty }
+ * @param {Set<string>} [params.excludedFromBuy] - CUSIPs that cannot be purchased
+ * @returns {Object} - { allocation, accountDollarsSpent, infeasibilities }
  */
 export function allocateToAccounts({
   accountMetadata,
   targetQuantities,
   maturityTiers,
   costPerBond,
+  rmdByAccount = {},
+  currentHoldingsByAccount = {},
+  excludedFromBuy = new Set(),
 }) {
   const accounts = Object.values(accountMetadata);
   const allocation = {}; // { [accountName][cusip][year] = qty }
-  const accountDollarsSpent = {}; // track dollars allocated to each account
+  const accountDollarsSpent = {};
   const infeasibilities = [];
 
-  // Initialize allocation structure
-  for (const acc of accounts) {
-    allocation[acc.name] = {};
-    accountDollarsSpent[acc.name] = 0;
-  }
-
-  // Compute fallback avgCostPerTIPS from costPerBond values
+  // Average cost for unknown CUSIPs
   const allCosts = Object.values(costPerBond);
   const avgCostPerTIPS = allCosts.length > 0
     ? allCosts.reduce((s, c) => s + c, 0) / allCosts.length
     : 1000;
 
-  // Greedy fill: create flat list of all target TIPS, sorted by maturity (longest first)
-  const allTargets = [];
-  for (const cusip in targetQuantities) {
-    for (const yearStr in targetQuantities[cusip]) {
-      const year = parseInt(yearStr);
-      const qty = targetQuantities[cusip][year];
-      if (qty > 0) {
-        allTargets.push({ cusip, year, qty });
+  // Initialize allocation and budget from current holdings
+  for (const acc of accounts) {
+    allocation[acc.name] = {};
+    accountDollarsSpent[acc.name] = 0;
+  }
+
+  for (const [accName, holdingsByCusip] of Object.entries(currentHoldingsByAccount)) {
+    if (!allocation[accName]) allocation[accName] = {};
+    for (const [cusip, holdingsByYear] of Object.entries(holdingsByCusip)) {
+      if (!allocation[accName][cusip]) allocation[accName][cusip] = {};
+      for (const [yearStr, qty] of Object.entries(holdingsByYear)) {
+        if (qty <= 0) continue;
+        const year = parseInt(yearStr);
+        allocation[accName][cusip][year] = qty;
+        const cost = costPerBond[cusip] ?? avgCostPerTIPS;
+        accountDollarsSpent[accName] = (accountDollarsSpent[accName] || 0) + qty * cost;
       }
     }
   }
 
-  // Sort by maturity year descending (longest maturity first)
-  allTargets.sort((a, b) => b.year - a.year);
+  // Build complete set of (cusip, year) pairs: targets + current holdings
+  const pairsMap = new Map(); // `${cusip}|${year}` → { cusip, year, targetQty }
 
-  // Account type preference order: Traditional IRA first (gets longest TIPS), then Roth, then Taxable
-  const typePreferenceOrder = ['traditional_ira', 'roth_ira', 'taxable'];
+  for (const cusip in targetQuantities) {
+    for (const yearStr in targetQuantities[cusip]) {
+      const year = parseInt(yearStr);
+      pairsMap.set(`${cusip}|${year}`, { cusip, year, targetQty: targetQuantities[cusip][yearStr] || 0 });
+    }
+  }
 
-  // Greedy allocation: fill accounts in type preference order
-  for (const { cusip, year, qty } of allTargets) {
-    let remaining = qty;
-
-    // Try each account type in preference order
-    for (const accountType of typePreferenceOrder) {
-      if (remaining <= 0) break;
-
-      // Find first account of this type with available capacity
-      for (const acc of accounts) {
-        if (acc.type !== accountType || remaining <= 0) continue;
-
-        const costThisCusip = costPerBond[cusip] ?? avgCostPerTIPS;
-        const remainingBudget = acc.sizeInDollars - (accountDollarsSpent[acc.name] || 0);
-        const maxAffordable = Math.floor(remainingBudget / costThisCusip);
-        const toAllocate = Math.min(remaining, maxAffordable);
-
-        if (toAllocate > 0) {
-          if (!allocation[acc.name][cusip]) {
-            allocation[acc.name][cusip] = {};
-          }
-          allocation[acc.name][cusip][year] = toAllocate;
-          accountDollarsSpent[acc.name] = (accountDollarsSpent[acc.name] || 0) + toAllocate * costThisCusip;
-          remaining -= toAllocate;
+  for (const holdingsByCusip of Object.values(currentHoldingsByAccount)) {
+    for (const cusip in holdingsByCusip) {
+      for (const yearStr in holdingsByCusip[cusip]) {
+        const year = parseInt(yearStr);
+        const key = `${cusip}|${year}`;
+        if (!pairsMap.has(key)) {
+          pairsMap.set(key, { cusip, year, targetQty: 0 });
         }
       }
     }
+  }
 
-    // If still remaining after all accounts, record as infeasible
-    if (remaining > 0) {
-      infeasibilities.push({
-        cusip,
-        year,
-        remainingQty: remaining,
-        reason: 'Insufficient total account capacity to accommodate all target TIPS',
-      });
+  // Compute netDelta for each pair
+  const allTargets = [];
+  for (const { cusip, year, targetQty } of pairsMap.values()) {
+    let totalCurrent = 0;
+    for (const accName in currentHoldingsByAccount) {
+      totalCurrent += (currentHoldingsByAccount[accName][cusip]?.[year] || 0);
     }
+    const netDelta = targetQty - totalCurrent;
+    allTargets.push({ cusip, year, targetQty, netDelta });
+  }
+
+  // Sort: year DESC; within same year, sells (netDelta < 0) before buys
+  allTargets.sort((a, b) => {
+    if (b.year !== a.year) return b.year - a.year;
+    const aOrder = a.netDelta < 0 ? 0 : 1;
+    const bOrder = b.netDelta < 0 ? 0 : 1;
+    return aOrder - bOrder;
+  });
+
+  // Pre-scan: accounts holding a CUSIP whose target is 0 are committed sellers for that year
+  const sellYearsByAccount = {}; // { [accName]: Set<year> }
+
+  for (const [accName, holdingsByCusip] of Object.entries(currentHoldingsByAccount)) {
+    for (const cusip in holdingsByCusip) {
+      for (const [yearStr, qty] of Object.entries(holdingsByCusip[cusip])) {
+        if (qty <= 0) continue;
+        const year = parseInt(yearStr);
+        const targetQty = targetQuantities[cusip]?.[year] ?? 0;
+        if (targetQty === 0) {
+          if (!sellYearsByAccount[accName]) sellYearsByAccount[accName] = new Set();
+          sellYearsByAccount[accName].add(year);
+        }
+      }
+    }
+  }
+
+  // Main allocation loop
+  for (const { cusip, year, netDelta } of allTargets) {
+    const costThisCusip = costPerBond[cusip] ?? avgCostPerTIPS;
+    const tier = maturityTiers instanceof Map ? maturityTiers.get(year) : maturityTiers[year];
+    const prefOrder = getTierPreference(tier);
+
+    if (netDelta > 0 && !excludedFromBuy.has(cusip)) {
+      // ── NET BUY ──
+      let remaining = netDelta;
+
+      // RMD priority: fill tIRA accounts first to ensure minimum bonds for distributions.
+      // Intentionally does NOT check sellYearsByAccount — RMD is a legal obligation that
+      // supersedes the direction-preserving constraint (e.g. CUSIP transitions where the
+      // old CUSIP is sold and the new one must still land in the IRA to cover RMDs).
+      for (const [accName, rmdAmount] of Object.entries(rmdByAccount)) {
+        if (remaining <= 0) break;
+        const acc = accounts.find(a => a.name === accName && a.type === 'traditional_ira');
+        if (!acc) continue;
+
+        const rmdMinQty = Math.ceil(rmdAmount / costThisCusip);
+        const currentInAcc = allocation[accName][cusip]?.[year] || 0;
+        const additionalForRMD = Math.max(0, rmdMinQty - currentInAcc);
+        if (additionalForRMD <= 0) continue;
+
+        const budgetAvail = acc.sizeInDollars - (accountDollarsSpent[accName] || 0);
+        const maxAffordable = Math.floor(budgetAvail / costThisCusip);
+        const toAdd = Math.min(additionalForRMD, remaining, maxAffordable);
+
+        if (toAdd > 0) {
+          if (!allocation[accName][cusip]) allocation[accName][cusip] = {};
+          allocation[accName][cusip][year] = (allocation[accName][cusip][year] || 0) + toAdd;
+          accountDollarsSpent[accName] = (accountDollarsSpent[accName] || 0) + toAdd * costThisCusip;
+          remaining -= toAdd;
+        }
+      }
+
+      // Tier-preference fill for remaining quantity
+      for (const accountType of prefOrder) {
+        if (remaining <= 0) break;
+        for (const acc of accounts) {
+          if (acc.type !== accountType || remaining <= 0) continue;
+          if (sellYearsByAccount[acc.name]?.has(year)) continue;
+
+          const budgetAvail = acc.sizeInDollars - (accountDollarsSpent[acc.name] || 0);
+          const maxAffordable = Math.floor(budgetAvail / costThisCusip);
+          const toAdd = Math.min(remaining, maxAffordable);
+
+          if (toAdd > 0) {
+            if (!allocation[acc.name][cusip]) allocation[acc.name][cusip] = {};
+            allocation[acc.name][cusip][year] = (allocation[acc.name][cusip][year] || 0) + toAdd;
+            accountDollarsSpent[acc.name] = (accountDollarsSpent[acc.name] || 0) + toAdd * costThisCusip;
+            remaining -= toAdd;
+          }
+        }
+      }
+
+      if (remaining > 0) {
+        infeasibilities.push({
+          cusip,
+          year,
+          remainingQty: remaining,
+          reason: 'Insufficient total account capacity to accommodate all target TIPS',
+        });
+      }
+
+    } else if (netDelta < 0) {
+      // ── NET SELL ── remove from least-preferred accounts first
+      let toRemove = -netDelta;
+      const reversePrefOrder = [...prefOrder].reverse();
+
+      for (const accountType of reversePrefOrder) {
+        if (toRemove <= 0) break;
+        for (const acc of accounts) {
+          if (acc.type !== accountType || toRemove <= 0) continue;
+
+          const currentHeld = allocation[acc.name][cusip]?.[year] || 0;
+
+          // tIRA: never sell below the RMD floor for this year
+          const rmdFloor = (acc.type === 'traditional_ira' && rmdByAccount[acc.name])
+            ? Math.ceil(rmdByAccount[acc.name] / costThisCusip)
+            : 0;
+          const canRemove = Math.min(toRemove, Math.max(0, currentHeld - rmdFloor));
+
+          if (canRemove > 0) {
+            allocation[acc.name][cusip][year] -= canRemove;
+            accountDollarsSpent[acc.name] = (accountDollarsSpent[acc.name] || 0) - canRemove * costThisCusip;
+            toRemove -= canRemove;
+            if (!sellYearsByAccount[acc.name]) sellYearsByAccount[acc.name] = new Set();
+            sellYearsByAccount[acc.name].add(year);
+          }
+        }
+      }
+    }
+    // netDelta === 0: allocation already initialized from current holdings, no action
   }
 
   return {
@@ -178,7 +271,6 @@ export function computeAccountCashFlows({
     const accountAlloc = allocation[accountName] || {};
     const accountCurrent = currentHoldings[accountName] || {};
 
-    // Informational: current value of TIPS in this account
     let currentValue = 0;
     for (const cusip in accountCurrent) {
       for (const yearStr in accountCurrent[cusip]) {
@@ -188,7 +280,6 @@ export function computeAccountCashFlows({
       }
     }
 
-    // Feasibility check: does new allocation cost fit within budget?
     let newAllocationCost = 0;
     for (const cusip in accountAlloc) {
       for (const yearStr in accountAlloc[cusip]) {

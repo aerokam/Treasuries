@@ -338,6 +338,16 @@
   </div>
 </div>
 
+<!-- Multi-Account Config: account size sliders, shown right after the form card when multi-account mode is on -->
+<div id="multi-account-config" style="display:none;margin-bottom:16px;padding:12px 16px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;">
+  <div id="multi-account-accounts"></div>
+  <div style="margin-top:10px;display:flex;align-items:center;gap:8px;font-size:13px;">
+    <label for="min-months-to-maturity" style="color:#374151;">Min months to maturity (no buy):</label>
+    <input type="number" id="min-months-to-maturity" value="6" min="0" max="36" step="1"
+      style="width:60px;padding:3px 6px;border:1px solid #d1d5db;border-radius:4px;font-size:13px;">
+  </div>
+</div>
+
 <!-- Per-year DARA panel -->
 <div id="dara-by-year" style="display:none">
   <div style="border:1px solid #ddd; border-radius:6px; background:#fff; padding:12px 16px;">
@@ -365,10 +375,9 @@
   </div>
 </div>
 
-<!-- Multi-Account Rebalance Panel -->
+<!-- Multi-Account Results Panel -->
 <div id="multi-account-panel" style="display:none;margin-top:20px;padding:16px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;">
-  <h3 style="margin:0 0 12px;font-size:14px;font-weight:600;">Multi-Account Rebalance</h3>
-  <div id="multi-account-accounts" style="margin-bottom:16px;"></div>
+  <div id="multi-account-summary" style="margin-bottom:16px;"></div>
   <div id="multi-account-feasibility" style="margin-bottom:16px;padding:12px;border-radius:6px;"></div>
   <div id="multi-account-results">
     <div class="table-wrap">
@@ -1011,6 +1020,11 @@ document.getElementById('holdings-file').addEventListener('change', async (e) =>
   brokerTipsValues = {};
   brokerTotalAccountValues = {};
   setStatus('');
+  // Clear previous rebalance output so stale results don't persist
+  simpleEl.innerHTML = '';
+  document.getElementById('multi-account-panel').style.display = 'none';
+  document.getElementById('multi-account-feasibility').innerHTML = '';
+  document.getElementById('multi-account-summary').innerHTML = '';
   // Clear all form fields to force re-inference from new holdings
   document.getElementById('dara').value = '';
   _daraAutoInferred = false;
@@ -1386,27 +1400,29 @@ function updateMultiAccountUI() {
   document.getElementById('field-multi-account-mode').style.display = hasMultipleAccounts ? '' : 'none';
 
   if (hasMultipleAccounts) {
-    // Auto-check the checkbox when multiple accounts are detected
     const checkbox = document.getElementById('multi-account-mode');
     checkbox.checked = true;
-    renderAccountSizes();
-    document.getElementById('multi-account-panel').style.display = 'block';
+    renderAccountSizes(); // shows #multi-account-config
   } else {
     document.getElementById('multi-account-panel').style.display = 'none';
     const checkbox = document.getElementById('multi-account-mode');
     checkbox.checked = false;
+    renderAccountSizes(); // hides #multi-account-config
   }
 }
 
 function renderAccountSizes() {
   const checkbox = document.getElementById('multi-account-mode');
   const panel = document.getElementById('multi-account-accounts');
+  const configDiv = document.getElementById('multi-account-config');
 
   if (!checkbox.checked) {
     panel.innerHTML = '';
+    configDiv.style.display = 'none';
     return;
   }
 
+  configDiv.style.display = '';
   let html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;">';
   for (const [accName, accInfo] of Object.entries(detectedAccounts)) {
     const type = accInfo.type;
@@ -1415,17 +1431,21 @@ function renderAccountSizes() {
     const maxSize = Math.round((accInfo.maxSizeInDollars || 50000) / 1000) * 1000;
     const displayMax = Math.max(maxSize, size);
 
+    const rmdSection = type === 'traditional_ira' ? `
+        <label style="display:block;font-size:11px;margin-top:10px;margin-bottom:4px;">Annual RMD ($)</label>
+        <input type="number" class="account-rmd-input" data-account="${esc(accName)}" value="${Math.round(accInfo.rmdAnnualAmount || 0)}" style="width:100%;padding:4px;font-size:11px;border:1px solid #cbd5e1;border-radius:4px;box-sizing:border-box;" min="0" step="1000" placeholder="0">
+      ` : '';
     html += `
       <div style="padding:12px;background:#fff;border:1px solid #d1d5db;border-radius:6px;">
         <div style="font-size:12px;font-weight:600;margin-bottom:4px;">${esc(accName)}</div>
         <div style="font-size:11px;color:#666;margin-bottom:8px;">${typeLabel}</div>
-        <div style="font-size:10px;color:#999;margin-bottom:8px;">TIPS Value: $${displayMax.toLocaleString('en-US', {maximumFractionDigits: 0})}</div>
         <label style="display:block;font-size:11px;margin-bottom:4px;">Allocation ($)</label>
         <input type="range" class="account-size-slider" data-account="${esc(accName)}" value="${size}" min="0" max="${displayMax}" step="1000" style="width:100%;margin-bottom:6px;">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">
-          <input type="number" class="account-size-input" data-account="${esc(accName)}" value="${size}" style="flex:1;padding:4px;font-size:11px;border:1px solid #cbd5e1;border-radius:4px;" min="0" max="${displayMax}" step="1000" data-formatted="${size.toLocaleString('en-US', {maximumFractionDigits: 0})}">
+          <input type="text" class="account-size-input" data-account="${esc(accName)}" value="${size.toLocaleString('en-US', {maximumFractionDigits: 0})}" style="flex:1;padding:4px;font-size:11px;border:1px solid #cbd5e1;border-radius:4px;">
           <span style="font-size:11px;color:#666;">/ $${displayMax.toLocaleString('en-US', {maximumFractionDigits: 0})}</span>
         </div>
+        ${rmdSection}
       </div>
     `;
   }
@@ -1440,8 +1460,7 @@ function renderAccountSizes() {
     slider.addEventListener('input', (e) => {
       const val = parseInt(e.target.value, 10);
       if (inputEl) {
-        inputEl.value = val;
-        inputEl.dataset.formatted = val.toLocaleString('en-US', {maximumFractionDigits: 0});
+        inputEl.value = val.toLocaleString('en-US', {maximumFractionDigits: 0});
       }
       if (detectedAccounts[accName]) {
         detectedAccounts[accName].sizeInDollars = val;
@@ -1454,13 +1473,23 @@ function renderAccountSizes() {
     const sliderEl = document.querySelector(`.account-size-slider[data-account="${CSS.escape(accName)}"]`);
 
     input.addEventListener('change', (e) => {
-      let val = parseInt(e.target.value, 10) || 0;
-      val = Math.round(val / 1000) * 1000; // Round to nearest 1000
+      let val = parseInt(e.target.value.replace(/,/g, ''), 10) || 0;
+      val = Math.round(val / 1000) * 1000;
       if (sliderEl) sliderEl.value = val;
-      input.value = val;
-      input.dataset.formatted = val.toLocaleString('en-US', {maximumFractionDigits: 0});
+      input.value = val.toLocaleString('en-US', {maximumFractionDigits: 0});
       if (detectedAccounts[accName]) {
         detectedAccounts[accName].sizeInDollars = val;
+      }
+    });
+  });
+
+  document.querySelectorAll('.account-rmd-input').forEach(input => {
+    const accName = input.dataset.account;
+    input.addEventListener('change', (e) => {
+      const val = Math.max(0, parseInt(e.target.value, 10) || 0);
+      input.value = val;
+      if (detectedAccounts[accName]) {
+        detectedAccounts[accName].rmdAnnualAmount = val;
       }
     });
   });
@@ -1468,16 +1497,18 @@ function renderAccountSizes() {
 
 document.getElementById('multi-account-mode').addEventListener('change', (e) => {
   renderAccountSizes();
-  document.getElementById('multi-account-panel').style.display = e.target.checked ? 'block' : 'none';
+  if (!e.target.checked) {
+    document.getElementById('multi-account-panel').style.display = 'none';
+  }
 });
 
 function renderMultiAccountOutput(maResult) {
-  const panel = document.getElementById('multi-account-panel');
   const feasEl = document.getElementById('multi-account-feasibility');
 
   // ─── Feasibility Report ───
   const feasRpt = maResult.feasibility;
-  let feasHtml = feasRpt.feasible
+  let feasHtml = '';
+  feasHtml += feasRpt.feasible
     ? '<div style="background:#dcfce7;border:1px solid #86efac;border-radius:6px;padding:10px;color:#166534;font-size:12px;"><strong>✓ Feasible</strong> — All account allocations fit within their budgets.</div>'
     : '<div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:6px;padding:10px;color:#991b1b;font-size:12px;"><strong>✗ Infeasible</strong> — Some accounts exceed their budget:<br>';
   if (!feasRpt.feasible) {
@@ -1489,17 +1520,18 @@ function renderMultiAccountOutput(maResult) {
   feasEl.innerHTML = feasHtml;
 
   // ─── Account Summary ───
-  let acctHtml = '<div style="font-size:12px;margin-bottom:12px;"><strong>Account Summary:</strong><br>';
+  let acctHtml = '<div style="font-size:12px;margin-bottom:4px;"><strong>Account Summary:</strong></div>';
+  acctHtml += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px;font-size:12px;">';
   for (const [name, flows] of Object.entries(maResult.accountCashFlows)) {
     const typeInfo = detectedAccounts[name];
     const typeLabel = typeInfo?.type === 'roth_ira' ? 'Roth IRA' : typeInfo?.type === 'traditional_ira' ? 'Traditional IRA' : 'Taxable';
-    acctHtml += `<div style="margin:6px 0;padding:8px;background:#fff;border:1px solid #ddd;border-radius:4px;">`;
+    acctHtml += `<div style="padding:8px;background:#fff;border:1px solid #ddd;border-radius:4px;">`;
     acctHtml += `<div><strong>${esc(name)}</strong> <span style="color:#666;font-size:11px;">(${typeLabel})</span></div>`;
-    acctHtml += `<div style="font-size:11px;margin-top:4px;">Current: $${flows.currentValue.toFixed(0)} | New: $${flows.newAllocationCost.toFixed(0)} | Budget: $${flows.budget.toFixed(0)}${flows.feasible ? ' ✓' : ` ✗ (shortfall: $${flows.shortfall.toFixed(0)})`}</div>`;
+    acctHtml += `<div style="font-size:11px;margin-top:4px;">New: $${flows.newAllocationCost.toFixed(0)} | Budget: $${flows.budget.toFixed(0)}${flows.feasible ? ' ✓' : ` ✗ (shortfall: $${flows.shortfall.toFixed(0)})`}</div>`;
     acctHtml += '</div>';
   }
   acctHtml += '</div>';
-  document.getElementById('multi-account-accounts').innerHTML = acctHtml;
+  document.getElementById('multi-account-summary').innerHTML = acctHtml;
 
   // ─── Color palette ───
   const colorPalette = ['#fce7f3','#dbeafe','#dcfce7','#fef3c7','#ede9fe','#e0e7ff','#f3e8ff','#fce4ec'];
@@ -1621,8 +1653,6 @@ function renderMultiAccountOutput(maResult) {
     allSubRows.forEach(sr => { sr.style.display = 'none'; });
     simpleEl.querySelectorAll('.acct-toggle').forEach(t => { t.textContent = ' ▶'; });
   });
-
-  panel.style.display = 'block';
 }
 
 // ─── Run handler ──────────────────────────────────────────────────────────────
@@ -1682,6 +1712,13 @@ document.getElementById('run-btn').addEventListener('click', async () => {
       let result;
       if (useMultiAccountMode) {
         // Run multi-account rebalance
+        // Build rmdByAccount from detectedAccounts for tIRA accounts with rmdAnnualAmount set
+        const rmdByAccount = {};
+        for (const [name, info] of Object.entries(detectedAccounts)) {
+          if (info.type === 'traditional_ira' && info.rmdAnnualAmount > 0) {
+            rmdByAccount[name] = info.rmdAnnualAmount;
+          }
+        }
         result = runMultiAccountRebalance({
           dara: finalDara,
           method: document.getElementById('method').value,
@@ -1694,7 +1731,9 @@ document.getElementById('run-btn').addEventListener('click', async () => {
           lastYearOverride: parseInt(document.getElementById('rebal-last-year').value),
           preLadderInterest: document.getElementById('pre-ladder-interest').checked,
           firstYearOverride: parseInt(document.getElementById('rebal-first-year').value),
-          accountSizes: detectedAccounts
+          accountSizes: detectedAccounts,
+          rmdByAccount,
+          minMonthsToMaturity: parseInt(document.getElementById('min-months-to-maturity').value) || 6,
         });
         _lastKnownDara = finalDara;
         renderOutput(result.rebalanceResult);

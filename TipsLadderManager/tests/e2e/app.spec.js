@@ -28,10 +28,9 @@ test.beforeEach(async ({ page }) => {
 });
 
 // ── 1. Data load ──────────────────────────────────────────────────────────────
-test('data loads: top-data-info shows FedInvest prices and Ref CPI date, run button enabled', async ({ page }) => {
-  const strip = page.locator('#top-data-info');
-  await expect(strip).toContainText('FedInvest prices');
-  await expect(strip).toContainText('Ref CPI date:');
+test('data loads: info strip shows FedInvest prices and Ref CPI date, run button enabled', async ({ page }) => {
+  await expect(page.locator('#info-source')).toContainText('FedInvest prices');
+  await expect(page.locator('#info-refcpi')).toContainText('Ref CPI');
   await expect(page.locator('#run-btn')).not.toBeDisabled();
 });
 
@@ -43,13 +42,13 @@ test('mode toggle: switching to Build hides holdings, shows year fields; run but
   await expect(page.locator('#field-last-year')).not.toBeVisible();
 
   // Switch to Build
-  await page.locator('.mode-btn[data-mode="build"]').click();
+  await page.locator('.tab-btn[data-mode="build"]').click();
   await expect(page.locator('#run-btn')).toHaveText('Build Ladder');
   await expect(page.locator('#field-holdings')).not.toBeVisible();
   await expect(page.locator('#field-last-year')).toBeVisible();
 
   // Switch back to Rebalance
-  await page.locator('.mode-btn[data-mode="rebalance"]').click();
+  await page.locator('.tab-btn[data-mode="rebalance"]').click();
   await expect(page.locator('#run-btn')).toHaveText('Run Rebalance');
   await expect(page.locator('#field-holdings')).toBeVisible();
   await expect(page.locator('#field-last-year')).not.toBeVisible();
@@ -89,7 +88,7 @@ test('rebalance: net cash value populated after run', async ({ page }) => {
 
 // ── 4. Build run ──────────────────────────────────────────────────────────────
 test('build: selecting last year and clicking Run renders build table', async ({ page }) => {
-  await page.locator('.mode-btn[data-mode="build"]').click();
+  await page.locator('.tab-btn[data-mode="build"]').click();
   await expect(page.locator('#run-btn')).toHaveText('Build Ladder');
 
   // DARA defaults to 10000 in build mode; pick the last available year (ensures range > 1 rung)
@@ -107,14 +106,14 @@ test('build: selecting last year and clicking Run renders build table', async ({
 
 test('build: maturity preference field visible in Build, hidden in Rebalance', async ({ page }) => {
   await expect(page.locator('#field-build-maturity')).not.toBeVisible();
-  await page.locator('.mode-btn[data-mode="build"]').click();
+  await page.locator('.tab-btn[data-mode="build"]').click();
   await expect(page.locator('#field-build-maturity')).toBeVisible();
-  await page.locator('.mode-btn[data-mode="rebalance"]').click();
+  await page.locator('.tab-btn[data-mode="rebalance"]').click();
   await expect(page.locator('#field-build-maturity')).not.toBeVisible();
 });
 
 test('build: first-to-mature preference runs successfully', async ({ page }) => {
-  await page.locator('.mode-btn[data-mode="build"]').click();
+  await page.locator('.tab-btn[data-mode="build"]').click();
   const lastYearSel = page.locator('#last-year');
   const optionCount = await lastYearSel.locator('option').count();
   await lastYearSel.selectOption({ index: optionCount - 1 });
@@ -127,16 +126,16 @@ test('build: first-to-mature preference runs successfully', async ({ page }) => 
 test('pre-ladder interest checkbox visible in both Build and Rebalance', async ({ page }) => {
   // PLI is shown in Rebalance (default mode) — allows Build→Rebalance symmetry testing
   await expect(page.locator('#field-pre-ladder')).toBeVisible();
-  await page.locator('.mode-btn[data-mode="build"]').click();
+  await page.locator('.tab-btn[data-mode="build"]').click();
   await expect(page.locator('#field-pre-ladder')).toBeVisible();
-  await page.locator('.mode-btn[data-mode="rebalance"]').click();
+  await page.locator('.tab-btn[data-mode="rebalance"]').click();
   await expect(page.locator('#field-pre-ladder')).toBeVisible();
 });
 
 test('build: pre-ladder interest zeroes early years and all row amounts stay near DARA', async ({ page }) => {
   // Regression guard: zeroed years must show ~DARA (preLadderCredit + laterMatInt),
   // NOT just laterMatInt (~24k when DARA=100k).
-  await page.locator('.mode-btn[data-mode="build"]').click();
+  await page.locator('.tab-btn[data-mode="build"]').click();
 
   // Pick a firstYear well into the future (~2030) so pool = preLadderYears × annualInt
   // is large enough to zero at least one funded year.
@@ -280,7 +279,7 @@ test('rebalance: running without holdings file shows status error', async ({ pag
 });
 
 test('build: running without selecting last year shows status error', async ({ page }) => {
-  await page.locator('.mode-btn[data-mode="build"]').click();
+  await page.locator('.tab-btn[data-mode="build"]').click();
   // Clear DARA so we get an error before year check, set it
   await page.locator('#dara').fill('10000');
   // Clear the default last-year selection to trigger the error
@@ -291,7 +290,7 @@ test('build: running without selecting last year shows status error', async ({ p
 
 // ── 9. Low-DARA edge cases ────────────────────────────────────────────────────
 test('build: DARA below $1,000 is rejected before running', async ({ page }) => {
-  await page.locator('.mode-btn[data-mode="build"]').click();
+  await page.locator('.tab-btn[data-mode="build"]').click();
   const lastYearSel = page.locator('#last-year');
   const optionCount = await lastYearSel.locator('option').count();
   await lastYearSel.selectOption({ index: optionCount - 1 });
@@ -301,7 +300,7 @@ test('build: DARA below $1,000 is rejected before running', async ({ page }) => 
 });
 
 test('build: DARA $2,000 either renders table or shows DARA-too-low error with no crash', async ({ page }) => {
-  await page.locator('.mode-btn[data-mode="build"]').click();
+  await page.locator('.tab-btn[data-mode="build"]').click();
   const lastYearSel = page.locator('#last-year');
   const optionCount = await lastYearSel.locator('option').count();
   await lastYearSel.selectOption({ index: optionCount - 1 });
@@ -364,7 +363,7 @@ test('rebalance: no NaN in table cells at low DARA ($5,000)', async ({ page }) =
 });
 
 test('build: no NaN in table cells or drill popup', async ({ page }) => {
-  await page.locator('.mode-btn[data-mode="build"]').click();
+  await page.locator('.tab-btn[data-mode="build"]').click();
   const lastYearSel = page.locator('#last-year');
   const optionCount = await lastYearSel.locator('option').count();
   await lastYearSel.selectOption({ index: optionCount - 1 });
@@ -381,7 +380,7 @@ test('build: no NaN in table cells or drill popup', async ({ page }) => {
 
 // ── 11. Per-year DARA panel ───────────────────────────────────────────────────
 test('build: per-year DARA panel renders when DARA focused with last year selected', async ({ page }) => {
-  await page.locator('.mode-btn[data-mode="build"]').click();
+  await page.locator('.tab-btn[data-mode="build"]').click();
   const lastYearSel = page.locator('#last-year');
   const optionCount = await lastYearSel.locator('option').count();
   await lastYearSel.selectOption({ index: optionCount - 1 });
@@ -396,7 +395,7 @@ test('build: per-year DARA panel renders when DARA focused with last year select
 });
 
 test('build: editing a per-year DARA input changes DARA field to "by year"', async ({ page }) => {
-  await page.locator('.mode-btn[data-mode="build"]').click();
+  await page.locator('.tab-btn[data-mode="build"]').click();
   const lastYearSel = page.locator('#last-year');
   const optionCount = await lastYearSel.locator('option').count();
   await lastYearSel.selectOption({ index: optionCount - 1 });
@@ -423,20 +422,20 @@ test('rebalance: per-year DARA panel renders after loading holdings and entering
 
 // ── 12. Enter key triggers Run ────────────────────────────────────────────────
 test('build: pressing Enter (no overlay open) triggers Build Ladder', async ({ page }) => {
-  await page.locator('.mode-btn[data-mode="build"]').click();
+  await page.locator('.tab-btn[data-mode="build"]').click();
   const lastYearSel = page.locator('#last-year');
   const optionCount = await lastYearSel.locator('option').count();
   await lastYearSel.selectOption({ index: optionCount - 1 });
 
   // Blur any focused element so no text field swallows the key
-  await page.locator('h1').click();
+  await page.locator('.app-title').click();
   await page.keyboard.press('Enter');
   await expect(page.locator('#build-output')).toHaveCSS('display', 'block', { timeout: 15_000 });
 });
 
 test('rebalance: pressing Enter (no overlay open) triggers Run Rebalance', async ({ page }) => {
   await page.locator('#holdings-file').setInputFiles(HOLDINGS_PATH);
-  await page.locator('h1').click();
+  await page.locator('.app-title').click();
   await page.keyboard.press('Enter');
   await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 15_000 });
 });
@@ -475,7 +474,7 @@ test('rebalance: export button visible after run and triggers CSV download', asy
 });
 
 test('build: export button visible after run', async ({ page }) => {
-  await page.locator('.mode-btn[data-mode="build"]').click();
+  await page.locator('.tab-btn[data-mode="build"]').click();
   const lastYearSel = page.locator('#last-year');
   const optionCount = await lastYearSel.locator('option').count();
   await lastYearSel.selectOption({ index: optionCount - 1 });

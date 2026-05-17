@@ -1356,6 +1356,8 @@ export function runMultiAccountRebalance({
   preLadderInterest = false,
   firstYearOverride = null,
   accountSizes = {},
+  rmdByAccount = {},
+  minMonthsToMaturity = 6,
 }) {
   // ──── Phase 1-4: Run standard blended rebalance ────
   const layer1Result = runRebalance({
@@ -1437,11 +1439,34 @@ export function runMultiAccountRebalance({
   }
 
   // ──── Phase 5: Account-aware allocation ────
+  // Build rmdByAccount from accountSizes (tIRA accounts with rmdAnnualAmount set)
+  const rmdByAccountResolved = { ...rmdByAccount };
+  for (const [name, meta] of Object.entries(accountMetadata)) {
+    if (meta.type === 'traditional_ira') {
+      const rmdFromSizes = accountSizes[name]?.rmdAnnualAmount || 0;
+      if (rmdFromSizes > 0 && !rmdByAccountResolved[name]) {
+        rmdByAccountResolved[name] = rmdFromSizes;
+      }
+    }
+  }
+
+  // Compute excludedFromBuy: CUSIPs maturing within minMonthsToMaturity months
+  const excludedFromBuy = new Set();
+  const msPerMonth = 1000 * 60 * 60 * 24 * 30.44;
+  for (const [cusip, bond] of tipsMap) {
+    if (bond.maturity && (bond.maturity - settlementDate) / msPerMonth < minMonthsToMaturity) {
+      excludedFromBuy.add(cusip);
+    }
+  }
+
   const allocationResult = allocateToAccounts({
     accountMetadata,
     targetQuantities,
     maturityTiers,
     costPerBond,
+    rmdByAccount: rmdByAccountResolved,
+    currentHoldingsByAccount,
+    excludedFromBuy,
   });
 
   // ──── Build accountSizes map ────
