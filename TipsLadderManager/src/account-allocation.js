@@ -270,7 +270,10 @@ export function allocateToAccounts({
       for (const fromAccType of reversePrefOrder) {
         for (const fromAcc of accounts) {
           if (fromAcc.type !== fromAccType) continue;
-          if (sellYearsByAccount[fromAcc.name]?.has(year)) continue; // already committed seller
+          // Note: no sellYearsByAccount[fromAcc] check here — moving bonds OUT of fromAcc
+          // is a sell regardless of whether fromAcc already sold a different CUSIP for this
+          // year (two sells = same direction, no violation). The destination check (below)
+          // still blocks buy+sell mix in toAcc.
 
           const fromIdx = prefOrder.indexOf(fromAccType);
           if (fromIdx === 0) continue; // already the most-preferred type, nothing to improve
