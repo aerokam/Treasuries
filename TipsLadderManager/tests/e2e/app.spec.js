@@ -132,7 +132,7 @@ test('pre-ladder interest checkbox visible in both Build and Rebalance', async (
   await expect(page.locator('#field-pre-ladder')).toBeVisible();
 });
 
-test.skip('build: pre-ladder interest zeroes early years and all row amounts stay near DARA', async ({ page }) => {
+test('build: pre-ladder interest zeroes early years and all row amounts stay near DARA', async ({ page }) => {
   // Regression guard: zeroed years must show ~DARA (preLadderCredit + laterMatInt),
   // NOT just laterMatInt (~24k when DARA=100k).
   await page.locator('.tab-btn[data-mode="build"]').click();
@@ -153,15 +153,16 @@ test.skip('build: pre-ladder interest zeroes early years and all row amounts sta
   await page.locator('#run-btn').click();
   await expect(page.locator('#build-output')).toHaveCSS('display', 'block', { timeout: 4_000 });
 
-  // All main-row Amount cells must be ≥ DARA×0.4.
+  // Amount is a fyLevel column: value lives in group header rows (td[1] after the colspan label),
+  // not in child rows (which render blank). Check group headers only.
   // Before fix: zeroed rows showed only laterMatInt (~24k) — far below 40k threshold.
-  const rows = page.locator('#build-table tbody tr:not(.excess-subrow)');
-  const rowCount = await rows.count();
+  const headers = page.locator('#build-table tbody tr.fy-group-header');
+  const rowCount = await headers.count();
   for (let i = 0; i < rowCount; i++) {
-    const amtText = await rows.nth(i).locator('td').nth(4).textContent();
+    const amtText = await headers.nth(i).locator('td').nth(1).textContent().catch(() => '');
     const amt = parseFloat((amtText ?? '').replace(/[^0-9.-]/g, ''));
     if (!isNaN(amt) && amt > 0) {
-      expect(amt, `Row ${i} amount ${amt} is unexpectedly low (pre-ladder credit missing?)`).toBeGreaterThan(40000);
+      expect(amt, `Group header ${i} amount ${amt} is unexpectedly low (pre-ladder credit missing?)`).toBeGreaterThan(40000);
     }
   }
 });
