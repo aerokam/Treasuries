@@ -118,12 +118,15 @@ export function allocateToAccounts({
     allTargets.push({ cusip, year, targetQty, netDelta });
   }
 
-  // Sort: year DESC; within same year, sells (netDelta < 0) before buys
+  // Sort: ALL sells before ALL buys (so sell proceeds free budget before any buy runs),
+  // then year DESC within each group (longest-maturity sells/buys first).
+  // Direction-preservation is maintained because sellYearsByAccount is fully populated
+  // before any buy is processed.
   allTargets.sort((a, b) => {
-    if (b.year !== a.year) return b.year - a.year;
-    const aOrder = a.netDelta < 0 ? 0 : 1;
-    const bOrder = b.netDelta < 0 ? 0 : 1;
-    return aOrder - bOrder;
+    const aIsSell = a.netDelta < 0 ? 0 : 1;
+    const bIsSell = b.netDelta < 0 ? 0 : 1;
+    if (aIsSell !== bIsSell) return aIsSell - bIsSell;
+    return b.year - a.year;
   });
 
   // Pre-scan: accounts holding a CUSIP whose target is 0 are committed sellers for that year
