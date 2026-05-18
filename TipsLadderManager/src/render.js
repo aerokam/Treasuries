@@ -33,14 +33,14 @@ export const COLS = [
   { label: 'Yield',       key: 'yield',       fmt: 'yld', buildOnly: true,
     value: d => d.yield },
   // Rebalance-only
-  { label: 'Amount Before', headerHTML: 'Amt<br>Before', key: 'amtBefore', fmt: 'amt', rebalOnly: true,
+  { label: 'Amount Before', headerHTML: 'Amt<br>Before', key: 'amtBefore', fmt: 'amt', rebalOnly: true, fyLevel: true,
     value:          d => d.araBeforeTotal,
     subValue:       d => d.excessQtyBefore * pi(d),
     subDrillKeyFn:  d => d.isFuture30yCover ? 'future30yAmtBefore' : 'gapAmtBefore',
     total: true, totalFn: d => (d.araBeforeTotal ?? 0) + (d.excessQtyBefore * pi(d) || 0),
     drill: true, drillCond: (_v, d) => d.araBeforeTotal !== null },
 
-  { label: 'Amount After',  headerHTML: 'Amt<br>After',  key: 'amtAfter',  fmt: 'amt', rebalOnly: true,
+  { label: 'Amount After',  headerHTML: 'Amt<br>After',  key: 'amtAfter',  fmt: 'amt', rebalOnly: true, fyLevel: true,
     value:          d => d.araAfterTotal,
     subValue:       d => d.excessQtyAfter * pi(d),
     subDrillKeyFn:  d => d.isFuture30yCover ? 'future30yAmtAfter' : 'gapAmtAfter',
@@ -86,7 +86,7 @@ export const COLS = [
     drill: true, drillCond: v => typeof v === 'number' && v !== 0 },
 
   // Build-only
-  { label: 'Amount', key: 'amount', fmt: 'amt', buildOnly: true,
+  { label: 'Amount', key: 'amount', fmt: 'amt', buildOnly: true, fyLevel: true,
     value:          d => d.fundedYearAmt,
     subValue:       d => d.excessAmt,
     subDrillKeyFn:  d => d.isFuture30yCover ? 'future30yAmt' : 'gapAmount',
@@ -125,12 +125,12 @@ function renderGroupHeader(cols, fy, groupRows, isBracketGroup) {
   let html = `<tr class="${cls}" data-fy="${fy}" data-expanded="true">`;
   html += `<td colspan="${labelCount}">${esc(label)}</td>`;
   for (const col of valueCols) {
-    const sum = groupRows.reduce((acc, d) => {
-      const v = col.value(d, 0, groupRows);
-      return acc + (typeof v === 'number' ? v : 0);
-    }, 0);
-    const s   = fmtCell(sum, col.fmt);
-    const cls2 = fmtCls(sum, col.fmt);
+    // fyLevel columns are year-level quantities: use first row's value, not sum
+    const agg = col.fyLevel
+      ? col.value(groupRows[0], 0, groupRows)
+      : groupRows.reduce((acc, d) => { const v = col.value(d, 0, groupRows); return acc + (typeof v === 'number' ? v : 0); }, 0);
+    const s    = fmtCell(agg, col.fmt);
+    const cls2 = fmtCls(agg, col.fmt);
     const attr = cls2 ? ` class="${cls2}"` : '';
     html += `<td${attr} style="text-align:right">${esc(s)}</td>`;
   }
@@ -178,6 +178,7 @@ export function renderTable({ details, mode, summary }) {
       const noChg = mode === 'rebal' && d.qtyAfter === d.qtyBefore && d.excessQtyAfter === d.excessQtyBefore;
 
       const mainCells = cols.map(col => {
+        if (col.fyLevel) return '<td></td>';
         const v = col.value(d, ri, details);
         let drillKey = null;
         if (col.drill) {
