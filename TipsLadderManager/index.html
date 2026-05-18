@@ -398,6 +398,7 @@
       </div>
     </div>
   </div>
+  <div id="multi-account-trade-tables" style="margin-top:20px;"></div>
 </div>
 
 <script type="module">
@@ -1075,6 +1076,7 @@ document.getElementById('holdings-file').addEventListener('change', async (e) =>
   document.getElementById('multi-account-panel').style.display = 'none';
   document.getElementById('multi-account-feasibility').innerHTML = '';
   document.getElementById('multi-account-summary').innerHTML = '';
+  document.getElementById('multi-account-trade-tables').innerHTML = '';
   // Clear all form fields to force re-inference from new holdings
   document.getElementById('dara').value = '';
   _daraAutoInferred = false;
@@ -1701,6 +1703,113 @@ function renderMultiAccountOutput(maResult) {
     allSubRows.forEach(sr => { sr.style.display = 'none'; });
     simpleEl.querySelectorAll('.acct-toggle').forEach(t => { t.textContent = ' ▶'; });
   });
+
+  // ─── Per-Account Trade Tables ───
+  const tradeTablesEl = document.getElementById('multi-account-trade-tables');
+
+  // Build cusip → costPerBond from details
+  const costByCusip = {};
+  for (const d of details) { if (d.cusip) costByCusip[d.cusip] = d.costPerBond; }
+
+  // Collect trade rows per account by iterating details (avoids key-type issues)
+  const tradesByAccount = {};
+  for (const name of accountNames) tradesByAccount[name] = [];
+
+  for (const d of details) {
+    const { cusip, fundedYear, maturity } = d;
+    for (const accountName of accountNames) {
+      const qtyBefore = currentByAcct[accountName]?.[cusip]?.[fundedYear] || 0;
+      const qtyAfter  = alloc[accountName]?.[cusip]?.[fundedYear] || 0;
+      const qtyDelta  = qtyAfter - qtyBefore;
+      if (qtyDelta === 0) continue;
+      tradesByAccount[accountName].push({ fundedYear, maturity, cusip, qtyBefore, qtyAfter, qtyDelta });
+    }
+  }
+
+  let tradeHtml = '<div style="font-size:13px;font-weight:600;margin-bottom:12px;">Per-Account Trade Instructions</div>';
+
+  for (const accountName of accountNames) {
+    const typeInfo  = detectedAccounts[accountName];
+    const typeLabel = typeInfo?.type === 'roth_ira' ? 'Roth IRA' : typeInfo?.type === 'traditional_ira' ? 'Traditional IRA' : 'Taxable';
+    const flows     = maResult.accountCashFlows[accountName] || {};
+    const bg        = accountColors[accountName] || '#f9fafb';
+    const rows      = tradesByAccount[accountName];
+
+    if (rows.length === 0) {
+      tradeHtml += `<div style="margin-bottom:12px;padding:8px 12px;background:${bg};border:1px solid #ddd;border-radius:6px;font-size:12px;">` +
+        `<strong>${esc(accountName)}</strong> <span style="color:#666;font-size:11px;">(${typeLabel})</span>` +
+        ` — No trades required</div>`;
+      continue;
+    }
+
+    rows.sort((a, b) => a.fundedYear - b.fundedYear);
+
+    let totalBuyCost = 0, totalSellProceeds = 0;
+    for (const r of rows) {
+      const cost = Math.abs(r.qtyDelta) * (costByCusip[r.cusip] || 0);
+      if (r.qtyDelta > 0) totalBuyCost += cost; else totalSellProceeds += cost;
+    }
+    const netCash      = totalSellProceeds - totalBuyCost;
+    const netColor     = netCash >= 0 ? '#166534' : '#991b1b';
+    const netStr       = (netCash >= 0 ? '+' : '') + '$' + Math.abs(netCash).toLocaleString('en-US', { maximumFractionDigits: 0 });
+
+    tradeHtml += `<div style="margin-bottom:20px;">`;
+
+    // Account header bar
+    tradeHtml +=
+      `<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:${bg};` +
+      `border:1px solid #ddd;border-bottom:none;border-radius:6px 6px 0 0;font-size:12px;">` +
+      `<span style="font-size:13px;font-weight:700;">${esc(accountName)}</span>` +
+      `<span style="background:#e2e8f0;border-radius:3px;padding:1px 6px;font-size:10px;">${typeLabel}</span>` +
+      `<span style="margin-left:auto;color:#475569;">Budget: <b>$${(flows.budget ?? 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}</b></span>` +
+      `<span style="margin-left:16px;color:${netColor};">Net cash: <b>${netStr}</b></span>` +
+      `</div>`;
+
+    // Trade table
+    tradeHtml +=
+      `<table style="width:100%;border-collapse:collapse;font-size:12px;border:1px solid #ddd;border-radius:0 0 6px 6px;overflow:hidden;">` +
+      `<thead><tr style="background:#f1f5f9;">`;
+    for (const [h, align] of [['Year','right'],['CUSIP','left'],['Maturity','right'],['Qty Before','right'],['Qty After','right'],['Action','right'],['Cash Impact','right']]) {
+      tradeHtml += `<th style="padding:5px 8px;text-align:${align};font-weight:600;border-bottom:1px solid #ddd;white-space:nowrap;">${h}</th>`;
+    }
+    tradeHtml += `</tr></thead><tbody>`;
+
+    for (const r of rows) {
+      const cost         = (costByCusip[r.cusip] || 0);
+      const cashImpact   = -r.qtyDelta * cost; // positive = cash in (sell), negative = cash out (buy)
+      const impactStr    = (cashImpact >= 0 ? '+' : '') + '$' + Math.abs(cashImpact).toLocaleString('en-US', { maximumFractionDigits: 0 });
+      const impactColor  = cashImpact >= 0 ? '#166534' : '#991b1b';
+      const actionText   = r.qtyDelta > 0 ? `BUY +${r.qtyDelta}` : `SELL ${r.qtyDelta}`;
+      const actionColor  = r.qtyDelta > 0 ? '#991b1b' : '#166534';
+      const matStr       = r.maturity ? fmtDate(r.maturity) : r.fundedYear;
+
+      tradeHtml +=
+        `<tr style="border-bottom:1px solid #f1f5f9;">` +
+        `<td style="padding:4px 8px;text-align:right;">${r.fundedYear}</td>` +
+        `<td style="padding:4px 8px;font-family:monospace;font-size:11px;">${esc(r.cusip)}</td>` +
+        `<td style="padding:4px 8px;text-align:right;white-space:nowrap;">${matStr}</td>` +
+        `<td style="padding:4px 8px;text-align:right;">${r.qtyBefore}</td>` +
+        `<td style="padding:4px 8px;text-align:right;">${r.qtyAfter}</td>` +
+        `<td style="padding:4px 8px;text-align:right;font-weight:700;color:${actionColor};">${actionText}</td>` +
+        `<td style="padding:4px 8px;text-align:right;color:${impactColor};">${impactStr}</td>` +
+        `</tr>`;
+    }
+
+    // Footer totals
+    const sellsStr = '+$' + totalSellProceeds.toLocaleString('en-US', { maximumFractionDigits: 0 });
+    const buysStr  = '-$' + totalBuyCost.toLocaleString('en-US', { maximumFractionDigits: 0 });
+    tradeHtml +=
+      `<tr style="background:#f8fafc;border-top:2px solid #ddd;font-weight:600;font-size:11px;">` +
+      `<td colspan="5" style="padding:5px 8px;text-align:right;color:#475569;">` +
+      `Sells: <span style="color:#166534;">${sellsStr}</span>&nbsp;&nbsp;Buys: <span style="color:#991b1b;">${buysStr}</span>` +
+      `</td>` +
+      `<td colspan="2" style="padding:5px 8px;text-align:right;color:${netColor};">Net: ${netStr}</td>` +
+      `</tr>`;
+
+    tradeHtml += `</tbody></table></div>`;
+  }
+
+  tradeTablesEl.innerHTML = tradeHtml;
 }
 
 // ─── Run handler ──────────────────────────────────────────────────────────────
