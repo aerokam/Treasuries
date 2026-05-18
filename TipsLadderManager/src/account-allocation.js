@@ -140,6 +140,17 @@ export function allocateToAccounts({
     return b.year - a.year;
   });
 
+  // Pre-compute long-tier net-buy credit: total cost of long-tier bonds that will redirect
+  // to the preferred long-tier account (tIRA) once zero-redistribution frees its budget.
+  // Grants the destination account (taxable) swap credit in zero-redistribution so the
+  // move isn't blocked by apparent lack of headroom — Joint will forgo those long-tier buys.
+  const _longPrefType = getTierPreference('long')[0]; // 'traditional_ira'
+  let _remainingLongCredit = 0;
+  for (const { cusip: _c, year: _y, netDelta: _nd } of allTargets) {
+    if (_nd <= 0 || _getTier(_y) !== 'long') continue;
+    _remainingLongCredit += (costPerBond[_c] ?? avgCostPerTIPS) * _nd;
+  }
+
   // Pre-scan: accounts holding a CUSIP whose target is 0 are committed sellers for that year
   const sellYearsByAccount = {}; // { [accName]: Set<year> }
 
@@ -282,8 +293,14 @@ export function allocateToAccounts({
               if (sellYearsByAccount[toAcc.name]?.has(year)) continue;
               if (canMoveFromHere <= 0) break;
 
-              const budgetAvail = toAcc.sizeInDollars - (accountDollarsSpent[toAcc.name] || 0);
-              const maxAffordable = Math.floor(budgetAvail / costThisCusip);
+              const hardBudget = toAcc.sizeInDollars - (accountDollarsSpent[toAcc.name] || 0);
+              // If fromAcc is the preferred long-tier type, freeing its budget will absorb
+              // long-tier buys that would otherwise land in toAcc. Grant toAcc swap credit
+              // for those expected savings so lack of headroom doesn't block the move.
+              const moveCost = canMoveFromHere * costThisCusip;
+              const swapCredit = fromAcc.type === _longPrefType
+                ? Math.min(_remainingLongCredit, moveCost) : 0;
+              const maxAffordable = Math.floor((hardBudget + swapCredit) / costThisCusip);
               const toMove = Math.min(canMoveFromHere, Math.max(0, maxAffordable));
               if (toMove <= 0) continue;
 
@@ -297,6 +314,7 @@ export function allocateToAccounts({
               allocation[toAcc.name][cusip][year] = (allocation[toAcc.name][cusip][year] || 0) + toMove;
               accountDollarsSpent[toAcc.name] = (accountDollarsSpent[toAcc.name] || 0) + toMove * costThisCusip;
               canMoveFromHere -= toMove;
+              if (swapCredit > 0) _remainingLongCredit -= toMove * costThisCusip;
             }
           }
         }
