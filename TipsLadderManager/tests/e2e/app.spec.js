@@ -314,7 +314,7 @@ test('build: DARA $2,000 either renders table or shows DARA-too-low error with n
 
   // If table rendered: all Funded Year Amount cells must be non-negative
   if (tableVisible) {
-    const rows = page.locator('#build-table tbody tr:not(.excess-subrow)');
+    const rows = page.locator('#build-table tbody tr:not(.excess-subrow):not(.fy-group-header)');
     const rowCount = await rows.count();
     for (let i = 0; i < rowCount; i++) {
       const amtText = await rows.nth(i).locator('td').nth(4).textContent();
@@ -428,14 +428,14 @@ test('build: pressing Enter (no overlay open) triggers Build Ladder', async ({ p
   await lastYearSel.selectOption({ index: optionCount - 1 });
 
   // Blur any focused element so no text field swallows the key
-  await page.locator('h1').click();
+  await page.locator('.app-title').click();
   await page.keyboard.press('Enter');
   await expect(page.locator('#build-output')).toHaveCSS('display', 'block', { timeout: 4_000 });
 });
 
 test('rebalance: pressing Enter (no overlay open) triggers Run Rebalance', async ({ page }) => {
   await page.locator('#holdings-file').setInputFiles(HOLDINGS_PATH);
-  await page.locator('h1').click();
+  await page.locator('.app-title').click();
   await page.keyboard.press('Enter');
   await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 4_000 });
 });
