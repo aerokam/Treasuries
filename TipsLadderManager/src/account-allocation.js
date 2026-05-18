@@ -118,14 +118,25 @@ export function allocateToAccounts({
     allTargets.push({ cusip, year, targetQty, netDelta });
   }
 
-  // Sort: ALL sells before ALL buys (so sell proceeds free budget before any buy runs),
-  // then year DESC within each group (longest-maturity sells/buys first).
-  // Direction-preservation is maintained because sellYearsByAccount is fully populated
-  // before any buy is processed.
+  // Three-phase sort:
+  //   Phase 0 — sells (year DESC): frees budget and marks sellYearsByAccount
+  //   Phase 1 — zero redistributions (short-tier first, year ASC within tier): moves
+  //             suboptimally-placed bonds (e.g. short TIPS in IRA) to preferred accounts,
+  //             freeing budget for long-tier buys in the next phase
+  //   Phase 2 — buys (year DESC): fills preferred accounts with freed + existing budget
+  const _tierOrd = { long: 0, medium: 1, short: 2 };
+  const _getTier = year => (maturityTiers instanceof Map ? maturityTiers.get(year) : maturityTiers[year]) || 'medium';
   allTargets.sort((a, b) => {
-    const aIsSell = a.netDelta < 0 ? 0 : 1;
-    const bIsSell = b.netDelta < 0 ? 0 : 1;
-    if (aIsSell !== bIsSell) return aIsSell - bIsSell;
+    const aPhase = a.netDelta < 0 ? 0 : a.netDelta === 0 ? 1 : 2;
+    const bPhase = b.netDelta < 0 ? 0 : b.netDelta === 0 ? 1 : 2;
+    if (aPhase !== bPhase) return aPhase - bPhase;
+    if (aPhase === 1) {
+      // Zero redistributions: short-tier first (highest _tierOrd first), then year ASC
+      const aTv = _tierOrd[_getTier(a.year)] ?? 1;
+      const bTv = _tierOrd[_getTier(b.year)] ?? 1;
+      if (aTv !== bTv) return bTv - aTv;
+      return a.year - b.year;
+    }
     return b.year - a.year;
   });
 
@@ -238,8 +249,59 @@ export function allocateToAccounts({
           }
         }
       }
+    } else if (netDelta === 0) {
+      // ── ZERO REDISTRIBUTION ──
+      // Move bonds from non-preferred accounts to preferred ones (cross-account migration).
+      // E.g. short-tier TIPS held in a tIRA are moved to taxable, freeing tIRA budget for
+      // long-tier buys that follow in phase 2.
+      const reversePrefOrder = [...prefOrder].reverse(); // least-preferred first (move FROM here)
+
+      for (const fromAccType of reversePrefOrder) {
+        for (const fromAcc of accounts) {
+          if (fromAcc.type !== fromAccType) continue;
+          if (sellYearsByAccount[fromAcc.name]?.has(year)) continue; // already committed seller
+
+          const fromIdx = prefOrder.indexOf(fromAccType);
+          if (fromIdx === 0) continue; // already the most-preferred type, nothing to improve
+
+          const currentInFrom = allocation[fromAcc.name][cusip]?.[year] || 0;
+          if (currentInFrom <= 0) continue;
+
+          // RMD floor: never move tIRA below its minimum for this year
+          const rmdFloor = (fromAcc.type === 'traditional_ira' && rmdByAccount[fromAcc.name])
+            ? Math.ceil(rmdByAccount[fromAcc.name] / costThisCusip)
+            : 0;
+          let canMoveFromHere = Math.max(0, currentInFrom - rmdFloor);
+          if (canMoveFromHere <= 0) continue;
+
+          // Offer to more-preferred account types (in preference order)
+          for (let pi = 0; pi < fromIdx && canMoveFromHere > 0; pi++) {
+            const toAccType = prefOrder[pi];
+            for (const toAcc of accounts) {
+              if (toAcc.type !== toAccType) continue;
+              if (sellYearsByAccount[toAcc.name]?.has(year)) continue;
+              if (canMoveFromHere <= 0) break;
+
+              const budgetAvail = toAcc.sizeInDollars - (accountDollarsSpent[toAcc.name] || 0);
+              const maxAffordable = Math.floor(budgetAvail / costThisCusip);
+              const toMove = Math.min(canMoveFromHere, Math.max(0, maxAffordable));
+              if (toMove <= 0) continue;
+
+              // Move bonds: fromAcc → toAcc
+              allocation[fromAcc.name][cusip][year] -= toMove;
+              accountDollarsSpent[fromAcc.name] -= toMove * costThisCusip;
+              if (!sellYearsByAccount[fromAcc.name]) sellYearsByAccount[fromAcc.name] = new Set();
+              sellYearsByAccount[fromAcc.name].add(year);
+
+              if (!allocation[toAcc.name][cusip]) allocation[toAcc.name][cusip] = {};
+              allocation[toAcc.name][cusip][year] = (allocation[toAcc.name][cusip][year] || 0) + toMove;
+              accountDollarsSpent[toAcc.name] = (accountDollarsSpent[toAcc.name] || 0) + toMove * costThisCusip;
+              canMoveFromHere -= toMove;
+            }
+          }
+        }
+      }
     }
-    // netDelta === 0: allocation already initialized from current holdings, no action
   }
 
   return {
