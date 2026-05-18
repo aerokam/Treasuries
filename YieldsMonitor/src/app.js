@@ -48,6 +48,8 @@ let activeRange = '2D';
 let activeTab = 'timeseries';
 let syncXAxis = true;
 let lockRight = false;
+let customStartDate = null; // Date (ET midnight of start day) | null — exclusive lower bound for Custom range
+let customEndDate = null;   // Date (ET midnight of day after end day) | null — exclusive upper bound for Custom range
 const xMaxAnchors = {}; // sym -> pinned xMax timestamp (set when data loads)
 let isSyncing = false;
 let isUpdatingData = false;
@@ -158,7 +160,7 @@ function syncAllChartsYZoom(sourceChart, factor) {
 
 function setupUI() {
   const root = document.getElementById('controls-root');
-  const rangeHtml = TIME_RANGES.map(r => `<button class="range-btn ${r === activeRange ? 'active' : ''}" data-range="${r}">${r}</button>`).join('');
+  const rangeHtml = TIME_RANGES.map(r => `<button class="range-btn ${r === activeRange ? 'active' : ''}" data-range="${r}">${r}</button>`).join('') + `<button class="range-btn ${activeRange === 'Custom' ? 'active' : ''}" data-range="Custom">Custom</button>`;
   const tips = Object.keys(AVAILABLE_SYMBOLS).filter(s => s.endsWith('TIPS')).sort((a,b) => MATURITY_ORDER[a] - MATURITY_ORDER[b]);
   const nominals = Object.keys(AVAILABLE_SYMBOLS).filter(s => !s.endsWith('TIPS')).sort((a,b) => MATURITY_ORDER[a] - MATURITY_ORDER[b]);
   const createGrid = (syms) => syms.map(sym => {
@@ -167,7 +169,7 @@ function setupUI() {
     return `<label class="sym-item-check" id="label-${sym}"><input type="checkbox" value="${sym}" ${activeSymbols.has(sym) ? 'checked' : ''}><span class="color-dot" style="background:${color}"></span><span class="sym-code">${SYMBOL_LABELS[sym] || sym}</span><span class="sym-yield" id="yield-${sym}">---</span><span class="sym-change" id="change-${sym}"></span></label>`;
   }).join('');
 
-  root.innerHTML = `<style>.range-picker { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 20px; } .range-btn { flex: 1; min-width: 45px; padding: 6px 0; border: none; background: var(--tab-inactive-bg); border-radius: 4px; cursor: pointer; font-weight: 700; font-size: 13px; color: var(--tab-inactive-text); text-transform: uppercase; letter-spacing: 0.04em; transition: background 0.1s; } .range-btn:hover:not(.active) { background: var(--btn-hover-bg); } .range-btn.active { background: var(--tab-active-bg); color: var(--tab-inactive-text); border-top: 3px solid var(--tab-active-accent); } .sym-group h4 { display: flex; justify-content: space-between; align-items: center; margin: 12px 0 6px; font-size: 13px; text-transform: uppercase; color: #000; font-weight: 800; letter-spacing: 0.05em; border-bottom: 1px solid #cbd5e1; padding-bottom: 2px; } .clear-btn { font-size: 11px; color: #64748b; cursor: pointer; text-transform: none; font-weight: 600; } .sym-item-check { display: flex; align-items: center; gap: 4px; padding: 4px 0; font-size: 15px; cursor: pointer; color: #000; } .color-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; } .sym-code { font-weight: 600; color: #000; width: 75px; flex-shrink: 0; white-space: nowrap; } .sym-yield { font-family: monospace; font-weight: 700; font-size: 15px; color: #000; margin-left: auto; padding-right: 4px; } .sym-change { font-family: monospace; font-weight: 700; font-size: 14px; min-width: 60px; text-align: right; } .sym-change.up { color: #16a34a; } .sym-change.down { color: #dc2626; } #fetchStatus { font-size: 13px; color: #000; margin-top: 20px; font-weight: 700; display: grid; grid-template-columns: auto auto; column-gap: 4px; row-gap: 2px; } #fetchStatus .fs-label { text-align: right; } #fetchStatus .fs-val { text-align: left; } .no-data-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: #000; background: rgba(255,255,255,0.9); pointer-events: none; z-index: 10; } .sync-zoom-label { display: flex; align-items: center; gap: 6px; margin-top: 15px; font-size: 14px; font-weight: 700; color: #334155; cursor: pointer; background: #f8fafc; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; }</style><div class="range-picker">${rangeHtml}</div><div class="sym-group"><h4>TIPS <span class="clear-btn" data-type="TIPS">Clear All</span></h4>${createGrid(tips)}<h4>Treasuries <span class="clear-btn" data-type="Nominal">Clear All</span></h4>${createGrid(nominals)}</div><label class="sync-zoom-label"><input type="checkbox" id="syncXAxis" ${syncXAxis ? 'checked' : ''}> Sync Zoom & Pan</label><label class="sync-zoom-label"><input type="checkbox" id="lockRight"> Lock Right</label><div id="fetchStatus">Ready</div>`;
+  root.innerHTML = `<style>.range-picker { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 20px; } .range-btn { flex: 1; min-width: 45px; padding: 6px 0; border: none; background: var(--tab-inactive-bg); border-radius: 4px; cursor: pointer; font-weight: 700; font-size: 13px; color: var(--tab-inactive-text); text-transform: uppercase; letter-spacing: 0.04em; transition: background 0.1s; } .range-btn:hover:not(.active) { background: var(--btn-hover-bg); } .range-btn.active { background: var(--tab-active-bg); color: var(--tab-inactive-text); border-top: 3px solid var(--tab-active-accent); } .sym-group h4 { display: flex; justify-content: space-between; align-items: center; margin: 12px 0 6px; font-size: 13px; text-transform: uppercase; color: #000; font-weight: 800; letter-spacing: 0.05em; border-bottom: 1px solid #cbd5e1; padding-bottom: 2px; } .clear-btn { font-size: 11px; color: #64748b; cursor: pointer; text-transform: none; font-weight: 600; } .sym-item-check { display: flex; align-items: center; gap: 4px; padding: 4px 0; font-size: 15px; cursor: pointer; color: #000; } .color-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; } .sym-code { font-weight: 600; color: #000; width: 75px; flex-shrink: 0; white-space: nowrap; } .sym-yield { font-family: monospace; font-weight: 700; font-size: 15px; color: #000; margin-left: auto; padding-right: 4px; } .sym-change { font-family: monospace; font-weight: 700; font-size: 14px; min-width: 60px; text-align: right; } .sym-change.up { color: #16a34a; } .sym-change.down { color: #dc2626; } #fetchStatus { font-size: 13px; color: #000; margin-top: 20px; font-weight: 700; display: grid; grid-template-columns: auto auto; column-gap: 4px; row-gap: 2px; } #fetchStatus .fs-label { text-align: right; } #fetchStatus .fs-val { text-align: left; } .no-data-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: #000; background: rgba(255,255,255,0.9); pointer-events: none; z-index: 10; } .sync-zoom-label { display: flex; align-items: center; gap: 6px; margin-top: 15px; font-size: 14px; font-weight: 700; color: #334155; cursor: pointer; background: #f8fafc; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; } .custom-date-range { display: none; flex-direction: column; gap: 6px; padding: 10px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; margin-bottom: 4px; } .custom-date-label { font-size: 12px; font-weight: 800; color: #334155; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.04em; } .custom-date-inputs { display: flex; flex-direction: column; gap: 6px; } .custom-date-inputs label { font-size: 12px; font-weight: 700; color: #334155; display: flex; flex-direction: column; gap: 2px; } .custom-date-inputs input[type="date"] { width: 100%; padding: 4px 6px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 13px; color: #000; background: #fff; font-weight: 600; box-sizing: border-box; } .custom-date-apply { margin-top: 4px; padding: 6px; background: var(--tab-active-bg); color: var(--tab-inactive-text); border: none; border-top: 3px solid var(--tab-active-accent); border-radius: 4px; font-size: 13px; font-weight: 700; cursor: pointer; width: 100%; } .custom-date-apply:hover { opacity: 0.85; }</style><div class="range-picker">${rangeHtml}</div><div class="custom-date-range" id="custom-date-range"><div class="custom-date-label">Custom Date Range</div><div class="custom-date-inputs"><label>Start Date<input type="date" id="customStart"></label><label>End Date<input type="date" id="customEnd"></label></div><button class="custom-date-apply" id="applyCustomRange">Apply</button></div><div class="sym-group"><h4>TIPS <span class="clear-btn" data-type="TIPS">Clear All</span></h4>${createGrid(tips)}<h4>Treasuries <span class="clear-btn" data-type="Nominal">Clear All</span></h4>${createGrid(nominals)}</div><label class="sync-zoom-label"><input type="checkbox" id="syncXAxis" ${syncXAxis ? 'checked' : ''}> Sync Zoom & Pan</label><label class="sync-zoom-label"><input type="checkbox" id="lockRight"> Lock Right</label><div id="fetchStatus">Ready</div>`;
 
   document.getElementById('syncXAxis').addEventListener('change', (e) => {
     syncXAxis = e.target.checked;
@@ -186,8 +188,33 @@ function setupUI() {
   }));
   document.querySelectorAll('.range-btn').forEach(btn => btn.addEventListener('click', (e) => {
     document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
-    e.target.classList.add('active'); activeRange = e.target.dataset.range; updateAllData();
+    e.target.classList.add('active');
+    activeRange = e.target.dataset.range;
+    const cdr = document.getElementById('custom-date-range');
+    if (activeRange === 'Custom') {
+      cdr.style.display = 'flex';
+      if (!customStartDate || !customEndDate) {
+        const today = new Date().toISOString().slice(0, 10);
+        const y1 = new Date(); y1.setFullYear(y1.getFullYear() - 1);
+        const y1str = y1.toISOString().slice(0, 10);
+        document.getElementById('customStart').value = y1str;
+        document.getElementById('customEnd').value = today;
+        customStartDate = dateInputToEtStart(y1str);
+        customEndDate = dateInputToEtEnd(today);
+      }
+    } else {
+      cdr.style.display = 'none';
+    }
+    updateAllData();
   }));
+  document.getElementById('applyCustomRange').addEventListener('click', () => {
+    const startVal = document.getElementById('customStart').value;
+    const endVal = document.getElementById('customEnd').value;
+    if (!startVal || !endVal) return;
+    customStartDate = dateInputToEtStart(startVal);
+    customEndDate = dateInputToEtEnd(endVal);
+    if (activeRange === 'Custom') updateAllData();
+  });
   document.querySelectorAll('.sym-item-check input').forEach(cb => cb.addEventListener('change', (e) => {
     if (e.target.checked) activeSymbols.add(e.target.value); else activeSymbols.delete(e.target.value);
     syncChartContainers(); updateAllData();
@@ -271,6 +298,16 @@ function makeEtMoment(year, month0, day, hour) {
   return d;
 }
 
+function dateInputToEtStart(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return makeEtMoment(y, m - 1, d, 0);
+}
+
+function dateInputToEtEnd(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return makeEtMoment(y, m - 1, d + 1, 0); // exclusive: midnight of next day
+}
+
 function isAfterHoursEt(tsMs) { const parts = ET_FULL_FMT.formatToParts(new Date(tsMs)).reduce((a, p) => ({ ...a, [p.type]: +p.value }), {}); const mins = parts.hour * 60 + parts.minute; return mins < 8 * 60 || mins >= 17 * 60; }
 function isWeekendEt(date) { return ET_WDAY_FMT.format(date).match(/Sat|Sun/); }
 
@@ -300,6 +337,27 @@ async function fetchHistory(symbol) {
 }
 
 async function fetchOne(symbol, range, force = false) {
+  if (range === 'Custom') {
+    const history = await fetchHistory(symbol);
+    const startMs = customStartDate ? customStartDate.getTime() : 0;
+    const endMs = customEndDate ? customEndDate.getTime() : Date.now();
+    let combined = (history || []).filter(p => p.x.getTime() >= startMs && p.x.getTime() < endMs);
+    if (endMs > Date.now() - 5 * 86400000) {
+      const tipKey = `${symbol}_5D`;
+      let liveTip = liveCache[tipKey];
+      if (!liveTip || force) {
+        console.log(`%c[CNBC] %cFetching 5D tip for ${symbol}...`, "color: #2563eb; font-weight: bold", "color: inherit");
+        liveTip = await fetchLive(symbol, '5D');
+        if (liveTip) liveCache[tipKey] = liveTip;
+      }
+      if (liveTip) {
+        const lastHistTime = combined.length > 0 ? combined[combined.length - 1].x.getTime() : 0;
+        const newPoints = liveTip.filter(p => p.x.getTime() > lastHistTime && p.x.getTime() < endMs);
+        combined = [...combined, ...newPoints];
+      }
+    }
+    return combined;
+  }
   const is2D = range === '2D', is10D = range === '10D';
   if (is2D || is10D) {
     const providerRange = is2D ? '1D' : '5D', cacheKey = `${symbol}_${providerRange}`;
@@ -358,7 +416,7 @@ function applyDefaultBounds(sym, chart, data) {
     const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 10);
     chart.options.scales.x.min = cutoff.getTime();
   } else {
-    chart.options.scales.x.min = data[0].x.getTime();
+    chart.options.scales.x.min = (activeRange === 'Custom' && customStartDate) ? customStartDate.getTime() : data[0].x.getTime();
   }
   chart.options.scales.x.max = xMaxAnchors[sym] ?? snapXMax(data[data.length-1].x).getTime();
   if (activeRange !== '2D' && activeRange !== '10D') {
@@ -456,7 +514,7 @@ function updateCharts() {
       }
       updateDynamicTicks(chart, data);
       chart.resetZoom();
-      xMaxAnchors[sym] = snapXMax(data[data.length - 1].x).getTime();
+      xMaxAnchors[sym] = (activeRange === 'Custom' && customEndDate) ? customEndDate.getTime() : snapXMax(data[data.length - 1].x).getTime();
       applyDefaultBounds(sym, chart, data);
     }
 

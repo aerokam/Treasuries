@@ -57,7 +57,8 @@ Calculates the difference between the latest yield and the previous market close
 
 ### [3.0 Interactive Visualization](../YieldsMonitor/knowledge/1.0_Operation.md#uiux-standards)
 Intraday and historical charts featuring market-state annotations.
-- **Features**: After-hours and weekend shading, Y-axis auto-rescaling, and comparative yield curve overlays.
+- **Features**: After-hours and weekend shading, Y-axis auto-rescaling, comparative yield curve overlays, and **custom date range** selection.
+- **Custom Date Range**: A dedicated sidebar control lets users input a specific start and end date. Time Series charts filter to that window; Yield Curve and Breakeven Inflation snapshot curves automatically reflect the custom start/end dates.
 - **Precision**: Yields are tracked to 3 decimal places for granular movement analysis.
 
 ---

@@ -840,16 +840,14 @@ function renderNominalsChart(fedBonds, fidBonds) {
       tickCb = val => (TERM_LABEL_4W.has(val) || TERM_LABEL_MINOR.has(val)) ? `${val}w` : '';
       tickFont = ctx => TERM_LABEL_MINOR.has(ctx.tick?.value) ? { size: 9 } : { size: 11 };
     } else {
-      // Adaptive ticks: years when zoomed out, months/weeks when zoomed in
       tickCb = (val) => {
         if (val < 0) return '';
         if (val >= 52) {
-          const years = val / 52;
-          if (Number.isInteger(years)) return `${years}y`;
-          const wholeYears = Math.floor(years);
-          const remMonths = Math.round((years - wholeYears) * 12);
-          if (remMonths === 6) return `${wholeYears}.5y`;
-          return `${wholeYears}y ${remMonths}m`;
+          const wy = Math.floor(val / 52);
+          const rm = Math.round((val / 52 - wy) * 12);
+          if (rm === 0) return `${wy}y`;
+          if (rm === 12) return `${wy + 1}y`;
+          return `${wy}y ${rm}m`;
         }
         if (val >= 4) return `${Math.round(val / 4.348)}m`;
         return `${Math.round(val)}w`;
@@ -868,17 +866,15 @@ function renderNominalsChart(fedBonds, fidBonds) {
           if (span > 260) {
             const start = Math.ceil(Math.max(scale.min, 0) / 52) * 52;
             for (let v = start; v <= scale.max; v += 52) ticks.push({ value: v });
-          } else if (span > 130) {
+          } else if (span > 104) {
             const start = Math.ceil(Math.max(scale.min, 0) / 26) * 26;
             for (let v = start; v <= scale.max; v += 26) ticks.push({ value: v });
           } else if (span > 52) {
             const start = Math.ceil(Math.max(scale.min, 0) / 13) * 13;
             for (let v = start; v <= scale.max; v += 13) ticks.push({ value: v });
           } else if (span > 12) {
-            // Align to calendar months (52/12 weeks each) to avoid duplicate labels
-            const startM = Math.ceil(scale.min * 12 / 52);
-            const endM = Math.floor(scale.max * 12 / 52);
-            for (let m = startM; m <= endM; m++) ticks.push({ value: m * 52 / 12 });
+            const start = Math.ceil(Math.max(scale.min, 0) / 4) * 4;
+            for (let v = start; v <= scale.max; v += 4) ticks.push({ value: v });
           } else {
             const start = Math.ceil(Math.max(scale.min, 0));
             for (let v = start; v <= scale.max; v += 1) ticks.push({ value: v });
@@ -1209,7 +1205,10 @@ function renderChart(fedBonds, brokerBonds) {
   const allBonds = [...(fedBonds || []), ...(brokerBonds || [])];
   if (allBonds.length === 0) { if (chart) { chart.destroy(); chart = null; } return; }
 
-  const toPt = (b, key) => ({ x: b.maturityDate.getTime(), y: parseFloat((b[key] * 100).toFixed(3)) });
+  const now = Date.now();
+  const toPt = xAxisMode === 'ttm'
+    ? (b, key) => ({ x: (b.maturityDate.getTime() - now) / (7 * 86400000), y: parseFloat((b[key] * 100).toFixed(3)) })
+    : (b, key) => ({ x: b.maturityDate.getTime(), y: parseFloat((b[key] * 100).toFixed(3)) });
   const both = fedBonds && brokerBonds;
   const seriesDef = [];
 
@@ -1232,18 +1231,70 @@ function renderChart(fedBonds, brokerBonds) {
 
   const activeSeries = seriesDef.filter(s => s.data.length > 0);
   const allPoints = activeSeries.flatMap(s => s.data);
-  const minDate = new Date(Math.min(...allPoints.map(d => d.x)));
-  const maxDate = new Date(Math.max(...allPoints.map(d => d.x)));
-  const _startDt = parseDateInput(document.getElementById('startMaturity').value);
-  const _endDt   = parseDateInput(document.getElementById('endMaturity').value);
-  const minX = _startDt
-    ? new Date(_startDt.getFullYear(), _startDt.getMonth(), 1).getTime()
-    : new Date(minDate.getFullYear(), 0, 1).getTime();
-  const maxX = _endDt
-    ? new Date(_endDt.getFullYear(), _endDt.getMonth() + 1, 1).getTime()
-    : new Date(maxDate.getFullYear() + 1, 0, 1).getTime();
-  const spanMonths = (maxX - minX) / (1000 * 60 * 60 * 24 * 30.5);
-  const timeUnit = spanMonths <= 18 ? 'month' : 'year';
+  let xScale;
+  if (xAxisMode === 'ttm') {
+    const rawMaxW = Math.max(...allPoints.map(d => d.x));
+    const maxW = Math.ceil(rawMaxW / 52) * 52;
+    const ttmTickCb = (val) => {
+      if (val < 0) return '';
+      if (val >= 52) {
+        const wy = Math.floor(val / 52);
+        const rm = Math.round((val / 52 - wy) * 12);
+        if (rm === 0) return `${wy}y`;
+        if (rm === 12) return `${wy + 1}y`;
+        return `${wy}y ${rm}m`;
+      }
+      if (val >= 4) return `${Math.round(val / 4.348)}m`;
+      return `${Math.round(val)}w`;
+    };
+    xScale = {
+      type: 'linear',
+      min: 0, max: maxW,
+      afterBuildTicks: scale => {
+        const span = scale.max - scale.min;
+        const ticks = [];
+        if (span > 260) {
+          const start = Math.ceil(Math.max(scale.min, 0) / 52) * 52;
+          for (let v = start; v <= scale.max; v += 52) ticks.push({ value: v });
+        } else if (span > 104) {
+          const start = Math.ceil(Math.max(scale.min, 0) / 26) * 26;
+          for (let v = start; v <= scale.max; v += 26) ticks.push({ value: v });
+        } else if (span > 52) {
+          const start = Math.ceil(Math.max(scale.min, 0) / 13) * 13;
+          for (let v = start; v <= scale.max; v += 13) ticks.push({ value: v });
+        } else if (span > 12) {
+          const start = Math.ceil(Math.max(scale.min, 0) / 4) * 4;
+          for (let v = start; v <= scale.max; v += 4) ticks.push({ value: v });
+        } else {
+          const start = Math.ceil(Math.max(scale.min, 0));
+          for (let v = start; v <= scale.max; v += 1) ticks.push({ value: v });
+        }
+        scale.ticks = ticks;
+      },
+      grid: { color: 'rgba(0,0,0,0.05)' },
+      ticks: { maxRotation: 0, callback: ttmTickCb }
+    };
+  } else {
+    const minDate = new Date(Math.min(...allPoints.map(d => d.x)));
+    const maxDate = new Date(Math.max(...allPoints.map(d => d.x)));
+    const _startDt = parseDateInput(document.getElementById('startMaturity').value);
+    const _endDt   = parseDateInput(document.getElementById('endMaturity').value);
+    const minX = _startDt
+      ? new Date(_startDt.getFullYear(), _startDt.getMonth(), 1).getTime()
+      : new Date(minDate.getFullYear(), 0, 1).getTime();
+    const maxX = _endDt
+      ? new Date(_endDt.getFullYear(), _endDt.getMonth() + 1, 1).getTime()
+      : new Date(maxDate.getFullYear() + 1, 0, 1).getTime();
+    const spanMonths = (maxX - minX) / (1000 * 60 * 60 * 24 * 30.5);
+    const timeUnit = spanMonths <= 18 ? 'month' : 'year';
+    xScale = {
+      type: 'time',
+      min: minX, max: maxX,
+      time: { unit: timeUnit, displayFormats: { year: 'MMM yyyy', month: 'MMM yyyy' } },
+      grid: { color: 'rgba(0,0,0,0.05)' },
+      ticks: { autoSkip: true, maxRotation: 0 }
+    };
+  }
   const allY = allPoints.map(d => d.y);
   const minY = Math.floor(Math.min(...allY) * 4) / 4;
   const maxY = Math.ceil(Math.max(...allY) * 4) / 4;
@@ -1277,7 +1328,7 @@ function renderChart(fedBonds, brokerBonds) {
       animation: false,
       interaction: { mode: 'nearest', axis: 'x', intersect: false },
       scales: {
-        x: { type: 'time', min: minX, max: maxX, time: xAxisMode === 'ttm' ? { displayFormats: {} } : { unit: timeUnit, displayFormats: { year: 'MMM yyyy', month: 'MMM yyyy' } }, grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { autoSkip: true, maxRotation: 0, ...(xAxisMode === 'ttm' ? { callback: (val, idx, ticks) => { if (!ticks || ticks.length < 2) return ttmLabel(val); const spanDays = (ticks[ticks.length-1].value - ticks[0].value) / 86400000; const days = (val - Date.now()) / 86400000; if (days <= 0) return ''; if (spanDays <= 91) return `${Math.round(days / 7)}w`; if (spanDays <= 365) return `${Math.round(days / 30.44)}m`; return `${Math.round(days / 365.25)}y`; } } : {}) } },
+        x: xScale,
         y: { type: 'linear', title: { display: true, text: 'Yield (%)' }, min: minY, max: maxY, ticks: { stepSize: 0.25, callback: (v) => v.toFixed(2) } }
       },
       plugins: {
@@ -1293,7 +1344,9 @@ function renderChart(fedBonds, brokerBonds) {
           backgroundColor: 'rgba(255,255,255,0.95)', titleColor: '#1e293b', bodyColor: '#475569', borderColor: '#e2e8f0', borderWidth: 1, padding: 8, cornerRadius: 6, displayColors: false,
           callbacks: {
             title: (items) => {
-              const ms = items[0].parsed.x;
+              const ms = xAxisMode === 'ttm'
+                ? now + items[0].parsed.x * 7 * 86400000
+                : items[0].parsed.x;
               return `${fmtDateMDY(new Date(ms))} (${ttmLabel(ms)})`;
             },
             label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y}%`
@@ -1469,7 +1522,7 @@ function _makeSpreadChart(ctx, seriesDef, yAxisLabel, yUnit, shouldClip) {
         x: {
           type: 'time', min: minX, max: maxX,
           time: xAxisMode === 'ttm' ? { displayFormats: {} } : { unit: timeUnit, displayFormats: { year: 'MMM yyyy', month: 'MMM yyyy' } },
-          grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { autoSkip: true, maxRotation: 0, ...(xAxisMode === 'ttm' ? { callback: (val, idx, ticks) => { if (!ticks || ticks.length < 2) return ttmLabel(val); const spanDays = (ticks[ticks.length-1].value - ticks[0].value) / 86400000; const days = (val - Date.now()) / 86400000; if (days <= 0) return ''; if (spanDays <= 91) return `${Math.round(days / 7)}w`; if (spanDays <= 365) return `${Math.round(days / 30.44)}m`; return `${Math.round(days / 365.25)}y`; } } : {}) }
+          grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { autoSkip: true, maxRotation: 0, ...(xAxisMode === 'ttm' ? { callback: (val, idx, ticks) => { if (!ticks || ticks.length < 2) return ttmLabel(val); const spanDays = (ticks[ticks.length-1].value - ticks[0].value) / 86400000; const days = (val - Date.now()) / 86400000; if (days <= 0) return ''; if (spanDays <= 91) return `${Math.round(days / 7)}w`; if (spanDays <= 365) return `${Math.round(days / 30.44)}m`; const yrs = days / 365.25; const wy = Math.floor(yrs); const rm = Math.round((yrs - wy) * 12); if (rm === 0) return `${wy}y`; if (rm === 12) return `${wy + 1}y`; if (wy === 0) return `${rm}m`; return `${wy}y ${rm}m`; } } : {}) }
         },
         y: {
           type: 'linear', title: { display: true, text: yAxisLabel },

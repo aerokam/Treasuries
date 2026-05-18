@@ -24,13 +24,13 @@ test.beforeEach(async ({ page }) => {
   // Allow sample pre-populate to succeed (uses local data/CusipQtyTest.csv via serve)
   await page.goto('./');
   // Wait for data load: run button must be enabled
-  await expect(page.locator('#run-btn')).not.toBeDisabled({ timeout: 15_000 });
+  await expect(page.locator('#run-btn')).not.toBeDisabled({ timeout: 4_000 });
 });
 
 // ── 1. Data load ──────────────────────────────────────────────────────────────
 test('data loads: info strip shows FedInvest prices and Ref CPI date, run button enabled', async ({ page }) => {
   await expect(page.locator('#info-source')).toContainText('FedInvest prices');
-  await expect(page.locator('#info-refcpi')).toContainText('Ref CPI');
+  await expect(page.locator('#info-refcpi')).toContainText('Ref CPI:');
   await expect(page.locator('#run-btn')).not.toBeDisabled();
 });
 
@@ -61,7 +61,7 @@ test('rebalance: uploading holdings and clicking Run renders table with rows', a
 
   // Table must appear with at least one data row (td, not th)
   const table = page.locator('#simple-table');
-  await expect(table).toBeVisible({ timeout: 15_000 });
+  await expect(table).toBeVisible({ timeout: 4_000 });
   const rows = table.locator('tbody tr');
   await expect(rows).toHaveCount(await rows.count()); // stabilizes
   expect(await rows.count()).toBeGreaterThan(0);
@@ -70,7 +70,7 @@ test('rebalance: uploading holdings and clicking Run renders table with rows', a
 test('rebalance: net-cash-inline visible and DARA populated after run', async ({ page }) => {
   await page.locator('#holdings-file').setInputFiles(HOLDINGS_PATH);
   await page.locator('#run-btn').click();
-  await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 4_000 });
   await expect(page.locator('#net-cash-inline')).toBeVisible();
   // DARA was auto-inferred and written back to the input
   const daraVal = await page.locator('#dara').inputValue();
@@ -80,7 +80,7 @@ test('rebalance: net-cash-inline visible and DARA populated after run', async ({
 test('rebalance: net cash value populated after run', async ({ page }) => {
   await page.locator('#holdings-file').setInputFiles(HOLDINGS_PATH);
   await page.locator('#run-btn').click();
-  await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 4_000 });
   // net-cash-inline uses CSS display:none with style.display='' override — check content directly
   const val = await page.locator('#net-cash-val').textContent();
   expect(val).toBeTruthy();
@@ -99,7 +99,7 @@ test('build: selecting last year and clicking Run renders build table', async ({
   await page.locator('#run-btn').click();
 
   // build-output becomes display:block after successful run
-  await expect(page.locator('#build-output')).toHaveCSS('display', 'block', { timeout: 15_000 });
+  await expect(page.locator('#build-output')).toHaveCSS('display', 'block', { timeout: 4_000 });
   const rows = page.locator('#build-table tbody tr');
   expect(await rows.count()).toBeGreaterThan(0);
 });
@@ -119,7 +119,7 @@ test('build: first-to-mature preference runs successfully', async ({ page }) => 
   await lastYearSel.selectOption({ index: optionCount - 1 });
   await page.locator('#build-maturity').selectOption('first');
   await page.locator('#run-btn').click();
-  await expect(page.locator('#build-output')).toHaveCSS('display', 'block', { timeout: 15_000 });
+  await expect(page.locator('#build-output')).toHaveCSS('display', 'block', { timeout: 4_000 });
   expect(await page.locator('#build-table tbody tr').count()).toBeGreaterThan(0);
 });
 
@@ -151,17 +151,18 @@ test('build: pre-ladder interest zeroes early years and all row amounts stay nea
   await page.locator('#dara').fill('100000');
   await page.locator('#pre-ladder-interest').check();
   await page.locator('#run-btn').click();
-  await expect(page.locator('#build-output')).toHaveCSS('display', 'block', { timeout: 15_000 });
+  await expect(page.locator('#build-output')).toHaveCSS('display', 'block', { timeout: 4_000 });
 
-  // All main-row Amount cells must be ≥ DARA×0.4.
+  // Amount is a fyLevel column: value lives in group header rows (td[1] after the colspan label),
+  // not in child rows (which render blank). Check group headers only.
   // Before fix: zeroed rows showed only laterMatInt (~24k) — far below 40k threshold.
-  const rows = page.locator('#build-table tbody tr:not(.excess-subrow)');
-  const rowCount = await rows.count();
+  const headers = page.locator('#build-table tbody tr.fy-group-header');
+  const rowCount = await headers.count();
   for (let i = 0; i < rowCount; i++) {
-    const amtText = await rows.nth(i).locator('td').nth(4).textContent();
+    const amtText = await headers.nth(i).locator('td').nth(1).textContent().catch(() => '');
     const amt = parseFloat((amtText ?? '').replace(/[^0-9.-]/g, ''));
     if (!isNaN(amt) && amt > 0) {
-      expect(amt, `Row ${i} amount ${amt} is unexpectedly low (pre-ladder credit missing?)`).toBeGreaterThan(40000);
+      expect(amt, `Group header ${i} amount ${amt} is unexpectedly low (pre-ladder credit missing?)`).toBeGreaterThan(40000);
     }
   }
 });
@@ -192,14 +193,14 @@ test('drill popup: clicking a drillable cell opens popup, × closes it', async (
   // Run rebalance to get a table first
   await page.locator('#holdings-file').setInputFiles(HOLDINGS_PATH);
   await page.locator('#run-btn').click();
-  await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 4_000 });
 
   // Click the first drillable cell (td with data-col attribute)
   const drillCell = page.locator('#simple-table tbody td[data-col]').first();
   await expect(drillCell).toBeVisible();
   await drillCell.click();
 
-  await expect(page.locator('#drill-overlay')).toBeVisible({ timeout: 5_000 });
+  await expect(page.locator('#drill-overlay')).toBeVisible({ timeout: 4_000 });
   await expect(page.locator('#drill-content')).not.toBeEmpty();
 
   // Close with × button
@@ -210,10 +211,10 @@ test('drill popup: clicking a drillable cell opens popup, × closes it', async (
 test('drill popup: closes on backdrop click', async ({ page }) => {
   await page.locator('#holdings-file').setInputFiles(HOLDINGS_PATH);
   await page.locator('#run-btn').click();
-  await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 4_000 });
 
   await page.locator('#simple-table tbody td[data-col]').first().click();
-  await expect(page.locator('#drill-overlay')).toBeVisible({ timeout: 5_000 });
+  await expect(page.locator('#drill-overlay')).toBeVisible({ timeout: 4_000 });
 
   // Click outside the modal (top-left of overlay)
   await page.locator('#drill-overlay').click({ position: { x: 5, y: 5 } });
@@ -224,7 +225,7 @@ test('drill popup: closes on backdrop click', async ({ page }) => {
 test('drill popup: clicking Ref CPI in Level 2 opens Level 3 Ref CPI popup', async ({ page }) => {
   await page.locator('#holdings-file').setInputFiles(HOLDINGS_PATH);
   await page.locator('#run-btn').click();
-  await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 4_000 });
 
   await page.locator('#simple-table tbody td[data-col]').first().click();
   await expect(page.locator('#drill-overlay')).toBeVisible();
@@ -249,7 +250,7 @@ test('drill popup: clicking Ref CPI in Level 2 opens Level 3 Ref CPI popup', asy
 test('drill popup: clicking Index Ratio in Level 2 opens Level 3 Index Ratio popup', async ({ page }) => {
   await page.locator('#holdings-file').setInputFiles(HOLDINGS_PATH);
   await page.locator('#run-btn').click();
-  await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 4_000 });
 
   await page.locator('#simple-table tbody td[data-col]').first().click();
   await expect(page.locator('#drill-overlay')).toBeVisible();
@@ -272,7 +273,7 @@ test('rebalance: running without holdings file shows status error', async ({ pag
   // Block the pre-populate fetch so no sample file is loaded into the input
   await page.route('**/tests/CusipQtyTestLumpy.csv', r => r.abort());
   await page.reload();
-  await expect(page.locator('#run-btn')).not.toBeDisabled({ timeout: 15_000 });
+  await expect(page.locator('#run-btn')).not.toBeDisabled({ timeout: 4_000 });
 
   await page.locator('#run-btn').click();
   await expect(page.locator('#status')).toContainText(/holdings|csv|file/i);
@@ -314,7 +315,7 @@ test('build: DARA $2,000 either renders table or shows DARA-too-low error with n
 
   // If table rendered: all Funded Year Amount cells must be non-negative
   if (tableVisible) {
-    const rows = page.locator('#build-table tbody tr:not(.excess-subrow)');
+    const rows = page.locator('#build-table tbody tr:not(.excess-subrow):not(.fy-group-header)');
     const rowCount = await rows.count();
     for (let i = 0; i < rowCount; i++) {
       const amtText = await rows.nth(i).locator('td').nth(4).textContent();
@@ -344,12 +345,12 @@ async function assertNoNaN(page, tableSelector) {
 test('rebalance: no NaN in table cells or drill popup (auto-infer DARA)', async ({ page }) => {
   await page.locator('#holdings-file').setInputFiles(HOLDINGS_PATH);
   await page.locator('#run-btn').click();
-  await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 4_000 });
   await assertNoNaN(page, '#simple-table');
 
   const drillCell = page.locator('#simple-table tbody td[data-col]').first();
   await drillCell.click();
-  await expect(page.locator('#drill-overlay')).toBeVisible({ timeout: 5_000 });
+  await expect(page.locator('#drill-overlay')).toBeVisible({ timeout: 4_000 });
   expect(await page.locator('#drill-content').textContent()).not.toContain('NaN');
   await page.locator('#drill-close').click();
 });
@@ -358,7 +359,7 @@ test('rebalance: no NaN in table cells at low DARA ($5,000)', async ({ page }) =
   await page.locator('#holdings-file').setInputFiles(HOLDINGS_PATH);
   await page.locator('#dara').fill('5000');
   await page.locator('#run-btn').click();
-  await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 4_000 });
   await assertNoNaN(page, '#simple-table');
 });
 
@@ -368,12 +369,12 @@ test('build: no NaN in table cells or drill popup', async ({ page }) => {
   const optionCount = await lastYearSel.locator('option').count();
   await lastYearSel.selectOption({ index: optionCount - 1 });
   await page.locator('#run-btn').click();
-  await expect(page.locator('#build-output')).toHaveCSS('display', 'block', { timeout: 15_000 });
+  await expect(page.locator('#build-output')).toHaveCSS('display', 'block', { timeout: 4_000 });
   await assertNoNaN(page, '#build-table');
 
   const drillCell = page.locator('#build-table tbody td[data-col]').first();
   await drillCell.click();
-  await expect(page.locator('#drill-overlay')).toBeVisible({ timeout: 5_000 });
+  await expect(page.locator('#drill-overlay')).toBeVisible({ timeout: 4_000 });
   expect(await page.locator('#drill-content').textContent()).not.toContain('NaN');
   await page.locator('#drill-close').click();
 });
@@ -430,14 +431,14 @@ test('build: pressing Enter (no overlay open) triggers Build Ladder', async ({ p
   // Blur any focused element so no text field swallows the key
   await page.locator('.app-title').click();
   await page.keyboard.press('Enter');
-  await expect(page.locator('#build-output')).toHaveCSS('display', 'block', { timeout: 15_000 });
+  await expect(page.locator('#build-output')).toHaveCSS('display', 'block', { timeout: 4_000 });
 });
 
 test('rebalance: pressing Enter (no overlay open) triggers Run Rebalance', async ({ page }) => {
   await page.locator('#holdings-file').setInputFiles(HOLDINGS_PATH);
   await page.locator('.app-title').click();
   await page.keyboard.press('Enter');
-  await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 4_000 });
 });
 
 // ── 13. DARA auto-infer writeback ─────────────────────────────────────────────
@@ -448,7 +449,7 @@ test('rebalance: Full method with blank DARA writes inferred DARA back to input'
   await expect(page.locator('#method')).toHaveValue('Full');
 
   await page.locator('#run-btn').click();
-  await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 4_000 });
 
   // DARA input must now contain a positive integer
   const daraVal = await page.locator('#dara').inputValue();
@@ -461,7 +462,7 @@ test('rebalance: Full method with blank DARA writes inferred DARA back to input'
 test('rebalance: export button visible after run and triggers CSV download', async ({ page }) => {
   await page.locator('#holdings-file').setInputFiles(HOLDINGS_PATH);
   await page.locator('#run-btn').click();
-  await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 4_000 });
 
   const exportBtn = page.locator('#export-csv-btn');
   await expect(exportBtn).toBeVisible();
@@ -480,7 +481,7 @@ test('build: export button visible after run', async ({ page }) => {
   await lastYearSel.selectOption({ index: optionCount - 1 });
 
   await page.locator('#run-btn').click();
-  await expect(page.locator('#build-output')).toHaveCSS('display', 'block', { timeout: 15_000 });
+  await expect(page.locator('#build-output')).toHaveCSS('display', 'block', { timeout: 4_000 });
   await expect(page.locator('#export-csv-btn')).toBeVisible();
 });
 
@@ -488,7 +489,7 @@ test('rebalance: no negative Qty After values at low DARA', async ({ page }) => 
   await page.locator('#holdings-file').setInputFiles(HOLDINGS_PATH);
   await page.locator('#dara').fill('5000');
   await page.locator('#run-btn').click();
-  await expect(page.locator('#simple-table')).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('#simple-table')).toBeVisible({ timeout: 4_000 });
 
   // Find the Qty After column index from the header row
   const headers = page.locator('#simple-table thead th');
@@ -500,7 +501,7 @@ test('rebalance: no negative Qty After values at low DARA', async ({ page }) => 
   }
   expect(qtyAfterIdx, 'Qty After column not found in table header').toBeGreaterThanOrEqual(0);
 
-  const rows = page.locator('#simple-table tbody tr');
+  const rows = page.locator('#simple-table tbody tr:not(.fy-group-header)');
   const rowCount = await rows.count();
   for (let i = 0; i < rowCount; i++) {
     const cellText = await rows.nth(i).locator('td').nth(qtyAfterIdx).textContent().catch(() => '');
@@ -523,7 +524,7 @@ test('rebalance: Full method net cash is non-negative and within $2,000', async 
   await expect(page.locator('#method')).toHaveValue('Full');
 
   await page.locator('#run-btn').click();
-  await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 4_000 });
 
   const raw = await page.locator('#net-cash-val').textContent();
   const netCash = parseNetCash(raw);
@@ -537,7 +538,7 @@ test('rebalance: changing RefCPI date clears output and does not alter DARA', as
   await page.locator('#holdings-file').setInputFiles(HOLDINGS_PATH);
   await page.locator('#dara').fill('');
   await page.locator('#run-btn').click();
-  await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 4_000 });
 
   // Record the inferred DARA
   const daraAfterRun = await page.locator('#dara').inputValue();
@@ -565,7 +566,7 @@ test('rebalance: Full method does not overwrite DARA when field is already fille
   await page.locator('#holdings-file').setInputFiles(HOLDINGS_PATH);
   await page.locator('#dara').fill('');
   await page.locator('#run-btn').click();
-  await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 4_000 });
 
   // Record the inferred DARA, then change RefCPI
   const daraAfterFirstRun = await page.locator('#dara').inputValue();
@@ -580,7 +581,7 @@ test('rebalance: Full method does not overwrite DARA when field is already fille
 
   // Re-run — DARA field is now a user-confirmed value, so Full must NOT re-infer
   await page.locator('#run-btn').click();
-  await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 4_000 });
 
   const daraAfterReRun = await page.locator('#dara').inputValue();
   expect(daraAfterReRun, 'Full rebalance overwrote user DARA with a new inferred value').toBe(daraAfterFirstRun);
@@ -591,7 +592,7 @@ test('rebalance: Full method net cash is non-negative after clearing DARA and re
   await page.locator('#holdings-file').setInputFiles(HOLDINGS_PATH);
   await page.locator('#dara').fill('');
   await page.locator('#run-btn').click();
-  await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 4_000 });
 
   // Change RefCPI, clear DARA, re-run to get fresh inference with new RefCPI
   await page.locator('#refcpi-link').click();
@@ -600,7 +601,7 @@ test('rebalance: Full method net cash is non-negative after clearing DARA and re
   await page.locator('#dara').fill('');
 
   await page.locator('#run-btn').click();
-  await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 4_000 });
 
   // DARA must have been re-inferred (field shows a number, not blank)
   const daraAfterReInfer = await page.locator('#dara').inputValue();
@@ -622,7 +623,7 @@ test('rebalance: auto-inferred DARA is re-inferred when bracket mode changes', a
 
   // First run — DARA auto-inferred
   await page.locator('#run-btn').click();
-  await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 4_000 });
   const daraFirst = await page.locator('#dara').inputValue();
   expect(daraFirst).toMatch(/^\d+$/);
 
@@ -632,7 +633,7 @@ test('rebalance: auto-inferred DARA is re-inferred when bracket mode changes', a
 
   // Re-run — should re-infer DARA (not silently reuse the stale auto-inferred value)
   await page.locator('#run-btn').click();
-  await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 4_000 });
 
   // DARA field must still contain a valid number (inference ran and succeeded)
   const daraSecond = await page.locator('#dara').inputValue();
@@ -644,7 +645,7 @@ test('rebalance: auto-inferred DARA is re-inferred when bracket mode changes', a
 test('rebalance: pressing Enter in RefCPI date picker applies date but does not auto-run', async ({ page }) => {
   await page.locator('#holdings-file').setInputFiles(HOLDINGS_PATH);
   await page.locator('#run-btn').click();
-  await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 4_000 });
 
   const daraBefore = await page.locator('#dara').inputValue();
 
