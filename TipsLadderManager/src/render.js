@@ -125,9 +125,10 @@ function renderGroupHeader(cols, fy, groupRows, isBracketGroup) {
   let html = `<tr class="${cls}" data-fy="${fy}" data-expanded="true">`;
   html += `<td colspan="${labelCount}">${esc(label)}</td>`;
   for (const col of valueCols) {
-    // fyLevel columns are year-level quantities: use first row's value, not sum
+    // fyLevel columns are year-level quantities: find first non-null row's value (not sum)
+    // groupRows[0] may have null due to multi-TIPS years processed in reverse + unshift order
     const agg = col.fyLevel
-      ? col.value(groupRows[0], 0, groupRows)
+      ? groupRows.reduce((found, d) => found !== null ? found : col.value(d, 0, groupRows), null)
       : groupRows.reduce((acc, d) => { const v = col.value(d, 0, groupRows); return acc + (typeof v === 'number' ? v : 0); }, 0);
     const s    = fmtCell(agg, col.fmt);
     const cls2 = fmtCls(agg, col.fmt);
