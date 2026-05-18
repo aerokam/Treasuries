@@ -2,8 +2,7 @@ import { defineConfig } from 'playwright/test';
 
 export default defineConfig({
   testDir: 'tests',
-  timeout: 15_000,
-  maxFailures: 1,
+  timeout: 5_000,
   use: {
     baseURL: 'http://127.0.0.1:8080/TipsLadderManager/',
     headless: true,

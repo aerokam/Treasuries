@@ -487,8 +487,8 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
     else { lastYear = year; break; }
   }
   const derivedLastYear = lastYear;  // save before override for sell-above-lastYear logic
-  if (lastYearOverride != null) lastYear = lastYearOverride;
-  if (firstYearOverride != null) firstYear = firstYearOverride;
+  if (lastYearOverride != null && !isNaN(lastYearOverride)) lastYear = lastYearOverride;
+  if (firstYearOverride != null && !isNaN(firstYearOverride)) firstYear = firstYearOverride;
 
   const tipsMapYears = new Set();
   let maxTipsYear = 0;

@@ -36,7 +36,7 @@ export function parseBrokerCSV(csvText, tipsMap) {
       // Find what comes before the "...DIGITS" part
       const beforeDots = line.substring(0, line.indexOf('...'));
       // Extract account name (remove "Positions for account" prefix and quotes)
-      const acctName = beforeDots.replace(/^["']?Positions\s+for\s+account\s+/, '').replace(/["']?\s*$/, '').trim();
+      const acctName = beforeDots.replace(/^["']/, '').replace(/^Positions\s+for\s+account\s+/, '').replace(/\s*$/, '').trim();
       if (acctName) {
         currentSchwabAccount = acctName;
         continue;
