@@ -227,7 +227,7 @@ test('drill popup: clicking Ref CPI in Level 2 opens Level 3 Ref CPI popup', asy
   await page.locator('#run-btn').click();
   await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 4_000 });
 
-  await page.locator('#simple-table tbody td[data-col]').first().click();
+  await page.locator('#simple-table tbody td[data-col="costBefore"]').first().click();
   await expect(page.locator('#drill-overlay')).toBeVisible();
 
   const refCpiLabel = page.locator('.drill-l3[data-l3="refCPI"]');
@@ -252,7 +252,7 @@ test('drill popup: clicking Index Ratio in Level 2 opens Level 3 Index Ratio pop
   await page.locator('#run-btn').click();
   await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 4_000 });
 
-  await page.locator('#simple-table tbody td[data-col]').first().click();
+  await page.locator('#simple-table tbody td[data-col="costBefore"]').first().click();
   await expect(page.locator('#drill-overlay')).toBeVisible();
 
   const irLabel = page.locator('.drill-l3[data-l3="indexRatio"]');

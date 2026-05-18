@@ -116,7 +116,8 @@ function isUpperBracket(d, summary, mode) {
     : d.fundedYear === summary.upperYear;
 }
 
-function renderGroupHeader(cols, fy, groupRows, isBracketGroup) {
+function renderGroupHeader(cols, fy, rows, isBracketGroup) {
+  const groupRows  = rows.map(r => r.d);
   const labelCount = cols.filter(c => c.fmt === 'str' || c.fmt === 'yld').length;
   const valueCols  = cols.filter(c => c.fmt !== 'str' && c.fmt !== 'yld');
   const cls = 'fy-group-header' + (isBracketGroup ? ' bracket' : '');
@@ -125,14 +126,29 @@ function renderGroupHeader(cols, fy, groupRows, isBracketGroup) {
   let html = `<tr class="${cls}" data-fy="${fy}" data-expanded="true">`;
   html += `<td colspan="${labelCount}">${esc(label)}</td>`;
   for (const col of valueCols) {
-    // fyLevel columns are year-level quantities: find first non-null row's value (not sum)
-    // groupRows[0] may have null due to multi-TIPS years processed in reverse + unshift order
-    const agg = col.fyLevel
-      ? groupRows.reduce((found, d) => found !== null ? found : col.value(d, 0, groupRows), null)
-      : groupRows.reduce((acc, d) => { const v = col.value(d, 0, groupRows); return acc + (typeof v === 'number' ? v : 0); }, 0);
+    let agg = null, drillKey = null, drillRi = null;
+    if (col.fyLevel) {
+      // fyLevel: find first non-null row's value (not sum); track its ri for drill
+      for (const { d, ri } of rows) {
+        const v = col.value(d, 0, groupRows);
+        if (v !== null) { agg = v; drillRi = ri; break; }
+      }
+      if (col.drill && drillRi !== null) {
+        const drillD = rows.find(r => r.ri === drillRi)?.d;
+        const ok = col.drillCond ? col.drillCond(agg, drillD) : (agg != null && agg !== 0);
+        if (ok) drillKey = col.key;
+      }
+    } else {
+      agg = groupRows.reduce((acc, d) => { const v = col.value(d, 0, groupRows); return acc + (typeof v === 'number' ? v : 0); }, 0);
+    }
     const s    = fmtCell(agg, col.fmt);
     const cls2 = fmtCls(agg, col.fmt);
-    const attr = cls2 ? ` class="${cls2}"` : '';
+    let attr = '';
+    if (drillKey) {
+      attr = ' class="drillable' + (cls2 ? ' ' + cls2 : '') + '" data-row="' + drillRi + '" data-col="' + drillKey + '"';
+    } else if (cls2) {
+      attr = ' class="' + cls2 + '"';
+    }
     html += `<td${attr} style="text-align:right">${esc(s)}</td>`;
   }
   html += '</tr>';
@@ -171,7 +187,7 @@ export function renderTable({ details, mode, summary }) {
 
   const bodyRows = groups.map(({ fy, rows }) => {
     const isBracketGroup = rows.some(({ d }) => isBracket(d, mode));
-    let html = renderGroupHeader(cols, fy, rows.map(r => r.d), isBracketGroup);
+    let html = renderGroupHeader(cols, fy, rows, isBracketGroup);
 
     for (const { d, ri } of rows) {
       const bt    = isBracket(d, mode);
