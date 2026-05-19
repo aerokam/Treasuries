@@ -4,7 +4,7 @@
 
 import { readFileSync, readdirSync, existsSync } from 'fs';
 import path from 'path';
-import { buildTipsMapFromYields, localDate, runRebalance, inferDARAFromCash, inferFirstYearFromHoldings } from '../src/rebalance-lib.js';
+import { buildTipsMapFromYields, localDate, runRebalance, inferDARAFromCash, inferFirstYearFromHoldings, runMultiAccountRebalance } from '../src/rebalance-lib.js';
 import { runBuild } from '../src/build-lib.js';
 import { parseBrokerCSV } from '../src/broker-import.js';
 
@@ -692,6 +692,294 @@ for (const gapFirstYear of [2037, 2038, 2039]) {
   const holdings36 = bldD36.map(d => ({ cusip: d.cusip, qty: d.fundedYearQty + d.excessQty, excessQty: d.excessQty }));
   const inferred36 = inferFirstYearFromHoldings({ holdings: holdings36, tipsMap, refCPI, settlementDate });
   assert('inferFirstYear from build firstYear=2036 → null (2036 is funded, not pure bracket)', inferred36, null);
+}
+
+// ── Test: Multi-account — no 2040 buys in McNeill Joint (taxable) ─────────────
+// Load FidelityAllAccounts.csv, select Harry IRA + McNeill Joint WROS, rebalance.
+// 2040 is long-tier → must go to tIRA (Harry IRA), never taxable (McNeill Joint).
+{
+  const fidelityPath = path.resolve('data/FidelityAllAccounts.csv');
+  if (existsSync(fidelityPath)) {
+    console.log('\nMulti-account — Harry IRA + McNeill Joint WROS: no 2040 buys in taxable');
+
+    const HARRY_IRA   = 'Harry IRA';
+    const JOINT       = 'McNeill Joint WROS';
+    const TARGET_YEAR = 2040;
+
+    const { holdings: allHoldings, tipsValues, totalAccountValues } =
+      parseBrokerCSV(readFileSync(fidelityPath, 'utf8'), tipsMap);
+
+    // Only select these two accounts
+    const selectedAccounts = [HARRY_IRA, JOINT].filter(n => allHoldings[n]);
+    const holdingsWithAccount = [];
+    const accountSizes = {};
+    for (const name of selectedAccounts) {
+      const tv = tipsValues[name] || 50000;
+      accountSizes[name] = { sizeInDollars: tv };
+      for (const h of allHoldings[name]) {
+        holdingsWithAccount.push({ ...h, account: name });
+      }
+    }
+
+    const { dara } = inferDARAFromCash({ holdings: holdingsWithAccount, tipsMap, refCPI, settlementDate });
+    const maResult = runMultiAccountRebalance({
+      dara,
+      method: 'Full',
+      holdings: holdingsWithAccount,
+      tipsMap,
+      refCPI,
+      settlementDate,
+      accountSizes,
+      minMonthsToMaturity: 6,
+    });
+
+    const alloc   = maResult.accountAllocation;
+    const current = maResult.currentHoldingsByAccount;
+    const details = maResult.rebalanceResult.details;
+    const tiers   = maResult.maturityTiers;
+    const flows   = maResult.accountCashFlows;
+
+    // Find all 2040 buys in Joint
+    const joint2040Buys = [];
+    for (const cusip in (alloc[JOINT] || {})) {
+      const qtyAfter  = alloc[JOINT][cusip]?.[TARGET_YEAR] || 0;
+      const qtyBefore = current[JOINT]?.[cusip]?.[TARGET_YEAR] || 0;
+      if (qtyAfter > qtyBefore) {
+        joint2040Buys.push({ cusip, qtyBefore, qtyAfter, delta: qtyAfter - qtyBefore });
+      }
+    }
+
+    const ok = joint2040Buys.length === 0;
+    assert(`no 2040 buys in ${JOINT} (long-tier should go to tIRA)`, ok, true);
+
+    if (!ok) {
+      console.error('\n  ── Diagnostic ──────────────────────────────────────────');
+      console.error(`  Tier of 2040: ${tiers[TARGET_YEAR]}`);
+
+      for (const { cusip, qtyBefore, qtyAfter, delta } of joint2040Buys) {
+        console.error(`  BUY in ${JOINT}: ${cusip} year=${TARGET_YEAR}  before=${qtyBefore}  after=${qtyAfter}  delta=+${delta}`);
+      }
+
+      // Harry IRA budget
+      const iraFlows = flows[HARRY_IRA] || {};
+      console.error(`\n  Harry IRA budget:          $${(iraFlows.budget || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}`);
+      console.error(`  Harry IRA allocation cost: $${(iraFlows.newAllocationCost || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}`);
+      const headroom = (iraFlows.budget || 0) - (iraFlows.newAllocationCost || 0);
+      console.error(`  Harry IRA headroom:        $${headroom.toLocaleString('en-US', { maximumFractionDigits: 0 })}`);
+
+      // Harry IRA 2040 position
+      for (const cusip in (alloc[HARRY_IRA] || {})) {
+        const qtyAfterIRA  = alloc[HARRY_IRA][cusip]?.[TARGET_YEAR] || 0;
+        const qtyBeforeIRA = current[HARRY_IRA]?.[cusip]?.[TARGET_YEAR] || 0;
+        if (qtyAfterIRA > 0 || qtyBeforeIRA > 0) {
+          console.error(`  Harry IRA ${TARGET_YEAR}: ${cusip}  before=${qtyBeforeIRA}  after=${qtyAfterIRA}  delta=${qtyAfterIRA - qtyBeforeIRA}`);
+        }
+      }
+
+      // All detail rows for year 2040 — targets
+      const rows2040 = details.filter(d => d.fundedYear === TARGET_YEAR);
+      console.error(`\n  Rebalance targets for year ${TARGET_YEAR}:`);
+      for (const d of rows2040) {
+        const currentTotal = Object.values(current).reduce((s, byC) => s + (byC[d.cusip]?.[TARGET_YEAR] || 0), 0);
+        const held = {
+          [HARRY_IRA]: current[HARRY_IRA]?.[d.cusip]?.[TARGET_YEAR] || 0,
+          [JOINT]:     current[JOINT]?.[d.cusip]?.[TARGET_YEAR] || 0,
+        };
+        console.error(`    cusip=${d.cusip}  qtyBefore=${d.qtyBefore}  qtyAfter=${d.qtyAfter}  delta=${d.qtyAfter - d.qtyBefore}`);
+        console.error(`      current: ${HARRY_IRA}=${held[HARRY_IRA]}  ${JOINT}=${held[JOINT]}  total=${currentTotal}`);
+        console.error(`      costPerBond=$${d.costPerBond?.toLocaleString('en-US', { maximumFractionDigits: 0 })}`);
+      }
+
+      // Harry IRA sells (what freed budget)
+      console.error(`\n  Harry IRA sells (budget freed):`);
+      let totalFreed = 0;
+      for (const cusip in (alloc[HARRY_IRA] || {})) {
+        for (const yearStr in (alloc[HARRY_IRA][cusip] || {})) {
+          const qA = alloc[HARRY_IRA][cusip][yearStr] || 0;
+          const qB = current[HARRY_IRA]?.[cusip]?.[yearStr] || 0;
+          const d  = details.find(row => row.cusip === cusip && row.fundedYear === parseInt(yearStr));
+          if (qA < qB) {
+            const freed = (qB - qA) * (d?.costPerBond || 0);
+            totalFreed += freed;
+            console.error(`    SELL year=${yearStr}  ${cusip}  qty ${qB}→${qA}  freed=$${freed.toLocaleString('en-US', { maximumFractionDigits: 0 })}`);
+          }
+        }
+      }
+      console.error(`    Total freed: $${totalFreed.toLocaleString('en-US', { maximumFractionDigits: 0 })}`);
+
+      // Is the budget headroom enough for the missed 2040 buy?
+      const missed2040Cost = joint2040Buys.reduce((s, b) => {
+        const d = details.find(row => row.cusip === b.cusip && row.fundedYear === TARGET_YEAR);
+        return s + b.delta * (d?.costPerBond || 0);
+      }, 0);
+      console.error(`\n  Cost of missed 2040 buy: $${missed2040Cost.toLocaleString('en-US', { maximumFractionDigits: 0 })}`);
+      console.error(`  Harry IRA headroom after allocation: $${headroom.toLocaleString('en-US', { maximumFractionDigits: 0 })}`);
+      console.error(`  → ${headroom >= missed2040Cost ? 'Headroom sufficient — blocked by sellYearsByAccount or ordering issue' : 'Headroom INSUFFICIENT — budget exhausted before 2040 buy'}`);
+      console.error('  ─────────────────────────────────────────────────────────\n');
+    }
+  }
+}
+
+// ── Test: Multi-account — no direction violations (buy+sell same year same account) ──────────
+// Spec 3.2 Step 5.3: within a single account, for any funded year, all transactions must be
+// in one direction (buy OR sell, never both).
+{
+  const fidelityPath = path.resolve('data/FidelityAllAccounts.csv');
+  if (existsSync(fidelityPath)) {
+    console.log('\nMulti-account — no direction violations (buy+sell same funded year same account)');
+
+    const HARRY_IRA = 'Harry IRA';
+    const JOINT     = 'McNeill Joint WROS';
+
+    const { holdings: allHoldings, tipsValues } =
+      parseBrokerCSV(readFileSync(fidelityPath, 'utf8'), tipsMap);
+
+    const selectedAccounts = [HARRY_IRA, JOINT].filter(n => allHoldings[n]);
+    const holdingsWithAccount = [];
+    const accountSizes = {};
+    for (const name of selectedAccounts) {
+      accountSizes[name] = { sizeInDollars: tipsValues[name] || 50000 };
+      for (const h of allHoldings[name]) holdingsWithAccount.push({ ...h, account: name });
+    }
+
+    const { dara } = inferDARAFromCash({ holdings: holdingsWithAccount, tipsMap, refCPI, settlementDate });
+    const maResult = runMultiAccountRebalance({
+      dara, method: 'Full', holdings: holdingsWithAccount,
+      tipsMap, refCPI, settlementDate, accountSizes, minMonthsToMaturity: 6,
+    });
+
+    const alloc   = maResult.accountAllocation;
+    const current = maResult.currentHoldingsByAccount;
+
+    const violations = [];
+    for (const [accName, byCusip] of Object.entries(alloc)) {
+      const yearDeltas = {};
+      const allCusips = new Set([
+        ...Object.keys(byCusip),
+        ...Object.keys(current[accName] || {}),
+      ]);
+      for (const cusip of allCusips) {
+        const allYears = new Set([
+          ...Object.keys(byCusip[cusip] || {}).map(String),
+          ...Object.keys(current[accName]?.[cusip] || {}).map(String),
+        ]);
+        for (const yearStr of allYears) {
+          const year = parseInt(yearStr);
+          const delta = (byCusip[cusip]?.[year] || 0) - (current[accName]?.[cusip]?.[year] || 0);
+          if (delta === 0) continue;
+          if (!yearDeltas[year]) yearDeltas[year] = [];
+          yearDeltas[year].push({ cusip, delta });
+        }
+      }
+      for (const [yearStr, deltas] of Object.entries(yearDeltas)) {
+        if (deltas.some(d => d.delta > 0) && deltas.some(d => d.delta < 0)) {
+          violations.push({ account: accName, year: parseInt(yearStr), deltas });
+        }
+      }
+    }
+
+    const ok = violations.length === 0;
+    assert('no direction violations (buy+sell same funded year same account)', ok, true);
+
+    if (!ok) {
+      console.error('\n  ── Direction Violations ─────────────────────────────────');
+      for (const { account, year, deltas } of violations) {
+        console.error(`  ${account}  year=${year}:`);
+        for (const { cusip, delta } of deltas) {
+          console.error(`    ${cusip}  ${delta > 0 ? `BUY +${delta}` : `SELL ${delta}`}`);
+        }
+      }
+      console.error('  ─────────────────────────────────────────────────────────\n');
+    }
+  }
+}
+
+// ── Test: Multi-account — IRA holds rmdMinQty per year when RMD is set ────────────────────────
+// With rmdByAccount set, IRA must retain at least ceil(rmd/cost) bonds for every year
+// where it currently holds bonds. "Sells all" (IRA → 0) is a failure.
+{
+  const fidelityPath = path.resolve('data/FidelityAllAccounts.csv');
+  if (existsSync(fidelityPath)) {
+    console.log('\nMulti-account — IRA retains rmdMinQty per funded year (RMD=$30k)');
+
+    const HARRY_IRA = 'Harry IRA';
+    const JOINT     = 'McNeill Joint WROS';
+    const RMD       = 30000;
+
+    const { holdings: allHoldings, tipsValues } =
+      parseBrokerCSV(readFileSync(fidelityPath, 'utf8'), tipsMap);
+
+    const selectedAccounts = [HARRY_IRA, JOINT].filter(n => allHoldings[n]);
+    const holdingsWithAccount = [];
+    const accountSizes = {};
+    for (const name of selectedAccounts) {
+      accountSizes[name] = { sizeInDollars: tipsValues[name] || 50000 };
+      for (const h of allHoldings[name]) holdingsWithAccount.push({ ...h, account: name });
+    }
+
+    const { dara } = inferDARAFromCash({ holdings: holdingsWithAccount, tipsMap, refCPI, settlementDate });
+    const maResult = runMultiAccountRebalance({
+      dara, method: 'Full', holdings: holdingsWithAccount,
+      tipsMap, refCPI, settlementDate, accountSizes,
+      rmdByAccount: { [HARRY_IRA]: RMD },
+      minMonthsToMaturity: 6,
+    });
+
+    const alloc   = maResult.accountAllocation;
+    const current = maResult.currentHoldingsByAccount;
+
+    // For each year where IRA currently holds bonds, verify it still holds >= rmdMinQty after.
+    const underfilled = [];
+    const iraCurrentByCusip = current[HARRY_IRA] || {};
+    const iraAllocByCusip   = alloc[HARRY_IRA]   || {};
+
+    // Collect years IRA currently holds (non-excluded)
+    const iraYears = new Set();
+    for (const cusip in iraCurrentByCusip) {
+      for (const yearStr in iraCurrentByCusip[cusip]) {
+        if ((iraCurrentByCusip[cusip][yearStr] || 0) > 0) iraYears.add(parseInt(yearStr));
+      }
+    }
+
+    for (const year of iraYears) {
+      // Total bonds IRA holds AFTER rebalance for this year
+      let afterQty = 0;
+      let repCost  = 0;
+      for (const cusip in iraAllocByCusip) {
+        const qty  = iraAllocByCusip[cusip][year] || 0;
+        const cost = tipsMap.get(cusip)?.price || 1000;
+        afterQty += qty;
+        if (qty > 0 && repCost === 0) repCost = cost;
+      }
+      // Fall back to avgCost if no allocation found
+      if (repCost === 0) {
+        for (const cusip in iraCurrentByCusip) {
+          const qty = iraCurrentByCusip[cusip][year] || 0;
+          if (qty > 0) { repCost = tipsMap.get(cusip)?.price || 1000; break; }
+        }
+      }
+      const rmdMinQty = Math.ceil(RMD / (repCost || 1000));
+
+      // Total current IRA qty for this year
+      let beforeQty = 0;
+      for (const cusip in iraCurrentByCusip) beforeQty += iraCurrentByCusip[cusip][year] || 0;
+
+      if (beforeQty >= rmdMinQty && afterQty < rmdMinQty) {
+        underfilled.push({ year, beforeQty, afterQty, rmdMinQty });
+      }
+    }
+
+    const ok = underfilled.length === 0;
+    assert('IRA retains rmdMinQty per funded year where it had enough', ok, true);
+
+    if (!ok) {
+      console.error('\n  ── RMD Under-filled Years ───────────────────────────────');
+      for (const { year, beforeQty, afterQty, rmdMinQty } of underfilled) {
+        console.error(`  year=${year}  before=${beforeQty}  after=${afterQty}  rmdMinQty=${rmdMinQty}  (sells too many)`);
+      }
+      console.error('  ─────────────────────────────────────────────────────────\n');
+    }
+  }
 }
 
 // ── Summary ───────────────────────────────────────────────────────────────────

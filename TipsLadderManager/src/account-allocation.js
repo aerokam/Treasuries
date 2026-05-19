@@ -15,321 +15,214 @@ export function detectAccountType(accountName) {
 }
 
 /**
- * Get buy preference order for a maturity tier
- * @param {string} tier - "short" | "medium" | "long"
- * @returns {string[]} - account types in preference order (most preferred first)
- */
-function getTierPreference(tier) {
-  switch (tier) {
-    case 'short':  return ['taxable', 'roth_ira', 'traditional_ira'];
-    case 'medium': return ['roth_ira', 'traditional_ira', 'taxable'];
-    case 'long':   return ['traditional_ira', 'roth_ira', 'taxable'];
-    default:       return ['taxable', 'roth_ira', 'traditional_ira'];
-  }
-}
-
-/**
- * Allocate target quantities to accounts using direction-preserving algorithm.
+ * Allocate target quantities to accounts using a liquidate-and-rebuild model.
  *
- * Core constraint: within a single account, for any funded year, all transactions
- * must be in one direction (buy OR sell, never both). Cross-account sell+buy of the
- * same TIPS is allowed.
+ * All accounts are treated as fully liquidated. Target bonds are placed longest-
+ * maturity first into IRA accounts (tIRA, then Roth), then taxable, until each
+ * account's budget is exhausted. No tier buckets — the IRA/taxable boundary is
+ * the natural cutoff where IRA runs out of money.
  *
  * @param {Object} params
  * @param {Object} params.accountMetadata - { [name]: { name, type, sizeInDollars } }
  * @param {Object} params.targetQuantities - { [cusip][year] = targetQty }
- * @param {Map<number, string>} params.maturityTiers - year → "short" | "medium" | "long"
  * @param {Object} params.costPerBond - { [cusip] = cost }
  * @param {Object} [params.rmdByAccount] - { [tIRAaccountName]: rmdAnnualAmountDollars }
- * @param {Object} [params.currentHoldingsByAccount] - { [accountName][cusip][year] = qty }
  * @param {Set<string>} [params.excludedFromBuy] - CUSIPs that cannot be purchased
  * @returns {Object} - { allocation, accountDollarsSpent, infeasibilities }
  */
 export function allocateToAccounts({
   accountMetadata,
   targetQuantities,
-  maturityTiers,
   costPerBond,
   rmdByAccount = {},
-  currentHoldingsByAccount = {},
   excludedFromBuy = new Set(),
+  // unused legacy params kept for call-site compatibility:
+  maturityTiers,
+  currentHoldingsByAccount,
 }) {
   const accounts = Object.values(accountMetadata);
-  const allocation = {}; // { [accountName][cusip][year] = qty }
+  const allocation = {};
   const accountDollarsSpent = {};
   const infeasibilities = [];
 
-  // Average cost for unknown CUSIPs
   const allCosts = Object.values(costPerBond);
   const avgCostPerTIPS = allCosts.length > 0
     ? allCosts.reduce((s, c) => s + c, 0) / allCosts.length
     : 1000;
 
-  // Initialize allocation and budget from current holdings
   for (const acc of accounts) {
     allocation[acc.name] = {};
     accountDollarsSpent[acc.name] = 0;
   }
 
-  for (const [accName, holdingsByCusip] of Object.entries(currentHoldingsByAccount)) {
-    if (!allocation[accName]) allocation[accName] = {};
-    for (const [cusip, holdingsByYear] of Object.entries(holdingsByCusip)) {
-      if (!allocation[accName][cusip]) allocation[accName][cusip] = {};
-      for (const [yearStr, qty] of Object.entries(holdingsByYear)) {
-        if (qty <= 0) continue;
-        const year = parseInt(yearStr);
-        allocation[accName][cusip][year] = qty;
-        const cost = costPerBond[cusip] ?? avgCostPerTIPS;
-        accountDollarsSpent[accName] = (accountDollarsSpent[accName] || 0) + qty * cost;
+  // Bonds too close to maturity cannot be traded — keep them in their current accounts.
+  // Without this, the liquidate-from-zero model would show them as SELL everywhere.
+  if (currentHoldingsByAccount) {
+    for (const [accName, holdingsByCusip] of Object.entries(currentHoldingsByAccount)) {
+      if (!allocation[accName]) continue;
+      for (const [cusip, holdingsByYear] of Object.entries(holdingsByCusip)) {
+        if (!excludedFromBuy.has(cusip)) continue;
+        for (const [yearStr, qty] of Object.entries(holdingsByYear)) {
+          if (qty <= 0) continue;
+          const cost = costPerBond[cusip] ?? avgCostPerTIPS;
+          if (!allocation[accName][cusip]) allocation[accName][cusip] = {};
+          allocation[accName][cusip][parseInt(yearStr)] = qty;
+          accountDollarsSpent[accName] += qty * cost;
+        }
       }
     }
   }
 
-  // Build complete set of (cusip, year) pairs: targets + current holdings
-  const pairsMap = new Map(); // `${cusip}|${year}` → { cusip, year, targetQty }
+  // Pre-lock RMD bonds in tIRA for years where current holdings already cover the minimum.
+  // Without this, the liquidate model treats all IRA bonds as sold, leaving zero for RMD.
+  // "If enough there, keep it" — lock rmdMinQty from existing holdings before any fill runs.
+  const rmdSatisfiedYears = {}; // { [accName]: Set<year> } — year already covered, skip Pass 1
+  if (currentHoldingsByAccount && Object.keys(rmdByAccount).length > 0) {
+    for (const [accName, rmdAmount] of Object.entries(rmdByAccount)) {
+      const acc = accountMetadata[accName];
+      if (!acc || acc.type !== 'traditional_ira') continue;
+      const holdingsByCusip = currentHoldingsByAccount[accName] || {};
 
+      const yearsWithHoldings = new Set();
+      for (const cusip in holdingsByCusip) {
+        if (excludedFromBuy.has(cusip)) continue;
+        for (const yearStr in holdingsByCusip[cusip]) {
+          if ((holdingsByCusip[cusip][yearStr] || 0) > 0) yearsWithHoldings.add(parseInt(yearStr));
+        }
+      }
+
+      for (const year of yearsWithHoldings) {
+        const cusipsInYear = [];
+        for (const cusip in holdingsByCusip) {
+          if (excludedFromBuy.has(cusip)) continue;
+          const qty = holdingsByCusip[cusip][year] || 0;
+          if (qty <= 0) continue;
+          cusipsInYear.push({ cusip, qty, cost: costPerBond[cusip] ?? avgCostPerTIPS });
+        }
+        if (cusipsInYear.length === 0) continue;
+
+        const repCost = cusipsInYear[0].cost;
+        const rmdMinQty = Math.ceil(rmdAmount / repCost);
+        const totalCurrentQty = cusipsInYear.reduce((s, c) => s + c.qty, 0);
+        if (totalCurrentQty < rmdMinQty) continue; // shortfall — Pass 1 handles it
+
+        // Lock rmdMinQty bonds (current CUSIP order; "sell earlier maturity" means
+        // prefer keeping later-maturity CUSIPs, but single-CUSIP years need no sort).
+        let toLock = rmdMinQty;
+        for (const { cusip, qty, cost } of cusipsInYear) {
+          const lockQty = Math.min(toLock, qty);
+          if (lockQty <= 0) break;
+          if (!allocation[accName][cusip]) allocation[accName][cusip] = {};
+          allocation[accName][cusip][year] = (allocation[accName][cusip][year] || 0) + lockQty;
+          accountDollarsSpent[accName] += lockQty * cost;
+          toLock -= lockQty;
+          if (toLock <= 0) break;
+        }
+
+        if (!rmdSatisfiedYears[accName]) rmdSatisfiedYears[accName] = new Set();
+        rmdSatisfiedYears[accName].add(year);
+      }
+    }
+  }
+
+  // Fill order: tIRA first, then Roth IRA, then taxable
+  const TYPE_ORDER = ['traditional_ira', 'roth_ira', 'taxable'];
+  const orderedAccounts = [...accounts].sort(
+    (a, b) => TYPE_ORDER.indexOf(a.type) - TYPE_ORDER.indexOf(b.type)
+  );
+
+  // All target bonds sorted longest to shortest
+  const allTargets = [];
   for (const cusip in targetQuantities) {
     for (const yearStr in targetQuantities[cusip]) {
       const year = parseInt(yearStr);
-      pairsMap.set(`${cusip}|${year}`, { cusip, year, targetQty: targetQuantities[cusip][yearStr] || 0 });
+      const targetQty = targetQuantities[cusip][yearStr] || 0;
+      if (targetQty <= 0 || excludedFromBuy.has(cusip)) continue;
+      allTargets.push({ cusip, year, targetQty });
     }
   }
+  allTargets.sort((a, b) => b.year - a.year);
 
-  for (const holdingsByCusip of Object.values(currentHoldingsByAccount)) {
-    for (const cusip in holdingsByCusip) {
-      for (const yearStr in holdingsByCusip[cusip]) {
-        const year = parseInt(yearStr);
-        const key = `${cusip}|${year}`;
-        if (!pairsMap.has(key)) {
-          pairsMap.set(key, { cusip, year, targetQty: 0 });
+  // Pre-scan: mark accounts as committed sellers for a funded year when they hold
+  // a CUSIP whose global target is 0 (CUSIP being fully exited). Those accounts
+  // cannot also buy a different CUSIP for the same funded year — direction constraint.
+  // Excluded bonds (held in place, not traded) are exempt from this scan.
+  const sellYearsByAccount = {};
+  if (currentHoldingsByAccount) {
+    for (const [accName, holdingsByCusip] of Object.entries(currentHoldingsByAccount)) {
+      for (const [cusip, holdingsByYear] of Object.entries(holdingsByCusip)) {
+        if (excludedFromBuy.has(cusip)) continue;
+        for (const [yearStr, qty] of Object.entries(holdingsByYear)) {
+          if (qty <= 0) continue;
+          const year = parseInt(yearStr);
+          if (qty > (targetQuantities[cusip]?.[year] ?? 0)) {
+            if (!sellYearsByAccount[accName]) sellYearsByAccount[accName] = new Set();
+            sellYearsByAccount[accName].add(year);
+          }
         }
       }
     }
   }
 
-  // Compute netDelta for each pair
-  const allTargets = [];
-  for (const { cusip, year, targetQty } of pairsMap.values()) {
-    let totalCurrent = 0;
-    for (const accName in currentHoldingsByAccount) {
-      totalCurrent += (currentHoldingsByAccount[accName][cusip]?.[year] || 0);
-    }
-    const netDelta = targetQty - totalCurrent;
-    allTargets.push({ cusip, year, targetQty, netDelta });
-  }
-
-  // Three-phase sort:
-  //   Phase 0 — sells (year DESC): frees budget and marks sellYearsByAccount
-  //   Phase 1 — zero redistributions (short-tier first, year ASC within tier): moves
-  //             suboptimally-placed bonds (e.g. short TIPS in IRA) to preferred accounts,
-  //             freeing budget for long-tier buys in the next phase
-  //   Phase 2 — buys (year DESC): fills preferred accounts with freed + existing budget
-  const _tierOrd = { long: 0, medium: 1, short: 2 };
-  const _getTier = year => (maturityTiers instanceof Map ? maturityTiers.get(year) : maturityTiers[year]) || 'medium';
-  allTargets.sort((a, b) => {
-    const aPhase = a.netDelta < 0 ? 0 : a.netDelta === 0 ? 1 : 2;
-    const bPhase = b.netDelta < 0 ? 0 : b.netDelta === 0 ? 1 : 2;
-    if (aPhase !== bPhase) return aPhase - bPhase;
-    if (aPhase === 1) {
-      // Zero redistributions: short-tier first (highest _tierOrd first), then year ASC
-      const aTv = _tierOrd[_getTier(a.year)] ?? 1;
-      const bTv = _tierOrd[_getTier(b.year)] ?? 1;
-      if (aTv !== bTv) return bTv - aTv;
-      return a.year - b.year;
-    }
-    return b.year - a.year;
-  });
-
-  // Pre-compute long-tier net-buy credit: total cost of long-tier bonds that will redirect
-  // to the preferred long-tier account (tIRA) once zero-redistribution frees its budget.
-  // Grants the destination account (taxable) swap credit in zero-redistribution so the
-  // move isn't blocked by apparent lack of headroom — Joint will forgo those long-tier buys.
-  const _longPrefType = getTierPreference('long')[0]; // 'traditional_ira'
-  let _remainingLongCredit = 0;
-  for (const { cusip: _c, year: _y, netDelta: _nd } of allTargets) {
-    if (_nd <= 0 || _getTier(_y) !== 'long') continue;
-    _remainingLongCredit += (costPerBond[_c] ?? avgCostPerTIPS) * _nd;
-  }
-
-  // Pre-scan: accounts holding a CUSIP whose target is 0 are committed sellers for that year
-  const sellYearsByAccount = {}; // { [accName]: Set<year> }
-
-  for (const [accName, holdingsByCusip] of Object.entries(currentHoldingsByAccount)) {
-    for (const cusip in holdingsByCusip) {
-      for (const [yearStr, qty] of Object.entries(holdingsByCusip[cusip])) {
-        if (qty <= 0) continue;
-        const year = parseInt(yearStr);
-        const targetQty = targetQuantities[cusip]?.[year] ?? 0;
-        if (targetQty === 0) {
-          if (!sellYearsByAccount[accName]) sellYearsByAccount[accName] = new Set();
-          sellYearsByAccount[accName].add(year);
-        }
-      }
-    }
-  }
-
-  // Main allocation loop
-  for (const { cusip, year, netDelta } of allTargets) {
-    const costThisCusip = costPerBond[cusip] ?? avgCostPerTIPS;
-    const tier = maturityTiers instanceof Map ? maturityTiers.get(year) : maturityTiers[year];
-    const prefOrder = getTierPreference(tier);
-
-    if (netDelta > 0 && !excludedFromBuy.has(cusip)) {
-      // ── NET BUY ──
-      let remaining = netDelta;
-
-      // RMD priority: fill tIRA accounts first to ensure minimum bonds for distributions.
-      // Intentionally does NOT check sellYearsByAccount — RMD is a legal obligation that
-      // supersedes the direction-preserving constraint (e.g. CUSIP transitions where the
-      // old CUSIP is sold and the new one must still land in the IRA to cover RMDs).
-      for (const [accName, rmdAmount] of Object.entries(rmdByAccount)) {
-        if (remaining <= 0) break;
-        const acc = accounts.find(a => a.name === accName && a.type === 'traditional_ira');
-        if (!acc) continue;
-
-        const rmdMinQty = Math.ceil(rmdAmount / costThisCusip);
-        const currentInAcc = allocation[accName][cusip]?.[year] || 0;
-        const additionalForRMD = Math.max(0, rmdMinQty - currentInAcc);
-        if (additionalForRMD <= 0) continue;
-
-        const budgetAvail = acc.sizeInDollars - (accountDollarsSpent[accName] || 0);
-        const maxAffordable = Math.floor(budgetAvail / costThisCusip);
-        const toAdd = Math.min(additionalForRMD, remaining, maxAffordable);
-
-        if (toAdd > 0) {
+  // Pass 1 — RMD reservation (shortest-first so near-term years are covered first).
+  // Pre-place rmdMinQty bonds into each tIRA for every year before the main fill
+  // runs. Without this, the IRA fills up with the longest bonds and has no budget
+  // left when short-year RMD bonds are processed.
+  if (Object.keys(rmdByAccount).length > 0) {
+    const shortestFirst = [...allTargets].sort((a, b) => a.year - b.year);
+    for (const [accName, rmdAmount] of Object.entries(rmdByAccount)) {
+      const acc = accountMetadata[accName];
+      if (!acc || acc.type !== 'traditional_ira') continue;
+      for (const { cusip, year, targetQty } of shortestFirst) {
+        if (rmdSatisfiedYears[accName]?.has(year)) continue; // already locked via pre-lock
+        if (sellYearsByAccount[accName]?.has(year)) continue;
+        const cost = costPerBond[cusip] ?? avgCostPerTIPS;
+        const rmdMinQty = Math.ceil(rmdAmount / cost);
+        const toReserve = Math.min(
+          rmdMinQty, targetQty,
+          Math.floor((acc.sizeInDollars - accountDollarsSpent[accName]) / cost)
+        );
+        if (toReserve > 0) {
           if (!allocation[accName][cusip]) allocation[accName][cusip] = {};
-          allocation[accName][cusip][year] = (allocation[accName][cusip][year] || 0) + toAdd;
-          accountDollarsSpent[accName] = (accountDollarsSpent[accName] || 0) + toAdd * costThisCusip;
-          remaining -= toAdd;
-        }
-      }
-
-      // Tier-preference fill for remaining quantity
-      for (const accountType of prefOrder) {
-        if (remaining <= 0) break;
-        for (const acc of accounts) {
-          if (acc.type !== accountType || remaining <= 0) continue;
-          if (sellYearsByAccount[acc.name]?.has(year)) continue;
-
-          const budgetAvail = acc.sizeInDollars - (accountDollarsSpent[acc.name] || 0);
-          const maxAffordable = Math.floor(budgetAvail / costThisCusip);
-          const toAdd = Math.min(remaining, maxAffordable);
-
-          if (toAdd > 0) {
-            if (!allocation[acc.name][cusip]) allocation[acc.name][cusip] = {};
-            allocation[acc.name][cusip][year] = (allocation[acc.name][cusip][year] || 0) + toAdd;
-            accountDollarsSpent[acc.name] = (accountDollarsSpent[acc.name] || 0) + toAdd * costThisCusip;
-            remaining -= toAdd;
-          }
-        }
-      }
-
-      if (remaining > 0) {
-        infeasibilities.push({
-          cusip,
-          year,
-          remainingQty: remaining,
-          reason: 'Insufficient total account capacity to accommodate all target TIPS',
-        });
-      }
-
-    } else if (netDelta < 0) {
-      // ── NET SELL ── remove from least-preferred accounts first
-      let toRemove = -netDelta;
-      const reversePrefOrder = [...prefOrder].reverse();
-
-      for (const accountType of reversePrefOrder) {
-        if (toRemove <= 0) break;
-        for (const acc of accounts) {
-          if (acc.type !== accountType || toRemove <= 0) continue;
-
-          const currentHeld = allocation[acc.name][cusip]?.[year] || 0;
-
-          // tIRA: never sell below the RMD floor for this year
-          const rmdFloor = (acc.type === 'traditional_ira' && rmdByAccount[acc.name])
-            ? Math.ceil(rmdByAccount[acc.name] / costThisCusip)
-            : 0;
-          const canRemove = Math.min(toRemove, Math.max(0, currentHeld - rmdFloor));
-
-          if (canRemove > 0) {
-            allocation[acc.name][cusip][year] -= canRemove;
-            accountDollarsSpent[acc.name] = (accountDollarsSpent[acc.name] || 0) - canRemove * costThisCusip;
-            toRemove -= canRemove;
-            if (!sellYearsByAccount[acc.name]) sellYearsByAccount[acc.name] = new Set();
-            sellYearsByAccount[acc.name].add(year);
-          }
-        }
-      }
-    } else if (netDelta === 0) {
-      // ── ZERO REDISTRIBUTION ──
-      // Move bonds from non-preferred accounts to preferred ones (cross-account migration).
-      // E.g. short-tier TIPS held in a tIRA are moved to taxable, freeing tIRA budget for
-      // long-tier buys that follow in phase 2.
-      const reversePrefOrder = [...prefOrder].reverse(); // least-preferred first (move FROM here)
-
-      for (const fromAccType of reversePrefOrder) {
-        for (const fromAcc of accounts) {
-          if (fromAcc.type !== fromAccType) continue;
-          // Note: no sellYearsByAccount[fromAcc] check here — moving bonds OUT of fromAcc
-          // is a sell regardless of whether fromAcc already sold a different CUSIP for this
-          // year (two sells = same direction, no violation). The destination check (below)
-          // still blocks buy+sell mix in toAcc.
-
-          const fromIdx = prefOrder.indexOf(fromAccType);
-          if (fromIdx === 0) continue; // already the most-preferred type, nothing to improve
-
-          const currentInFrom = allocation[fromAcc.name][cusip]?.[year] || 0;
-          if (currentInFrom <= 0) continue;
-
-          // RMD floor: never move tIRA below its minimum for this year
-          const rmdFloor = (fromAcc.type === 'traditional_ira' && rmdByAccount[fromAcc.name])
-            ? Math.ceil(rmdByAccount[fromAcc.name] / costThisCusip)
-            : 0;
-          let canMoveFromHere = Math.max(0, currentInFrom - rmdFloor);
-          if (canMoveFromHere <= 0) continue;
-
-          // Offer to more-preferred account types (in preference order)
-          for (let pi = 0; pi < fromIdx && canMoveFromHere > 0; pi++) {
-            const toAccType = prefOrder[pi];
-            for (const toAcc of accounts) {
-              if (toAcc.type !== toAccType) continue;
-              if (sellYearsByAccount[toAcc.name]?.has(year)) continue;
-              if (canMoveFromHere <= 0) break;
-
-              const hardBudget = toAcc.sizeInDollars - (accountDollarsSpent[toAcc.name] || 0);
-              // If fromAcc is the preferred long-tier type, freeing its budget will absorb
-              // long-tier buys that would otherwise land in toAcc. Grant toAcc swap credit
-              // for those expected savings so lack of headroom doesn't block the move.
-              const moveCost = canMoveFromHere * costThisCusip;
-              const swapCredit = fromAcc.type === _longPrefType
-                ? Math.min(_remainingLongCredit, moveCost) : 0;
-              const maxAffordable = Math.floor((hardBudget + swapCredit) / costThisCusip);
-              const toMove = Math.min(canMoveFromHere, Math.max(0, maxAffordable));
-              if (toMove <= 0) continue;
-
-              // Move bonds: fromAcc → toAcc
-              allocation[fromAcc.name][cusip][year] -= toMove;
-              accountDollarsSpent[fromAcc.name] -= toMove * costThisCusip;
-              if (!sellYearsByAccount[fromAcc.name]) sellYearsByAccount[fromAcc.name] = new Set();
-              sellYearsByAccount[fromAcc.name].add(year);
-
-              if (!allocation[toAcc.name][cusip]) allocation[toAcc.name][cusip] = {};
-              allocation[toAcc.name][cusip][year] = (allocation[toAcc.name][cusip][year] || 0) + toMove;
-              accountDollarsSpent[toAcc.name] = (accountDollarsSpent[toAcc.name] || 0) + toMove * costThisCusip;
-              canMoveFromHere -= toMove;
-              if (swapCredit > 0) _remainingLongCredit -= toMove * costThisCusip;
-            }
-          }
+          allocation[accName][cusip][year] = (allocation[accName][cusip][year] || 0) + toReserve;
+          accountDollarsSpent[accName] += toReserve * cost;
         }
       }
     }
   }
 
-  return {
-    allocation,
-    accountDollarsSpent,
-    infeasibilities,
-  };
+  // Pass 2 — fill remaining longest-first, IRA then taxable
+  for (const { cusip, year, targetQty } of allTargets) {
+    const costThisCusip = costPerBond[cusip] ?? avgCostPerTIPS;
+
+    // Count bonds already placed (from RMD reservation)
+    let alreadyPlaced = 0;
+    for (const acc of accounts) alreadyPlaced += allocation[acc.name][cusip]?.[year] || 0;
+    let remaining = targetQty - alreadyPlaced;
+
+    // Fill accounts in order until remaining is satisfied
+    for (const acc of orderedAccounts) {
+      if (remaining <= 0) break;
+      if (sellYearsByAccount[acc.name]?.has(year)) continue;
+      const budgetAvail = acc.sizeInDollars - accountDollarsSpent[acc.name];
+      const toAdd = Math.min(remaining, Math.floor(budgetAvail / costThisCusip));
+      if (toAdd > 0) {
+        if (!allocation[acc.name][cusip]) allocation[acc.name][cusip] = {};
+        allocation[acc.name][cusip][year] = (allocation[acc.name][cusip][year] || 0) + toAdd;
+        accountDollarsSpent[acc.name] += toAdd * costThisCusip;
+        remaining -= toAdd;
+      }
+    }
+
+    if (remaining > 0) {
+      infeasibilities.push({
+        cusip, year, remainingQty: remaining,
+        reason: 'Insufficient total account capacity to accommodate all target TIPS',
+      });
+    }
+  }
+
+  return { allocation, accountDollarsSpent, infeasibilities };
 }
 
 /**

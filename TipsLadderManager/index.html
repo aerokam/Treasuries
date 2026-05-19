@@ -389,7 +389,6 @@
 
 <!-- Multi-Account Results Panel -->
 <div id="multi-account-panel" style="display:none;margin-top:20px;padding:16px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;">
-  <div id="multi-account-summary" style="margin-bottom:16px;"></div>
   <div id="multi-account-feasibility" style="margin-bottom:16px;padding:12px;border-radius:6px;"></div>
   <div id="multi-account-results">
     <div class="table-wrap">
@@ -1076,7 +1075,6 @@ document.getElementById('holdings-file').addEventListener('change', async (e) =>
   document.getElementById('purchase-list-btn').style.display = 'none';
   document.getElementById('multi-account-panel').style.display = 'none';
   document.getElementById('multi-account-feasibility').innerHTML = '';
-  document.getElementById('multi-account-summary').innerHTML = '';
   document.getElementById('multi-account-trade-tables').innerHTML = '';
   // Clear all form fields to force re-inference from new holdings
   document.getElementById('dara').value = '';
@@ -1570,39 +1568,14 @@ function renderMultiAccountOutput(maResult) {
   }
   feasEl.innerHTML = feasHtml;
 
-  // ─── Account Summary ───
-  let acctHtml = '<div style="font-size:12px;margin-bottom:4px;"><strong>Account Summary:</strong></div>';
-  acctHtml += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px;font-size:12px;">';
-  for (const [name, flows] of Object.entries(maResult.accountCashFlows)) {
-    const typeInfo = detectedAccounts[name];
-    const typeLabel = typeInfo?.type === 'roth_ira' ? 'Roth IRA' : typeInfo?.type === 'traditional_ira' ? 'Traditional IRA' : 'Taxable';
-    acctHtml += `<div style="padding:8px;background:#fff;border:1px solid #ddd;border-radius:4px;">`;
-    acctHtml += `<div><strong>${esc(name)}</strong> <span style="color:#666;font-size:11px;">(${typeLabel})</span></div>`;
-    acctHtml += `<div style="font-size:11px;margin-top:4px;">New: $${flows.newAllocationCost.toFixed(0)} | Budget: $${flows.budget.toFixed(0)}${flows.feasible ? ' ✓' : ` ✗ (shortfall: $${flows.shortfall.toFixed(0)})`}</div>`;
-    acctHtml += '</div>';
-  }
-  acctHtml += '</div>';
-  document.getElementById('multi-account-summary').innerHTML = acctHtml;
-
-  // ─── Color palette ───
-  const colorPalette = ['#fce7f3','#dbeafe','#dcfce7','#fef3c7','#ede9fe','#e0e7ff','#f3e8ff','#fce4ec'];
   const accountNames = Object.keys(maResult.accountAllocation).sort();
-  const accountColors = {};
-  accountNames.forEach((name, idx) => { accountColors[name] = colorPalette[idx % colorPalette.length]; });
 
-  // ─── Legend + expand/collapse controls in panel ───
-  let legendHtml = '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:11px;">';
-  legendHtml += '<strong>Legend:</strong>';
-  accountNames.forEach(name => {
-    legendHtml += `<span style="display:flex;align-items:center;gap:4px;">` +
-      `<span style="display:inline-block;width:11px;height:11px;background:${accountColors[name]};border:1px solid #aaa;border-radius:2px;"></span>` +
-      `${esc(name)}</span>`;
-  });
-  legendHtml += `<span style="margin-left:auto;display:flex;gap:6px;">` +
+  // ─── Expand/collapse controls ───
+  document.getElementById('multi-account-results').innerHTML =
+    `<div style="display:flex;justify-content:flex-end;gap:6px;margin-bottom:6px;">` +
     `<button id="ma-expand-all" style="padding:2px 8px;font-size:11px;cursor:pointer;border:1px solid #cbd5e1;border-radius:3px;background:#f8fafc;">Expand All</button>` +
     `<button id="ma-collapse-all" style="padding:2px 8px;font-size:11px;cursor:pointer;border:1px solid #cbd5e1;border-radius:3px;background:#f8fafc;">Collapse All</button>` +
-    `</span></div>`;
-  document.getElementById('multi-account-results').innerHTML = legendHtml;
+    `</div>`;
 
   // ─── Clear previous sub-rows and rebuild ───
   simpleEl.querySelectorAll('tr.acct-subrow').forEach(tr => tr.remove());
@@ -1632,10 +1605,6 @@ function renderMultiAccountOutput(maResult) {
     }
     if (acctData.length === 0) continue;
 
-    // Dominant account color on the main row
-    const dominant = acctData.reduce((best, a) => a.qtyAfter > (best?.qtyAfter ?? -1) ? a : best, null);
-    if (dominant) mainTr.style.backgroundColor = accountColors[dominant.accountName] || '';
-
     // Toggle indicator on first cell
     const firstTd = mainTr.querySelector('td:first-child');
     if (firstTd) {
@@ -1659,7 +1628,6 @@ function renderMultiAccountOutput(maResult) {
       const typeLabel = typeInfo?.type === 'roth_ira' ? 'R' : typeInfo?.type === 'traditional_ira' ? 'T' : 'X';
       const actionText = qtyDelta > 0 ? `BUY +${qtyDelta}` : qtyDelta < 0 ? `SELL ${qtyDelta}` : 'HOLD';
       const actionColor = qtyDelta > 0 ? '#166534' : qtyDelta < 0 ? '#991b1b' : '#64748b';
-      const bg = accountColors[accountName] || '#f9fafb';
 
       const subTr = document.createElement('tr');
       subTr.className = 'acct-subrow';
@@ -1667,7 +1635,7 @@ function renderMultiAccountOutput(maResult) {
 
       const td = document.createElement('td');
       td.colSpan = colCount;
-      td.style.cssText = `padding:2px 8px 2px 30px;background:${bg};border-bottom:1px solid rgba(0,0,0,0.06);font-size:11px;`;
+      td.style.cssText = `padding:2px 8px 2px 30px;background:#f8fafc;border-bottom:1px solid rgba(0,0,0,0.06);font-size:11px;`;
       td.innerHTML =
         `<span style="font-weight:600;margin-right:8px;">${esc(accountName)}</span>` +
         `<span style="background:#e2e8f0;border-radius:3px;padding:1px 5px;font-size:10px;margin-right:12px;">${typeLabel}</span>` +
@@ -1732,11 +1700,10 @@ function renderMultiAccountOutput(maResult) {
     const typeInfo  = detectedAccounts[accountName];
     const typeLabel = typeInfo?.type === 'roth_ira' ? 'Roth IRA' : typeInfo?.type === 'traditional_ira' ? 'Traditional IRA' : 'Taxable';
     const flows     = maResult.accountCashFlows[accountName] || {};
-    const bg        = accountColors[accountName] || '#f9fafb';
     const rows      = tradesByAccount[accountName];
 
     if (rows.length === 0) {
-      tradeHtml += `<div style="margin-bottom:12px;padding:8px 12px;background:${bg};border:1px solid #ddd;border-radius:6px;font-size:12px;">` +
+      tradeHtml += `<div style="margin-bottom:12px;padding:8px 12px;background:#f1f5f9;border:1px solid #ddd;border-radius:6px;font-size:12px;">` +
         `<strong>${esc(accountName)}</strong> <span style="color:#666;font-size:11px;">(${typeLabel})</span>` +
         ` — No trades required</div>`;
       continue;
@@ -1758,7 +1725,7 @@ function renderMultiAccountOutput(maResult) {
 
     // Account header bar
     tradeHtml +=
-      `<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:${bg};` +
+      `<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:#f1f5f9;` +
       `border:1px solid #ddd;border-bottom:none;border-radius:6px 6px 0 0;font-size:12px;">` +
       `<span style="font-size:13px;font-weight:700;">${esc(accountName)}</span>` +
       `<span style="background:#e2e8f0;border-radius:3px;padding:1px 6px;font-size:10px;">${typeLabel}</span>` +
@@ -1778,7 +1745,7 @@ function renderMultiAccountOutput(maResult) {
     for (const r of rows) {
       const cost         = (costByCusip[r.cusip] || 0);
       const isHold       = r.qtyDelta === 0;
-      const cashImpact   = -r.qtyDelta * cost;
+      const cashImpact   = r.qtyDelta === 0 ? 0 : -r.qtyDelta * cost;
       const impactStr    = isHold ? '—' : (cashImpact >= 0 ? '+' : '') + '$' + Math.abs(cashImpact).toLocaleString('en-US', { maximumFractionDigits: 0 });
       const impactColor  = isHold ? '#64748b' : cashImpact >= 0 ? '#166534' : '#991b1b';
       const actionText   = isHold ? 'HOLD' : r.qtyDelta > 0 ? `BUY +${r.qtyDelta}` : `SELL ${r.qtyDelta}`;
