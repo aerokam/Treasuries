@@ -60,7 +60,7 @@ export function parseBrokerCSV(csvText, tipsMap) {
       map.symbol = sIdx;
       map.accountNum = lowerCols.findIndex(c => c.includes('account number') || c === 'account');
       map.accountName = lowerCols.findIndex(c => c.includes('account name'));
-      map.currentValue = lowerCols.findIndex(c => c.includes('current value'));
+      map.currentValue = lowerCols.findIndex(c => c.includes('current value') || c.includes('market value'));
       continue;
     }
 
