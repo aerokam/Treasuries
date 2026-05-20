@@ -692,6 +692,7 @@ function _setGroupExpanded(tbl, fy, expanded) {
   if (!hdr) return;
   hdr.dataset.expanded = expanded ? 'true' : 'false';
   tbl.querySelectorAll(`tr.fy-child[data-fy="${fy}"]`).forEach(tr => { tr.hidden = !expanded; });
+  tbl.querySelectorAll(`tr.acct-subrow[data-fy="${fy}"]`).forEach(tr => { tr.hidden = !expanded; });
 }
 
 function _setAllGroupsExpanded(expanded) {
@@ -1632,6 +1633,7 @@ function renderMultiAccountOutput(maResult) {
       const subTr = document.createElement('tr');
       subTr.className = 'acct-subrow';
       subTr.dataset.parentRi = ri;
+      subTr.dataset.fy = String(fundedYear);
 
       const td = document.createElement('td');
       td.colSpan = colCount;
