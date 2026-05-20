@@ -88,10 +88,12 @@ export function buildDrillHTML(d, colKey, summary) {
     const _plCredit  = d.preLadderCreditForYear || 0;
     const sameYearExInt = d.excessLMI_After || 0;
     const longerDatedInt = d.longerDatedLMI ?? d.fundedYearLaterMatInt; // use separated if available, else combined legacy
-    
+    const _amd = d.future30yUpperAnnualAmd || 0;
+
     let totalFmla = 'Principal + Coupons + <span class="formula-var" data-source="lmi">Longer-dated int</span>';
     if (sameYearExInt > 0) totalFmla += ' + <span class="formula-var" data-source="exlmi">Same-year excess int</span>';
     if (_plCredit > 0) totalFmla += ' + Pre-ladder credit';
+    if (_amd > 0) totalFmla += ' + <span class="formula-var" data-source="amd">AMD</span>';
 
     rows =
       row('Quantity', '', d.fundedYearQty, false, undefined, 'qty') +
@@ -103,6 +105,7 @@ export function buildDrillHTML(d, colKey, summary) {
       row('Interest from longer-dated TIPS', 'from TIPS maturing after ' + d.fundedYear, fm(longerDatedInt), false, undefined, 'lmi') +
       (sameYearExInt > 0 ? row('Interest from same-year excess (bracket)', 'from excess TIPS maturing in ' + d.fundedYear, fm(sameYearExInt), false, undefined, 'exlmi') : '') +
       (_plCredit > 0 ? row('Pre-ladder credit', 'pre-ladder pool applied to this year', fm(_plCredit)) : '') +
+      (_amd > 0 ? row('AMD — 2052 excess', 'accrued market discount realized from excess 2052 TIPS sold this year', fm(_amd), false, undefined, 'amd') : '') +
       sep() +
       row('Funded Year Amount', totalFmla, fm(d.fundedYearAmt), true) +
       sep() +
@@ -192,6 +195,7 @@ export function buildDrillHTML(d, colKey, summary) {
     const araTotal    = isBef ? d.araBeforeTotal       : d.araAfterTotal;
     const DARA        = d.DARA ?? summary?.DARA;
     const _plCredit   = isBef ? 0 : (d.preLadderCreditForYear || 0);
+    const _amd        = isBef ? (d.future30yUpperAnnualAmdBefore || 0) : (d.future30yUpperAnnualAmd || 0);
     // Compute ownSum first so we can detect PLI-zeroed years (holdings present but all qty=0).
     let ownSum = 0;
     holdings.forEach(h => { ownSum += h.principalPerBond * (1 + h.coupon / 2 * h.nPeriods) * h.qty; });
@@ -218,11 +222,15 @@ export function buildDrillHTML(d, colKey, summary) {
     if (_plCredit > 0) {
       rows += row('Pre-ladder credit', 'pre-ladder pool applied to this year', fm(_plCredit), false, undefined, 'plc');
     }
+    if (_amd > 0) {
+      rows += row('AMD — 2052 excess', 'accrued market discount realized from excess 2052 TIPS sold this year', fm(_amd), false, undefined, 'amd');
+    }
     let totalFmla = _pliZeroed
       ? 'Inferred from CSV'
       : 'Funded year TIPS + <span class="formula-var" data-source="lmi">Longer-dated int</span>';
     if (!_pliZeroed && excessLMI > 0) totalFmla += ' + <span class="formula-var" data-source="exlmi">Same-year excess int</span>';
     if (!_pliZeroed && _plCredit > 0) totalFmla += ' + <span class="formula-var" data-source="plc">Pre-ladder credit</span>';
+    if (!_pliZeroed && _amd > 0) totalFmla += ' + <span class="formula-var" data-source="amd">AMD</span>';
     rows += sep()
       + row(isBef ? 'Amount Before' : 'Amount After', totalFmla, fm(_displayAmt), true)
       + sep()
