@@ -108,6 +108,7 @@ function calcFuture30yParams(future30yYears, bond2056, settlementDate, dara) {
 export function runBuild({ dara, firstYear: firstYearOpt, lastYear, tipsMap, refCPI, settlementDate, maturityPref = 'last', preLadderInterest = false, daraByYear = null }) {
   const firstYear      = firstYearOpt ?? settlementDate.getFullYear();
   const settleDateDisp = fmtDate(settlementDate);
+  const settlementYear = settlementDate.getFullYear();
 
   // 1. Build yearBondMap: for each year in [firstYear, lastYear],
   //    pick the latest-maturing TIPS that matures after settlement.
@@ -198,7 +199,7 @@ export function runBuild({ dara, firstYear: firstYearOpt, lastYear, tipsMap, ref
   // 2. Identify brackets (only needed when there are gap years)
   let lowerYear = null, upperYear = null;
 
-  // 3. Preliminary sweep (longest \u2192 shortest, no bracket excess)
+  // 3. Preliminary sweep (longest → shortest, no bracket excess)
   //    Accumulates rebuildLaterMatInt the same way as Phase 4 of the rebalancer.
   const prelim = {};
   let laterMatInt = 0;
@@ -223,70 +224,10 @@ export function runBuild({ dara, firstYear: firstYearOpt, lastYear, tipsMap, ref
     }
   }
 
-  // 3b. Pre-ladder interest pool (Build only, spec: 4.0 §Pre-Ladder Interest Option)
-  //     Coupons received from all ladder TIPS before the ladder starts (years < firstYear).
-  //     Single interleaved pass short→long over ALL year types (funded + gap).
-  //     Gap years consume pool before longer-dated funded years — e.g. 2037-2039 before 2040.
-  const preLadderYears = preLadderInterest ? Math.max(0, firstYear - settlementDate.getFullYear()) : 0;
-  let preLadderPool = 0;
-  const zeroedFundedYears = new Set();
-  const pliCreditByGapYear = {};
-  let partialCreditYear = null, partialCredit = 0;
-
-  if (preLadderYears > 0) {
-    const totalAnnualInt = Object.values(prelim).reduce((s, p) => s + p.annualInterest, 0);
-    preLadderPool = preLadderYears * totalAnnualInt;
-
-    const gapYearSet = new Set(gapYears);
-    const allYearsSorted = [...new Set([...rangeYears, ...gapYears])].sort((a, b) => a - b);
-    let remaining = preLadderPool;
-
-    for (const year of allYearsSorted) {
-      if (year < firstYear) continue; // lower bracket year is not a funded year
-      if (gapYearSet.has(year)) {
-        // Gap year: estimate need using full prelim LMI (approximation — zeroing not yet complete).
-        // Synthetic LMI from longer gap years not yet known; omitted consistently with funded year pass.
-        const actualTIPSLMI = Object.entries(prelim)
-          .filter(([y]) => parseInt(y) > year)
-          .reduce((s, [, p]) => s + p.annualInterest, 0);
-        const need = Math.max(0, dara - actualTIPSLMI);
-        if (remaining >= need) {
-          pliCreditByGapYear[year] = need;
-          remaining -= need;
-        } else {
-          pliCreditByGapYear[year] = remaining;
-          remaining = 0;
-          break;
-        }
-      } else {
-        // Funded year
-        const need = (daraByYear?.get(year) ?? dara) - prelim[year].laterMatInt;
-        if (need <= 0) { zeroedFundedYears.add(year); continue; }
-        if (remaining >= need) {
-          zeroedFundedYears.add(year);
-          remaining -= need;
-        } else {
-          partialCreditYear = year;
-          partialCredit = remaining;
-          break;
-        }
-      }
-    }
-  }
-
-  // 3c. Build effective prelim for gap calculation: zeroed funded years have no actual TIPS
-  //     purchased, so they generate no coupon income — zero their annualInterest.
-  let effectivePrelim = prelim;
-  if (zeroedFundedYears.size > 0) {
-    effectivePrelim = { ...prelim };
-    for (const yr of zeroedFundedYears) {
-      if (effectivePrelim[yr]) effectivePrelim[yr] = { ...effectivePrelim[yr], annualInterest: 0 };
-    }
-  }
-
   const BL_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
-  // 4a. Future 30Y parameters → duration matching → cover excess quantities (MUST run before gap params
+  // 4a. Future 30Y parameters → duration matching → cover excess quantities (run BEFORE PLI pool
+  //     so that AMD pre-ladder contributions can be included in the pool; and before gap params
   //     so future 30Y cover excess LMI at 2056/2052 can be included in the gap cost calculation).
   let future30yParams = null;
   let future30yLowerDuration = 0, future30yUpperDuration = 0;
@@ -310,6 +251,96 @@ export function runBuild({ dara, firstYear: firstYearOpt, lastYear, tipsMap, ref
     future30yTotalExcessCost = future30yLowerExQty * future30yLowerCPB + future30yUpperExQty * future30yUpperCPB;
     future30yLowerMonth = BL_MONTHS[future30yLowerCoverBond.maturity.getMonth()];
     future30yUpperMonth = BL_MONTHS[future30yUpperCoverBond.maturity.getMonth()];
+  }
+
+  // ── Future 30Y upper cover AMD (spec: 2.0 §Future 30Y Upper Cover AMD) ─────────
+  // The 2052 TIPS excess trades at a deep market discount (low coupon → large AMD).
+  // Excess is sold ~1/N per year through 2036; annual AMD contribution declines each year.
+  // Must be computed AFTER future30yUpperExQty is known and BEFORE PLI pool.
+  const future30yUpperN = future30yYears.length > 0 ? Math.max(1, 2036 - settlementYear) : 0;
+  let future30yUpperPrincipalPerBond = 0;
+  let future30yUpperAmdCostPerBond   = 0;
+  let future30yUpperYearsToMaturity  = 0;
+  let future30yUpperAmdPerBondPerYear = 0;
+  if (future30yYears.length > 0 && future30yUpperExQty > 0 && future30yUpperCoverBond?.maturity) {
+    const { indexRatio: irUpper } = bondCalcs(future30yUpperCoverBond, refCPI);
+    future30yUpperPrincipalPerBond = 1000 * irUpper;
+    future30yUpperAmdCostPerBond   = (future30yUpperCoverBond.price ?? 0) / 100 * irUpper * 1000;
+    future30yUpperYearsToMaturity  = (future30yUpperCoverBond.maturity - settlementDate) / (365.25 * 24 * 3600 * 1000);
+    if (future30yUpperYearsToMaturity > 0)
+      future30yUpperAmdPerBondPerYear = (future30yUpperPrincipalPerBond - future30yUpperAmdCostPerBond) / future30yUpperYearsToMaturity;
+  }
+  // AMD for funded year Y: remaining excess fraction × annual per-bond rate.
+  // Fraction = (2036 − Y) / N for Y < 2036; partial year (2 months) for Y = 2036; 0 above.
+  function calcFuture30yUpperAnnualAmd(year) {
+    if (future30yUpperAmdPerBondPerYear <= 0 || future30yUpperN <= 0) return 0;
+    if (year < 2036)  return future30yUpperExQty * (2036 - year) / future30yUpperN * future30yUpperAmdPerBondPerYear;
+    if (year === 2036) return future30yUpperExQty / future30yUpperN * (2 / 12) * future30yUpperAmdPerBondPerYear;
+    return 0;
+  }
+
+  // 3b. Pre-ladder interest pool (Build only, spec: 4.0 §Pre-Ladder Interest Option)
+  //     Coupons received from all ladder TIPS before the ladder starts (years < firstYear).
+  //     Single interleaved pass short→long over ALL year types (funded + gap).
+  //     Gap years consume pool before longer-dated funded years — e.g. 2037-2039 before 2040.
+  const preLadderYears = preLadderInterest ? Math.max(0, firstYear - settlementYear) : 0;
+  let preLadderPool = 0;
+  const zeroedFundedYears = new Set();
+  const pliCreditByGapYear = {};
+  let partialCreditYear = null, partialCredit = 0;
+
+  if (preLadderYears > 0) {
+    const totalAnnualInt = Object.values(prelim).reduce((s, p) => s + p.annualInterest, 0);
+    preLadderPool = preLadderYears * totalAnnualInt;
+    // Add AMD pre-ladder contributions (spec: 2.0 §Future 30Y Upper Cover AMD §Pre-Ladder Interest)
+    for (let y = settlementYear; y < firstYear; y++) preLadderPool += calcFuture30yUpperAnnualAmd(y);
+
+    const gapYearSet = new Set(gapYears);
+    const allYearsSorted = [...new Set([...rangeYears, ...gapYears])].sort((a, b) => a - b);
+    let remaining = preLadderPool;
+
+    for (const year of allYearsSorted) {
+      if (year < firstYear) continue; // lower bracket year is not a funded year
+      if (gapYearSet.has(year)) {
+        // Gap year: estimate need using full prelim LMI (approximation — zeroing not yet complete).
+        // Synthetic LMI from longer gap years not yet known; omitted consistently with funded year pass.
+        const actualTIPSLMI = Object.entries(prelim)
+          .filter(([y]) => parseInt(y) > year)
+          .reduce((s, [, p]) => s + p.annualInterest, 0);
+        const need = Math.max(0, dara - actualTIPSLMI);
+        if (remaining >= need) {
+          pliCreditByGapYear[year] = need;
+          remaining -= need;
+        } else {
+          pliCreditByGapYear[year] = remaining;
+          remaining = 0;
+          break;
+        }
+      } else {
+        // Funded year: AMD reduces how much the PLI pool needs to cover for this year
+        const yearDaraForPLI = daraByYear?.get(year) ?? dara;
+        const need = yearDaraForPLI - prelim[year].laterMatInt - calcFuture30yUpperAnnualAmd(year);
+        if (need <= 0) { zeroedFundedYears.add(year); continue; }
+        if (remaining >= need) {
+          zeroedFundedYears.add(year);
+          remaining -= need;
+        } else {
+          partialCreditYear = year;
+          partialCredit = remaining;
+          break;
+        }
+      }
+    }
+  }
+
+  // 3c. Build effective prelim for gap calculation: zeroed funded years have no actual TIPS
+  //     purchased, so they generate no coupon income — zero their annualInterest.
+  let effectivePrelim = prelim;
+  if (zeroedFundedYears.size > 0) {
+    effectivePrelim = { ...prelim };
+    for (const yr of zeroedFundedYears) {
+      if (effectivePrelim[yr]) effectivePrelim[yr] = { ...effectivePrelim[yr], annualInterest: 0 };
+    }
   }
 
   // 4b. Gap parameters → duration matching → bracket weights (only when gap years exist).
@@ -384,15 +415,16 @@ export function runBuild({ dara, firstYear: firstYearOpt, lastYear, tipsMap, ref
       const pi      = prelim[year].pi;
       const yearDara = daraByYear?.get(year) ?? dara;
       const isZrd   = zeroedFundedYears.has(year);
-      
+
       const exQty = exByYear[year] ?? 0;
       const excessLMI = exQty * 1000 * ir * (bond.coupon ?? 0);
+      const future30yAmd = calcFuture30yUpperAnnualAmd(year);
 
       const fyQty   = (isZrd || year > lastYear || year < firstYear) ? 0
         : year === partialCreditYear
-          ? Math.max(0, Math.round((yearDara - runningLMI - excessLMI - partialCredit) / pi))
-          : Math.max(0, Math.round((yearDara - runningLMI - excessLMI) / pi));
-      
+          ? Math.max(0, Math.round((yearDara - runningLMI - excessLMI - partialCredit - future30yAmd) / pi))
+          : Math.max(0, Math.round((yearDara - runningLMI - excessLMI - future30yAmd) / pi));
+
       corrFYQty[year] = fyQty;
       runningLMI += (fyQty + exQty) * 1000 * ir * (bond.coupon ?? 0);
     }
@@ -415,7 +447,8 @@ export function runBuild({ dara, firstYear: firstYearOpt, lastYear, tipsMap, ref
     const totQty      = fundedYearQty + excessQty;
     const { indexRatio: ir, costPerBond: cpb } = bondCalcs(bond, refCPI);
     const excessLMI   = excessQty * 1000 * ir * (bond.coupon ?? 0);
-    
+    const future30yAmd = calcFuture30yUpperAnnualAmd(year);
+
     const mDuration = calculateMDuration(settlementDate, bond.maturity, bond.coupon ?? 0, bond.yield ?? 0);
     const isBracket    = excessQty > 0;
     const isFuture30yCover = future30yExQty > 0;
@@ -423,11 +456,12 @@ export function runBuild({ dara, firstYear: firstYearOpt, lastYear, tipsMap, ref
     const halfOrFull = monthF < 7 ? 0.5 : 1.0;
     const principalPerBond     = 1000 * ir;
     const ownRungCouponPerBond = principalPerBond * (bond.coupon ?? 0) * halfOrFull;
-    
+
     const preLadderCreditForYear = isZeroed
       ? Math.max(0, yearDara - (corr_lmi + excessLMI))
       : year === partialCreditYear ? partialCredit : 0;
-    const fundedYearAmt = (year > lastYear || year < firstYear) ? 0 : fundedYearQty * prelim_pi + corr_lmi + excessLMI + preLadderCreditForYear;
+    const fundedYearAmt = (year > lastYear || year < firstYear) ? 0
+      : fundedYearQty * prelim_pi + corr_lmi + excessLMI + preLadderCreditForYear + future30yAmd;
     const gapLMIAlloc = gapExQty > 0
       ? (year === lowerYear ? lowerWeight : upperWeight) * (gapParams?.gapLMITotal ?? 0)
       : 0;
@@ -463,6 +497,7 @@ export function runBuild({ dara, firstYear: firstYearOpt, lastYear, tipsMap, ref
       longerDatedLMI: corr_lmi,
       excessLMI_After: excessLMI,
       preLadderCreditForYear,
+      future30yUpperAnnualAmd: future30yAmd,
       fundedYearPi: prelim[year].pi,
       fundedYearPrincipalTotal: fundedYearQty * principalPerBond,
       fundedYearOwnRungInt: fundedYearQty * ownRungCouponPerBond,
@@ -501,6 +536,8 @@ export function runBuild({ dara, firstYear: firstYearOpt, lastYear, tipsMap, ref
     future30yLowerExQty, future30yUpperExQty, future30yFellBack, future30yTotalExcessCost,
     future30yLowerMonth, future30yUpperMonth,
     future30yParams,
+    future30yUpperPrincipalPerBond, future30yUpperAmdCostPerBond,
+    future30yUpperYearsToMaturity, future30yUpperAmdPerBondPerYear, future30yUpperN,
     totalBuyCost,
     weightedAvgDuration,
     preLadderInterest, preLadderYears, preLadderPool,
