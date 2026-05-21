@@ -879,6 +879,13 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
       }
     }
   }
+  // AMD-driven selling: years below 2036 receive 2052 excess AMD income and must be sold to
+  // their AMD-adjusted need regardless of mode. Full mode already includes them; Gap mode does not.
+  if (future30yUpperExQty > 0) {
+    for (let y = firstYear; y < 2036 && y <= lastYear; y++) {
+      if (!bracketYearSet.has(y) && !gapYearSet.has(y) && !future30yYearSet.has(y)) rebalYearSet.add(y);
+    }
+  }
 
   const bracketExcessTargetCost = {};
   if (gapYears.length > 0) {
@@ -995,8 +1002,16 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
       const needed = yearDara - rebuildLaterMatInt - excessLMI - effectivePartialCredit - future30yAmd;
 
       if (zeroedFundedYears.has(year)) {
-        // PLI covers this year's funded need — zero funded qty
+        // PLI covers this year's funded need — zero funded qty AND sell all non-target holdings
         tFundedYearQty = 0;
+        for (const h of yi.holdings) {
+          if (h.cusip !== targetCUSIP && h.qty > 0) {
+            postRebalQtyMap[h.cusip] = 0;
+            const b2 = tipsMap.get(h.cusip);
+            const c2 = (b2?.price ?? 0) / 100 * (refCPI / (b2?.baseCpi ?? refCPI)) * 1000;
+            nonTargetSells[h.cusip] = { newQty: 0, qtyDelta: -h.qty, costDelta: h.qty * c2, targetCost: 0 };
+          }
+        }
       } else if (isFullMode) {
         const sortedH = [...yi.holdings].sort((a, b) => b.maturity - a.maturity);
         const nonTarget = sortedH.filter(h => h.cusip !== targetCUSIP).reverse();
@@ -1097,7 +1112,7 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
         holdingsBefore.push({ cusip: h.cusip, maturityMonth: m - 1, maturityYear: h.maturity.getFullYear(), qty: q, principalPerBond: ap, nPeriods: m < 7 ? 1 : 2, coupon: b?.coupon ?? 0 });
       }
     }
-    const amdBefore = calcFuture30yUpperAnnualAmdForQty(year, future30yUpperQtyBefore);
+    const amdBefore = (year >= firstYear && year <= lastYear) ? calcFuture30yUpperAnnualAmdForQty(year, future30yUpperQtyBefore) : 0;
     beforeARAByYear[year] = pB + cB + lBefore + amdBefore;
     beforeARABreakdown[year] = { principal: pB, ownCoupon: cB, laterMatInt: lBefore, holdings: holdingsBefore, future30yUpperAnnualAmd: amdBefore };
 
@@ -1147,7 +1162,7 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
       }
     }
     const pliCredit = pliCreditByFundedYear[year] ?? 0;
-    const amdAfter = calcFuture30yUpperAnnualAmd(year);
+    const amdAfter = (year >= firstYear && year <= lastYear) ? calcFuture30yUpperAnnualAmd(year) : 0;
     postARAByYear[year] = pA + cA + lAfter + exIntA + pliCredit + amdAfter;
     postARABreakdown[year] = { principal: pA, ownCoupon: cA, laterMatInt: lAfter, holdings: holdingsAfter, pliCredit, future30yUpperAnnualAmd: amdAfter };
   }
