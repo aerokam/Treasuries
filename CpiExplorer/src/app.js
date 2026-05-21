@@ -217,17 +217,18 @@ function renderStats(labels, values) {
   const s = calcStats(labels, values, state.displayMode);
   if (!s) { strip.style.display = 'none'; return; }
 
+  const dec = state.dataSources[0] === 'ref-cpi' ? 5 : 3;
   const isIndexMode = state.displayMode === 'index' || state.displayMode === 'p2p';
   strip.innerHTML = [
-    `<span class="stat"><span class="stat-label">Current</span> <span class="stat-val">${fmt(s.current, 3)}</span></span>`,
+    `<span class="stat"><span class="stat-label">Current</span> <span class="stat-val">${fmt(s.current, dec)}</span></span>`,
     isIndexMode && s.changePct !== null
       ? `<span class="stat"><span class="stat-label">Period Chg</span> <span class="stat-val">${fmt(s.changePct)}%</span></span>`
       : '',
     isIndexMode && s.annualized !== null
       ? `<span class="stat"><span class="stat-label">Annualized</span> <span class="stat-val">${fmt(s.annualized)}%</span></span>`
       : '',
-    `<span class="stat"><span class="stat-label">Peak</span> <span class="stat-val">${fmt(s.peak, 3)} <span class="stat-date">(${fmtDate(s.peakLabel)})</span></span></span>`,
-    `<span class="stat"><span class="stat-label">Trough</span> <span class="stat-val">${fmt(s.trough, 3)} <span class="stat-date">(${fmtDate(s.troughLabel)})</span></span></span>`,
+    `<span class="stat"><span class="stat-label">Peak</span> <span class="stat-val">${fmt(s.peak, dec)} <span class="stat-date">(${fmtDate(s.peakLabel)})</span></span></span>`,
+    `<span class="stat"><span class="stat-label">Trough</span> <span class="stat-val">${fmt(s.trough, dec)} <span class="stat-date">(${fmtDate(s.troughLabel)})</span></span></span>`,
   ].filter(Boolean).join('');
   strip.style.display = 'flex';
 }

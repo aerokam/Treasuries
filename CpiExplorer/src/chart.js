@@ -140,7 +140,8 @@ export function createChart(canvasId, { datasets, yLabel, logScale, tooltipForma
             title: items => items[0]?.label ?? '',
             label: item => {
               const v = item.raw && typeof item.raw === 'object' ? item.raw.y : item.raw;
-              return ` ${item.dataset.label}: ${typeof v === 'number' ? v.toFixed(3) : v}`;
+              const dec = item.dataset.label === 'Ref CPI' ? 5 : 3;
+              return ` ${item.dataset.label}: ${typeof v === 'number' ? v.toFixed(dec) : v}`;
             },
           },
         },
