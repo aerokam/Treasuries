@@ -1,7 +1,7 @@
 # setup-cpi-release-tasks.ps1
 #
 # Registers (or updates) Windows Scheduled Tasks for CPI-related jobs so they
-# fire only on actual BLS CPI release dates, at 8:35 AM ET (5:35 AM PT).
+# fire only on actual BLS CPI release dates, at 2:00 PM ET (11:00 AM PT).
 #
 # Tasks managed:
 #   RefCPI          -- runs run-ref-cpi.cmd
@@ -17,14 +17,15 @@ $ErrorActionPreference = 'Stop'
 $R2_BASE = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev'
 $REPO    = Split-Path $PSScriptRoot
 
-# BLS releases at 8:30 AM ET; run 5 minutes later.
+# BLS releases at 8:30 AM ET. TreasuryDirect ref CPI data lags a few hours after release,
+# so run at 2:00 PM ET (11:00 AM PT) to ensure TreasuryDirect has updated.
 # Machine is Pacific time. ET is always 3 hours ahead of PT.
-$RELEASE_HOUR_PT   = 5
-$RELEASE_MINUTE_PT = 35
+$RELEASE_HOUR_PT   = 11
+$RELEASE_MINUTE_PT = 0
 
 $TASKS = @(
-    [PSCustomObject]@{ Name = 'RefCPI';          Cmd = "$REPO\scripts\run-ref-cpi.cmd" },
-    [PSCustomObject]@{ Name = 'FetchCpiHistory'; Cmd = "$REPO\scripts\run-cpi-history.cmd" }
+    [PSCustomObject]@{ Name = 'RefCpi';      Cmd = "$REPO\scripts\run-ref-cpi.cmd" },
+    [PSCustomObject]@{ Name = 'CpiHistory';  Cmd = "$REPO\scripts\run-cpi-history.cmd" }
 )
 
 function Get-ReleaseDates {
