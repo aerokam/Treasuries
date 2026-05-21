@@ -568,90 +568,10 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
   const inferredDARA = medianARA;
   const isFullMode   = (method === 'Full');
   const DARA         = dara !== null ? dara : inferredDARA;
+  const settlementYear = settlementDate.getFullYear();
 
-  // ── PLI zeroing pass (mirrors build-lib §3b) ──────────────────────────────────
-  // Single interleaved pass short→long: gap years consume pool before longer funded years.
-  const zeroedFundedYears = new Set();
-  const pliCreditByFundedYear = {};
-  const pliCreditByGapYear = {};
-  let preLadderPool = 0;
-  let partialCreditYear = null, partialCredit = 0;
-
-  if (preLadderInterest) {
-    const preLadderYears = Math.max(0, firstYear - settlementDate.getFullYear());
-    if (preLadderYears > 0) {
-      // Prelim sweep (long→short) over actual TIPS years: funded-qty-based annual interest only.
-      // Mirrors build-lib's prelim phase — must NOT include excess bracket quantities in the pool,
-      // otherwise the pool is inflated and too many years get zeroed.
-      let runningPrelimLMI = 0;
-      const prelimFundedAnnualInt = {};
-      const actualYearsLongToShort = Object.keys(yearInfo).map(Number)
-        .filter(y => y >= firstYear && y <= lastYear)
-        .sort((a, b) => b - a);
-      for (const year of actualYearsLongToShort) {
-        const sortedH = [...yearInfo[year].holdings].sort((a, b) => b.maturity - a.maturity);
-        const targetH = sortedH[0];
-        if (!targetH) continue;
-        const b = tipsMap.get(targetH.cusip);
-        if (!b) continue;
-        const ir = refCPI / (b.baseCpi ?? refCPI);
-        const piPB = calculatePIPerBond(targetH.cusip, targetH.maturity, refCPI, tipsMap);
-        const yearDara = daraByYear?.get(year) ?? DARA;
-        const fyQty = Math.max(0, Math.round((yearDara - runningPrelimLMI) / piPB));
-        const annInt = fyQty * 1000 * ir * (b.coupon ?? 0);
-        prelimFundedAnnualInt[year] = annInt;
-        runningPrelimLMI += annInt;
-      }
-
-      const totalAnnualInt = Object.values(prelimFundedAnnualInt).reduce((s, v) => s + v, 0);
-      preLadderPool = preLadderYears * totalAnnualInt;
-
-      const gapYearSetForPLI = new Set(gapYears);
-      const future30yYearSetForPLI = new Set(future30yYears);
-      let remaining = preLadderPool;
-      for (let year = firstYear; year <= lastYear; year++) {
-        if (remaining <= 0) break;
-        if (gapYearSetForPLI.has(year)) {
-          // Gap year: estimate need using funded-year-based LMI above (matches build-lib)
-          const actualTIPSLMI = Object.entries(prelimFundedAnnualInt)
-            .filter(([y]) => parseInt(y) > year)
-            .reduce((s, [, v]) => s + v, 0);
-          const need = Math.max(0, DARA - actualTIPSLMI);
-          if (remaining >= need) {
-            pliCreditByGapYear[year] = need;
-            remaining -= need;
-          } else {
-            pliCreditByGapYear[year] = remaining;
-            remaining = 0;
-          }
-        } else if (!future30yYearSetForPLI.has(year)) {
-          // Funded year (with or without current holdings): need = DARA - funded-LMI-from-above.
-          // Must NOT restrict to yearInfo[year] — years zeroed in Build have no holdings when
-          // loaded into Rebalance, but the PLI pool should still zero them.
-          const laterMatInt = Object.entries(prelimFundedAnnualInt)
-            .filter(([y]) => parseInt(y) > year)
-            .reduce((s, [, v]) => s + v, 0);
-          const need = (daraByYear?.get(year) ?? DARA) - laterMatInt;
-          if (need <= 0) { zeroedFundedYears.add(year); pliCreditByFundedYear[year] = 0; continue; }
-          if (remaining >= need) {
-            zeroedFundedYears.add(year);
-            pliCreditByFundedYear[year] = need;
-            remaining -= need;
-          } else {
-            // Pool covers this year partially — reduce its qty but don't zero it
-            pliCreditByFundedYear[year] = remaining;
-            partialCreditYear = year;
-            partialCredit = remaining;
-            remaining = 0;
-            break;
-          }
-        }
-      }
-    }
-  }
-
-  // ── Phase 3.1: Future cover pair identification and params (BEFORE gap params)
-  //    Future excess at 2056/2052 contributes LMI to gap years, so must be computed first.
+  // ── Phase 3.1: Future cover pair identification and params (BEFORE PLI pass and gap params)
+  //    Moved before PLI pass so future30yUpperExQty is available for AMD pre-ladder pool.
   let future30yLowerYear = null, future30yUpperYear = null;
   let future30yLowerCoverBond = null, future30yUpperCoverBond = null;
   let future30yParams = null;
@@ -706,6 +626,117 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
     future30yUpperExQty = future30yUpperCPB > 0 ? Math.round(future30yParams.future30yTotalCost * future30yUpperWeight / future30yUpperCPB) : 0;
     future30yLowerExQty = future30yLowerCPB > 0 ? Math.round(future30yParams.future30yTotalCost * future30yLowerWeight / future30yLowerCPB) : 0;
   }
+
+  // ── AMD computation for Future 30Y Upper Cover (2052 TIPS) ──────────────────
+  const future30yUpperN = future30yYears.length > 0 ? Math.max(1, 2036 - settlementYear) : 0;
+  let future30yUpperPrincipalPerBond = 0;
+  let future30yUpperAmdCostPerBond   = 0;
+  let future30yUpperYearsToMaturity  = 0;
+  let future30yUpperAmdPerBondPerYear = 0;
+  if (future30yYears.length > 0 && future30yUpperExQty > 0 && future30yUpperCoverBond?.maturity) {
+    const irUpper = refCPI / (future30yUpperCoverBond.baseCpi ?? refCPI);
+    future30yUpperPrincipalPerBond = 1000 * irUpper;
+    future30yUpperAmdCostPerBond   = (future30yUpperCoverBond.price ?? 0) / 100 * irUpper * 1000;
+    future30yUpperYearsToMaturity  = (future30yUpperCoverBond.maturity - settlementDate) / (365.25 * 24 * 3600 * 1000);
+    if (future30yUpperYearsToMaturity > 0)
+      future30yUpperAmdPerBondPerYear = (future30yUpperPrincipalPerBond - future30yUpperAmdCostPerBond) / future30yUpperYearsToMaturity;
+  }
+  const future30yUpperQtyBefore = (future30yYears.length > 0 && future30yUpperCoverBond)
+    ? (yearInfo[future30yUpperYear]?.holdings?.reduce((s, h) => h.cusip === future30yUpperCoverBond.cusip ? s + h.qty : s, 0) ?? 0)
+    : 0;
+  function calcFuture30yUpperAnnualAmdForQty(year, qty) {
+    if (future30yUpperAmdPerBondPerYear <= 0 || future30yUpperN <= 0 || qty <= 0) return 0;
+    if (year < 2036)   return qty * (2036 - year) / future30yUpperN * future30yUpperAmdPerBondPerYear;
+    if (year === 2036) return qty / future30yUpperN * (2 / 12) * future30yUpperAmdPerBondPerYear;
+    return 0;
+  }
+  function calcFuture30yUpperAnnualAmd(year) {
+    return calcFuture30yUpperAnnualAmdForQty(year, future30yUpperExQty);
+  }
+
+  // ── PLI zeroing pass (mirrors build-lib §3b) ──────────────────────────────────
+  // Single interleaved pass short→long: gap years consume pool before longer funded years.
+  const zeroedFundedYears = new Set();
+  const pliCreditByFundedYear = {};
+  const pliCreditByGapYear = {};
+  let preLadderPool = 0;
+  let partialCreditYear = null, partialCredit = 0;
+
+  if (preLadderInterest) {
+    const preLadderYears = Math.max(0, firstYear - settlementDate.getFullYear());
+    if (preLadderYears > 0) {
+      // Prelim sweep (long→short) over actual TIPS years: funded-qty-based annual interest only.
+      // Mirrors build-lib's prelim phase — must NOT include excess bracket quantities in the pool,
+      // otherwise the pool is inflated and too many years get zeroed.
+      let runningPrelimLMI = 0;
+      const prelimFundedAnnualInt = {};
+      const actualYearsLongToShort = Object.keys(yearInfo).map(Number)
+        .filter(y => y >= firstYear && y <= lastYear)
+        .sort((a, b) => b - a);
+      for (const year of actualYearsLongToShort) {
+        const sortedH = [...yearInfo[year].holdings].sort((a, b) => b.maturity - a.maturity);
+        const targetH = sortedH[0];
+        if (!targetH) continue;
+        const b = tipsMap.get(targetH.cusip);
+        if (!b) continue;
+        const ir = refCPI / (b.baseCpi ?? refCPI);
+        const piPB = calculatePIPerBond(targetH.cusip, targetH.maturity, refCPI, tipsMap);
+        const yearDara = daraByYear?.get(year) ?? DARA;
+        const fyQty = Math.max(0, Math.round((yearDara - runningPrelimLMI) / piPB));
+        const annInt = fyQty * 1000 * ir * (b.coupon ?? 0);
+        prelimFundedAnnualInt[year] = annInt;
+        runningPrelimLMI += annInt;
+      }
+
+      const totalAnnualInt = Object.values(prelimFundedAnnualInt).reduce((s, v) => s + v, 0);
+      preLadderPool = preLadderYears * totalAnnualInt;
+      for (let y = settlementYear; y < firstYear; y++) preLadderPool += calcFuture30yUpperAnnualAmd(y);
+
+      const gapYearSetForPLI = new Set(gapYears);
+      const future30yYearSetForPLI = new Set(future30yYears);
+      let remaining = preLadderPool;
+      for (let year = firstYear; year <= lastYear; year++) {
+        if (remaining <= 0) break;
+        if (gapYearSetForPLI.has(year)) {
+          // Gap year: estimate need using funded-year-based LMI above (matches build-lib)
+          const actualTIPSLMI = Object.entries(prelimFundedAnnualInt)
+            .filter(([y]) => parseInt(y) > year)
+            .reduce((s, [, v]) => s + v, 0);
+          const need = Math.max(0, DARA - actualTIPSLMI);
+          if (remaining >= need) {
+            pliCreditByGapYear[year] = need;
+            remaining -= need;
+          } else {
+            pliCreditByGapYear[year] = remaining;
+            remaining = 0;
+          }
+        } else if (!future30yYearSetForPLI.has(year)) {
+          // Funded year (with or without current holdings): need = DARA - funded-LMI-from-above.
+          // Must NOT restrict to yearInfo[year] — years zeroed in Build have no holdings when
+          // loaded into Rebalance, but the PLI pool should still zero them.
+          const laterMatInt = Object.entries(prelimFundedAnnualInt)
+            .filter(([y]) => parseInt(y) > year)
+            .reduce((s, [, v]) => s + v, 0);
+          const need = (daraByYear?.get(year) ?? DARA) - laterMatInt - calcFuture30yUpperAnnualAmd(year);
+          if (need <= 0) { zeroedFundedYears.add(year); pliCreditByFundedYear[year] = 0; continue; }
+          if (remaining >= need) {
+            zeroedFundedYears.add(year);
+            pliCreditByFundedYear[year] = need;
+            remaining -= need;
+          } else {
+            // Pool covers this year partially — reduce its qty but don't zero it
+            pliCreditByFundedYear[year] = remaining;
+            partialCreditYear = year;
+            partialCredit = remaining;
+            remaining = 0;
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  // Phase 3.1 and AMD computation are above the PLI pass (future30yUpperExQty needed for pre-ladder AMD pool).
 
   // Augment gapLaterMaturityInterest with future cover excess LMI before computing gap params
   const future30yExtraLMI = {};
@@ -848,6 +879,13 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
       }
     }
   }
+  // AMD-driven selling: years below 2036 receive 2052 excess AMD income and must be sold to
+  // their AMD-adjusted need regardless of mode. Full mode already includes them; Gap mode does not.
+  if (future30yUpperExQty > 0) {
+    for (let y = firstYear; y < 2036 && y <= lastYear; y++) {
+      if (!bracketYearSet.has(y) && !gapYearSet.has(y) && !future30yYearSet.has(y)) rebalYearSet.add(y);
+    }
+  }
 
   const bracketExcessTargetCost = {};
   if (gapYears.length > 0) {
@@ -960,11 +998,20 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
 
       // 3. Calculate needed P+I, subtracting both incoming LMI and current year excess LMI
       const effectivePartialCredit = (year === partialCreditYear) ? partialCredit : 0;
-      const needed = yearDara - rebuildLaterMatInt - excessLMI - effectivePartialCredit;
+      const future30yAmd = calcFuture30yUpperAnnualAmd(year);
+      const needed = yearDara - rebuildLaterMatInt - excessLMI - effectivePartialCredit - future30yAmd;
 
       if (zeroedFundedYears.has(year)) {
-        // PLI covers this year's funded need — zero funded qty
+        // PLI covers this year's funded need — zero funded qty AND sell all non-target holdings
         tFundedYearQty = 0;
+        for (const h of yi.holdings) {
+          if (h.cusip !== targetCUSIP && h.qty > 0) {
+            postRebalQtyMap[h.cusip] = 0;
+            const b2 = tipsMap.get(h.cusip);
+            const c2 = (b2?.price ?? 0) / 100 * (refCPI / (b2?.baseCpi ?? refCPI)) * 1000;
+            nonTargetSells[h.cusip] = { newQty: 0, qtyDelta: -h.qty, costDelta: h.qty * c2, targetCost: 0 };
+          }
+        }
       } else if (isFullMode) {
         const sortedH = [...yi.holdings].sort((a, b) => b.maturity - a.maturity);
         const nonTarget = sortedH.filter(h => h.cusip !== targetCUSIP).reverse();
@@ -1065,8 +1112,9 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
         holdingsBefore.push({ cusip: h.cusip, maturityMonth: m - 1, maturityYear: h.maturity.getFullYear(), qty: q, principalPerBond: ap, nPeriods: m < 7 ? 1 : 2, coupon: b?.coupon ?? 0 });
       }
     }
-    beforeARAByYear[year] = pB + cB + lBefore;
-    beforeARABreakdown[year] = { principal: pB, ownCoupon: cB, laterMatInt: lBefore, holdings: holdingsBefore };
+    const amdBefore = (year >= firstYear && year <= lastYear) ? calcFuture30yUpperAnnualAmdForQty(year, future30yUpperQtyBefore) : 0;
+    beforeARAByYear[year] = pB + cB + lBefore + amdBefore;
+    beforeARABreakdown[year] = { principal: pB, ownCoupon: cB, laterMatInt: lBefore, holdings: holdingsBefore, future30yUpperAnnualAmd: amdBefore };
 
     // Years outside [firstYear, lastYear] are not ladder rungs; their "Amount After" is 0.
     // LMI from later bonds flows to firstYear (the shortest rung), not to dropped years.
@@ -1114,8 +1162,9 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
       }
     }
     const pliCredit = pliCreditByFundedYear[year] ?? 0;
-    postARAByYear[year] = pA + cA + lAfter + exIntA + pliCredit;
-    postARABreakdown[year] = { principal: pA, ownCoupon: cA, laterMatInt: lAfter, holdings: holdingsAfter, pliCredit };
+    const amdAfter = (year >= firstYear && year <= lastYear) ? calcFuture30yUpperAnnualAmd(year) : 0;
+    postARAByYear[year] = pA + cA + lAfter + exIntA + pliCredit + amdAfter;
+    postARABreakdown[year] = { principal: pA, ownCoupon: cA, laterMatInt: lAfter, holdings: holdingsAfter, pliCredit, future30yUpperAnnualAmd: amdAfter };
   }
 
   // Summary Metrics
@@ -1170,6 +1219,7 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
         cFY += oh.qty * (b.price / 100 * ir * 1000);
       }
       iFY += lmi; aFY = pFY + iFY; aB = beforeARAByYear[h.year]; aA = postARAByYear[h.year];
+      aFY += calcFuture30yUpperAnnualAmdForQty(h.year, future30yUpperQtyBefore);
     }
 
     const b = tipsMap.get(h.cusip);
@@ -1236,6 +1286,8 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
       araAfterLaterMatInt:  isLast ? (postARABreakdown[h.year]?.laterMatInt  ?? 0) : null,
       araAfterHoldings:     isLast ? (postARABreakdown[h.year]?.holdings     ?? []) : null,
       preLadderCreditForYear: isLast ? (postARABreakdown[h.year]?.pliCredit ?? 0) : null,
+      future30yUpperAnnualAmd:       isLast ? (postARABreakdown[h.year]?.future30yUpperAnnualAmd ?? 0) : null,
+      future30yUpperAnnualAmdBefore: isLast ? (beforeARABreakdown[h.year]?.future30yUpperAnnualAmd ?? 0) : null,
       nPeriods: (h.maturity.getMonth() + 1 < 7 ? 1 : 2),
       mDuration,
     });
@@ -1295,6 +1347,8 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
       araAfterLaterMatInt: yearLaterMatIntSnapshot[bYear] ?? 0,
       araAfterHoldings: holdingsAfterSyn,
       preLadderCreditForYear: pliCreditByFundedYear[bYear] ?? 0,
+      future30yUpperAnnualAmd:       postARABreakdown[bYear]?.future30yUpperAnnualAmd ?? 0,
+      future30yUpperAnnualAmdBefore: beforeARABreakdown[bYear]?.future30yUpperAnnualAmd ?? 0,
       nPeriods: m < 7 ? 1 : 2,
       mDuration: (tb?.yield != null) ? calculateMDuration(settlementDate, tb.maturity, tb.coupon ?? 0, tb.yield) : 0,
     };
@@ -1327,7 +1381,7 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
 
   const HDR = ['CUSIP','Qty','Maturity','FY','Principal','Interest','ARA','Cost','Target Qty','Qty Delta','Target Cost','Cost Delta','ARA (Before)','ARA-DARA Before','ARA (After)','ARA-DARA After','Excess ARA Before','Excess ARA After','Incoming LMI','Excess Interest','Funded PI'];
 
-  return { results, HDR, summary: { settleDateDisp, refCPI, DARA, inferredDARA, daraIsInferred: dara === null, method, firstYear, lastYear, derivedFirstYear, rungCount, gapYears, future30yYears, brackets, lowerWeight, upperWeight, costDeltaSum, costForNewRungs, gapCoverageSurplus, gapParams, bracketMode, lowerDuration, upperDuration, newLowerYear, newLowerCUSIP, newLowerDuration, newLowerWeight3, origLowerWeight, bracketFellBack3to2, beforeLowerWeight, beforeUpperWeight, beforeNewLowerWeight, afterLowerWeight, afterUpperWeight, afterNewLowerWeight, totalPreviousExcessCost, totalExcessCost, araByYear, future30yLowerYear, future30yUpperYear, future30yLowerCoverCUSIP: future30yLowerCoverBond?.cusip, future30yUpperCoverCUSIP: future30yUpperCoverBond?.cusip, future30yParams, future30yLowerDuration, future30yUpperDuration, future30yUpperWeight, future30yLowerWeight, future30yUpperExQty, future30yLowerExQty, future30yFellBack, preLadderInterest, preLadderPool, zeroedFundedYears: [...zeroedFundedYears].sort((a, b) => a - b), weightedAvgDuration }, details };
+  return { results, HDR, summary: { settleDateDisp, refCPI, DARA, inferredDARA, daraIsInferred: dara === null, method, firstYear, lastYear, derivedFirstYear, rungCount, gapYears, future30yYears, brackets, lowerWeight, upperWeight, costDeltaSum, costForNewRungs, gapCoverageSurplus, gapParams, bracketMode, lowerDuration, upperDuration, newLowerYear, newLowerCUSIP, newLowerDuration, newLowerWeight3, origLowerWeight, bracketFellBack3to2, beforeLowerWeight, beforeUpperWeight, beforeNewLowerWeight, afterLowerWeight, afterUpperWeight, afterNewLowerWeight, totalPreviousExcessCost, totalExcessCost, araByYear, future30yLowerYear, future30yUpperYear, future30yLowerCoverCUSIP: future30yLowerCoverBond?.cusip, future30yUpperCoverCUSIP: future30yUpperCoverBond?.cusip, future30yParams, future30yLowerDuration, future30yUpperDuration, future30yUpperWeight, future30yLowerWeight, future30yUpperExQty, future30yLowerExQty, future30yFellBack, future30yUpperPrincipalPerBond, future30yUpperAmdCostPerBond, future30yUpperYearsToMaturity, future30yUpperAmdPerBondPerYear, future30yUpperN, preLadderInterest, preLadderPool, zeroedFundedYears: [...zeroedFundedYears].sort((a, b) => a - b), weightedAvgDuration }, details };
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
