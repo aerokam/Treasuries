@@ -858,21 +858,23 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
       const originalLowerExcessCost = Math.max(0, (originalLowerHolding?.qty ?? 0) - (bracketTargetFundedYearQtyBefore[brackets.lowerYear] ?? 0)) * originalLowerCostPerBond;
 
       const weights3Bracket = bracketWeights3(lowerDuration, newLowerDuration, upperDuration, gapParams.avgDuration, originalLowerExcessCost, gapParams.totalCost);
-      if (weights3Bracket.cappedToOptimal) {
-        // Orig lower already covers its optimal share — drop new lower entirely so 2036 is
-        // processed as a regular rebal year, identical to 2-bracket mode.
+      if (weights3Bracket.cappedToOptimal || weights3Bracket.origLowerWeight > 1) {
+        // Orig lower already sufficient for duration matching — degrade to pure 2-bracket.
+        // is3Bracket = false forces ALL downstream paths (bracketYearSet, bracketExcessTargetCost,
+        // Phase 4 sweep) through identical 2-bracket logic, guaranteeing equal results.
+        is3Bracket = false;
         newLowerYear = null; newLowerCUSIP = null; newLowerMaturity = null; newLowerDuration = 0;
-      }
-      if (weights3Bracket.origLowerWeight > 1) {
-        // Orig lower excess exceeds gap total cost — fall back to 2-bracket using orig lower
-        const weightsFallback = bracketWeights(lowerDuration, upperDuration, gapParams.avgDuration);
-        origLowerWeight = weightsFallback.lowerWeight; newLowerWeight3 = 0; upperWeight3 = weightsFallback.upperWeight;
-        bracketFellBack3to2 = true;
+        bracketYearSet.clear();
+        if (brackets.lowerYear != null) bracketYearSet.add(brackets.lowerYear);
+        if (brackets.upperYear != null) bracketYearSet.add(brackets.upperYear);
+        for (const y of future30yCoverYearSet) bracketYearSet.add(y);
+        if (weights3Bracket.origLowerWeight > 1) bracketFellBack3to2 = true;
       } else {
         origLowerWeight = weights3Bracket.origLowerWeight; newLowerWeight3 = weights3Bracket.newLowerWeight; upperWeight3 = weights3Bracket.upperWeight;
+        lowerWeight = origLowerWeight; upperWeight = upperWeight3;
       }
-      lowerWeight = origLowerWeight; upperWeight = upperWeight3;
-    } else {
+    }
+    if (!is3Bracket) {
       const weights2Bracket = bracketWeights(lowerDuration, upperDuration, gapParams.avgDuration);
       lowerWeight = weights2Bracket.lowerWeight; upperWeight = weights2Bracket.upperWeight;
     }
