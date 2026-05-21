@@ -77,7 +77,7 @@ function applyYBoundsFromData(datasets) {
  * @param {{ datasets: Array, yLabel: string, logScale: boolean }} config
  * @returns {Chart}
  */
-export function createChart(canvasId, { datasets, yLabel, logScale }) {
+export function createChart(canvasId, { datasets, yLabel, logScale, tooltipFormat = 'MMM yyyy' }) {
   if (_chart) { _chart.destroy(); _chart = null; }
   _currentDatasets = datasets;
 
@@ -149,7 +149,7 @@ export function createChart(canvasId, { datasets, yLabel, logScale }) {
         x: {
           type: 'time',
           time: {
-            tooltipFormat: 'MMM yyyy',
+            tooltipFormat: tooltipFormat,
             displayFormats: { year: 'yyyy', month: 'MMM yyyy', day: 'MMM d yyyy' },
           },
           grid: { color: '#f1f5f9' },
@@ -192,13 +192,14 @@ export function createChart(canvasId, { datasets, yLabel, logScale }) {
  * Update the existing chart with new data and y-axis label.
  * @param {{ datasets: Array, yLabel: string, logScale: boolean }} config
  */
-export function updateChart({ datasets, yLabel, logScale }) {
+export function updateChart({ datasets, yLabel, logScale, tooltipFormat = 'MMM yyyy' }) {
   if (!_chart) return;
   _currentDatasets = datasets;
 
   _chart.options.scales.y.type = logScale ? 'logarithmic' : 'linear';
   _chart.options.scales.y.title.text = yLabel;
   _chart.options.plugins.legend.display = datasets.length > 1;
+  _chart.options.scales.x.time.tooltipFormat = tooltipFormat;
 
   _chart.data.datasets = datasets.map((ds, i) => ({
     label: ds.label,
