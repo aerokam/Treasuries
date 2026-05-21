@@ -115,7 +115,15 @@ function bracketWeights(lowerDur, upperDur, dGap) {
 
 function bracketWeights3(d1, d2, d3, dGap, currentExcessCost1, gapTotalCost) {
   if (gapTotalCost <= 0) return { origLowerWeight: 0, newLowerWeight: 0, upperWeight: 0, feasible: true };
-  const w1 = currentExcessCost1 / gapTotalCost;
+  // 2-bracket optimal lower weight — duration-match target if allocating freely.
+  const lw2b = Math.abs(d3 - d1) > 0.0001 ? (d3 - dGap) / (d3 - d1) : 0.5;
+  const w1_raw = currentExcessCost1 / gapTotalCost;
+  if (w1_raw >= lw2b) {
+    // Orig lower covers its optimal share — degrade to 2-bracket weights entirely.
+    return { origLowerWeight: lw2b, newLowerWeight: 0, upperWeight: 1 - lw2b, feasible: true, cappedToOptimal: true };
+  }
+  // Orig lower is short — freeze it, compute new lower and upper for the remainder.
+  const w1 = w1_raw;
   const den = d2 - d3;
   if (Math.abs(den) < 0.0001) return { origLowerWeight: w1, newLowerWeight: Math.max(0, 1 - w1) / 2, upperWeight: Math.max(0, 1 - w1) / 2, feasible: true };
   const w2_raw = (dGap - d3 + w1 * (d3 - d1)) / den;
@@ -850,6 +858,11 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
       const originalLowerExcessCost = Math.max(0, (originalLowerHolding?.qty ?? 0) - (bracketTargetFundedYearQtyBefore[brackets.lowerYear] ?? 0)) * originalLowerCostPerBond;
 
       const weights3Bracket = bracketWeights3(lowerDuration, newLowerDuration, upperDuration, gapParams.avgDuration, originalLowerExcessCost, gapParams.totalCost);
+      if (weights3Bracket.cappedToOptimal) {
+        // Orig lower already covers its optimal share — drop new lower entirely so 2036 is
+        // processed as a regular rebal year, identical to 2-bracket mode.
+        newLowerYear = null; newLowerCUSIP = null; newLowerMaturity = null; newLowerDuration = 0;
+      }
       if (weights3Bracket.origLowerWeight > 1) {
         // Orig lower excess exceeds gap total cost — fall back to 2-bracket using orig lower
         const weightsFallback = bracketWeights(lowerDuration, upperDuration, gapParams.avgDuration);
@@ -975,14 +988,13 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
       let excessQtyTarget = 0;
       if (isBracket) {
         if (is3Bracket && year === brackets.lowerYear) {
-          // Special for 3-bracket orig lower: preserve current excess relative to BEFORE state FY target.
-          // If DARA has grown such that bracketTargetFundedYearQtyBefore >= current holdings, there is no
-          // "preserved" excess — fall through to the standard bracketExcessTargetCost formula so that the
-          // new-lower bracket allocation (w2 × totalCost) is correctly applied rather than returning 0.
-          const _preservedExcess = Math.max(0, targetCurrentQty - (bracketTargetFundedYearQtyBefore[year] ?? 0));
-          excessQtyTarget = _preservedExcess > 0
-            ? _preservedExcess
-            : costPerBond > 0 ? Math.max(0, Math.round((bracketExcessTargetCost[year] || 0) / costPerBond)) : 0;
+          // 3-bracket orig lower: freeze only when current excess is UNDER the duration-optimal target
+          // (new lower will fill the gap). When at or above optimal, sell to optimal — same as 2-bracket.
+          // The freeze prevents selling the orig lower to fund the new lower; it does not block selling
+          // when the orig lower itself holds more than duration matching requires.
+          const _currentExcess  = Math.max(0, targetCurrentQty - (bracketTargetFundedYearQtyBefore[year] ?? 0));
+          const _optimalExcess  = costPerBond > 0 ? Math.max(0, Math.round((bracketExcessTargetCost[year] || 0) / costPerBond)) : 0;
+          excessQtyTarget = Math.min(_currentExcess, _optimalExcess);
         } else if (future30yYears.length > 0 && year === future30yUpperYear) {
           // Use precomputed UNADJ-based excess qty directly (matches build-lib)
           excessQtyTarget = future30yUpperExQty;
