@@ -182,11 +182,12 @@ function render() {
     datasets.push({ label: getSourceLabel(src), labels, values });
   });
 
+  const tooltipFormat = state.dataSources.includes('ref-cpi') ? 'MMM d, yyyy' : 'MMM yyyy';
   const chart = getChart();
   if (!chart) {
-    createChart('cpiChart', { datasets, yLabel: yAxisLabel(), logScale: state.logScale });
+    createChart('cpiChart', { datasets, yLabel: yAxisLabel(), logScale: state.logScale, tooltipFormat });
   } else {
-    updateChart({ datasets, yLabel: yAxisLabel(), logScale: state.logScale });
+    updateChart({ datasets, yLabel: yAxisLabel(), logScale: state.logScale, tooltipFormat });
   }
 
   // Stats from primary (first) selected source
