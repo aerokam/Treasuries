@@ -1,4 +1,4 @@
-// Tests that the RANGE date inputs adapt the chart X axis to the selected range.
+﻿// Tests that the RANGE date inputs adapt the chart X axis to the selected range.
 // The chart should re-scale horizontally to match the filtered data whenever the
 // start or end maturity is changed.
 
@@ -47,7 +47,7 @@ const HOLIDAYS_CSV = '"Wednesday, January 1, 2025",New Year\'s Day\n';
 
 async function setupTipsRoutes(page) {
   await page.route('**/Treasuries/YieldsFromFedInvestPrices.csv', r => r.fulfill({ body: TIPS_MULTIYR_CSV, contentType: 'text/csv' }));
-  await page.route('**/Treasuries/RefCpiNsaSa.csv', r => r.fulfill({ body: REF_CPI_CSV, contentType: 'text/csv' }));
+  await page.route('**/TIPS/RefCpiNsaSa.csv', r => r.fulfill({ body: REF_CPI_CSV, contentType: 'text/csv' }));
   await page.route('**/misc/BondHolidaysSifma.csv', r => r.fulfill({ body: HOLIDAYS_CSV, contentType: 'text/csv' }));
   await page.route('**/Treasuries/FidelityTreasuries.csv', r => r.fulfill({ status: 404, body: '' }));
   await page.route('**/Treasuries/FidelityTips.csv', r => r.fulfill({ status: 404, body: '' }));
@@ -55,7 +55,7 @@ async function setupTipsRoutes(page) {
 
 async function setupNominalsRoutes(page) {
   await page.route('**/Treasuries/YieldsFromFedInvestPrices.csv', r => r.fulfill({ body: NOMINALS_CSV, contentType: 'text/csv' }));
-  await page.route('**/Treasuries/RefCpiNsaSa.csv', r => r.fulfill({ body: REF_CPI_CSV, contentType: 'text/csv' }));
+  await page.route('**/TIPS/RefCpiNsaSa.csv', r => r.fulfill({ body: REF_CPI_CSV, contentType: 'text/csv' }));
   await page.route('**/misc/BondHolidaysSifma.csv', r => r.fulfill({ body: HOLIDAYS_CSV, contentType: 'text/csv' }));
   await page.route('**/Treasuries/FidelityTreasuries.csv', r => r.fulfill({ status: 404, body: '' }));
   await page.route('**/Treasuries/FidelityTips.csv', r => r.fulfill({ status: 404, body: '' }));

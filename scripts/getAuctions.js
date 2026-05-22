@@ -137,7 +137,6 @@ async function main() {
   const merged = mergeRows(existingRows, newRows);
   const csvBody = toCSV(headers, merged);
   await uploadToR2('Treasuries/Auctions.csv', csvBody);
-  await uploadToR2('TIPS/Auctions.csv', csvBody);
 }
 
 main().catch(err => { console.error(err); process.exit(1); });

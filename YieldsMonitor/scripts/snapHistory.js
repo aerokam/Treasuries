@@ -99,7 +99,6 @@ function mergePoints(existing, incoming) {
 async function snap() {
   for (const sym of SYMBOLS) {
     const r2Key = `Treasuries/yield-history/${sym}_history.json`;
-    const r2KeyOld = `TIPS/yield-history/${sym}_history.json`;
     console.log(`Updating ${sym}...`);
 
     // 1. Get Live 10D data (the "tip" with 5 trading days of overlap)
@@ -163,7 +162,6 @@ async function snap() {
       console.log(`  Appended ${newCloses.length} new closes for ${sym}.`);
 
       await uploadToR2(r2Key, history);
-      await uploadToR2(r2KeyOld, history);
     } else {
       console.log(`  No new data to append.`);
     }

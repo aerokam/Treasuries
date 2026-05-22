@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+﻿import { test, expect } from '@playwright/test';
 
 test.describe('Yield Curves Chart and UI', () => {
   test.beforeEach(async ({ page }) => {
@@ -15,7 +15,7 @@ test.describe('Yield Curves Chart and UI', () => {
       });
     });
 
-    await page.route('**/Treasuries/RefCpiNsaSa.csv', async route => {
+    await page.route('**/TIPS/RefCpiNsaSa.csv', async route => {
       await route.fulfill({
         status: 200,
         contentType: 'text/csv',

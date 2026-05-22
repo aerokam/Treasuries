@@ -1,4 +1,4 @@
-import fs from 'fs';
+﻿import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { uploadToR2 } from './r2.js';
@@ -8,7 +8,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const R2_BASE_URL = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev';
 const FIDELITY_TIPS_URL = `${R2_BASE_URL}/Treasuries/FidelityTips.csv`;
-const REF_CPI_URL = `${R2_BASE_URL}/Treasuries/RefCpiNsaSa.csv`;
+const REF_CPI_URL = `${R2_BASE_URL}/TIPS/RefCpiNsaSa.csv`;
 const HOLIDAYS_URL = `${R2_BASE_URL}/misc/BondHolidaysSifma.csv`;
 
 // Helper: parse CSV with quoted fields and header
@@ -214,9 +214,6 @@ async function main() {
   );
   const csvContent = [header, ...lines].join('\n') + '\n';
 
-  // Upload to R2
-  console.error("Uploading to R2: TIPS/YieldsSaSao.csv");
-  await uploadToR2('TIPS/YieldsSaSao.csv', csvContent);
   console.error("Update complete.");
 }
 

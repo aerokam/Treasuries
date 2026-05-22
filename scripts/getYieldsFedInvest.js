@@ -326,7 +326,6 @@ async function main() {
   const content = [settleDateStr, header, ...lines].join('\n') + '\n';
   
   await uploadToR2('Treasuries/YieldsFromFedInvestPrices.csv', content);
-  await uploadToR2('TIPS/YieldsFromFedInvestPrices.csv', content);
 
   // Write sentinel so the retry wrapper knows today's fetch succeeded
   const logsDir = resolve(dirname(fileURLToPath(import.meta.url)), '../logs');

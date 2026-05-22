@@ -1,4 +1,4 @@
-import express from 'express';
+﻿import express from 'express';
 import { spawn, execSync } from 'child_process';
 import { existsSync, readFileSync } from 'fs';
 import { resolve, dirname, join, relative, isAbsolute } from 'path';
@@ -82,7 +82,7 @@ const APP_CONFIGS = [
         id: 'cpi-seasonal',
         label: 'CPI seasonal adjustment factors',
         feeds: 'CPI overlay',
-        r2Key: 'Treasuries/RefCpiNsaSa.csv',
+        r2Key: 'TIPS/RefCpiNsaSa.csv',
         localJobIds: ['update-ref-cpi-nsa-sa'],
         stalenessHours: 720,
         weekdayOnly: true,
