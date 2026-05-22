@@ -8,7 +8,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const R2_BASE_URL = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev';
 const FIDELITY_TIPS_URL = `${R2_BASE_URL}/Treasuries/FidelityTips.csv`;
-const REF_CPI_URL = `${R2_BASE_URL}/TIPS/RefCpiNsaSa.csv`;
+const REF_CPI_URL = `${R2_BASE_URL}/Treasuries/RefCpiNsaSa.csv`;
 const HOLIDAYS_URL = `${R2_BASE_URL}/misc/BondHolidaysSifma.csv`;
 
 // Helper: parse CSV with quoted fields and header

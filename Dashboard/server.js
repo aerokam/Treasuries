@@ -82,7 +82,7 @@ const APP_CONFIGS = [
         id: 'cpi-seasonal',
         label: 'CPI seasonal adjustment factors',
         feeds: 'CPI overlay',
-        r2Key: 'TIPS/RefCpiNsaSa.csv',
+        r2Key: 'Treasuries/RefCpiNsaSa.csv',
         localJobIds: ['update-ref-cpi-nsa-sa'],
         stalenessHours: 720,
         weekdayOnly: true,
