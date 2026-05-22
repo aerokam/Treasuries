@@ -19,7 +19,7 @@ test.beforeEach(async ({ page }) => {
     r.fulfill({ body: csv('YieldsFromFedInvestPrices.csv'), contentType: 'text/csv' }));
   await page.route('**/TIPS/RefCPI.csv', r =>
     r.fulfill({ body: csv('RefCPI.csv'), contentType: 'text/csv' }));
-  await page.route('**/Treasuries/TipsRef.csv', r =>
+  await page.route('**/TIPS/TipsRef.csv', r =>
     r.fulfill({ body: csv('TipsRef.csv'), contentType: 'text/csv' }));
   // Allow sample pre-populate to succeed (uses local data/CusipQtyTest.csv via serve)
   await page.goto('./');
