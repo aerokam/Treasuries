@@ -10,8 +10,8 @@ Audit run 2026-04-30. Cleanup executed 2026-05-21.
 
 | Prefix | Files |
 |--------|-------|
-| `TIPS/` | `RefCPI.csv`, `TipsRef.csv`, `tentative_tips.json`, `Tentative-Auction-Schedule.xml` |
-| `Treasuries/` | `YieldsFromFedInvestPrices.csv`, `Auctions.csv`, `FidelityTips.csv`, `FidelityTreasuries.csv`, `RefCpiNsaSa.csv`, `yield-history/*.json` (14 files) |
+| `TIPS/` | `RefCPI.csv`, `TipsRef.csv`, `RefCpiNsaSa.csv`, `tentative_tips.json`, `Tentative-Auction-Schedule.xml` |
+| `Treasuries/` | `YieldsFromFedInvestPrices.csv`, `Auctions.csv`, `FidelityTips.csv`, `FidelityTreasuries.csv`, `yield-history/*.json` (14 files) |
 | `bls/` | `CPI.csv`, `CPI_history.csv`, `CpiReleaseSchedule2025.csv`, `CpiReleaseSchedule2026.csv` |
 | `misc/` | `BondHolidaysSifma.csv` |
 | `schwab/` | `SchwabHoldings-SCHP.csv` (written by external ScrapeSchwabHoldings project) |
@@ -49,7 +49,7 @@ Audit run 2026-04-30. Cleanup executed 2026-05-21.
 - `TIPS/Yields.csv` (old filename, last written 2026-04-03)
 - `TIPS/TipsYields.csv` (2026-03-24)
 - `Treasuries/TipsYields.csv` (2026-03-25)
-- `TIPS/RefCpiNsaSa.csv` (migration artifact, 2026-03-20)
+- `Treasuries/RefCpiNsaSa.csv` (migration artifact — canonical is `TIPS/RefCpiNsaSa.csv`)
 
 **Audit clarification items:**
 - `misc/TIPS_SAO.csv` — no code references, deleted

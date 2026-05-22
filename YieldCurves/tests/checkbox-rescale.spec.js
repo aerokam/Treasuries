@@ -83,7 +83,7 @@ const FED_YIELDS_CSV_OUTLIER = makeFedOutlierCsv();
 
 async function setupRoutes(page) {
   await page.route('**/Treasuries/YieldsFromFedInvestPrices.csv', r => r.fulfill({ status: 200, contentType: 'text/csv', body: FED_YIELDS_CSV }));
-  await page.route('**/Treasuries/RefCpiNsaSa.csv', r => r.fulfill({ status: 200, contentType: 'text/csv', body: REF_CPI_CSV }));
+  await page.route('**/TIPS/RefCpiNsaSa.csv', r => r.fulfill({ status: 200, contentType: 'text/csv', body: REF_CPI_CSV }));
   await page.route('**/misc/BondHolidaysSifma.csv', r => r.fulfill({ status: 200, contentType: 'text/csv', body: HOLIDAYS_CSV }));
   await page.route('**/Treasuries/FidelityTreasuries.csv', r => r.fulfill({ status: 200, contentType: 'text/csv', body: FID_TREASURIES_CSV }));
   await page.route('**/Treasuries/FidelityTips.csv', r => r.fulfill({ status: 200, contentType: 'text/csv', body: FID_TIPS_CSV }));
@@ -91,7 +91,7 @@ async function setupRoutes(page) {
 
 async function setupOutlierRoutes(page) {
   await page.route('**/Treasuries/YieldsFromFedInvestPrices.csv', r => r.fulfill({ status: 200, contentType: 'text/csv', body: FED_YIELDS_CSV_OUTLIER }));
-  await page.route('**/Treasuries/RefCpiNsaSa.csv', r => r.fulfill({ status: 200, contentType: 'text/csv', body: REF_CPI_CSV }));
+  await page.route('**/TIPS/RefCpiNsaSa.csv', r => r.fulfill({ status: 200, contentType: 'text/csv', body: REF_CPI_CSV }));
   await page.route('**/misc/BondHolidaysSifma.csv', r => r.fulfill({ status: 200, contentType: 'text/csv', body: HOLIDAYS_CSV }));
   // No matching Fidelity CUSIPs — Market source inactive for this test
   await page.route('**/Treasuries/FidelityTreasuries.csv', r => r.fulfill({ status: 200, contentType: 'text/csv', body: FID_TREASURIES_CSV.split('\n')[0] }));
