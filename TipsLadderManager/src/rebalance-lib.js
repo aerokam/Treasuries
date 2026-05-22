@@ -654,8 +654,8 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
     : 0;
   function calcFuture30yUpperAnnualAmdForQty(year, qty) {
     if (future30yUpperAmdPerBondPerYear <= 0 || future30yUpperN <= 0 || qty <= 0) return 0;
-    if (year < 2036)   return qty * (2036 - year) / future30yUpperN * future30yUpperAmdPerBondPerYear;
-    if (year === 2036) return qty / future30yUpperN * (2 / 12) * future30yUpperAmdPerBondPerYear;
+    if (year > settlementYear && year <= 2036)
+      return (qty / future30yUpperN) * (year - settlementYear) * future30yUpperAmdPerBondPerYear;
     return 0;
   }
   function calcFuture30yUpperAnnualAmd(year) {
@@ -894,10 +894,11 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
       }
     }
   }
-  // AMD-driven selling: years below 2036 receive 2052 excess AMD income and must be sold to
-  // their AMD-adjusted need regardless of mode. Full mode already includes them; Gap mode does not.
+  // AMD-driven selling: years up to and including 2036 receive 2052 excess AMD income and must be
+  // sold to their AMD-adjusted need regardless of mode. Full mode already includes them; Gap mode does not.
+  // 2036 is included: it now carries the largest AMD (final tranche, most appreciated).
   if (future30yUpperExQty > 0) {
-    for (let y = firstYear; y < 2036 && y <= lastYear; y++) {
+    for (let y = firstYear; y <= 2036 && y <= lastYear; y++) {
       if (!bracketYearSet.has(y) && !gapYearSet.has(y) && !future30yYearSet.has(y)) rebalYearSet.add(y);
     }
   }

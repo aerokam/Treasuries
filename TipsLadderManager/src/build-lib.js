@@ -255,7 +255,8 @@ export function runBuild({ dara, firstYear: firstYearOpt, lastYear, tipsMap, ref
 
   // ── Future 30Y upper cover AMD (spec: 2.0 §Future 30Y Upper Cover AMD) ─────────
   // The 2052 TIPS excess trades at a deep market discount (low coupon → large AMD).
-  // Excess is sold ~1/N per year through 2036; annual AMD contribution declines each year.
+  // Excess is sold ~1/N per year through 2036; AMD cash is realized at sale, not by annual accretion.
+  // Gain per bond = (Y − settlementYear) × rate → increases each year; max AMD in 2036.
   // Must be computed AFTER future30yUpperExQty is known and BEFORE PLI pool.
   const future30yUpperN = future30yYears.length > 0 ? Math.max(1, 2036 - settlementYear) : 0;
   let future30yUpperPrincipalPerBond = 0;
@@ -270,12 +271,12 @@ export function runBuild({ dara, firstYear: firstYearOpt, lastYear, tipsMap, ref
     if (future30yUpperYearsToMaturity > 0)
       future30yUpperAmdPerBondPerYear = (future30yUpperPrincipalPerBond - future30yUpperAmdCostPerBond) / future30yUpperYearsToMaturity;
   }
-  // AMD for funded year Y: remaining excess fraction × annual per-bond rate.
-  // Fraction = (2036 − Y) / N for Y < 2036; partial year (2 months) for Y = 2036; 0 above.
+  // AMD cash for funded year Y = gain realized selling 1/N bonds that year.
+  // Gain per bond = (Y − settlementYear) × rate; increases each year as bonds appreciate toward par.
   function calcFuture30yUpperAnnualAmd(year) {
     if (future30yUpperAmdPerBondPerYear <= 0 || future30yUpperN <= 0) return 0;
-    if (year < 2036)  return future30yUpperExQty * (2036 - year) / future30yUpperN * future30yUpperAmdPerBondPerYear;
-    if (year === 2036) return future30yUpperExQty / future30yUpperN * (2 / 12) * future30yUpperAmdPerBondPerYear;
+    if (year > settlementYear && year <= 2036)
+      return (future30yUpperExQty / future30yUpperN) * (year - settlementYear) * future30yUpperAmdPerBondPerYear;
     return 0;
   }
 
