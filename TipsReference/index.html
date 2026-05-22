@@ -361,7 +361,7 @@ async function loadData() {
     var responses = await Promise.all([
       fetch(BASE_URL + '/YieldsFromFedInvestPrices.csv', { cache: 'no-cache' }),
       fetch(TIPS_URL + '/RefCPI.csv', { cache: 'no-cache' }),
-      fetch(BASE_URL + '/TipsRef.csv', { cache: 'no-cache' }),
+      fetch(TIPS_URL + '/TipsRef.csv', { cache: 'no-cache' }),
     ]);
     if (!responses[0].ok) throw new Error('YieldsFromFedInvestPrices.csv: HTTP ' + responses[0].status);
     if (!responses[1].ok) throw new Error('RefCPI.csv: HTTP ' + responses[1].status);

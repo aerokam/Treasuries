@@ -7,5 +7,8 @@
       "Bash(git log*)",
       "Bash(git diff*)"
     ]
+  },
+  "worktree": {
+    "bgIsolation": "none"
   }
 }

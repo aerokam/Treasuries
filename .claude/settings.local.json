@@ -4,7 +4,11 @@
       "PowerShell(schtasks *)",
       "Bash(npm test *)",
       "Bash(git add *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "PowerShell(node \"C:\\\\Users\\\\aerok\\\\projects\\\\Treasuries\\\\scripts\\\\fetchRefCpi.js\" 2>&1 | Select-Object -Last 35)",
+      "PowerShell(node \"C:\\\\Users\\\\aerok\\\\projects\\\\Treasuries\\\\scripts\\\\fetchRefCpi.js\" --write 2>&1)",
+      "Bash(node *)",
+      "Bash(git commit -m ' *)"
     ]
   }
 }
