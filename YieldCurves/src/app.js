@@ -1362,6 +1362,8 @@ function renderChart(fedBonds, brokerBonds) {
     chart.options.scales.y.min = zoomToRestore.yMin;
     chart.options.scales.y.max = zoomToRestore.yMax;
     chart.update('none');
+  } else {
+    rescaleToVisible(chart);
   }
 
   setupAxisWheelZoom(chart.canvas, ({chart}) => rescaleToVisible(chart), ({chart, factor}) => snapYAfterZoom(chart, factor));
