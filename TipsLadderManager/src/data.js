@@ -8,7 +8,7 @@ const TIPS_URL = R2_ROOT + '/TIPS';
 
 // Parse BondHolidaysSifma.csv into a Set of YYYY-MM-DD ISO strings.
 // CSV rows look like: "Thursday, April 03, 2025","Good Friday"
-function parseBondHolidays(text) {
+export function parseBondHolidays(text) {
   const months = { January:1, February:2, March:3, April:4, May:5, June:6,
                    July:7, August:8, September:9, October:10, November:11, December:12 };
   const holidays = new Set();

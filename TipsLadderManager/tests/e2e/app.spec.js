@@ -6,21 +6,42 @@ import { test, expect } from 'playwright/test';
 import { readFileSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { nextBondTradingDay, parseBondHolidays } from '../../src/data.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const FIXTURES = path.join(ROOT, 'tests', 'e2e');
 const csv = name => readFileSync(path.join(FIXTURES, name), 'utf8');
 
-// Holdings CSV for rebalance tests (simple 2-col format: cusip,qty)
-const HOLDINGS_PATH = path.join(ROOT, 'tests', 'CusipQtyTestLumpy.csv');
+// Compute today's T+1 settlement date using the same logic as the live app.
+function computeSettleDateStr() {
+  const holidayText = readFileSync(path.join(FIXTURES, 'BondHolidaysSifma.csv'), 'utf8');
+  const bondHolidays = parseBondHolidays(holidayText);
+  const now = new Date();
+  const todayISO = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+  return nextBondTradingDay(todayISO, bondHolidays);
+}
+
+// Yields CSV with line 1 replaced by today's T+1 settlement date.
+function yieldsWithTodaySettlement() {
+  const raw = csv('YieldsFromFedInvestPrices.csv');
+  const lines = raw.split('\n');
+  lines[0] = computeSettleDateStr();
+  return lines.join('\n');
+}
+
+// Holdings CSV for rebalance tests (Kevin_IRA, Format 3: cusip,qty)
+const HOLDINGS_PATH = path.join(ROOT, 'tests', 'e2e', 'KevinIraHoldings.csv');
 
 test.beforeEach(async ({ page }) => {
+  const yieldsBody = yieldsWithTodaySettlement();
   await page.route('**/Treasuries/YieldsFromFedInvestPrices.csv', r =>
-    r.fulfill({ body: csv('YieldsFromFedInvestPrices.csv'), contentType: 'text/csv' }));
+    r.fulfill({ body: yieldsBody, contentType: 'text/csv' }));
   await page.route('**/TIPS/RefCPI.csv', r =>
     r.fulfill({ body: csv('RefCPI.csv'), contentType: 'text/csv' }));
   await page.route('**/TIPS/TipsRef.csv', r =>
     r.fulfill({ body: csv('TipsRef.csv'), contentType: 'text/csv' }));
+  await page.route('**/misc/BondHolidaysSifma.csv', r =>
+    r.fulfill({ body: csv('BondHolidaysSifma.csv'), contentType: 'text/csv' }));
   // Allow sample pre-populate to succeed (uses local data/CusipQtyTest.csv via serve)
   await page.goto('./');
   // Wait for data load: run button must be enabled
