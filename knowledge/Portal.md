@@ -1,6 +1,6 @@
 # Treasury Investors Portal
 
-The portal is the browser-based entry point to all Treasury investment tools. It links to five standalone apps, each focused on a distinct phase of Treasury portfolio management. All apps run privately in the browser; no user data is uploaded to any server.
+The portal is the browser-based entry point to all Treasury investment tools. It links to five standalone apps plus one third-party tool, each focused on a distinct phase of Treasury portfolio management. All portal apps run privately in the browser; no user data is uploaded to any server.
 
 **URL (GH Pages):** `https://aerokam.github.io/Treasuries/`
 
@@ -15,6 +15,7 @@ The portal is the browser-based entry point to all Treasury investment tools. It
 | A3 | Yields Monitor | [YieldsMonitor/](../YieldsMonitor/knowledge/) | Live intraday and historical yield charts for selected maturities |
 | A4 | Treasury Auctions | [TreasuryAuctions/](../TreasuryAuctions/knowledge/) | Upcoming and historical auction results with spreadsheet-style filtering |
 | A5 | CPI Explorer | [CpiExplorer/](../CpiExplorer/knowledge/) | CPI index levels, YoY/MoM changes, rolling windows, and CAGR over any date range |
+| A6 | After-Tax TIPS Ladder Calculator *(third-party)* | https://motips.pythonanywhere.com/data-entry/ | After-tax return calculator for TIPS ladders; linked from the portal because it complements the suite but is not a portal app |
 
 ---
 
