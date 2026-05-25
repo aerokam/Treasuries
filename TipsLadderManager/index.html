@@ -1054,7 +1054,9 @@ let brokerTipsValues = {}; // { accountName: valueOfTipsOnly }
 let brokerTotalAccountValues = {}; // { accountName: totalAccountValue }
 
 document.getElementById('holdings-file-btn').addEventListener('click', () => {
-  document.getElementById('holdings-file').click();
+  const fi = document.getElementById('holdings-file');
+  fi.value = '';
+  fi.click();
 });
 
 document.getElementById('holdings-file').addEventListener('change', async (e) => {
