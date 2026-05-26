@@ -31,7 +31,7 @@ export const COLS = [
   { label: 'Maturity',    key: 'maturity',    fmt: 'str',
     value: d => d.maturityStr, subValue: d => d.maturityStr },
   { label: 'Yield',       key: 'yield',       fmt: 'yld', buildOnly: true,
-    value: d => d.yield },
+    value: d => d.yield, subValue: d => d.yield },
   // Rebalance-only
   { label: 'Amount Before', headerHTML: 'Amt<br>Before', key: 'amtBefore', fmt: 'amt', rebalOnly: true, fyLevel: true,
     value:          d => d.araBeforeTotal,
