@@ -4,7 +4,7 @@
 // Entry point: runBuild({ dara, lastYear, tipsMap, refCPI, settlementDate })
 
 import { fmtDate } from './rebalance-lib.js';
-import { bondCalcs, calculateMDuration, rungAmount } from '../../shared/src/bond-math.js';
+import { bondCalcs, calculateMDuration, rungAmount, calcMktWtdAvg } from '../../shared/src/bond-math.js';
 import { interpolateYield, syntheticCoupon as _synCoupon, bracketWeights, bracketExcessQtys, fyQty as _fyQty } from './gap-math.js';
 
 export const MAX_LAST_YEAR = 2066;
@@ -517,15 +517,9 @@ export function runBuild({ dara, firstYear: firstYearOpt, lastYear, tipsMap, ref
     });
   }
 
-  let _wadNum = 0, _wadDen = 0, _wayNum = 0;
-  for (const d of details) {
-    const mv = (d.fundedYearQty + d.excessQty) * d.costPerBond;
-    _wadNum += mv * d.mDuration;
-    _wayNum += mv * d.yield;
-    _wadDen += mv;
-  }
-  const weightedAvgDuration = _wadDen > 0 ? _wadNum / _wadDen : 0;
-  const weightedAvgYield    = _wadDen > 0 ? _wayNum / _wadDen : 0;
+  const _mktCosts = details.map(d => (d.fundedYearQty + d.excessQty) * d.costPerBond);
+  const weightedAvgDuration = calcMktWtdAvg(details.map(d => d.mDuration), _mktCosts);
+  const weightedAvgYield    = calcMktWtdAvg(details.map(d => d.yield),     _mktCosts);
 
   const HDR = ['CUSIP', 'Maturity', 'Funded Year', 'Funded Year Qty', 'Excess Qty', 'Total Qty', 'Funded Year Amount', 'Funded Year Cost', 'Excess Amount', 'Excess Cost'];
 

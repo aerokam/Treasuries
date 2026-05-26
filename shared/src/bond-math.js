@@ -256,6 +256,19 @@ export function priceFromYield(yld, coupon, settle, mature) {
   return pv - accrued; // Return clean price
 }
 
+// ─── Market-value weighted average ────────────────────────────────────────────
+// SUMPRODUCT(values, costs) / SUM(costs). Both arrays must be equal length.
+// Null/undefined values contribute 0 to numerator (cost still counts in denominator).
+export function calcMktWtdAvg(values, costs) {
+  let num = 0, den = 0;
+  for (let i = 0; i < values.length; i++) {
+    const c = costs[i] ?? 0;
+    num += (values[i] ?? 0) * c;
+    den += c;
+  }
+  return den > 0 ? num / den : 0;
+}
+
 // ─── Rung amount ──────────────────────────────────────────────────────────────
 // Spec: 5.0 §rungAmount, 4.0 Phase 5 ARA After formula
 export function rungAmount(qty, piPerBond, laterMatInt) {

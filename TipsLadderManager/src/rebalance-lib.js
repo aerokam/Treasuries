@@ -1,7 +1,7 @@
 // rebalance-lib.js -- Core logic for TIPS ladder rebalancing (4.0_TIPS_Ladder_Rebalancing.md)
 // Exports: buildTipsMapFromYields, runRebalance, localDate, inferDARAFromCash, runMultiAccountRebalance
 
-import { bondCalcs, calculateMDuration, yieldFromPrice } from '../../shared/src/bond-math.js';
+import { bondCalcs, calculateMDuration, yieldFromPrice, calcMktWtdAvg } from '../../shared/src/bond-math.js';
 export { yieldFromPrice };
 import { interpolateYield, syntheticCoupon } from './gap-math.js';
 import { detectAccountType, allocateToAccounts, computeAccountCashFlows, generateFeasibilityReport } from './account-allocation.js';
@@ -1386,15 +1386,9 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
   const costForNewRungs = Object.values(buySellTargets).reduce((s, bst) => s + (bst.isBracket ? 0 : Math.max(0, bst.targetCost)), 0);
   const gapCoverageSurplus = totalPreviousExcessCost - costForNewRungs - (gapParams.totalCost || 0);
 
-  let _wadNum = 0, _wadDen = 0, _wayNum = 0;
-  for (const d of details) {
-    const mv = d.qtyAfter * d.costPerBond;
-    _wadNum += mv * (d.mDuration ?? 0);
-    _wayNum += mv * (d.yield ?? 0);
-    _wadDen += mv;
-  }
-  const weightedAvgDuration = _wadDen > 0 ? _wadNum / _wadDen : 0;
-  const weightedAvgYield    = _wadDen > 0 ? _wayNum / _wadDen : 0;
+  const _mktCosts = details.map(d => d.qtyAfter * d.costPerBond);
+  const weightedAvgDuration = calcMktWtdAvg(details.map(d => d.mDuration), _mktCosts);
+  const weightedAvgYield    = calcMktWtdAvg(details.map(d => d.yield),     _mktCosts);
 
   const HDR = ['CUSIP','Qty','Maturity','FY','Principal','Interest','ARA','Cost','Target Qty','Qty Delta','Target Cost','Cost Delta','ARA (Before)','ARA-DARA Before','ARA (After)','ARA-DARA After','Excess ARA Before','Excess ARA After','Incoming LMI','Excess Interest','Funded PI'];
 
