@@ -518,6 +518,11 @@ function updateCharts() {
       applyDefaultBounds(sym, chart, data);
     }
 
+  });
+
+  Object.keys(AVAILABLE_SYMBOLS).forEach(sym => {
+    const data = rangeData[sym];
+    if (!data || data.length === 0) return;
     const calculationData = (liveCache[`${sym}_5D`] || liveCache[`${sym}_1D`] || data), latest = calculationData[calculationData.length - 1];
     let closeP = null;
     const latestDayET = getEtDateStr(latest.x);
