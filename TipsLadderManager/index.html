@@ -323,7 +323,10 @@
       <button id="export-cusip-qty-btn" style="display:none;padding:2px 10px;font-size:11px;align-self:flex-end" title="Export CUSIP/Qty for Rebalance import">Export CUSIP/Qty</button>
       <button id="purchase-list-btn" style="display:none;padding:2px 10px;font-size:11px;align-self:flex-end" title="Show consolidated order quantities">Purchase List</button>
       <div id="duration-links" style="align-self:flex-end"></div>
-      <span id="wad-display" style="display:none;align-self:flex-end" class="info-stat">Wtd Mod Dur <span id="wad-val" class="info-stat-val"></span></span>
+      <div id="ladder-stats-display" style="display:none;align-self:flex-end;flex-direction:column;gap:2px;align-items:flex-end">
+        <span id="avg-yld-display" class="info-stat">Avg Yld <span id="avg-yld-val" class="info-stat-val"></span></span>
+        <span id="wad-display" class="info-stat">Avg Mod Dur <span id="wad-val" class="info-stat-val"></span></span>
+      </div>
     </div>
     <!-- Info row -->
     <div class="card-info">
@@ -591,7 +594,7 @@ document.querySelectorAll('.tab-bar .tab-btn').forEach(btn => {
     _infoPopups.future30yDuration = isRebalance ? _rebalFuture30yDurationRows : _buildFuture30yDurationRows;
     _renderDurationLinks();
     const _activeSummary = isRebalance ? rebalSummary : buildSummary;
-    _renderWAD(_activeSummary?.weightedAvgDuration ?? 0);
+    _renderWAD(_activeSummary?.weightedAvgDuration ?? 0, _activeSummary?.weightedAvgYield ?? 0);
 
     setStatus('');
   });
@@ -835,7 +838,7 @@ function renderOutput({ results, HDR, summary, details }, portfolioCash = null) 
     }
     const _ncColor = costDeltaSum >= 0 ? '#16a34a' : '#dc2626';
     _renderDurationLinks();
-    _renderWAD(summary.weightedAvgDuration);
+    _renderWAD(summary.weightedAvgDuration, summary.weightedAvgYield);
 
   rebalDetails = details;
   rebalSummary = summary;
@@ -883,7 +886,7 @@ function renderBuildOutput({ results, HDR, summary, details }) {
       _infoPopups.future30yDuration = null;
     }
     _renderDurationLinks();
-    _renderWAD(summary.weightedAvgDuration);
+    _renderWAD(summary.weightedAvgDuration, summary.weightedAvgYield);
     buildDetails = details;
   buildSummary  = summary;
 
@@ -898,13 +901,14 @@ function renderBuildOutput({ results, HDR, summary, details }) {
   document.getElementById('table-controls').style.display = 'flex';
 }
 
-function _renderWAD(wad) {
-  const el = document.getElementById('wad-display');
+function _renderWAD(wad, way) {
+  const wrap = document.getElementById('ladder-stats-display');
   if (wad) {
     document.getElementById('wad-val').textContent = wad.toFixed(2);
-    el.style.display = 'inline';
+    document.getElementById('avg-yld-val').textContent = way ? (way * 100).toFixed(2) + '%' : '—';
+    wrap.style.display = 'flex';
   } else {
-    el.style.display = 'none';
+    wrap.style.display = 'none';
   }
 }
 
@@ -2066,7 +2070,7 @@ function _clearOutput() {
   document.getElementById('export-csv-btn').style.display = 'none';
   document.getElementById('export-cusip-qty-btn').style.display = 'none';
   document.getElementById('net-cash-inline').style.display = 'none';
-  document.getElementById('wad-display').style.display = 'none';
+  document.getElementById('ladder-stats-display').style.display = 'none';
   _clearAutoDara();
 }
 

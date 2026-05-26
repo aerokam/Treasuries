@@ -517,13 +517,15 @@ export function runBuild({ dara, firstYear: firstYearOpt, lastYear, tipsMap, ref
     });
   }
 
-  let _wadNum = 0, _wadDen = 0;
+  let _wadNum = 0, _wadDen = 0, _wayNum = 0;
   for (const d of details) {
     const mv = (d.fundedYearQty + d.excessQty) * d.costPerBond;
     _wadNum += mv * d.mDuration;
+    _wayNum += mv * d.yield;
     _wadDen += mv;
   }
   const weightedAvgDuration = _wadDen > 0 ? _wadNum / _wadDen : 0;
+  const weightedAvgYield    = _wadDen > 0 ? _wayNum / _wadDen : 0;
 
   const HDR = ['CUSIP', 'Maturity', 'Funded Year', 'Funded Year Qty', 'Excess Qty', 'Total Qty', 'Funded Year Amount', 'Funded Year Cost', 'Excess Amount', 'Excess Cost'];
 
@@ -542,6 +544,7 @@ export function runBuild({ dara, firstYear: firstYearOpt, lastYear, tipsMap, ref
     future30yUpperYearsToMaturity, future30yUpperAmdPerBondPerYear, future30yUpperN,
     totalBuyCost,
     weightedAvgDuration,
+    weightedAvgYield,
     preLadderInterest, preLadderYears, preLadderPool,
     zeroedFundedYears: [...zeroedFundedYears].sort((a, b) => a - b),
   };
