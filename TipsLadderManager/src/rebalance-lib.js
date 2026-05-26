@@ -602,18 +602,18 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
     future30yLowerYear = 2056;
     future30yUpperYear = 2052;
 
-    const coupon2056 = future30yLowerCoverBond.coupon ?? 0;
-    const yield2056  = future30yLowerCoverBond.yield  ?? 0;
-    const piPerFutureTips = 1000 + 1000 * coupon2056 * 0.5;
+    const yield2056   = future30yLowerCoverBond.yield  ?? 0;
+    const synCoupon   = syntheticCoupon(yield2056);
+    const piPerFutureTips = 1000 + 1000 * synCoupon * 0.5;
     let totalFuture30yDur = 0, future30yTotalCost = 0, runningFuture30yLMI = 0;
     const future30yBreakdown = [];
     for (const year of [...future30yYears].sort((a, b) => b - a)) {
       const futureMat = new Date(year, 1, 15);
-      const dur = calculateMDuration(settlementDate, futureMat, coupon2056, yield2056);
+      const dur = calculateMDuration(settlementDate, futureMat, synCoupon, yield2056);
       totalFuture30yDur += dur;
       const qty = Math.max(0, Math.round((DARA - runningFuture30yLMI) / piPerFutureTips));
       future30yBreakdown.push({ year, qty, piPerBond: piPerFutureTips, laterMatInt: runningFuture30yLMI, dur });
-      runningFuture30yLMI += qty * 1000 * coupon2056;
+      runningFuture30yLMI += qty * 1000 * synCoupon;
       future30yTotalCost  += qty * 1000;
     }
     future30yParams = { avgDuration: totalFuture30yDur / future30yYears.length, future30yTotalCost, breakdown: future30yBreakdown, future30ySeedLMI: runningFuture30yLMI };

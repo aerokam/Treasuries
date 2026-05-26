@@ -67,24 +67,25 @@ function calcGapParams(gapYears, tipsMap, settlementDate, refCPI, dara, prelim, 
 }
 
 // ─── Future 30Y parameters for build-from-scratch ──────────────────────────────
-// Uses 2056 coupon/yield as flat-curve anchor for all hypothetical future 30Y TIPS.
+// Uses 2056 yield as flat-curve anchor; coupon derived via syntheticCoupon() to model what
+// a newly-issued 30Y TIPS would carry (nearest 0.125% below current yield).
 // Processes longest-to-shortest with a running LMI accumulator (same pattern as calcGapParams).
 // No actual TIPS exist above future 30Y years, so inter-future synthetic LMI is the only source.
 function calcFuture30yParams(future30yYears, bond2056, settlementDate, dara) {
   if (!future30yYears.length || !bond2056) return { avgDuration: 0, future30yTotalCost: 0, breakdown: [] };
-  const coupon2056 = bond2056.coupon ?? 0;
   const yield2056  = bond2056.yield  ?? 0;
+  const synCoupon  = _synCoupon(yield2056);
   // Feb maturity (30-year TIPS issued in Feb) → halfOrFull = 0.5; IR = 1.0 (par assumption)
-  const piPerFuture30yTips = 1000 + 1000 * coupon2056 * 0.5;
+  const piPerFuture30yTips = 1000 + 1000 * synCoupon * 0.5;
   let totalDuration = 0, future30yTotalCost = 0, runningFuture30yLMI = 0;
   const breakdown = [];
   for (const year of [...future30yYears].sort((a, b) => b - a)) {
     const futureMat = new Date(year, 1, 15); // Feb 15
-    const dur = calculateMDuration(settlementDate, futureMat, coupon2056, yield2056);
+    const dur = calculateMDuration(settlementDate, futureMat, synCoupon, yield2056);
     totalDuration += dur;
     const qty = Math.max(0, Math.round((dara - runningFuture30yLMI) / piPerFuture30yTips));
     breakdown.push({ year, qty, piPerBond: piPerFuture30yTips, laterMatInt: runningFuture30yLMI, dur });
-    runningFuture30yLMI += qty * 1000 * coupon2056;
+    runningFuture30yLMI += qty * 1000 * synCoupon;
     future30yTotalCost  += qty * 1000;
   }
   return { avgDuration: totalDuration / future30yYears.length, future30yTotalCost, breakdown, future30ySeedLMI: runningFuture30yLMI };
