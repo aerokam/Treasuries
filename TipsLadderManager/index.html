@@ -481,12 +481,12 @@ async function loadData() {
     const fileInput = document.getElementById('holdings-file');
     if (!fileInput.files.length) {
       try {
-        let samplePath = './tests/e2e/KevinIraHoldings.csv';
+        let samplePath = './tests/e2e/SampleHoldings.csv';
         let sampleRes = await fetch(samplePath);
-        if (!sampleRes.ok) { samplePath = 'tests/e2e/KevinIraHoldings.csv'; sampleRes = await fetch(samplePath); }
+        if (!sampleRes.ok) { samplePath = 'tests/e2e/SampleHoldings.csv'; sampleRes = await fetch(samplePath); }
         if (sampleRes.ok) {
           const blob = await sampleRes.blob();
-          const file = new File([blob], 'KevinIraHoldings.csv', { type: 'text/csv' });
+          const file = new File([blob], 'SampleHoldings.csv', { type: 'text/csv' });
           const dt = new DataTransfer(); dt.items.add(file);
           fileInput.files = dt.files;
           fileInput.dispatchEvent(new Event('change'));

@@ -29,8 +29,8 @@ function yieldsWithTodaySettlement() {
   return lines.join('\n');
 }
 
-// Holdings CSV for rebalance tests (Kevin_IRA, Format 3: cusip,qty)
-const HOLDINGS_PATH = path.join(ROOT, 'tests', 'e2e', 'KevinIraHoldings.csv');
+// Holdings CSV for rebalance tests (Format 3: cusip,qty)
+const HOLDINGS_PATH = path.join(ROOT, 'tests', 'e2e', 'SampleHoldings.csv');
 
 test.beforeEach(async ({ page }) => {
   const yieldsBody = yieldsWithTodaySettlement();
@@ -42,7 +42,7 @@ test.beforeEach(async ({ page }) => {
     r.fulfill({ body: csv('TipsRef.csv'), contentType: 'text/csv' }));
   await page.route('**/misc/BondHolidaysSifma.csv', r =>
     r.fulfill({ body: csv('BondHolidaysSifma.csv'), contentType: 'text/csv' }));
-  // Allow sample pre-populate to succeed (fetches tests/e2e/KevinIraHoldings.csv via serve)
+  // Allow sample pre-populate to succeed (fetches tests/e2e/SampleHoldings.csv via serve)
   await page.goto('./');
   // Wait for data load: run button must be enabled
   await expect(page.locator('#run-btn')).not.toBeDisabled({ timeout: 4_000 });
@@ -292,7 +292,7 @@ test('drill popup: clicking Index Ratio in Level 2 opens Level 3 Index Ratio pop
 // ── 9. Error handling ─────────────────────────────────────────────────────────
 test('rebalance: running without holdings file shows status error', async ({ page, context }) => {
   // Block the pre-populate fetch so no sample file is loaded into the input
-  await page.route('**/tests/e2e/KevinIraHoldings.csv', r => r.abort());
+  await page.route('**/tests/e2e/SampleHoldings.csv', r => r.abort());
   await page.reload();
   await expect(page.locator('#run-btn')).not.toBeDisabled({ timeout: 4_000 });
 

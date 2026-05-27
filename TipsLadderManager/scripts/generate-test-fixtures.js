@@ -2,7 +2,7 @@
 // scripts/generate-test-fixtures.js
 // Reads data/SchwabAllAccounts.csv and data/FidelityAllAccounts.csv (private, gitignored)
 // Writes sanitized/scaled (÷5) versions to tests/ for use in test suite.
-// Also writes tests/e2e/KevinIraHoldings.csv (Format 3: cusip,qty in bonds).
+// Also writes tests/e2e/SampleHoldings.csv (Format 3: cusip,qty in bonds).
 //
 // Sanitization rules:
 //   - Bond face values: ÷5, rounded to nearest $1000
@@ -250,7 +250,7 @@ const fidelityCsv = sanitizeFidelity(readFileSync(fidelitySrc, 'utf8'));
 
 const schwabOut   = path.join(TESTS, 'SchwabAllAccounts.csv');
 const fidelityOut = path.join(TESTS, 'FidelityAllAccounts.csv');
-const holdingsOut = path.join(E2E,   'KevinIraHoldings.csv');
+const holdingsOut = path.join(E2E,   'SampleHoldings.csv');
 
 writeFileSync(schwabOut,   schwabCsv,   'utf8');
 writeFileSync(fidelityOut, fidelityCsv, 'utf8');
