@@ -14,10 +14,10 @@ graph LR
     LS[(Local Storage)]
 
     %% Processes (P)
-    P1((1.0 Build Logic))
-    P2((2.0 Rebalance Logic))
-    P3((3.0 Broker Import))
-    P4((4.0 UI Rendering))
+    P1((Build Logic))
+    P2((Rebalance Logic))
+    P3((Broker Import))
+    P4((UI Rendering))
 
     %% User (E)
     U[User / Investor]
@@ -39,7 +39,7 @@ graph LR
     P4 -->|CSV Export| U
 
     %% Links to Specs
-    click P1 "#/md/TipsLadderManager/knowledge/1.0_Bond_Ladders.md" "View Build Logic"
+    click P1 "#/md/TipsLadderManager/knowledge/2.0_TIPS_Ladders.md" "View Build Logic"
     click P2 "#/md/TipsLadderManager/knowledge/3.0_TIPS_Ladder_Rebalancing.md" "View Rebalance Logic"
     click P3 "#/md/TipsLadderManager/knowledge/2.1_Broker_Import.md" "View Import Logic"
     click P4 "#/md/TipsLadderManager/knowledge/5.0_UI_Schema.md" "View UI Specs"
