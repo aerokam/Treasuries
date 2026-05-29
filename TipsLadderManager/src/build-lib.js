@@ -14,7 +14,7 @@ export const MAX_LAST_YEAR = 2066;
 // prelim passed here must be the effective prelim: zeroed funded years have annualInterest = 0
 // (they have no actual TIPS purchased and generate no coupon income).
 // pliCreditByGapYear: remaining PLI pool allocated to each gap year (short→long interleaved pass).
-function calcGapParams(gapYears, tipsMap, settlementDate, refCPI, dara, prelim, pliCreditByGapYear = {}) {
+function calcGapParams(gapYears, tipsMap, settlementDate, refCPI, dara, prelim, pliCreditByGapYear = {}, daraByYear = null) {
   const minGapYear = Math.min(...gapYears);
   const maxGapYear = Math.max(...gapYears);
 
@@ -54,8 +54,8 @@ function calcGapParams(gapYears, tipsMap, settlementDate, refCPI, dara, prelim, 
     }
 
     const piPerBond = 1000 + 1000 * synCpn * 0.5;
-    // Treat synthetic TIPS like any other rung: subtract LMI and PLI credit before sizing.
-    const qty = Math.max(0, Math.round((dara - laterMatInt - (pliCreditByGapYear[year] ?? 0)) / piPerBond));
+    const yearDara = daraByYear?.get(year) ?? dara;
+    const qty = Math.max(0, Math.round((yearDara - laterMatInt - (pliCreditByGapYear[year] ?? 0)) / piPerBond));
     totalCost += qty * 1000;
     breakdown.push({ year, qty, piPerBond, laterMatInt, pliCredit: pliCreditByGapYear[year] ?? 0, dur: synDur });
     runningSynLMI += qty * 1000 * synCpn; // this gap year's synthetic interest feeds shorter rungs
@@ -71,7 +71,7 @@ function calcGapParams(gapYears, tipsMap, settlementDate, refCPI, dara, prelim, 
 // a newly-issued 30Y TIPS would carry (nearest 0.125% below current yield).
 // Processes longest-to-shortest with a running LMI accumulator (same pattern as calcGapParams).
 // No actual TIPS exist above future 30Y years, so inter-future synthetic LMI is the only source.
-function calcFuture30yParams(future30yYears, bond2056, settlementDate, dara) {
+function calcFuture30yParams(future30yYears, bond2056, settlementDate, dara, daraByYear = null) {
   if (!future30yYears.length || !bond2056) return { avgDuration: 0, future30yTotalCost: 0, breakdown: [] };
   const yield2056  = bond2056.yield  ?? 0;
   const synCoupon  = _synCoupon(yield2056);
@@ -83,7 +83,8 @@ function calcFuture30yParams(future30yYears, bond2056, settlementDate, dara) {
     const futureMat = new Date(year, 1, 15); // Feb 15
     const dur = calculateMDuration(settlementDate, futureMat, synCoupon, yield2056);
     totalDuration += dur;
-    const qty = Math.max(0, Math.round((dara - runningFuture30yLMI) / piPerFuture30yTips));
+    const yearDara = daraByYear?.get(year) ?? dara;
+    const qty = Math.max(0, Math.round((yearDara - runningFuture30yLMI) / piPerFuture30yTips));
     breakdown.push({ year, qty, piPerBond: piPerFuture30yTips, laterMatInt: runningFuture30yLMI, dur });
     runningFuture30yLMI += qty * 1000 * synCoupon;
     future30yTotalCost  += qty * 1000;
@@ -239,7 +240,7 @@ export function runBuild({ dara, firstYear: firstYearOpt, lastYear, tipsMap, ref
   let future30yLowerMonth = null, future30yUpperMonth = null;
 
   if (future30yYears.length > 0) {
-    future30yParams = calcFuture30yParams(future30yYears, future30yLowerCoverBond, settlementDate, dara);
+    future30yParams = calcFuture30yParams(future30yYears, future30yLowerCoverBond, settlementDate, dara, daraByYear);
     future30yLowerDuration = calculateMDuration(settlementDate, future30yLowerCoverBond.maturity, future30yLowerCoverBond.coupon ?? 0, future30yLowerCoverBond.yield ?? 0);
     future30yUpperDuration = calculateMDuration(settlementDate, future30yUpperCoverBond.maturity, future30yUpperCoverBond.coupon ?? 0, future30yUpperCoverBond.yield ?? 0);
 
@@ -309,7 +310,7 @@ export function runBuild({ dara, firstYear: firstYearOpt, lastYear, tipsMap, ref
         const actualTIPSLMI = Object.entries(prelim)
           .filter(([y]) => parseInt(y) > year)
           .reduce((s, [, p]) => s + p.annualInterest, 0);
-        const need = Math.max(0, dara - actualTIPSLMI);
+        const need = Math.max(0, (daraByYear?.get(year) ?? dara) - actualTIPSLMI);
         if (remaining >= need) {
           pliCreditByGapYear[year] = need;
           remaining -= need;
@@ -380,7 +381,7 @@ export function runBuild({ dara, firstYear: firstYearOpt, lastYear, tipsMap, ref
       }
     }
 
-    gapParams = calcGapParams(gapYears, tipsMap, settlementDate, refCPI, dara, augmentedPrelim, pliCreditByGapYear);
+    gapParams = calcGapParams(gapYears, tipsMap, settlementDate, refCPI, dara, augmentedPrelim, pliCreditByGapYear, daraByYear);
 
     const upperBond = yearBondMap[upperYear];
     upperDuration = calculateMDuration(settlementDate, upperBond.maturity, upperBond.coupon ?? 0, upperBond.yield ?? 0);

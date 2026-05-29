@@ -132,7 +132,7 @@ function bracketWeights3(d1, d2, d3, dGap, currentExcessCost1, gapTotalCost) {
   return { origLowerWeight: w1, newLowerWeight: w2, upperWeight: w3, feasible: w2_raw >= 0 };
 }
 
-function calculateGapParameters(gapYears, settlementDate, refCPI, tipsMap, DARA, holdings, lastYear, isFullMode, extraLMIByYear = {}, pliCreditByGapYear = {}, skipActualHoldingsYears = new Set()) {
+function calculateGapParameters(gapYears, settlementDate, refCPI, tipsMap, DARA, holdings, lastYear, isFullMode, extraLMIByYear = {}, pliCreditByGapYear = {}, skipActualHoldingsYears = new Set(), daraByYear = null) {
   if (gapYears.length === 0) return { avgDuration: 0, totalCost: 0 };
   const holdingsByYear = {};
   for (const h of holdings) {
@@ -317,8 +317,8 @@ function calculateGapParameters(gapYears, settlementDate, refCPI, tipsMap, DARA,
     }
 
     const piPerBond = 1000 + 1000 * synCpn * 0.5;
-    // Treat synthetic TIPS like any other rung: subtract LMI and PLI credit before sizing.
-    const qty = Math.max(0, Math.round((DARA - sumLaterMaturityInterest - (pliCreditByGapYear[year] ?? 0)) / piPerBond));
+    const yearDara = daraByYear?.get(year) ?? DARA;
+    const qty = Math.max(0, Math.round((yearDara - sumLaterMaturityInterest - (pliCreditByGapYear[year] ?? 0)) / piPerBond));
 
     // Gap total cost is the sum of market costs of all gap years.
     // For synthetic TIPS, price is 100 since we're interpolating yields.
@@ -611,7 +611,8 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
       const futureMat = new Date(year, 1, 15);
       const dur = calculateMDuration(settlementDate, futureMat, synCoupon, yield2056);
       totalFuture30yDur += dur;
-      const qty = Math.max(0, Math.round((DARA - runningFuture30yLMI) / piPerFutureTips));
+      const yearDaraF30 = daraByYear?.get(year) ?? DARA;
+      const qty = Math.max(0, Math.round((yearDaraF30 - runningFuture30yLMI) / piPerFutureTips));
       future30yBreakdown.push({ year, qty, piPerBond: piPerFutureTips, laterMatInt: runningFuture30yLMI, dur });
       runningFuture30yLMI += qty * 1000 * synCoupon;
       future30yTotalCost  += qty * 1000;
@@ -710,7 +711,7 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
           const actualTIPSLMI = Object.entries(prelimFundedAnnualInt)
             .filter(([y]) => parseInt(y) > year)
             .reduce((s, [, v]) => s + v, 0);
-          const need = Math.max(0, DARA - actualTIPSLMI);
+          const need = Math.max(0, (daraByYear?.get(year) ?? DARA) - actualTIPSLMI);
           if (remaining >= need) {
             pliCreditByGapYear[year] = need;
             remaining -= need;
@@ -758,7 +759,7 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
   }
 
   const skipActualHoldingsYearsForGap = future30yYears.length > 0 ? new Set([future30yLowerYear, future30yUpperYear]) : new Set();
-  const gapParams = calculateGapParameters(gapYears, settlementDate, refCPI, tipsMap, DARA, holdings, lastYear, isFullMode, future30yExtraLMI, pliCreditByGapYear, skipActualHoldingsYearsForGap);
+  const gapParams = calculateGapParameters(gapYears, settlementDate, refCPI, tipsMap, DARA, holdings, lastYear, isFullMode, future30yExtraLMI, pliCreditByGapYear, skipActualHoldingsYearsForGap, daraByYear);
 
   const brackets  = identifyBrackets(gapYears, holdings, yearInfo, tipsMap, araByYear, DARA, firstYear);
   const lowerBond = brackets.lowerCUSIP ? tipsMap.get(brackets.lowerCUSIP) : null;
