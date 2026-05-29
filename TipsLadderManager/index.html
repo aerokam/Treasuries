@@ -2031,6 +2031,10 @@ function _buildRows() {
 
 function _clearAutoDara() { if (_daraAutoInferred) { document.getElementById('dara').value = ''; _daraAutoInferred = false; } }
 
+// Refresh per-year DARA panel when the year range changes in rebalance mode
+document.getElementById('rebal-last-year').addEventListener('change', renderDaraByYearPanel);
+document.getElementById('rebal-first-year').addEventListener('change', renderDaraByYearPanel);
+
 /* --- DRILL-DOWN MODAL LISTENERS --- */
 document.getElementById('drill-close').addEventListener('click', () => {
   document.getElementById('drill-overlay').style.display = 'none';
