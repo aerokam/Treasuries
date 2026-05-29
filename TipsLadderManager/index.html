@@ -1058,6 +1058,76 @@ function updateRebalLastYearDropdown() {
   fieldDiv.style.display = '';
 }
 
+// ─── Per-year DARA from portfolio ARA ────────────────────────────────────────
+
+// Compute raw ARA for each funded year from holdings.
+// Process longest-to-shortest, accumulating LMI (annual coupon from later bonds).
+function computePortfolioARAByYear(holdingsArr, tipsMap, refCPI) {
+  const byYear = {};
+  for (const h of holdingsArr) {
+    const b = tipsMap.get(h.cusip);
+    if (!b?.maturity) continue;
+    const ir = refCPI / (b.baseCpi ?? refCPI);
+    const year = b.maturity.getFullYear();
+    const m = b.maturity.getMonth() + 1;
+    const nPay = m < 7 ? 1 : 2;  // Jan-Jun: 1 final coupon; Jul-Dec: 2
+    const piPB = 1000 * ir * (1 + (b.coupon ?? 0) * 0.5 * nPay);
+    const annInt = h.qty * 1000 * ir * (b.coupon ?? 0);
+    if (!byYear[year]) byYear[year] = { totalPI: 0, annInt: 0 };
+    byYear[year].totalPI += h.qty * piPB;
+    byYear[year].annInt  += annInt;
+  }
+  const years = Object.keys(byYear).map(Number).sort((a, b) => b - a); // long to short
+  let lmi = 0;
+  const ara = {};
+  for (const y of years) {
+    ara[y] = byYear[y].totalPI + lmi;
+    lmi += byYear[y].annInt;
+  }
+  return ara; // { year: rawARA }
+}
+
+// Derive per-year DARA from raw ARA map.
+// Bracket years (raw ARA > 1.5× median) are substituted with median to avoid
+// inflating the funded-year target with excess bracket bond P+I.
+// Returns { median, daraMap: Map<year, number> }.
+function derivePerYearDara(araByYear) {
+  const vals = Object.values(araByYear).filter(v => v > 0);
+  if (vals.length === 0) return { median: 0, daraMap: new Map() };
+  const sorted = [...vals].sort((a, b) => a - b);
+  const median = sorted[Math.floor(sorted.length / 2)];
+  const daraMap = new Map();
+  for (const [y, ara] of Object.entries(araByYear)) {
+    const year = parseInt(y);
+    const val  = ara > 1.5 * median ? median : ara;
+    daraMap.set(year, Math.round(val));
+  }
+  return { median: Math.round(median), daraMap };
+}
+
+// Populate _daraByYearStore from portfolio ARA, set DARA field to median, open panel.
+// Called after any file load or account selection in rebalance mode.
+function _initRebalDaraFromPortfolio() {
+  _daraByYearStore = new Map();
+  _daraByYearPanelDefault = null;
+  document.getElementById('dara').value = '';
+
+  if (currentMode !== 'rebalance' || !currentHoldingsArray || !tipsMap || !refCpiRows || !settlementDate) {
+    renderDaraByYearPanel();
+    return;
+  }
+  const rc = lookupRefCpi(refCpiRows, activeRefCpiDateStr ?? _defaultRefCpiDateStr);
+  if (!(rc > 0)) { renderDaraByYearPanel(); return; }
+
+  const rawARA = computePortfolioARAByYear(currentHoldingsArray, tipsMap, rc);
+  if (Object.keys(rawARA).length === 0) { renderDaraByYearPanel(); return; }
+
+  const { median, daraMap } = derivePerYearDara(rawARA);
+  _daraByYearStore = daraMap;
+  document.getElementById('dara').value = median;
+  renderDaraByYearPanel();  // opens panel with median as default, per-year values from store
+}
+
 // ─── File Parsing & State ─────────────────────────────────────────────────────
 let currentHoldingsArray = null;
 let brokerTipsValues = {}; // { accountName: valueOfTipsOnly }
@@ -1089,9 +1159,11 @@ document.getElementById('holdings-file').addEventListener('change', async (e) =>
   document.getElementById('multi-account-panel').style.display = 'none';
   document.getElementById('multi-account-feasibility').innerHTML = '';
   document.getElementById('multi-account-trade-tables').innerHTML = '';
-  // Clear all form fields to force re-inference from new holdings
+  // Clear all form fields and per-year DARA state for fresh file
   document.getElementById('dara').value = '';
   _daraAutoInferred = false;
+  _daraByYearStore = new Map();
+  _daraByYearPanelDefault = null;
   document.getElementById('rebal-last-year').value = '';
   document.getElementById('rebal-first-year').value = '';
   document.getElementById('account-list').innerHTML = ''; // Clear account modal content
@@ -1188,7 +1260,7 @@ document.getElementById('holdings-file').addEventListener('change', async (e) =>
     document.getElementById('rebal-first-year').value = '';
     updateRebalLastYearDropdown();
     updateRebalFirstYearDropdown();
-    renderDaraByYearPanel();
+    _initRebalDaraFromPortfolio();
   } catch (err) {
     setStatus('Error reading file: ' + err.message, true);
   }
@@ -1221,7 +1293,7 @@ document.getElementById('holdings-file').addEventListener('change', async (e) =>
     document.getElementById('rebal-first-year').value = '';
     updateRebalLastYearDropdown();
     updateRebalFirstYearDropdown();
-    renderDaraByYearPanel();
+    _initRebalDaraFromPortfolio();
     updateMultiAccountUI();
   });
   const clearAllBtn = document.getElementById('account-clear-all');
@@ -1858,22 +1930,18 @@ document.getElementById('run-btn').addEventListener('click', async () => {
       if (!currentHoldingsArray) { setStatus('Holdings required.', true); return; }
 
       let finalDara = _getDefaultDara();
-      if (!isNaN(finalDara) && finalDara < 1000) { setStatus('DARA must be at least $1,000.', true); return; }
-      if (document.getElementById('method').value === 'Full' && (isNaN(finalDara) || _daraAutoInferred)) {
-        const inferred = inferDARAFromCash({
-          bracketMode: document.getElementById('bracket-mode').value,
-          holdings: currentHoldingsArray,
-          tipsMap,
-          refCPI,
-          settlementDate,
-          lastYearOverride: parseInt(document.getElementById('rebal-last-year').value),
-          preLadderInterest: document.getElementById('pre-ladder-interest').checked,
-          firstYearOverride: parseInt(document.getElementById('rebal-first-year').value)
-        });
-        finalDara = Math.floor(inferred.dara);
-        document.getElementById('dara').value = finalDara;
-        _daraAutoInferred = true;
+      if (isNaN(finalDara) || finalDara <= 0) {
+        // No scalar entered — use panel default derived from portfolio ARA at file load
+        finalDara = _daraByYearPanelDefault;
+        if (!finalDara || isNaN(finalDara) || finalDara <= 0) {
+          setStatus('Load a holdings file to set DARA targets, or enter DARA manually.', true);
+          return;
+        }
       }
+      if (finalDara < 1000) { setStatus('DARA must be at least $1,000.', true); return; }
+      // Sync panel default so getDaraByYear() returns stored per-year values on this run
+      _daraByYearPanelDefault = finalDara;
+      updateDaraInput();
 
       // Check if multi-account mode is enabled
       const useMultiAccountMode = document.getElementById('multi-account-mode')?.checked && currentHoldingsWithAccounts && Object.keys(detectedAccounts).length > 1;
@@ -1933,7 +2001,7 @@ document.getElementById('run-btn').addEventListener('click', async () => {
         document.getElementById('val-term').textContent = (result.summary.lastYear - result.summary.firstYear + 1) + ' years';
       }
     }
-    _setDaraByYearCollapsed(true);
+    if (!_hasCustomDara()) _setDaraByYearCollapsed(true);
     updateDaraInput();
   } catch (err) {
     setStatus(err.message, true);
