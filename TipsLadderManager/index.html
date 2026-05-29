@@ -545,6 +545,9 @@ let activeRefCpiDateStr = null;
 let _defaultRefCpiDateStr = null;
 let _maxRefCpiDate = null;
 let _daraRebal = '', _daraBuild = '40000';
+// Per-mode per-year DARA state — saved/restored on mode switch so Build and Rebalance are fully independent
+let _daraByYearStoreRebal = new Map(), _daraByYearPanelDefaultRebal = null;
+let _daraByYearStoreBuild = new Map(), _daraByYearPanelDefaultBuild = null;
 const _infoPopups = {};
 let _rebalDurationRows = null, _buildDurationRows = null;
 let _rebalFuture30yDurationRows = null, _buildFuture30yDurationRows = null;
@@ -562,8 +565,17 @@ document.querySelectorAll('.tab-bar .tab-btn').forEach(btn => {
     const daraEl = document.getElementById('dara');
     daraEl.step        = '1000';
     daraEl.placeholder = isRebalance ? 'auto-infer' : '';
-    if (isRebalance) { _daraBuild = daraEl.value; daraEl.value = _daraRebal; }
-    else             { _daraRebal = daraEl.value; daraEl.value = _daraBuild || '10000'; }
+    if (isRebalance) {
+      _daraBuild = daraEl.value;
+      _daraByYearStoreBuild = _daraByYearStore; _daraByYearPanelDefaultBuild = _daraByYearPanelDefault;
+      daraEl.value = _daraRebal;
+      _daraByYearStore = _daraByYearStoreRebal; _daraByYearPanelDefault = _daraByYearPanelDefaultRebal;
+    } else {
+      _daraRebal = daraEl.value;
+      _daraByYearStoreRebal = _daraByYearStore; _daraByYearPanelDefaultRebal = _daraByYearPanelDefault;
+      daraEl.value = _daraBuild || '10000';
+      _daraByYearStore = _daraByYearStoreBuild; _daraByYearPanelDefault = _daraByYearPanelDefaultBuild;
+    }
     
     // Toggle field visibility
     document.getElementById('field-holdings').style.display = isRebalance ? '' : 'none';
@@ -603,6 +615,7 @@ document.querySelectorAll('.tab-bar .tab-btn').forEach(btn => {
     _renderWAD(_activeSummary?.weightedAvgDuration ?? 0, _activeSummary?.weightedAvgYield ?? 0);
 
     setStatus('');
+    renderDaraByYearPanel();
   });
 });
 
