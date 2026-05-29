@@ -255,9 +255,9 @@
         </div>
       </div>
       <div class="field" id="field-dara">
-        <label>DARA ($)</label>
+        <label>DARA – all yrs ($)</label>
         <div style="display:flex;align-items:center;gap:2px">
-          <input type="text" id="dara" placeholder="auto-infer" style="width:80px">
+          <input type="text" id="dara" placeholder="" style="width:80px">
           <div style="display:flex;flex-direction:column;gap:1px">
             <button type="button" id="dara-inc" title="+$1,000" style="font-size:9px;padding:0 5px;height:13px;line-height:1;border:1px solid #ccc;border-radius:2px 2px 0 0;background:#f8fafc;cursor:pointer;color:#475569">▲</button>
             <button type="button" id="dara-dec" title="-$1,000" style="font-size:9px;padding:0 5px;height:13px;line-height:1;border:1px solid #ccc;border-radius:0 0 2px 2px;background:#f8fafc;cursor:pointer;color:#475569">▼</button>
@@ -564,7 +564,6 @@ document.querySelectorAll('.tab-bar .tab-btn').forEach(btn => {
     const isRebalance = mode === 'rebalance';
     const daraEl = document.getElementById('dara');
     daraEl.step        = '1000';
-    daraEl.placeholder = isRebalance ? 'auto-infer' : '';
     if (isRebalance) {
       _daraBuild = daraEl.value;
       _daraByYearStoreBuild = _daraByYearStore; _daraByYearPanelDefaultBuild = _daraByYearPanelDefault;
@@ -1547,8 +1546,16 @@ document.getElementById('dara').addEventListener('focus', () => {
   }
 });
 
-// After user leaves the DARA field, re-evaluate 'by year' state
-document.getElementById('dara').addEventListener('blur', updateDaraInput);
+// When user leaves the DARA field with a valid value, apply it to all per-year entries
+document.getElementById('dara').addEventListener('blur', () => {
+  const val = parseFloat(document.getElementById('dara').value);
+  if (!isNaN(val) && val >= 1000) {
+    _daraByYearPanelDefault = val;
+    for (const [yr] of _daraByYearStore) _daraByYearStore.set(yr, val);
+    renderDaraByYearPanel();
+  }
+  updateDaraInput();
+});
 
 // Shared step logic for ▲/▼ buttons and ArrowUp/Down keys
 function _daraStep(delta) {
