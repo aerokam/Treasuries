@@ -446,7 +446,10 @@ export function inferDARAFromCash({ bracketMode = '2bracket', holdings: holdings
 // per-year map at that value. The caller (UI) shows per-year ARA info separately;
 // the default rebalance uses this uniform map so the cash constraint holds.
 // Users can edit individual years in the panel to customise (accepts non-zero net cash).
-export function inferScaledDARAFromPortfolio({ daraMap, median, holdings: holdingsRaw, tipsMap, refCPI, settlementDate, bracketMode = '2bracket', lastYearOverride = null, firstYearOverride = null }) {
+export function inferScaledDARAFromPortfolio({ daraMap, median: _median, holdings: holdingsRaw, tipsMap, refCPI, settlementDate, bracketMode = '2bracket', lastYearOverride = null, firstYearOverride = null }) {
+  // Compute median from daraMap if caller didn't provide it.
+  const _vals = [...daraMap.values()].filter(v => v > 0).sort((a, b) => a - b);
+  const median = _median ?? (_vals.length > 0 ? _vals[Math.floor(_vals.length / 2)] : 0);
   // Binary-search the median level at which the PROPORTIONAL per-year map is self-financing.
   // Each candidate uses daraByYear = { y: round(daraMap[y] * mid/median) } so the search
   // result is valid for the actual proportional run — not just a uniform-DARA approximation.
@@ -458,7 +461,9 @@ export function inferScaledDARAFromPortfolio({ daraMap, median, holdings: holdin
     const { summary } = runRebalance({ dara: mid, method: 'Full', bracketMode, holdings: holdingsRaw, tipsMap, refCPI, settlementDate, daraByYear: scaledMap, lastYearOverride, firstYearOverride });
     if (summary.costDeltaSum >= 0) { foundDARA = mid; lo = mid + 1; } else { hi = mid - 1; }
   }
-  return { scaledMedian: foundDARA };
+  const k = median > 0 ? foundDARA / median : 1;
+  const scaledMap = new Map([...daraMap.entries()].map(([y, v]) => [y, Math.round(v * k)]));
+  return { scaledMedian: foundDARA, scaledMap };
 }
 
 export function runRebalance({ dara, method, bracketMode = '2bracket', holdings: holdingsRaw, tipsMap, refCPI, settlementDate, daraByYear = null, lastYearOverride = null, preLadderInterest = false, firstYearOverride = null }) {

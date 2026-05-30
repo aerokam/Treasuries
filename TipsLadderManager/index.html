@@ -1117,18 +1117,17 @@ function _initRebalDaraFromPortfolio() {
   const rawARA = computePortfolioARAByYear(currentHoldingsArray, tipsMap, rc);
   if (Object.keys(rawARA).length === 0) { renderDaraByYearPanel(); return; }
 
-  const { median, daraMap } = derivePerYearDara(rawARA);
+  const { daraMap } = derivePerYearDara(rawARA);
 
-  // Binary-search the median that makes the proportional per-year map self-financing.
+  // Binary-search the equilibrium median; function computes median and returns scaledMap.
   const lastYearOverride = parseInt(document.getElementById('rebal-last-year').value) || undefined;
   const firstYearOverride = parseInt(document.getElementById('rebal-first-year').value) || undefined;
   const bracketMode = document.getElementById('bracket-mode').value;
-  const { scaledMedian } = inferScaledDARAFromPortfolio({
-    daraMap, median, holdings: currentHoldingsArray, tipsMap, refCPI: rc, settlementDate,
+  const { scaledMedian, scaledMap } = inferScaledDARAFromPortfolio({
+    daraMap, holdings: currentHoldingsArray, tipsMap, refCPI: rc, settlementDate,
     bracketMode, lastYearOverride, firstYearOverride,
   });
-  const k = median > 0 ? scaledMedian / median : 1;
-  _daraByYearStore = new Map([...daraMap.entries()].map(([y, v]) => [y, Math.round(v * k)]));
+  _daraByYearStore = scaledMap;
   document.getElementById('dara').value = scaledMedian;
   renderDaraByYearPanel();
 }
