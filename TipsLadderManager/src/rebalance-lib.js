@@ -785,13 +785,31 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
   const skipActualHoldingsYearsForGap = future30yYears.length > 0 ? new Set([future30yLowerYear, future30yUpperYear]) : new Set();
   const gapParams = calculateGapParameters(gapYears, settlementDate, refCPI, tipsMap, DARA, holdings, lastYear, isFullMode, future30yExtraLMI, pliCreditByGapYear, skipActualHoldingsYearsForGap, daraByYear);
 
+  const minGapYear = gapYears.length > 0 ? Math.min(...gapYears) : Infinity;
   const brackets  = identifyBrackets(gapYears, holdings, yearInfo, tipsMap, araByYear, DARA, firstYear);
+
+  // 2-bracket: lower bracket is always the canonical tipsMap lower (latest Jan TIPS below minGapYear,
+  // currently Jan 2036). identifyBrackets may return an older year (e.g. 2034) found via excess-ARA.
+  // Override it so bracketYearSet uses Jan 2036; the old year falls into rebalYearSet (Full mode
+  // rebuilds it to funded-year qty only, selling any excess).
+  if (bracketMode === '2bracket' && gapYears.length > 0) {
+    let canonCUSIP = null, canonYear = null, canonMaturity = null;
+    for (const bond of tipsMap.values()) {
+      if (!bond.maturity || !bond.yield) continue;
+      const yr = bond.maturity.getFullYear(), mo = bond.maturity.getMonth() + 1;
+      if (mo === 1 && yr < minGapYear && (!canonMaturity || yr > canonMaturity.getFullYear())) {
+        canonCUSIP = bond.cusip; canonYear = yr; canonMaturity = bond.maturity;
+      }
+    }
+    if (canonCUSIP) {
+      brackets.lowerCUSIP = canonCUSIP; brackets.lowerYear = canonYear; brackets.lowerMaturity = canonMaturity;
+    }
+  }
+
   const lowerBond = brackets.lowerCUSIP ? tipsMap.get(brackets.lowerCUSIP) : null;
   const upperBond = brackets.upperCUSIP ? tipsMap.get(brackets.upperCUSIP) : null;
   const lowerDuration = brackets.lowerMaturity ? calculateMDuration(settlementDate, brackets.lowerMaturity, lowerBond?.coupon ?? 0, lowerBond?.yield ?? 0) : 0;
   const upperDuration = brackets.upperMaturity ? calculateMDuration(settlementDate, brackets.upperMaturity, upperBond?.coupon ?? 0, upperBond?.yield ?? 0) : 0;
-  
-  const minGapYear = gapYears.length > 0 ? Math.min(...gapYears) : Infinity;
   // 3-bracket requires a distinct orig-lower vs new-lower; when firstYear is inside the gap
   // (e.g. 2038/2039), minGapYear = firstYear, so the nearest pre-gap Jan TIPS is Jan 2036 for
   // both orig-lower (from identifyBrackets fallback) and new-lower → same year → auto-degrades below.
@@ -830,8 +848,8 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
   const gapYearSet    = new Set(gapYears);
   const future30yYearSet = new Set(future30yYears);
 
-  // LMI-based FY estimate for ALL standard gap bracket years.
-  // Used for: (a) 3-bracket w1 weight via originalLowerExcessCost; (b) exB fallback for broker CSVs.
+  // LMI-based FY estimate for ALL standard gap bracket years (funded-year qty, not total).
+  // Used for computing current excess = totalQty - fundedYearQty for bracket priority logic.
   // Future30y cover years skipped — they have no funded-year component.
   const bracketTargetFundedYearQtyBefore = {};
   if (gapYears.length > 0) {
@@ -874,34 +892,55 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
 
   let lowerWeight = 0, upperWeight = 0, origLowerWeight = null, newLowerWeight3 = null, upperWeight3 = null;
   let bracketFellBack3to2 = false;
+  const bracketExcessTargetCost = {};
   if (gapYears.length > 0) {
     if (is3Bracket) {
-      const originalLowerHolding = yearInfo[brackets.lowerYear]?.holdings?.find(h => h.cusip === brackets.lowerCUSIP);
-      const originalLowerBond = tipsMap.get(brackets.lowerCUSIP);
-      const ir = refCPI / (originalLowerBond?.baseCpi ?? refCPI);
-      const originalLowerCostPerBond = (originalLowerBond?.price ?? 0) / 100 * ir * 1000;
-      const originalLowerExcessCost = Math.max(0, (originalLowerHolding?.qty ?? 0) - (bracketTargetFundedYearQtyBefore[brackets.lowerYear] ?? 0)) * originalLowerCostPerBond;
+      // 3-bracket lower bracket target: use newLower (2036) duration for 2-bracket formula.
+      // This is the optimal cost if 2036 were the sole lower bracket.
+      const { lowerWeight: lw_nl, upperWeight: uw_nl } = bracketWeights(newLowerDuration, upperDuration, gapParams.avgDuration);
+      lowerWeight = lw_nl; upperWeight = uw_nl; upperWeight3 = uw_nl;
+      const targetLowerCost = gapParams.totalCost * lw_nl;
 
-      const weights3Bracket = bracketWeights3(lowerDuration, newLowerDuration, upperDuration, gapParams.avgDuration, originalLowerExcessCost, gapParams.totalCost);
-      if (weights3Bracket.cappedToOptimal || weights3Bracket.origLowerWeight > 1) {
-        // Orig lower already sufficient for duration matching — degrade to pure 2-bracket.
-        // is3Bracket = false forces ALL downstream paths (bracketYearSet, bracketExcessTargetCost,
-        // Phase 4 sweep) through identical 2-bracket logic, guaranteeing equal results.
-        is3Bracket = false;
-        newLowerYear = null; newLowerCUSIP = null; newLowerMaturity = null; newLowerDuration = 0;
-        bracketYearSet.clear();
-        if (brackets.lowerYear != null) bracketYearSet.add(brackets.lowerYear);
-        if (brackets.upperYear != null) bracketYearSet.add(brackets.upperYear);
-        for (const y of future30yCoverYearSet) bracketYearSet.add(y);
-        if (weights3Bracket.origLowerWeight > 1) bracketFellBack3to2 = true;
+      // Current excess cost for orig lower (2034).
+      const _olBond = tipsMap.get(brackets.lowerCUSIP);
+      const _olIR   = refCPI / (_olBond?.baseCpi ?? refCPI);
+      const _olCPB  = (_olBond?.price ?? 0) / 100 * _olIR * 1000;
+      const _olH    = yearInfo[brackets.lowerYear]?.holdings?.find(h => h.cusip === brackets.lowerCUSIP);
+      const _olCurrentExcessCost = Math.max(0, (_olH?.qty ?? 0) - (bracketTargetFundedYearQtyBefore[brackets.lowerYear] ?? 0)) * _olCPB;
+
+      // Current excess cost for new lower (2036).
+      const _nlBondObj = tipsMap.get(newLowerCUSIP);
+      const _nlIR      = refCPI / (_nlBondObj?.baseCpi ?? refCPI);
+      const _nlCPB     = (_nlBondObj?.price ?? 0) / 100 * _nlIR * 1000;
+      const _nlH       = yearInfo[newLowerYear]?.holdings?.find(h => h.cusip === newLowerCUSIP);
+      const _nlCurrentExcessCost = Math.max(0, (_nlH?.qty ?? 0) - (bracketTargetFundedYearQtyBefore[newLowerYear] ?? 0)) * _nlCPB;
+
+      let olTargetCost, nlTargetCost;
+      if (_olCurrentExcessCost + _nlCurrentExcessCost > targetLowerCost) {
+        // Over-allocated: sell orig lower (2034) first; only sell new lower (2036) if still over.
+        const overage    = _olCurrentExcessCost + _nlCurrentExcessCost - targetLowerCost;
+        const sellFromOL = Math.min(_olCurrentExcessCost, overage);
+        olTargetCost     = Math.max(0, _olCurrentExcessCost - sellFromOL);
+        nlTargetCost     = Math.max(0, _nlCurrentExcessCost - (overage - sellFromOL));
       } else {
-        origLowerWeight = weights3Bracket.origLowerWeight; newLowerWeight3 = weights3Bracket.newLowerWeight; upperWeight3 = weights3Bracket.upperWeight;
-        lowerWeight = origLowerWeight; upperWeight = upperWeight3;
+        // Under-allocated: freeze orig lower at current; buy new lower to cover remainder.
+        olTargetCost = _olCurrentExcessCost;
+        nlTargetCost = Math.max(0, targetLowerCost - _olCurrentExcessCost);
       }
+
+      bracketExcessTargetCost[brackets.lowerYear] = olTargetCost;
+      bracketExcessTargetCost[newLowerYear]        = nlTargetCost;
+      bracketExcessTargetCost[brackets.upperYear]  = gapParams.totalCost * uw_nl;
+
+      // Effective weights for summary reporting.
+      origLowerWeight = gapParams.totalCost > 0 ? olTargetCost / gapParams.totalCost : 0;
+      newLowerWeight3 = gapParams.totalCost > 0 ? nlTargetCost / gapParams.totalCost : 0;
     }
     if (!is3Bracket) {
       const weights2Bracket = bracketWeights(lowerDuration, upperDuration, gapParams.avgDuration);
       lowerWeight = weights2Bracket.lowerWeight; upperWeight = weights2Bracket.upperWeight;
+      if (brackets.lowerYear != null) bracketExcessTargetCost[brackets.lowerYear] = gapParams.totalCost * lowerWeight;
+      bracketExcessTargetCost[brackets.upperYear] = gapParams.totalCost * upperWeight;
     }
   }
 
@@ -925,23 +964,6 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
   if (future30yUpperExQty > 0) {
     for (let y = firstYear; y <= 2036 && y <= lastYear; y++) {
       if (!bracketYearSet.has(y) && !gapYearSet.has(y) && !future30yYearSet.has(y)) rebalYearSet.add(y);
-    }
-  }
-
-  const bracketExcessTargetCost = {};
-  if (gapYears.length > 0) {
-    if (is3Bracket) {
-      const w1 = origLowerWeight ?? 0, w2 = newLowerWeight3 ?? 0, w3 = upperWeight3 ?? 0;
-      bracketExcessTargetCost[brackets.lowerYear] = (bracketExcessTargetCost[brackets.lowerYear] || 0) + gapParams.totalCost * w1;
-      bracketExcessTargetCost[newLowerYear]       = (bracketExcessTargetCost[newLowerYear] || 0) + gapParams.totalCost * w2;
-      bracketExcessTargetCost[brackets.upperYear] = (bracketExcessTargetCost[brackets.upperYear] || 0) + gapParams.totalCost * w3;
-      // Update summary weights to reflect the sum if they share a year
-      if (brackets.lowerYear === newLowerYear) {
-        lowerWeight = w1 + w2;
-      }
-    } else {
-      if (brackets.lowerYear != null) bracketExcessTargetCost[brackets.lowerYear] = gapParams.totalCost * lowerWeight;
-      bracketExcessTargetCost[brackets.upperYear] = gapParams.totalCost * upperWeight;
     }
   }
 
@@ -1015,15 +1037,7 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
       // 1. Determine target excess quantity for this bracket/rebal year
       let excessQtyTarget = 0;
       if (isBracket) {
-        if (is3Bracket && year === brackets.lowerYear) {
-          // 3-bracket orig lower: freeze only when current excess is UNDER the duration-optimal target
-          // (new lower will fill the gap). When at or above optimal, sell to optimal — same as 2-bracket.
-          // The freeze prevents selling the orig lower to fund the new lower; it does not block selling
-          // when the orig lower itself holds more than duration matching requires.
-          const _currentExcess  = Math.max(0, targetCurrentQty - (bracketTargetFundedYearQtyBefore[year] ?? 0));
-          const _optimalExcess  = costPerBond > 0 ? Math.max(0, Math.round((bracketExcessTargetCost[year] || 0) / costPerBond)) : 0;
-          excessQtyTarget = Math.min(_currentExcess, _optimalExcess);
-        } else if (future30yYears.length > 0 && year === future30yUpperYear) {
+        if (future30yYears.length > 0 && year === future30yUpperYear) {
           // Use precomputed UNADJ-based excess qty directly (matches build-lib)
           excessQtyTarget = future30yUpperExQty;
         } else if (future30yYears.length > 0 && year === future30yLowerYear) {

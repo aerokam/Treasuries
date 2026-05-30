@@ -160,7 +160,7 @@
     <h3 style="font-size:13px;margin:16px 0 6px;border-bottom:1px solid #eee;padding-bottom:4px;">Mode: Rebalance</h3>
     <p>For existing TIPS ladder holders. Sells excess bracket TIPS and buys into newly available maturities (former gap years). Support for extending the ladder beyond 2040 is included.</p>
     <p><b>Last Year</b> — Automatically detected from holdings. If your last maturity is 2040, it defaults to 2040 (or the last gap year, 2039). If your holdings end before 2040, that year is used. You can override this to extend the ladder to 2041+; the tool will identify the appropriate TIPS for those years automatically.</p>
-    <p><b>Brackets</b> — <i>2-bracket</i>: standard lower + upper split (lower bracket = TIPS with most holdings before the gap). <i>3-bracket</i>: original lower bracket excess is frozen; a new lower bracket (latest Jan 10-year TIPS before the gap) is bought to supplement, allowing a more duration-efficient split. Use when the new lower TIPS now exists and you want to minimize disturbance to your existing lower holdings.</p>
+    <p><b>Brackets</b> — <i>2-bracket</i>: always uses the latest Jan 10-year TIPS before the gap (Jan 2036) as the lower bracket; any older lower bracket holdings (e.g. Jan 2034) become regular funded years and their full excess is sold. <i>3-bracket</i> (default): lower bracket excess is managed with a priority rule — when over-allocated, Jan 2034 excess is sold first, and Jan 2036 excess only if still over target; when under-allocated, Jan 2034 is frozen at current and Jan 2036 is bought to fill the gap. Jan 2034 excess is never increased. Click the <b>?</b> next to the Brackets selector for a quick comparison.</p>
     <p><b>Holdings CSV</b> — Two columns: <code>cusip</code> and <code>qty</code>. A sample is pre-filled when you click the file input.</p>
     <pre style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:4px;padding:8px;font-size:12px;margin:6px 0;">cusip,qty
 912828S50,50
@@ -282,10 +282,13 @@
       <input type="hidden" id="method" value="Full">
 <div class="field" id="field-bracket-mode">
         <label>Brackets</label>
-        <select id="bracket-mode">
-          <option value="2bracket">2-bracket</option>
-          <option value="3bracket" selected>3-bracket</option>
-        </select>
+        <div style="display:flex;align-items:center;gap:4px">
+          <select id="bracket-mode">
+            <option value="2bracket">2-bracket</option>
+            <option value="3bracket" selected>3-bracket</option>
+          </select>
+          <button id="bracket-mode-help" style="background:none;border:1px solid #64748b;border-radius:50%;width:16px;height:16px;font-size:10px;color:#64748b;cursor:pointer;padding:0;line-height:1;flex-shrink:0" title="Bracket mode help">?</button>
+        </div>
       </div>
       <div class="field" id="field-multi-account-mode" style="display:none">
         <label style="white-space:nowrap" title="Allocate ladder across multiple accounts by tax preference">Multi-Acct</label>
@@ -421,6 +424,17 @@ const tableEl  = document.getElementById('build-table');
 // ─── Help modal ───────────────────────────────────────────────────────────────
 document.getElementById('help-btn').addEventListener('click', () => {
   document.getElementById('help-overlay').style.display = 'block';
+});
+
+document.getElementById('bracket-mode-help').addEventListener('click', e => {
+  e.stopPropagation();
+  showPopup(e.currentTarget, 'Bracket Mode', [
+    { heading: '2-bracket' },
+    { html: '<b>Lower bracket:</b> always the latest Jan 10-year TIPS before the gap (currently Jan 2036).<br>Any older lower bracket holdings (e.g. Jan 2034) become regular funded years — their excess is sold and the bracket role moves to Jan 2036.' },
+    { sep: true },
+    { heading: '3-bracket (default)' },
+    { html: 'Lower bracket excess from Jan 2034 and Jan 2036 is managed with a priority rule:<br><b>Over-allocated:</b> sell Jan 2034 excess first; only sell Jan 2036 if still over target after depleting Jan 2034.<br><b>Under-allocated:</b> buy Jan 2036; Jan 2034 is frozen at current excess and never increased.<br>Use when you hold Jan 2034 holdings you want to keep until duration math forces a sell.' },
+  ]);
 });
 document.getElementById('help-close').addEventListener('click', () => {
   document.getElementById('help-overlay').style.display = 'none';
@@ -1067,10 +1081,12 @@ function computePortfolioARAByYear(holdingsArr, tipsMap, refCPI) {
     const m = b.maturity.getMonth() + 1;
     const nPay = m < 7 ? 1 : 2;  // Jan-Jun: 1 final coupon; Jul-Dec: 2
     const piPB = 1000 * ir * (1 + (b.coupon ?? 0) * 0.5 * nPay);
-    const annInt = h.qty * 1000 * ir * (b.coupon ?? 0);
+    // Use funded qty only for this year's P+I — excess bonds' P+I inflates the ARA target.
+    // Keep full qty for annual interest (LMI flowing to earlier years remains correct).
+    const fundedQty = (h.excessQty != null) ? Math.max(0, h.qty - h.excessQty) : h.qty;
     if (!byYear[year]) byYear[year] = { totalPI: 0, annInt: 0 };
-    byYear[year].totalPI += h.qty * piPB;
-    byYear[year].annInt  += annInt;
+    byYear[year].totalPI += fundedQty * piPB;
+    byYear[year].annInt  += h.qty * 1000 * ir * (b.coupon ?? 0);
   }
   const years = Object.keys(byYear).map(Number).sort((a, b) => b - a); // long to short
   let lmi = 0;
@@ -1099,7 +1115,18 @@ function _getGapYearBracketCandidates() {
   if (gapYears.length === 0) return new Set();
   const minGap = Math.min(...gapYears);
   const maxGap = Math.max(...gapYears);
-  return new Set([minGap - 1, maxGap + 1]);
+  // Upper bracket is always maxGap+1 (2040).
+  // Lower bracket candidates: any Jan TIPS year in [2032, minGap) — the range of years that could
+  // have served as an old lower bracket. Holdings in these years with ARA > 1.5× median are
+  // auto-capped to median (assumed bracket excess, not intentional higher income).
+  const LOWEST_LOWER = 2032;
+  const candidates = new Set([maxGap + 1]);
+  for (const b of tipsMap.values()) {
+    if (!b.maturity) continue;
+    const yr = b.maturity.getFullYear(), mo = b.maturity.getMonth() + 1;
+    if (mo === 1 && yr >= LOWEST_LOWER && yr < minGap) candidates.add(yr);
+  }
+  return candidates;
 }
 
 // Derive per-year DARA from raw ARA map.
@@ -1108,16 +1135,21 @@ function _getGapYearBracketCandidates() {
 // Returns { median, daraMap: Map<year, number> }.
 function derivePerYearDara(araByYear, bracketCandidates = new Set()) {
   const vals = Object.values(araByYear).filter(v => v > 0);
-  if (vals.length === 0) return { median: 0, daraMap: new Map() };
+  if (vals.length === 0) return { median: 0, daraMap: new Map(), autoCappedYears: new Set() };
   const sorted = [...vals].sort((a, b) => a - b);
   const median = sorted[Math.floor(sorted.length / 2)];
   const daraMap = new Map();
+  const autoCappedYears = new Set();
   for (const [y, ara] of Object.entries(araByYear)) {
     const year = parseInt(y);
-    const val  = (bracketCandidates.has(year) && ara > 1.5 * median) ? median : ara;
-    daraMap.set(year, Math.round(val));
+    if (bracketCandidates.has(year) && ara > 1.5 * median) {
+      daraMap.set(year, Math.round(median));
+      autoCappedYears.add(year);
+    } else {
+      daraMap.set(year, Math.round(ara));
+    }
   }
-  return { median: Math.round(median), daraMap };
+  return { median: Math.round(median), daraMap, autoCappedYears };
 }
 
 // Populate _daraByYearStore from portfolio ARA, scaled so Full rebalance is self-financing.
@@ -1125,6 +1157,7 @@ function derivePerYearDara(araByYear, bracketCandidates = new Set()) {
 function _initRebalDaraFromPortfolio() {
   _daraByYearStore = new Map();
   _daraByYearPanelDefault = null;
+  _bracketAutoCapYears = new Set();
   document.getElementById('dara').value = '';
 
   if (currentMode !== 'rebalance' || !currentHoldingsArray || !tipsMap || !refCpiRows || !settlementDate) {
@@ -1138,7 +1171,8 @@ function _initRebalDaraFromPortfolio() {
   if (Object.keys(rawARA).length === 0) { renderDaraByYearPanel(); return; }
 
   const bracketCandidates = _getGapYearBracketCandidates();
-  const { daraMap } = derivePerYearDara(rawARA, bracketCandidates);
+  const { daraMap, autoCappedYears } = derivePerYearDara(rawARA, bracketCandidates);
+  _bracketAutoCapYears = autoCappedYears;
 
   // Binary-search the equilibrium median; function computes median and returns scaledMap.
   const lastYearOverride = parseInt(document.getElementById('rebal-last-year').value) || undefined;
@@ -1189,6 +1223,7 @@ document.getElementById('holdings-file').addEventListener('change', async (e) =>
   _daraAutoInferred = false;
   _daraByYearStore = new Map();
   _daraByYearPanelDefault = null;
+  _bracketAutoCapYears = new Set();
   document.getElementById('rebal-last-year').value = '';
   document.getElementById('rebal-first-year').value = '';
   document.getElementById('account-list').innerHTML = ''; // Clear account modal content
@@ -1420,6 +1455,7 @@ let _drillDragging = false;
 // ─── Per-year DARA panel ──────────────────────────────────────────────────────
 let _daraByYearPanelDefault = null;
 let _daraByYearStore = new Map();  // year → value; persists across year-range changes
+let _bracketAutoCapYears = new Set();  // years auto-capped to median (bracket excess detected)
 let _lastKnownDara = null;          // last DARA used (including auto-inferred)
 let _daraAutoInferred = false;      // true when DARA field was populated by inferDARAFromCash
 let _daraByYearBodyCollapsed = true;
@@ -1432,10 +1468,13 @@ function _setDaraByYearCollapsed(collapsed) {
   if (glyph) glyph.textContent   = collapsed ? '▶' : '▼';
 }
 
-function _daraByYearRow(y, val, suffix = '') {
+function _daraByYearRow(y, val, suffix = '', bracketFlag = false) {
+  const flagHTML = bracketFlag
+    ? ' <span title="Auto-set to median: holdings suggest bracket excess. Adjust if this year is intended for higher income." style="color:#d97706;cursor:help;font-size:10px">⚠</span>'
+    : '';
   const label = suffix
-    ? y + ' <span style="color:#94a3b8;font-size:10px;font-style:italic">' + suffix + '</span>'
-    : String(y);
+    ? y + flagHTML + ' <span style="color:#94a3b8;font-size:10px;font-style:italic">' + suffix + '</span>'
+    : y + flagHTML;
   return '<tr><td style="text-align:center">' + label + '</td>'
     + '<td style="text-align:right"><input type="number" value="' + Math.round(val) + '" step="1000" min="0" data-year="' + y + '"'
     + ' style="width:100px;text-align:right;border:1px solid #ccc;border-radius:3px;padding:2px 4px;font-size:12px;font-variant-numeric:tabular-nums"></td></tr>';
@@ -1515,7 +1554,7 @@ function renderDaraByYearPanel() {
 
   const tableEl = document.getElementById('dara-by-year-table');
   tableEl.innerHTML = '<thead><tr><th>Year</th><th>DARA ($)</th></tr></thead><tbody>'
-    + yearEntries.map(({ year: y, suffix }) => _daraByYearRow(y, _daraByYearStore.get(y) ?? defaultDara, suffix)).join('')
+    + yearEntries.map(({ year: y, suffix }) => _daraByYearRow(y, _daraByYearStore.get(y) ?? defaultDara, suffix, _bracketAutoCapYears.has(y))).join('')
     + '</tbody>';
 
   _daraByYearPanelDefault = defaultDara;
