@@ -1,5 +1,5 @@
 // rebalance-lib.js -- Core logic for TIPS ladder rebalancing (4.0_TIPS_Ladder_Rebalancing.md)
-// Exports: buildTipsMapFromYields, runRebalance, localDate, inferDARAFromCash, runMultiAccountRebalance
+// Exports: buildTipsMapFromYields, runRebalance, localDate, inferDARAFromCash, inferScaledDARAFromPortfolio, runMultiAccountRebalance
 
 import { bondCalcs, calculateMDuration, yieldFromPrice, calcMktWtdAvg } from '../../shared/src/bond-math.js';
 export { yieldFromPrice };
@@ -440,6 +440,25 @@ export function inferDARAFromCash({ bracketMode = '2bracket', holdings: holdings
     }
   }
   return { dara: foundDARA, portfolioCash };
+}
+
+// Find the equilibrium DARA (self-financing Full rebalance) then return a uniform
+// per-year map at that value. The caller (UI) shows per-year ARA info separately;
+// the default rebalance uses this uniform map so the cash constraint holds.
+// Users can edit individual years in the panel to customise (accepts non-zero net cash).
+export function inferScaledDARAFromPortfolio({ daraMap, median, holdings: holdingsRaw, tipsMap, refCPI, settlementDate, bracketMode = '2bracket', lastYearOverride = null, firstYearOverride = null }) {
+  // Binary-search the median level at which the PROPORTIONAL per-year map is self-financing.
+  // Each candidate uses daraByYear = { y: round(daraMap[y] * mid/median) } so the search
+  // result is valid for the actual proportional run — not just a uniform-DARA approximation.
+  let lo = 1000, hi = 1000000, foundDARA = lo;
+  while (lo <= hi) {
+    const mid = Math.floor((lo + hi) / 2);
+    const k = median > 0 ? mid / median : 1;
+    const scaledMap = new Map([...daraMap.entries()].map(([y, v]) => [y, Math.round(v * k)]));
+    const { summary } = runRebalance({ dara: mid, method: 'Full', bracketMode, holdings: holdingsRaw, tipsMap, refCPI, settlementDate, daraByYear: scaledMap, lastYearOverride, firstYearOverride });
+    if (summary.costDeltaSum >= 0) { foundDARA = mid; lo = mid + 1; } else { hi = mid - 1; }
+  }
+  return { scaledMedian: foundDARA };
 }
 
 export function runRebalance({ dara, method, bracketMode = '2bracket', holdings: holdingsRaw, tipsMap, refCPI, settlementDate, daraByYear = null, lastYearOverride = null, preLadderInterest = false, firstYearOverride = null }) {

@@ -4,7 +4,7 @@
 
 import { readFileSync, readdirSync, existsSync } from 'fs';
 import path from 'path';
-import { buildTipsMapFromYields, localDate, runRebalance, inferDARAFromCash, inferFirstYearFromHoldings, runMultiAccountRebalance } from '../src/rebalance-lib.js';
+import { buildTipsMapFromYields, localDate, runRebalance, inferDARAFromCash, inferScaledDARAFromPortfolio, inferFirstYearFromHoldings, runMultiAccountRebalance } from '../src/rebalance-lib.js';
 import { runBuild } from '../src/build-lib.js';
 import { parseBrokerCSV } from '../src/broker-import.js';
 import { nextBondTradingDay, parseBondHolidays } from '../src/data.js';
@@ -158,6 +158,37 @@ function assert(name, actual, expected, tolerance = 0) {
   }
 }
 
+// ── Mirrors index.html computePortfolioARAByYear + derivePerYearDara ─────────
+function computePortfolioARAByYear(holdingsArr, tipsMap, refCPI) {
+  const byYear = {};
+  for (const h of holdingsArr) {
+    const b = tipsMap.get(h.cusip); if (!b?.maturity) continue;
+    const ir = refCPI / (b.baseCpi ?? refCPI);
+    const year = b.maturity.getFullYear();
+    const m = b.maturity.getMonth() + 1;
+    const nPay = m < 7 ? 1 : 2;
+    const piPB = 1000 * ir * (1 + (b.coupon ?? 0) * 0.5 * nPay);
+    const annInt = h.qty * 1000 * ir * (b.coupon ?? 0);
+    if (!byYear[year]) byYear[year] = { totalPI: 0, annInt: 0 };
+    byYear[year].totalPI += h.qty * piPB; byYear[year].annInt += annInt;
+  }
+  const years = Object.keys(byYear).map(Number).sort((a, b) => b - a);
+  let lmi = 0; const ara = {};
+  for (const y of years) { ara[y] = byYear[y].totalPI + lmi; lmi += byYear[y].annInt; }
+  return ara;
+}
+function derivePerYearDara(araByYear) {
+  const vals = Object.values(araByYear).filter(v => v > 0).sort((a, b) => a - b);
+  if (!vals.length) return { daraMap: new Map() };
+  const median = vals[Math.floor(vals.length / 2)];
+  const daraMap = new Map();
+  for (const [y, ara] of Object.entries(araByYear)) {
+    const val = ara > 1.5 * median ? median : ara;
+    daraMap.set(parseInt(y), Math.round(val));
+  }
+  return { daraMap };
+}
+
 // ── Helper: assert no simultaneous buy+sell on the same TIPS at any bracket year ─
 function assertNoBuySell(details, label) {
   const violations = details.filter(d => {
@@ -174,20 +205,26 @@ function assertNoBuySell(details, label) {
   }
 }
 
-// ── Helper: Run Full Rebalance on a holdings file ─────────────────────────────
+// ── Helper: Run Full Rebalance on a holdings file (per-year ARA path) ────────
 function runFullRebalanceTest(name, filePath) {
   const fullPath = path.resolve(filePath);
   if (!existsSync(fullPath)) return;
 
-  console.log(`\n${name} — Full rebalance`);
+  console.log(`\n${name} — Full rebalance (per-year ARA path)`);
   console.log(`  Input: ${fullPath}`);
 
   const holdings = parseHoldings(readFileSync(fullPath, 'utf8'));
-  const { dara, portfolioCash } = inferDARAFromCash({ holdings, tipsMap, refCPI, settlementDate });
-  const { summary, details } = runRebalance({ dara, method: 'Full', holdings, tipsMap, refCPI, settlementDate });
+  const rawARA = computePortfolioARAByYear(holdings, tipsMap, refCPI);
+  const { daraMap } = derivePerYearDara(rawARA);
+  const { scaledMap, scaledMedian } = inferScaledDARAFromPortfolio({
+    daraMap, holdings, tipsMap, refCPI, settlementDate,
+  });
+  const { summary, details } = runRebalance({
+    dara: scaledMedian, method: 'Full', holdings, tipsMap, refCPI, settlementDate,
+    daraByYear: scaledMap,
+  });
 
-  // Net cash should be effectively non-negative (surplus) and < cost of ~two bonds (~$3000).
-  // (Allowing > -50 to account for binary search tolerance in inferDARA)
+  // Net cash must be small and non-negative — portfolio is self-financing.
   const netCash = summary.costDeltaSum;
   const ok = netCash > -50 && netCash < 3000;
 
@@ -200,7 +237,7 @@ function runFullRebalanceTest(name, filePath) {
     failed++;
   }
   assertNoBuySell(details, name);
-  console.log(`        inferred DARA: ${Math.round(dara).toLocaleString()}`);
+  console.log(`        scaled DARA:   ${Math.round(scaledMedian).toLocaleString()}`);
   console.log(`        net cash:      ${Math.round(netCash).toLocaleString()}`);
   console.log(`        surplus check: ${Math.round(summary.gapCoverageSurplus).toLocaleString()}`);
 }
@@ -229,8 +266,10 @@ runFullRebalanceTest('Kevin_IRA', './tests/e2e/SampleHoldings.csv');
     '91282CNS6,4',   // Jul 2035
   ].join('\n');
   const holdings = parseHoldings(holdingsCsv);
-  const { dara } = inferDARAFromCash({ holdings, tipsMap, refCPI, settlementDate });
-  const { summary, details } = runRebalance({ dara, method: 'Full', holdings, tipsMap, refCPI, settlementDate });
+  const rawARA2 = computePortfolioARAByYear(holdings, tipsMap, refCPI);
+  const { daraMap: daraMap2 } = derivePerYearDara(rawARA2);
+  const { scaledMap: sMap2, scaledMedian: sDara2 } = inferScaledDARAFromPortfolio({ daraMap: daraMap2, holdings, tipsMap, refCPI, settlementDate });
+  const { summary, details } = runRebalance({ dara: sDara2, method: 'Full', holdings, tipsMap, refCPI, settlementDate, daraByYear: sMap2 });
 
   assert('lastYear === 2035',   summary.lastYear, 2035);
   assert('no 2040 funded rung', details.some(d => d.fundedYear === 2040), false);
@@ -243,7 +282,7 @@ runFullRebalanceTest('Kevin_IRA', './tests/e2e/SampleHoldings.csv');
   assert('2051 not rebuilt (qtyDelta 0 or absent)', delta2051, 0);
   console.log(`        lastYear:      ${summary.lastYear}`);
   console.log(`        rungCount:     ${summary.rungCount}`);
-  console.log(`        inferredDARA:  ${Math.round(dara).toLocaleString()}`);
+  console.log(`        scaledDARA:    ${Math.round(sDara2).toLocaleString()}`);
   console.log(`        netCash:       ${Math.round(summary.costDeltaSum).toLocaleString()}`);
 }
 

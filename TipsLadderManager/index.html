@@ -166,8 +166,7 @@
 912828S50,50
 91282CEJ6,30
 912810QF8,100</pre>
-    <p><b>DARA</b> — Leave blank to auto-infer from holdings. After entering a value, a per-year table appears where you can set a different target for individual funded years. The DARA field shows <b style="color:#7c3aed">by year</b> when any year's target differs from the default.</p>
-    <p><b>Method</b> — <i>Gap</i>: rebalances only the bracket years and previous gap years (sells excess from brackets, buys into previous gap years). <i>Full</i>: rebalances all rungs across the full contiguous ladder range.</p>
+    <p><b>DARA</b> — Target annual real amount. Auto-computed from holdings on file load (equilibrium value that makes the rebalance self-financing). After loading, a per-year table lets you override individual year targets — changes may result in non-zero net cash. The DARA field shows <b style="color:#7c3aed">by year</b> when any year's target differs from the default.</p>
     <p><b>Net Cash</b> — Net proceeds (sells minus buys). Negative = net purchase.</p>
 
     <h3 style="font-size:13px;margin:16px 0 6px;border-bottom:1px solid #eee;padding-bottom:4px;">Mode: Build</h3>
@@ -280,14 +279,8 @@
         <label>Last Year</label>
         <select id="last-year"><option value="">—</option></select>
       </div>
-      <div class="field" id="field-method" style="width:72px">
-        <label>Method</label>
-        <select id="method">
-          <option value="Gap">Gap</option>
-          <option value="Full" selected>Full</option>
-        </select>
-      </div>
-      <div class="field" id="field-bracket-mode">
+      <input type="hidden" id="method" value="Full">
+<div class="field" id="field-bracket-mode">
         <label>Brackets</label>
         <select id="bracket-mode">
           <option value="2bracket">2-bracket</option>
@@ -410,7 +403,7 @@
 </div>
 
 <script type="module">
-import { buildTipsMapFromYields, localDate, runRebalance, runMultiAccountRebalance, inferDARAFromCash, inferFirstYearFromHoldings, yieldFromPrice, fmtDate } from './src/rebalance-lib.js';
+import { buildTipsMapFromYields, localDate, runRebalance, runMultiAccountRebalance, inferScaledDARAFromPortfolio, inferFirstYearFromHoldings, yieldFromPrice, fmtDate } from './src/rebalance-lib.js';
 import { runBuild, MAX_LAST_YEAR } from './src/build-lib.js';
 import { renderTable, COLS } from './src/render.js';
 import { buildDrillHTML, buildDurationPopupRows, buildFuture30yDurationPopupRows, buildIndexRatioDrill, buildRefCpiDrill, buildPIPerBondDrill } from './src/drill.js';
@@ -578,7 +571,7 @@ document.querySelectorAll('.tab-bar .tab-btn').forEach(btn => {
     
     // Toggle field visibility
     document.getElementById('field-holdings').style.display = isRebalance ? '' : 'none';
-    document.getElementById('field-method').style.display = isRebalance ? '' : 'none';
+
     document.getElementById('field-bracket-mode').style.display = isRebalance ? '' : 'none';
     document.getElementById('field-build-maturity').style.display = isRebalance ? 'none' : '';
     
@@ -839,11 +832,8 @@ function renderOutput({ results, HDR, summary, details }, portfolioCash = null) 
     document.getElementById('net-cash-inline').style.display = 'flex';
     _infoPopups.range = [
     { label: 'Range', value: firstYear + '–' + lastYear + ' (' + rungCount + ' rungs)' },
-    { label: 'Method', value: method },
     { sep: true },
-    { label: method === 'Gap'
-        ? 'Bracket years and former gap years rebalanced; other rungs unchanged.'
-        : 'All contiguous rungs in this range are rebalanced.' },
+    { label: 'All contiguous rungs in this range are rebalanced.' },
   ];
     _rebalDurationRows = buildDurationPopupRows(summary, 'rebal');
     _infoPopups.duration = _rebalDurationRows;
@@ -863,6 +853,7 @@ function renderOutput({ results, HDR, summary, details }, portfolioCash = null) 
 
   const { headerHTML: rHdr, bodyHTML: rBody, tfootHTML: rFoot } = renderTable({ details, mode: 'rebal', summary });
   simpleEl.innerHTML = rHdr + rBody + rFoot;
+  _setAllGroupsExpanded(false);
 
     rebalanceRendered = true;
   document.getElementById('output').style.display = 'block';
@@ -910,6 +901,7 @@ function renderBuildOutput({ results, HDR, summary, details }) {
 
   const { headerHTML: bHdr, bodyHTML: bBody, tfootHTML: bFoot } = renderTable({ details, mode: 'build', summary });
   tableEl.innerHTML = bHdr + bBody + bFoot;
+  _setAllGroupsExpanded(false);
 
     buildRendered = true;
   document.getElementById('build-output').style.display = 'block';
@@ -1117,7 +1109,7 @@ function derivePerYearDara(araByYear) {
   return { median: Math.round(median), daraMap };
 }
 
-// Populate _daraByYearStore from portfolio ARA, set DARA field to median, open panel.
+// Populate _daraByYearStore from portfolio ARA, scaled so Full rebalance is self-financing.
 // Called after any file load or account selection in rebalance mode.
 function _initRebalDaraFromPortfolio() {
   _daraByYearStore = new Map();
@@ -1135,9 +1127,19 @@ function _initRebalDaraFromPortfolio() {
   if (Object.keys(rawARA).length === 0) { renderDaraByYearPanel(); return; }
 
   const { median, daraMap } = derivePerYearDara(rawARA);
-  _daraByYearStore = daraMap;
-  document.getElementById('dara').value = median;
-  renderDaraByYearPanel();  // opens panel with median as default, per-year values from store
+
+  // Binary-search the median that makes the proportional per-year map self-financing.
+  const lastYearOverride = parseInt(document.getElementById('rebal-last-year').value) || undefined;
+  const firstYearOverride = parseInt(document.getElementById('rebal-first-year').value) || undefined;
+  const bracketMode = document.getElementById('bracket-mode').value;
+  const { scaledMedian } = inferScaledDARAFromPortfolio({
+    daraMap, median, holdings: currentHoldingsArray, tipsMap, refCPI: rc, settlementDate,
+    bracketMode, lastYearOverride, firstYearOverride,
+  });
+  const k = median > 0 ? scaledMedian / median : 1;
+  _daraByYearStore = new Map([...daraMap.entries()].map(([y, v]) => [y, Math.round(v * k)]));
+  document.getElementById('dara').value = scaledMedian;
+  renderDaraByYearPanel();
 }
 
 // ─── File Parsing & State ─────────────────────────────────────────────────────
@@ -1409,7 +1411,7 @@ let _daraByYearPanelDefault = null;
 let _daraByYearStore = new Map();  // year → value; persists across year-range changes
 let _lastKnownDara = null;          // last DARA used (including auto-inferred)
 let _daraAutoInferred = false;      // true when DARA field was populated by inferDARAFromCash
-let _daraByYearBodyCollapsed = false;
+let _daraByYearBodyCollapsed = true;
 
 function _setDaraByYearCollapsed(collapsed) {
   _daraByYearBodyCollapsed = collapsed;
@@ -1443,10 +1445,11 @@ function _hasCustomDara() {
   return false;
 }
 
-// Shows 'by year' inside the DARA input whenever custom per-year values exist
-function updateDaraInput() {
+// Shows 'by year' inside the DARA input whenever custom per-year values exist.
+// force=true bypasses the active-element guard (used when per-year table fires input events).
+function updateDaraInput(force = false) {
   const inp = document.getElementById('dara');
-  if (document.activeElement === inp) return;  // don't interfere while user is typing
+  if (!force && document.activeElement === inp) return;  // don't interfere while user is typing
   if (_hasCustomDara()) {
     inp.value = 'by year';
   } else if (inp.value === 'by year') {
@@ -1505,7 +1508,7 @@ function renderDaraByYearPanel() {
     + '</tbody>';
 
   _daraByYearPanelDefault = defaultDara;
-  _setDaraByYearCollapsed(false);
+  _setDaraByYearCollapsed(_daraByYearBodyCollapsed);
   panel.style.display = 'block';
   updateDaraInput();
 }
@@ -1530,7 +1533,7 @@ document.getElementById('dara-by-year-table').addEventListener('input', e => {
   const inp = e.target.closest('input[data-year]');
   if (!inp) return;
   _daraByYearStore.set(parseInt(inp.dataset.year, 10), parseFloat(inp.value));
-  updateDaraInput();
+  updateDaraInput(true);  // force=true: bypass active-element guard (DARA field may still have focus)
 });
 
 // When user focuses the DARA field: open per-year panel; populate from last known if empty
@@ -1551,8 +1554,14 @@ document.getElementById('dara').addEventListener('blur', () => {
   const val = parseFloat(document.getElementById('dara').value);
   if (!isNaN(val) && val >= 1000) {
     _daraByYearPanelDefault = val;
-    for (const [yr] of _daraByYearStore) _daraByYearStore.set(yr, val);
-    renderDaraByYearPanel();
+    // Update store and existing input elements in-place — avoids replacing innerHTML
+    // (which would destroy any per-year input the user may be clicking into)
+    const table = document.getElementById('dara-by-year-table');
+    for (const [yr] of _daraByYearStore) {
+      _daraByYearStore.set(yr, val);
+      const inp = table.querySelector(`input[data-year="${yr}"]`);
+      if (inp) inp.value = val;
+    }
   }
   updateDaraInput();
 });
@@ -2261,6 +2270,6 @@ loadData();
     </div>
   </div>
 </div>
-<script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js');</script>
+<script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js').then(r => r.update());</script>
 </body>
 </html>
