@@ -1086,7 +1086,27 @@ function computePortfolioARAByYear(holdingsArr, tipsMap, refCPI) {
 // Bracket years (raw ARA > 1.5× median) are substituted with median to avoid
 // inflating the funded-year target with excess bracket bond P+I.
 // Returns { median, daraMap: Map<year, number> }.
-function derivePerYearDara(araByYear) {
+// Compute Set of years adjacent to structural gap years (2037-2039) — bracket candidates only.
+function _getGapYearBracketCandidates() {
+  if (!tipsMap) return new Set();
+  const tipsYears = new Set();
+  for (const b of tipsMap.values()) { if (b.maturity) tipsYears.add(b.maturity.getFullYear()); }
+  const gapYears = [];
+  for (let y = 2039; y >= 2020; y--) {
+    if (!tipsYears.has(y)) gapYears.push(y);
+    else break;
+  }
+  if (gapYears.length === 0) return new Set();
+  const minGap = Math.min(...gapYears);
+  const maxGap = Math.max(...gapYears);
+  return new Set([minGap - 1, maxGap + 1]);
+}
+
+// Derive per-year DARA from raw ARA map.
+// Only suppress ARA > 1.5× median for bracket candidate years (adjacent to structural gap years).
+// Non-bracket years always keep their full ARA, preserving intentional high-DARA shapes.
+// Returns { median, daraMap: Map<year, number> }.
+function derivePerYearDara(araByYear, bracketCandidates = new Set()) {
   const vals = Object.values(araByYear).filter(v => v > 0);
   if (vals.length === 0) return { median: 0, daraMap: new Map() };
   const sorted = [...vals].sort((a, b) => a - b);
@@ -1094,7 +1114,7 @@ function derivePerYearDara(araByYear) {
   const daraMap = new Map();
   for (const [y, ara] of Object.entries(araByYear)) {
     const year = parseInt(y);
-    const val  = ara > 1.5 * median ? median : ara;
+    const val  = (bracketCandidates.has(year) && ara > 1.5 * median) ? median : ara;
     daraMap.set(year, Math.round(val));
   }
   return { median: Math.round(median), daraMap };
@@ -1117,7 +1137,8 @@ function _initRebalDaraFromPortfolio() {
   const rawARA = computePortfolioARAByYear(currentHoldingsArray, tipsMap, rc);
   if (Object.keys(rawARA).length === 0) { renderDaraByYearPanel(); return; }
 
-  const { daraMap } = derivePerYearDara(rawARA);
+  const bracketCandidates = _getGapYearBracketCandidates();
+  const { daraMap } = derivePerYearDara(rawARA, bracketCandidates);
 
   // Binary-search the equilibrium median; function computes median and returns scaledMap.
   const lastYearOverride = parseInt(document.getElementById('rebal-last-year').value) || undefined;

@@ -177,14 +177,29 @@ function computePortfolioARAByYear(holdingsArr, tipsMap, refCPI) {
   for (const y of years) { ara[y] = byYear[y].totalPI + lmi; lmi += byYear[y].annInt; }
   return ara;
 }
-function derivePerYearDara(araByYear) {
+// Returns gap year bracket candidates from tipsMap (years adjacent to structural 2037-2039 gap).
+function getGapYearBracketCandidates(tm) {
+  const tipsYears = new Set();
+  for (const b of tm.values()) { if (b.maturity) tipsYears.add(b.maturity.getFullYear()); }
+  const gapYears = [];
+  for (let y = 2039; y >= 2020; y--) {
+    if (!tipsYears.has(y)) gapYears.push(y);
+    else break;
+  }
+  if (!gapYears.length) return new Set();
+  const minGap = Math.min(...gapYears);
+  const maxGap = Math.max(...gapYears);
+  return new Set([minGap - 1, maxGap + 1]);
+}
+function derivePerYearDara(araByYear, bracketCandidates = new Set()) {
   const vals = Object.values(araByYear).filter(v => v > 0).sort((a, b) => a - b);
   if (!vals.length) return { daraMap: new Map() };
   const median = vals[Math.floor(vals.length / 2)];
   const daraMap = new Map();
   for (const [y, ara] of Object.entries(araByYear)) {
-    const val = ara > 1.5 * median ? median : ara;
-    daraMap.set(parseInt(y), Math.round(val));
+    const year = parseInt(y);
+    const val = (bracketCandidates.has(year) && ara > 1.5 * median) ? median : ara;
+    daraMap.set(year, Math.round(val));
   }
   return { daraMap };
 }
@@ -215,7 +230,8 @@ function runFullRebalanceTest(name, filePath) {
 
   const holdings = parseHoldings(readFileSync(fullPath, 'utf8'));
   const rawARA = computePortfolioARAByYear(holdings, tipsMap, refCPI);
-  const { daraMap } = derivePerYearDara(rawARA);
+  const bracketCandidates = getGapYearBracketCandidates(tipsMap);
+  const { daraMap } = derivePerYearDara(rawARA, bracketCandidates);
   const { scaledMap, scaledMedian } = inferScaledDARAFromPortfolio({
     daraMap, holdings, tipsMap, refCPI, settlementDate,
   });
@@ -267,7 +283,8 @@ runFullRebalanceTest('Kevin_IRA', './tests/e2e/SampleHoldings.csv');
   ].join('\n');
   const holdings = parseHoldings(holdingsCsv);
   const rawARA2 = computePortfolioARAByYear(holdings, tipsMap, refCPI);
-  const { daraMap: daraMap2 } = derivePerYearDara(rawARA2);
+  const bc2 = getGapYearBracketCandidates(tipsMap);
+  const { daraMap: daraMap2 } = derivePerYearDara(rawARA2, bc2);
   const { scaledMap: sMap2, scaledMedian: sDara2 } = inferScaledDARAFromPortfolio({ daraMap: daraMap2, holdings, tipsMap, refCPI, settlementDate });
   const { summary, details } = runRebalance({ dara: sDara2, method: 'Full', holdings, tipsMap, refCPI, settlementDate, daraByYear: sMap2 });
 
