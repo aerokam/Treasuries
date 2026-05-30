@@ -489,15 +489,6 @@ async function loadData() {
           const dt = new DataTransfer(); dt.items.add(file);
           fileInput.files = dt.files;
           fileInput.dispatchEvent(new Event('change'));
-          let autoRunRetries = 0;
-          const autoRun = () => {
-            const btn = document.getElementById('run-btn');
-            const isRebalance = currentMode === 'rebalance';
-            const ready = isRebalance ? (currentHoldingsArray !== null && !btn.disabled) : !btn.disabled;
-            if (ready) { btn.click(); }
-            else if (autoRunRetries < 50) { autoRunRetries++; setTimeout(autoRun, 100); }
-          };
-          autoRun();
         }
       } catch (e) {}
     }
