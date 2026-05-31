@@ -1,7 +1,7 @@
 // rebalance-lib.js -- Core logic for TIPS ladder rebalancing (4.0_TIPS_Ladder_Rebalancing.md)
 // Exports: buildTipsMapFromYields, runRebalance, localDate, inferDARAFromCash, inferScaledDARAFromPortfolio, runMultiAccountRebalance
 
-import { bondCalcs, calculateMDuration, yieldFromPrice, calcMktWtdAvg } from '../../shared/src/bond-math.js';
+import { bondCalcs, calculateMDuration, yieldFromPrice, calcMktWtdAvg, priceFromYield } from '../../shared/src/bond-math.js';
 export { yieldFromPrice };
 import { interpolateYield, syntheticCoupon } from './gap-math.js';
 import { detectAccountType, allocateToAccounts, computeAccountCashFlows, generateFeasibilityReport } from './account-allocation.js';
@@ -328,7 +328,13 @@ function calculateGapParameters(gapYears, settlementDate, refCPI, tipsMap, DARA,
     count++;
   }
 
-  return { avgDuration: totalDuration / count, totalCost, breakdown };
+  // Cost-weighted avg duration (Σ qty·dur / Σ qty) so uneven per-year DARA is reflected; fall back
+  // to simple mean when no synthetic qty exists. Spec: 2.0 §Average Block Duration is Cost-Weighted.
+  const _qtySum = breakdown.reduce((s, g) => s + g.qty, 0);
+  const avgDuration = _qtySum > 0
+    ? breakdown.reduce((s, g) => s + g.qty * g.dur, 0) / _qtySum
+    : (count > 0 ? totalDuration / count : 0);
+  return { avgDuration, totalCost, breakdown };
 }
 
 // Infer the true firstYear when a Format 4/5 CSV is loaded whose derivedFirstYear is a pure bracket
@@ -641,7 +647,13 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
       runningFuture30yLMI += qty * 1000 * synCoupon;
       future30yTotalCost  += qty * 1000;
     }
-    future30yParams = { avgDuration: totalFuture30yDur / future30yYears.length, future30yTotalCost, breakdown: future30yBreakdown, future30ySeedLMI: runningFuture30yLMI };
+    // Cost-weighted avg duration so the per-rung 2052 cover decomposition sums exactly to the block
+    // excess and uneven per-year DARA is reflected. Spec: 2.0 §Average Block Duration is Cost-Weighted.
+    const _f30QtySum = future30yBreakdown.reduce((s, b) => s + b.qty, 0);
+    const future30yAvgDuration = _f30QtySum > 0
+      ? future30yBreakdown.reduce((s, b) => s + b.qty * b.dur, 0) / _f30QtySum
+      : (future30yYears.length > 0 ? totalFuture30yDur / future30yYears.length : 0);
+    future30yParams = { avgDuration: future30yAvgDuration, future30yTotalCost, breakdown: future30yBreakdown, future30ySeedLMI: runningFuture30yLMI };
 
     future30yLowerDuration = calculateMDuration(settlementDate, future30yLowerCoverBond.maturity, future30yLowerCoverBond.coupon ?? 0, future30yLowerCoverBond.yield ?? 0);
     future30yUpperDuration = calculateMDuration(settlementDate, future30yUpperCoverBond.maturity, future30yUpperCoverBond.coupon ?? 0, future30yUpperCoverBond.yield ?? 0);
@@ -661,30 +673,49 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
   }
 
   // ── AMD computation for Future 30Y Upper Cover (2052 TIPS) ──────────────────
-  const future30yUpperN = future30yYears.length > 0 ? Math.max(1, 2036 - settlementYear) : 0;
-  let future30yUpperPrincipalPerBond = 0;
-  let future30yUpperAmdCostPerBond   = 0;
-  let future30yUpperYearsToMaturity  = 0;
-  let future30yUpperAmdPerBondPerYear = 0;
-  if (future30yYears.length > 0 && future30yUpperExQty > 0 && future30yUpperCoverBond?.maturity) {
-    const irUpper = refCPI / (future30yUpperCoverBond.baseCpi ?? refCPI);
-    future30yUpperPrincipalPerBond = 1000 * irUpper;
-    future30yUpperAmdCostPerBond   = (future30yUpperCoverBond.price ?? 0) / 100 * irUpper * 1000;
-    future30yUpperYearsToMaturity  = (future30yUpperCoverBond.maturity - settlementDate) / (365.25 * 24 * 3600 * 1000);
-    if (future30yUpperYearsToMaturity > 0)
-      future30yUpperAmdPerBondPerYear = (future30yUpperPrincipalPerBond - future30yUpperAmdCostPerBond) / future30yUpperYearsToMaturity;
+  // AMD is treated like interest on a deep-discount, low-coupon TIPS: income each year =
+  // (2052s still held) × (that year's constant-yield per-bond price step-up). Income accrues on the
+  // HELD position, not the few bonds sold; the roll qRoll(Y) depletes the pool and steps the basis up.
+  //   adjPrice(Y) = priceFromYield(...)/100 × IR_settle × 1000;  a(Y) = adjPrice(Y) − adjPrice(Y−1)
+  //   H(Y) = exQty − Σ_{y<Y} qRoll(y);  AMD(Y) = H(Y) × a(Y).   Σ AMD telescopes to the lifetime discount.
+  // Built for the rebuilt (after) exQty partition; ForQty scales linearly by held qty.
+  // Spec: 2.0 §Future 30Y Upper Cover AMD.
+  const future30yUpperAnnualAmdByYear = new Map();   // saleYear → AMD cash realized that year
+  if (future30yYears.length > 0 && future30yUpperExQty > 0 && future30yUpperCoverBond?.maturity && future30yParams) {
+    const irUpper         = refCPI / (future30yUpperCoverBond.baseCpi ?? refCPI);
+    const costPerBond2052 = (future30yUpperCoverBond.price ?? 0) / 100 * irUpper * 1000;
+    const span            = future30yUpperDuration - future30yLowerDuration;
+    const qRollByYear = new Map();
+    for (const rung of future30yParams.breakdown) {
+      const saleYear = rung.year - 30;            // 2057→2027 … 2066→2036 (nearest-first roll)
+      if (saleYear <= settlementYear) continue;
+      const wUpper = span > 0 ? (rung.dur - future30yLowerDuration) / span : 0;
+      const q      = costPerBond2052 > 0 ? (rung.qty * 1000 * wUpper) / costPerBond2052 : 0;
+      qRollByYear.set(saleYear, q);
+    }
+    const adjPrice = (saleYear) => {
+      const futPrice = priceFromYield(future30yUpperCoverBond.yield ?? 0, future30yUpperCoverBond.coupon ?? 0, new Date(saleYear, 2, 0), future30yUpperCoverBond.maturity);
+      return futPrice == null ? null : futPrice / 100 * irUpper * 1000;
+    };
+    let held = future30yUpperExQty, prevAdj = costPerBond2052;
+    for (const saleYear of [...qRollByYear.keys()].sort((a, b) => a - b)) {
+      const ap = adjPrice(saleYear);
+      if (ap == null) continue;
+      const a = ap - prevAdj;                       // this year's accretion increment per bond
+      future30yUpperAnnualAmdByYear.set(saleYear, held * a);
+      held -= qRollByYear.get(saleYear);            // roll depletes the held pool
+      prevAdj = ap;                                 // basis steps up
+    }
   }
   const future30yUpperQtyBefore = (future30yYears.length > 0 && future30yUpperCoverBond)
     ? (yearInfo[future30yUpperYear]?.holdings?.reduce((s, h) => h.cusip === future30yUpperCoverBond.cusip ? s + h.qty : s, 0) ?? 0)
     : 0;
   function calcFuture30yUpperAnnualAmdForQty(year, qty) {
-    if (future30yUpperAmdPerBondPerYear <= 0 || future30yUpperN <= 0 || qty <= 0) return 0;
-    if (year > settlementYear && year <= 2036)
-      return (qty / future30yUpperN) * (year - settlementYear) * future30yUpperAmdPerBondPerYear;
-    return 0;
+    if (future30yUpperExQty <= 0 || qty <= 0) return 0;
+    return (future30yUpperAnnualAmdByYear.get(year) ?? 0) * qty / future30yUpperExQty;
   }
   function calcFuture30yUpperAnnualAmd(year) {
-    return calcFuture30yUpperAnnualAmdForQty(year, future30yUpperExQty);
+    return future30yUpperAnnualAmdByYear.get(year) ?? 0;
   }
 
   // ── PLI zeroing pass (mirrors build-lib §3b) ──────────────────────────────────
@@ -958,12 +989,13 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
       }
     }
   }
-  // AMD-driven selling: years up to and including 2036 receive 2052 excess AMD income and must be
-  // sold to their AMD-adjusted need regardless of mode. Full mode already includes them; Gap mode does not.
-  // 2036 is included: it now carries the largest AMD (final tranche, most appreciated).
+  // AMD-driven selling: each AMD sale year (rung.year − 30) receives 2052 excess AMD income and must
+  // be sold to its AMD-adjusted need regardless of mode (Full already includes them; Gap does not).
+  // Range follows the actual sale years, not a hardcoded ≤ 2036 cap. Spec: 2.0 §Future 30Y Upper Cover AMD.
   if (future30yUpperExQty > 0) {
-    for (let y = firstYear; y <= 2036 && y <= lastYear; y++) {
-      if (!bracketYearSet.has(y) && !gapYearSet.has(y) && !future30yYearSet.has(y)) rebalYearSet.add(y);
+    for (const y of future30yUpperAnnualAmdByYear.keys()) {
+      if (y >= firstYear && y <= lastYear && !bracketYearSet.has(y) && !gapYearSet.has(y) && !future30yYearSet.has(y))
+        rebalYearSet.add(y);
     }
   }
 
@@ -1431,7 +1463,7 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
 
   const HDR = ['CUSIP','Qty','Maturity','FY','Principal','Interest','ARA','Cost','Target Qty','Qty Delta','Target Cost','Cost Delta','ARA (Before)','ARA-DARA Before','ARA (After)','ARA-DARA After','Excess ARA Before','Excess ARA After','Incoming LMI','Excess Interest','Funded PI'];
 
-  return { results, HDR, summary: { settleDateDisp, refCPI, DARA, inferredDARA, daraIsInferred: dara === null, method, firstYear, lastYear, derivedFirstYear, rungCount, gapYears, future30yYears, brackets, lowerWeight, upperWeight, costDeltaSum, costForNewRungs, gapCoverageSurplus, gapParams, bracketMode, lowerDuration, upperDuration, newLowerYear, newLowerCUSIP, newLowerDuration, newLowerWeight3, origLowerWeight, bracketFellBack3to2, beforeLowerWeight, beforeUpperWeight, beforeNewLowerWeight, afterLowerWeight, afterUpperWeight, afterNewLowerWeight, totalPreviousExcessCost, totalExcessCost, araByYear, future30yLowerYear, future30yUpperYear, future30yLowerCoverCUSIP: future30yLowerCoverBond?.cusip, future30yUpperCoverCUSIP: future30yUpperCoverBond?.cusip, future30yParams, future30yLowerDuration, future30yUpperDuration, future30yUpperWeight, future30yLowerWeight, future30yUpperExQty, future30yLowerExQty, future30yFellBack, future30yUpperPrincipalPerBond, future30yUpperAmdCostPerBond, future30yUpperYearsToMaturity, future30yUpperAmdPerBondPerYear, future30yUpperN, preLadderInterest, preLadderPool, zeroedFundedYears: [...zeroedFundedYears].sort((a, b) => a - b), weightedAvgDuration, weightedAvgYield }, details };
+  return { results, HDR, summary: { settleDateDisp, refCPI, DARA, inferredDARA, daraIsInferred: dara === null, method, firstYear, lastYear, derivedFirstYear, rungCount, gapYears, future30yYears, brackets, lowerWeight, upperWeight, costDeltaSum, costForNewRungs, gapCoverageSurplus, gapParams, bracketMode, lowerDuration, upperDuration, newLowerYear, newLowerCUSIP, newLowerDuration, newLowerWeight3, origLowerWeight, bracketFellBack3to2, beforeLowerWeight, beforeUpperWeight, beforeNewLowerWeight, afterLowerWeight, afterUpperWeight, afterNewLowerWeight, totalPreviousExcessCost, totalExcessCost, araByYear, future30yLowerYear, future30yUpperYear, future30yLowerCoverCUSIP: future30yLowerCoverBond?.cusip, future30yUpperCoverCUSIP: future30yUpperCoverBond?.cusip, future30yParams, future30yLowerDuration, future30yUpperDuration, future30yUpperWeight, future30yLowerWeight, future30yUpperExQty, future30yLowerExQty, future30yFellBack, future30yUpperAnnualAmdByYear, preLadderInterest, preLadderPool, zeroedFundedYears: [...zeroedFundedYears].sort((a, b) => a - b), weightedAvgDuration, weightedAvgYield }, details };
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
