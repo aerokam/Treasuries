@@ -2,6 +2,10 @@ node_modules/
 test-results/
 .DS_Store
 .env
+
+# Claude Code: machine-local overrides + worktrees stay local; .claude/settings.json is shared
+.claude/settings.local.json
+.claude/worktrees/
 Dashboard/.env
 Dashboard/logs/
 Dashboard/node_modules/
