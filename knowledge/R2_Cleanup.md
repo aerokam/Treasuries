@@ -10,7 +10,7 @@ Audit run 2026-04-30. Cleanup executed 2026-05-21.
 
 | Prefix | Files |
 |--------|-------|
-| `TIPS/` | `RefCPI.csv`, `TipsRef.csv`, `RefCpiNsaSa.csv`, `tentative_tips.json`, `Tentative-Auction-Schedule.xml` |
+| `TIPS/` | `RefCPI.csv`, `TipsRef.csv`, `RefCpiNsaSa.csv`, `tentative_tips.json`, `Tentative-Auction-Schedule.xml`, `YieldsSaSao.csv` |
 | `Treasuries/` | `YieldsFromFedInvestPrices.csv`, `Auctions.csv`, `FidelityTips.csv`, `FidelityTreasuries.csv`, `yield-history/*.json` (14 files) |
 | `bls/` | `CPI.csv`, `CPI_history.csv`, `CpiReleaseSchedule2025.csv`, `CpiReleaseSchedule2026.csv` |
 | `misc/` | `BondHolidaysSifma.csv` |
@@ -32,7 +32,7 @@ Audit run 2026-04-30. Cleanup executed 2026-05-21.
 | `scripts/getAuctions.js` | Removed upload to `TIPS/Auctions.csv` |
 | `scripts/getYieldsFedInvest.js` | Removed upload to `TIPS/YieldsFromFedInvestPrices.csv` |
 | `YieldsMonitor/scripts/snapHistory.js` | Removed `r2KeyOld` variable and `TIPS/yield-history/` upload |
-| `YieldCurves/scripts/updateSaSaoYields.js` | Removed upload to `TIPS/YieldsSaSao.csv` |
+| `YieldCurves/scripts/updateSaSaoYields.js` | Removed upload to `TIPS/YieldsSaSao.csv` — **REVERTED 2026-06-01, see correction below** |
 | `scripts/fetchTipsRef.js` | Removed upload to `Treasuries/TipsRef.csv` |
 | `TipsLadderManager/src/data.js` | Changed TipsRef.csv fetch from `Treasuries/` to `TIPS/` |
 
@@ -42,7 +42,7 @@ Audit run 2026-04-30. Cleanup executed 2026-05-21.
 - `Treasuries/RefCPI.csv`
 - `TIPS/Auctions.csv`
 - `TIPS/YieldsFromFedInvestPrices.csv`
-- `TIPS/YieldsSaSao.csv`
+- `TIPS/YieldsSaSao.csv` — **misclassified; see correction below**
 - `TIPS/yield-history/*_history.json` (14 files)
 
 **Stale legacy (no current reader or writer):**
@@ -58,3 +58,19 @@ Audit run 2026-04-30. Cleanup executed 2026-05-21.
 
 **TipsRef consolidation:**
 - `Treasuries/TipsRef.csv` — consolidated to `TIPS/TipsRef.csv`; browser app updated accordingly
+
+---
+
+## Correction (2026-06-01)
+
+`TIPS/YieldsSaSao.csv` was **wrongly classified as an orphan** above. It is read by no
+*app*, but it is a deliberate **public resource** — published so people can pull market
+SA/SAO TIPS yields into their own spreadsheets. The upload in
+`YieldCurves/scripts/updateSaSaoYields.js` has been restored and the file is written
+to `TIPS/YieldsSaSao.csv` on every Fidelity broker-quote run. Do not remove it.
+
+Separately, that run was logging `Exited with code 1` even on success: the script wrote
+its progress via `console.error`, and `run-fidelity.cmd`'s `2>&1` pipe makes PowerShell 5.1
+wrap any native stderr as a `NativeCommandError` and flip the exit code. Progress logging
+was moved to `console.log` (stdout); `console.error` + `exit(1)` is now reserved for real
+failures only.

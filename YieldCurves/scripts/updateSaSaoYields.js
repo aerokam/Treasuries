@@ -113,10 +113,10 @@ function calculateSAO(bonds) {
 }
 
 async function main() {
-  console.error(`Starting Market SA/SAO Yield update at ${new Date().toISOString()}`);
+  console.log(`Starting Market SA/SAO Yield update at ${new Date().toISOString()}`);
 
   // Fetch Fidelity TIPS
-  console.error(`Fetching market data from ${FIDELITY_TIPS_URL}...`);
+  console.log(`Fetching market data from ${FIDELITY_TIPS_URL}...`);
   const fidRes = await fetch(FIDELITY_TIPS_URL);
   if (!fidRes.ok) throw new Error(`Failed to fetch Fidelity TIPS: ${fidRes.status}`);
   const fidText = await fidRes.text();
@@ -125,12 +125,12 @@ async function main() {
   const m = fidText.match(/Date downloaded\s+([\d/]+ [\d:]+ [AP]M)/i);
   const downloadDateStr = m ? m[1] : null;
   if (!downloadDateStr) {
-    console.error("Warning: Could not find download date in Fidelity TIPS footer. Using today.");
+    console.log("Warning: Could not find download date in Fidelity TIPS footer. Using today.");
   }
   const downloadDate = downloadDateStr ? parseFidelityDateStr(downloadDateStr) : new Date();
   
   // Fetch Holidays for T+1 settlement
-  console.error(`Fetching holidays from ${HOLIDAYS_URL}...`);
+  console.log(`Fetching holidays from ${HOLIDAYS_URL}...`);
   const holidayRes = await fetch(HOLIDAYS_URL);
   const holidaySet = new Set();
   if (holidayRes.ok) {
@@ -146,10 +146,10 @@ async function main() {
   
   const settleDate = nextBusinessDay(downloadDate, holidaySet);
   const settleDateStr = toIsoDate(settleDate);
-  console.error(`Market settlement date (T+1): ${settleDateStr}`);
+  console.log(`Market settlement date (T+1): ${settleDateStr}`);
 
   // Parse RefCPI
-  console.error(`Fetching SA factors from ${REF_CPI_URL}...`);
+  console.log(`Fetching SA factors from ${REF_CPI_URL}...`);
   const refCpiRes = await fetch(REF_CPI_URL);
   const refCpiText = await refCpiRes.text();
   const refCpiData = parseCsv(refCpiText);
@@ -198,10 +198,10 @@ async function main() {
     return { cusip, maturity, coupon, askYield, saYield, maturityDate };
   }).filter(Boolean).sort((a, b) => a.maturityDate - b.maturityDate);
 
-  console.error(`Processed ${processed.length} market TIPS bonds.`);
+  console.log(`Processed ${processed.length} market TIPS bonds.`);
 
   // Apply SAO
-  console.error("Applying SAO smoothing...");
+  console.log("Applying SAO smoothing...");
   const smoothed = calculateSAO(processed);
   processed.forEach((b, i) => b.saoYield = smoothed[i]);
 
@@ -214,7 +214,13 @@ async function main() {
   );
   const csvContent = [header, ...lines].join('\n') + '\n';
 
-  console.error("Update complete.");
+  // Upload to R2. Not read by any app — published as a public resource for
+  // folks building their own spreadsheets. (Restored 2026-06-01; the 2026-05-21
+  // R2 cleanup wrongly classified it as an orphan write and removed it.)
+  console.log("Uploading to R2: TIPS/YieldsSaSao.csv");
+  await uploadToR2('TIPS/YieldsSaSao.csv', csvContent);
+
+  console.log("Update complete.");
 }
 
 main().catch(err => {
