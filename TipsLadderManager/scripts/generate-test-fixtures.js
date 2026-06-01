@@ -116,7 +116,7 @@ function sanitizeSchwab(text) {
     outLines.push(`${section.rawName} ...${String(idx + 1).padStart(3, '0')}`);
     outLines.push(SCHWAB_COL_HEADER);
 
-    const isKevinIra = section.rawName === 'Kevin_IRA';
+    const isKevinIra = section.rawName === 'Owner8_IRA';
     let totalMkt = 0;
 
     for (const cols of section.positions) {

@@ -3,7 +3,7 @@
 
 /**
  * Detect account type from account name
- * @param {string} accountName - e.g., "Harry ROTH IRA", "Harry IRA", "McNeill Joint WROS"
+ * @param {string} accountName - e.g., "Owner4 ROTH IRA", "Owner4 IRA", "Owner14 Joint WROS"
  * @returns {string} - "roth_ira" | "traditional_ira" | "taxable"
  */
 export function detectAccountType(accountName) {
