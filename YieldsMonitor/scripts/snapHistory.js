@@ -97,22 +97,19 @@ function mergePoints(existing, incoming) {
 }
 
 async function snap() {
+  // Today in ET as compact YYYYMMDD. We only persist *completed* trading days, so the
+  // current (provisional) day is skipped until it closes and is fetched the next run.
+  const todayET = new Date()
+    .toLocaleDateString('en-CA', { timeZone: 'America/New_York' })
+    .replace(/-/g, '');
+
   for (const sym of SYMBOLS) {
     const r2Key = `Treasuries/yield-history/${sym}_history.json`;
     console.log(`Updating ${sym}...`);
 
-    // 1. Get Live 10D data (the "tip" with 5 trading days of overlap)
-    let liveData = [];
-    try {
-      liveData = await fetchRange(sym, '5D');
-    } catch (err) {
-      console.error(`  Live fetch failed for ${sym}: ${err.message}`);
-      continue;
-    }
-
-    // 2. Load Existing History or Bootstrap
+    // 1. Load Existing History or Bootstrap
     let history = await getExistingFromR2(r2Key);
-    
+
     if (!history || history.length === 0) {
       console.log(`  Bootstrapping history (merging multiple ranges for resolution)...`);
       try {
@@ -120,7 +117,7 @@ async function snap() {
         // 5D: 5m, 1M: 3d?, 3M: 3d?, 6M: 3d?, 1Y: 3d?, 5Y: 8d, ALL: Monthly
         const ranges = ['ALL', '5Y', '1Y', '6M', '3M', '1M', '5D'];
         const results = await Promise.all(ranges.map(r => fetchRange(sym, r).catch(() => [])));
-        
+
         history = [];
         results.forEach(pts => {
           history = mergePoints(history, pts);
@@ -132,35 +129,33 @@ async function snap() {
       }
     }
 
-    // 3. Increment (Tack on latest closing data)
-    // We only want to add the 17:00-17:05 ET close for each day that isn't in history yet.
+    // 2. Incremental daily-close append.
+    // CNBC tradeTime is a compact "YYYYMMDDHHMMSS" string; daily-close bars are stamped
+    // at midnight ("...000000"). We pull the daily feed and append every completed
+    // trading day newer than what we already have.
+    //
+    // NOTE: do NOT derive closes from the 5D intraday feed — it is 24h-continuous with
+    // no reliable 17:00 ET close bar, and a feed-format change (loss of the "T"/colon
+    // separators the old parser relied on) silently stopped all appends. The browser
+    // already stitches live intraday on top of this daily baseline.
     const lastHistTime = history[history.length - 1].x;
-    
-    // Identify closes in the liveData
-    const newCloses = [];
-    const closesByDay = new Map();
+    let daily = [];
+    try {
+      daily = await fetchRange(sym, '3M');
+    } catch (err) {
+      console.error(`  Daily fetch failed for ${sym}: ${err.message}`);
+      continue;
+    }
 
-    liveData.forEach(p => {
-      if (p.x <= lastHistTime) return;
-      
-      // Check if this is a "close" point (between 17:00 and 17:05 ET)
-      // The CNBC tradeTime is usually in "2026-03-30T17:00:00" format
-      const datePart = p.x.split('T')[0];
-      const timePart = p.x.split('T')[1];
-      if (timePart >= "17:00:00" && timePart <= "17:05:00") {
-        // For each day, keep the latest available close point in the window
-        closesByDay.set(datePart, p);
-      }
-    });
+    const newCloses = daily.filter(p =>
+      p.x.slice(8) === '000000' &&   // daily-close bar (midnight stamp)
+      p.x > lastHistTime &&          // newer than what we have stored
+      p.x.slice(0, 8) < todayET      // completed days only (skip provisional same-day)
+    );
 
-    Array.from(closesByDay.values()).sort((a, b) => a.x.localeCompare(b.x)).forEach(p => {
-      newCloses.push(p);
-    });
-    
     if (newCloses.length > 0) {
       history = mergePoints(history, newCloses);
-      console.log(`  Appended ${newCloses.length} new closes for ${sym}.`);
-
+      console.log(`  Appended ${newCloses.length} new daily close(s) for ${sym}.`);
       await uploadToR2(r2Key, history);
     } else {
       console.log(`  No new data to append.`);

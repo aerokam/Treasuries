@@ -80,9 +80,13 @@ This document provides the technical schemas and field-level specifications for 
 
 ## <a id="s6"></a>S6: yield-history/
 **Description**: JSON time series of yields per symbol (US10Y, US30Y, etc.).
-**Update Frequency**: Weekdays (end-of-day snapshots).
+**Update Frequency**: Weekdays (end-of-day snapshots) via `snapHistory.js`.
 
-**Format**: `{ "symbol": "US10Y", "history": [ { "x": "2026-03-01", "y": 4.25 }, ... ] }`
+**Format**: bare array of `{ x, y }` points, e.g. `[ { "x": "20260403000000", "y": 4.25 }, ... ]`.
+- `x` is CNBC's compact `tradeTime` string `YYYYMMDDHHMMSS` (no separators). Daily-close bars are stamped at midnight (`...000000`); the older tail may contain intraday `HHMMSS` bars from a bootstrap merge.
+- `y` is the yield as a number (percent, `%` stripped).
+
+**Append logic**: `snapHistory.js` pulls CNBC's daily feed (`3M` range → midnight bars) and appends each *completed* trading day newer than the last stored point. It must NOT parse the `5D` intraday feed for a "17:00 close" — that feed is 24h-continuous, and a CNBC format change (ISO `2026-03-30T17:00:00` → compact `20260330170000`) once broke the `split('T')`-based parser, silently halting all appends for ~7 weeks (Apr 3 – May 22, 2026). The browser stitches live intraday on top of this daily baseline.
 
 **Live Sample**: [View US10Y History](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/yield-history/US10Y_history.json)
 
