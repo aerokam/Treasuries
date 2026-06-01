@@ -69,9 +69,31 @@ function gapBreakdownRows(gapParams, dara) {
     rows += row(g.year + ' quantity', fmla, g.qty, false, undefined, id + 'qty')
           + row('\u21b3 P+I per synthetic TIPS', '', fm2(g.piPerBond), false, undefined, id + 'pi')
           + row('\u21b3 LMI (actual TIPS + longer synth)', 'coupon from funded years above + synth LMI from longer gap years', fm(g.laterMatInt), false, undefined, id + 'lmi')
-          + (pliCredit > 0 ? row('\u21b3 PLI credit', 'pre-ladder pool applied to this gap year', fm(pliCredit), false, undefined, id + 'pli') : '')
+          + (pliCredit > 0 ? row('\u21b3 PLI credit', 'pre-ladder pool applied to this gap year', fm(pliCredit), false, 'plcpool:' + Math.round(pliCredit), id + 'pli') : '')
           + row('\u21b3 Theoretical cost', '<span class="formula-var" data-source="' + id + 'qty">Quantity</span> \xd7 $1,000', fm(g.qty * 1000));
   });
+  return rows;
+}
+
+// Level-3 drill: composition of the pre-ladder pool (coupon interest + pre-ladder AMD).
+// Spec: 2.0 §Future 30Y Upper Cover AMD §Pre-Ladder Interest, 6.0 §Pre-ladder pool drill.
+export function buildPreLadderPoolDrill(summary, plCreditForYear) {
+  const couponPool = summary?.preLadderCouponPool ?? 0;
+  const amdPool    = summary?.preLadderAmdPool ?? 0;
+  const total      = summary?.preLadderPool ?? (couponPool + amdPool);
+  const years      = summary?.preLadderYears ?? 0;
+  const rows = [
+    { label: 'Pre-ladder coupon interest', note: years + ' yr \xd7 annual ladder coupon income', value: fm(couponPool) },
+  ];
+  if (amdPool > 0) {
+    rows.push({ label: 'Pre-ladder AMD (excess 2052)', note: 'discount realized from excess 2052 TIPS sold before the ladder starts', value: fm(amdPool) });
+  }
+  rows.push({ sep: true });
+  rows.push({ label: 'Total pre-ladder pool', note: 'coupon interest + AMD', value: fm(total), total: true });
+  if (plCreditForYear > 0) {
+    rows.push({ sep: true });
+    rows.push({ label: 'Applied to this year', note: 'slice of the pool credited here', value: fm(plCreditForYear) });
+  }
   return rows;
 }
 
@@ -104,7 +126,7 @@ export function buildDrillHTML(d, colKey, summary) {
       row(couponLabel, '<span class="formula-var" data-source="ppb">Par Value/TIPS</span> \xd7 <span class="formula-var" data-source="cpp">coupon/period</span> \xd7 <span class="formula-var" data-source="cp">periods</span> \xd7 <span class="formula-var" data-source="qty">Quantity</span>', fm(d.fundedYearOwnRungInt)) +
       row('Interest from longer-dated TIPS', 'from TIPS maturing after ' + d.fundedYear, fm(longerDatedInt), false, undefined, 'lmi') +
       (sameYearExInt > 0 ? row('Interest from same-year excess (bracket)', 'from excess TIPS maturing in ' + d.fundedYear, fm(sameYearExInt), false, undefined, 'exlmi') : '') +
-      (_plCredit > 0 ? row('Pre-ladder credit', 'pre-ladder pool applied to this year', fm(_plCredit)) : '') +
+      (_plCredit > 0 ? row('Pre-ladder credit', 'pre-ladder pool applied to this year', fm(_plCredit), false, 'plcpool') : '') +
       (_amd > 0 ? row('AMD — 2052 excess', 'accrued market discount realized from excess 2052 TIPS sold this year', fm(_amd), false, undefined, 'amd') : '') +
       sep() +
       row('Funded Year Amount', totalFmla, fm(d.fundedYearAmt), true) +
@@ -220,7 +242,7 @@ export function buildDrillHTML(d, colKey, summary) {
       rows += row('Interest from same-year excess (bracket)', 'from additional ' + d.fundedYear + ' TIPS held to cover Future 30Y rungs', fm(excessLMI), false, undefined, 'exlmi');
     }
     if (_plCredit > 0) {
-      rows += row('Pre-ladder credit', 'pre-ladder pool applied to this year', fm(_plCredit), false, undefined, 'plc');
+      rows += row('Pre-ladder credit', 'pre-ladder pool applied to this year', fm(_plCredit), false, 'plcpool', 'plc');
     }
     if (_amd > 0) {
       rows += row('AMD — 2052 excess', 'accrued market discount realized from excess 2052 TIPS sold this year', fm(_amd), false, undefined, 'amd');

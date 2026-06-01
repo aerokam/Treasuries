@@ -319,15 +319,18 @@ export function runBuild({ dara, firstYear: firstYearOpt, lastYear, tipsMap, ref
   //     Gap years consume pool before longer-dated funded years — e.g. 2037-2039 before 2040.
   const preLadderYears = preLadderInterest ? Math.max(0, firstYear - settlementYear) : 0;
   let preLadderPool = 0;
+  let preLadderCouponPool = 0;   // coupon-interest portion of the pre-ladder pool
+  let preLadderAmdPool = 0;      // AMD portion: excess 2052 discount realized in pre-ladder years
   const zeroedFundedYears = new Set();
   const pliCreditByGapYear = {};
   let partialCreditYear = null, partialCredit = 0;
 
   if (preLadderYears > 0) {
     const totalAnnualInt = Object.values(prelim).reduce((s, p) => s + p.annualInterest, 0);
-    preLadderPool = preLadderYears * totalAnnualInt;
+    preLadderCouponPool = preLadderYears * totalAnnualInt;
     // Add AMD pre-ladder contributions (spec: 2.0 §Future 30Y Upper Cover AMD §Pre-Ladder Interest)
-    for (let y = settlementYear; y < firstYear; y++) preLadderPool += calcFuture30yUpperAnnualAmd(y);
+    for (let y = settlementYear; y < firstYear; y++) preLadderAmdPool += calcFuture30yUpperAnnualAmd(y);
+    preLadderPool = preLadderCouponPool + preLadderAmdPool;
 
     const gapYearSet = new Set(gapYears);
     const allYearsSorted = [...new Set([...rangeYears, ...gapYears])].sort((a, b) => a - b);
@@ -570,7 +573,7 @@ export function runBuild({ dara, firstYear: firstYearOpt, lastYear, tipsMap, ref
     totalBuyCost,
     weightedAvgDuration,
     weightedAvgYield,
-    preLadderInterest, preLadderYears, preLadderPool,
+    preLadderInterest, preLadderYears, preLadderPool, preLadderCouponPool, preLadderAmdPool,
     zeroedFundedYears: [...zeroedFundedYears].sort((a, b) => a - b),
   };
 

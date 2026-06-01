@@ -293,6 +293,87 @@ test('drill popup: clicking Index Ratio in Level 2 opens Level 3 Index Ratio pop
   await expect(l3Popup).not.toBeVisible();
 });
 
+test('drill popup: clicking Pre-ladder credit opens Level 3 pool composition with AMD breakout', async ({ page }) => {
+  // Regression guard: the L3 handler must read `summary` in its own scope (it was previously
+  // block-scoped to the `if (drill)` branch, so clicking Pre-ladder credit threw and did nothing).
+  await page.locator('.tab-btn[data-mode="build"]').click();
+
+  const firstYearSel = page.locator('#first-year');
+  const fyCount = await firstYearSel.locator('option').count();
+  await firstYearSel.selectOption({ index: Math.min(5, fyCount - 1) }); // ~2032 → real pre-ladder window
+  const lastYearSel = page.locator('#last-year');
+  const lyCount = await lastYearSel.locator('option').count();
+  await lastYearSel.selectOption({ index: lyCount - 1 });               // 2066 → future-30Y cover exists
+
+  await page.locator('#dara').fill('100000');
+  await page.locator('#pre-ladder-interest').check();
+  await page.locator('#run-btn').click();
+  await expect(page.locator('#build-output')).toHaveCSS('display', 'block', { timeout: 4_000 });
+
+  // Find a funded year whose Amount popup has a drillable "Pre-ladder credit" line.
+  const amtCells = page.locator('#build-table td.drillable[data-col="amount"]');
+  const n = await amtCells.count();
+  expect(n, 'no drillable Amount cells rendered').toBeGreaterThan(0);
+
+  let found = false;
+  for (let i = 0; i < n; i++) {
+    await amtCells.nth(i).click();
+    await expect(page.locator('#drill-overlay')).toBeVisible({ timeout: 4_000 });
+    const plc = page.locator('.drill-l3[data-l3="plcpool"]');
+    if (await plc.count() > 0) {
+      await plc.first().click();
+      const l3 = page.locator('#shared-popup');
+      await expect(l3).toBeVisible();                                   // was failing: nothing happened
+      await expect(l3).toContainText('Pre-ladder pool composition');
+      await expect(l3).toContainText('Pre-ladder coupon interest');
+      await expect(l3).toContainText('Pre-ladder AMD');                 // the AMD breakout line
+      await l3.locator('#sp-close').click();
+      found = true;
+      break;
+    }
+    await page.locator('#drill-close').click();
+    await expect(page.locator('#drill-overlay')).not.toBeVisible();
+  }
+  expect(found, 'no funded year exposed a drillable Pre-ladder credit line').toBe(true);
+});
+
+test('drill popup: gap-year PLI credit drills into pool composition', async ({ page }) => {
+  // The Gap Amount popup lists each gap year's "↳ PLI credit"; each must drill into the shared
+  // pool composition (slice encoded in the data-l3 key as plcpool:<slice>).
+  await page.locator('.tab-btn[data-mode="build"]').click();
+  await page.locator('#first-year').selectOption({ label: '2036' });    // gaps 2037–2039 get PLI credit
+  const lastYearSel = page.locator('#last-year');
+  const lyCount = await lastYearSel.locator('option').count();
+  await lastYearSel.selectOption({ index: lyCount - 1 });               // 2066 → future-30Y cover → AMD in pool
+
+  await page.locator('#dara').fill('80000');
+  await page.locator('#pre-ladder-interest').check();
+  await page.locator('#run-btn').click();
+  await expect(page.locator('#build-output')).toHaveCSS('display', 'block', { timeout: 4_000 });
+
+  // Expand groups so bracket sub-rows (gapAmount cells) become visible.
+  const headers = page.locator('#build-table tbody tr.fy-group-header');
+  const hc = await headers.count();
+  for (let i = 0; i < hc; i++) await headers.nth(i).locator('td').first().click();
+
+  const gapCell = page.locator('#build-table td.drillable[data-col="gapAmount"]').first();
+  await expect(gapCell).toBeVisible();
+  await gapCell.click();
+  await expect(page.locator('#drill-overlay')).toBeVisible({ timeout: 4_000 });
+
+  const gapPli = page.locator('.drill-l3[data-l3^="plcpool:"]').first();
+  await expect(gapPli).toBeVisible();                                    // the "↳ PLI credit" line
+  await gapPli.click();
+
+  const l3 = page.locator('#shared-popup');
+  await expect(l3).toBeVisible();
+  await expect(l3).toContainText('Pre-ladder pool composition');
+  await expect(l3).toContainText('Pre-ladder AMD');
+  await expect(l3).toContainText('Applied to this year');
+  await l3.locator('#sp-close').click();
+  await expect(l3).not.toBeVisible();
+});
+
 // ── 9. Error handling ─────────────────────────────────────────────────────────
 test('rebalance: running without holdings file shows status error', async ({ page, context }) => {
   // Block the pre-populate fetch so no sample file is loaded into the input
