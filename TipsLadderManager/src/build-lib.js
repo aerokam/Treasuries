@@ -136,6 +136,10 @@ export function runBuild({ dara, firstYear: firstYearOpt, lastYear, tipsMap, ref
       costPerBond: cpb,
       fundedYearCost: fundedYearCost,
       isFuture30yCover,
+      // Designated gap bracket (2036 lower / 2040 upper). Stays flagged even when its excess
+      // sizes to 0 (gap fully covered by PLI/LMI/AMD), so the row keeps its "*" + a qty-0 excess
+      // sub-row whose Gap Amount drill shows why no excess is needed (required qty 0).
+      isGapBracket: gapYears.length > 0 && (year === lowerYear || year === upperYear),
       excessQty: excessQty,
       excessPrincipalTotal: excessQty * principalPerBond,
       excessOwnRungInt: excessQty * ownRungCouponPerBond,

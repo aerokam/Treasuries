@@ -107,7 +107,10 @@ export const COLS = [
 ];
 
 function isBracket(d, mode) {
-  return mode === 'rebal' ? (d.excessQtyBefore > 0 || d.excessQtyAfter > 0) : d.excessQty > 0;
+  if (mode === 'rebal') return d.excessQtyBefore > 0 || d.excessQtyAfter > 0;
+  // Build: designated gap brackets stay rendered as brackets even at 0 excess (gap covered by
+  // PLI/LMI/AMD) — the "*" + qty-0 excess sub-row remains, its drill explains the 0.
+  return d.excessQty > 0 || d.isGapBracket;
 }
 
 function isUpperBracket(d, summary, mode) {
