@@ -809,3 +809,40 @@ test('build variable DARA then rebalance: per-year panel shows proportional valu
   expect(netCash, 'net cash must be non-negative (self-funding)').toBeGreaterThanOrEqual(0);
   expect(netCash, 'net cash must be small (within $2,000)').toBeLessThan(2000);
 });
+
+// ── Full UI round-trip: build → export → import → rebalance (Future-30Y cover excess) ──
+// Regression for the bug where importing a built 2026–2066 ladder defaulted the rebalance
+// last-year to 2056 (longest actual TIPS), so the 2052/2056 Future-30Y cover excess was sold
+// to DARA. The last-year must be recovered (2066) from the cover excess so the round-trip is flat.
+test('round-trip: build 2026–2066 → export CUSIP/Qty → import → last-year recovers 2066, ~0 net cash', async ({ page }) => {
+  test.setTimeout(20_000);
+
+  // 1. Build 2026–2066 @ DARA 40k
+  await page.locator('.tab-btn[data-mode="build"]').click();
+  await page.locator('#last-year').selectOption({ value: '2066' });
+  await page.locator('#dara').fill('40000');
+  await page.locator('#run-btn').click();
+  await expect(page.locator('#build-output')).toHaveCSS('display', 'block', { timeout: 4_000 });
+
+  // 2. Export CUSIP/Qty (captures the Format-5 file the app produces)
+  const downloadPromise = page.waitForEvent('download');
+  await page.locator('#export-cusip-qty-btn').click();
+  const download = await downloadPromise;
+  const csvPath = test.info().outputPath('roundtrip.csv');
+  await download.saveAs(csvPath);
+
+  // 3. Switch to rebalance and import that exact file
+  await page.locator('.tab-btn[data-mode="rebalance"]').click();
+  await page.locator('#holdings-file').setInputFiles(csvPath);
+
+  // 4. The crux: last-year must default to 2066 (recovered from the 2052/2056 cover excess),
+  //    NOT 2056 — else the covers are sold and the round-trip is full of trades.
+  await expect(page.locator('#rebal-last-year')).toHaveValue('2066', { timeout: 4_000 });
+
+  // 5. Rebalance at the same DARA → near-zero net cash (build↔rebalance are internally consistent).
+  await page.locator('#dara').fill('40000');
+  await page.locator('#run-btn').click();
+  await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 6_000 });
+  const netCash = parseFloat((await page.locator('#net-cash-val').textContent()).replace(/[^0-9.-]/g, ''));
+  expect(Math.abs(netCash), 'round-trip net cash must be ~0').toBeLessThan(2000);
+});

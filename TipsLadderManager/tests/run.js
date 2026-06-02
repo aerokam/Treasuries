@@ -612,6 +612,39 @@ console.log('\nBuild→Rebalance NO-override round-trip — firstYear=2026, last
   console.log(`        inferredLast: ${inferredLast}  future30y up/lo: ${rS.future30yUpperExQty}/${rS.future30yLowerExQty}  |qtyDelta|: ${totalAbsQtyDelta}  netCash: ${Math.round(rS.costDeltaSum).toLocaleString()}`);
 }
 
+// ── Test: Build→Rebalance round-trip through the REAL export string + parse (PLI) ──
+// Regression for the Future-30Y import bug: mirrors the app's "Export CUSIP/Qty" → import path
+// exactly (serialize to cusip,qty,excess; re-parse via parseHoldingsCSV), with PLI on. The last
+// funded year must be recovered from the 2052/2056 cover excess so the round-trip is flat.
+console.log('\nBuild→Rebalance export-string round-trip — firstYear=2036, lastYear=2066, PLI, DARA=40000');
+{
+  const DARA = 40000, firstYear = 2036, lastYear = 2066;
+  const { details: bD, summary: bS } = runBuild({ dara: DARA, firstYear, lastYear, tipsMap, refCPI, settlementDate, preLadderInterest: true });
+  const zeroed = new Set(bS.zeroedFundedYears ?? []);
+
+  // Serialize exactly like index.html's export-cusip-qty handler
+  const rows = ['cusip,qty,excess'];
+  for (const d of bD) {
+    const f = d.fundedYearQty, e = d.excessQty;
+    if (f + e > 0) rows.push(`${d.cusip},${f},${e}`);
+    else if (zeroed.has(d.fundedYear)) rows.push(`${d.cusip},0,0`);
+  }
+  const holdings = parseHoldingsCSV(rows.join('\n'), tipsMap);   // same parser the app uses (Format 5)
+
+  const infLast = inferLastYearFromHoldings({ holdings, tipsMap, refCPI, settlementDate });
+  assert('PLI round-trip: last year recovered as 2066', infLast, 2066);
+
+  // Rebalance the way the (fixed) UI would: recovered last year, PLI on, no first-year override.
+  const { summary: rS, results: rR } = runRebalance({
+    dara: DARA, method: 'Full', bracketMode: '2bracket', holdings, tipsMap, refCPI, settlementDate,
+    preLadderInterest: true, lastYearOverride: infLast,
+  });
+  const totalAbsQtyDelta = rR.reduce((s, r) => s + Math.abs(r[9] ?? 0), 0);
+  assert('PLI round-trip: zero total |qtyDelta|', totalAbsQtyDelta <= 2, true);
+  assert('PLI round-trip: zero net cash', Math.abs(Math.round(rS.costDeltaSum)) <= 4000, true);
+  console.log(`        infLast=${infLast}  future30y up/lo: ${rS.future30yUpperExQty}/${rS.future30yLowerExQty}  |qtyDelta|=${totalAbsQtyDelta}  netCash=${Math.round(rS.costDeltaSum).toLocaleString()}`);
+}
+
 // ── Test: Build→Rebalance symmetry — Full method, default bracket mode ───────
 // Same scenario as the Gap-method test above, but with method='Full'.
 // 3-bracket is equivalent to 2-bracket here (firstYear=2036 = anchorBefore),
