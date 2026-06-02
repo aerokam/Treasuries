@@ -39,6 +39,23 @@ This document maps conceptual definitions from the [Master Glossary](../../knowl
 
 ---
 
+## Missing-Block Coverage & Ladder Bounds
+
+Concepts from 2.0 §Duration Matching and §Gap/Future-30Y, bound to code symbols. A *missing block* is a
+stretch of years whose TIPS have not yet been issued; each is duration-covered by a *pair* of real TIPS.
+
+| Concept | Code Symbol | Notes |
+|---|---|---|
+| First / Last Funded Year (ladder endpoints) | `firstYear` / `lastYear` | endpoints of the ladder, not bracket years |
+| Gap lower bracket / upper bracket (gap **bracket pair**) | `lowerYear`/`lowerCUSIP`, `upperYear`/`upperCUSIP` | latest Jan TIPS below the gap (canon. 2036) / 2040 |
+| Future-30Y lower cover / upper cover (Future-30Y **cover pair**) | `future30yLowerCoverBond` (2056) / `future30yUpperCoverBond` (2052) | longest actual TIPS / longest duration excl. 2056 |
+| Imported excess (cover/bracket excess from the file's excess column) | `h.excessQty` (Format 4/5 import) | a calculated field, only ever written by this app's export; records build intent, not user-edited |
+| First-funded-year recovery (reverse-engineer gap duration match) | `inferFirstYearFromHoldings` | gap side may use the excess→DARA ratio shortcut |
+| Last-funded-year recovery (reverse-engineer Future-30Y duration match) | `inferLastYearFromHoldings` | matches the imported cover split; user-overridable |
+| Upper-bracket coupon feedback (gap fixpoint) | `gapParamsWithUpperFeedback` | shared by build + rebalance; see 2.0 §Gap Year Coverage Model |
+
+---
+
 ## Project-Specific Details
 
 ### Settlement Date
