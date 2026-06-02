@@ -3,7 +3,7 @@
 
 import { bondCalcs, calculateMDuration, yieldFromPrice, calcMktWtdAvg } from '../../shared/src/bond-math.js';
 export { yieldFromPrice };
-import { interpolateYield, syntheticCoupon, bracketWeights, future30yUpperAmdSchedule, gapParamsCore, future30yParamsCore } from './gap-math.js';
+import { interpolateYield, syntheticCoupon, bracketWeights, future30yUpperAmdSchedule, gapParamsWithUpperFeedback, future30yParamsCore } from './gap-math.js';
 import { sizeLadder, selectLadderBonds } from './ladder-core.js';
 import { localDate, fmtDate, toDateStr } from './date-util.js';
 import { detectAccountType, allocateToAccounts, computeAccountCashFlows, generateFeasibilityReport } from './account-allocation.js';
@@ -227,10 +227,11 @@ function calculateGapParameters(gapYears, settlementDate, refCPI, tipsMap, DARA,
     if (extra > 0) gapLaterMaturityInterest[y] = (gapLaterMaturityInterest[y] ?? 0) + extra;
   }
 
-  // Shared sweep. Rebalance's "LMI above the gap" = gapLaterMaturityInterest (holdings/targets
-  // + future-cover excess), assembled above. Everything else is identical to build via gapParamsCore.
-  return gapParamsCore({
-    gapYears, tipsMap, settlementDate, dara: DARA, daraByYear,
+  // Shared sweep + 2040 upper-excess-coupon fixpoint. Rebalance's "LMI above the gap" =
+  // gapLaterMaturityInterest (holdings/targets + future-cover excess), assembled above.
+  // Everything else is identical to build via the shared gapParamsWithUpperFeedback.
+  return gapParamsWithUpperFeedback({
+    gapYears, tipsMap, settlementDate, refCPI, dara: DARA, daraByYear,
     lmiAboveByYear: gapLaterMaturityInterest, pliCreditByGapYear, amdByYear,
   });
 }
@@ -321,6 +322,62 @@ export function inferFirstYearFromHoldings({ holdings, tipsMap, refCPI, settleme
   const minGap = structuralGap[0], maxGap = structuralGap[structuralGap.length - 1];
   if (inferred < minGap || inferred > maxGap) return null;
   return inferred;
+}
+
+// Symmetric to inferFirstYearFromHoldings, for the OTHER end of the ladder.
+// Spec: 2.0 §Future 30Y Rungs. The file's EXCESS column at the Future-30Y cover years (latest 2056
+// lower + latest 2052 upper) signals the ladder extends past the last actual TIPS year (2056). The
+// number of synthetic rungs — i.e. lastYear — is encoded in the cost-weighted split between the two
+// covers, which is DARA-independent (it's a pure duration match). So we forward-reconstruct: for each
+// candidate lastYear, predict the upper-cover weight via the SAME future30yParamsCore + bracketWeights
+// the build uses, and return the year whose predicted split matches the file. Returns null when there
+// is no cover excess (ladder ends at the last actual TIPS) or the covers are missing — leaving the
+// contiguous-holdings derivation in place. A simple excess/DARA ratio (as the gap uses) does NOT work
+// here: the 2052 cover is deep-discount and a long Future-30Y block carries a large LMI cascade.
+export function inferLastYearFromHoldings({ holdings, tipsMap, refCPI, settlementDate }) {
+  const MAX_LAST_YEAR = 2066;   // longest fundable Future-30Y rung (30Y TIPS issued Feb, max 10 past 2056)
+  let cover2056 = null, cover2052 = null, maxTipsYear = 0;
+  for (const b of tipsMap.values()) {
+    if (!b.maturity) continue;
+    const yr = b.maturity.getFullYear();
+    maxTipsYear = Math.max(maxTipsYear, yr);
+    if (yr === 2056 && (!cover2056 || b.maturity > cover2056.maturity)) cover2056 = b;
+    if (yr === 2052 && (!cover2052 || b.maturity > cover2052.maturity)) cover2052 = b;
+  }
+  if (!cover2056 || !cover2052) return null;
+
+  // Observed cover excess from the file (Format 4/5 only — excessQty must be present).
+  const coverHoldings = holdings.filter(h => {
+    const yr = tipsMap.get(h.cusip)?.maturity?.getFullYear();
+    return yr === 2052 || yr === 2056;
+  });
+  if (!coverHoldings.length || !coverHoldings.every(h => h.excessQty != null)) return null;
+  const exAt = (yr) => coverHoldings
+    .filter(h => tipsMap.get(h.cusip).maturity.getFullYear() === yr)
+    .reduce((s, h) => s + (h.excessQty ?? 0), 0);
+  const obsLo = exAt(2056), obsUp = exAt(2052);
+  if (obsLo + obsUp <= 0) return null;   // no Future-30Y excess → ladder ends at maxTipsYear
+
+  const irL = refCPI / (cover2056.baseCpi ?? refCPI), irU = refCPI / (cover2052.baseCpi ?? refCPI);
+  const cpb2056 = (cover2056.price ?? 0) / 100 * irL * 1000;
+  const cpb2052 = (cover2052.price ?? 0) / 100 * irU * 1000;
+  if (!(cpb2056 > 0) || !(cpb2052 > 0)) return null;
+  const dur2056 = calculateMDuration(settlementDate, cover2056.maturity, cover2056.coupon ?? 0, cover2056.yield ?? 0);
+  const dur2052 = calculateMDuration(settlementDate, cover2052.maturity, cover2052.coupon ?? 0, cover2052.yield ?? 0);
+
+  // Cost-weighted observed upper weight, matched against the build's predicted weight per candidate year.
+  const obsUW = (obsUp * cpb2052) / ((obsUp * cpb2052) + (obsLo * cpb2056));
+  const NOMINAL_DARA = 100000;   // predicted upper weight is scale-invariant; any nominal DARA works
+  let best = null;
+  for (let L = maxTipsYear + 1; L <= MAX_LAST_YEAR; L++) {
+    const years = [];
+    for (let y = maxTipsYear + 1; y <= L; y++) years.push(y);
+    const fp = future30yParamsCore({ future30yYears: years, coverBond2056: cover2056, settlementDate, dara: NOMINAL_DARA });
+    const { upperWeight } = bracketWeights(dur2056, dur2052, fp.avgDuration);
+    const err = Math.abs(upperWeight - obsUW);
+    if (!best || err < best.err) best = { L, err };
+  }
+  return best ? best.L : null;
 }
 
 export function inferDARAFromCash({ bracketMode = '2bracket', holdings: holdingsRaw, tipsMap, refCPI, settlementDate, lastYearOverride = null, preLadderInterest = false, firstYearOverride = null }) {
@@ -425,6 +482,14 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
   }
   const derivedLastYear = lastYear;  // save before override for sell-above-lastYear logic
   if (lastYearOverride != null && !isNaN(lastYearOverride)) lastYear = lastYearOverride;
+  else {
+    // No explicit last year: the contiguous-holdings walk caps at the longest actual TIPS (2056) and
+    // can't see Future-30Y rungs, which live as EXCESS at the 2052/2056 covers. Infer lastYear from
+    // that excess (symmetric to firstYear inference from gap-bracket excess) so the round-trip
+    // preserves the future cover excess instead of selling it to DARA.
+    const inferredLast = inferLastYearFromHoldings({ holdings: holdingsRaw, tipsMap, refCPI, settlementDate });
+    if (inferredLast != null && inferredLast > lastYear) lastYear = inferredLast;
+  }
   if (firstYearOverride != null && !isNaN(firstYearOverride)) firstYear = firstYearOverride;
 
   const tipsMapYears = new Set();

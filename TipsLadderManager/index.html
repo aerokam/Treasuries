@@ -406,7 +406,7 @@
 </div>
 
 <script type="module">
-import { buildTipsMapFromYields, localDate, runRebalance, runMultiAccountRebalance, inferScaledDARAFromPortfolio, inferFirstYearFromHoldings, yieldFromPrice, fmtDate } from './src/rebalance-lib.js';
+import { buildTipsMapFromYields, localDate, runRebalance, runMultiAccountRebalance, inferScaledDARAFromPortfolio, inferFirstYearFromHoldings, inferLastYearFromHoldings, yieldFromPrice, fmtDate } from './src/rebalance-lib.js';
 import { runBuild, MAX_LAST_YEAR } from './src/build-lib.js';
 import { renderTable, COLS } from './src/render.js';
 import { buildDrillHTML, buildDurationPopupRows, buildFuture30yDurationPopupRows, buildIndexRatioDrill, buildRefCpiDrill, buildPIPerBondDrill, buildPreLadderPoolDrill } from './src/drill.js';
@@ -1049,8 +1049,19 @@ function updateRebalLastYearDropdown() {
   const _gapSet = new Set(_gapYears);
 
   // Infer default: if gap ends right before derivedLastYear, suggest last gap year
-  const _defaultLY = _gapYears.length > 0 && _gapYears[_gapYears.length - 1] + 1 === _derivedLY
+  let _defaultLY = _gapYears.length > 0 && _gapYears[_gapYears.length - 1] + 1 === _derivedLY
     ? _gapYears[_gapYears.length - 1] : _derivedLY;
+  // Future-30Y: the contiguous walk caps at the longest actual TIPS (2056). If the file carries
+  // EXCESS at the 2052/2056 covers, the ladder extends past 2056 — infer that lastYear from the
+  // excess (symmetric to first-year inference from gap excess) so import preserves the cover excess.
+  {
+    const _refCPI = refCpiRows && (activeRefCpiDateStr ?? _defaultRefCpiDateStr)
+      ? lookupRefCpi(refCpiRows, activeRefCpiDateStr ?? _defaultRefCpiDateStr) : 0;
+    if (_refCPI > 0 && settlementDate) {
+      const _inferredLast = inferLastYearFromHoldings({ holdings: currentHoldingsArray, tipsMap, refCPI: _refCPI, settlementDate });
+      if (_inferredLast != null && _inferredLast > _defaultLY) _defaultLY = _inferredLast;
+    }
+  }
 
   // Preserve current selection if valid, else use inferred default
   const _curVal = sel.value ? parseInt(sel.value, 10) : NaN;

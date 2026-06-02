@@ -2,10 +2,14 @@
 
 _Last updated: 2026-06-02 · Branch: `amd-option-c-and-gap-unification`_
 
-## Current state — GREEN
-- **Unit:** 107/107 (`npm test`)
+## Current state — GREEN (uncommitted work in tree)
+- **Unit:** 113/113 (`npm test`)
 - **E2E:** 42/42 (`npm run test:e2e`)
-- Working tree clean except **`tests/SchwabAllAccounts.csv`** (your uncommitted edit — left untouched).
+- Uncommitted this session: the 2040 gap-excess fixpoint (#2) AND the Future-30Y last-year inference (below). Plus your own `tests/*AllAccounts.csv` edits (left untouched).
+
+## Uncommitted fix — Future-30Y last-year inference (export→import round-trip)
+**Bug:** build 2026–2066 (DARA 40k) → Export CUSIP/Qty (excess at 2052/2056 correct) → import → rebalance **sold the 2052/2056 excess down to DARA**. Root cause: `firstYear` was auto-inferred from gap-bracket excess, but `lastYear` was NOT inferred from Future-30Y cover excess — rebalance capped `lastYear` at the longest actual TIPS (2056), so the future rungs vanished. (Long-standing asymmetry, not today's gap fix.)
+**Fix:** new `inferLastYearFromHoldings` (rebalance-lib) — symmetric to `inferFirstYearFromHoldings`; forward-reconstructs the candidate `lastYear` whose 2052/2056 cover split matches the file (DARA-free duration match; a simple ratio misinfers due to the deep-discount 2052 + long LMI cascade). Wired as: (a) engine default in `runRebalance` when no `lastYearOverride`; (b) UI `rebal-last-year` default on import (index.html). Regression test added (build→rebalance with NO year overrides → 0 trades, excess preserved). Specs: 2.0 §Future 30Y Rungs.
 
 ---
 
@@ -24,14 +28,15 @@ _Last updated: 2026-06-02 · Branch: `amd-option-c-and-gap-unification`_
 
 ## Next steps (start here next session)
 
-### 1. Verify PLI-uncheck behavior  ← FRESH OBSERVATION, do first
-With **Pre-Ladder Interest CHECKED**, the gap-bracket display is correct (2036/2040 show `*` + qty-0 excess, gap covered by the pool).
-With PLI **UNCHECKED**, you observed **"no change"** — but it *should* change: at DARA 80,000 / firstYear 2036 / lastYear 2066, PLI-off produces **real gap excess (~57 bonds at 2036, ~47 at 2040)**.
-- **To check:** uncheck PLI, click **Run again** (the build only recomputes on Run), and confirm 2036/2040 show real excess quantities — not still 0.
-- If it stays 0 after re-running, that's a real bug: trace whether the PLI checkbox state reaches `runBuild({ preLadderInterest })` and whether `lowerExQty`/`upperExQty` come back non-zero. (Node check: `sizeLadder` with `preLadderInterest:false` gave 57/47 — so the engine is right; suspect the UI wiring or a stale render.)
+### 1. Verify PLI-uncheck behavior  ← RESOLVED 2026-06-02: NOT A BUG
+Reproduced in a headless Playwright drive (DARA 80,000 / 2036–2066, build mode). The table **does** change with PLI when Run is re-clicked:
+- PLI **unchecked**: 2036 excess **57** (107,165), 2040 excess **47** (132,164).
+- PLI **checked**: 2036 excess **0**, 2040 excess **2** (3,018).
 
-### 2. (Pinned) 2040 gap-excess circularity
-Gap upper bracket (2040) excess coupon isn't fed back into gap sizing — currently approximated; cancels in build↔rebalance so symmetry holds. Revisit now that unification is done. See memory `project_2040_gap_excess_circularity`.
+The earlier "no change" was the **Run-gate**: the build only recomputes on **Build Ladder** click, so toggling PLI without re-running shows the stale prior render. Verified clean: engine PLI-sensitive (57/47 vs 0/0), wiring reads `#pre-ladder-interest`.checked → `runBuild` (index.html:1999), checkbox visible in build mode (index.html:587), and `isBracket`'s gap-bracket OR-logic doesn't clobber non-zero excess. No code change needed.
+
+### 2. 2040 gap-excess circularity — RESOLVED 2026-06-02 (View A)
+Upper-bracket (2040) excess coupon is now credited into gap sizing via a shared fixpoint `gapParamsWithUpperFeedback` (`gap-math.js`), called by both `calcGapParams` (build) and `calculateGapParameters` (rebalance) — equal inputs → equal output, so the 0-trade round-trip is preserved by construction. Effect: gap brackets 57/47 → 55/45 (~2 fewer bonds each, removes ~3% over-coverage). Specs 2.0/4.0 updated; one unit tolerance widened (avgAmt≈DARA 200→300). Unit 107/107, e2e 42/42. See memory `project_2040_gap_excess_circularity`.
 
 ### 3. (Open) Long-tier TIPS buying in Joint (taxable)
 2040/2041 TIPS still allocated to taxable (Joint) despite swap-credit + CUSIP-transition fixes; root cause unknown. Multi-account allocation (`account-allocation.js`). See memory `project_long_tier_joint_bug`.

@@ -137,6 +137,57 @@ export function gapParamsCore({ gapYears, tipsMap, settlementDate, dara, daraByY
   return { avgDuration, totalCost, breakdown, gapLMITotal };
 }
 
+// ─── Gap params with upper-bracket excess-coupon feedback (View A fixpoint) ─────
+// Spec: 2.0 §Gap Year Coverage Model. The gap's upper bracket (2040) holds EXCESS TIPS,
+// sized from the gap's total cost, whose coupon is paid through the gap years it spans.
+// Like every other rung's coupon, that excess coupon is income arriving in the gap years and
+// must size the gap synthetic quantities down — but upperExQty depends on the gap totalCost,
+// which depends on this coupon. That's a contraction map (the term is ~1% of gap cost), so we
+// iterate to a fixed point (converges in ~2 steps). Both build and rebalance call this with
+// their own lmiAboveByYear, so equal inputs → equal output → the build↔rebalance round-trip
+// stays exact. Falls back to plain gapParamsCore when bracket bonds can't be resolved.
+// (3-bracket rebalance reuses the same 2-bracket upper weight here — the feedback is a tiny,
+// second-order term and 3-bracket is not round-trip-symmetry-checked against build.)
+export function gapParamsWithUpperFeedback(args) {
+  const { gapYears, tipsMap, settlementDate, refCPI, creditUpperExcess = true } = args;
+  if (!creditUpperExcess || !gapYears?.length || !refCPI) return gapParamsCore(args);
+
+  const minGapYear = Math.min(...gapYears), maxGapYear = Math.max(...gapYears);
+  // Bracket bonds (same anchors gapParamsCore uses): lower = highest Jan TIPS strictly below
+  // the gap; upper = nearest Feb TIPS above. Only the UPPER coupon flows up into the gap years
+  // (the lower bracket matures before them), so only it feeds back here.
+  let lowerBond = null, upperBond = null;
+  for (const b of tipsMap.values()) {
+    if (!b.maturity || !b.yield) continue;
+    const yr = b.maturity.getFullYear(), mo = b.maturity.getMonth() + 1;
+    if (mo === 1 && yr < minGapYear && (!lowerBond || yr > lowerBond.maturity.getFullYear())) lowerBond = b;
+    if (mo === 2 && yr > maxGapYear && (!upperBond || b.maturity < upperBond.maturity)) upperBond = b;
+  }
+  if (!lowerBond || !upperBond) return gapParamsCore(args);
+
+  const upperYear = upperBond.maturity.getFullYear();
+  const irU = refCPI / (upperBond.baseCpi ?? refCPI);
+  const upperCPB = (upperBond.price ?? 0) / 100 * irU * 1000;          // cost per bond (real $)
+  const upperAnnCpnPerBond = 1000 * irU * (upperBond.coupon ?? 0);     // annual coupon per bond (real $)
+  if (!(upperCPB > 0) || !(upperAnnCpnPerBond > 0)) return gapParamsCore(args);
+
+  const lowerDur = calculateMDuration(settlementDate, lowerBond.maturity, lowerBond.coupon ?? 0, lowerBond.yield ?? 0);
+  const upperDur = calculateMDuration(settlementDate, upperBond.maturity, upperBond.coupon ?? 0, upperBond.yield ?? 0);
+  const baseLMI = args.lmiAboveByYear ?? {};
+
+  let extra = 0, params = null;
+  for (let i = 0; i < 6; i++) {
+    const lmi = { ...baseLMI, [upperYear]: (baseLMI[upperYear] ?? 0) + extra };
+    params = gapParamsCore({ ...args, lmiAboveByYear: lmi });
+    const { upperWeight } = bracketWeights(lowerDur, upperDur, params.avgDuration);
+    const upperExQty = Math.round(params.totalCost * upperWeight / upperCPB);
+    const newExtra = upperExQty * upperAnnCpnPerBond;
+    if (newExtra === extra) break;   // fixed point: params already reflects this extra
+    extra = newExtra;
+  }
+  return params;
+}
+
 // ─── Future 30Y parameters core (shared by build and rebalance) ────────────────
 // Spec: 2.0 §Future 30Y Rungs, §Duration Matching. Hypothetical 30Y TIPS sized off the 2056
 // cover bond's yield as a flat-curve anchor (coupon = syntheticCoupon(yield2056)). No actual

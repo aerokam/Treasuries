@@ -10,14 +10,15 @@
 // truth that kills the build↔rebalance duplication.
 
 import { bondCalcs, calculateMDuration } from '../../shared/src/bond-math.js';
-import { bracketWeights, bracketExcessQtys, fyQty as _fyQty, gapParamsCore, future30yParamsCore, future30yUpperAmdSchedule } from './gap-math.js';
+import { bracketWeights, bracketExcessQtys, fyQty as _fyQty, gapParamsWithUpperFeedback, future30yParamsCore, future30yUpperAmdSchedule } from './gap-math.js';
 
 // ─── Gap parameters adapter ─────────────────────────────────────────────────────
 // Build's "LMI above the gap" = prelim funded-year coupon (effective prelim: zeroed years = 0).
+// Sizing (incl. the 2040 upper-excess-coupon fixpoint) lives in the shared gapParamsWithUpperFeedback.
 function calcGapParams(gapYears, tipsMap, settlementDate, refCPI, dara, prelim, pliCreditByGapYear = {}, daraByYear = null, amdByYear = null) {
   const lmiAboveByYear = {};
   for (const [y, p] of Object.entries(prelim)) lmiAboveByYear[y] = p.annualInterest;
-  return gapParamsCore({ gapYears, tipsMap, settlementDate, dara, daraByYear, lmiAboveByYear, pliCreditByGapYear, amdByYear });
+  return gapParamsWithUpperFeedback({ gapYears, tipsMap, settlementDate, refCPI, dara, daraByYear, lmiAboveByYear, pliCreditByGapYear, amdByYear });
 }
 
 // ─── Future 30Y parameters adapter ──────────────────────────────────────────────

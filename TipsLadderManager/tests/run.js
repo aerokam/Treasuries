@@ -4,7 +4,7 @@
 
 import { readFileSync, readdirSync, existsSync } from 'fs';
 import path from 'path';
-import { buildTipsMapFromYields, localDate, runRebalance, inferDARAFromCash, inferScaledDARAFromPortfolio, inferFirstYearFromHoldings, runMultiAccountRebalance } from '../src/rebalance-lib.js';
+import { buildTipsMapFromYields, localDate, runRebalance, inferDARAFromCash, inferScaledDARAFromPortfolio, inferFirstYearFromHoldings, inferLastYearFromHoldings, runMultiAccountRebalance } from '../src/rebalance-lib.js';
 import { runBuild } from '../src/build-lib.js';
 import { parseBrokerCSV } from '../src/broker-import.js';
 import { nextBondTradingDay, parseBondHolidays } from '../src/data.js';
@@ -461,7 +461,11 @@ console.log('\nBuild — DARA=50000, lastYear=2040');
   const numRungs = lastYear - firstYear + 1;
   const totalAmt = details.reduce((s, d) => s + (d.fundedYearAmt ?? 0) + (d.excessAmt ?? 0), 0);
   const avgAmt = totalAmt / numRungs;
-  assert('avgAmt ≈ DARA (gap LMI included)', avgAmt, dara, 200);
+  // Tolerance 300 (was 200): the 2040 upper-excess-coupon fixpoint (View A, gap-math
+  // gapParamsWithUpperFeedback) trims ~2 bonds/bracket of over-coverage, so the displayed
+  // average dips a hair below DARA and the integer-rounding residual of this approximate
+  // coverage invariant shifts by ~10–50. Still <0.6% of DARA.
+  assert('avgAmt ≈ DARA (gap LMI included)', avgAmt, dara, 300);
   console.log(`        totalBuyCost:  ${Math.round(summary.totalBuyCost).toLocaleString()}`);
   console.log(`        lowerYear:     ${summary.lowerYear}, upperYear: ${summary.upperYear}`);
   console.log(`        weights:       ${summary.lowerWeight.toFixed(4)} / ${summary.upperWeight.toFixed(4)}`);
@@ -511,7 +515,7 @@ console.log('\nBuild — firstYear=2036, lastYear=2056, preLadderInterest=true')
   const numRungs = lastYear - firstYear + 1;
   const totalAmt = details.reduce((s, d) => s + (d.fundedYearAmt ?? 0) + (d.excessAmt ?? 0), 0);
   const avgAmt = totalAmt / numRungs;
-  assert('avgAmt ≈ DARA with PLI (gap LMI included)', avgAmt, dara, 200);
+  assert('avgAmt ≈ DARA with PLI (gap LMI included)', avgAmt, dara, 300); // see note above (fixpoint shifts residual)
   console.log(`        lowerYear: ${summary.lowerYear}, upperYear: ${summary.upperYear}`);
   console.log(`        lowerExQty: ${summary.lowerExQty}, upperExQty: ${summary.upperExQty}`);
   console.log(`        zeroedFundedYears: [${summary.zeroedFundedYears?.join(', ')}]`);
@@ -577,6 +581,35 @@ console.log('\nBuild→Rebalance symmetry — firstYear=2036, lastYear=2065, PLI
   console.log(`        Build total cost:  ${Math.round(buildSummary.totalBuyCost).toLocaleString()}`);
   console.log(`        Rebal net cash:    ${Math.round(rebalSummary.costDeltaSum).toLocaleString()}`);
   console.log(`        Total |qtyDelta|:  ${totalAbsQtyDelta}`);
+}
+
+// ── Test: Build→Rebalance round-trip with NO year overrides — Future-30Y excess ──
+// Regression: build 2026–2066 (default DARA), export CUSIP/Qty/excess, import, rebalance
+// WITHOUT setting first/last year. lastYear must be INFERRED from the 2052/2056 cover excess
+// (inferLastYearFromHoldings) so the round-trip preserves it instead of selling to DARA.
+console.log('\nBuild→Rebalance NO-override round-trip — firstYear=2026, lastYear=2066, DARA=40000');
+{
+  const DARA = 40000, firstYear = settlementDate.getFullYear(), lastYear = 2066;
+  const { details: bD, summary: bS } = runBuild({ dara: DARA, firstYear, lastYear, tipsMap, refCPI, settlementDate });
+  const holdings = bD
+    .map(d => ({ cusip: d.cusip, qty: d.fundedYearQty + d.excessQty, excessQty: d.excessQty }))
+    .filter(h => h.qty > 0);
+
+  // Direct inference check
+  const inferredLast = inferLastYearFromHoldings({ holdings, tipsMap, refCPI, settlementDate });
+  assert('inferLastYear from build holdings === 2066', inferredLast, 2066);
+
+  // Rebalance with NO firstYearOverride / NO lastYearOverride — must self-infer.
+  const { summary: rS, results: rR } = runRebalance({
+    dara: DARA, method: 'Full', bracketMode: '2bracket', holdings, tipsMap, refCPI, settlementDate,
+  });
+  assert('NO-override rebal infers lastYear 2066', rS.lastYear, 2066);
+  assert('NO-override rebal preserves 2052 upper cover excess', rS.future30yUpperExQty, bS.future30yUpperExQty);
+  assert('NO-override rebal preserves 2056 lower cover excess', rS.future30yLowerExQty, bS.future30yLowerExQty);
+  const totalAbsQtyDelta = rR.reduce((s, r) => s + Math.abs(r[9] ?? 0), 0);
+  assert('NO-override round-trip: zero total |qtyDelta|', totalAbsQtyDelta <= 2, true);
+  assert('NO-override round-trip: zero net cash', Math.abs(Math.round(rS.costDeltaSum)) <= 4000, true);
+  console.log(`        inferredLast: ${inferredLast}  future30y up/lo: ${rS.future30yUpperExQty}/${rS.future30yLowerExQty}  |qtyDelta|: ${totalAbsQtyDelta}  netCash: ${Math.round(rS.costDeltaSum).toLocaleString()}`);
 }
 
 // ── Test: Build→Rebalance symmetry — Full method, default bracket mode ───────
