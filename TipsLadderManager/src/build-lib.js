@@ -3,9 +3,9 @@
 //
 // Entry point: runBuild({ dara, lastYear, tipsMap, refCPI, settlementDate })
 
-import { fmtDate } from './rebalance-lib.js';
+import { fmtDate } from './date-util.js';
 import { bondCalcs, calculateMDuration, rungAmount, calcMktWtdAvg } from '../../shared/src/bond-math.js';
-import { sizeLadder } from './ladder-core.js';
+import { sizeLadder, selectLadderBonds } from './ladder-core.js';
 
 export const MAX_LAST_YEAR = 2066;
 
@@ -29,91 +29,13 @@ export function runBuild({ dara, firstYear: firstYearOpt, lastYear, tipsMap, ref
   const settleDateDisp = fmtDate(settlementDate);
   const settlementYear = settlementDate.getFullYear();
 
-  // 1. Build yearBondMap: for each year in [firstYear, lastYear],
-  //    pick the latest-maturing TIPS that matures after settlement.
-  const yearBondMap = {};
-  for (const bond of tipsMap.values()) {
-    if (!bond.maturity || bond.maturity <= settlementDate) continue;
-    const yr = bond.maturity.getFullYear();
-    if (yr < firstYear || yr > lastYear) continue;
-    if (!yearBondMap[yr] || (maturityPref === 'first' ? bond.maturity < yearBondMap[yr].maturity : bond.maturity > yearBondMap[yr].maturity))
-      yearBondMap[yr] = bond;
-  }
-
-  let rangeYears = Object.keys(yearBondMap).map(Number).sort((a, b) => a - b);
-
-  // Find the maximum year with actual TIPS data
-  let maxTipsYear = 0;
-  for (const bond of tipsMap.values()) {
-    if (bond.maturity) maxTipsYear = Math.max(maxTipsYear, bond.maturity.getFullYear());
-  }
-
-  // Gap years: within actual TIPS range but no TIPS issued.
-  // Future 30Y years: beyond maxTipsYear (hypothetical, covered by future 30Y cover pair).
-  const gapYears = [], future30yYears = [];
-  for (let y = firstYear; y <= lastYear; y++) {
-    if (!yearBondMap[y]) {
-      if (y > maxTipsYear) future30yYears.push(y);
-      else gapYears.push(y);
-    }
-  }
-
-  // If gap years exist and 2040 is not already in range, add the 2040 bond (upper bracket)
-  // so its coupons count as laterMatInt for earlier years.
-  if (gapYears.length > 0 && !yearBondMap[2040]) {
-    for (const bond of tipsMap.values()) {
-      if (!bond.maturity) continue;
-      if (bond.maturity.getFullYear() !== 2040) continue;
-      if (!yearBondMap[2040] || bond.maturity > yearBondMap[2040].maturity)
-        yearBondMap[2040] = bond;
-    }
-    if (!yearBondMap[2040])
-      throw new Error('No TIPS available in 2040 for upper bracket');
-    rangeYears = [...rangeYears, 2040].sort((a, b) => a - b);
-  }
-
-  // Ensure the lower bracket (nearest pre-gap Jan TIPS, currently 2036) is in yearBondMap/rangeYears.
-  // Required when firstYear is inside the gap: the lower bracket year is < firstYear and holds only
-  // excess TIPS for duration matching (fundedYearQty = 0; no funded year component).
-  if (gapYears.length > 0) {
-    const minGapYearTmp = Math.min(...gapYears);
-    let lbBond = null;
-    for (const bond of tipsMap.values()) {
-      if (!bond.maturity || !bond.yield) continue;
-      const yr = bond.maturity.getFullYear(), mo = bond.maturity.getMonth() + 1;
-      if (mo === 1 && yr < minGapYearTmp && (!lbBond || yr > lbBond.maturity.getFullYear()))
-        lbBond = bond;
-    }
-    if (lbBond) {
-      const lbYear = lbBond.maturity.getFullYear();
-      if (!yearBondMap[lbYear]) {
-        yearBondMap[lbYear] = lbBond;
-        rangeYears = [...rangeYears, lbYear].sort((a, b) => a - b);
-      }
-    }
-  }
+  // 1. Canonical ladder bond selection (shared with rebalance — single source of truth).
+  const {
+    yearBondMap, rangeYears, gapYears, future30yYears,
+    future30yLowerYear, future30yUpperYear, future30yLowerCoverBond, future30yUpperCoverBond,
+  } = selectLadderBonds({ tipsMap, firstYear, lastYear, settlementDate, maturityPref });
 
   if (!rangeYears.length) throw new Error('No TIPS bonds found in the specified year range');
-
-  // ── Future 30Y cover pair identification ─────────────────────────────────────
-  // future30yLower = 2056 (shorter duration due to higher coupon on recently-issued 30y TIPS)
-  // future30yUpper = 2052 (longer duration: near-zero coupon from 2022 issuance ≈ zero-coupon bond)
-  let future30yLowerYear = null, future30yUpperYear = null;
-  let future30yLowerCoverBond = null, future30yUpperCoverBond = null;
-  if (future30yYears.length > 0) {
-    for (const bond of tipsMap.values()) {
-      if (!bond.maturity) continue;
-      const yr = bond.maturity.getFullYear();
-      if (yr === 2056 && (!future30yLowerCoverBond || bond.maturity > future30yLowerCoverBond.maturity))
-        future30yLowerCoverBond = bond;
-      if (yr === 2052 && (!future30yUpperCoverBond || bond.maturity > future30yUpperCoverBond.maturity))
-        future30yUpperCoverBond = bond;
-    }
-    if (!future30yLowerCoverBond) throw new Error('No 2056 TIPS found for Future 30Y lower cover');
-    if (!future30yUpperCoverBond) throw new Error('No 2052 TIPS found for Future 30Y upper cover');
-    future30yLowerYear = 2056;
-    future30yUpperYear = 2052;
-  }
 
   // 2-5. Shared sizing pipeline — prelim, future-30Y/AMD, PLI, gap/excess, corrected sweep.
   //        Lives in ladder-core.js: the IDENTICAL code path build and rebalance both run.

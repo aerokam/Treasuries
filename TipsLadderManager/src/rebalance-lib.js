@@ -4,28 +4,12 @@
 import { bondCalcs, calculateMDuration, yieldFromPrice, calcMktWtdAvg } from '../../shared/src/bond-math.js';
 export { yieldFromPrice };
 import { interpolateYield, syntheticCoupon, bracketWeights, future30yUpperAmdSchedule, gapParamsCore, future30yParamsCore } from './gap-math.js';
+import { sizeLadder, selectLadderBonds } from './ladder-core.js';
+import { localDate, fmtDate, toDateStr } from './date-util.js';
 import { detectAccountType, allocateToAccounts, computeAccountCashFlows, generateFeasibilityReport } from './account-allocation.js';
 
-export function localDate(str) {
-  if (!str) return null;
-  const parts = str.split('-').map(Number);
-  if (parts.length !== 3) {
-    console.log('localDate invalid format:', str);
-    return null;
-  }
-  const [y, m, d] = parts;
-  const dt = new Date(y, m - 1, d);
-  if (isNaN(dt.getTime())) {
-    console.log('localDate invalid date:', str);
-  }
-  return dt;
-}
-
-function toDateStr(d) { return d.toISOString().split('T')[0]; }
-export function fmtDate(d) {
-  if (!d) return '';
-  return d.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
-}
+// Re-export date helpers so existing importers (index.html, tests) keep working.
+export { localDate, fmtDate };
 
 function calculatePIPerBond(cusip, maturity, refCPI, tipsMap) {
   const bond = tipsMap.get(cusip);
@@ -517,9 +501,12 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
       ? (definedARAValues[_araMid - 1] + definedARAValues[_araMid]) / 2
       : definedARAValues[_araMid];
   const rungCount    = lastYear - firstYear + 1;
-  const inferredDARA = medianARA;
+  // Provisional inference (AMD-excluded). Corrected below once the AMD schedule exists:
+  // build credits each funded year's DARA with held-to-maturity 2052 AMD (Option C), so the
+  // raw P+I+LMI median understates DARA by ~one year's AMD. See AMD-inclusive correction.
+  let inferredDARA = medianARA;
   const isFullMode   = (method === 'Full');
-  const DARA         = dara !== null ? dara : inferredDARA;
+  let DARA           = dara !== null ? dara : inferredDARA;
   const settlementYear = settlementDate.getFullYear();
 
   // ── Phase 3.1: Future cover pair identification and params (BEFORE PLI pass and gap params)
@@ -583,93 +570,50 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
     return future30yUpperAnnualAmdByYear.get(year) ?? 0;
   }
 
-  // ── PLI zeroing pass (mirrors build-lib §3b) ──────────────────────────────────
-  // Single interleaved pass short→long: gap years consume pool before longer funded years.
-  const zeroedFundedYears = new Set();
-  const pliCreditByFundedYear = {};
-  const pliCreditByGapYear = {};
-  let preLadderPool = 0;
-  let preLadderCouponPool = 0;   // coupon-interest portion of the pre-ladder pool
-  let preLadderAmdPool = 0;      // AMD portion: excess 2052 discount realized in pre-ladder years
-  let partialCreditYear = null, partialCredit = 0;
-
-  if (preLadderInterest) {
-    const preLadderYears = Math.max(0, firstYear - settlementDate.getFullYear());
-    if (preLadderYears > 0) {
-      // Prelim sweep (long→short) over actual TIPS years: funded-qty-based annual interest only.
-      // Mirrors build-lib's prelim phase — must NOT include excess bracket quantities in the pool,
-      // otherwise the pool is inflated and too many years get zeroed.
-      let runningPrelimLMI = 0;
-      const prelimFundedAnnualInt = {};
-      const actualYearsLongToShort = Object.keys(yearInfo).map(Number)
-        .filter(y => y >= firstYear && y <= lastYear)
-        .sort((a, b) => b - a);
-      for (const year of actualYearsLongToShort) {
-        const sortedH = [...yearInfo[year].holdings].sort((a, b) => b.maturity - a.maturity);
-        const targetH = sortedH[0];
-        if (!targetH) continue;
-        const b = tipsMap.get(targetH.cusip);
-        if (!b) continue;
-        const ir = refCPI / (b.baseCpi ?? refCPI);
-        const piPB = calculatePIPerBond(targetH.cusip, targetH.maturity, refCPI, tipsMap);
-        const yearDara = daraByYear?.get(year) ?? DARA;
-        const fyQty = Math.max(0, Math.round((yearDara - runningPrelimLMI) / piPB));
-        const annInt = fyQty * 1000 * ir * (b.coupon ?? 0);
-        prelimFundedAnnualInt[year] = annInt;
-        runningPrelimLMI += annInt;
-      }
-
-      const totalAnnualInt = Object.values(prelimFundedAnnualInt).reduce((s, v) => s + v, 0);
-      preLadderCouponPool = preLadderYears * totalAnnualInt;
-      for (let y = settlementYear; y < firstYear; y++) preLadderAmdPool += calcFuture30yUpperAnnualAmd(y);
-      preLadderPool = preLadderCouponPool + preLadderAmdPool;
-
-      const gapYearSetForPLI = new Set(gapYears);
-      const future30yYearSetForPLI = new Set(future30yYears);
-      let remaining = preLadderPool;
-      for (let year = firstYear; year <= lastYear; year++) {
-        if (remaining <= 0) break;
-        if (gapYearSetForPLI.has(year)) {
-          // Gap year: estimate need using funded-year-based LMI above (matches build-lib)
-          const actualTIPSLMI = Object.entries(prelimFundedAnnualInt)
-            .filter(([y]) => parseInt(y) > year)
-            .reduce((s, [, v]) => s + v, 0);
-          // AMD reduces this gap year's pool need, same as the funded-year branch below (and as coupon).
-          const need = Math.max(0, (daraByYear?.get(year) ?? DARA) - actualTIPSLMI - calcFuture30yUpperAnnualAmd(year));
-          if (remaining >= need) {
-            pliCreditByGapYear[year] = need;
-            remaining -= need;
-          } else {
-            pliCreditByGapYear[year] = remaining;
-            remaining = 0;
-          }
-        } else if (!future30yYearSetForPLI.has(year)) {
-          // Funded year (with or without current holdings): need = DARA - funded-LMI-from-above.
-          // Must NOT restrict to yearInfo[year] — years zeroed in Build have no holdings when
-          // loaded into Rebalance, but the PLI pool should still zero them.
-          const laterMatInt = Object.entries(prelimFundedAnnualInt)
-            .filter(([y]) => parseInt(y) > year)
-            .reduce((s, [, v]) => s + v, 0);
-          const need = (daraByYear?.get(year) ?? DARA) - laterMatInt - calcFuture30yUpperAnnualAmd(year);
-          if (need <= 0) { zeroedFundedYears.add(year); pliCreditByFundedYear[year] = 0; continue; }
-          if (remaining >= need) {
-            zeroedFundedYears.add(year);
-            pliCreditByFundedYear[year] = need;
-            remaining -= need;
-          } else {
-            // Pool covers this year partially — reduce its qty but don't zero it
-            pliCreditByFundedYear[year] = remaining;
-            partialCreditYear = year;
-            partialCredit = remaining;
-            remaining = 0;
-            break;
-          }
-        }
-      }
+  // ── AMD-inclusive DARA inference correction ───────────────────────────────────
+  // Build sizes each funded year so P+I + LMI + held-to-maturity 2052 AMD = DARA (Option C).
+  // The provisional median above used only P+I + LMI, understating DARA by one year's AMD.
+  // Re-take the median with the AMD the PORTFOLIO actually earns (scaled by held 2052 excess),
+  // so inferredDARA reflects the true DARA the holdings encode. Only the dara===null path.
+  if (dara === null && future30yUpperExQty > 0 && future30yUpperQtyBefore > 0) {
+    const amdInclusiveARA = [];
+    for (let year = firstYear; year <= lastYear; year++) {
+      if (araByYear[year] !== undefined)
+        amdInclusiveARA.push(araByYear[year] + calcFuture30yUpperAnnualAmdForQty(year, future30yUpperQtyBefore));
     }
+    amdInclusiveARA.sort((a, b) => a - b);
+    const _mid = Math.floor(amdInclusiveARA.length / 2);
+    inferredDARA = amdInclusiveARA.length === 0 ? inferredDARA
+      : amdInclusiveARA.length % 2 === 0
+        ? (amdInclusiveARA[_mid - 1] + amdInclusiveARA[_mid]) / 2
+        : amdInclusiveARA[_mid];
+    DARA = inferredDARA;
   }
 
-  // Phase 3.1 and AMD computation are above the PLI pass (future30yUpperExQty needed for pre-ladder AMD pool).
+  // ── Canonical sizing via shared sizeLadder (single source of truth) ───────────
+  // Build and rebalance run the IDENTICAL sizing pipeline. We derive the canonical
+  // bond set for [firstYear, lastYear] and call sizeLadder to obtain the pre-ladder
+  // interest distribution (zeroing + partial credit) and gap parameters. Rebalance's
+  // diff machinery below targets these canonical values, so a build→rebalance
+  // round-trip produces zero trades. Previously rebalance recomputed the PLI pool from
+  // holdings, which drifted from build's at the partial-credit boundary year (e.g. 2040).
+  const _canon = selectLadderBonds({ tipsMap, firstYear, lastYear, settlementDate });
+  const _sl = sizeLadder({
+    dara: DARA, daraByYear, firstYear, lastYear,
+    rangeYears: _canon.rangeYears, gapYears: _canon.gapYears, future30yYears: _canon.future30yYears,
+    yearBondMap: _canon.yearBondMap, tipsMap, refCPI, settlementDate, settlementYear,
+    preLadderInterest,
+    future30yLowerCoverBond: _canon.future30yLowerCoverBond, future30yUpperCoverBond: _canon.future30yUpperCoverBond,
+    future30yLowerYear: _canon.future30yLowerYear, future30yUpperYear: _canon.future30yUpperYear,
+  });
+  const zeroedFundedYears   = _sl.zeroedFundedYears;
+  const pliCreditByFundedYear = _sl.pliCreditByFundedYear;
+  const pliCreditByGapYear  = _sl.pliCreditByGapYear;
+  const partialCreditYear   = _sl.partialCreditYear;
+  const partialCredit       = _sl.partialCredit;
+  const preLadderPool       = _sl.preLadderPool;
+  const preLadderCouponPool = _sl.preLadderCouponPool;
+  const preLadderAmdPool    = _sl.preLadderAmdPool;
 
   // Augment gapLaterMaturityInterest with future cover excess LMI before computing gap params
   const future30yExtraLMI = {};
