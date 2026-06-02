@@ -494,9 +494,9 @@ async function loadData() {
     const fileInput = document.getElementById('holdings-file');
     if (!fileInput.files.length) {
       try {
-        let samplePath = './tests/e2e/SampleHoldings.csv';
+        let samplePath = './data/SampleHoldings.csv';
         let sampleRes = await fetch(samplePath);
-        if (!sampleRes.ok) { samplePath = 'tests/e2e/SampleHoldings.csv'; sampleRes = await fetch(samplePath); }
+        if (!sampleRes.ok) { samplePath = 'data/SampleHoldings.csv'; sampleRes = await fetch(samplePath); }
         if (sampleRes.ok) {
           const blob = await sampleRes.blob();
           const file = new File([blob], 'SampleHoldings.csv', { type: 'text/csv' });

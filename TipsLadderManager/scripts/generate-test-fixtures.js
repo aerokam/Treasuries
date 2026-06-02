@@ -250,11 +250,14 @@ const fidelityCsv = sanitizeFidelity(readFileSync(fidelitySrc, 'utf8'));
 
 const schwabOut   = path.join(TESTS, 'SchwabAllAccounts.csv');
 const fidelityOut = path.join(TESTS, 'FidelityAllAccounts.csv');
-const holdingsOut = path.join(E2E,   'SampleHoldings.csv');
+const holdingsOut = path.join(DATA,  'SampleHoldings.csv'); // single canonical copy: app pre-populate + tests both read here
 
 writeFileSync(schwabOut,   schwabCsv,   'utf8');
 writeFileSync(fidelityOut, fidelityCsv, 'utf8');
 
+// Guard: never silently overwrite the canonical holdings file with a header-only stub.
+// (A prior regen with no Kevin-IRA TIPS flattened it and broke pre-populate + e2e.)
+if (kevinIraTips.length === 0) die(`No Kevin IRA TIPS extracted from ${schwabSrc}; refusing to write an empty ${holdingsOut}`);
 const holdingsCsv = ['cusip,qty', ...kevinIraTips].join('\n') + '\n';
 writeFileSync(holdingsOut, holdingsCsv, 'utf8');
 

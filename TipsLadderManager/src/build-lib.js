@@ -85,8 +85,11 @@ export function runBuild({ dara, firstYear: firstYearOpt, lastYear, tipsMap, ref
     const principalPerBond     = 1000 * ir;
     const ownRungCouponPerBond = principalPerBond * (bond.coupon ?? 0) * halfOrFull;
 
+    // Zeroed years are funded entirely by the PLI pool. The displayed credit must subtract
+    // AMD too (held-2052 AMD is income that year), else the row's Amount overshoots DARA by
+    // the AMD. Mirrors rebalance, which uses the AMD-adjusted pliCreditByFundedYear.
     const preLadderCreditForYear = isZeroed
-      ? Math.max(0, yearDara - (corr_lmi + excessLMI))
+      ? Math.max(0, yearDara - (corr_lmi + excessLMI + future30yAmd))
       : year === partialCreditYear ? partialCredit : 0;
     const fundedYearAmt = (year > lastYear || year < firstYear) ? 0
       : fundedYearQty * prelim_pi + corr_lmi + excessLMI + preLadderCreditForYear + future30yAmd;

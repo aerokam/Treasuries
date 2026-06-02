@@ -2,7 +2,10 @@ import { defineConfig } from 'playwright/test';
 
 export default defineConfig({
   testDir: 'tests',
-  timeout: 5_000,
+  // Failures should fail fast, but the cap must sit just ABOVE the spec's inline { timeout: 4_000 }
+  // assertion waits, else a slow-but-legit test races the cap and flakes. 4.5s is that floor; to go
+  // shorter, lower the per-assertion 4_000 waits in app.spec.js too.
+  timeout: 4_500,
   use: {
     baseURL: 'http://127.0.0.1:8080/TipsLadderManager/',
     headless: true,
