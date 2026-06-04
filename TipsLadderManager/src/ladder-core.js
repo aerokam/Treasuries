@@ -26,6 +26,27 @@ function calcFuture30yParams(future30yYears, bond2056, settlementDate, dara, dar
   return future30yParamsCore({ future30yYears, coverBond2056: bond2056, settlementDate, dara, daraByYear });
 }
 
+// ─── Shared per-year funded Amount (single source of truth for build & rebalance "After") ───
+// A funded year's annual Amount = own principal + own coupon + later-maturity interest (LMI)
+// + own-year excess coupon + held-2052 AMD, plus a pre-ladder credit. For a PLI-zeroed year
+// (funded entirely from the pre-ladder pool, qty 0) the credit is reconciled so the row lands
+// exactly on its DARA against the CORRECTED income components; otherwise it is the year's
+// non-zeroed pre-ladder credit (the partial-credit year's share, else 0). Build and rebalance
+// BOTH call this, so their per-year Amounts are identical by construction — there is no second
+// copy of the formula to drift (this replaces the duplicated zeroed-year reconciliation).
+// `dara` is the year's resolved DARA. Display-only: trades use sized quantities, not this credit.
+// Returns { credit, amount }.
+export function fundedYearAmount({
+  principal = 0, ownCoupon = 0, laterMatInt = 0, ownExcessCoupon = 0, amd = 0,
+  dara, isZeroed = false, partialCredit = 0,
+}) {
+  // Income fixed regardless of the pre-ladder credit. For a zeroed year principal & ownCoupon
+  // are 0, so this is the LMI + own-excess-coupon + AMD that the credit tops up to DARA.
+  const fixedIncome = principal + ownCoupon + laterMatInt + ownExcessCoupon + amd;
+  const credit = isZeroed ? Math.max(0, dara - fixedIncome) : partialCredit;
+  return { credit, amount: fixedIncome + credit };
+}
+
 const BL_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 // ─── Canonical ladder bond selection (shared by build and rebalance) ────────────

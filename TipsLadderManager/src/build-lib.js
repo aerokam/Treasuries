@@ -5,7 +5,7 @@
 
 import { fmtDate } from './date-util.js';
 import { bondCalcs, calculateMDuration, rungAmount, calcMktWtdAvg } from '../../shared/src/bond-math.js';
-import { sizeLadder, selectLadderBonds } from './ladder-core.js';
+import { sizeLadder, selectLadderBonds, fundedYearAmount } from './ladder-core.js';
 
 export const MAX_LAST_YEAR = 2066;
 
@@ -85,14 +85,16 @@ export function runBuild({ dara, firstYear: firstYearOpt, lastYear, tipsMap, ref
     const principalPerBond     = 1000 * ir;
     const ownRungCouponPerBond = principalPerBond * (bond.coupon ?? 0) * halfOrFull;
 
-    // Zeroed years are funded entirely by the PLI pool. The displayed credit must subtract
-    // AMD too (held-2052 AMD is income that year), else the row's Amount overshoots DARA by
-    // the AMD. Mirrors rebalance, which uses the AMD-adjusted pliCreditByFundedYear.
-    const preLadderCreditForYear = isZeroed
-      ? Math.max(0, yearDara - (corr_lmi + excessLMI + future30yAmd))
-      : year === partialCreditYear ? partialCredit : 0;
-    const fundedYearAmt = (year > lastYear || year < firstYear) ? 0
-      : fundedYearQty * prelim_pi + corr_lmi + excessLMI + preLadderCreditForYear + future30yAmd;
+    // Per-year Amount + pre-ladder credit via the shared rule (ladder-core.fundedYearAmount),
+    // so build and rebalance "After" are identical by construction. Zeroed years are funded
+    // entirely by the PLI pool; the credit subtracts LMI + own-excess coupon + AMD so the row
+    // lands on DARA (not overshooting by the AMD).
+    const { credit: preLadderCreditForYear, amount: _fundedAmt } = fundedYearAmount({
+      principal: fundedYearQty * prelim_pi, laterMatInt: corr_lmi, ownExcessCoupon: excessLMI,
+      amd: future30yAmd, dara: yearDara, isZeroed,
+      partialCredit: year === partialCreditYear ? partialCredit : 0,
+    });
+    const fundedYearAmt = (year > lastYear || year < firstYear) ? 0 : _fundedAmt;
     const gapLMIAlloc = gapExQty > 0
       ? (year === lowerYear ? lowerWeight : upperWeight) * (gapParams?.gapLMITotal ?? 0)
       : 0;

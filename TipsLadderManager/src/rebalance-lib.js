@@ -4,7 +4,7 @@
 import { bondCalcs, calculateMDuration, yieldFromPrice, calcMktWtdAvg } from '../../shared/src/bond-math.js';
 export { yieldFromPrice };
 import { interpolateYield, syntheticCoupon, bracketWeights, future30yUpperAmdSchedule, gapParamsWithUpperFeedback, future30yParamsCore } from './gap-math.js';
-import { sizeLadder, selectLadderBonds } from './ladder-core.js';
+import { sizeLadder, selectLadderBonds, fundedYearAmount } from './ladder-core.js';
 import { localDate, fmtDate, toDateStr } from './date-util.js';
 import { detectAccountType, allocateToAccounts, computeAccountCashFlows, generateFeasibilityReport } from './account-allocation.js';
 
@@ -1291,19 +1291,18 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
       }
     }
     const amdAfter = (year >= firstYear && year <= lastYear) ? calcFuture30yUpperAnnualAmd(year) : 0;
-    // Pre-ladder credit for the displayed "After" ARA — the SHARED build rule, so After ≡ build
-    // (locked by the "rebal After == build amount per year" test). sizeLadder sizes the PLI pool
-    // against the PRELIMINARY later-mat interest (the approximation that decides which years zero),
-    // but a row's ARA is built from the CORRECTED components (lAfter + own-year excess coupon exIntA
-    // + AMD). For a fully PLI-funded (zeroed) year the credit is therefore reconciled to those
-    // corrected components so the row lands exactly on its DARA — identical to build-lib.js
-    // preLadderCreditForYear. (A non-zeroed year that LMI alone over-covers legitimately exceeds its
-    // DARA — build shows the same.) Display-only: trades use the sized quantities, never this credit.
+    // "After" ARA via the SAME shared rule build uses (ladder-core.fundedYearAmount), so After ≡
+    // build by construction (locked by the "rebal After == build amount per year" test). sizeLadder
+    // sizes the PLI pool against the PRELIMINARY later-mat interest (the approximation that decides
+    // which years zero), but a row's ARA is built from the CORRECTED components (lAfter + own-year
+    // excess coupon exIntA + AMD); for a zeroed year the shared rule reconciles the credit to those.
     const yearDaraDisp = daraByYear?.get(year) ?? DARA;
-    const pliCredit = zeroedFundedYears.has(year)
-      ? Math.max(0, yearDaraDisp - (pA + cA + lAfter + exIntA + amdAfter))
-      : (pliCreditByFundedYear[year] ?? 0);
-    postARAByYear[year] = pA + cA + lAfter + exIntA + pliCredit + amdAfter;
+    const { credit: pliCredit, amount: _postAmt } = fundedYearAmount({
+      principal: pA, ownCoupon: cA, laterMatInt: lAfter, ownExcessCoupon: exIntA, amd: amdAfter,
+      dara: yearDaraDisp, isZeroed: zeroedFundedYears.has(year),
+      partialCredit: pliCreditByFundedYear[year] ?? 0,
+    });
+    postARAByYear[year] = _postAmt;
     postARABreakdown[year] = { principal: pA, ownCoupon: cA, laterMatInt: lAfter, holdings: holdingsAfter, pliCredit, future30yUpperAnnualAmd: amdAfter };
   }
 
