@@ -107,9 +107,10 @@ export const COLS = [
 ];
 
 function isBracket(d, mode) {
-  if (mode === 'rebal') return d.excessQtyBefore > 0 || d.excessQtyAfter > 0;
-  // Build: designated gap brackets stay rendered as brackets even at 0 excess (gap covered by
-  // PLI/LMI/AMD) — the "*" + qty-0 excess sub-row remains, its drill explains the 0.
+  // Designated gap brackets stay rendered as brackets even at 0 excess (gap covered by PLI/LMI/AMD)
+  // — the "*" + qty-0 excess sub-row remains, its drill explains the 0. Same rule for build and
+  // rebalance, so a 0-excess bracket (e.g. 2036/2040 under high later-year DARA) shows in both.
+  if (mode === 'rebal') return d.excessQtyBefore > 0 || d.excessQtyAfter > 0 || d.isGapBracket;
   return d.excessQty > 0 || d.isGapBracket;
 }
 

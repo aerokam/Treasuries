@@ -216,7 +216,7 @@ export function buildDrillHTML(d, colKey, summary) {
     const laterMatInt = isBef ? d.araBeforeLaterMatInt : d.araAfterLaterMatInt;
     const araTotal    = isBef ? d.araBeforeTotal       : d.araAfterTotal;
     const DARA        = d.DARA ?? summary?.DARA;
-    const _plCredit   = isBef ? 0 : (d.preLadderCreditForYear || 0);
+    const _plCredit   = isBef ? (d.preLadderCreditForYearBefore || 0) : (d.preLadderCreditForYear || 0);
     const _amd        = isBef ? (d.future30yUpperAnnualAmdBefore || 0) : (d.future30yUpperAnnualAmd || 0);
     // Compute ownSum first so we can detect PLI-zeroed years (holdings present but all qty=0).
     let ownSum = 0;

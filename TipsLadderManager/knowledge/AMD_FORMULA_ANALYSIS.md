@@ -212,3 +212,19 @@ Verified empirically (DARA $80k, exQty 537, settlement 2026-05-29): **both total
 | `src/rebalance-lib.js` | same AMD-block rewrite; `ForQty` linear scale unchanged |
 | `knowledge/2.0_TIPS_Ladders.md` | §Future 30Y Upper Cover AMD rewritten to the interest/held-position model + Abel reconciliation |
 | `knowledge/4.0_Computation_Modules.md` | AMD pseudocode rewritten (qRoll + held-walk); front-loaded profile note |
+
+### Revisit (Revision 4): "excess only" applied to the rebalance "Before"/inference qty
+
+The "excess only" rule (Rev 3, above) was honored by build and by the rebalance "After" sweep, but the
+rebalance **"Before" / DARA-inference** path scaled AMD by `future30yUpperQtyBefore` = the *total* held
+2052 (funded + excess), via `s + h.qty`. That over-credited the funded-year 2052s with AMD — exactly
+the double-count Rev 3 forbids (funded 2052s mature at par; their discount is in P+I, not AMD). For a
+no-trade round-trip this inflated "Amount Before" by ~`(funded/excess)·AMD` on every year (~$500/yr in
+the 40k-DARA case), independent of the separately-missing excess-coupon and pre-ladder-credit terms.
+
+**Fix:** `future30yUpperQtyBefore` now sums held **excess** of the 2052 cover bond
+(`s + (h.excessQty != null ? h.excessQty : h.qty)`). Our files carry the funded/excess split
+(`h.excessQty`) so this is exact; broker files (Formats 1–3, no split) fall back to total held —
+**unchanged** until broker handling is revisited. This feeds both the "Before" display and the
+`dara === null` AMD-inclusive DARA inference. Locked by the "rebal Before == build amount per year"
+invariant in tests/run.js.

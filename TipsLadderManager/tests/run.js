@@ -682,6 +682,21 @@ console.log('\nBuild→Rebalance export-string round-trip — firstYear=2036, la
       }
       assert(`${label}: every build funded year renders in rebalance (missing: ${missing.join(',') || 'none'})`, missing.length, 0);
       assert(`${label}: rebal After == build amount per year (worst $${Math.round(worstDiff)}${worstY ? ' @' + worstY : ''})`, worstDiff < 2, true);
+
+      // "Amount Before" is the current-holdings valuation. For our own no-trade round-trip the held
+      // ladder IS the target, so Before must also equal build per year — via the SAME shared rule
+      // (fundedYearAmount): bracket excess coupon, zeroed-year pre-ladder credit, and excess-only AMD
+      // all included. Locks the unified Before sweep against drift (was: missing those → 20k+ deficits
+      // at zeroed/bracket years and ~$500 AMD drift on every middle year).
+      const rebalBeforeByYear = new Map();
+      for (const d of rD) if (d.fundedYear != null && d.araBeforeTotal != null) rebalBeforeByYear.set(d.fundedYear, d.araBeforeTotal);
+      let worstBef = 0, worstBefY = null;
+      for (const [y, amt] of buildAmtByYear) {
+        if (!rebalBeforeByYear.has(y)) continue; // render coverage already asserted above
+        const diff = Math.abs(rebalBeforeByYear.get(y) - amt);
+        if (diff > worstBef) { worstBef = diff; worstBefY = y; }
+      }
+      assert(`${label}: rebal Before == build amount per year (worst $${Math.round(worstBef)}${worstBefY ? ' @' + worstBefY : ''})`, worstBef < 2, true);
     }
     console.log(`        med=${med}  yrs=${yrs[0]}–${yrs[yrs.length - 1]}  |qtyDelta|=${totalAbsQtyDelta}  netCash=${Math.round(rS.costDeltaSum).toLocaleString()}`);
   }
