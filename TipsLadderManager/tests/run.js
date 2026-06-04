@@ -4,7 +4,7 @@
 
 import { readFileSync, readdirSync, existsSync } from 'fs';
 import path from 'path';
-import { buildTipsMapFromYields, localDate, runRebalance, inferDARAFromCash, inferScaledDARAFromPortfolio, computePortfolioARAByYear, getGapYearBracketCandidates, derivePerYearDara, parseFundedYearDaraBlock, inferFirstYearFromHoldings, inferLastYearFromHoldings, runMultiAccountRebalance } from '../src/rebalance-lib.js';
+import { buildTipsMapFromYields, localDate, runRebalance, inferDARAFromCash, inferScaledDARAFromPortfolio, computePortfolioARAByYear, getGapYearBracketCandidates, derivePerYearDara, parseFundedYearDaraBlock, parseParamsBlock, inferFirstYearFromHoldings, inferLastYearFromHoldings, runMultiAccountRebalance } from '../src/rebalance-lib.js';
 import { runBuild } from '../src/build-lib.js';
 import { parseBrokerCSV } from '../src/broker-import.js';
 import { nextBondTradingDay, parseBondHolidays } from '../src/data.js';
@@ -664,23 +664,56 @@ console.log('\nBuild→Rebalance export-string round-trip — firstYear=2036, la
     // Displayed Amount After must land on each year's DARA for fully PLI-funded (zeroed) years.
     // Regression for the variable+PLI overshoot: the zeroed-year credit was sized against the
     // preliminary LMI but displayed against the corrected LMI, inflating the row above its DARA.
-    if (pli) {
-      const araByYear = new Map();
-      for (const d of rD) if (d.fundedYear != null && d.araAfterTotal != null) araByYear.set(d.fundedYear, d.araAfterTotal);
-      let worstOvershoot = 0, worstYear = null, checked = 0;
-      for (const y of bS.zeroedFundedYears ?? []) {
-        const ara = araByYear.get(y);
-        if (ara == null) continue;
-        checked++;
-        const diff = Math.abs(ara - importedDara.get(y));
-        if (diff > worstOvershoot) { worstOvershoot = diff; worstYear = y; }
+    // UNIFICATION INVARIANT: rebalance "Amount After" must equal build's "Amount" for EVERY funded
+    // year, and every build funded year must render (no silent skip of fully-covered rungs like the
+    // "2035 skip"). This is the real build≡rebalance contract — it subsumes the zeroed-year check
+    // (a zeroed year's build amount is its DARA) and the all-years-render check, and catches any
+    // divergence between build-lib's per-year amount and rebalance's postARA "After" computation.
+    {
+      const buildAmtByYear = new Map(bD.map(d => [d.fundedYear, d.fundedYearAmt]));
+      const rebalAraByYear = new Map();
+      for (const d of rD) if (d.fundedYear != null && d.araAfterTotal != null) rebalAraByYear.set(d.fundedYear, d.araAfterTotal);
+      const missing = [];
+      let worstDiff = 0, worstY = null;
+      for (const [y, amt] of buildAmtByYear) {
+        if (!rebalAraByYear.has(y)) { missing.push(y); continue; }
+        const diff = Math.abs(rebalAraByYear.get(y) - amt);
+        if (diff > worstDiff) { worstDiff = diff; worstY = y; }
       }
-      // Guard against a vacuous pass: there must be ≥1 zeroed year whose Amount After we checked.
-      assert(`${label}: zeroed years present to verify (n=${checked})`, checked > 0, true);
-      assert(`${label}: zeroed-year Amount After == DARA (worst $${Math.round(worstOvershoot)}${worstYear ? ' @' + worstYear : ''})`, worstOvershoot < 2, true);
+      assert(`${label}: every build funded year renders in rebalance (missing: ${missing.join(',') || 'none'})`, missing.length, 0);
+      assert(`${label}: rebal After == build amount per year (worst $${Math.round(worstDiff)}${worstY ? ' @' + worstY : ''})`, worstDiff < 2, true);
     }
     console.log(`        med=${med}  yrs=${yrs[0]}–${yrs[yrs.length - 1]}  |qtyDelta|=${totalAbsQtyDelta}  netCash=${Math.round(rS.costDeltaSum).toLocaleString()}`);
   }
+}
+
+// ── Test: parseParamsBlock — construction params (#params line) ──────────────
+// DARA doesn't encode PLI / maturityPref, but they change the target ladder. The export
+// appends `#params,...`; the import parses it to set the UI controls (file-authoritative on
+// load, user may override). Round-trip the values build/rebalance summaries expose.
+console.log('\nparseParamsBlock — #params line');
+{
+  const fileLines = [
+    'cusip,qty,excess', '91282CLE9,0,0', '91282CPU9,33,50',
+    '#fundedYear,dara', '2034,20000', '2035,30000',
+    '#params,preLadderInterest=true,maturityPref=first',
+  ];
+  const p = parseParamsBlock(fileLines);
+  assert('params parsed not null', p != null, true);
+  assert('params PLI=true', p?.preLadderInterest, true);
+  assert('params maturityPref=first', p?.maturityPref, 'first');
+
+  const pOff = parseParamsBlock(['#params,preLadderInterest=false,maturityPref=last']);
+  assert('params PLI=false', pOff?.preLadderInterest, false);
+  assert('params maturityPref=last', pOff?.maturityPref, 'last');
+
+  // No #params line (broker/legacy) → null, so import falls back to UI/inference.
+  assert('no #params line → null', parseParamsBlock(['cusip,qty', '91282CLE9,10']), null);
+
+  // The values come from the summaries that the export reads.
+  const { summary: bSum } = runBuild({ dara: 40000, firstYear: 2034, lastYear: 2047, tipsMap, refCPI, settlementDate, preLadderInterest: true, maturityPref: 'first' });
+  assert('build summary carries preLadderInterest', bSum.preLadderInterest, true);
+  assert('build summary carries maturityPref', bSum.maturityPref, 'first');
 }
 
 // ── Test: Build→Rebalance symmetry — Full method, default bracket mode ───────

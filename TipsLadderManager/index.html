@@ -406,7 +406,7 @@
 </div>
 
 <script type="module">
-import { buildTipsMapFromYields, localDate, runRebalance, runMultiAccountRebalance, inferScaledDARAFromPortfolio, computePortfolioARAByYear, getGapYearBracketCandidates, derivePerYearDara, parseFundedYearDaraBlock, inferFirstYearFromHoldings, inferLastYearFromHoldings, yieldFromPrice, fmtDate } from './src/rebalance-lib.js';
+import { buildTipsMapFromYields, localDate, runRebalance, runMultiAccountRebalance, inferScaledDARAFromPortfolio, computePortfolioARAByYear, getGapYearBracketCandidates, derivePerYearDara, parseFundedYearDaraBlock, parseParamsBlock, inferFirstYearFromHoldings, inferLastYearFromHoldings, yieldFromPrice, fmtDate } from './src/rebalance-lib.js';
 import { runBuild, MAX_LAST_YEAR } from './src/build-lib.js';
 import { renderTable, COLS } from './src/render.js';
 import { buildDrillHTML, buildDurationPopupRows, buildFuture30yDurationPopupRows, buildIndexRatioDrill, buildRefCpiDrill, buildPIPerBondDrill, buildPreLadderPoolDrill } from './src/drill.js';
@@ -703,6 +703,11 @@ document.getElementById('export-cusip-qty-btn').addEventListener('click', () => 
     for (const y of [...daraByYearResolved.keys()].sort((a, b) => a - b)) {
       rows.push(`${y},${Math.round(daraByYearResolved.get(y))}`);
     }
+  }
+  // Construction params DARA doesn't encode (PLI zeroes early rungs; maturityPref picks the bond
+  // per year). Persisted so a re-import reconstructs the exact target without relying on UI state.
+  if (summary) {
+    rows.push(`#params,preLadderInterest=${summary.preLadderInterest ? 'true' : 'false'},maturityPref=${summary.maturityPref ?? 'last'}`);
   }
 
   const filename = `cusip-qty-${new Date().toISOString().split('T')[0]}.csv`;
@@ -1153,6 +1158,7 @@ function _initRebalDaraFromPortfolio() {
 // ─── File Parsing & State ─────────────────────────────────────────────────────
 let currentHoldingsArray = null;
 let currentImportedDaraByYear = null; // explicit per-year DARA from our own export's #fundedYear,dara block (null for broker/legacy)
+let currentImportedParams = null; // construction params from our own export's #params line ({preLadderInterest, maturityPref}); null for broker/legacy
 let brokerTipsValues = {}; // { accountName: valueOfTipsOnly }
 let brokerTotalAccountValues = {}; // { accountName: totalAccountValue }
 
@@ -1189,6 +1195,7 @@ document.getElementById('holdings-file').addEventListener('change', async (e) =>
   _daraByYearPanelDefault = null;
   _bracketAutoCapYears = new Set();
   currentImportedDaraByYear = null;
+  currentImportedParams = null;
   document.getElementById('rebal-last-year').value = '';
   document.getElementById('rebal-first-year').value = '';
   document.getElementById('account-list').innerHTML = ''; // Clear account modal content
@@ -1266,6 +1273,15 @@ document.getElementById('holdings-file').addEventListener('change', async (e) =>
       currentHoldingsArray = arr;
       // Our own exports append an explicit per-year DARA block — honor it on import (exact round-trip).
       currentImportedDaraByYear = parseFundedYearDaraBlock(rawLines);
+      // …and a #params line with the construction params DARA doesn't encode (PLI / maturityPref).
+      // File is authoritative on load; the user may override afterward (controls are read live at Run).
+      currentImportedParams = parseParamsBlock(rawLines);
+      if (currentImportedParams) {
+        if (currentImportedParams.preLadderInterest != null)
+          document.getElementById('pre-ladder-interest').checked = currentImportedParams.preLadderInterest;
+        if (currentImportedParams.maturityPref)
+          document.getElementById('build-maturity').value = currentImportedParams.maturityPref;
+      }
     } else if (acctNames.length === 1) {
       currentHoldingsArray = parsedAccounts[acctNames[0]];
     } else {
@@ -2014,6 +2030,7 @@ document.getElementById('run-btn').addEventListener('click', async () => {
           lastYearOverride: parseInt(document.getElementById('rebal-last-year').value),
           preLadderInterest: document.getElementById('pre-ladder-interest').checked,
           firstYearOverride: parseInt(document.getElementById('rebal-first-year').value),
+          maturityPref: currentImportedParams?.maturityPref ?? 'last',
           accountSizes: detectedAccounts,
           rmdByAccount,
           minMonthsToMaturity: parseInt(document.getElementById('min-months-to-maturity').value) || 6,
@@ -2035,7 +2052,8 @@ document.getElementById('run-btn').addEventListener('click', async () => {
           daraByYear: getDaraByYear(),
           lastYearOverride: parseInt(document.getElementById('rebal-last-year').value),
           preLadderInterest: document.getElementById('pre-ladder-interest').checked,
-          firstYearOverride: parseInt(document.getElementById('rebal-first-year').value)
+          firstYearOverride: parseInt(document.getElementById('rebal-first-year').value),
+          maturityPref: currentImportedParams?.maturityPref ?? 'last'
         });
         _lastKnownDara = finalDara;
         renderOutput(result);

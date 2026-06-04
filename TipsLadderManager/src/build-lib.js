@@ -177,7 +177,7 @@ export function runBuild({ dara, firstYear: firstYearOpt, lastYear, tipsMap, ref
     totalBuyCost,
     weightedAvgDuration,
     weightedAvgYield,
-    preLadderInterest, preLadderYears, preLadderPool, preLadderCouponPool, preLadderAmdPool,
+    preLadderInterest, maturityPref, preLadderYears, preLadderPool, preLadderCouponPool, preLadderAmdPool,
     zeroedFundedYears: [...zeroedFundedYears].sort((a, b) => a - b),
   };
 
