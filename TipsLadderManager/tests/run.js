@@ -4,7 +4,7 @@
 
 import { readFileSync, readdirSync, existsSync } from 'fs';
 import path from 'path';
-import { buildTipsMapFromYields, localDate, runRebalance, inferDARAFromCash, inferScaledDARAFromPortfolio, inferFirstYearFromHoldings, inferLastYearFromHoldings, runMultiAccountRebalance } from '../src/rebalance-lib.js';
+import { buildTipsMapFromYields, localDate, runRebalance, inferDARAFromCash, inferScaledDARAFromPortfolio, computePortfolioARAByYear, getGapYearBracketCandidates, derivePerYearDara, parseFundedYearDaraBlock, inferFirstYearFromHoldings, inferLastYearFromHoldings, runMultiAccountRebalance } from '../src/rebalance-lib.js';
 import { runBuild } from '../src/build-lib.js';
 import { parseBrokerCSV } from '../src/broker-import.js';
 import { nextBondTradingDay, parseBondHolidays } from '../src/data.js';
@@ -158,51 +158,8 @@ function assert(name, actual, expected, tolerance = 0) {
   }
 }
 
-// ── Mirrors index.html computePortfolioARAByYear + derivePerYearDara ─────────
-function computePortfolioARAByYear(holdingsArr, tipsMap, refCPI) {
-  const byYear = {};
-  for (const h of holdingsArr) {
-    const b = tipsMap.get(h.cusip); if (!b?.maturity) continue;
-    const ir = refCPI / (b.baseCpi ?? refCPI);
-    const year = b.maturity.getFullYear();
-    const m = b.maturity.getMonth() + 1;
-    const nPay = m < 7 ? 1 : 2;
-    const piPB = 1000 * ir * (1 + (b.coupon ?? 0) * 0.5 * nPay);
-    const annInt = h.qty * 1000 * ir * (b.coupon ?? 0);
-    if (!byYear[year]) byYear[year] = { totalPI: 0, annInt: 0 };
-    byYear[year].totalPI += h.qty * piPB; byYear[year].annInt += annInt;
-  }
-  const years = Object.keys(byYear).map(Number).sort((a, b) => b - a);
-  let lmi = 0; const ara = {};
-  for (const y of years) { ara[y] = byYear[y].totalPI + lmi; lmi += byYear[y].annInt; }
-  return ara;
-}
-// Returns gap year bracket candidates from tipsMap (years adjacent to structural 2037-2039 gap).
-function getGapYearBracketCandidates(tm) {
-  const tipsYears = new Set();
-  for (const b of tm.values()) { if (b.maturity) tipsYears.add(b.maturity.getFullYear()); }
-  const gapYears = [];
-  for (let y = 2039; y >= 2020; y--) {
-    if (!tipsYears.has(y)) gapYears.push(y);
-    else break;
-  }
-  if (!gapYears.length) return new Set();
-  const minGap = Math.min(...gapYears);
-  const maxGap = Math.max(...gapYears);
-  return new Set([minGap - 1, maxGap + 1]);
-}
-function derivePerYearDara(araByYear, bracketCandidates = new Set()) {
-  const vals = Object.values(araByYear).filter(v => v > 0).sort((a, b) => a - b);
-  if (!vals.length) return { daraMap: new Map() };
-  const median = vals[Math.floor(vals.length / 2)];
-  const daraMap = new Map();
-  for (const [y, ara] of Object.entries(araByYear)) {
-    const year = parseInt(y);
-    const val = (bracketCandidates.has(year) && ara > 1.5 * median) ? median : ara;
-    daraMap.set(year, Math.round(val));
-  }
-  return { daraMap };
-}
+// computePortfolioARAByYear / getGapYearBracketCandidates / derivePerYearDara are imported
+// from rebalance-lib.js (single source of truth — the same code the app runs on import).
 
 // ── Helper: assert no simultaneous buy+sell on the same TIPS at any bracket year ─
 function assertNoBuySell(details, label) {
@@ -643,6 +600,87 @@ console.log('\nBuild→Rebalance export-string round-trip — firstYear=2036, la
   assert('PLI round-trip: zero total |qtyDelta|', totalAbsQtyDelta <= 2, true);
   assert('PLI round-trip: zero net cash', Math.abs(Math.round(rS.costDeltaSum)) <= 4000, true);
   console.log(`        infLast=${infLast}  future30y up/lo: ${rS.future30yUpperExQty}/${rS.future30yLowerExQty}  |qtyDelta|=${totalAbsQtyDelta}  netCash=${Math.round(rS.costDeltaSum).toLocaleString()}`);
+}
+
+// ── Test: FULL app round-trip via the EXPLICIT per-year DARA block (#fundedYear,dara) ──
+// This is the path the app uses for our own export files: build → export (Format-5 holdings +
+// #fundedYear,dara block) → import (parse both) → rebalance honoring the explicit per-year DARA.
+// Because the DARA is STATED, not inferred, the ladder reproduces EXACTLY (0 trades) for any
+// shape — flat, variable (user-edited per-year), PLI-zeroed early years, future-30Y covers.
+// The best-effort inference path (computePortfolioARAByYear → inferScaledDARAFromPortfolio) is
+// retained for broker/legacy files but is NOT exercised here.
+{
+  const SY = settlementDate.getFullYear();
+  for (const tc of [
+    { label: '2026–2056 flat',     firstYear: SY,   lastYear: 2056, pli: false, vary: false },
+    { label: '2026–2066 flat',     firstYear: SY,   lastYear: 2066, pli: false, vary: false },
+    { label: '2036–2066 +PLI',     firstYear: 2036, lastYear: 2066, pli: true,  vary: false },
+    { label: '2026–2056 variable', firstYear: SY,   lastYear: 2056, pli: false, vary: true  },
+    { label: '2034–2066 variable+PLI', firstYear: 2034, lastYear: 2066, pli: true, vary: true },
+  ]) {
+    const { label, firstYear, lastYear, pli, vary } = tc;
+    console.log(`\nFULL explicit-DARA round-trip (build→export→import→rebalance) — ${label}`);
+    const DARA = 40000;
+    // Variable: edit the first two funded years to distinct lower values (mirrors user per-year edits).
+    let buildDaraByYear = null;
+    if (vary) {
+      buildDaraByYear = new Map([[firstYear, 25000], [firstYear + 1, 30000]]);
+    }
+    const { details: bD, summary: bS } = runBuild({ dara: DARA, firstYear, lastYear, tipsMap, refCPI, settlementDate, preLadderInterest: pli, daraByYear: buildDaraByYear });
+
+    // Serialize exactly like index.html export: Format-5 holdings + #fundedYear,dara block.
+    const zeroed = new Set(bS.zeroedFundedYears ?? []);
+    const rows = ['cusip,qty,excess'];
+    for (const d of bD) {
+      const f = d.fundedYearQty, e = d.excessQty;
+      if (f + e > 0) rows.push(`${d.cusip},${f},${e}`);
+      else if (zeroed.has(d.fundedYear)) rows.push(`${d.cusip},0,0`);
+    }
+    rows.push('#fundedYear,dara');
+    for (const y of [...bS.daraByYearResolved.keys()].sort((a, b) => a - b)) rows.push(`${y},${Math.round(bS.daraByYearResolved.get(y))}`);
+    const csv = rows.join('\n');
+
+    // Import: holdings via the shared parser; explicit DARA via the shared block parser.
+    const rawLines = csv.trim().split('\n').filter(l => l.trim());
+    const holdings = parseHoldingsCSV(csv, tipsMap);
+    const importedDara = parseFundedYearDaraBlock(rawLines);
+    assert(`${label}: #fundedYear,dara block parsed`, importedDara != null && importedDara.size > 0, true);
+    const yrs = [...importedDara.keys()].sort((a, b) => a - b);
+    const vals = [...importedDara.values()].sort((a, b) => a - b);
+    const med = Math.round(vals[Math.floor(vals.length / 2)]);
+
+    // Rebalance honoring explicit DARA (what _initRebalDaraFromPortfolio + Run handler now do).
+    const { summary: rS, results: rR, details: rD } = runRebalance({
+      dara: med, method: 'Full', bracketMode: '3bracket', holdings, tipsMap, refCPI, settlementDate,
+      daraByYear: importedDara, lastYearOverride: yrs[yrs.length - 1], firstYearOverride: yrs[0], preLadderInterest: pli,
+    });
+
+    const totalAbsQtyDelta = rR.reduce((s, r) => s + Math.abs(r[9] ?? 0), 0);
+    assert(`${label}: recovered last year`, rS.lastYear, lastYear);
+    assert(`${label}: ZERO total |qtyDelta|`, totalAbsQtyDelta, 0);
+    assert(`${label}: ZERO net cash`, Math.round(rS.costDeltaSum), 0);
+    if (vary) assert(`${label}: variable DARA preserved (firstYear < median)`, importedDara.get(firstYear) < med, true);
+
+    // Displayed Amount After must land on each year's DARA for fully PLI-funded (zeroed) years.
+    // Regression for the variable+PLI overshoot: the zeroed-year credit was sized against the
+    // preliminary LMI but displayed against the corrected LMI, inflating the row above its DARA.
+    if (pli) {
+      const araByYear = new Map();
+      for (const d of rD) if (d.fundedYear != null && d.araAfterTotal != null) araByYear.set(d.fundedYear, d.araAfterTotal);
+      let worstOvershoot = 0, worstYear = null, checked = 0;
+      for (const y of bS.zeroedFundedYears ?? []) {
+        const ara = araByYear.get(y);
+        if (ara == null) continue;
+        checked++;
+        const diff = Math.abs(ara - importedDara.get(y));
+        if (diff > worstOvershoot) { worstOvershoot = diff; worstYear = y; }
+      }
+      // Guard against a vacuous pass: there must be ≥1 zeroed year whose Amount After we checked.
+      assert(`${label}: zeroed years present to verify (n=${checked})`, checked > 0, true);
+      assert(`${label}: zeroed-year Amount After == DARA (worst $${Math.round(worstOvershoot)}${worstYear ? ' @' + worstYear : ''})`, worstOvershoot < 2, true);
+    }
+    console.log(`        med=${med}  yrs=${yrs[0]}–${yrs[yrs.length - 1]}  |qtyDelta|=${totalAbsQtyDelta}  netCash=${Math.round(rS.costDeltaSum).toLocaleString()}`);
+  }
 }
 
 // ── Test: Build→Rebalance symmetry — Full method, default bracket mode ───────

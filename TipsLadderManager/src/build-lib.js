@@ -156,8 +156,14 @@ export function runBuild({ dara, firstYear: firstYearOpt, lastYear, tipsMap, ref
 
   const HDR = ['CUSIP', 'Maturity', 'Funded Year', 'Funded Year Qty', 'Excess Qty', 'Total Qty', 'Funded Year Amount', 'Funded Year Cost', 'Excess Amount', 'Excess Cost'];
 
+  // Resolved per-year DARA for EVERY year in [firstYear, lastYear] (incl. gap + future-30Y
+  // years that have no TIPS row). This is the durable build intent the export persists as the
+  // `#fundedYear,dara` block, so a re-import reproduces the ladder exactly. See 2.1 Broker Import.
+  const daraByYearResolved = new Map();
+  for (let y = firstYear; y <= lastYear; y++) daraByYearResolved.set(y, daraByYear?.get(y) ?? dara);
+
   const summary = {
-    settleDateDisp, refCPI, dara,
+    settleDateDisp, refCPI, dara, daraByYearResolved,
     firstYear, lastYear, gapYears, future30yYears,
     gapParams, lowerYear, upperYear,
     lowerDuration, upperDuration, lowerWeight, upperWeight, lowerMonth, upperMonth,

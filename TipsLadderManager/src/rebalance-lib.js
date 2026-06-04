@@ -403,23 +403,167 @@ export function inferDARAFromCash({ bracketMode = '2bracket', holdings: holdings
   return { dara: foundDARA, portfolioCash };
 }
 
-// Find the equilibrium DARA (self-financing Full rebalance) then return a uniform
-// per-year map at that value. The caller (UI) shows per-year ARA info separately;
-// the default rebalance uses this uniform map so the cash constraint holds.
-// Users can edit individual years in the panel to customise (accepts non-zero net cash).
-export function inferScaledDARAFromPortfolio({ daraMap, median: _median, holdings: holdingsRaw, tipsMap, refCPI, settlementDate, bracketMode = '2bracket', lastYearOverride = null, firstYearOverride = null }) {
-  // Compute median from daraMap if caller didn't provide it.
+// ─── Per-year DARA recovery from holdings (import path) ──────────────────────────
+// These three are the front half of the import-time DARA reconstruction: recover each
+// funded year's ARA from the held quantities, flag gap-bracket years, and turn the ARA
+// map into a per-year DARA map. They live here (not in index.html) so the full
+// build→export→import→rebalance round-trip is reachable from tests as one chain.
+
+// Recover raw ARA per funded year from holdings: funded-qty P+I plus LMI cascaded from
+// later maturities (full held qty, incl. excess, contributes coupon to earlier years).
+// NOTE: this is only (P+I)+LMI. The cover-year income terms (own excess coupon + 2052
+// AMD) that build also credits are added downstream in inferScaledDARAFromPortfolio,
+// which has the settlement/last-year context the AMD schedule needs.
+export function computePortfolioARAByYear(holdingsArr, tipsMap, refCPI) {
+  const byYear = {};
+  for (const h of holdingsArr) {
+    const b = tipsMap.get(h.cusip);
+    if (!b?.maturity) continue;
+    const ir = refCPI / (b.baseCpi ?? refCPI);
+    const year = b.maturity.getFullYear();
+    const m = b.maturity.getMonth() + 1;
+    const nPay = m < 7 ? 1 : 2;  // Jan-Jun: 1 final coupon; Jul-Dec: 2
+    const piPB = 1000 * ir * (1 + (b.coupon ?? 0) * 0.5 * nPay);
+    // Use funded qty only for this year's P+I — excess bonds' P+I inflates the ARA target.
+    // Keep full qty for annual interest (LMI flowing to earlier years remains correct).
+    const fundedQty = (h.excessQty != null) ? Math.max(0, h.qty - h.excessQty) : h.qty;
+    if (!byYear[year]) byYear[year] = { totalPI: 0, annInt: 0 };
+    byYear[year].totalPI += fundedQty * piPB;
+    byYear[year].annInt  += h.qty * 1000 * ir * (b.coupon ?? 0);
+  }
+  const years = Object.keys(byYear).map(Number).sort((a, b) => b - a); // long to short
+  let lmi = 0;
+  const ara = {};
+  for (const y of years) {
+    ara[y] = byYear[y].totalPI + lmi;
+    lmi += byYear[y].annInt;
+  }
+  return ara; // { year: rawARA }
+}
+
+// Years adjacent to the structural gap (2037-2039) that may carry bracket excess: the
+// 2040 upper bracket and any Jan TIPS in [2032, minGap) that could have been an old lower
+// bracket. Holdings in these years with ARA > 1.5× median are auto-capped to median.
+export function getGapYearBracketCandidates(tipsMap) {
+  if (!tipsMap) return new Set();
+  const tipsYears = new Set();
+  for (const b of tipsMap.values()) { if (b.maturity) tipsYears.add(b.maturity.getFullYear()); }
+  const gapYears = [];
+  for (let y = 2039; y >= 2020; y--) {
+    if (!tipsYears.has(y)) gapYears.push(y);
+    else break;
+  }
+  if (gapYears.length === 0) return new Set();
+  const minGap = Math.min(...gapYears);
+  const maxGap = Math.max(...gapYears);
+  const LOWEST_LOWER = 2032;
+  const candidates = new Set([maxGap + 1]);
+  for (const b of tipsMap.values()) {
+    if (!b.maturity) continue;
+    const yr = b.maturity.getFullYear(), mo = b.maturity.getMonth() + 1;
+    if (mo === 1 && yr >= LOWEST_LOWER && yr < minGap) candidates.add(yr);
+  }
+  return candidates;
+}
+
+// Turn the raw ARA map into a per-year DARA map. Only suppress ARA > 1.5× median for
+// bracket-candidate years (adjacent to structural gaps); non-bracket years keep full ARA.
+export function derivePerYearDara(araByYear, bracketCandidates = new Set()) {
+  const vals = Object.values(araByYear).filter(v => v > 0);
+  if (vals.length === 0) return { median: 0, daraMap: new Map(), autoCappedYears: new Set() };
+  const sorted = [...vals].sort((a, b) => a - b);
+  const median = sorted[Math.floor(sorted.length / 2)];
+  const daraMap = new Map();
+  const autoCappedYears = new Set();
+  for (const [y, ara] of Object.entries(araByYear)) {
+    const year = parseInt(y);
+    if (bracketCandidates.has(year) && ara > 1.5 * median) {
+      daraMap.set(year, Math.round(median));
+      autoCappedYears.add(year);
+    } else {
+      daraMap.set(year, Math.round(ara));
+    }
+  }
+  return { median: Math.round(median), daraMap, autoCappedYears };
+}
+
+// Parse the optional `#fundedYear,dara` metadata block appended to our own export files
+// (see 2.1 Broker Import). Returns Map<year, dara> — the durable build intent for EVERY year
+// in [firstYear, lastYear], incl. gap + future-30Y — or null if absent. When present, the
+// import honors it directly (exact round-trip, no DARA/last-year inference). Backward-compatible:
+// the holdings parsers skip these lines (they aren't valid CUSIP rows).
+export function parseFundedYearDaraBlock(rawLines) {
+  const map = new Map();
+  let inBlock = false;
+  for (const line of rawLines) {
+    const norm = line.replace(/\s/g, '').toLowerCase();
+    if (!inBlock) { if (norm === '#fundedyear,dara') inBlock = true; continue; }
+    const parts = line.replace(/^#/, '').split(',').map(s => s.trim());
+    const yr = parseInt(parts[0], 10), v = parseFloat(parts[1]);
+    if (parts.length >= 2 && yr >= 2000 && yr <= 2200 && !isNaN(v) && v > 0) map.set(yr, v);
+  }
+  return map.size > 0 ? map : null;
+}
+
+// BEST-EFFORT per-year DARA recovery for files that carry NO explicit DARA (broker imports,
+// legacy Format-5 exports, tipsladder Format-4). Our own current exports carry an explicit
+// `#fundedYear,dara` block (see 2.1 Broker Import) and bypass this entirely — for those the
+// round-trip is exact by construction. This path only estimates a self-financing per-year
+// DARA from the held quantities, which is inherently lossy where build hid the DARA (e.g.
+// PLI-zeroed years) — hence "best effort".
+//
+// Recover per-year ARA, correct the cover-year income build credits (own-excess-coupon on the
+// 2056 lower cover, AMD on the 2052 upper cover), then PROPORTIONALLY scale the whole map to
+// the self-financing level — preserving any genuine per-year shape (user-edited DARA) rather
+// than flattening it. preLadderInterest must match the run (the PLI pool shifts the equilibrium).
+export function inferScaledDARAFromPortfolio({ daraMap, median: _median, holdings: holdingsRaw, tipsMap, refCPI, settlementDate, bracketMode = '2bracket', lastYearOverride = null, firstYearOverride = null, preLadderInterest = false }) {
+  // Cover-year income correction: build's per-year DARA identity is
+  //   DARA_y = (P+I)_y + LMI_y + ownExcessCoupon_y + AMD_y
+  // but computePortfolioARAByYear recovers only (P+I)+LMI. Add the two cover terms back so the
+  // recovered map matches build at the covers. (Coupon-bearing 2056 earns ownExcessCoupon;
+  // near-zero-coupon 2052 earns AMD — complementary.)
+  const settlementYear = settlementDate.getFullYear();
+  let maxTipsYear = 0;
+  for (const bond of tipsMap.values()) if (bond.maturity) maxTipsYear = Math.max(maxTipsYear, bond.maturity.getFullYear());
+  const _lastY = (lastYearOverride != null && !isNaN(lastYearOverride)) ? lastYearOverride : maxTipsYear;
+
+  const ownExcessCoupon = {};
+  for (const h of holdingsRaw) {
+    const ex = h.excessQty ?? 0;
+    if (ex <= 0) continue;
+    const bond = tipsMap.get(h.cusip);
+    if (!bond?.maturity) continue;
+    const ir = refCPI / (bond.baseCpi ?? refCPI);
+    const yr = bond.maturity.getFullYear();
+    ownExcessCoupon[yr] = (ownExcessCoupon[yr] ?? 0) + ex * 1000 * ir * (bond.coupon ?? 0);
+  }
+
+  let amdByYear = new Map();
+  if (_lastY > maxTipsYear) {
+    const future30yYears = [];
+    for (let y = maxTipsYear + 1; y <= _lastY; y++) future30yYears.push(y);
+    let upperCover = null;
+    for (const bond of tipsMap.values()) {
+      if (bond.maturity?.getFullYear() === 2052 && (!upperCover || bond.maturity > upperCover.maturity)) upperCover = bond;
+    }
+    if (upperCover) {
+      const heldUpperExcess = holdingsRaw.reduce((s, h) => h.cusip === upperCover.cusip ? s + (h.excessQty ?? 0) : s, 0);
+      if (heldUpperExcess > 0)
+        amdByYear = future30yUpperAmdSchedule({ future30yYears, future30yUpperExQty: heldUpperExcess, future30yUpperCoverBond: upperCover, refCPI, settlementYear });
+    }
+  }
+
+  daraMap = new Map([...daraMap.entries()].map(([y, v]) => [y, v + (ownExcessCoupon[y] ?? 0) + (amdByYear.get(y) ?? 0)]));
+
   const _vals = [...daraMap.values()].filter(v => v > 0).sort((a, b) => a - b);
   const median = _median ?? (_vals.length > 0 ? _vals[Math.floor(_vals.length / 2)] : 0);
-  // Binary-search the median level at which the PROPORTIONAL per-year map is self-financing.
-  // Each candidate uses daraByYear = { y: round(daraMap[y] * mid/median) } so the search
-  // result is valid for the actual proportional run — not just a uniform-DARA approximation.
+  // Binary-search the level at which the PROPORTIONAL per-year map is self-financing.
   let lo = 1000, hi = 1000000, foundDARA = lo;
   while (lo <= hi) {
     const mid = Math.floor((lo + hi) / 2);
     const k = median > 0 ? mid / median : 1;
     const scaledMap = new Map([...daraMap.entries()].map(([y, v]) => [y, Math.round(v * k)]));
-    const { summary } = runRebalance({ dara: mid, method: 'Full', bracketMode, holdings: holdingsRaw, tipsMap, refCPI, settlementDate, daraByYear: scaledMap, lastYearOverride, firstYearOverride });
+    const { summary } = runRebalance({ dara: mid, method: 'Full', bracketMode, holdings: holdingsRaw, tipsMap, refCPI, settlementDate, daraByYear: scaledMap, lastYearOverride, firstYearOverride, preLadderInterest });
     if (summary.costDeltaSum >= 0) { foundDARA = mid; lo = mid + 1; } else { hi = mid - 1; }
   }
   const k = median > 0 ? foundDARA / median : 1;
@@ -1125,8 +1269,18 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
         }
       }
     }
-    const pliCredit = pliCreditByFundedYear[year] ?? 0;
     const amdAfter = (year >= firstYear && year <= lastYear) ? calcFuture30yUpperAnnualAmd(year) : 0;
+    // Pre-ladder credit for the displayed ARA. sizeLadder sizes the PLI pool against the
+    // PRELIMINARY later-mat interest (the shared approximation that decides which years zero),
+    // but the row's ARA is built from the CORRECTED components (lAfter + own-year excess coupon
+    // exIntA + AMD). For a fully PLI-funded (zeroed) year we must reconcile the credit to those
+    // corrected components so the row lands exactly on its DARA — exactly as build does
+    // (build-lib.js preLadderCreditForYear). Otherwise the year overshoots by (lAfter − prelimLMI).
+    // Display-only: trades use the sized quantities, never this credit.
+    const yearDaraDisp = daraByYear?.get(year) ?? DARA;
+    const pliCredit = zeroedFundedYears.has(year)
+      ? Math.max(0, yearDaraDisp - (pA + cA + lAfter + exIntA + amdAfter))
+      : (pliCreditByFundedYear[year] ?? 0);
     postARAByYear[year] = pA + cA + lAfter + exIntA + pliCredit + amdAfter;
     postARABreakdown[year] = { principal: pA, ownCoupon: cA, laterMatInt: lAfter, holdings: holdingsAfter, pliCredit, future30yUpperAnnualAmd: amdAfter };
   }
@@ -1341,7 +1495,12 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
 
   const HDR = ['CUSIP','Qty','Maturity','FY','Principal','Interest','ARA','Cost','Target Qty','Qty Delta','Target Cost','Cost Delta','ARA (Before)','ARA-DARA Before','ARA (After)','ARA-DARA After','Excess ARA Before','Excess ARA After','Incoming LMI','Excess Interest','Funded PI'];
 
-  return { results, HDR, summary: { settleDateDisp, refCPI, DARA, inferredDARA, daraIsInferred: dara === null, method, firstYear, lastYear, derivedFirstYear, rungCount, gapYears, future30yYears, brackets, lowerWeight, upperWeight, costDeltaSum, costForNewRungs, gapCoverageSurplus, gapParams, bracketMode, lowerDuration, upperDuration, newLowerYear, newLowerCUSIP, newLowerDuration, newLowerWeight3, origLowerWeight, bracketFellBack3to2, beforeLowerWeight, beforeUpperWeight, beforeNewLowerWeight, afterLowerWeight, afterUpperWeight, afterNewLowerWeight, totalPreviousExcessCost, totalExcessCost, araByYear, future30yLowerYear, future30yUpperYear, future30yLowerCoverCUSIP: future30yLowerCoverBond?.cusip, future30yUpperCoverCUSIP: future30yUpperCoverBond?.cusip, future30yParams, future30yLowerDuration, future30yUpperDuration, future30yUpperWeight, future30yLowerWeight, future30yUpperExQty, future30yLowerExQty, future30yFellBack, future30yUpperAnnualAmdByYear, preLadderInterest, preLadderPool, preLadderCouponPool, preLadderAmdPool, zeroedFundedYears: [...zeroedFundedYears].sort((a, b) => a - b), weightedAvgDuration, weightedAvgYield }, details };
+  // Resolved per-year DARA for EVERY year in [firstYear, lastYear] (incl. gap + future-30Y).
+  // Persisted on export as the `#fundedYear,dara` block so a re-import is exact. See 2.1 Broker Import.
+  const daraByYearResolved = new Map();
+  for (let y = firstYear; y <= lastYear; y++) daraByYearResolved.set(y, daraByYear?.get(y) ?? DARA);
+
+  return { results, HDR, summary: { settleDateDisp, refCPI, DARA, daraByYearResolved, inferredDARA, daraIsInferred: dara === null, method, firstYear, lastYear, derivedFirstYear, rungCount, gapYears, future30yYears, brackets, lowerWeight, upperWeight, costDeltaSum, costForNewRungs, gapCoverageSurplus, gapParams, bracketMode, lowerDuration, upperDuration, newLowerYear, newLowerCUSIP, newLowerDuration, newLowerWeight3, origLowerWeight, bracketFellBack3to2, beforeLowerWeight, beforeUpperWeight, beforeNewLowerWeight, afterLowerWeight, afterUpperWeight, afterNewLowerWeight, totalPreviousExcessCost, totalExcessCost, araByYear, future30yLowerYear, future30yUpperYear, future30yLowerCoverCUSIP: future30yLowerCoverBond?.cusip, future30yUpperCoverCUSIP: future30yUpperCoverBond?.cusip, future30yParams, future30yLowerDuration, future30yUpperDuration, future30yUpperWeight, future30yLowerWeight, future30yUpperExQty, future30yLowerExQty, future30yFellBack, future30yUpperAnnualAmdByYear, preLadderInterest, preLadderPool, preLadderCouponPool, preLadderAmdPool, zeroedFundedYears: [...zeroedFundedYears].sort((a, b) => a - b), weightedAvgDuration, weightedAvgYield }, details };
 }
 
 // ──────────────────────────────────────────────────────────────────────────────

@@ -406,7 +406,7 @@
 </div>
 
 <script type="module">
-import { buildTipsMapFromYields, localDate, runRebalance, runMultiAccountRebalance, inferScaledDARAFromPortfolio, inferFirstYearFromHoldings, inferLastYearFromHoldings, yieldFromPrice, fmtDate } from './src/rebalance-lib.js';
+import { buildTipsMapFromYields, localDate, runRebalance, runMultiAccountRebalance, inferScaledDARAFromPortfolio, computePortfolioARAByYear, getGapYearBracketCandidates, derivePerYearDara, parseFundedYearDaraBlock, inferFirstYearFromHoldings, inferLastYearFromHoldings, yieldFromPrice, fmtDate } from './src/rebalance-lib.js';
 import { runBuild, MAX_LAST_YEAR } from './src/build-lib.js';
 import { renderTable, COLS } from './src/render.js';
 import { buildDrillHTML, buildDurationPopupRows, buildFuture30yDurationPopupRows, buildIndexRatioDrill, buildRefCpiDrill, buildPIPerBondDrill, buildPreLadderPoolDrill } from './src/drill.js';
@@ -691,6 +691,20 @@ document.getElementById('export-cusip-qty-btn').addEventListener('click', () => 
       rows.push(`${d.cusip},0,0`);
     }
   }
+
+  // Append the durable per-year DARA intent (every year incl. gap + future-30Y) as a metadata
+  // block. On re-import this is honored directly so the ladder reproduces exactly — no DARA
+  // inference, no last-year inference. Backward-compatible: old parsers skip these lines.
+  // See 2.1 Broker Import (Format 5 + #fundedYear,dara section).
+  const summary = currentMode === 'build' ? buildSummary : rebalSummary;
+  const daraByYearResolved = summary?.daraByYearResolved;
+  if (daraByYearResolved && daraByYearResolved.size > 0) {
+    rows.push('#fundedYear,dara');
+    for (const y of [...daraByYearResolved.keys()].sort((a, b) => a - b)) {
+      rows.push(`${y},${Math.round(daraByYearResolved.get(y))}`);
+    }
+  }
+
   const filename = `cusip-qty-${new Date().toISOString().split('T')[0]}.csv`;
   const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
   const url = window.URL.createObjectURL(blob);
@@ -1079,89 +1093,8 @@ function updateRebalLastYearDropdown() {
 }
 
 // ─── Per-year DARA from portfolio ARA ────────────────────────────────────────
-
-// Compute raw ARA for each funded year from holdings.
-// Process longest-to-shortest, accumulating LMI (annual coupon from later bonds).
-function computePortfolioARAByYear(holdingsArr, tipsMap, refCPI) {
-  const byYear = {};
-  for (const h of holdingsArr) {
-    const b = tipsMap.get(h.cusip);
-    if (!b?.maturity) continue;
-    const ir = refCPI / (b.baseCpi ?? refCPI);
-    const year = b.maturity.getFullYear();
-    const m = b.maturity.getMonth() + 1;
-    const nPay = m < 7 ? 1 : 2;  // Jan-Jun: 1 final coupon; Jul-Dec: 2
-    const piPB = 1000 * ir * (1 + (b.coupon ?? 0) * 0.5 * nPay);
-    // Use funded qty only for this year's P+I — excess bonds' P+I inflates the ARA target.
-    // Keep full qty for annual interest (LMI flowing to earlier years remains correct).
-    const fundedQty = (h.excessQty != null) ? Math.max(0, h.qty - h.excessQty) : h.qty;
-    if (!byYear[year]) byYear[year] = { totalPI: 0, annInt: 0 };
-    byYear[year].totalPI += fundedQty * piPB;
-    byYear[year].annInt  += h.qty * 1000 * ir * (b.coupon ?? 0);
-  }
-  const years = Object.keys(byYear).map(Number).sort((a, b) => b - a); // long to short
-  let lmi = 0;
-  const ara = {};
-  for (const y of years) {
-    ara[y] = byYear[y].totalPI + lmi;
-    lmi += byYear[y].annInt;
-  }
-  return ara; // { year: rawARA }
-}
-
-// Derive per-year DARA from raw ARA map.
-// Bracket years (raw ARA > 1.5× median) are substituted with median to avoid
-// inflating the funded-year target with excess bracket bond P+I.
-// Returns { median, daraMap: Map<year, number> }.
-// Compute Set of years adjacent to structural gap years (2037-2039) — bracket candidates only.
-function _getGapYearBracketCandidates() {
-  if (!tipsMap) return new Set();
-  const tipsYears = new Set();
-  for (const b of tipsMap.values()) { if (b.maturity) tipsYears.add(b.maturity.getFullYear()); }
-  const gapYears = [];
-  for (let y = 2039; y >= 2020; y--) {
-    if (!tipsYears.has(y)) gapYears.push(y);
-    else break;
-  }
-  if (gapYears.length === 0) return new Set();
-  const minGap = Math.min(...gapYears);
-  const maxGap = Math.max(...gapYears);
-  // Upper bracket is always maxGap+1 (2040).
-  // Lower bracket candidates: any Jan TIPS year in [2032, minGap) — the range of years that could
-  // have served as an old lower bracket. Holdings in these years with ARA > 1.5× median are
-  // auto-capped to median (assumed bracket excess, not intentional higher income).
-  const LOWEST_LOWER = 2032;
-  const candidates = new Set([maxGap + 1]);
-  for (const b of tipsMap.values()) {
-    if (!b.maturity) continue;
-    const yr = b.maturity.getFullYear(), mo = b.maturity.getMonth() + 1;
-    if (mo === 1 && yr >= LOWEST_LOWER && yr < minGap) candidates.add(yr);
-  }
-  return candidates;
-}
-
-// Derive per-year DARA from raw ARA map.
-// Only suppress ARA > 1.5× median for bracket candidate years (adjacent to structural gap years).
-// Non-bracket years always keep their full ARA, preserving intentional high-DARA shapes.
-// Returns { median, daraMap: Map<year, number> }.
-function derivePerYearDara(araByYear, bracketCandidates = new Set()) {
-  const vals = Object.values(araByYear).filter(v => v > 0);
-  if (vals.length === 0) return { median: 0, daraMap: new Map(), autoCappedYears: new Set() };
-  const sorted = [...vals].sort((a, b) => a - b);
-  const median = sorted[Math.floor(sorted.length / 2)];
-  const daraMap = new Map();
-  const autoCappedYears = new Set();
-  for (const [y, ara] of Object.entries(araByYear)) {
-    const year = parseInt(y);
-    if (bracketCandidates.has(year) && ara > 1.5 * median) {
-      daraMap.set(year, Math.round(median));
-      autoCappedYears.add(year);
-    } else {
-      daraMap.set(year, Math.round(ara));
-    }
-  }
-  return { median: Math.round(median), daraMap, autoCappedYears };
-}
+// computePortfolioARAByYear / getGapYearBracketCandidates / derivePerYearDara are
+// imported from rebalance-lib.js (single source of truth; testable as one round-trip chain).
 
 // Populate _daraByYearStore from portfolio ARA, scaled so Full rebalance is self-financing.
 // Called after any file load or account selection in rebalance mode.
@@ -1178,10 +1111,28 @@ function _initRebalDaraFromPortfolio() {
   const rc = lookupRefCpi(refCpiRows, activeRefCpiDateStr ?? _defaultRefCpiDateStr);
   if (!(rc > 0)) { renderDaraByYearPanel(); return; }
 
+  // Our own export carries explicit per-year DARA (#fundedYear,dara). Honor it directly — no
+  // inference — so the round-trip reproduces the ladder exactly for any shape (flat/variable/PLI).
+  // first/last year come straight from the DARA year span. Inference below is only for files
+  // without the block (broker/legacy/tipsladder).
+  if (currentImportedDaraByYear && currentImportedDaraByYear.size > 0) {
+    const yrs = [...currentImportedDaraByYear.keys()].sort((a, b) => a - b);
+    _daraByYearStore = new Map(currentImportedDaraByYear);
+    const vals = [...currentImportedDaraByYear.values()].sort((a, b) => a - b);
+    _daraByYearPanelDefault = Math.round(vals[Math.floor(vals.length / 2)]);
+    document.getElementById('dara').value = _daraByYearPanelDefault;
+    const lySel = document.getElementById('rebal-last-year');
+    if (lySel && [...lySel.options].some(o => +o.value === yrs[yrs.length - 1])) lySel.value = String(yrs[yrs.length - 1]);
+    const fySel = document.getElementById('rebal-first-year');
+    if (fySel && [...fySel.options].some(o => +o.value === yrs[0])) fySel.value = String(yrs[0]);
+    renderDaraByYearPanel();
+    return;
+  }
+
   const rawARA = computePortfolioARAByYear(currentHoldingsArray, tipsMap, rc);
   if (Object.keys(rawARA).length === 0) { renderDaraByYearPanel(); return; }
 
-  const bracketCandidates = _getGapYearBracketCandidates();
+  const bracketCandidates = getGapYearBracketCandidates(tipsMap);
   const { daraMap, autoCappedYears } = derivePerYearDara(rawARA, bracketCandidates);
   _bracketAutoCapYears = autoCappedYears;
 
@@ -1192,6 +1143,7 @@ function _initRebalDaraFromPortfolio() {
   const { scaledMedian, scaledMap } = inferScaledDARAFromPortfolio({
     daraMap, holdings: currentHoldingsArray, tipsMap, refCPI: rc, settlementDate,
     bracketMode, lastYearOverride, firstYearOverride,
+    preLadderInterest: document.getElementById('pre-ladder-interest').checked,
   });
   _daraByYearStore = scaledMap;
   document.getElementById('dara').value = scaledMedian;
@@ -1200,6 +1152,7 @@ function _initRebalDaraFromPortfolio() {
 
 // ─── File Parsing & State ─────────────────────────────────────────────────────
 let currentHoldingsArray = null;
+let currentImportedDaraByYear = null; // explicit per-year DARA from our own export's #fundedYear,dara block (null for broker/legacy)
 let brokerTipsValues = {}; // { accountName: valueOfTipsOnly }
 let brokerTotalAccountValues = {}; // { accountName: totalAccountValue }
 
@@ -1235,6 +1188,7 @@ document.getElementById('holdings-file').addEventListener('change', async (e) =>
   _daraByYearStore = new Map();
   _daraByYearPanelDefault = null;
   _bracketAutoCapYears = new Set();
+  currentImportedDaraByYear = null;
   document.getElementById('rebal-last-year').value = '';
   document.getElementById('rebal-first-year').value = '';
   document.getElementById('account-list').innerHTML = ''; // Clear account modal content
@@ -1310,6 +1264,8 @@ document.getElementById('holdings-file').addEventListener('change', async (e) =>
 
       if (arr.length === 0) { setStatus('Holdings CSV has no valid data rows.', true); return; }
       currentHoldingsArray = arr;
+      // Our own exports append an explicit per-year DARA block — honor it on import (exact round-trip).
+      currentImportedDaraByYear = parseFundedYearDaraBlock(rawLines);
     } else if (acctNames.length === 1) {
       currentHoldingsArray = parsedAccounts[acctNames[0]];
     } else {
