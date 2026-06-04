@@ -617,14 +617,20 @@ console.log('\nBuild→Rebalance export-string round-trip — firstYear=2036, la
     { label: '2036–2066 +PLI',     firstYear: 2036, lastYear: 2066, pli: true,  vary: false },
     { label: '2026–2056 variable', firstYear: SY,   lastYear: 2056, pli: false, vary: true  },
     { label: '2034–2066 variable+PLI', firstYear: 2034, lastYear: 2066, pli: true, vary: true },
+    // User repro: 40k base, RAISED later years (2040/41/42 = 50/60/70k), PLI, 2066. This drives the
+    // gap-bracket excess toward 0 and exercises the "Before == build" + 0-excess bracket render fixes.
+    { label: '2036–2066 high-mid+PLI', firstYear: 2036, lastYear: 2066, pli: true, vary: false,
+      daraOverrides: { 2040: 50000, 2041: 60000, 2042: 70000 } },
   ]) {
-    const { label, firstYear, lastYear, pli, vary } = tc;
+    const { label, firstYear, lastYear, pli, vary, daraOverrides } = tc;
     console.log(`\nFULL explicit-DARA round-trip (build→export→import→rebalance) — ${label}`);
     const DARA = 40000;
     // Variable: edit the first two funded years to distinct lower values (mirrors user per-year edits).
     let buildDaraByYear = null;
     if (vary) {
       buildDaraByYear = new Map([[firstYear, 25000], [firstYear + 1, 30000]]);
+    } else if (daraOverrides) {
+      buildDaraByYear = new Map(Object.entries(daraOverrides).map(([y, v]) => [+y, v]));
     }
     const { details: bD, summary: bS } = runBuild({ dara: DARA, firstYear, lastYear, tipsMap, refCPI, settlementDate, preLadderInterest: pli, daraByYear: buildDaraByYear });
 
@@ -697,6 +703,17 @@ console.log('\nBuild→Rebalance export-string round-trip — firstYear=2036, la
         if (diff > worstBef) { worstBef = diff; worstBefY = y; }
       }
       assert(`${label}: rebal Before == build amount per year (worst $${Math.round(worstBef)}${worstBefY ? ' @' + worstBefY : ''})`, worstBef < 2, true);
+    }
+
+    // Part-2 regression: a designated gap bracket (Jan 2036 lower / Jan 2040 upper) must carry the
+    // isGapBracket flag in BOTH build and rebalance details, so render.js isBracket() renders it with
+    // "*" + a qty-0 excess sub-row even when its excess sized to 0 (the high-mid scenario drove that).
+    // Previously rebalance lacked the flag and hid 0-excess brackets that build showed.
+    if (daraOverrides) {
+      for (const y of [2036, 2040]) {
+        assert(`${label}: build ${y} flagged isGapBracket`, bD.some(d => d.fundedYear === y && d.isGapBracket), true);
+        assert(`${label}: rebal ${y} flagged isGapBracket (renders at 0 excess)`, rD.some(d => d.fundedYear === y && d.isGapBracket), true);
+      }
     }
     console.log(`        med=${med}  yrs=${yrs[0]}–${yrs[yrs.length - 1]}  |qtyDelta|=${totalAbsQtyDelta}  netCash=${Math.round(rS.costDeltaSum).toLocaleString()}`);
   }
