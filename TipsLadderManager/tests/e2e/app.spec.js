@@ -886,7 +886,7 @@ test('two-segment DARA: split year + per-segment fill leave the other segment un
   // 4. Set the speculative segment to a constant; LMP must be untouched
   const lmpBefore = await lmpInput.inputValue();
   await page.locator('#seg-spec-const').fill('55000');
-  await page.locator('#seg-spec-set').click();
+  await page.locator('#seg-spec-const').blur();  // commit on blur (no Set button) — mirrors main DARA field
   await expect(specInput).toHaveValue('55000');
   expect(await lmpInput.inputValue(), 'LMP year unchanged by speculative set').toBe(lmpBefore);
 

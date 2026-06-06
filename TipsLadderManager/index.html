@@ -167,6 +167,7 @@
 91282CEJ6,30
 912810QF8,100</pre>
     <p><b>DARA</b> — Target annual real amount. Auto-computed from holdings on file load (equilibrium value that makes the rebalance self-financing). After loading, a per-year table lets you override individual year targets — changes may result in non-zero net cash. The DARA field shows <b style="color:#7c3aed">by year</b> when any year's target differs from the default.</p>
+    <p><b>Two-Segment DARA (LMP / Speculative)</b> — At the top of the per-year table you can pick a <b>split year</b> to treat one holdings file as two ladders: the <b>LMP</b> (liability-matching portfolio, years ≤ split, intended to spend down) and <b>speculative</b> holdings (years &gt; split, e.g. for heirs). <b>Infer LMP DARA</b> and <b>Infer speculative DARA</b> each solve a single self-financing DARA for that segment alone and stamp it across its rungs, leaving the other segment untouched — re-inferring one never clobbers the other. Type a constant in a segment's <i>$ each</i> field (Enter/blur to apply) to override. Individual rungs stay editable, so a segment can remain lumpy to match year-varying liabilities. Click the <b>?</b> next to <i>Split year</i> for details.</p>
     <p><b>Net Cash</b> — Net proceeds (sells minus buys). Negative = net purchase.</p>
 
     <h3 style="font-size:13px;margin:16px 0 6px;border-bottom:1px solid #eee;padding-bottom:4px;">Mode: Build</h3>
@@ -363,21 +364,20 @@
     <div id="dara-by-year-body">
       <div id="dara-seg-tools" style="display:none;font-size:12px;margin:2px 0 10px">
         <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
-          <span style="color:#64748b">Split year:</span>
+          <span style="color:#334155">Split year:</span>
           <select id="split-year" style="border:1px solid #ccc;border-radius:3px;padding:2px 4px;font-size:12px"></select>
-          <span id="split-year-desc" style="color:#94a3b8;font-size:11px"></span>
+          <button id="seg-tools-help" type="button" style="background:none;border:1px solid #64748b;border-radius:50%;width:16px;height:16px;font-size:10px;color:#64748b;cursor:pointer;padding:0;line-height:1;flex-shrink:0" title="Two-segment DARA help">?</button>
+          <span id="split-year-desc" style="color:#475569;font-size:11px"></span>
         </div>
         <div id="seg-lmp-row" style="display:flex;align-items:center;gap:6px;margin-bottom:5px;flex-wrap:wrap">
           <b id="seg-lmp-label" style="min-width:150px;color:#334155"></b>
-          <button type="button" id="seg-lmp-median" class="seg-btn" style="font-size:11px;padding:3px 8px;border:1px solid #cbd5e1;border-radius:4px;background:#f1f5f9;color:#475569;cursor:pointer">Fill self-financing median</button>
+          <button type="button" id="seg-lmp-median" class="seg-btn" title="Infer the self-financing DARA for the LMP segment and apply it across its rungs" style="font-size:11px;padding:3px 8px;border:1px solid #cbd5e1;border-radius:4px;background:#f1f5f9;color:#475569;cursor:pointer">Infer LMP DARA</button>
           <input type="number" id="seg-lmp-const" placeholder="$ each" step="1000" min="0" style="width:80px;text-align:right;border:1px solid #ccc;border-radius:3px;padding:2px 4px;font-size:12px">
-          <button type="button" id="seg-lmp-set" class="seg-btn" style="font-size:11px;padding:3px 8px;border:1px solid #cbd5e1;border-radius:4px;background:#f1f5f9;color:#475569;cursor:pointer">Set</button>
         </div>
         <div id="seg-spec-row" style="display:flex;align-items:center;gap:6px;margin-bottom:2px;flex-wrap:wrap">
           <b id="seg-spec-label" style="min-width:150px;color:#334155"></b>
-          <button type="button" id="seg-spec-median" class="seg-btn" style="font-size:11px;padding:3px 8px;border:1px solid #cbd5e1;border-radius:4px;background:#f1f5f9;color:#475569;cursor:pointer">Fill self-financing median</button>
+          <button type="button" id="seg-spec-median" class="seg-btn" title="Infer the self-financing DARA for the speculative segment and apply it across its rungs" style="font-size:11px;padding:3px 8px;border:1px solid #cbd5e1;border-radius:4px;background:#f1f5f9;color:#475569;cursor:pointer">Infer speculative DARA</button>
           <input type="number" id="seg-spec-const" placeholder="$ each" step="1000" min="0" style="width:80px;text-align:right;border:1px solid #ccc;border-radius:3px;padding:2px 4px;font-size:12px">
-          <button type="button" id="seg-spec-set" class="seg-btn" style="font-size:11px;padding:3px 8px;border:1px solid #cbd5e1;border-radius:4px;background:#f1f5f9;color:#475569;cursor:pointer">Set</button>
         </div>
       </div>
       <div class="table-scroll-wrap" id="dara-by-year-scroll">
@@ -454,6 +454,21 @@ document.getElementById('bracket-mode-help').addEventListener('click', e => {
     { sep: true },
     { heading: '3-bracket (default)' },
     { html: 'Lower bracket excess from Jan 2034 and Jan 2036 is managed with a priority rule:<br><b>Over-allocated:</b> sell Jan 2034 excess first; only sell Jan 2036 if still over target after depleting Jan 2034.<br><b>Under-allocated:</b> buy Jan 2036; Jan 2034 is frozen at current excess and never increased.<br>Use when you hold Jan 2034 holdings you want to keep until duration math forces a sell.' },
+  ]);
+});
+document.getElementById('seg-tools-help').addEventListener('click', e => {
+  e.stopPropagation();
+  showPopup(e.currentTarget, 'Two-Segment DARA', [
+    { html: 'Manage one holdings file as two ladders with independent DARA targets.' },
+    { sep: true },
+    { heading: 'Split year' },
+    { html: 'The boundary funded year. Years <b>≤ split</b> are the <b>LMP</b> (liability-matching portfolio) you intend to spend down; years <b>&gt; split</b> are <b>speculative</b> holdings (e.g. destined for heirs). Set it to your last LMP year. If the split is the last year, the whole ladder is LMP.' },
+    { sep: true },
+    { heading: 'Infer LMP / speculative DARA' },
+    { html: 'Solves a single self-financing DARA for that segment alone (net cash ≈ 0 within the segment) and stamps it across every rung in the segment — giving even real income <i>if you want it</i>. The other segment is left untouched, so re-inferring one never clobbers the other. You can still edit individual rungs afterward to keep a segment lumpy (e.g. to match year-varying liabilities).' },
+    { sep: true },
+    { heading: 'Typed amount ($ each)' },
+    { html: 'Type a constant and press Enter (or click away) to stamp it across that segment’s rungs — a manual override of the inferred value. No separate button, same as the main DARA field.' },
   ]);
 });
 document.getElementById('help-close').addEventListener('click', () => {
@@ -1648,8 +1663,10 @@ document.getElementById('split-year').addEventListener('change', e => {
 });
 document.getElementById('seg-lmp-median').addEventListener('click', () => _runSegmentMedian('lmp'));
 document.getElementById('seg-spec-median').addEventListener('click', () => _runSegmentMedian('spec'));
-document.getElementById('seg-lmp-set').addEventListener('click', () => _runSegmentConst('lmp'));
-document.getElementById('seg-spec-set').addEventListener('click', () => _runSegmentConst('spec'));
+// Apply the typed constant on commit (Enter or blur) — no Set button, mirroring the main DARA field.
+// 'change' fires only when the value actually changed, so tabbing through a filled median won't re-flatten it.
+document.getElementById('seg-lmp-const').addEventListener('change', () => _runSegmentConst('lmp'));
+document.getElementById('seg-spec-const').addEventListener('change', () => _runSegmentConst('spec'));
 
 function getDaraByYear() {
   // Reads from _daraByYearStore directly — panel visibility does not affect computation.
