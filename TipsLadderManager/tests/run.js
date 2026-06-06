@@ -4,7 +4,8 @@
 
 import { readFileSync, readdirSync, existsSync } from 'fs';
 import path from 'path';
-import { buildTipsMapFromYields, localDate, runRebalance, inferDARAFromCash, inferScaledDARAFromPortfolio, computePortfolioARAByYear, getGapYearBracketCandidates, derivePerYearDara, parseFundedYearDaraBlock, parseParamsBlock, inferFirstYearFromHoldings, inferLastYearFromHoldings, runMultiAccountRebalance } from '../src/rebalance-lib.js';
+import { buildTipsMapFromYields, localDate, runRebalance, inferDARAFromCash, inferScaledDARAFromPortfolio, inferSegmentedDARAFromPortfolio, computePortfolioARAByYear, getGapYearBracketCandidates, derivePerYearDara, parseFundedYearDaraBlock, parseParamsBlock, inferFirstYearFromHoldings, inferLastYearFromHoldings, runMultiAccountRebalance } from '../src/rebalance-lib.js';
+import { segmentRanges, constantMap, applySegmentMap } from '../src/segment-dara.js';
 import { runBuild } from '../src/build-lib.js';
 import { parseBrokerCSV } from '../src/broker-import.js';
 import { nextBondTradingDay, parseBondHolidays } from '../src/data.js';
@@ -1222,6 +1223,80 @@ for (const gapFirstYear of [2037, 2038, 2039]) {
       console.error('  ─────────────────────────────────────────────────────────\n');
     }
   }
+}
+
+// ── Test: segment-dara pure helpers (shared build/rebalance layer) ────────────
+{
+  console.log('\nsegment-dara helpers — partition / constant / no-clobber merge');
+  const { lmpYears, specYears } = segmentRanges(2047, 2026, 2055);
+  assert('segmentRanges: LMP count 2026–2047', lmpYears.size, 22);
+  assert('segmentRanges: spec count 2048–2055', specYears.size, 8);
+  assert('segmentRanges: split year is LMP', lmpYears.has(2047), true);
+  assert('segmentRanges: split+1 is spec', specYears.has(2048), true);
+
+  const { lmpYears: allLmp, specYears: noneSpec } = segmentRanges(2055, 2026, 2055);
+  assert('segmentRanges: split=last → whole ladder LMP', allLmp.size, 30);
+  assert('segmentRanges: split=last → spec empty', noneSpec.size, 0);
+
+  const cm = constantMap(specYears, 50000);
+  assert('constantMap: covers every spec year', cm.size, 8);
+  assert('constantMap: value stamped', cm.get(2050), 50000);
+
+  // No-clobber: stamping the spec segment must not touch LMP entries.
+  const store = new Map([[2030, 40000], [2047, 40000], [2050, 11111]]);
+  applySegmentMap(store, specYears, constantMap(specYears, 60000));
+  assert('applySegmentMap: spec year written', store.get(2050), 60000);
+  assert('applySegmentMap: LMP year 2030 untouched', store.get(2030), 40000);
+  assert('applySegmentMap: LMP year 2047 untouched', store.get(2047), 40000);
+}
+
+// ── Test: two-segment cascade self-finances each segment AND the whole portfolio ──
+// Build a flat 2026–2055 ladder, hold it, then run the LMP/speculative cascade at split 2047.
+// Each segment's own net cash (cost delta summed over its funded years) must be ≈ 0, the whole
+// portfolio must be ≈ 0, and both segment medians must be positive (≈ the flat build DARA).
+{
+  console.log('\nTwo-segment cascade — split 2047, LMP 2026–2047 / speculative 2048–2055, DARA=40000');
+  const DARA = 40000, firstYear = settlementDate.getFullYear(), lastYear = 2055, splitYear = 2047;
+
+  const { details: bD } = runBuild({ dara: DARA, firstYear, lastYear, tipsMap, refCPI, settlementDate });
+  const holdings = bD
+    .map(d => ({ cusip: d.cusip, qty: d.fundedYearQty + d.excessQty, excessQty: d.excessQty }))
+    .filter(h => h.qty > 0);
+
+  const rawARA = computePortfolioARAByYear(holdings, tipsMap, refCPI);
+  const { daraMap } = derivePerYearDara(rawARA, getGapYearBracketCandidates(tipsMap));
+
+  const seg = inferSegmentedDARAFromPortfolio({
+    daraMap, holdings, tipsMap, refCPI, settlementDate, splitYear, firstYear, lastYear,
+  });
+
+  assert('cascade: LMP median positive',  seg.lmpMedian > 0, true);
+  assert('cascade: speculative median positive', seg.specMedian > 0, true);
+
+  // Flat (even real income): every in-scope rung equals its segment median.
+  const lmpEven  = [...seg.lmpMap.values()].every(v => v === seg.lmpMedian);
+  const specEven = [...seg.specMap.values()].every(v => v === seg.specMedian);
+  assert('cascade: LMP rungs are flat (even income)',  lmpEven, true);
+  assert('cascade: speculative rungs are flat (even income)', specEven, true);
+
+  // Run the actual rebalance with the merged map and partition cost delta by segment.
+  const { results, details } = runRebalance({
+    dara: seg.lmpMedian, method: 'Full', holdings, tipsMap, refCPI, settlementDate,
+    daraByYear: seg.combinedMap, lastYearOverride: lastYear, firstYearOverride: firstYear,
+  });
+  let lmpNet = 0, specNet = 0;
+  for (let i = 0; i < results.length; i++) {
+    const cd = results[i][11];
+    if (typeof cd !== 'number') continue;
+    if (details[i].fundedYear <= splitYear) lmpNet += cd; else specNet += cd;
+  }
+  const wholeNet = lmpNet + specNet;
+
+  assert('cascade: LMP segment net cash within ±$4000', Math.abs(Math.round(lmpNet)) <= 4000, true);
+  assert('cascade: speculative segment net cash within ±$4000', Math.abs(Math.round(specNet)) <= 4000, true);
+  assert('cascade: whole-portfolio net cash within ±$4000', Math.abs(Math.round(wholeNet)) <= 4000, true);
+  console.log(`        LMP median: ${Math.round(seg.lmpMedian).toLocaleString()}  spec median: ${Math.round(seg.specMedian).toLocaleString()}`);
+  console.log(`        net cash — LMP: ${Math.round(lmpNet).toLocaleString()}  spec: ${Math.round(specNet).toLocaleString()}  whole: ${Math.round(wholeNet).toLocaleString()}`);
 }
 
 // ── Summary ───────────────────────────────────────────────────────────────────

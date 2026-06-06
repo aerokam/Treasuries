@@ -361,6 +361,25 @@
       <span style="font-size:11px;font-weight:700;color:#334155;text-transform:uppercase;letter-spacing:.05em">Per-Year DARA</span>
     </div>
     <div id="dara-by-year-body">
+      <div id="dara-seg-tools" style="display:none;font-size:12px;margin:2px 0 10px">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+          <span style="color:#64748b">Split year:</span>
+          <select id="split-year" style="border:1px solid #ccc;border-radius:3px;padding:2px 4px;font-size:12px"></select>
+          <span id="split-year-desc" style="color:#94a3b8;font-size:11px"></span>
+        </div>
+        <div id="seg-lmp-row" style="display:flex;align-items:center;gap:6px;margin-bottom:5px;flex-wrap:wrap">
+          <b id="seg-lmp-label" style="min-width:150px;color:#334155"></b>
+          <button type="button" id="seg-lmp-median" class="seg-btn" style="font-size:11px;padding:3px 8px;border:1px solid #cbd5e1;border-radius:4px;background:#f1f5f9;color:#475569;cursor:pointer">Fill self-financing median</button>
+          <input type="number" id="seg-lmp-const" placeholder="$ each" step="1000" min="0" style="width:80px;text-align:right;border:1px solid #ccc;border-radius:3px;padding:2px 4px;font-size:12px">
+          <button type="button" id="seg-lmp-set" class="seg-btn" style="font-size:11px;padding:3px 8px;border:1px solid #cbd5e1;border-radius:4px;background:#f1f5f9;color:#475569;cursor:pointer">Set</button>
+        </div>
+        <div id="seg-spec-row" style="display:flex;align-items:center;gap:6px;margin-bottom:2px;flex-wrap:wrap">
+          <b id="seg-spec-label" style="min-width:150px;color:#334155"></b>
+          <button type="button" id="seg-spec-median" class="seg-btn" style="font-size:11px;padding:3px 8px;border:1px solid #cbd5e1;border-radius:4px;background:#f1f5f9;color:#475569;cursor:pointer">Fill self-financing median</button>
+          <input type="number" id="seg-spec-const" placeholder="$ each" step="1000" min="0" style="width:80px;text-align:right;border:1px solid #ccc;border-radius:3px;padding:2px 4px;font-size:12px">
+          <button type="button" id="seg-spec-set" class="seg-btn" style="font-size:11px;padding:3px 8px;border:1px solid #cbd5e1;border-radius:4px;background:#f1f5f9;color:#475569;cursor:pointer">Set</button>
+        </div>
+      </div>
       <div class="table-scroll-wrap" id="dara-by-year-scroll">
         <table class="simple" id="dara-by-year-table"></table>
       </div>
@@ -407,6 +426,7 @@
 
 <script type="module">
 import { buildTipsMapFromYields, localDate, runRebalance, runMultiAccountRebalance, inferScaledDARAFromPortfolio, computePortfolioARAByYear, getGapYearBracketCandidates, derivePerYearDara, parseFundedYearDaraBlock, parseParamsBlock, inferFirstYearFromHoldings, inferLastYearFromHoldings, yieldFromPrice, fmtDate } from './src/rebalance-lib.js';
+import { segmentRanges, constantMap, applySegmentMap } from './src/segment-dara.js';
 import { runBuild, MAX_LAST_YEAR } from './src/build-lib.js';
 import { renderTable, COLS } from './src/render.js';
 import { buildDrillHTML, buildDurationPopupRows, buildFuture30yDurationPopupRows, buildIndexRatioDrill, buildRefCpiDrill, buildPIPerBondDrill, buildPreLadderPoolDrill } from './src/drill.js';
@@ -1194,6 +1214,7 @@ document.getElementById('holdings-file').addEventListener('change', async (e) =>
   _daraByYearStore = new Map();
   _daraByYearPanelDefault = null;
   _bracketAutoCapYears = new Set();
+  _splitYear = null;
   currentImportedDaraByYear = null;
   currentImportedParams = null;
   document.getElementById('rebal-last-year').value = '';
@@ -1442,6 +1463,8 @@ let _bracketAutoCapYears = new Set();  // years auto-capped to median (bracket e
 let _lastKnownDara = null;          // last DARA used (including auto-inferred)
 let _daraAutoInferred = false;      // true when DARA field was populated by inferDARAFromCash
 let _daraByYearBodyCollapsed = true;
+let _splitYear = null;              // LMP/speculative boundary (rebalance two-segment DARA); null → whole ladder is LMP
+let _panelYearRange = null;         // { fy, ly } of the years currently shown in the per-year panel
 
 function _setDaraByYearCollapsed(collapsed) {
   _daraByYearBodyCollapsed = collapsed;
@@ -1541,10 +1564,92 @@ function renderDaraByYearPanel() {
     + '</tbody>';
 
   _daraByYearPanelDefault = defaultDara;
+  _panelYearRange = { fy: yearEntries[0].year, ly: yearEntries[yearEntries.length - 1].year };
+  _renderSegTools();
   _setDaraByYearCollapsed(_daraByYearBodyCollapsed);
   panel.style.display = 'block';
   updateDaraInput();
 }
+
+// ─── Two-segment (LMP / speculative) DARA tools (rebalance only for now) ───────
+// Returns { lmpYears, specYears } for the years currently shown in the panel, split at _splitYear.
+function _segmentSets() {
+  if (!_panelYearRange) return { lmpYears: new Set(), specYears: new Set() };
+  const { fy, ly } = _panelYearRange;
+  const split = (_splitYear != null && _splitYear >= fy && _splitYear <= ly) ? _splitYear : ly;
+  return segmentRanges(split, fy, ly);
+}
+
+// Render the split-year control + per-segment action rows. Shown only in rebalance with a range.
+function _renderSegTools() {
+  const tools = document.getElementById('dara-seg-tools');
+  if (currentMode !== 'rebalance' || !_panelYearRange) { tools.style.display = 'none'; return; }
+  const { fy, ly } = _panelYearRange;
+  if (_splitYear == null || _splitYear < fy || _splitYear > ly) _splitYear = ly;
+
+  const sel = document.getElementById('split-year');
+  let opts = '';
+  for (let y = fy; y <= ly; y++) opts += `<option value="${y}"${y === _splitYear ? ' selected' : ''}>${y}</option>`;
+  sel.innerHTML = opts;
+
+  const { lmpYears, specYears } = _segmentSets();
+  const range = s => { const a = [...s]; return a.length ? `${Math.min(...a)}–${Math.max(...a)}` : '—'; };
+  document.getElementById('split-year-desc').textContent =
+    specYears.size ? `LMP ≤ ${_splitYear}, speculative > ${_splitYear}` : 'whole ladder is LMP';
+  document.getElementById('seg-lmp-label').textContent = `LMP ${range(lmpYears)}`;
+  document.getElementById('seg-spec-label').textContent = `Speculative ${range(specYears)}`;
+  document.getElementById('seg-spec-row').style.display = specYears.size ? '' : 'none';
+  tools.style.display = '';
+}
+
+// Run the segment-scoped self-finance solve and write the result into that segment's rows only.
+function _runSegmentMedian(which) {
+  if (currentMode !== 'rebalance' || !currentHoldingsArray || !tipsMap || !refCpiRows || !settlementDate) return;
+  const rc = lookupRefCpi(refCpiRows, activeRefCpiDateStr ?? _defaultRefCpiDateStr);
+  if (!(rc > 0)) return;
+  const rawARA = computePortfolioARAByYear(currentHoldingsArray, tipsMap, rc);
+  if (Object.keys(rawARA).length === 0) return;
+  const { daraMap } = derivePerYearDara(rawARA, getGapYearBracketCandidates(tipsMap));
+  const { lmpYears, specYears } = _segmentSets();
+  const scopeYears = which === 'lmp' ? lmpYears : specYears;
+  if (!scopeYears.size) return;
+
+  const { scaledMap, scaledMedian } = inferScaledDARAFromPortfolio({
+    daraMap, holdings: currentHoldingsArray, tipsMap, refCPI: rc, settlementDate,
+    bracketMode: document.getElementById('bracket-mode').value,
+    lastYearOverride: parseInt(document.getElementById('rebal-last-year').value) || undefined,
+    firstYearOverride: parseInt(document.getElementById('rebal-first-year').value) || undefined,
+    preLadderInterest: document.getElementById('pre-ladder-interest').checked,
+    scopeYears, fixedDaraByYear: _daraByYearStore, flat: true,
+  });
+  applySegmentMap(_daraByYearStore, scopeYears, scaledMap);
+  // Surface the inferred flat median in the segment's input so it's visible and editable.
+  document.getElementById(which === 'lmp' ? 'seg-lmp-const' : 'seg-spec-const').value = Math.round(scaledMedian);
+  _clearOutput();
+  renderDaraByYearPanel();
+  updateDaraInput(true);
+}
+
+// Stamp a typed constant across the segment's rows (the other segment is left untouched).
+function _runSegmentConst(which) {
+  const { lmpYears, specYears } = _segmentSets();
+  const scopeYears = which === 'lmp' ? lmpYears : specYears;
+  const val = parseFloat(document.getElementById(which === 'lmp' ? 'seg-lmp-const' : 'seg-spec-const').value);
+  if (!scopeYears.size || isNaN(val) || val < 0) return;
+  applySegmentMap(_daraByYearStore, scopeYears, constantMap(scopeYears, val));
+  _clearOutput();
+  renderDaraByYearPanel();
+  updateDaraInput(true);
+}
+
+document.getElementById('split-year').addEventListener('change', e => {
+  _splitYear = parseInt(e.target.value, 10);
+  _renderSegTools();
+});
+document.getElementById('seg-lmp-median').addEventListener('click', () => _runSegmentMedian('lmp'));
+document.getElementById('seg-spec-median').addEventListener('click', () => _runSegmentMedian('spec'));
+document.getElementById('seg-lmp-set').addEventListener('click', () => _runSegmentConst('lmp'));
+document.getElementById('seg-spec-set').addEventListener('click', () => _runSegmentConst('spec'));
 
 function getDaraByYear() {
   // Reads from _daraByYearStore directly — panel visibility does not affect computation.

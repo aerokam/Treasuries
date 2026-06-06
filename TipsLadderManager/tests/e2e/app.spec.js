@@ -846,3 +846,68 @@ test('round-trip: build 2026–2066 → export CUSIP/Qty → import → last-yea
   const netCash = parseFloat((await page.locator('#net-cash-val').textContent()).replace(/[^0-9.-]/g, ''));
   expect(Math.abs(netCash), 'round-trip net cash must be ~0').toBeLessThan(2000);
 });
+
+// ── Two-segment (LMP / speculative) DARA: split control + no-clobber bulk actions ──
+// Build a 2026–2055 ladder, import it, then drive the per-year panel's segment tools:
+// set a constant on the speculative segment, fill the LMP median, and verify each action
+// touches ONLY its own segment (the long-standing clobber pain), then run with ~0 net cash.
+test('two-segment DARA: split year + per-segment fill leave the other segment untouched', async ({ page }) => {
+  test.setTimeout(20_000);
+
+  // 1. Build 2026–2055 @ DARA 40k and export
+  await page.locator('.tab-btn[data-mode="build"]').click();
+  await page.locator('#last-year').selectOption({ value: '2055' });
+  await page.locator('#dara').fill('40000');
+  await page.locator('#run-btn').click();
+  await expect(page.locator('#build-output')).toHaveCSS('display', 'block', { timeout: 4_000 });
+
+  const downloadPromise = page.waitForEvent('download');
+  await page.locator('#export-cusip-qty-btn').click();
+  const csvPath = test.info().outputPath('twoseg.csv');
+  await (await downloadPromise).saveAs(csvPath);
+
+  // 2. Import into rebalance — panel + segment tools populate
+  await page.locator('.tab-btn[data-mode="rebalance"]').click();
+  await page.locator('#holdings-file').setInputFiles(csvPath);
+  await expect(page.locator('#dara-by-year')).toBeVisible({ timeout: 4_000 });
+
+  // Expand the panel body so its inputs/buttons are interactable
+  await page.locator('#dara-by-year-hdr').click();
+  await expect(page.locator('#dara-seg-tools')).toBeVisible({ timeout: 2_000 });
+
+  // 3. Split at 2047 → LMP 2026–2047, speculative 2048–2055
+  await page.locator('#split-year').selectOption({ value: '2047' });
+  await expect(page.locator('#seg-spec-row')).toBeVisible();
+  const lmpInput  = page.locator('#dara-by-year-table input[data-year="2030"]');
+  const specInput = page.locator('#dara-by-year-table input[data-year="2050"]');
+  await expect(lmpInput).toHaveCount(1);
+  await expect(specInput).toHaveCount(1);
+
+  // 4. Set the speculative segment to a constant; LMP must be untouched
+  const lmpBefore = await lmpInput.inputValue();
+  await page.locator('#seg-spec-const').fill('55000');
+  await page.locator('#seg-spec-set').click();
+  await expect(specInput).toHaveValue('55000');
+  expect(await lmpInput.inputValue(), 'LMP year unchanged by speculative set').toBe(lmpBefore);
+
+  // 5. Fill the LMP self-financing median; the speculative constant must survive (no clobber)
+  await page.locator('#seg-lmp-median').click();
+  await expect(specInput).toHaveValue('55000', { timeout: 6_000 });
+
+  // The inferred flat median must appear in the LMP field…
+  const lmpMedian = await page.locator('#seg-lmp-const').inputValue();
+  expect(parseFloat(lmpMedian), 'inferred LMP median shown in field').toBeGreaterThan(0);
+
+  // …and EVERY LMP rung (2026–2047) must be flattened to that single value (even real income).
+  const lmpVals = await page.locator('#dara-by-year-table input[data-year]').evaluateAll(
+    (els) => els.filter(e => +e.dataset.year <= 2047).map(e => e.value)
+  );
+  expect(lmpVals.length).toBeGreaterThan(1);
+  expect(new Set(lmpVals).size, 'all LMP rungs share one flat DARA').toBe(1);
+  expect(lmpVals[0], 'flat rung value equals the shown median').toBe(lmpMedian);
+
+  // 6. Run completes and renders a table (whole-portfolio rebalance over the merged map)
+  await page.locator('#run-btn').click();
+  await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 6_000 });
+  expect(await page.locator('#net-cash-val').textContent()).toBeTruthy();
+});

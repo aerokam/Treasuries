@@ -1,5 +1,5 @@
 // rebalance-lib.js -- Core logic for TIPS ladder rebalancing (4.0_TIPS_Ladder_Rebalancing.md)
-// Exports: buildTipsMapFromYields, runRebalance, localDate, inferDARAFromCash, inferScaledDARAFromPortfolio, runMultiAccountRebalance
+// Exports: buildTipsMapFromYields, runRebalance, localDate, inferDARAFromCash, inferScaledDARAFromPortfolio, inferSegmentedDARAFromPortfolio, runMultiAccountRebalance
 
 import { bondCalcs, calculateMDuration, yieldFromPrice, calcMktWtdAvg } from '../../shared/src/bond-math.js';
 export { yieldFromPrice };
@@ -537,7 +537,15 @@ export function parseParamsBlock(rawLines) {
 // 2056 lower cover, AMD on the 2052 upper cover), then PROPORTIONALLY scale the whole map to
 // the self-financing level — preserving any genuine per-year shape (user-edited DARA) rather
 // than flattening it. preLadderInterest must match the run (the PLI pool shifts the equilibrium).
-export function inferScaledDARAFromPortfolio({ daraMap, median: _median, holdings: holdingsRaw, tipsMap, refCPI, settlementDate, bracketMode = '2bracket', lastYearOverride = null, firstYearOverride = null, preLadderInterest = false }) {
+// `scopeYears` (Set<year>) + `fixedDaraByYear` (Map) make this a SEGMENT-scoped solve (see 3.0 §
+// Two-Segment DARA): only in-scope years are scaled by the searched factor; out-of-scope years take
+// their value from `fixedDaraByYear` (the other segment's already-decided DARA — the cascade
+// boundary); and the self-finance metric becomes the cost delta summed over in-scope funded years
+// only, not the whole portfolio. Both default null → identical whole-portfolio behaviour as before.
+// `flat = true` makes the in-scope solve target a SINGLE flat DARA across every in-scope rung
+// (even real income — the liability-matching use case) instead of the proportionally-scaled
+// natural-ARA shape; the binary search then finds the one flat level that self-finances the segment.
+export function inferScaledDARAFromPortfolio({ daraMap, median: _median, holdings: holdingsRaw, tipsMap, refCPI, settlementDate, bracketMode = '2bracket', lastYearOverride = null, firstYearOverride = null, preLadderInterest = false, scopeYears = null, fixedDaraByYear = null, flat = false }) {
   // Cover-year income correction: build's per-year DARA identity is
   //   DARA_y = (P+I)_y + LMI_y + ownExcessCoupon_y + AMD_y
   // but computePortfolioARAByYear recovers only (P+I)+LMI. Add the two cover terms back so the
@@ -576,20 +584,73 @@ export function inferScaledDARAFromPortfolio({ daraMap, median: _median, holding
 
   daraMap = new Map([...daraMap.entries()].map(([y, v]) => [y, v + (ownExcessCoupon[y] ?? 0) + (amdByYear.get(y) ?? 0)]));
 
-  const _vals = [...daraMap.values()].filter(v => v > 0).sort((a, b) => a - b);
+  const inScope = scopeYears ? (y => scopeYears.has(y)) : (() => true);
+
+  // Scaling pivots on the IN-SCOPE natural-ARA median, so the returned scaledMedian is the
+  // segment's own median (the whole-portfolio median when unscoped).
+  const _vals = [...daraMap.entries()].filter(([y, v]) => inScope(y) && v > 0).map(([, v]) => v).sort((a, b) => a - b);
   const median = _median ?? (_vals.length > 0 ? _vals[Math.floor(_vals.length / 2)] : 0);
-  // Binary-search the level at which the PROPORTIONAL per-year map is self-financing.
+
+  // daraByYear fed to each trial at DARA `level`: in-scope years take `level` flat (flat mode) or
+  // the natural ARA scaled by level/median; out-of-scope years take the other segment's fixed DARA
+  // (else their own natural ARA, so fixed=null ≡ whole-portfolio).
+  const buildMap = level => {
+    const k = median > 0 ? level / median : 1;
+    const m = new Map();
+    for (const [y, v] of daraMap) m.set(y, inScope(y) ? (flat ? level : Math.round(v * k)) : (fixedDaraByYear?.get(y) ?? Math.round(v)));
+    if (fixedDaraByYear) for (const [y, v] of fixedDaraByYear) if (!inScope(y) && !m.has(y)) m.set(y, v);
+    return m;
+  };
+
+  // Self-finance metric: whole costDeltaSum, or — when scoped — cost delta summed over rebalance
+  // rows whose funded year is in scope (results[i][11] ↔ details[i].fundedYear, kept index-parallel).
+  const netCash = ({ results, details, summary }) => {
+    if (!scopeYears) return summary.costDeltaSum;
+    let s = 0;
+    for (let i = 0; i < results.length; i++) {
+      const cd = results[i][11];
+      if (inScope(details[i]?.fundedYear) && typeof cd === 'number') s += cd;
+    }
+    return s;
+  };
+
+  // Binary-search the DARA level at which the per-year map (flat or proportional) is self-financing.
   let lo = 1000, hi = 1000000, foundDARA = lo;
   while (lo <= hi) {
     const mid = Math.floor((lo + hi) / 2);
-    const k = median > 0 ? mid / median : 1;
-    const scaledMap = new Map([...daraMap.entries()].map(([y, v]) => [y, Math.round(v * k)]));
-    const { summary } = runRebalance({ dara: mid, method: 'Full', bracketMode, holdings: holdingsRaw, tipsMap, refCPI, settlementDate, daraByYear: scaledMap, lastYearOverride, firstYearOverride, preLadderInterest });
-    if (summary.costDeltaSum >= 0) { foundDARA = mid; lo = mid + 1; } else { hi = mid - 1; }
+    const result = runRebalance({ dara: mid, method: 'Full', bracketMode, holdings: holdingsRaw, tipsMap, refCPI, settlementDate, daraByYear: buildMap(mid), lastYearOverride, firstYearOverride, preLadderInterest });
+    if (netCash(result) >= 0) { foundDARA = mid; lo = mid + 1; } else { hi = mid - 1; }
   }
-  const k = median > 0 ? foundDARA / median : 1;
-  const scaledMap = new Map([...daraMap.entries()].map(([y, v]) => [y, Math.round(v * k)]));
+  const scaledMap = buildMap(foundDARA);
+  // In-scope gap / future-30Y years have no natural-ARA row — pin them to the segment median
+  // (mirrors the scalar fallback runRebalance used for them during the search).
+  if (scopeYears) for (const y of scopeYears) if (!scaledMap.has(y)) scaledMap.set(y, foundDARA);
   return { scaledMedian: foundDARA, scaledMap };
+}
+
+// Two-segment cascade (see 3.0 § Two-Segment DARA). Solve the speculative segment FIRST — it sits
+// at the top of the longest→shortest sweep, so its cost delta is independent of the LMP (LMI+AMD
+// flows only downward) — then solve the LMP with the speculative per-year DARA held fixed as the
+// boundary credit. Each segment is driven to its own net-cash ≈ 0, so whole-portfolio net cash
+// (the sum) is ≈ 0. Returns per-segment maps + medians and the merged combinedMap.
+export function inferSegmentedDARAFromPortfolio({ daraMap, holdings, tipsMap, refCPI, settlementDate, bracketMode = '2bracket', lastYearOverride = null, firstYearOverride = null, preLadderInterest = false, splitYear, firstYear, lastYear, flat = true }) {
+  const lmpYears = new Set(), specYears = new Set();
+  for (let y = firstYear; y <= lastYear; y++) (y <= splitYear ? lmpYears : specYears).add(y);
+
+  const common = { daraMap, holdings, tipsMap, refCPI, settlementDate, bracketMode, lastYearOverride, firstYearOverride, preLadderInterest, flat };
+
+  const spec = specYears.size
+    ? inferScaledDARAFromPortfolio({ ...common, scopeYears: specYears, fixedDaraByYear: daraMap })
+    : { scaledMedian: 0, scaledMap: new Map() };
+
+  const lmp = inferScaledDARAFromPortfolio({ ...common, scopeYears: lmpYears, fixedDaraByYear: spec.scaledMap });
+
+  const lmpMap  = new Map([...lmp.scaledMap].filter(([y]) => lmpYears.has(y)));
+  const specMap = new Map([...spec.scaledMap].filter(([y]) => specYears.has(y)));
+  return {
+    combinedMap: new Map([...lmpMap, ...specMap]),
+    lmpMap, specMap, lmpMedian: lmp.scaledMedian, specMedian: spec.scaledMedian, lmpYears, specYears,
+  };
 }
 
 export function runRebalance({ dara, method, bracketMode = '2bracket', holdings: holdingsRaw, tipsMap, refCPI, settlementDate, daraByYear = null, lastYearOverride = null, preLadderInterest = false, firstYearOverride = null, maturityPref = 'last' }) {
