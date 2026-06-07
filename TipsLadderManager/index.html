@@ -167,7 +167,7 @@
 91282CEJ6,30
 912810QF8,100</pre>
     <p><b>DARA</b> — Target annual real amount. Auto-computed from holdings on file load (equilibrium value that makes the rebalance self-financing). After loading, a per-year table lets you override individual year targets — changes may result in non-zero net cash. The DARA field shows <b style="color:#7c3aed">by year</b> when any year's target differs from the default.</p>
-    <p><b>Two-Segment DARA (LMP / Speculative)</b> — At the top of the per-year table you can pick a <b>split year</b> to treat one holdings file as two ladders: the <b>LMP</b> (liability-matching portfolio, years ≤ split, intended to spend down) and <b>speculative</b> holdings (years &gt; split, e.g. for heirs). Choosing a split year only sets the boundary — nothing is inferred automatically; you decide what to infer. <b>Infer LMP DARA</b> solves the LMP alone against the current speculative DARA (preserving a hand-set "heirs" amount). <b>Infer speculative DARA</b> solves speculative and then ripples down to re-infer the LMP (so it infers both). The LMP self-finances against the speculative boundary, so <b>any change to speculative</b> — infer, typed constant, or hand-edited rung — ripples down to re-infer the LMP; to keep a lumpy/hand-tuned LMP, <b>tune it last</b>. Type a constant in a segment's <i>$ each</i> field (Enter/blur to apply) to override; individual rungs stay editable. Every bulk change is undoable — <b>Undo</b> (Ctrl+Z) or <b>Revert to loaded</b> restores prior values without reloading the CSV. Click the <b>?</b> next to <i>Split year</i> for details.</p>
+    <p><b>Two-Segment DARA (LMP / Speculative)</b> — At the top of the per-year table you can pick a <b>split year</b> to treat one holdings file as two ladders: the <b>LMP</b> (liability-matching portfolio, years ≤ split, intended to spend down) and <b>speculative</b> holdings (years &gt; split, e.g. for heirs). Choosing a split year only sets the boundary — nothing is inferred automatically; you decide what to infer. <b>Infer LMP DARA</b> and <b>Infer speculative DARA</b> each solve one segment independently and never rewrite the other segment's per-year DARA. The speculative TIPS' income still funds the LMP — but as the natural coupon flow (LMI+AMD) at rebalance time, not by changing LMP targets. Because the LMP solves against the current speculative DARA, infer/finalize <b>speculative first and the LMP last</b> for whole-portfolio net cash ≈ 0. Type a constant in a segment's <i>$ each</i> field (Enter/blur to apply) to override; individual rungs stay editable. Every bulk change is undoable — <b>Undo</b> (Ctrl+Z) or <b>Revert to loaded</b> restores prior values without reloading the CSV. Click the <b>?</b> next to <i>Split year</i> for details.</p>
     <p><b>Net Cash</b> — Net proceeds (sells minus buys). Negative = net purchase.</p>
 
     <h3 style="font-size:13px;margin:16px 0 6px;border-bottom:1px solid #eee;padding-bottom:4px;">Mode: Build</h3>
@@ -468,14 +468,14 @@ document.getElementById('seg-tools-help').addEventListener('click', e => {
     { heading: 'Split year' },
     { html: 'The boundary funded year. Years <b>≤ split</b> are the <b>LMP</b> (liability-matching portfolio) you intend to spend down; years <b>&gt; split</b> are <b>speculative</b> holdings (e.g. destined for heirs). Choosing a split year only sets the boundary — <b>nothing is inferred automatically</b>. You decide whether to infer the LMP, the speculative segment, or both.' },
     { sep: true },
-    { heading: 'Infer LMP DARA' },
-    { html: 'Solves the LMP segment alone against the <b>current</b> speculative DARA (so a hand-set “heirs” amount is preserved) and stamps a single self-financing value across its rungs. Nothing depends on the LMP, so this never disturbs the speculative segment.' },
+    { heading: 'Infer LMP / speculative DARA' },
+    { html: 'Each button solves <b>one segment, independently</b>, and stamps a single self-financing value across that segment’s rungs — the other segment’s per-year DARA is never touched. The LMP solves against the <b>current</b> speculative DARA, so for whole-portfolio net cash ≈ 0, infer/finalize <b>speculative first and the LMP last</b>.' },
     { sep: true },
-    { heading: 'Infer speculative DARA' },
-    { html: 'Solves the speculative segment, then <b>ripples down to re-infer the LMP</b> — because the LMP self-finances against the speculative boundary, any change to speculative forces a fresh LMP. (So this effectively infers both.) To keep a lumpy/hand-tuned LMP, <b>tune the LMP last</b>.' },
+    { heading: '“Ripple down”' },
+    { html: 'The speculative TIPS’ income still funds the LMP rungs — but that happens as the natural coupon flow (LMI+AMD) inside the rebalance, <b>not</b> by rewriting the LMP’s DARA. So you can infer speculative on its own and the LMP benefits when you run, without its targets changing.' },
     { sep: true },
     { heading: 'Typed amount ($ each)' },
-    { html: 'Type a constant and press Enter (or click away) to stamp it across that segment’s rungs — a manual override of the inferred value (same as the main DARA field, no button). A <b>speculative</b> constant or hand-edit also ripples down to re-infer the LMP; an LMP entry changes nothing downstream.' },
+    { html: 'Type a constant and press Enter (or click away) to stamp it across that segment’s rungs — a manual override of the inferred value (same as the main DARA field, no button). The other segment is left untouched.' },
     { sep: true },
     { heading: 'Undo / Revert to loaded' },
     { html: 'Every bulk change is undoable (<b>Undo</b>, or Ctrl+Z while the panel is open). <b>Revert to loaded</b> jumps straight back to the per-year DARA as it was when the file loaded — no CSV reload needed.' },
@@ -1515,9 +1515,13 @@ function _snapshotDara() {
   _renderDaraHistoryBtns();
 }
 
-// Restore the store from a snapshot map, then refresh panel + clear stale output.
+// Restore the store from a snapshot map, then refresh panel + clear stale output. The segment
+// "inferred amount" fields are display-only echoes of the last infer, so blank them — the restored
+// state no longer corresponds to those inferred medians.
 function _restoreDara(map) {
   _daraByYearStore = map;
+  const lmpC = document.getElementById('seg-lmp-const'); if (lmpC) lmpC.value = '';
+  const specC = document.getElementById('seg-spec-const'); if (specC) specC.value = '';
   _clearOutput();
   renderDaraByYearPanel();
   updateDaraInput(true);
@@ -1720,19 +1724,14 @@ function _applyInferSegment(which, ctx) {
   return true;
 }
 
-// The speculative segment is UPSTREAM (top of the longest→shortest sweep); the LMP is downstream and
-// self-finances against it. So any change to speculative must ripple down to re-infer the LMP, or the
-// LMP goes stale (large net cash). No-op when there's no LMP/speculative split. Re-infers LMP against
-// the now-current speculative — clobbers a hand-tuned LMP by design, so tune the LMP last.
-function _rippleLMPFromSpec() {
-  const { lmpYears, specYears } = _segmentSets();
-  if (!specYears.size || !lmpYears.size) return;
-  const ctx = _segmentInferCtx(); if (!ctx) return;
-  _applyInferSegment('lmp', ctx);
-}
+// The two segments are inferred INDEPENDENTLY — inferring/changing one never rewrites the other's
+// per-year DARA. The speculative segment's income still "ripples down" to fund the LMP, but that is
+// the natural LMI+AMD coupon flow inside the rebalance engine (longest→shortest sweep), not a DARA
+// rewrite. Because the LMP self-finances against the current speculative DARA, infer/finalize
+// speculative first and the LMP last for whole-portfolio net cash ≈ 0.
 
-// Infer LMP DARA button: LMP alone, against the current speculative DARA (preserves a hand-set
-// "heirs" speculative amount). Nothing depends on the LMP, so this never ripples.
+// Infer LMP DARA button: LMP alone, against the current speculative DARA (so a hand-set "heirs"
+// speculative amount is preserved).
 function _runSegmentInferLMP() {
   const ctx = _segmentInferCtx(); if (!ctx || !_segmentSets().lmpYears.size) return;
   _snapshotDara();
@@ -1740,17 +1739,15 @@ function _runSegmentInferLMP() {
   _clearOutput(); renderDaraByYearPanel(); updateDaraInput(true);
 }
 
-// Infer speculative DARA button: speculative, then ripple to re-infer the LMP.
+// Infer speculative DARA button: speculative alone. Leaves the LMP per-year DARA untouched.
 function _runSegmentInferSpec() {
   const ctx = _segmentInferCtx(); if (!ctx || !_segmentSets().specYears.size) return;
   _snapshotDara();
   _applyInferSegment('spec', ctx);
-  _rippleLMPFromSpec();
   _clearOutput(); renderDaraByYearPanel(); updateDaraInput(true);
 }
 
-// Stamp a typed constant across one segment's rows. A speculative constant (e.g. a high "heirs"
-// amount) ripples to re-infer the LMP; an LMP constant changes nothing downstream.
+// Stamp a typed constant across one segment's rows. The other segment is left untouched.
 function _runSegmentConst(which) {
   const { lmpYears, specYears } = _segmentSets();
   const scopeYears = which === 'lmp' ? lmpYears : specYears;
@@ -1758,7 +1755,6 @@ function _runSegmentConst(which) {
   if (!scopeYears.size || isNaN(val) || val < 0) return;
   _snapshotDara();
   applySegmentMap(_daraByYearStore, scopeYears, constantMap(scopeYears, val));
-  if (which === 'spec') _rippleLMPFromSpec();
   _clearOutput();
   renderDaraByYearPanel();
   updateDaraInput(true);
@@ -1824,14 +1820,7 @@ _daraTable.addEventListener('focusout', e => {
   // Defer so a focus move between two rung inputs keeps the same edit session open.
   setTimeout(() => {
     if (_daraTable.contains(document.activeElement)) return;  // still editing another rung
-    if (_rungPreEdit && _rungDirty) {
-      _daraUndoStack.push(_rungPreEdit);
-      // A hand-edit to any speculative rung ripples down to re-infer the LMP (same undo entry).
-      const { specYears, lmpYears } = _segmentSets();
-      const specChanged = lmpYears.size && [...specYears].some(y => (_rungPreEdit.get(y) ?? null) !== (_daraByYearStore.get(y) ?? null));
-      if (specChanged) { _rippleLMPFromSpec(); _clearOutput(); renderDaraByYearPanel(); updateDaraInput(true); }
-      _renderDaraHistoryBtns();
-    }
+    if (_rungPreEdit && _rungDirty) { _daraUndoStack.push(_rungPreEdit); _renderDaraHistoryBtns(); }
     _rungPreEdit = null; _rungDirty = false;
   }, 0);
 });

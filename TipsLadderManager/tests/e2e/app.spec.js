@@ -875,7 +875,7 @@ async function _twoSegSetup(page, name) {
 const _lmpVals  = (page) => page.locator('#dara-by-year-table input[data-year]').evaluateAll(els => els.filter(e => +e.dataset.year <= 2047).map(e => e.value));
 const _specVals = (page) => page.locator('#dara-by-year-table input[data-year]').evaluateAll(els => els.filter(e => +e.dataset.year >  2047).map(e => e.value));
 
-test('two-segment DARA: split does not auto-infer; Infer LMP leaves speculative; speculative change ripples to LMP', async ({ page }) => {
+test('two-segment DARA: split does not auto-infer; segment infers are independent (one never rewrites the other)', async ({ page }) => {
   test.setTimeout(20_000);
   await _twoSegSetup(page, 'twoseg.csv');
 
@@ -894,50 +894,58 @@ test('two-segment DARA: split does not auto-infer; Infer LMP leaves speculative;
   expect(new Set(lmp1).size, 'all LMP rungs share one flat DARA').toBe(1);
   expect(await _specVals(page), 'Infer LMP leaves speculative as-is').toEqual(specBefore);
 
-  // 3. Change speculative (typed constant) → it ripples down and re-infers the LMP.
+  // 3. Infer speculative alone → speculative flattens; the LMP per-year DARA is NOT rewritten.
+  await page.locator('#seg-spec-median').click();
+  const spec1 = await _specVals(page);
+  expect(new Set(spec1).size, 'all speculative rungs share one flat DARA').toBe(1);
+  expect(await _lmpVals(page), 'Infer speculative leaves the LMP DARA untouched').toEqual(lmp1);
+
+  // 4. A speculative typed constant also leaves the LMP untouched.
   await page.locator('#seg-spec-const').fill('55000');
   await page.locator('#seg-spec-const').blur();
   await expect(page.locator('#dara-by-year-table input[data-year="2050"]')).toHaveValue('55000');
-  const lmp2 = await _lmpVals(page);
-  expect(new Set(lmp2).size, 'LMP stays flat after ripple').toBe(1);
-  expect(lmp2[0], 'speculative change rippled to re-infer the LMP').not.toBe(lmp1[0]);
+  expect(await _lmpVals(page), 'speculative constant leaves the LMP DARA untouched').toEqual(lmp1);
 
   await page.locator('#run-btn').click();
   await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 6_000 });
 });
 
-test('two-segment DARA: Infer speculative ripples to LMP → near-zero net cash', async ({ page }) => {
+test('two-segment DARA: infer speculative then LMP → near-zero net cash', async ({ page }) => {
   test.setTimeout(20_000);
-  await _twoSegSetup(page, 'twoseg-spec.csv');
+  await _twoSegSetup(page, 'twoseg-order.csv');
 
   await page.locator('#split-year').selectOption({ value: '2047' });
   await expect(page.locator('#seg-spec-row')).toBeVisible();
 
-  // Inferring speculative also re-infers the LMP (ripple), so the whole portfolio self-finances.
+  // Correct order — speculative first, LMP last — makes the whole portfolio self-finance.
   // This is the −15k regression guard.
   await page.locator('#seg-spec-median').click();
+  await page.locator('#seg-lmp-median').click();
   await page.locator('#run-btn').click();
   await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 6_000 });
   const nc = _parseNetCash(await page.locator('#net-cash-val').textContent());
-  expect(Math.abs(nc), `two-segment net cash ≈ 0 after Infer speculative (got ${nc})`).toBeLessThan(3000);
+  expect(Math.abs(nc), `two-segment net cash ≈ 0 after spec→LMP infer (got ${nc})`).toBeLessThan(3000);
 });
 
-test('per-year DARA: Undo and Revert restore prior values', async ({ page }) => {
+test('per-year DARA: Undo and Revert restore prior values and blank the inferred-amount field', async ({ page }) => {
   test.setTimeout(20_000);
   await _twoSegSetup(page, 'undo.csv');
 
   const rung = page.locator('#dara-by-year-table input[data-year="2030"]');
+  const lmpConst = page.locator('#seg-lmp-const');
   const loaded = await rung.inputValue();
 
-  // Inferring the LMP is a bulk change → Undo becomes available and the rung changes.
+  // Inferring the LMP is a bulk change → rung changes and the inferred amount appears in the field.
   await page.locator('#split-year').selectOption({ value: '2047' });
   await page.locator('#seg-lmp-median').click();
   await expect(page.locator('#dara-undo')).toBeEnabled();
   expect(await rung.inputValue()).not.toBe(loaded);
+  expect(parseFloat(await lmpConst.inputValue()), 'inferred amount shown in field').toBeGreaterThan(0);
 
-  // Undo restores the pre-infer (as-loaded) value.
+  // Undo restores the pre-infer value AND blanks the inferred-amount field.
   await page.locator('#dara-undo').click();
   expect(await rung.inputValue()).toBe(loaded);
+  expect(await lmpConst.inputValue(), 'inferred-amount field blanks on undo').toBe('');
 
   // Make another bulk change, then Revert-to-loaded jumps straight back to the import state.
   await page.locator('#seg-lmp-median').click();
@@ -945,4 +953,5 @@ test('per-year DARA: Undo and Revert restore prior values', async ({ page }) => 
   await expect(page.locator('#dara-revert')).toBeVisible();
   await page.locator('#dara-revert').click();
   expect(await rung.inputValue()).toBe(loaded);
+  expect(await lmpConst.inputValue(), 'inferred-amount field blanks on revert').toBe('');
 });
