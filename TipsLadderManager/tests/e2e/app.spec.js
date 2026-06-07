@@ -911,3 +911,74 @@ test('two-segment DARA: split year + per-segment fill leave the other segment un
   await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 6_000 });
   expect(await page.locator('#net-cash-val').textContent()).toBeTruthy();
 });
+
+const _parseNetCash = (s) => parseFloat(String(s).replace(/[^0-9.-]/g, ''));
+
+test('two-segment DARA: choosing a split auto-infers both segments → near-zero net cash', async ({ page }) => {
+  test.setTimeout(20_000);
+
+  // Build 2026–2055 and round-trip into rebalance
+  await page.locator('.tab-btn[data-mode="build"]').click();
+  await page.locator('#last-year').selectOption({ value: '2055' });
+  await page.locator('#dara').fill('40000');
+  await page.locator('#run-btn').click();
+  await expect(page.locator('#build-output')).toHaveCSS('display', 'block', { timeout: 4_000 });
+  const dl = page.waitForEvent('download');
+  await page.locator('#export-cusip-qty-btn').click();
+  const csvPath = test.info().outputPath('twoseg-auto.csv');
+  await (await dl).saveAs(csvPath);
+
+  await page.locator('.tab-btn[data-mode="rebalance"]').click();
+  await page.locator('#holdings-file').setInputFiles(csvPath);
+  await expect(page.locator('#dara-by-year')).toBeVisible({ timeout: 4_000 });
+  await page.locator('#dara-by-year-hdr').click();
+
+  // Selecting a real split year auto-infers BOTH segments via the spec→LMP cascade — no buttons.
+  await page.locator('#split-year').selectOption({ value: '2047' });
+  await expect(page.locator('#seg-spec-row')).toBeVisible();
+
+  // Running immediately must self-finance the whole portfolio (this is the −15k regression guard).
+  await page.locator('#run-btn').click();
+  await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 6_000 });
+  const nc = _parseNetCash(await page.locator('#net-cash-val').textContent());
+  expect(Math.abs(nc), `auto-inferred two-segment net cash ≈ 0 (got ${nc})`).toBeLessThan(3000);
+});
+
+test('per-year DARA: Undo and Revert restore prior values', async ({ page }) => {
+  test.setTimeout(20_000);
+
+  await page.locator('.tab-btn[data-mode="build"]').click();
+  await page.locator('#last-year').selectOption({ value: '2055' });
+  await page.locator('#dara').fill('40000');
+  await page.locator('#run-btn').click();
+  await expect(page.locator('#build-output')).toHaveCSS('display', 'block', { timeout: 4_000 });
+  const dl = page.waitForEvent('download');
+  await page.locator('#export-cusip-qty-btn').click();
+  const csvPath = test.info().outputPath('undo.csv');
+  await (await dl).saveAs(csvPath);
+
+  await page.locator('.tab-btn[data-mode="rebalance"]').click();
+  await page.locator('#holdings-file').setInputFiles(csvPath);
+  await expect(page.locator('#dara-by-year')).toBeVisible({ timeout: 4_000 });
+  await page.locator('#dara-by-year-hdr').click();
+
+  const rung = page.locator('#dara-by-year-table input[data-year="2030"]');
+  const loaded = await rung.inputValue();
+
+  // A split selection auto-infers (a bulk change) → Undo becomes available and the rung changes.
+  await page.locator('#split-year').selectOption({ value: '2047' });
+  await expect(page.locator('#dara-undo')).toBeEnabled();
+  const afterSplit = await rung.inputValue();
+  expect(afterSplit).not.toBe(loaded);
+
+  // Undo restores the pre-split (as-loaded) value.
+  await page.locator('#dara-undo').click();
+  expect(await rung.inputValue()).toBe(loaded);
+
+  // Make another bulk change, then Revert-to-loaded jumps straight back to the import state.
+  await page.locator('#split-year').selectOption({ value: '2047' });
+  await expect(rung).not.toHaveValue(loaded);
+  await expect(page.locator('#dara-revert')).toBeVisible();
+  await page.locator('#dara-revert').click();
+  expect(await rung.inputValue()).toBe(loaded);
+});
