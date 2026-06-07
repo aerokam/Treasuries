@@ -851,73 +851,10 @@ test('round-trip: build 2026–2066 → export CUSIP/Qty → import → last-yea
 // Build a 2026–2055 ladder, import it, then drive the per-year panel's segment tools:
 // set a constant on the speculative segment, fill the LMP median, and verify each action
 // touches ONLY its own segment (the long-standing clobber pain), then run with ~0 net cash.
-test('two-segment DARA: split year + per-segment fill leave the other segment untouched', async ({ page }) => {
-  test.setTimeout(20_000);
-
-  // 1. Build 2026–2055 @ DARA 40k and export
-  await page.locator('.tab-btn[data-mode="build"]').click();
-  await page.locator('#last-year').selectOption({ value: '2055' });
-  await page.locator('#dara').fill('40000');
-  await page.locator('#run-btn').click();
-  await expect(page.locator('#build-output')).toHaveCSS('display', 'block', { timeout: 4_000 });
-
-  const downloadPromise = page.waitForEvent('download');
-  await page.locator('#export-cusip-qty-btn').click();
-  const csvPath = test.info().outputPath('twoseg.csv');
-  await (await downloadPromise).saveAs(csvPath);
-
-  // 2. Import into rebalance — panel + segment tools populate
-  await page.locator('.tab-btn[data-mode="rebalance"]').click();
-  await page.locator('#holdings-file').setInputFiles(csvPath);
-  await expect(page.locator('#dara-by-year')).toBeVisible({ timeout: 4_000 });
-
-  // Expand the panel body so its inputs/buttons are interactable
-  await page.locator('#dara-by-year-hdr').click();
-  await expect(page.locator('#dara-seg-tools')).toBeVisible({ timeout: 2_000 });
-
-  // 3. Split at 2047 → LMP 2026–2047, speculative 2048–2055
-  await page.locator('#split-year').selectOption({ value: '2047' });
-  await expect(page.locator('#seg-spec-row')).toBeVisible();
-  const lmpInput  = page.locator('#dara-by-year-table input[data-year="2030"]');
-  const specInput = page.locator('#dara-by-year-table input[data-year="2050"]');
-  await expect(lmpInput).toHaveCount(1);
-  await expect(specInput).toHaveCount(1);
-
-  // 4. Set the speculative segment to a constant; LMP must be untouched
-  const lmpBefore = await lmpInput.inputValue();
-  await page.locator('#seg-spec-const').fill('55000');
-  await page.locator('#seg-spec-const').blur();  // commit on blur (no Set button) — mirrors main DARA field
-  await expect(specInput).toHaveValue('55000');
-  expect(await lmpInput.inputValue(), 'LMP year unchanged by speculative set').toBe(lmpBefore);
-
-  // 5. Fill the LMP self-financing median; the speculative constant must survive (no clobber)
-  await page.locator('#seg-lmp-median').click();
-  await expect(specInput).toHaveValue('55000', { timeout: 6_000 });
-
-  // The inferred flat median must appear in the LMP field…
-  const lmpMedian = await page.locator('#seg-lmp-const').inputValue();
-  expect(parseFloat(lmpMedian), 'inferred LMP median shown in field').toBeGreaterThan(0);
-
-  // …and EVERY LMP rung (2026–2047) must be flattened to that single value (even real income).
-  const lmpVals = await page.locator('#dara-by-year-table input[data-year]').evaluateAll(
-    (els) => els.filter(e => +e.dataset.year <= 2047).map(e => e.value)
-  );
-  expect(lmpVals.length).toBeGreaterThan(1);
-  expect(new Set(lmpVals).size, 'all LMP rungs share one flat DARA').toBe(1);
-  expect(lmpVals[0], 'flat rung value equals the shown median').toBe(lmpMedian);
-
-  // 6. Run completes and renders a table (whole-portfolio rebalance over the merged map)
-  await page.locator('#run-btn').click();
-  await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 6_000 });
-  expect(await page.locator('#net-cash-val').textContent()).toBeTruthy();
-});
-
 const _parseNetCash = (s) => parseFloat(String(s).replace(/[^0-9.-]/g, ''));
 
-test('two-segment DARA: choosing a split auto-infers both segments → near-zero net cash', async ({ page }) => {
-  test.setTimeout(20_000);
-
-  // Build 2026–2055 and round-trip into rebalance
+// Build 2026–2055 @ 40k, export CUSIP/Qty, import into rebalance, expand the panel. Returns csvPath.
+async function _twoSegSetup(page, name) {
   await page.locator('.tab-btn[data-mode="build"]').click();
   await page.locator('#last-year').selectOption({ value: '2055' });
   await page.locator('#dara').fill('40000');
@@ -925,58 +862,85 @@ test('two-segment DARA: choosing a split auto-infers both segments → near-zero
   await expect(page.locator('#build-output')).toHaveCSS('display', 'block', { timeout: 4_000 });
   const dl = page.waitForEvent('download');
   await page.locator('#export-cusip-qty-btn').click();
-  const csvPath = test.info().outputPath('twoseg-auto.csv');
+  const csvPath = test.info().outputPath(name);
   await (await dl).saveAs(csvPath);
 
   await page.locator('.tab-btn[data-mode="rebalance"]').click();
   await page.locator('#holdings-file').setInputFiles(csvPath);
   await expect(page.locator('#dara-by-year')).toBeVisible({ timeout: 4_000 });
   await page.locator('#dara-by-year-hdr').click();
+  await expect(page.locator('#dara-seg-tools')).toBeVisible({ timeout: 2_000 });
+}
 
-  // Selecting a real split year auto-infers BOTH segments via the spec→LMP cascade — no buttons.
+const _lmpVals  = (page) => page.locator('#dara-by-year-table input[data-year]').evaluateAll(els => els.filter(e => +e.dataset.year <= 2047).map(e => e.value));
+const _specVals = (page) => page.locator('#dara-by-year-table input[data-year]').evaluateAll(els => els.filter(e => +e.dataset.year >  2047).map(e => e.value));
+
+test('two-segment DARA: split does not auto-infer; Infer LMP leaves speculative; speculative change ripples to LMP', async ({ page }) => {
+  test.setTimeout(20_000);
+  await _twoSegSetup(page, 'twoseg.csv');
+
+  const before = await _lmpVals(page);
+  const specBefore = await _specVals(page);
+
+  // 1. Choosing a split year must NOT infer anything — every rung keeps its loaded value.
+  await page.locator('#split-year').selectOption({ value: '2047' });
+  await expect(page.locator('#seg-spec-row')).toBeVisible();
+  expect(await _lmpVals(page), 'split alone does not touch LMP').toEqual(before);
+  expect(await _specVals(page), 'split alone does not touch speculative').toEqual(specBefore);
+
+  // 2. Infer LMP alone → LMP flattens to one value; speculative untouched.
+  await page.locator('#seg-lmp-median').click();
+  const lmp1 = await _lmpVals(page);
+  expect(new Set(lmp1).size, 'all LMP rungs share one flat DARA').toBe(1);
+  expect(await _specVals(page), 'Infer LMP leaves speculative as-is').toEqual(specBefore);
+
+  // 3. Change speculative (typed constant) → it ripples down and re-infers the LMP.
+  await page.locator('#seg-spec-const').fill('55000');
+  await page.locator('#seg-spec-const').blur();
+  await expect(page.locator('#dara-by-year-table input[data-year="2050"]')).toHaveValue('55000');
+  const lmp2 = await _lmpVals(page);
+  expect(new Set(lmp2).size, 'LMP stays flat after ripple').toBe(1);
+  expect(lmp2[0], 'speculative change rippled to re-infer the LMP').not.toBe(lmp1[0]);
+
+  await page.locator('#run-btn').click();
+  await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 6_000 });
+});
+
+test('two-segment DARA: Infer speculative ripples to LMP → near-zero net cash', async ({ page }) => {
+  test.setTimeout(20_000);
+  await _twoSegSetup(page, 'twoseg-spec.csv');
+
   await page.locator('#split-year').selectOption({ value: '2047' });
   await expect(page.locator('#seg-spec-row')).toBeVisible();
 
-  // Running immediately must self-finance the whole portfolio (this is the −15k regression guard).
+  // Inferring speculative also re-infers the LMP (ripple), so the whole portfolio self-finances.
+  // This is the −15k regression guard.
+  await page.locator('#seg-spec-median').click();
   await page.locator('#run-btn').click();
   await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 6_000 });
   const nc = _parseNetCash(await page.locator('#net-cash-val').textContent());
-  expect(Math.abs(nc), `auto-inferred two-segment net cash ≈ 0 (got ${nc})`).toBeLessThan(3000);
+  expect(Math.abs(nc), `two-segment net cash ≈ 0 after Infer speculative (got ${nc})`).toBeLessThan(3000);
 });
 
 test('per-year DARA: Undo and Revert restore prior values', async ({ page }) => {
   test.setTimeout(20_000);
-
-  await page.locator('.tab-btn[data-mode="build"]').click();
-  await page.locator('#last-year').selectOption({ value: '2055' });
-  await page.locator('#dara').fill('40000');
-  await page.locator('#run-btn').click();
-  await expect(page.locator('#build-output')).toHaveCSS('display', 'block', { timeout: 4_000 });
-  const dl = page.waitForEvent('download');
-  await page.locator('#export-cusip-qty-btn').click();
-  const csvPath = test.info().outputPath('undo.csv');
-  await (await dl).saveAs(csvPath);
-
-  await page.locator('.tab-btn[data-mode="rebalance"]').click();
-  await page.locator('#holdings-file').setInputFiles(csvPath);
-  await expect(page.locator('#dara-by-year')).toBeVisible({ timeout: 4_000 });
-  await page.locator('#dara-by-year-hdr').click();
+  await _twoSegSetup(page, 'undo.csv');
 
   const rung = page.locator('#dara-by-year-table input[data-year="2030"]');
   const loaded = await rung.inputValue();
 
-  // A split selection auto-infers (a bulk change) → Undo becomes available and the rung changes.
+  // Inferring the LMP is a bulk change → Undo becomes available and the rung changes.
   await page.locator('#split-year').selectOption({ value: '2047' });
+  await page.locator('#seg-lmp-median').click();
   await expect(page.locator('#dara-undo')).toBeEnabled();
-  const afterSplit = await rung.inputValue();
-  expect(afterSplit).not.toBe(loaded);
+  expect(await rung.inputValue()).not.toBe(loaded);
 
-  // Undo restores the pre-split (as-loaded) value.
+  // Undo restores the pre-infer (as-loaded) value.
   await page.locator('#dara-undo').click();
   expect(await rung.inputValue()).toBe(loaded);
 
   // Make another bulk change, then Revert-to-loaded jumps straight back to the import state.
-  await page.locator('#split-year').selectOption({ value: '2047' });
+  await page.locator('#seg-lmp-median').click();
   await expect(rung).not.toHaveValue(loaded);
   await expect(page.locator('#dara-revert')).toBeVisible();
   await page.locator('#dara-revert').click();
