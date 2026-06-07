@@ -615,10 +615,21 @@ export function inferScaledDARAFromPortfolio({ daraMap, median: _median, holding
   };
 
   // Binary-search the DARA level at which the per-year map (flat or proportional) is self-financing.
+  // A trial may be INFEASIBLE: pushing this segment's DARA high floods later-maturity interest into a
+  // downstream (out-of-scope) year until it can't fund one bond → sizeLadder throws (err.daraTooLowYear).
+  // Such a throw means this segment's DARA is too high → search lower. A throw on an IN-SCOPE year means
+  // this segment's own DARA is too low → search higher. (Without scoping every year is in scope.)
   let lo = 1000, hi = 1000000, foundDARA = lo;
   while (lo <= hi) {
     const mid = Math.floor((lo + hi) / 2);
-    const result = runRebalance({ dara: mid, method: 'Full', bracketMode, holdings: holdingsRaw, tipsMap, refCPI, settlementDate, daraByYear: buildMap(mid), lastYearOverride, firstYearOverride, preLadderInterest });
+    let result;
+    try {
+      result = runRebalance({ dara: mid, method: 'Full', bracketMode, holdings: holdingsRaw, tipsMap, refCPI, settlementDate, daraByYear: buildMap(mid), lastYearOverride, firstYearOverride, preLadderInterest });
+    } catch (e) {
+      if (e && e.daraTooLowYear != null && inScope(e.daraTooLowYear)) lo = mid + 1;
+      else hi = mid - 1;
+      continue;
+    }
     if (netCash(result) >= 0) { foundDARA = mid; lo = mid + 1; } else { hi = mid - 1; }
   }
   const scaledMap = buildMap(foundDARA);

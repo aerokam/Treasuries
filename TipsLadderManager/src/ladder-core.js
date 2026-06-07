@@ -167,7 +167,9 @@ export function sizeLadder({
     const yearDara = daraByYear?.get(year) ?? dara;
     if (targetFundedYearQty === 0 && yearDara > laterMatInt) {
       const minNeeded = Math.ceil(laterMatInt + pi);
-      throw new Error(`DARA too low for ${year}: need at least $${minNeeded.toLocaleString()} to fund one bond (pi/bond = $${Math.round(pi).toLocaleString()}, later-mat interest = $${Math.round(laterMatInt).toLocaleString()})`);
+      const err = new Error(`DARA too low for ${year}: need at least $${minNeeded.toLocaleString()} to fund one bond (pi/bond = $${Math.round(pi).toLocaleString()}, later-mat interest = $${Math.round(laterMatInt).toLocaleString()})`);
+      err.daraTooLowYear = year;  // lets the inference binary search steer around infeasible probes
+      throw err;
     }
   }
 

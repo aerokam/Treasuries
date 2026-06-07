@@ -1299,6 +1299,32 @@ for (const gapFirstYear of [2037, 2038, 2039]) {
   console.log(`        net cash — LMP: ${Math.round(lmpNet).toLocaleString()}  spec: ${Math.round(specNet).toLocaleString()}  whole: ${Math.round(wholeNet).toLocaleString()}`);
 }
 
+// Spec-only infer must NOT throw when probing high DARA floods later-maturity interest into a fixed
+// downstream LMP year (regression: this aborted _runSegmentInferSpec before re-render → "does nothing").
+// Build data is too uniform to hit it; the real-ish SampleHoldings (2040 gap, lumpy ARA) does.
+{
+  const fp = path.resolve('./data/SampleHoldings.csv');
+  if (existsSync(fp)) {
+    console.log('\nSpec-only infer on SampleHoldings (split 2047) — must converge, not throw');
+    const holdings = parseHoldings(readFileSync(fp, 'utf8'));
+    const yrs = holdings.map(h => tipsMap.get(h.cusip)?.maturity?.getFullYear()).filter(Boolean);
+    const fy = Math.min(...yrs), ly = Math.max(...yrs);
+    const rawARA = computePortfolioARAByYear(holdings, tipsMap, refCPI);
+    const { daraMap } = derivePerYearDara(rawARA, getGapYearBracketCandidates(tipsMap));
+    const specYears = new Set(); for (let y = fy; y <= ly; y++) if (y > 2047) specYears.add(y);
+    let median = null, threw = false;
+    try {
+      ({ scaledMedian: median } = inferScaledDARAFromPortfolio({
+        daraMap, holdings, tipsMap, refCPI, settlementDate,
+        scopeYears: specYears, fixedDaraByYear: daraMap, flat: true,
+      }));
+    } catch { threw = true; }
+    assert('spec-only infer does not throw', threw, false);
+    assert('spec-only infer returns a positive flat DARA', median > 0, true);
+    console.log(`        spec flat DARA: ${Math.round(median || 0).toLocaleString()}`);
+  }
+}
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 console.log(`\n${passed + failed} tests: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);
