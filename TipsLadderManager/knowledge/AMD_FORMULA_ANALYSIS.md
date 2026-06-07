@@ -1,5 +1,5 @@
 # AMD Formula Analysis — Working Notes
-*Status: Implemented on branch `worktree-amd-formula-analysis` — pending review and merge*
+*Status: Historical analysis log (Rev 1–4). Superseded by **Revision 5 — Option C**, which shipped to `main`. Read Rev 5 (bottom) first; Rev 1–4 are kept for the derivation history. Canonical spec is 2.0 §Future 30Y Upper Cover AMD.*
 
 ---
 
@@ -228,3 +228,22 @@ the 40k-DARA case), independent of the separately-missing excess-coupon and pre-
 **unchanged** until broker handling is revisited. This feeds both the "Before" display and the
 `dara === null` AMD-inclusive DARA inference. Locked by the "rebal Before == build amount per year"
 invariant in tests/run.js.
+
+---
+
+## Revision 5 — Option C (even, held-to-maturity) — SHIPPED, supersedes Rev 2–4
+
+**The sell-into-roll model documented in Rev 2–4 above is no longer current.** The "hold to maturity"
+variant flagged as a possible future PR in the Background note at the top of this file became the chosen
+design ("Option C"). It shipped on branch `amd-option-c-and-gap-unification` and merged to `main`.
+
+What changed vs Rev 3/4:
+
+- **Income basis is the full, undepleted excess**, not the depleting held pool. `AMD(Y) = future30yUpperExQty × a(Y)` — there is no `qRoll`, no `H(Y)`, no `wUpper` decomposition. Selling 2052s realizes cash but does **not** reduce the income basis; sale qty and income are fully decoupled, exactly as coupon income is earned on a whole position regardless of which bonds are later sold.
+- **Range is every year `settlementYear+1 → 2052 maturity`**, not the `{rung.year − 30}` sale window. AMD is credited to every funded year in ladder range, not just 2027–2036.
+- **Profile is even (gently back-loaded by convexity)**, not the front-loaded hump of Rev 3. Still conserving: `Σ a(Y) = par − cost`.
+- The Abel reconciliation (Rev 3) and the cost-weighted `Σ qRoll = exQty` closure (Rev 2) no longer apply to AMD — AMD does not use the roll partition at all. Cost-weighted block `avgDuration` is still used for the **duration match / cover split** that sizes `future30yUpperExQty`.
+
+Single source of truth: `future30yUpperAmdSchedule()` in `gap-math.js`, consumed by `ladder-core.js`
+for both build and rebalance. Canonical spec: **2.0 §Future 30Y Upper Cover AMD** (rewritten to Option C);
+implementation detail: **4.0 §Future 30Y Upper Cover AMD**; DARA-inference interaction: **3.0**.
