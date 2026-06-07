@@ -2,14 +2,19 @@
 // scripts/generate-test-fixtures.js
 // Reads data/SchwabAllAccounts.csv and data/FidelityAllAccounts.csv (private, gitignored)
 // Writes sanitized/scaled (÷5) versions to tests/ for use in test suite.
-// Also writes tests/e2e/SampleHoldings.csv (Format 3: cusip,qty in bonds).
+// Also writes data/SampleHoldings.csv (Format 3: cusip,qty in bonds) — the app's pre-populate sample.
 //
 // Sanitization rules:
 //   - Bond face values: ÷5, rounded to nearest $1000
 //   - ETF/MM share counts: ÷5
 //   - Gain/loss, cost basis: zeroed / replaced with "--"
 //   - Account numbers (Schwab suffix, Fidelity account#): replaced with sequential fakes
+//   - Account NAMES: discarded entirely, replaced with synthetic "Acct<N>" labels that retain ONLY
+//     the account-type keyword (IRA / Roth IRA) — the only thing downstream logic needs (see
+//     detectAccountType in src/account-allocation.js). No real name can leak: the label is re-derived
+//     from the type, never copied, so new or renamed accounts are safe by construction.
 //   - Market values: recalculated for bonds, scaled ÷5 for other positions
+//   - SampleHoldings.csv: the TIPS of the traditional IRA holding the most TIPS (the richest tIRA).
 
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { fileURLToPath } from 'url';
@@ -22,6 +27,18 @@ const TESTS = path.join(ROOT, 'tests');
 const E2E   = path.join(TESTS, 'e2e');
 
 function die(msg) { console.error('ERROR:', msg); process.exit(1); }
+
+// Account-type detection mirrors src/account-allocation.js detectAccountType: only the IRA / Roth IRA
+// distinction is retained from a real account name; everything else (the names) is discarded.
+function detectType(name) {
+  const u = (name || '').toUpperCase();
+  if (u.includes('ROTH')) return 'roth_ira';
+  if (u.includes('IRA'))  return 'traditional_ira';
+  return 'taxable';
+}
+function typeSuffix(t) {
+  return t === 'roth_ira' ? ' Roth IRA' : t === 'traditional_ira' ? ' IRA' : '';
+}
 
 // ─── Schwab Format 2 ─────────────────────────────────────────────────────────
 
@@ -92,7 +109,6 @@ function scaleSchwabPos(cols) {
 function sanitizeSchwab(text) {
   const lines = text.split('\n');
   const outLines = [lines[0]]; // date/time header
-  const kevinIraTips = [];
 
   // Parse into account sections
   const sections = [];
@@ -110,29 +126,38 @@ function sanitizeSchwab(text) {
     }
   }
 
-  // Emit each section
+  // Emit each section under a synthetic label (real name discarded; only IRA/Roth type retained).
   sections.forEach((section, idx) => {
+    section.type      = detectType(section.rawName);
+    section.tips      = [];   // "CUSIP,bonds" strings for this account's TIPS
+    section.tipsBonds = 0;    // total scaled face (in bonds) — used to pick the richest tIRA
+
     outLines.push('', '');
-    outLines.push(`${section.rawName} ...${String(idx + 1).padStart(3, '0')}`);
+    outLines.push(`Acct${idx + 1}${typeSuffix(section.type)} ...${String(idx + 1).padStart(3, '0')}`);
     outLines.push(SCHWAB_COL_HEADER);
 
-    const isKevinIra = section.rawName === 'Owner8_IRA';
     let totalMkt = 0;
-
     for (const cols of section.positions) {
       const result = scaleSchwabPos(cols);
       if (!result) continue;
       outLines.push(result.row);
       totalMkt += result.mktNum;
-      if (isKevinIra && result.isTips) {
-        kevinIraTips.push(`${result.sym},${result.scaledBonds}`);
+      if (result.isTips) {
+        section.tips.push(`${result.sym},${result.scaledBonds}`);
+        section.tipsBonds += result.scaledBonds;
       }
     }
 
     outLines.push(`"Positions Total","","--","--","$${totalMkt.toFixed(2)}","--","--","--",`);
   });
 
-  return { csv: outLines.join('\n') + '\n', kevinIraTips };
+  // SampleHoldings source = the traditional IRA holding the most TIPS (by scaled face).
+  const richestTIra = sections
+    .filter(s => s.type === 'traditional_ira' && s.tips.length)
+    .sort((a, b) => b.tipsBonds - a.tipsBonds)[0];
+  const sampleTips = richestTIra ? richestTIra.tips : [];
+
+  return { csv: outLines.join('\n') + '\n', sampleTips };
 }
 
 // ─── Fidelity Format 1 ───────────────────────────────────────────────────────
@@ -187,6 +212,18 @@ function sanitizeFidelity(text) {
     return fake;
   }
 
+  // Synthetic account NAME per real account (keyed on the real account number, assigned in
+  // encounter order). Real name discarded; only the IRA/Roth type keyword is re-derived and kept.
+  const nameMap = {};
+  let nameSeq = 0;
+  function fakeName(realNum, realName) {
+    if (!(realNum in nameMap)) {
+      nameSeq++;
+      nameMap[realNum] = `Acct${nameSeq}${typeSuffix(detectType(realName))}`;
+    }
+    return nameMap[realNum];
+  }
+
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i];
     const trimmed = line.trim();
@@ -196,7 +233,7 @@ function sanitizeFidelity(text) {
 
     const cols = trimmed.split(',');
     const acctNum  = cols[0] ?? '';
-    const acctName = cols[1] ?? '';
+    const acctName = fakeName(acctNum, cols[1] ?? '');  // synthetic label; real name discarded
     const sym      = cols[2] ?? '';
     const desc     = cols[3] ?? '';
     const qty      = cols[4] ?? '';
@@ -243,7 +280,7 @@ if (!existsSync(schwabSrc))   die(`Missing ${schwabSrc}\n  Copy SchwabAllAccount
 if (!existsSync(fidelitySrc)) die(`Missing ${fidelitySrc}\n  Copy FidelityAllAccounts.csv from Downloads to data/`);
 
 console.log('Reading', schwabSrc);
-const { csv: schwabCsv, kevinIraTips } = sanitizeSchwab(readFileSync(schwabSrc, 'utf8'));
+const { csv: schwabCsv, sampleTips } = sanitizeSchwab(readFileSync(schwabSrc, 'utf8'));
 
 console.log('Reading', fidelitySrc);
 const fidelityCsv = sanitizeFidelity(readFileSync(fidelitySrc, 'utf8'));
@@ -256,11 +293,11 @@ writeFileSync(schwabOut,   schwabCsv,   'utf8');
 writeFileSync(fidelityOut, fidelityCsv, 'utf8');
 
 // Guard: never silently overwrite the canonical holdings file with a header-only stub.
-// (A prior regen with no Kevin-IRA TIPS flattened it and broke pre-populate + e2e.)
-if (kevinIraTips.length === 0) die(`No Kevin IRA TIPS extracted from ${schwabSrc}; refusing to write an empty ${holdingsOut}`);
-const holdingsCsv = ['cusip,qty', ...kevinIraTips].join('\n') + '\n';
+// (A prior regen with no richest-tIRA TIPS flattened it and broke pre-populate + e2e.)
+if (sampleTips.length === 0) die(`No traditional-IRA TIPS extracted from ${schwabSrc}; refusing to write an empty ${holdingsOut}`);
+const holdingsCsv = ['cusip,qty', ...sampleTips].join('\n') + '\n';
 writeFileSync(holdingsOut, holdingsCsv, 'utf8');
 
 console.log(`Wrote ${schwabOut}   (${schwabCsv.split('\n').length} lines)`);
 console.log(`Wrote ${fidelityOut}  (${fidelityCsv.split('\n').length} lines)`);
-console.log(`Wrote ${holdingsOut} (${kevinIraTips.length} TIPS)`);
+console.log(`Wrote ${holdingsOut} (${sampleTips.length} TIPS)`);
