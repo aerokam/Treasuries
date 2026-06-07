@@ -5,8 +5,10 @@ appsscript/
 memory/
 
 
-# Legacy data folder (ensure ignored if present)
-data/
+# Legacy data folder — ignored, EXCEPT the sample holdings the app fetches in prod.
+# (data/* not data/: a fully-excluded dir can't have a file re-included under it.)
+data/*
+!data/SampleHoldings.csv
 # Wrangler local state
 .wrangler/
 tips-data-worker/.wrangler/
