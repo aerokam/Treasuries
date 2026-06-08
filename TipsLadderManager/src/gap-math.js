@@ -219,38 +219,41 @@ export function future30yParamsCore({ future30yYears, coverBond2056, settlementD
   return { avgDuration, future30yTotalCost, breakdown, future30ySeedLMI: runningLMI };
 }
 
-// ─── Future 30Y upper-cover AMD schedule (Accrued Market Discount as interest) ──
+// ─── Excess-holding AMD schedule (Accrued Market Discount as interest) ──────────
 // Spec: 2.0 §Future 30Y Upper Cover AMD. Single source of truth for build AND rebalance.
+// GENERIC over any discount excess holding: pass the bond + its excess qty. Today only the
+// Future-30Y upper cover (2052) is wired in; the 2056 / 2036 / 2040 excess can reuse this same
+// function once specced (see sizeLadder's `amdExcessBonds`) — nothing here is 2052-specific.
 //
-// The excess 2052 is a deep-discount, low-coupon TIPS: a ~2.7% yield against a 0.125% coupon means
-// almost all of its return arrives as price accretion, not coupon. AMD is treated EXACTLY like coupon
-// interest — the only difference is that some 2052s must be sold to turn the accrued discount into cash.
-// Like coupon, the income is what the FULL held excess position earns each year, modeled held-to-maturity
-// (settlement → the 2052's own maturity), independent of how many bonds are sold to realize it. Under the
-// constant-yield method the per-bond accretion increment IS that interest:
+// A deep-discount, low-coupon TIPS (e.g. the 2052: ~2.7% yield vs 0.125% coupon) returns almost all
+// of its yield as price accretion, not coupon. AMD is treated EXACTLY like coupon interest — the only
+// difference is that some bonds must be sold to turn the accrued discount into cash. Like coupon, the
+// income is what the FULL held excess position earns each year, modeled held-to-maturity (settlement →
+// the bond's own maturity), independent of how many bonds are sold to realize it. Under the constant-
+// yield method the per-bond accretion increment IS that interest:
 //   adjPrice(Y) = priceFromYield(yield, coupon, Feb(Y), mat)/100 × IR_settle × 1000   (real $)
 //   a(Y)        = adjPrice(Y) − adjPrice(Y−1)     // accretion increment, per bond (basis steps up)
 //   AMD(Y)      = exQty × a(Y)                     // full undepleted position — same basis as coupon
 // Even (gently back-loaded by convexity), conserving (Σ a(Y) = par − cost). Returns Map<year, amd$>.
-export function future30yUpperAmdSchedule({ future30yYears, future30yUpperExQty, future30yUpperCoverBond, refCPI, settlementYear }) {
+export function excessAmdSchedule({ bond, exQty, refCPI, settlementYear }) {
   const byYear = new Map();
-  if (!(future30yYears?.length > 0 && future30yUpperExQty > 0 && future30yUpperCoverBond?.maturity)) return byYear;
-  const irUpper     = refCPI / (future30yUpperCoverBond.baseCpi ?? refCPI);
-  const costPerBond = (future30yUpperCoverBond.price ?? 0) / 100 * irUpper * 1000;
-  const matYear     = future30yUpperCoverBond.maturity.getFullYear();
-  const parPerBond  = irUpper * 1000;                // redemption value in settlement-real dollars
-  const adjPrice = (year) => {                       // constant-yield real price at last cal day of Feb
+  if (!(exQty > 0 && bond?.maturity)) return byYear;
+  const ir          = refCPI / (bond.baseCpi ?? refCPI);
+  const costPerBond = (bond.price ?? 0) / 100 * ir * 1000;
+  const matYear     = bond.maturity.getFullYear();
+  const parPerBond  = ir * 1000;                      // redemption value in settlement-real dollars
+  const adjPrice = (year) => {                        // constant-yield real price at last cal day of Feb
     const saleDate = new Date(year, 2, 0);
-    if (saleDate >= future30yUpperCoverBond.maturity) return parPerBond;   // at/after maturity → par
-    const p = priceFromYield(future30yUpperCoverBond.yield ?? 0, future30yUpperCoverBond.coupon ?? 0, saleDate, future30yUpperCoverBond.maturity);
-    return p == null ? null : p / 100 * irUpper * 1000;
+    if (saleDate >= bond.maturity) return parPerBond;  // at/after maturity → par
+    const p = priceFromYield(bond.yield ?? 0, bond.coupon ?? 0, saleDate, bond.maturity);
+    return p == null ? null : p / 100 * ir * 1000;
   };
-  let prevAdj = costPerBond;                          // basis starts at settlement cost
+  let prevAdj = costPerBond;                           // basis starts at settlement cost
   for (let year = settlementYear + 1; year <= matYear; year++) {
     const ap = adjPrice(year);
     if (ap == null) continue;
-    byYear.set(year, future30yUpperExQty * (ap - prevAdj));
-    prevAdj = ap;                                     // basis steps up — next year counts only the next increment
+    byYear.set(year, exQty * (ap - prevAdj));
+    prevAdj = ap;                                      // basis steps up — next year counts only the next increment
   }
   return byYear;
 }

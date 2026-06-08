@@ -33,18 +33,20 @@ export const COLS = [
   { label: 'Yield',       key: 'yield',       fmt: 'yld', buildOnly: true,
     value: d => d.yield, subValue: d => d.yield },
   // Rebalance-only
+  // Excess sub-row = coverage delivered (≈ missing-years × DARA): excessAmt{Before,After} from
+  // rebalance-lib (P+I − AMD net-out + block-LMI add-back), same rule as build's Amount column.
   { label: 'Amount Before', headerHTML: 'Amt<br>Before', key: 'amtBefore', fmt: 'amt', rebalOnly: true, fyLevel: true,
     value:          d => d.araBeforeTotal,
-    subValue:       d => d.excessQtyBefore * pi(d),
+    subValue:       d => d.excessAmtBefore ?? (d.excessQtyBefore * pi(d)),
     subDrillKeyFn:  d => d.isFuture30yCover ? 'future30yAmtBefore' : 'gapAmtBefore',
-    total: true, totalFn: d => (d.araBeforeTotal ?? 0) + (d.excessQtyBefore * pi(d) || 0),
+    total: true, totalFn: d => (d.araBeforeTotal ?? 0) + ((d.excessAmtBefore ?? d.excessQtyBefore * pi(d)) || 0),
     drill: true, drillCond: (_v, d) => d.araBeforeTotal !== null },
 
   { label: 'Amount After',  headerHTML: 'Amt<br>After',  key: 'amtAfter',  fmt: 'amt', rebalOnly: true, fyLevel: true,
     value:          d => d.araAfterTotal,
-    subValue:       d => d.excessQtyAfter * pi(d),
+    subValue:       d => d.excessAmtAfter ?? (d.excessQtyAfter * pi(d)),
     subDrillKeyFn:  d => d.isFuture30yCover ? 'future30yAmtAfter' : 'gapAmtAfter',
-    total: true, totalFn: d => (d.araAfterTotal ?? 0) + (d.excessQtyAfter * pi(d) || 0),
+    total: true, totalFn: d => (d.araAfterTotal ?? 0) + ((d.excessAmtAfter ?? d.excessQtyAfter * pi(d)) || 0),
     drill: true, drillCond: (_v, d) => d.araAfterTotal !== null },
 
   { label: 'Cost Before',   headerHTML: 'Cost<br>Before', key: 'costBefore', fmt: 'amt', rebalOnly: true,

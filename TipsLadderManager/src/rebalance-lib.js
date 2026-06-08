@@ -3,7 +3,7 @@
 
 import { bondCalcs, calculateMDuration, yieldFromPrice, calcMktWtdAvg } from '../../shared/src/bond-math.js';
 export { yieldFromPrice };
-import { interpolateYield, syntheticCoupon, bracketWeights, future30yUpperAmdSchedule, gapParamsWithUpperFeedback, future30yParamsCore } from './gap-math.js';
+import { interpolateYield, syntheticCoupon, bracketWeights, excessAmdSchedule, gapParamsWithUpperFeedback, future30yParamsCore } from './gap-math.js';
 import { sizeLadder, selectLadderBonds, fundedYearAmount } from './ladder-core.js';
 import { localDate, fmtDate, toDateStr } from './date-util.js';
 import { detectAccountType, allocateToAccounts, computeAccountCashFlows, generateFeasibilityReport } from './account-allocation.js';
@@ -568,21 +568,35 @@ export function inferScaledDARAFromPortfolio({ daraMap, median: _median, holding
   }
 
   let amdByYear = new Map();
+  let rollByYear = new Map();   // Future-30Y cover-roll coupon credited to post-2052-maturity years (2053–56)
   if (_lastY > maxTipsYear) {
     const future30yYears = [];
     for (let y = maxTipsYear + 1; y <= _lastY; y++) future30yYears.push(y);
-    let upperCover = null;
+    let upperCover = null, lowerCover = null;
     for (const bond of tipsMap.values()) {
       if (bond.maturity?.getFullYear() === 2052 && (!upperCover || bond.maturity > upperCover.maturity)) upperCover = bond;
+      if (bond.maturity?.getFullYear() === 2056 && (!lowerCover || bond.maturity > lowerCover.maturity)) lowerCover = bond;
     }
     if (upperCover) {
       const heldUpperExcess = holdingsRaw.reduce((s, h) => h.cusip === upperCover.cusip ? s + (h.excessQty ?? 0) : s, 0);
-      if (heldUpperExcess > 0)
-        amdByYear = future30yUpperAmdSchedule({ future30yYears, future30yUpperExQty: heldUpperExcess, future30yUpperCoverBond: upperCover, refCPI, settlementYear });
+      if (heldUpperExcess > 0) {
+        amdByYear = excessAmdSchedule({ bond: upperCover, exQty: heldUpperExcess, refCPI, settlementYear });
+        // Roll coupon (held-based): rolled upper-cover dollars × the synthetic Future-30Y coupon rate
+        // — algebraically the same as upperWeight × block coupon used in sizeLadder. Spec 2.0 §AMD.
+        if (lowerCover) {
+          const irU = refCPI / (upperCover.baseCpi ?? refCPI);
+          const costUpper = (upperCover.price ?? 0) / 100 * irU * 1000;
+          const rollAnnual = heldUpperExcess * costUpper * syntheticCoupon(lowerCover.yield ?? 0);
+          const upperMatYear = upperCover.maturity.getFullYear();
+          const minFuture30y = Math.min(...future30yYears);
+          if (rollAnnual > 0)
+            for (let y = upperMatYear + 1; y < minFuture30y; y++) rollByYear.set(y, rollAnnual);
+        }
+      }
     }
   }
 
-  daraMap = new Map([...daraMap.entries()].map(([y, v]) => [y, v + (ownExcessCoupon[y] ?? 0) + (amdByYear.get(y) ?? 0)]));
+  daraMap = new Map([...daraMap.entries()].map(([y, v]) => [y, v + (ownExcessCoupon[y] ?? 0) + (amdByYear.get(y) ?? 0) + (rollByYear.get(y) ?? 0)]));
 
   const inScope = scopeYears ? (y => scopeYears.has(y)) : (() => true);
 
@@ -855,38 +869,77 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
     future30yLowerExQty = future30yLowerCPB > 0 ? Math.round(future30yParams.future30yTotalCost * future30yLowerWeight / future30yLowerCPB) : 0;
   }
 
-  // ── Future 30Y upper cover AMD (spec: 2.0 §Future 30Y Upper Cover AMD) ──────────
-  // AMD = interest on the held excess 2052, modeled held-to-maturity, treated exactly like coupon.
-  // Shared with build via gap-math (single source of truth). ForQty scales it linearly by held qty.
-  const future30yUpperAnnualAmdByYear = future30yUpperAmdSchedule({
-    future30yYears, future30yUpperExQty, future30yUpperCoverBond, refCPI, settlementYear,
-  });
-  // AMD is realized only on the EXCESS (cover) 2052s; funded-year 2052s are held to maturity and
-  // their discount lands in P+I, never as AMD (spec: AMD_FORMULA_ANALYSIS §"Excess only"). So scale
-  // by held EXCESS, not total held. Our files carry the funded/excess split (h.excessQty); broker
-  // files (no split) fall back to total held — unchanged behavior until broker handling is revisited.
-  const future30yUpperQtyBefore = (future30yYears.length > 0 && future30yUpperCoverBond)
-    ? (yearInfo[future30yUpperYear]?.holdings?.reduce((s, h) => h.cusip === future30yUpperCoverBond.cusip
+  // ── Future 30Y cover AMD (spec: 2.0 §Future 30Y Cover AMD) ─────────────────────
+  // AMD = interest on the held excess cover TIPS, modeled held-to-maturity, treated exactly like
+  // coupon. Both deep-discount covers (2052 upper, 2056 lower) carry AMD. Shared with build via
+  // gap-math (single source of truth). AMD is realized only on the EXCESS (cover) TIPS; funded-year
+  // TIPS are held to maturity and their discount lands in P+I, never as AMD (AMD_FORMULA_ANALYSIS
+  // §"Excess only"). Files carry the funded/excess split (h.excessQty); broker files (no split)
+  // fall back to total held — unchanged until broker handling is revisited.
+  const future30yAmdExcessBonds = [];
+  if (future30yYears.length > 0 && future30yUpperExQty > 0 && future30yUpperCoverBond)
+    future30yAmdExcessBonds.push({ year: future30yUpperYear, bond: future30yUpperCoverBond, exQty: future30yUpperExQty });
+  if (future30yYears.length > 0 && future30yLowerExQty > 0 && future30yLowerCoverBond)
+    future30yAmdExcessBonds.push({ year: future30yLowerYear, bond: future30yLowerCoverBond, exQty: future30yLowerExQty });
+
+  const heldExcessOf = (bond) => bond
+    ? (yearInfo[bond.maturity.getFullYear()]?.holdings?.reduce((s, h) => h.cusip === bond.cusip
         ? s + (h.excessQty != null ? h.excessQty : h.qty) : s, 0) ?? 0)
     : 0;
-  function calcFuture30yUpperAnnualAmdForQty(year, qty) {
-    if (future30yUpperExQty <= 0 || qty <= 0) return 0;
-    return (future30yUpperAnnualAmdByYear.get(year) ?? 0) * qty / future30yUpperExQty;
+
+  // Target-state AMD (full target excess), combined across covers — drives target sizing + gap params.
+  const future30yUpperAnnualAmdByYear = new Map();
+  // Before-state AMD, from ACTUAL held excess per cover (held proportions differ from target).
+  const future30yAmdBeforeByYear = new Map();
+  for (const { bond, exQty } of future30yAmdExcessBonds) {
+    for (const [y, v] of excessAmdSchedule({ bond, exQty, refCPI, settlementYear }))
+      future30yUpperAnnualAmdByYear.set(y, (future30yUpperAnnualAmdByYear.get(y) ?? 0) + v);
+    const held = heldExcessOf(bond);
+    if (held > 0)
+      for (const [y, v] of excessAmdSchedule({ bond, exQty: held, refCPI, settlementYear }))
+        future30yAmdBeforeByYear.set(y, (future30yAmdBeforeByYear.get(y) ?? 0) + v);
+  }
+  const future30yUpperQtyBefore = heldExcessOf(future30yUpperCoverBond);
+  const future30yLowerQtyBefore = heldExcessOf(future30yLowerCoverBond);
+  function calcFuture30yUpperAnnualAmdBefore(year) {
+    return future30yAmdBeforeByYear.get(year) ?? 0;
   }
   function calcFuture30yUpperAnnualAmd(year) {
     return future30yUpperAnnualAmdByYear.get(year) ?? 0;
   }
 
+  // ── Future-30Y cover-roll coupon (post-upper-maturity years 2053–56) ───────────
+  // Mirrors ladder-core.sizeLadder: after the 2052 matures its cost basis is rolled into the
+  // actual Future-30Y TIPS, whose coupon (upper-cover share) sizes 2053–56 down. ForQty scales
+  // by held excess for the Before state, exactly like the AMD ForQty above.
+  const future30yRollCouponByYear = new Map();
+  if (future30yYears.length > 0 && future30yUpperExQty > 0 && future30yUpperCoverBond) {
+    const rollAnnual   = future30yUpperWeight * (future30yParams?.future30ySeedLMI ?? 0);
+    const upperMatYear = future30yUpperCoverBond.maturity.getFullYear();
+    const minFuture30y = Math.min(...future30yYears);
+    if (rollAnnual > 0)
+      for (let y = upperMatYear + 1; y < minFuture30y; y++) future30yRollCouponByYear.set(y, rollAnnual);
+  }
+  function calcFuture30yRollCoupon(year) {
+    return future30yRollCouponByYear.get(year) ?? 0;
+  }
+  function calcFuture30yRollCouponForQty(year, qty) {
+    if (future30yUpperExQty <= 0 || qty <= 0) return 0;
+    return (future30yRollCouponByYear.get(year) ?? 0) * qty / future30yUpperExQty;
+  }
+
   // ── AMD-inclusive DARA inference correction ───────────────────────────────────
   // Build sizes each funded year so P+I + LMI + held-to-maturity 2052 AMD = DARA (Option C).
   // The provisional median above used only P+I + LMI, understating DARA by one year's AMD.
-  // Re-take the median with the AMD the PORTFOLIO actually earns (scaled by held 2052 excess),
-  // so inferredDARA reflects the true DARA the holdings encode. Only the dara===null path.
-  if (dara === null && future30yUpperExQty > 0 && future30yUpperQtyBefore > 0) {
+  // Re-take the median with the AMD the PORTFOLIO actually earns (from held cover excess, both
+  // covers), so inferredDARA reflects the true DARA the holdings encode. Only the dara===null path.
+  if (dara === null && (future30yUpperQtyBefore > 0 || future30yLowerQtyBefore > 0)) {
     const amdInclusiveARA = [];
     for (let year = firstYear; year <= lastYear; year++) {
       if (araByYear[year] !== undefined)
-        amdInclusiveARA.push(araByYear[year] + calcFuture30yUpperAnnualAmdForQty(year, future30yUpperQtyBefore));
+        amdInclusiveARA.push(araByYear[year]
+          + calcFuture30yUpperAnnualAmdBefore(year)
+          + calcFuture30yRollCouponForQty(year, future30yUpperQtyBefore));   // 2053–56 roll coupon (2052-only)
     }
     amdInclusiveARA.sort((a, b) => a - b);
     const _mid = Math.floor(amdInclusiveARA.length / 2);
@@ -921,6 +974,9 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
   const preLadderPool       = _sl.preLadderPool;
   const preLadderCouponPool = _sl.preLadderCouponPool;
   const preLadderAmdPool    = _sl.preLadderAmdPool;
+  const preLadderRollCouponPool = _sl.preLadderRollCouponPool;
+  const amdLifetimeByBracketYear = _sl.amdLifetimeByBracketYear ?? new Map();  // per-cover Σ AMD (cover-Amount net-out)
+  const future30yLMITotal   = _sl.future30yLMITotal ?? 0;                      // intra-block coupon add-back
 
   // Augment gapLaterMaturityInterest with future cover excess LMI before computing gap params
   const future30yExtraLMI = {};
@@ -1095,6 +1151,28 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
     }
   }
 
+  // Bracket/cover Amount = coverage delivered (≈ missing-years × DARA), IDENTICAL rule to build-lib:
+  //   excessQty × P+I − amdLifetime(scaled to qty) + weight × blockLMITotal   (gap or future-30Y block)
+  // The AMD net-out and intra-block add-back make the cover total read ≈ N×DARA (Rev 6). amdLifetime
+  // is keyed by bracket year and scaled by qty over that cover's own target excess (both Future-30Y
+  // covers populated; gap brackets are near par). Spec: 2.0 §Excess Amount (Bracket / Cover Display).
+  function excessLMIAllocFor(year) {   // weight × block coupon add-back (gap or future-30Y), per bracket year
+    if (future30yYears.length > 0 && year === future30yUpperYear)        return future30yUpperWeight * future30yLMITotal;
+    if (future30yYears.length > 0 && year === future30yLowerYear)        return future30yLowerWeight * future30yLMITotal;
+    if (gapYears.length > 0 && year === brackets.upperYear)              return upperWeight * (gapParams?.gapLMITotal ?? 0);
+    if (gapYears.length > 0 && is3Bracket && year === newLowerYear)      return lowerWeight * (gapParams?.gapLMITotal ?? 0);
+    if (gapYears.length > 0 && year === brackets.lowerYear)              return (is3Bracket ? (origLowerWeight ?? 0) : lowerWeight) * (gapParams?.gapLMITotal ?? 0);
+    return 0;
+  }
+  function excessCoverageAmt(year, exQty, piPB) {
+    if (!(exQty > 0)) return 0;
+    const amdFull = amdLifetimeByBracketYear.get(year) ?? 0;   // lifetime AMD at this cover's TARGET excess
+    const targetExQty = year === future30yUpperYear ? future30yUpperExQty
+                      : year === future30yLowerYear ? future30yLowerExQty : 0;   // own denominator per cover
+    const amdScaled = targetExQty > 0 ? amdFull * exQty / targetExQty : 0;
+    return exQty * piPB - amdScaled + excessLMIAllocFor(year);
+  }
+
   let rebalYearSet = new Set();
   if (isFullMode) {
     for (let y = firstYear; y <= lastYear; y++) {
@@ -1113,7 +1191,9 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
   // be sold to its AMD-adjusted need regardless of mode (Full already includes them; Gap does not).
   // Range follows the actual sale years, not a hardcoded ≤ 2036 cap. Spec: 2.0 §Future 30Y Upper Cover AMD.
   if (future30yUpperExQty > 0) {
-    for (const y of future30yUpperAnnualAmdByYear.keys()) {
+    // AMD years (≤2052) AND cover-roll-coupon years (2053–56) both reduce a funded year's need and
+    // must be sold to that lower need in any mode (spec: 2.0 §Future 30Y Upper Cover AMD).
+    for (const y of [...future30yUpperAnnualAmdByYear.keys(), ...future30yRollCouponByYear.keys()]) {
       if (y >= firstYear && y <= lastYear && !bracketYearSet.has(y) && !gapYearSet.has(y) && !future30yYearSet.has(y))
         rebalYearSet.add(y);
     }
@@ -1204,8 +1284,8 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
 
       // 3. Calculate needed P+I, subtracting both incoming LMI and current year excess LMI
       const effectivePartialCredit = (year === partialCreditYear) ? partialCredit : 0;
-      const future30yAmd = calcFuture30yUpperAnnualAmd(year);
-      const needed = yearDara - rebuildLaterMatInt - excessLMI - effectivePartialCredit - future30yAmd;
+      const future30yExtra = calcFuture30yUpperAnnualAmd(year) + calcFuture30yRollCoupon(year);  // AMD (≤2052) + roll coupon (2053–56)
+      const needed = yearDara - rebuildLaterMatInt - excessLMI - effectivePartialCredit - future30yExtra;
 
       if (zeroedFundedYears.has(year)) {
         // PLI covers this year's funded need — zero funded qty AND sell all non-target holdings
@@ -1320,7 +1400,8 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
         holdingsBefore.push({ cusip: h.cusip, maturityMonth: m - 1, maturityYear: h.maturity.getFullYear(), qty: qFunded, principalPerBond: ap, nPeriods: m < 7 ? 1 : 2, coupon: b?.coupon ?? 0 });
       }
     }
-    const amdBefore = (year >= firstYear && year <= lastYear) ? calcFuture30yUpperAnnualAmdForQty(year, future30yUpperQtyBefore) : 0;
+    const amdBefore  = (year >= firstYear && year <= lastYear) ? calcFuture30yUpperAnnualAmdBefore(year) : 0;
+    const rollBefore = (year >= firstYear && year <= lastYear) ? calcFuture30yRollCouponForQty(year, future30yUpperQtyBefore) : 0;
     // "Before" = annual real amount from CURRENT holdings, via the SAME shared rule build/After use
     // (one computation, before-qtys), so a no-trade round-trip lands Before ≡ build per year. The
     // zeroed-year pre-ladder credit is applied only for OUR files (explicit per-year DARA block);
@@ -1329,13 +1410,13 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
     const hasExplicitDara = daraByYear != null;
     const yearDaraBefore = daraByYear?.get(year) ?? DARA;
     const { credit: pliCreditBefore, amount: beforeAmt } = fundedYearAmount({
-      principal: pB, ownCoupon: cB, laterMatInt: lBefore, ownExcessCoupon: exIntB, amd: amdBefore,
+      principal: pB, ownCoupon: cB, laterMatInt: lBefore, ownExcessCoupon: exIntB, amd: amdBefore, rollCoupon: rollBefore,
       dara: yearDaraBefore,
       isZeroed: hasExplicitDara && zeroedFundedYears.has(year),
       partialCredit: hasExplicitDara ? (pliCreditByFundedYear[year] ?? 0) : 0,
     });
     beforeARAByYear[year] = beforeAmt;
-    beforeARABreakdown[year] = { principal: pB, ownCoupon: cB, laterMatInt: lBefore, ownExcessCoupon: exIntB, pliCredit: pliCreditBefore, holdings: holdingsBefore, future30yUpperAnnualAmd: amdBefore };
+    beforeARABreakdown[year] = { principal: pB, ownCoupon: cB, laterMatInt: lBefore, ownExcessCoupon: exIntB, pliCredit: pliCreditBefore, holdings: holdingsBefore, future30yUpperAnnualAmd: amdBefore, future30yRollCoupon: rollBefore };
 
     // Years outside [firstYear, lastYear] are not ladder rungs; their "Amount After" is 0.
     // LMI from later bonds flows to firstYear (the shortest rung), not to dropped years.
@@ -1382,7 +1463,8 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
         }
       }
     }
-    const amdAfter = (year >= firstYear && year <= lastYear) ? calcFuture30yUpperAnnualAmd(year) : 0;
+    const amdAfter  = (year >= firstYear && year <= lastYear) ? calcFuture30yUpperAnnualAmd(year) : 0;
+    const rollAfter = (year >= firstYear && year <= lastYear) ? calcFuture30yRollCoupon(year) : 0;
     // "After" ARA via the SAME shared rule build uses (ladder-core.fundedYearAmount), so After ≡
     // build by construction (locked by the "rebal After == build amount per year" test). sizeLadder
     // sizes the PLI pool against the PRELIMINARY later-mat interest (the approximation that decides
@@ -1390,12 +1472,12 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
     // excess coupon exIntA + AMD); for a zeroed year the shared rule reconciles the credit to those.
     const yearDaraDisp = daraByYear?.get(year) ?? DARA;
     const { credit: pliCredit, amount: _postAmt } = fundedYearAmount({
-      principal: pA, ownCoupon: cA, laterMatInt: lAfter, ownExcessCoupon: exIntA, amd: amdAfter,
+      principal: pA, ownCoupon: cA, laterMatInt: lAfter, ownExcessCoupon: exIntA, amd: amdAfter, rollCoupon: rollAfter,
       dara: yearDaraDisp, isZeroed: zeroedFundedYears.has(year),
       partialCredit: pliCreditByFundedYear[year] ?? 0,
     });
     postARAByYear[year] = _postAmt;
-    postARABreakdown[year] = { principal: pA, ownCoupon: cA, laterMatInt: lAfter, holdings: holdingsAfter, pliCredit, future30yUpperAnnualAmd: amdAfter };
+    postARABreakdown[year] = { principal: pA, ownCoupon: cA, laterMatInt: lAfter, holdings: holdingsAfter, pliCredit, future30yUpperAnnualAmd: amdAfter, future30yRollCoupon: rollAfter };
   }
 
   // Summary Metrics
@@ -1450,7 +1532,7 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
         cFY += oh.qty * (b.price / 100 * ir * 1000);
       }
       iFY += lmi; aFY = pFY + iFY; aB = beforeARAByYear[h.year]; aA = postARAByYear[h.year];
-      aFY += calcFuture30yUpperAnnualAmdForQty(h.year, future30yUpperQtyBefore);
+      aFY += calcFuture30yUpperAnnualAmdBefore(h.year);
     }
 
     const b = tipsMap.get(h.cusip);
@@ -1507,6 +1589,9 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
       isBracketTarget: isBT, isFuture30yCover: isBT && future30yCoverYearSet.has(h.year),
       isGapBracket: gapYears.length > 0 && (h.year === brackets.lowerYear || h.year === brackets.upperYear || (is3Bracket && h.year === newLowerYear)),
       excessQtyBefore: exB, excessQtyAfter: exA,
+      excessAmtBefore: excessCoverageAmt(h.year, exB, piPB),
+      excessAmtAfter:  excessCoverageAmt(h.year, exA, piPB),
+      excessLMIAlloc:  excessLMIAllocFor(h.year),
       excessLMI_Before: excessLMI_B, excessLMI_After: excessLMI_A,
       araBeforeTotal:    isLast ? aB : null, araAfterTotal:    isLast ? aA : null,
       araBeforePrincipal:   isLast ? (beforeARABreakdown[h.year]?.principal   ?? 0) : null,
@@ -1521,6 +1606,8 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
       preLadderCreditForYearBefore: isLast ? (beforeARABreakdown[h.year]?.pliCredit ?? 0) : null,
       future30yUpperAnnualAmd:       isLast ? (postARABreakdown[h.year]?.future30yUpperAnnualAmd ?? 0) : null,
       future30yUpperAnnualAmdBefore: isLast ? (beforeARABreakdown[h.year]?.future30yUpperAnnualAmd ?? 0) : null,
+      future30yRollCoupon:       isLast ? (postARABreakdown[h.year]?.future30yRollCoupon ?? 0) : null,
+      future30yRollCouponBefore: isLast ? (beforeARABreakdown[h.year]?.future30yRollCoupon ?? 0) : null,
       nPeriods: (h.maturity.getMonth() + 1 < 7 ? 1 : 2),
       mDuration,
     });
@@ -1573,6 +1660,9 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
       isBracketTarget: bst.isBracket, isFuture30yCover: bst.isBracket && future30yCoverYearSet.has(bYear),
       isGapBracket: gapYears.length > 0 && (bYear === brackets.lowerYear || bYear === brackets.upperYear || (is3Bracket && bYear === newLowerYear)),
       excessQtyBefore: 0, excessQtyAfter: exA,
+      excessAmtBefore: 0,
+      excessAmtAfter:  excessCoverageAmt(bYear, exA, piPB),
+      excessLMIAlloc:  excessLMIAllocFor(bYear),
       excessLMI_Before: 0, excessLMI_After: excessLMI,
       araBeforeTotal: araB, araAfterTotal: araA,
       araBeforePrincipal: 0, araBeforeOwnCoupon: 0, araBeforeLaterMatInt: lmiBefore,
@@ -1585,6 +1675,8 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
       preLadderCreditForYearBefore: beforeARABreakdown[bYear]?.pliCredit ?? 0,
       future30yUpperAnnualAmd:       postARABreakdown[bYear]?.future30yUpperAnnualAmd ?? 0,
       future30yUpperAnnualAmdBefore: beforeARABreakdown[bYear]?.future30yUpperAnnualAmd ?? 0,
+      future30yRollCoupon:       postARABreakdown[bYear]?.future30yRollCoupon ?? 0,
+      future30yRollCouponBefore: beforeARABreakdown[bYear]?.future30yRollCoupon ?? 0,
       nPeriods: m < 7 ? 1 : 2,
       mDuration: (tb?.yield != null) ? calculateMDuration(settlementDate, tb.maturity, tb.coupon ?? 0, tb.yield) : 0,
     };
@@ -1631,6 +1723,7 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
         isBracketTarget: false, isFuture30yCover: false,
         isGapBracket: gapYears.length > 0 && (year === brackets.lowerYear || year === brackets.upperYear || (is3Bracket && year === newLowerYear)),
         excessQtyBefore: 0, excessQtyAfter: 0,
+        excessAmtBefore: 0, excessAmtAfter: 0,
         excessLMI_Before: 0, excessLMI_After: 0,
         araBeforeTotal: araB, araAfterTotal: araA,
         araBeforePrincipal: bbd.principal ?? 0, araBeforeOwnCoupon: bbd.ownCoupon ?? 0,
@@ -1641,6 +1734,8 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
         preLadderCreditForYearBefore: bbd.pliCredit ?? 0,
         future30yUpperAnnualAmd: bd.future30yUpperAnnualAmd ?? 0,
         future30yUpperAnnualAmdBefore: bbd.future30yUpperAnnualAmd ?? 0,
+        future30yRollCoupon: bd.future30yRollCoupon ?? 0,
+        future30yRollCouponBefore: bbd.future30yRollCoupon ?? 0,
         nPeriods: m < 7 ? 1 : 2,
         mDuration: (bond.yield != null) ? calculateMDuration(settlementDate, bond.maturity, bond.coupon ?? 0, bond.yield) : 0,
       };
@@ -1672,7 +1767,7 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
   const daraByYearResolved = new Map();
   for (let y = firstYear; y <= lastYear; y++) daraByYearResolved.set(y, daraByYear?.get(y) ?? DARA);
 
-  return { results, HDR, summary: { settleDateDisp, refCPI, DARA, daraByYearResolved, inferredDARA, daraIsInferred: dara === null, method, firstYear, lastYear, derivedFirstYear, rungCount, gapYears, future30yYears, brackets, lowerWeight, upperWeight, costDeltaSum, costForNewRungs, gapCoverageSurplus, gapParams, bracketMode, lowerDuration, upperDuration, newLowerYear, newLowerCUSIP, newLowerDuration, newLowerWeight3, origLowerWeight, bracketFellBack3to2, beforeLowerWeight, beforeUpperWeight, beforeNewLowerWeight, afterLowerWeight, afterUpperWeight, afterNewLowerWeight, totalPreviousExcessCost, totalExcessCost, araByYear, future30yLowerYear, future30yUpperYear, future30yLowerCoverCUSIP: future30yLowerCoverBond?.cusip, future30yUpperCoverCUSIP: future30yUpperCoverBond?.cusip, future30yParams, future30yLowerDuration, future30yUpperDuration, future30yUpperWeight, future30yLowerWeight, future30yUpperExQty, future30yLowerExQty, future30yFellBack, future30yUpperAnnualAmdByYear, preLadderInterest, maturityPref, preLadderPool, preLadderCouponPool, preLadderAmdPool, zeroedFundedYears: [...zeroedFundedYears].sort((a, b) => a - b), weightedAvgDuration, weightedAvgYield }, details };
+  return { results, HDR, summary: { settleDateDisp, refCPI, DARA, daraByYearResolved, inferredDARA, daraIsInferred: dara === null, method, firstYear, lastYear, derivedFirstYear, rungCount, gapYears, future30yYears, brackets, lowerWeight, upperWeight, costDeltaSum, costForNewRungs, gapCoverageSurplus, gapParams, bracketMode, lowerDuration, upperDuration, newLowerYear, newLowerCUSIP, newLowerDuration, newLowerWeight3, origLowerWeight, bracketFellBack3to2, beforeLowerWeight, beforeUpperWeight, beforeNewLowerWeight, afterLowerWeight, afterUpperWeight, afterNewLowerWeight, totalPreviousExcessCost, totalExcessCost, araByYear, future30yLowerYear, future30yUpperYear, future30yLowerCoverCUSIP: future30yLowerCoverBond?.cusip, future30yUpperCoverCUSIP: future30yUpperCoverBond?.cusip, future30yParams, future30yLowerDuration, future30yUpperDuration, future30yUpperWeight, future30yLowerWeight, future30yUpperExQty, future30yLowerExQty, future30yFellBack, future30yUpperAnnualAmdByYear, future30yLMITotal, preLadderInterest, maturityPref, preLadderPool, preLadderCouponPool, preLadderAmdPool, preLadderRollCouponPool, zeroedFundedYears: [...zeroedFundedYears].sort((a, b) => a - b), weightedAvgDuration, weightedAvgYield }, details };
 }
 
 // ──────────────────────────────────────────────────────────────────────────────

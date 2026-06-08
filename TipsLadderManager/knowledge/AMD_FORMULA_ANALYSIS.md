@@ -1,5 +1,5 @@
 # AMD Formula Analysis — Working Notes
-*Status: Historical analysis log (Rev 1–4). Superseded by **Revision 5 — Option C**, which shipped to `main`. Read Rev 5 (bottom) first; Rev 1–4 are kept for the derivation history. Canonical spec is 2.0 §Future 30Y Upper Cover AMD.*
+*Status: Historical analysis log (Rev 1–4). Superseded by **Revision 5 — Option C**, refined by **Revision 6** (cover Amount accounting + roll coupon) and **Revision 7** (2056 lower cover AMD flipped on), all shipped to `main`. Read Rev 7 then 6 then Rev 5 (bottom) first; Rev 1–4 are kept for the derivation history. Canonical spec is 2.0 §Future 30Y Cover AMD.*
 
 ---
 
@@ -247,3 +247,96 @@ What changed vs Rev 3/4:
 Single source of truth: `future30yUpperAmdSchedule()` in `gap-math.js`, consumed by `ladder-core.js`
 for both build and rebalance. Canonical spec: **2.0 §Future 30Y Upper Cover AMD** (rewritten to Option C);
 implementation detail: **4.0 §Future 30Y Upper Cover AMD**; DARA-inference interaction: **3.0**.
+
+---
+
+## Revision 6 — Cover Amount accounting + cover-roll coupon (MtnBiker) — SHIPPED
+
+Two corrections from MtnBiker, after Option C was live. Both close double-/under-count gaps in how the
+Future-30Y cover is **accounted across time**; neither changes the AMD income model itself.
+
+### 6a. Cover Amount must equal the coverage delivered (≈ numFuture30yYears × DARA), not par P+I
+
+The build "Amount" for the cover rows showed `excessQty × pi` — the **par** value at maturity. For the 2052
+that double-counts: par = cost + accretion, and the accretion **is** the AMD already credited to funded
+years 2027–2052. So the cover total read ~`539,337` (fixture) when the coverage those 10 future years
+actually receive is `10 × DARA = 400,000`. The gap brackets already land on `numGapYears × DARA` (they add
+their sizing LMI back via `gapLMITotal`); the Future-30Y cover added nothing back.
+
+Fix — the cover Amount mirrors the gap, with one extra term for the discount:
+```
+excessAmt_b = excessQty_b × pi_b − amdLifetime_b + weight_b × future30yLMITotal
+```
+- `− amdLifetime_b`: the bond's total AMD, delivered to earlier years, netted out (2052 only today).
+- `+ weight_b × future30yLMITotal`: the intra-block coupon (`Σ breakdown.laterMatInt`) that sized the
+  synthetic rungs down — the analog of `gapLMITotal`.
+- Result (fixture): `2052 228,641 + 2056 177,329 = 405,970 ≈ 400,000`. The removed `175,366` is exactly
+  the 2052 AMD on the 2027–2052 rows. **Conserved across the whole table, counted once.**
+- This is keyed by bracket year (`amdLifetimeByBracketYear`), so 2056/2036/2040 auto-correct once given
+  AMD schedules. (Scope note: applied to the **build** Amount column; the rebalance Before/After excess
+  sub-rows still show raw held P+I, a pre-existing build/rebal display divergence shared by gap brackets.)
+
+### 6b. Cover-roll coupon credited to funded years 2053–2056
+
+AMD runs settlement→2052. After the 2052 matures, its cost basis is rolled (the swaps) into the actual
+Future-30Y TIPS, which pay coupon. The funded years **2053–2056** (between the upper cover's maturity and the
+first Future-30Y year) were not being credited that coupon, so they over-funded. Fix: credit the upper-cover
+share, `future30yUpperWeight × future30ySeedLMI` (≈ `$5,104/yr` in the fixture), to each of 2053–2056.
+**Non-cascading** (years ≤ 2052 are credited via AMD; cascading below 2053 would double-count) — threaded
+exactly like AMD: combined into `calcFuture30yExtraIncome = AMD + rollCoupon` for `fyQty`/`fundedYearAmount`,
+shown as its own line item, summed into `preLadderRollCouponPool` for ladders starting after 2053. The lower
+cover (2056) needs no analog (no funded year between it and the block). The seamless AMD→roll hand-off is the
+"rough equivalence" of the excess TIPS' interest+AMD and the Future-30Y coupon the swaps buy.
+
+### Generalized for future accountability
+
+`future30yUpperAmdSchedule` was generalized to **`excessAmdSchedule({ bond, exQty, refCPI, settlementYear })`**
+— nothing 2052-specific. `sizeLadder` holds an `amdExcessBonds` list (today the 2052 cover only); adding the
+2056 / 2036 / 2040 excess there extends sizing, the cover-Amount net-out, and rebalance automatically.
+
+### Changes Made (Revision 6)
+
+| File | Change |
+|------|--------|
+| `src/gap-math.js` | `future30yUpperAmdSchedule` → generic `excessAmdSchedule({ bond, exQty, … })` |
+| `src/ladder-core.js` | `amdExcessBonds` loop → combined `future30yUpperAnnualAmdByYear` + `amdLifetimeByBracketYear`; `future30yRollCouponByYear` + `calcFuture30yExtraIncome`; `future30yLMITotal`; `fundedYearAmount` gains `rollCoupon`; sweep/PLI use extra income; `preLadderRollCouponPool` |
+| `src/build-lib.js` | cover `excessAmt` = P+I − amdLifetime + LMI add-back; thread roll coupon; new detail/summary fields |
+| `src/rebalance-lib.js` | `excessAmdSchedule` rename; roll-coupon map + `…ForQty`; target `needed` and ARA Before/After subtract AMD+roll; rebalYearSet incl. roll years; DARA inference + natural-ARA recovery add roll |
+| `src/drill.js` | "Future-30Y coupon (2052 roll)" line in build + rebal Amount drills; cover-Amount drill shows P+I − AMD + add-back |
+| `knowledge/2.0, 3.0, 4.0` | §Excess Amount rewrite; §Cover-roll coupon; fyQty/pool/inference updates |
+
+---
+
+## Revision 7 — 2056 lower cover AMD flipped on — SHIPPED
+
+Rev 6 built the generic hook but only the 2052 upper cover was wired in, so the 2056 lower cover still
+showed full par P+I with no AMD net-out. Reasonableness check (40K DARA, 2057–2066): cover total read
+`414,747` vs the correct `400,000` — the entire ~14.7K overage lived in the **2056 leg**, exactly its
+un-netted lifetime discount accretion. The 2052 leg already landed dead-on (`159,489 ≈ 4×DARA`). Gap
+brackets (2036/2040) were on-target because they are near par (negligible accretion) — that asymmetry
+*validated* the formula rather than contradicting it.
+
+Fix: push the 2056 cover onto `amdExcessBonds`. Because the machinery is keyed by bracket year, the build
+auto-corrects. The rebalance path needed three matching changes since it carries its own AMD threading:
+- **Combined target AMD** across both covers (drives target sizing + gap params).
+- **Per-cover Before-state AMD**: rebuilt from each cover's *actual held excess* and summed — not a single
+  linear rescale, since held 2052-vs-2056 proportions need not match the target split.
+- **Per-cover net-out denominator** in `excessCoverageAmt`: scale each cover's lifetime AMD by
+  `exQty / (that cover's own target excess)` (was hardcoded to `future30yUpperExQty`).
+
+Result: cover total `2052 228,641 + 2056 171,372 = 400,013 ≈ 400,000`. 210/210 unit (round-trips ZERO net
+cash, rebal After ≡ build) and 46/46 e2e pass. The 2056's AMD runs settlement→2056, so funded years
+2053–2056 now carry **both** the 2052 cover-roll coupon and the 2056-cover AMD — distinct income, no
+double-count. **Lower-cover Amount can exceed its raw par P+I** (LMI add-back > AMD at weight ≈0.76) — correct.
+
+Remaining: the near-par 2036/2040 gap brackets are the last un-modeled excess; adding them to
+`amdExcessBonds` would make the ledger uniform, but the effect is small.
+
+### Changes Made (Revision 7)
+
+| File | Change |
+|------|--------|
+| `src/ladder-core.js` | push 2056 lower cover onto `amdExcessBonds` |
+| `src/rebalance-lib.js` | combined target AMD over both covers; per-cover Before-state AMD from held excess (`calcFuture30yUpperAnnualAmdBefore`); `excessCoverageAmt` scales by each cover's own target excess; DARA-inference guard incl. 2056 held |
+| `tests/run.js` | Rev 6 block: assert 2056 net-out applied + AMD present @2053 (from 2056); drop stale "no AMD @2053" |
+| `knowledge/2.0` | §Future 30Y Cover AMD generalized to both covers; §Excess Amount example updated to 400,013 |

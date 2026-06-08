@@ -49,7 +49,8 @@ export function runBuild({ dara, firstYear: firstYearOpt, lastYear, tipsMap, ref
     future30yLowerExQty, future30yUpperExQty, future30yFellBack, future30yTotalExcessCost,
     future30yLowerMonth, future30yUpperMonth,
     future30yUpperAnnualAmdByYear, calcFuture30yUpperAnnualAmd,
-    preLadderYears, preLadderPool, preLadderCouponPool, preLadderAmdPool,
+    amdLifetimeByBracketYear, future30yLMITotal, calcFuture30yRollCoupon,
+    preLadderYears, preLadderPool, preLadderCouponPool, preLadderAmdPool, preLadderRollCouponPool,
   } = sizeLadder({
     dara, daraByYear, firstYear, lastYear,
     rangeYears, gapYears, future30yYears,
@@ -75,7 +76,8 @@ export function runBuild({ dara, firstYear: firstYearOpt, lastYear, tipsMap, ref
     const totQty      = fundedYearQty + excessQty;
     const { indexRatio: ir, costPerBond: cpb } = bondCalcs(bond, refCPI);
     const excessLMI   = excessQty * 1000 * ir * (bond.coupon ?? 0);
-    const future30yAmd = calcFuture30yUpperAnnualAmd(year);
+    const future30yAmd  = calcFuture30yUpperAnnualAmd(year);
+    const future30yRoll = calcFuture30yRollCoupon(year);   // cover-roll coupon credited to 2053–56
 
     const mDuration = calculateMDuration(settlementDate, bond.maturity, bond.coupon ?? 0, bond.yield ?? 0);
     const isBracket    = excessQty > 0;
@@ -91,14 +93,23 @@ export function runBuild({ dara, firstYear: firstYearOpt, lastYear, tipsMap, ref
     // lands on DARA (not overshooting by the AMD).
     const { credit: preLadderCreditForYear, amount: _fundedAmt } = fundedYearAmount({
       principal: fundedYearQty * prelim_pi, laterMatInt: corr_lmi, ownExcessCoupon: excessLMI,
-      amd: future30yAmd, dara: yearDara, isZeroed,
+      amd: future30yAmd, rollCoupon: future30yRoll, dara: yearDara, isZeroed,
       partialCredit: year === partialCreditYear ? partialCredit : 0,
     });
     const fundedYearAmt = (year > lastYear || year < firstYear) ? 0 : _fundedAmt;
+    // Excess (bracket/cover) Amount = coverage the excess provides ≈ (missing years) × DARA. Built as
+    // the excess P+I + the block coupon used to size the synthetic rungs down (gap or future-30Y),
+    // MINUS any accretion (AMD) already delivered to earlier years — its market discount is income
+    // booked to those years, not coverage delivered to this block. Net-out keyed by bracket year, so
+    // 2056/2036/2040 auto-correct once they get an AMD schedule. Spec 2.0 §Future 30Y Upper Cover AMD.
     const gapLMIAlloc = gapExQty > 0
       ? (year === lowerYear ? lowerWeight : upperWeight) * (gapParams?.gapLMITotal ?? 0)
       : 0;
-    const exAmt  = isBracket ? excessQty * prelim_pi + gapLMIAlloc : '';
+    const future30yLMIAlloc = future30yExQty > 0
+      ? (year === future30yLowerYear ? future30yLowerWeight : future30yUpperWeight) * (future30yLMITotal ?? 0)
+      : 0;
+    const amdLifetime = amdLifetimeByBracketYear.get(year) ?? 0;
+    const exAmt  = isBracket ? excessQty * prelim_pi - amdLifetime + gapLMIAlloc + future30yLMIAlloc : '';
     const fundedYearCost = fundedYearQty * cpb;
     const exCost = isBracket ? excessQty * cpb : '';
     totalBuyCost += totQty * cpb;
@@ -131,6 +142,7 @@ export function runBuild({ dara, firstYear: firstYearOpt, lastYear, tipsMap, ref
       excessLMI_After: excessLMI,
       preLadderCreditForYear,
       future30yUpperAnnualAmd: future30yAmd,
+      future30yRollCoupon: future30yRoll,
       fundedYearPi: prelim[year].pi,
       fundedYearPrincipalTotal: fundedYearQty * principalPerBond,
       fundedYearOwnRungInt: fundedYearQty * ownRungCouponPerBond,
@@ -145,8 +157,10 @@ export function runBuild({ dara, firstYear: firstYearOpt, lastYear, tipsMap, ref
       excessQty: excessQty,
       excessPrincipalTotal: excessQty * principalPerBond,
       excessOwnRungInt: excessQty * ownRungCouponPerBond,
-      excessAmt: isBracket ? excessQty * prelim_pi + gapLMIAlloc : 0,
+      excessAmt: isBracket ? excessQty * prelim_pi - amdLifetime + gapLMIAlloc + future30yLMIAlloc : 0,
       gapLMIAlloc,
+      future30yLMIAlloc,
+      excessAmdLifetime: amdLifetime,
       excessCost: isBracket ? excessQty * cpb : 0,
       mDuration,
     });
@@ -176,10 +190,11 @@ export function runBuild({ dara, firstYear: firstYearOpt, lastYear, tipsMap, ref
     future30yLowerMonth, future30yUpperMonth,
     future30yParams,
     future30yUpperAnnualAmdByYear,
+    future30yLMITotal,
     totalBuyCost,
     weightedAvgDuration,
     weightedAvgYield,
-    preLadderInterest, maturityPref, preLadderYears, preLadderPool, preLadderCouponPool, preLadderAmdPool,
+    preLadderInterest, maturityPref, preLadderYears, preLadderPool, preLadderCouponPool, preLadderAmdPool, preLadderRollCouponPool,
     zeroedFundedYears: [...zeroedFundedYears].sort((a, b) => a - b),
   };
 

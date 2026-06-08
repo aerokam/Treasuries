@@ -454,6 +454,49 @@ console.log('\nBuild — DARA=50000, lastYear=2060 (Future 30Y years)');
   console.log(`        totalBuyCost:        ${Math.round(summary.totalBuyCost).toLocaleString()}`);
 }
 
+// ── Test: Rev 6 — cover Amount = N×DARA, AMD net-out, roll coupon hand-off ─────────
+console.log('\nBuild — Rev 6 cover Amount + roll coupon, DARA=40000, lastYear=2066');
+{
+  const dara = 40000, lastYear = 2066, firstYear = settlementDate.getFullYear();
+  const { summary, details } = runBuild({ dara, lastYear, tipsMap, refCPI, settlementDate });
+  const cover = details.filter(d => d.isFuture30yCover);
+  const coverAmt = cover.reduce((s, d) => s + (d.excessAmt ?? 0), 0);
+  const nFuture = summary.future30yYears.length;
+  // 6a: cover Amount totals ≈ numFuture30yYears × DARA (was par-based ≈ 1.3× that). Within 2%.
+  assert('cover Amount ≈ numFuture30yYears × DARA', coverAmt, nFuture * dara, nFuture * dara * 0.02);
+  // 6a: the 2052 cover nets its lifetime AMD out of P+I — Amount strictly below raw par P+I.
+  const c2052 = cover.find(d => d.fundedYear === 2052);
+  assert('2052 cover Amount < raw par P+I (AMD netted out)',
+    c2052.excessAmt < c2052.excessQty * c2052.fundedYearPi, true);
+  assert('2052 excessAmdLifetime > 0', c2052.excessAmdLifetime > 0, true);
+  // 6a: the 2056 lower cover also nets its lifetime AMD out (deep-discount cover, flipped on Rev 7).
+  // Its Amount can sit ABOVE raw par (large LMI add-back, weight ≈0.76, exceeds its AMD) — so assert
+  // the net-out is actually applied via the formula identity rather than a raw-par inequality.
+  const c2056 = cover.find(d => d.fundedYear === 2056);
+  assert('2056 excessAmdLifetime > 0', c2056.excessAmdLifetime > 0, true);
+  assert('2056 cover Amount = par − AMD + LMI add-back (net-out applied)',
+    c2056.excessAmt,
+    c2056.excessQty * c2056.fundedYearPi - c2056.excessAmdLifetime + (c2056.future30yLMIAlloc ?? 0), 1);
+  // 6b: roll coupon credited to each of 2053–2056; AMD now runs through 2056 (2052 + 2056 covers,
+  // both held-to-maturity), so 2053–56 carry BOTH the 2052 roll coupon and the 2056-cover AMD.
+  const roll = y => details.find(d => d.fundedYear === y)?.future30yRollCoupon ?? 0;
+  const amd  = y => details.find(d => d.fundedYear === y)?.future30yUpperAnnualAmd ?? 0;
+  for (const y of [2053, 2054, 2055, 2056]) assert(`roll coupon credited @${y}`, roll(y) > 0, true);
+  assert('no roll coupon @2052', roll(2052), 0);
+  assert('no roll coupon @2057', roll(2057), 0);
+  assert('AMD present @2052', amd(2052) > 0, true);
+  assert('AMD present @2053 (from 2056 cover)', amd(2053) > 0, true);
+  assert('no AMD @2057 (covers matured by 2056)', amd(2057), 0);
+  // Every funded year in 2050–2056 still lands on DARA after the credits.
+  for (const y of [2050, 2052, 2053, 2056]) {
+    const d = details.find(x => x.fundedYear === y);
+    assert(`amount ≈ DARA @${y}`, d.fundedYearAmt, dara, 700);
+  }
+  console.log(`        cover Amount total:  ${Math.round(coverAmt).toLocaleString()} vs ${nFuture}×DARA = ${(nFuture*dara).toLocaleString()}`);
+  console.log(`        2052 cover: amt ${Math.round(c2052.excessAmt).toLocaleString()}  rawPI ${Math.round(c2052.excessQty*c2052.fundedYearPi).toLocaleString()}  amdLifetime ${Math.round(c2052.excessAmdLifetime).toLocaleString()}`);
+  console.log(`        roll 2053–56: ${[2053,2054,2055,2056].map(roll).map(v=>Math.round(v)).join(' / ')}`);
+}
+
 // ── Test: Build — firstYear=2036, lastYear=2056, preLadderInterest=true ───────
 // Regression for bug: inflated prelim LMI in calcGapParams caused totalCost→0,
 // collapsing bracket excess quantities to 0 even while gap breakdown showed non-zero.
