@@ -135,10 +135,10 @@ Register-NodeTask "TipsRef" `
     @(New-ScheduledTaskTrigger -Weekly -DaysOfWeek Monday -At "7:00am") `
     "scripts/fetchTipsRef.js"
 
-# YieldsHistory  -  Weekdays 11:00am PT
+# YieldsHistory  -  Weekdays 2:00pm PT (bond market closes at 5pm ET / 2pm PT)
 Register-NodeTask "YieldsHistory" `
     "Snapshot current Treasury and TIPS yield curves to history archive in R2" `
-    @(New-ScheduledTaskTrigger -Weekly -DaysOfWeek $Weekdays -At "11:00am") `
+    @(New-ScheduledTaskTrigger -Weekly -DaysOfWeek $Weekdays -At "2:00pm") `
     "YieldsMonitor/scripts/snapHistory.js"
 
 # SaFactors  -  Daily 6:35am PT
