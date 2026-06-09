@@ -15,7 +15,7 @@ The TipsLadderManager was recently enhanced to include Accrued Market Discount (
 
 Duration matching with bracket pairs (2052 upper cover, 2056 lower cover) is a **temporary approximation** — a placeholder until the actual desired TIPS become available. Rolling into each new issuance as soon as possible replaces synthetic coverage with actual coverage, which improves duration matching by keeping bracket years as close together as possible. This minimizes drift from non-parallel yield curve shifts.
 
-*Note: A "hold to maturity" variant (excess 2052s never sold, AMD realized only at 2052 maturity) could be a future PR enhancement, consistent with how other ladder apps work. But sell-ASAP is and remains the default.*
+*Note (Rev 1 framing — superseded): a "hold to maturity" variant (excess 2052s never sold, AMD realized only at 2052 maturity) was flagged here as a possible future enhancement. It became the chosen design in **Rev 5 (Option C)** below: income is decoupled from sales — AMD is realized each year by selling the market discount that accrued over the prior year, not by an annual sell-into-roll swap into the newly-issued 30Y. The sell-ASAP/swap paradigm in this Background block is no longer current.*
 
 ---
 
@@ -278,7 +278,7 @@ excessAmt_b = excessQty_b × pi_b − amdLifetime_b + weight_b × future30yLMITo
 
 ### 6b. Cover-roll coupon credited to funded years 2053–2056
 
-AMD runs settlement→2052. After the 2052 matures, its cost basis is rolled (the swaps) into the actual
+AMD runs settlement→2052. After the 2052 matures (at par), its cost basis is reinvested into the actual
 Future-30Y TIPS, which pay coupon. The funded years **2053–2056** (between the upper cover's maturity and the
 first Future-30Y year) were not being credited that coupon, so they over-funded. Fix: credit the upper-cover
 share, `future30yUpperWeight × future30ySeedLMI` (≈ `$5,104/yr` in the fixture), to each of 2053–2056.
@@ -286,7 +286,7 @@ share, `future30yUpperWeight × future30ySeedLMI` (≈ `$5,104/yr` in the fixtur
 exactly like AMD: combined into `calcFuture30yExtraIncome = AMD + rollCoupon` for `fyQty`/`fundedYearAmount`,
 shown as its own line item, summed into `preLadderRollCouponPool` for ladders starting after 2053. The lower
 cover (2056) needs no analog (no funded year between it and the block). The seamless AMD→roll hand-off is the
-"rough equivalence" of the excess TIPS' interest+AMD and the Future-30Y coupon the swaps buy.
+"rough equivalence" of the excess TIPS' interest+AMD and the Future-30Y coupon that reinvestment buys.
 
 ### Generalized for future accountability
 
