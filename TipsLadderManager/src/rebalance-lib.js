@@ -1187,7 +1187,7 @@ export function runRebalance({ dara, method, bracketMode = '2bracket', holdings:
       }
     }
   }
-  // AMD-driven selling: each AMD sale year (rung.year − 30) receives 2052 excess AMD income and must
+  // AMD-driven selling: each AMD sale year (rung.year − 30) receives excess AMD income and must
   // be sold to its AMD-adjusted need regardless of mode (Full already includes them; Gap does not).
   // Range follows the actual sale years, not a hardcoded ≤ 2036 cap. Spec: 2.0 §Future 30Y Upper Cover AMD.
   if (future30yUpperExQty > 0) {

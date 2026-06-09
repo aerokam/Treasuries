@@ -101,7 +101,7 @@ export function buildPreLadderPoolDrill(summary, plCreditForYear) {
     { label: 'Pre-ladder coupon interest', note: years + ' yr \xd7 annual ladder coupon income', value: fm(couponPool) },
   ];
   if (amdPool > 0) {
-    rows.push({ label: 'Pre-ladder AMD (excess 2052)', note: 'discount realized from excess 2052 TIPS sold before the ladder starts', value: fm(amdPool) });
+    rows.push({ label: 'Pre-ladder AMD from excess TIPS', note: 'discount from sales of excess TIPS before the ladder starts', value: fm(amdPool) });
   }
   if (rollPool > 0) {
     rows.push({ label: 'Pre-ladder Future-30Y coupon', note: 'coupon on the 2052-roll Future-30Y TIPS for pre-ladder years 2053–56', value: fm(rollPool) });
@@ -147,7 +147,7 @@ export function buildDrillHTML(d, colKey, summary) {
       row('Interest from longer-dated TIPS', 'from TIPS maturing after ' + d.fundedYear, fm(longerDatedInt), false, undefined, 'lmi') +
       (sameYearExInt > 0 ? row('Interest from same-year excess (bracket)', 'from excess TIPS maturing in ' + d.fundedYear, fm(sameYearExInt), false, undefined, 'exlmi') : '') +
       (_plCredit > 0 ? row('Pre-ladder credit', 'pre-ladder pool applied to this year', fm(_plCredit), false, 'plcpool') : '') +
-      (_amd > 0 ? row('AMD — 2052 excess', 'accrued market discount realized from excess 2052 TIPS sold this year', fm(_amd), false, undefined, 'amd') : '') +
+      (_amd > 0 ? row('AMD from excess TIPS', 'accrued market discount from sales of excess TIPS', fm(_amd), false, undefined, 'amd') : '') +
       (_roll > 0 ? row('Future-30Y coupon (2052 roll)', 'coupon on the Future-30Y TIPS bought with the matured 2052 cover proceeds (upper-cover share)', fm(_roll), false, undefined, 'roll') : '') +
       sep() +
       row('Funded Year Amount', totalFmla, fm(d.fundedYearAmt), true) +
@@ -276,7 +276,7 @@ export function buildDrillHTML(d, colKey, summary) {
       rows += row('Pre-ladder credit', 'pre-ladder pool applied to this year', fm(_plCredit), false, 'plcpool', 'plc');
     }
     if (_amd > 0) {
-      rows += row('AMD — 2052 excess', 'accrued market discount realized from excess 2052 TIPS sold this year', fm(_amd), false, undefined, 'amd');
+      rows += row('AMD from excess TIPS', 'accrued market discount from sales of excess TIPS', fm(_amd), false, undefined, 'amd');
     }
     if (_roll > 0) {
       rows += row('Future-30Y coupon (2052 roll)', 'coupon on the Future-30Y TIPS bought with the matured 2052 cover proceeds (upper-cover share)', fm(_roll), false, undefined, 'roll');

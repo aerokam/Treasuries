@@ -118,7 +118,7 @@ export function gapParamsCore({ gapYears, tipsMap, settlementDate, dara, daraByY
 
     const piPerBond = 1000 + 1000 * synCpn * 0.5;
     const yearDara = daraByYear?.get(year) ?? dara;
-    // AMD from the excess 2052 is income arriving this year, treated exactly like coupon LMI.
+    // AMD from excess TIPS is income arriving this year, treated exactly like coupon LMI.
     const amd = amdByYear?.get(year) ?? 0;
     const qty = Math.max(0, Math.round((yearDara - laterMatInt - (pliCreditByGapYear[year] ?? 0) - amd) / piPerBond));
     totalCost += qty * 1000;
