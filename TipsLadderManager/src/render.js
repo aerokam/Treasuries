@@ -192,7 +192,7 @@ export function renderTable({ details, mode, summary }) {
   const cols = COLS.filter(c => mode === 'rebal' ? !c.buildOnly : !c.rebalOnly);
 
   const headerHTML = '<thead><tr>' +
-    cols.map(c => '<th data-col="' + c.key + '" style="cursor:help">' + (c.headerHTML || esc(c.label)) + '</th>').join('') +
+    cols.map(c => '<th data-col="' + c.key + '">' + (c.headerHTML || esc(c.label)) + '</th>').join('') +
     '</tr></thead>';
 
   // Group consecutive rows by fundedYear
