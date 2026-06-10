@@ -41,5 +41,12 @@
     "cmd": "node scripts/updateTentativeSchedule.js",
     "cwd": ".",
     "apps": ["auctions"]
+  },
+  {
+    "id": "inspect-feeds",
+    "label": "Feed Inspector (US10YTIPS)",
+    "cmd": "node YieldsMonitor/scripts/inspect.js US10YTIPS",
+    "cwd": ".",
+    "apps": ["yieldsmonitor"]
   }
 ]

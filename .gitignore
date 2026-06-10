@@ -27,7 +27,7 @@ lerna-debug.log*
 /TipsSA/node_modules/
 /TipsSA/data/*.csv
 
-YieldsMonitor/data/yield-history/
+YieldsMonitor/data/
 # Yield Curves project folder
 YieldCurves/data/
 YieldCurves/.browser-profile/

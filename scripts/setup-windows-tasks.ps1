@@ -149,6 +149,18 @@ Register-NodeTask "IntradayArchive" `
     @(New-ScheduledTaskTrigger -Weekly -DaysOfWeek $Weekdays -At "2:05pm") `
     "YieldsMonitor/scripts/archiveIntraday.js"
 
+# CloseProbe  -  Weekdays starting 2:05pm PT [ET: 5:05pm], repeating every 15 min for 1 hour
+# Temporary investigation: logs the last 1D bar of US10YTIPS at 17:05/17:20/17:35/17:50/18:05
+# ET to pin down when the 17:05 consolidation print reliably posts. Retire once known.
+$probeTrigger = New-ScheduledTaskTrigger -Weekly -DaysOfWeek $Weekdays -At "2:05pm"
+$probeTrigger.Repetition = (New-ScheduledTaskTrigger -Once -At "2:05pm" `
+    -RepetitionInterval (New-TimeSpan -Minutes 15) `
+    -RepetitionDuration (New-TimeSpan -Hours 1)).Repetition
+Register-NodeTask "CloseProbe" `
+    "Probe: log US10YTIPS last 1D bar every 15min after close to find when 17:05 print posts" `
+    @($probeTrigger) `
+    "YieldsMonitor/scripts/probeClose.js"
+
 # SaFactors  -  Daily 6:35am PT
 Register-NodeTask "SaFactors" `
     "Fetch CPI NSA/SA from BLS, calculate daily SA factors, upload RefCpiNsaSa.csv, refresh SA/SAO yields" `

@@ -124,6 +124,15 @@ const APP_CONFIGS = [
         stalenessHours: null,
         liveNote: 'Browser fetches CNBC GraphQL directly on page load — no job to run',
       },
+      {
+        id: 'feed-inspector',
+        label: 'Feed inspector (diagnostic)',
+        feeds: 'On-demand: per-range resolution, current-day status, 3PM vs 17:05 vs live',
+        r2Key: null,
+        localJobIds: ['inspect-feeds'],
+        stalenessHours: null,
+        liveNote: 'Click Run for an annotated snapshot of every CNBC feed — self-documenting. See knowledge/Close_Price_Investigation.md',
+      },
     ],
   },
   {
