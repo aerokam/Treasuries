@@ -178,6 +178,20 @@ Register-CmdTask "FidelityQuotes" `
     ) `
     "$ProjectDir\YieldCurves\scripts\run-fidelity.cmd"
 
+# LockProbe  -  Weekdays 2:00pm PT [ET: 5:00pm market close], hourly for 18h (overnight).
+# Temporary investigation: logs the 1D-intraday value vs the daily-feed "today" value (6M & 5Y
+# ranges) for US10YTIPS + US10Y each hour. While CNBC tracks live, delta ≈ 0; when CNBC locks
+# the settled close overnight, the daily value freezes and the delta jumps — pinning the lock
+# time. Retire once the lock window is known.
+$lockTrigger = New-ScheduledTaskTrigger -Weekly -DaysOfWeek $Weekdays -At "2:00pm"
+$lockTrigger.Repetition = (New-ScheduledTaskTrigger -Once -At "2:00pm" `
+    -RepetitionInterval (New-TimeSpan -Hours 1) `
+    -RepetitionDuration (New-TimeSpan -Hours 18)).Repetition
+Register-NodeTask "LockProbe" `
+    "Probe daily-vs-1D divergence hourly overnight to find when CNBC locks the settled close" `
+    @($lockTrigger) `
+    "YieldsMonitor/scripts/probeLock.js"
+
 # DashboardServer  -  Weekday mornings 6:00am PT, self-healing every 30 min through the day.
 # Keeps the local Admin Dashboard (Dashboard/server.js, port 3737) running. The wrapper is
 # guarded (starts only if 3737 is free) and headless (no browser), so the repetition is a
