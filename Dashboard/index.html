@@ -513,16 +513,18 @@ function renderDFD(){
 // \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 // STATUS LOADING
 // \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
-async function loadStatus(){
+async function loadStatus(preserveDrill=false){
   document.getElementById('fetched-at').textContent='Fetching\u2026';
   try{
     const r = await fetch('/api/status');
     statusData = await r.json();
     document.getElementById('fetched-at').textContent='Updated '+fmtAge(statusData.fetchedAt);
     applyStatusDots();
-    // Re-render open drill panel so last-run info reflects fresh data
+    // Re-render open drill panel so last-run info reflects fresh data.
+    // Skipped when preserveDrill is set (e.g. right after a run) so streamed
+    // output \u2014 the whole point of a diagnostic like the Feed Inspector \u2014 isn't wiped.
     const drillView = document.getElementById('drill-view');
-    if(drillView.classList.contains('open') && selectedId){
+    if(!preserveDrill && drillView.classList.contains('open') && selectedId){
       const node = nodeMap[selectedId];
       if(node) openDrill(node);
     }
@@ -922,7 +924,7 @@ async function runJob(jobId, btn){
       const {type,text}=JSON.parse(e.data);
       pre.textContent+=text;
       logEl.scrollTop=logEl.scrollHeight;
-      if(type==='exit'){ es.close(); btn.disabled=false; btn.textContent='\u25b6 Run locally'; loadStatus(); }
+      if(type==='exit'){ es.close(); btn.disabled=false; btn.textContent='\u25b6 Run locally'; loadStatus(true); }
     };
     es.onerror=()=>{ es.close(); btn.disabled=false; btn.textContent='\u25b6 Run locally'; };
   }catch(e){ btn.disabled=false; btn.textContent='\u25b6 Run locally'; }
