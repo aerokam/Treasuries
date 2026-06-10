@@ -45,11 +45,13 @@ async function main() {
 
   if (allDates.includes(todayET)) {
     console.log('MATCH — CPI release day.');
-    process.exit(0);
+    process.exitCode = 0;
   } else {
     console.log('Not a CPI release day.');
-    process.exit(1);
+    process.exitCode = 1;
   }
 }
 
-main().catch(err => { console.error(err); process.exit(1); });
+// Set exitCode and let the event loop drain naturally; calling process.exit()
+// while fetch handles are still closing aborts with a libuv assertion on Windows.
+main().catch(err => { console.error(err); process.exitCode = 1; });

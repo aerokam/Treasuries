@@ -9,6 +9,18 @@
 // Pick the one with the longest history from: https://www.treasurydirect.gov/TA_WS/secindex/search?cusip=<CUSIP>
 // Good candidates: longest-dated 30-yr TIPS on-the-run at the time.
 
+// Load .env from repo root if present (local dev); does not override real env vars
+import { existsSync, readFileSync } from 'fs';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
+const _envPath = resolve(dirname(fileURLToPath(import.meta.url)), '../.env');
+if (existsSync(_envPath)) {
+  readFileSync(_envPath, 'utf8').split('\n').forEach(line => {
+    const m = line.match(/^\s*([^#\s][^=]*?)\s*=\s*(.*?)\s*$/);
+    if (m && !process.env[m[1]]) process.env[m[1]] = m[2].replace(/^["']|["']$/g, '');
+  });
+}
+
 const CUSIP = '912810FD5';
 
 async function uploadToR2(key, body) {
