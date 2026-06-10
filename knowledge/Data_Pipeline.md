@@ -32,7 +32,7 @@ These jobs run on the host machine via Windows Task Scheduler.
 | **Fidelity Quotes** | 3× Daily | *(Windows Task)* | `FidelityTreasuries.csv` |
 | **Auction Refresh** | Weekdays 8:05/10:35am PT | `scripts/getAuctions.js` | `Auctions.csv` |
 | **TIPS Ref Refresh** | Mondays 7am PT | `scripts/fetchTipsRef.js` | `TipsRef.csv` |
-| **Yield History Snap** | Weekdays 2:00pm PT | `YieldsMonitor/scripts/snapHistory.js` | `yield-history/` |
+| **Update Yields History** | Weekdays 2:00pm PT | `YieldsMonitor/scripts/updateYieldsHistory.js` | `yields-history/history.json` |
 | **Ref CPI Refresh** | 8:35 AM ET on each BLS release date | `scripts/fetchRefCpi.js` (`run-ref-cpi.cmd`) | `TIPS/RefCPI.csv` |
 | **SA Factor Update** | Daily 6:35am | `YieldCurves/scripts/updateRefCpi.js` | `RefCpiNsaSa.csv` |
 | **CPI History Refresh** | 8:35 AM ET on each BLS release date | `scripts/fetchCpiHistory.js` (`run-cpi-history.cmd`) | `bls/CPI_history.csv` |

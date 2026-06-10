@@ -59,8 +59,8 @@ The following symbols are currently supported and grouped by security type:
 
 **Intended for 1Y+ ranges**: R2 provides daily closing yields for long-term ranges. **Current blocker**: R2 lacks CORS headers for direct browser access. Enable CORS or add backend proxy to use this baseline instead of CNBC workaround.
 
-- **Base URL**: `https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/yield-history/`
-- **Files**: `{SYMBOL}_history.json` (array of {x: timestamp, y: yield})
+- **Base URL**: `https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/yields-history/`
+- **File**: `history.json` — single nested object `{ "<SYMBOL>": [{x: timestamp, y: yield}, …], … }`
 
 ## No Local Fallbacks
 

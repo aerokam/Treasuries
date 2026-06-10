@@ -2,14 +2,14 @@
 // Captures the CNBC 1D (1-min) and 5D (5-min) feeds for every symbol and stores an
 // immutable snapshot per symbol per trading day, so any past close window can be
 // inspected offline. This is an AUDIT archive (Goal A) — it is NOT the daily-close
-// baseline (see snapHistory.js / {symbol}_history.json).
+// baseline (see updateYieldsHistory.js / yields-history/history.json).
 //
 // Run after the 17:00 ET cash close (scheduled 5:05pm ET) so the close-window bars
 // are settled in the feed.
 //
 // Output:
-//   R2:    Treasuries/yield-history/intraday-raw/{symbol}/{YYYYMMDD}.json
-//   local: data/yield-history/intraday-raw/{symbol}/{YYYYMMDD}.json (mirror, for inspection)
+//   R2:    Treasuries/yields-history/intraday-raw/{symbol}/{YYYYMMDD}.json
+//   local: data/yields-history/intraday-raw/{symbol}/{YYYYMMDD}.json (mirror, for inspection)
 
 import dotenv from 'dotenv';
 import fs from 'fs';
@@ -20,7 +20,7 @@ import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, '../../.env') });
 
-const LOCAL_DIR = path.join(__dirname, '../data/yield-history/intraday-raw');
+const LOCAL_DIR = path.join(__dirname, '../data/yields-history/intraday-raw');
 
 const SYMBOLS = [
   'US1YTIPS', 'US2YTIPS', 'US5YTIPS', 'US10YTIPS', 'US30YTIPS',
@@ -119,7 +119,7 @@ async function main() {
     fs.writeFileSync(path.join(localDir, `${dateET}.json`), JSON.stringify(snapshot, null, 2));
 
     // R2
-    const key = `Treasuries/yield-history/intraday-raw/${sym}/${dateET}.json`;
+    const key = `Treasuries/yields-history/intraday-raw/${sym}/${dateET}.json`;
     const ok = await uploadToR2(key, snapshot);
     if (ok) r2Ok++; else r2Skip++;
 

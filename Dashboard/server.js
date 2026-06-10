@@ -106,14 +106,14 @@ const APP_CONFIGS = [
     url: 'https://aerokam.github.io/Treasuries/YieldsMonitor/',
     pipelines: [
       {
-        id: 'yield-history',
-        label: 'Daily yield history snapshots',
+        id: 'yields-history',
+        label: 'Daily yields-history snapshots',
         feeds: 'History charts — 14 symbols',
-        r2Key: 'Treasuries/yield-history/US10Y_history.json',
-        localJobIds: ['yield-history-snap'],
+        r2Key: 'Treasuries/yields-history/history.json',
+        localJobIds: ['update-yields-history'],
         stalenessHours: 24,
         weekdayOnly: true,
-        r2Note: 'US10Y shown as representative; 14 symbol files total',
+        r2Note: 'Single consolidated nested-by-symbol file (all 14 symbols)',
       },
       {
         id: 'live-yields',

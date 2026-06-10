@@ -48,5 +48,12 @@
     "cmd": "node YieldsMonitor/scripts/inspect.js US10YTIPS",
     "cwd": ".",
     "apps": ["yieldsmonitor"]
+  },
+  {
+    "id": "update-yields-history",
+    "label": "Update Yields History",
+    "cmd": "node YieldsMonitor/scripts/updateYieldsHistory.js",
+    "cwd": ".",
+    "apps": ["yieldsmonitor"]
   }
 ]

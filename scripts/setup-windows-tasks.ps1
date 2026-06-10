@@ -137,15 +137,15 @@ Register-NodeTask "TipsRef" `
 
 # YieldsHistory  -  Weekdays 2:00pm PT (bond market closes at 5pm ET / 2pm PT)
 Register-NodeTask "YieldsHistory" `
-    "Snapshot current Treasury and TIPS yield curves to history archive in R2" `
+    "Refresh consolidated yields-history/history.json (3PM closes, all 14 symbols) in R2" `
     @(New-ScheduledTaskTrigger -Weekly -DaysOfWeek $Weekdays -At "2:00pm") `
-    "YieldsMonitor/scripts/snapHistory.js"
+    "YieldsMonitor/scripts/updateYieldsHistory.js"
 
 # IntradayArchive  -  Weekdays 2:05pm PT [ET: 5:05pm] (5 min after cash close)
 # Audit archive: captures raw 1D + 5D feeds per symbol so any past close window can be
 # inspected offline. Separate from YieldsHistory (daily-close baseline).
 Register-NodeTask "IntradayArchive" `
-    "Archive raw CNBC 1D+5D intraday feeds per symbol to R2 yield-history/intraday-raw" `
+    "Archive raw CNBC 1D+5D intraday feeds per symbol to R2 yields-history/intraday-raw" `
     @(New-ScheduledTaskTrigger -Weekly -DaysOfWeek $Weekdays -At "2:05pm") `
     "YieldsMonitor/scripts/archiveIntraday.js"
 

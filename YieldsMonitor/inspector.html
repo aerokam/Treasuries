@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Feed Inspector — Yields Monitor</title>
+<style>
+  :root {
+    --bg: #e9efef;
+    --card-bg: #ffffff;
+    --header-bg: #164242;
+    --header-text: #FFEBCD;
+    --text-main: #1e293b;
+    --text-muted: #475569;
+    --border: #cbd5e1;
+    --btn-bg: #5BA4A4;
+    --btn-text: #ffffff;
+    --btn-hover: #76B9B9;
+    --chip-bg: #e2e8f0;
+    --prov-bg: #fefce8;
+    --prov-border: #ca8a04;
+    --prov-text: #854d0e;
+    --unavail-text: #dc2626;
+    --ok-text: #16a34a;
+    --mono: 'Courier New', Courier, monospace;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text-main);
+    margin: 0;
+    font-family: system-ui, -apple-system, sans-serif;
+    font-size: 14px;
+    min-height: 100vh;
+  }
+  header {
+    background: var(--header-bg);
+    color: var(--header-text);
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  header h1 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--header-text);
+  }
+  header .subtitle {
+    font-size: 12px;
+    color: #AEDADA;
+    font-weight: 600;
+  }
+  .container {
+    max-width: 960px;
+    margin: 24px auto;
+    padding: 0 16px;
+  }
+  .controls-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  }
+  label {
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  select {
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-main);
+    background: #f8fafc;
+    cursor: pointer;
+    min-width: 160px;
+  }
+  button#runBtn {
+    padding: 7px 20px;
+    background: var(--btn-bg);
+    color: var(--btn-text);
+    border: none;
+    border-radius: 5px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.1s;
+    letter-spacing: 0.03em;
+  }
+  button#runBtn:hover:not(:disabled) { background: var(--btn-hover); }
+  button#runBtn:disabled { opacity: 0.6; cursor: not-allowed; }
+  #status-line {
+    font-size: 13px;
+    color: var(--text-muted);
+    font-weight: 600;
+    font-family: var(--mono);
+  }
+  #status-line.running { color: #2563eb; }
+  #status-line.error   { color: #dc2626; }
+  #status-line.done    { color: #16a34a; }
+
+  /* ── Output ── */
+  #output { display: none; }
+  .section-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .section-title {
+    font-size: 13px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    margin: 0 0 12px 0;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+  }
+  table.feed-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  table.feed-table th {
+    text-align: left;
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    padding: 4px 10px 6px 0;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  table.feed-table td {
+    padding: 5px 10px 5px 0;
+    border-bottom: 1px solid #f1f5f9;
+    vertical-align: top;
+  }
+  table.feed-table tr:last-child td { border-bottom: none; }
+  .mono { font-family: var(--mono); font-weight: 700; }
+  .tag-prov {
+    display: inline-block;
+    padding: 1px 7px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 700;
+    background: var(--prov-bg);
+    color: var(--prov-text);
+    border: 1px solid var(--prov-border);
+  }
+  .tag-unavail {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--unavail-text);
+    font-weight: 700;
+  }
+  .res-badge {
+    display: inline-block;
+    padding: 1px 7px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 700;
+    background: var(--chip-bg);
+    color: var(--text-muted);
+  }
+  .crosscheck-grid {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    column-gap: 16px;
+    row-gap: 5px;
+    font-size: 13px;
+  }
+  .crosscheck-grid .ck-label {
+    font-weight: 700;
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+  .crosscheck-grid .ck-val {
+    font-family: var(--mono);
+    font-weight: 700;
+    color: var(--text-main);
+  }
+  .crosscheck-grid .ck-note {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-style: italic;
+    margin-top: 1px;
+  }
+  .delta-pos { color: #16a34a; }
+  .delta-neg { color: #dc2626; }
+  .legend-pre {
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.7;
+    color: var(--text-main);
+    background: #f8fafc;
+    border-radius: 6px;
+    padding: 12px 14px;
+    margin: 0;
+    border: 1px solid var(--border);
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .legend-link {
+    font-size: 12px;
+    margin-top: 10px;
+    color: var(--text-muted);
+  }
+  .legend-link a {
+    color: #2563eb;
+    font-weight: 700;
+    text-decoration: none;
+  }
+  .legend-link a:hover { text-decoration: underline; }
+  .run-stamp {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-family: var(--mono);
+    margin-bottom: 12px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Feed Inspector</h1>
+    <div class="subtitle">Yields Monitor &mdash; diagnostic portal (unlinked)</div>
+  </div>
+</header>
+
+<div class="container">
+
+  <div class="controls-card">
+    <label for="symSelect">Symbol</label>
+    <select id="symSelect">
+      <option value="US10YTIPS" selected>US10YTIPS (10-Year TIPS)</option>
+      <option value="US1YTIPS">US1YTIPS (1-Year TIPS)</option>
+      <option value="US2YTIPS">US2YTIPS (2-Year TIPS)</option>
+      <option value="US5YTIPS">US5YTIPS (5-Year TIPS &mdash; flaky)</option>
+      <option value="US30YTIPS">US30YTIPS (30-Year TIPS)</option>
+      <option value="US1M">US1M (1-Month)</option>
+      <option value="US2M">US2M (2-Month)</option>
+      <option value="US3M">US3M (3-Month)</option>
+      <option value="US6M">US6M (6-Month)</option>
+      <option value="US1Y">US1Y (1-Year)</option>
+      <option value="US2Y">US2Y (2-Year)</option>
+      <option value="US5Y">US5Y (5-Year)</option>
+      <option value="US10Y">US10Y (10-Year)</option>
+      <option value="US30Y">US30Y (30-Year)</option>
+    </select>
+    <button id="runBtn">Run / Refresh</button>
+    <span id="status-line">Ready.</span>
+  </div>
+
+  <div id="output">
+    <div class="run-stamp" id="run-stamp"></div>
+
+    <!-- Section 1: Daily-close feeds -->
+    <div class="section-card">
+      <div class="section-title">Daily-Close Feeds &mdash; history basis (value &asymp; ~3&nbsp;PM benchmark, bar stamped 00:00)</div>
+      <table class="feed-table">
+        <thead>
+          <tr>
+            <th>Provider / UI</th>
+            <th>Bars</th>
+            <th>Resolution</th>
+            <th>Last Bar Date</th>
+            <th>Last Close</th>
+            <th>Today Status</th>
+          </tr>
+        </thead>
+        <tbody id="daily-tbody"></tbody>
+      </table>
+    </div>
+
+    <!-- Section 2: Intraday feeds -->
+    <div class="section-card">
+      <div class="section-title">Intraday Feeds &mdash; live, 24h continuous (not stored)</div>
+      <table class="feed-table">
+        <thead>
+          <tr>
+            <th>Provider / UI</th>
+            <th>Bars</th>
+            <th>Resolution</th>
+            <th>Last Bar Date &amp; Time (ET)</th>
+            <th>Last Close</th>
+          </tr>
+        </thead>
+        <tbody id="intra-tbody"></tbody>
+      </table>
+    </div>
+
+    <!-- Section 3: Cross-check -->
+    <div class="section-card">
+      <div class="section-title">Cross-Check &mdash; close concepts side-by-side</div>
+      <div id="crosscheck-day" style="font-size:13px; font-weight:700; color:var(--text-muted); margin-bottom:10px;"></div>
+      <div class="crosscheck-grid" id="crosscheck-grid"></div>
+    </div>
+
+    <!-- Section 4: Legend -->
+    <div class="section-card">
+      <div class="section-title">Legend / How It Works</div>
+      <pre class="legend-pre" id="legend-pre"></pre>
+      <div class="legend-link">Full detail: <a href="knowledge/Close_Price_Investigation.md" target="_blank">knowledge/Close_Price_Investigation.md</a></div>
+    </div>
+
+  </div><!-- /#output -->
+
+</div><!-- /.container -->
+
+<script>
+// ── ET helpers (ported from scripts/inspect.js) ─────────────────────────────
+
+const ET_FMT = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'America/New_York', hourCycle: 'h23',
+  year: 'numeric', month: '2-digit', day: '2-digit',
+  hour: '2-digit', minute: '2-digit', second: '2-digit'
+});
+
+function parseT(s) {
+  const y = +s.slice(0,4), mo = +s.slice(4,6)-1, d = +s.slice(6,8);
+  const h = +s.slice(8,10)||0, mi = +s.slice(10,12)||0, se = +s.slice(12,14)||0;
+  let dt = new Date(Date.UTC(y, mo, d, h, mi, se));
+  for (let i = 0; i < 2; i++) {
+    const p = ET_FMT.formatToParts(dt).reduce((a,x) => ({...a, [x.type]: x.value}), {});
+    const diff = Date.UTC(y, mo, d, h, mi, se)
+               - Date.UTC(+p.year, +p.month-1, +p.day, +p.hour, +p.minute, +p.second);
+    if (diff === 0) break;
+    dt = new Date(dt.getTime() + diff);
+  }
+  return dt;
+}
+
+function etDate(raw) {
+  const f = ET_FMT.format(parseT(raw));
+  const m = f.match(/(\d\d)\/(\d\d)\/(\d{4})/);
+  return `${m[3]}-${m[1]}-${m[2]}`;
+}
+
+function etHM(raw) {
+  const f = ET_FMT.format(parseT(raw));
+  const m = f.match(/(\d\d):(\d\d)/);
+  return `${m[1]}:${m[2]}`;
+}
+
+function mins(raw) {
+  const m = ET_FMT.format(parseT(raw)).match(/ (\d\d):(\d\d)/);
+  return +m[1] * 60 + +m[2];
+}
+
+function num(v) { return parseFloat(String(v).replace('%', '')); }
+
+function nowETStr() { return ET_FMT.format(new Date()); }
+
+function todayET() {
+  const f = nowETStr();
+  const m = f.match(/(\d\d)\/(\d\d)\/(\d{4})/);
+  return `${m[3]}-${m[1]}-${m[2]}`;
+}
+
+// ── CNBC GraphQL feed (same URL builder as inspect.js) ──────────────────────
+
+function buildUrl(symbol, timeRange) {
+  const params = {
+    operationName: 'getQuoteChartData',
+    variables: JSON.stringify({ symbol, timeRange }),
+    extensions: JSON.stringify({
+      persistedQuery: {
+        version: 1,
+        sha256Hash: '9e1670c29a10707c417a1efd327d4b2b1d456b77f1426e7e84fb7d399416bb6b'
+      }
+    })
+  };
+  return 'https://webql-redesign.cnbcfm.com/graphql?' +
+    Object.entries(params).map(([k,v]) => k + '=' + encodeURIComponent(v)).join('&');
+}
+
+async function fetchBars(symbol, range) {
+  try {
+    const r = await fetch(buildUrl(symbol, range), { cache: 'no-cache' });
+    const j = await r.json();
+    return j?.data?.chartData?.priceBars || [];
+  } catch {
+    return [];
+  }
+}
+
+// ── Resolution label (ported from inspect.js) ───────────────────────────────
+
+function resLabel(bars) {
+  if (bars.length < 2) return '—';
+  const d = bars.map(b =>
+    Date.UTC(+b.tradeTime.slice(0,4), +b.tradeTime.slice(4,6)-1, +b.tradeTime.slice(6,8)) / 86400000
+  );
+  const g = [];
+  for (let i = 1; i < d.length; i++) g.push(d[i] - d[i-1]);
+  g.sort((a,b) => a-b);
+  const med = g[Math.floor(g.length/2)];
+  if (med <= 1)  return 'daily';
+  if (med <= 4)  return 'daily(+wknd)';
+  if (med <= 10) return 'weekly';
+  if (med <= 45) return 'monthly';
+  return 'quarterly';
+}
+
+// ── 17:05 session-close extraction (ported from inspect.js) ─────────────────
+
+function sessionClose(bars, day) {
+  const arr = bars
+    .filter(b => etDate(b.tradeTime) === day)
+    .sort((a,b) => mins(a.tradeTime) - mins(b.tradeTime));
+  const exact = arr.find(b => etHM(b.tradeTime) === '17:05');
+  if (exact) return { hm: '17:05', v: num(exact.close) };
+  const post = arr.filter(b => mins(b.tradeTime) >= 17 * 60);
+  let cp = post[0] || null;
+  for (let i = 1; i < post.length; i++) {
+    if (mins(post[i].tradeTime) - mins(post[i-1].tradeTime) > 20) { cp = post[i-1]; break; }
+    cp = post[i];
+  }
+  return cp ? { hm: etHM(cp.tradeTime), v: num(cp.close) } : null;
+}
+
+// ── Nearest bar to a target minute (ported from inspect.js) ─────────────────
+
+function nearest(bars, day, target) {
+  let best = null;
+  for (const b of bars) {
+    if (etDate(b.tradeTime) !== day) continue;
+    const dd = Math.abs(mins(b.tradeTime) - target);
+    if (dd <= 8 && (!best || dd < best.dd)) best = { dd, v: num(b.close), hm: etHM(b.tradeTime) };
+  }
+  return best;
+}
+
+// ── HTML helpers ─────────────────────────────────────────────────────────────
+
+function esc(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function setStatus(msg, cls) {
+  const el = document.getElementById('status-line');
+  el.textContent = msg;
+  el.className = cls || '';
+}
+
+// ── Main run ─────────────────────────────────────────────────────────────────
+
+async function run() {
+  const sym = document.getElementById('symSelect').value;
+  const runBtn = document.getElementById('runBtn');
+  runBtn.disabled = true;
+  setStatus('Fetching 7 feeds…', 'running');
+  document.getElementById('output').style.display = 'none';
+
+  let m1, m3, m6, y5, all, d5, d1;
+  try {
+    [m1, m3, m6, y5, all, d5, d1] = await Promise.all(
+      ['1M','3M','6M','5Y','ALL','5D','1D'].map(r => fetchBars(sym, r))
+    );
+  } catch (e) {
+    setStatus('Fetch error: ' + e.message, 'error');
+    runBtn.disabled = false;
+    return;
+  }
+
+  const today  = todayET();
+  const nowStr = nowETStr();
+
+  // ── Timestamp ───────────────────────────────────────────────────────────
+  document.getElementById('run-stamp').textContent =
+    `Run at ${nowStr} ET  •  Symbol: ${sym}`;
+
+  // ── Section 1: Daily-close feeds ─────────────────────────────────────────
+  const dailyFeeds = [
+    { r:'1M',  ui:'1Y',  b: m1  },
+    { r:'3M',  ui:'2Y',  b: m3  },
+    { r:'6M',  ui:'3Y',  b: m6  },
+    { r:'5Y',  ui:'10Y', b: y5  },
+    { r:'ALL', ui:'ALL', b: all },
+  ];
+
+  const tbody1 = document.getElementById('daily-tbody');
+  tbody1.innerHTML = '';
+
+  for (const { r, ui, b } of dailyFeeds) {
+    const tr = document.createElement('tr');
+    if (!b.length) {
+      tr.innerHTML =
+        `<td><span class="mono">${esc(r)}</span> <span style="color:var(--text-muted);font-size:11px;">(${esc(ui)})</span></td>` +
+        `<td colspan="5"><span class="tag-unavail">unavailable / flaky feed</span></td>`;
+    } else {
+      const last   = b[b.length - 1];
+      const lday   = etDate(last.tradeTime);
+      const isProv = lday === today;
+      const res    = resLabel(b);
+      const val    = num(last.close).toFixed(4);
+      const todayCell = isProv
+        ? `<span class="tag-prov">PROVISIONAL &mdash; current day showing; value tracks live, not ~3&nbsp;PM</span>`
+        : `<span style="color:var(--text-muted);font-size:12px;">not yet present; last completed ${esc(lday)}</span>`;
+      tr.innerHTML =
+        `<td><span class="mono">${esc(r)}</span> <span style="color:var(--text-muted);font-size:11px;">(${esc(ui)})</span></td>` +
+        `<td class="mono">${b.length.toLocaleString()}</td>` +
+        `<td><span class="res-badge">${esc(res)}</span></td>` +
+        `<td class="mono">${esc(lday)}</td>` +
+        `<td class="mono">${esc(val)}</td>` +
+        `<td>${todayCell}</td>`;
+    }
+    tbody1.appendChild(tr);
+  }
+
+  // ── Section 2: Intraday feeds ─────────────────────────────────────────────
+  const intradayFeeds = [
+    { r:'1D', ui:'2D',  b: d1, resStr:'1-min' },
+    { r:'5D', ui:'10D', b: d5, resStr:'5-min' },
+  ];
+
+  const tbody2 = document.getElementById('intra-tbody');
+  tbody2.innerHTML = '';
+
+  for (const { r, ui, b, resStr } of intradayFeeds) {
+    const tr = document.createElement('tr');
+    if (!b.length) {
+      tr.innerHTML =
+        `<td><span class="mono">${esc(r)}</span> <span style="color:var(--text-muted);font-size:11px;">(${esc(ui)})</span></td>` +
+        `<td colspan="4"><span class="tag-unavail">unavailable</span></td>`;
+    } else {
+      const last = b[b.length - 1];
+      tr.innerHTML =
+        `<td><span class="mono">${esc(r)}</span> <span style="color:var(--text-muted);font-size:11px;">(${esc(ui)})</span></td>` +
+        `<td class="mono">${b.length.toLocaleString()}</td>` +
+        `<td><span class="res-badge">${esc(resStr)}</span></td>` +
+        `<td class="mono">${esc(etDate(last.tradeTime))} ${esc(etHM(last.tradeTime))}</td>` +
+        `<td class="mono">${esc(num(last.close).toFixed(4))}</td>`;
+    }
+    tbody2.appendChild(tr);
+  }
+
+  // ── Section 3: Cross-check ────────────────────────────────────────────────
+  // Anchor on 3M (2Y) as the "daily close" reference — same as inspect.js
+  const dailyLast = m3.length ? m3[m3.length - 1] : null;
+  const cmpDay    = dailyLast ? etDate(dailyLast.tradeTime) : null;
+
+  const ckDayEl = document.getElementById('crosscheck-day');
+  if (!cmpDay) {
+    ckDayEl.textContent = 'No daily data available for cross-check.';
+    document.getElementById('crosscheck-grid').innerHTML = '';
+  } else {
+    const isProv = cmpDay === today;
+    ckDayEl.innerHTML =
+      `Day: <span class="mono">${esc(cmpDay)}</span>` +
+      (isProv ? ' &nbsp;<span class="tag-prov">provisional</span>' : '');
+
+    const sc    = sessionClose(d1, cmpDay) || sessionClose(d5, cmpDay);
+    const at15  = nearest(d5, cmpDay, 15 * 60);
+    const live  = d1.length ? num(d1[d1.length - 1].close) : null;
+    const dcVal = dailyLast ? num(dailyLast.close) : null;
+
+    function deltaHtml(a) {
+      if (a == null || dcVal == null) return '';
+      const d = a - dcVal;
+      const s = (d >= 0 ? '+' : '') + d.toFixed(4);
+      const cls = d >= 0 ? 'delta-pos' : 'delta-neg';
+      return ` <span class="${cls}">(${esc(s)} vs daily-close)</span>`;
+    }
+
+    const rows = [
+      {
+        label: 'daily-close (history basis)',
+        val:   dcVal != null ? dcVal.toFixed(4) : '—',
+        note:  '≈ ~3 PM Tradeweb benchmark — stored in R2 history files'
+      },
+      {
+        label: '~15:00 intraday',
+        val:   at15 ? `${at15.v.toFixed(4)} [${at15.hm}]` : '—',
+        extra: at15 && dcVal != null ? deltaHtml(at15.v) : '',
+        note:  'sanity check — daily-close should ≈ this; delta > 2 bp is unusual'
+      },
+      {
+        label: '17:05 session print',
+        val:   sc ? `${sc.v.toFixed(4)} [${sc.hm}]` : '—',
+        extra: sc && dcVal != null ? deltaHtml(sc.v) : '',
+        note:  'actual end-of-session consolidation print (1D is authoritative); shown in 2D/10D'
+      },
+      {
+        label: 'live latest (1D last bar)',
+        val:   live != null ? live.toFixed(4) : '—',
+        extra: live != null && dcVal != null ? deltaHtml(live) : '',
+        note:  'most recent 1D bar — may be overnight/pre-market'
+      },
+    ];
+
+    const grid = document.getElementById('crosscheck-grid');
+    grid.innerHTML = rows.map(row =>
+      `<div class="ck-label">${esc(row.label)}</div>` +
+      `<div>` +
+        `<div class="ck-val">${esc(row.val)}${row.extra || ''}</div>` +
+        `<div class="ck-note">${esc(row.note)}</div>` +
+      `</div>`
+    ).join('');
+  }
+
+  // ── Section 4: Legend ─────────────────────────────────────────────────────
+  document.getElementById('legend-pre').textContent = [
+    '  History (1Y / 2Y / 3Y / 10Y / ALL) stores the DAILY-feed close ~= ~3 PM benchmark',
+    '  (Treasury CMT/real ~3:30 PM ET; Tradeweb 3/4 PM snapshot; IOSCO-compliant).',
+    '',
+    '  1Y / 2Y / 3Y are fully daily resolution -- reread fresh from CNBC each run.',
+    '  10Y (provider 5Y) thins to weekly for older bars; ALL is quarterly (~91d).',
+    '  The persistent merge store preserves daily recent resolution for 10Y and ALL.',
+    '',
+    '  2D / 10D (providers 1D / 5D) show live 24h-continuous intraday bars, including',
+    '  the 17:05 ET fixed-time session-end consolidation print. NOT stored in history.',
+    '',
+    '  Current-day bar in daily feeds is PROVISIONAL: it tracks the live price all',
+    '  day, then settles to the ~3 PM close overnight. Persist completed days only.',
+    '',
+    '  US5YTIPS is flaky -- sparse/irregular prints and a broken daily feed.',
+    '  Use US10YTIPS as the reliable TIPS reference for probing.',
+    '',
+    '  Three reference times (do not conflate):',
+    '    ~3:00-3:30 PM ET  mid-afternoon benchmark  -> CNBC daily close; Treasury CMT',
+    '    ~16:59 ET         last continuous-trade bar -> chart intraday stream',
+    '    17:05 ET          end-of-session print      -> 1D feed; actual session close',
+    '',
+    '  Provider -> UI range mapping:',
+    '    1D  -> 2D  (1-min bars, ~2 days)     5D  -> 10D (5-min, ~10 days)',
+    '    1M  -> 1Y  3M  -> 2Y  6M -> 3Y  5Y -> 10Y  ALL -> ALL',
+  ].join('\n');
+
+  // ── Show output ──────────────────────────────────────────────────────────
+  document.getElementById('output').style.display = 'block';
+  setStatus(`Done — ${nowStr} ET`, 'done');
+  runBtn.disabled = false;
+}
+
+document.getElementById('runBtn').addEventListener('click', run);
+</script>
+</body>
+</html>

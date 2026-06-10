@@ -316,19 +316,31 @@ async function fetchWithTimeout(url, options = {}, timeout = 8000) {
   try { const response = await fetch(url, { ...options, signal: controller.signal, cache: 'no-cache' }); clearTimeout(id); return response; } catch (e) { clearTimeout(id); throw e; }
 }
 
-const R2_HISTORY_URL = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/yield-history';
+// Single consolidated, symbol-nested history file: { "US10Y": [{x,y}, ...], ... }
+const R2_HISTORY_URL = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/yields-history/history.json';
+
+let allHistoryPromise = null;
+async function fetchAllHistory() {
+  if (!allHistoryPromise) {
+    allHistoryPromise = (async () => {
+      const response = await fetchWithTimeout(R2_HISTORY_URL);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return await response.json();
+    })();
+  }
+  return allHistoryPromise;
+}
 
 async function fetchHistory(symbol) {
   if (!historyCache[symbol]) {
     historyCache[symbol] = (async () => {
       try {
-        const response = await fetchWithTimeout(`${R2_HISTORY_URL}/${symbol}_history.json`);
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const data = await response.json();
-        return data.map(p => ({ x: parseSourceTime(p.x), y: p.y }));
+        const all = await fetchAllHistory();
+        return (all[symbol] || []).map(p => ({ x: parseSourceTime(p.x), y: p.y }));
       } catch (err) {
         console.error(`R2 history fetch failed for ${symbol}:`, err);
         delete historyCache[symbol];
+        allHistoryPromise = null; // allow retry on next call
         return null;
       }
     })();

@@ -81,16 +81,6 @@ Register-ScheduledTask `
   -Settings    (New-ScheduledTaskSettingsSet -ExecutionTimeLimit $execLimit72h -MultipleInstances IgnoreNew) `
   -Principal   $principal -Force
 
-# ── SNAP YIELD HISTORY (weekdays 11:00 AM PT) ────────────────────────────────
-
-Register-ScheduledTask `
-  -TaskName    "SnapYieldHistory" `
-  -Description "Snapshot daily yield history from FedInvest to R2" `
-  -Action      (New-ScheduledTaskAction -Execute "cmd.exe" -Argument "/c `"$REPO\scripts\run-snap-history.cmd`"") `
-  -Trigger     (New-WeekdayTrigger "11:00AM") `
-  -Settings    (New-ScheduledTaskSettingsSet -ExecutionTimeLimit $execLimit72h -MultipleInstances IgnoreNew) `
-  -Principal   $principal -Force
-
 # ── TIPS REF (Mondays 7:00 AM PT) ────────────────────────────────────────────
 
 Register-ScheduledTask `
@@ -136,7 +126,7 @@ $names = @(
   "FidelityDownload-Morning","FidelityDownload-Midday","FidelityDownload-Close",
   "FedInvestPrices",
   "TreasuryAuctions-Morning","TreasuryAuctions-Afternoon",
-  "SnapYieldHistory","TipsRef","Update CPI release schedule",
+  "TipsRef","Update CPI release schedule",
   "RefCPI","FetchCpiHistory","RefreshCpiTasks"
 )
 Get-ScheduledTask | Where-Object { $_.TaskName -in $names } |

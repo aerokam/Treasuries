@@ -216,8 +216,8 @@ const NODES = [
   {id:'P5',type:'process',label:'getAuctions',   short:'Get\nAuctions',  sub:'P5',cx:265,cy:480,
    script:'scripts/getAuctions.js',localJobId:'get-auctions',
    reads:['E3'],writes:['S5']},
-  {id:'P6',type:'process',label:'snapHistory',   short:'Snap\nHistory',  sub:'P6',cx:265,cy:575,
-   script:'YieldsMonitor/scripts/snapHistory.js',localJobId:'yield-history-snap',
+  {id:'P6',type:'process',label:'updateYieldsHistory', short:'Update\nYields\nHistory',  sub:'P6',cx:265,cy:575,
+   script:'YieldsMonitor/scripts/updateYieldsHistory.js',localJobId:'update-yields-history',
    reads:['E5','S6'],writes:['S6']},
   {id:'P7',type:'process',label:'fidelityDownload',short:'Fidelity\nDL', sub:'P7',cx:265,cy:690,
    script:'YieldCurves/scripts/fidelityDownload.js',localJobId:'fidelity-download',
@@ -250,8 +250,8 @@ const NODES = [
   {id:'S5',type:'store',label:'Auctions.csv',    sub:'S5',cx:468,cy:480,
    r2Key:'Treasuries/Auctions.csv',
    schema:'{CUSIP + Auction_Date + Security_Type + \u2026 + High_Yield}'},
-  {id:'S6',type:'store',label:'yield-history/',  sub:'S6',cx:468,cy:575,
-   r2Key:'Treasuries/yield-history/US10Y_history.json',
+  {id:'S6',type:'store',label:'yields-history/',  sub:'S6',cx:468,cy:575,
+   r2Key:'Treasuries/yields-history/history.json',
    schema:'{Symbol + [{Timestamp + Yield_Value}]}',
    r2Note:'14 symbol files; US10Y shown as representative'},
   {id:'S7a',type:'store',label:'FidelityTreasuries',sub:'S7a',cx:468,cy:660,
@@ -302,7 +302,7 @@ const EDGES = [
   {id:'eP3S2',from:'P3',to:'S2',style:'solid',  desc:'Writes TipsRef.csv'},
   {id:'eP4S4',from:'P4',to:'S4',style:'solid',  desc:'Writes RefCpiNsaSa.csv'},
   {id:'eP5S5',from:'P5',to:'S5',style:'solid',  desc:'Writes Auctions.csv'},
-  {id:'eP6S6',from:'P6',to:'S6',style:'solid',  desc:'Appends to yield-history/'},
+  {id:'eP6S6',from:'P6',to:'S6',style:'solid',  desc:'Refreshes yields-history/'},
   {id:'eP7S7a',from:'P7',to:'S7a',style:'solid', desc:'Writes FidelityTreasuries.csv'},
   {id:'eP7S7b',from:'P7',to:'S7b',style:'solid', desc:'Writes FidelityTips.csv'},
   {id:'eP8S8', from:'P8',to:'S8', style:'solid', desc:'Writes BondHolidaysSifma.csv'},
@@ -318,14 +318,14 @@ const EDGES = [
   {id:'eS8A1', from:'S8', to:'A1',style:'dashed',desc:'BondHolidaysSifma.csv \u2192 business-day calculations in YieldCurves'},
   {id:'eS5A4',from:'S5',to:'A4',style:'solid',  desc:'Auctions.csv \u2192 all auction tabs'},
   {id:'eS9A4',from:'S9',to:'A4',style:'solid',  desc:'tentative_tips.json \u2192 TIPS identification in Upcoming'},
-  {id:'eS6A3',from:'S6',to:'A3',style:'solid',  desc:'yield-history/ \u2192 history charts (14 symbols)'},
+  {id:'eS6A3',from:'S6',to:'A3',style:'solid',  desc:'yields-history/ \u2192 history charts (14 symbols)'},
   // live browser fetches (dashed, long-range)
   {id:'eE5A3',from:'E5',to:'A3',style:'dashed', desc:'Live CNBC GraphQL fetch \u2014 YieldsMonitor calls CNBC directly in the browser on page load (no R2 intermediary)'},
   {id:'eE3A4',from:'E3',to:'A4',style:'dashed', desc:'Live FiscalData fetch \u2014 TreasuryAuctions fetches upcoming auctions from FiscalData API directly in the browser'},
 ];
 
 // \u2500\u2500 Mappings for status overlay \u2500\u2500
-const R2_TO_NODE  = {'Treasuries/YieldsFromFedInvestPrices.csv':'S1','Treasuries/RefCPI.csv':'S3','Treasuries/TipsRef.csv':'S2','Treasuries/RefCpiNsaSa.csv':'S4','Treasuries/Auctions.csv':'S5','Treasuries/yield-history/US10Y_history.json':'S6','Treasuries/FidelityTreasuries.csv':'S7a','Treasuries/FidelityTips.csv':'S7b','misc/BondHolidaysSifma.csv':'S8','TIPS/tentative_tips.json':'S9'};
+const R2_TO_NODE  = {'Treasuries/YieldsFromFedInvestPrices.csv':'S1','Treasuries/RefCPI.csv':'S3','Treasuries/TipsRef.csv':'S2','Treasuries/RefCpiNsaSa.csv':'S4','Treasuries/Auctions.csv':'S5','Treasuries/yields-history/history.json':'S6','Treasuries/FidelityTreasuries.csv':'S7a','Treasuries/FidelityTips.csv':'S7b','misc/BondHolidaysSifma.csv':'S8','TIPS/tentative_tips.json':'S9'};
 const APPID_TO_NODE = {'yieldcurves':'A1','tipsladder':'A2','auctions':'A4','yieldsmonitor':'A3'};
 
 const nodeMap = Object.fromEntries(NODES.map(n=>[n.id,n]));

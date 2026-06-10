@@ -2,12 +2,12 @@
 // Logs the LAST bar of the CNBC 1D feed for one reference symbol, with the wall-clock
 // fetch time, so we can pin down WHEN the 17:05 ET consolidation print reliably posts.
 // Scheduled to run every 15 min starting 17:05 ET; once the posting time is known we can
-// retire this and set snapHistory's run time accordingly.
+// retire this and set updateYieldsHistory's run time accordingly.
 //
 // Reference symbol: US10YTIPS (10Y TIPS) — chosen for reliability. Do NOT use US5YTIPS;
 // the 5Y TIPS feed is flaky (sparse/irregular prints) and must not be depended on.
 //
-// Output (append): data/yield-history/close-probe/{symbol}.csv  + same key on R2.
+// Output (append): data/yields-history/close-probe/{symbol}.csv  + same key on R2.
 
 import dotenv from 'dotenv';
 import fs from 'fs';
@@ -18,7 +18,7 @@ import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, '../../.env') });
 
-const LOCAL_DIR = path.join(__dirname, '../data/yield-history/close-probe');
+const LOCAL_DIR = path.join(__dirname, '../data/yields-history/close-probe');
 
 const ET_FMT = new Intl.DateTimeFormat('en-US', {
   timeZone: 'America/New_York', hourCycle: 'h23',
@@ -80,7 +80,7 @@ async function main() {
   fs.appendFileSync(localFile, row);
 
   const csv = fs.readFileSync(localFile, 'utf8');
-  const ok = await uploadToR2(`Treasuries/yield-history/close-probe/${symbol}.csv`, csv, 'text/csv');
+  const ok = await uploadToR2(`Treasuries/yields-history/close-probe/${symbol}.csv`, csv, 'text/csv');
 
   console.log(`${symbol}  fetched ${fetchedAtET}  ->  lastBar ${lastBarET}  close ${close}  ${ok ? '(R2 synced)' : '(local only)'}`);
 }

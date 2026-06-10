@@ -29,7 +29,7 @@ The app's `TIME_RANGE_MAP` (UI label → CNBC provider `timeRange`):
 | 10Y | `5Y` | daily→weekly (older = sparser) | history baseline |
 | ALL | `ALL` | monthly/quarterly | history baseline |
 
-Runtime: long ranges read the **R2 history baseline** (`{symbol}_history.json`), not these CNBC ranges live. The daily feeds are used by `snapHistory.js` (and this investigation) to build/refresh that baseline.
+Runtime: long ranges read the **R2 history baseline** (`yields-history/history.json`, nested by symbol), not these CNBC ranges live. The daily feeds are used by `updateYieldsHistory.js` (and this investigation) to build/refresh that baseline.
 
 ## 2. Intraday feed structure & the 17:05 print
 
@@ -117,9 +117,9 @@ Rationale:
 | Script | Purpose |
 |---|---|
 | `scripts/dumpFeed.js <sym> <1D\|5D>` | dump a raw feed with ET-annotated bars |
-| `scripts/archiveIntraday.js` | daily immutable raw 1D+5D snapshot per symbol → R2 `yield-history/intraday-raw/{sym}/{YYYYMMDD}.json` (task `IntradayArchive`, 17:05 ET) |
+| `scripts/archiveIntraday.js` | daily immutable raw 1D+5D snapshot per symbol → R2 `yields-history/intraday-raw/{sym}/{YYYYMMDD}.json` (task `IntradayArchive`, 17:05 ET) |
 | `scripts/analyzeCloseWindow.js <sym>` | per-day close-window structure from an archived snapshot |
-| `scripts/probeClose.js <sym>` | log last `1D` bar over time → `yield-history/close-probe/{sym}.csv` (task `CloseProbe`, 17:05+15min×1h) to pin when the 17:05 print posts |
+| `scripts/probeClose.js <sym>` | log last `1D` bar over time → `yields-history/close-probe/{sym}.csv` (task `CloseProbe`, 17:05+15min×1h) to pin when the 17:05 print posts |
 | `scripts/compareDailyVsIntraday.js <sym>` | compare daily-feed close vs intraday 15:00/16:00/16:59/17:05 (Section 3) |
 
 ## 8. Open items

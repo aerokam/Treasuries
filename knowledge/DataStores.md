@@ -78,17 +78,17 @@ This document provides the technical schemas and field-level specifications for 
 
 ---
 
-## <a id="s6"></a>S6: yield-history/
-**Description**: JSON time series of yields per symbol (US10Y, US30Y, etc.).
-**Update Frequency**: Weekdays (end-of-day snapshots) via `snapHistory.js`.
+## <a id="s6"></a>S6: yields-history/
+**Description**: Single consolidated JSON, nested by symbol (US10Y, US30Y, … — all 14).
+**Update Frequency**: Weekdays (end-of-day snapshots) via `updateYieldsHistory.js`.
 
-**Format**: bare array of `{ x, y }` points, e.g. `[ { "x": "20260403000000", "y": 4.25 }, ... ]`.
-- `x` is CNBC's compact `tradeTime` string `YYYYMMDDHHMMSS` (no separators). Daily-close bars are stamped at midnight (`...000000`); the older tail may contain intraday `HHMMSS` bars from a bootstrap merge.
+**Format**: one object keyed by symbol, each value a `{ x, y }` array, e.g. `{ "US10Y": [ { "x": "20260403150000", "y": 4.25 }, ... ], "US30Y": [ ... ], ... }`.
+- `x` is CNBC's compact `tradeTime` string `YYYYMMDDHHMMSS` (no separators). Daily-close bars are stamped at 15:00 ET (`...150000`) — the ~3PM benchmark close (see `YieldsMonitor/knowledge/Close_Price_Investigation.md`).
 - `y` is the yield as a number (percent, `%` stripped).
 
-**Append logic**: `snapHistory.js` pulls CNBC's daily feed (`3M` range → midnight bars) and appends each *completed* trading day newer than the last stored point. It must NOT parse the `5D` intraday feed for a "17:00 close" — that feed is 24h-continuous, and a CNBC format change (ISO `2026-03-30T17:00:00` → compact `20260330170000`) once broke the `split('T')`-based parser, silently halting all appends for ~7 weeks (Apr 3 – May 22, 2026). The browser stitches live intraday on top of this daily baseline.
+**Refresh logic**: `updateYieldsHistory.js` rereads the 1Y/2Y/3Y daily feeds and merges the coarser 10Y/ALL feeds, skipping the current (provisional) ET day, and rewrites the whole file. One daily 3PM close per completed trading day per symbol. The browser stitches live intraday on top of this daily baseline. (Replaces the retired per-symbol `snapHistory.js` append model.)
 
-**Live Sample**: [View US10Y History](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/yield-history/US10Y_history.json)
+**Live Sample**: [View consolidated history](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/yields-history/history.json)
 
 ---
 

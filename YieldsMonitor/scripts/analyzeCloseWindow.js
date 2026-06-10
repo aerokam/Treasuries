@@ -10,7 +10,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const ARCH = path.join(__dirname, '../data/yield-history/intraday-raw');
+const ARCH = path.join(__dirname, '../data/yields-history/intraday-raw');
 
 // "MM/DD/YYYY, HH:MM:SS" -> {day:'MMDD', mins: minutesSinceMidnightET, hhmm}
 function etParts(et) {

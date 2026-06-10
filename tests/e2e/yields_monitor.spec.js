@@ -24,7 +24,7 @@ test.describe('Yields Monitor Regression Tests', () => {
       await btn.click();
       
       // Wait for fetch status to indicate update
-      await expect(page.locator('#fetchStatus')).toContainText('Data:');
+      await expect(page.locator('#fetchStatus')).toContainText('Latest data:');
       
       // Check data point count via evaluate
       const count = await chartCanvas.evaluate((canvas) => {
@@ -60,7 +60,7 @@ test.describe('Yields Monitor Regression Tests', () => {
     await btn.click();
     
     // Wait for data
-    await expect(page.locator('#fetchStatus')).toContainText('Data:');
+    await expect(page.locator('#fetchStatus')).toContainText('Latest data:');
     await page.waitForTimeout(1000); // Wait for potential late updates
 
     const xRange = await chartCanvas.evaluate((canvas) => {
