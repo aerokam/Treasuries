@@ -307,4 +307,56 @@ app.get('/api/status', async (_req, res) => {
   res.json({ apps: appsOut, fetchedAt: new Date().toISOString() });
 });
 
+// ── Preview: first N lines of an R2 file ───────────────────────────────────────
+app.get('/api/preview', async (req, res) => {
+  try {
+    const { source, key } = req.query;
+    const n = Math.max(1, Math.min(parseInt(req.query.lines, 10) || 12, 200));
+    if (source !== 'r2' || !key) return res.status(400).json({ error: 'bad request: need source=r2&key=' });
+    const r = await fetch(`${R2_BASE}/${key}`);
+    if (!r.ok) return res.status(502).json({ error: `R2 HTTP ${r.status}` });
+    const text = await r.text();
+    const all = text.split(/\r?\n/);
+    if (all.length && all[all.length - 1] === '') all.pop(); // drop trailing newline
+    // Cap line length so single-line JSON blobs (e.g. history.json) stay previewable.
+    const lines = all.slice(0, n).map(l => (l.length > 500 ? l.slice(0, 500) + '…' : l));
+    res.json({ lines, total: all.length });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── Run a local job, streaming output over SSE ─────────────────────────────────
+app.get('/api/run/:jobId', (req, res) => {
+  const job = jobs.find(j => j.id === req.params.jobId);
+  res.set({ 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' });
+  res.flushHeaders();
+  const send = obj => res.write(`data: ${JSON.stringify(obj)}\n\n`);
+
+  if (!job) { send({ type: 'exit', text: `\n[no such job: ${req.params.jobId}]\n` }); return res.end(); }
+  if (!job.cmd) { send({ type: 'exit', text: `\n[job ${job.id} has no cmd]\n` }); return res.end(); }
+
+  const cwd = resolve(REPO_ROOT, job.cwd || '.');
+  send({ type: 'start', text: `$ ${job.cmd}\n` });
+
+  let child;
+  try {
+    child = spawn(job.cmd, { cwd, shell: true });
+  } catch (e) {
+    send({ type: 'exit', text: `\n[spawn failed: ${e.message}]\n` });
+    return res.end();
+  }
+
+  child.stdout.on('data', d => send({ type: 'out', text: d.toString() }));
+  child.stderr.on('data', d => send({ type: 'err', text: d.toString() }));
+  child.on('error', e => send({ type: 'err', text: `\n[error: ${e.message}]\n` }));
+  child.on('close', code => {
+    jobHistory[job.id] = { lastRunAt: new Date().toISOString(), exitCode: code };
+    send({ type: 'exit', text: `\n[exit ${code}]\n` });
+    res.end();
+  });
+
+  req.on('close', () => { if (child && !child.killed) child.kill(); });
+});
+
 app.listen(PORT, () => console.log(`Dashboard running at http://localhost:${PORT}`));

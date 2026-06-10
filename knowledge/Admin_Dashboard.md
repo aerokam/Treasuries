@@ -31,6 +31,7 @@ The dashboard should feel like it was written by someone who knows the system. T
 
 - **Runtime:** Node.js + Express, port `3737`
 - **Role:** Serve `index.html`; expose REST API for status aggregation and job execution
+- **REST API:** `GET /api/status` (aggregated R2 freshness + job history), `GET /api/jobs`, `GET /api/preview?source=r2&key=<key>&lines=<n>` → `{ lines[], total }` (lines capped at 500 chars so single-line JSON stays previewable), `GET /api/run/:jobId` → **SSE** stream of `{type,text}` events (`start`/`out`/`err`/`exit`); spawns the job's `cmd` with `shell:true` in its `cwd`, killed if the client disconnects, and records `lastRunAt`/`exitCode` in in-memory job history
 - **Start command:** `npm run dashboard` from repo root
 - **Manual launcher:** `Dashboard/start.cmd` — opens a browser tab and starts the server (unguarded; errors harmlessly with `EADDRINUSE` if 3737 is already up)
 - **Auto-start (headless):** `scripts/run-dashboard.cmd` — guarded launcher used by the `DashboardServer` scheduled task. Starts the server only if nothing is LISTENING on 3737 (idempotent), runs it hidden via `Start-Process`, and never opens a browser. Logs to `logs/dashboard.log` (+ `dashboard.out/err.log`).
