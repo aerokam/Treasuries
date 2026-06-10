@@ -28,13 +28,13 @@ export const COLS = [
   // Shared (both modes)
   { label: 'CUSIP',       key: 'cusip',       fmt: 'str',
     value: d => d.cusip,       subValue: d => d.cusip,
-    headerHTML: 'Funded Year<br><span style="font-weight:normal">CUSIP</span>' },
+    headerHTML: 'Funded Year<br><span style="font-weight:normal;opacity:0.7">CUSIP</span>' },
   { label: 'Maturity',    key: 'maturity',    fmt: 'str',
     value: d => d.maturityStr, subValue: d => d.maturityStr,
-    headerHTML: '<span style="visibility:hidden">.</span><br><span style="font-weight:normal">Maturity</span>' },
+    headerHTML: '<span style="visibility:hidden">.</span><br><span style="font-weight:normal;opacity:0.7">Maturity</span>' },
   { label: 'Yield',       key: 'yield',       fmt: 'yld', buildOnly: true,
     value: d => d.yield, subValue: d => d.yield,
-    headerHTML: '<span style="visibility:hidden">.</span><br><span style="font-weight:normal">Yield</span>' },
+    headerHTML: '<span style="visibility:hidden">.</span><br><span style="font-weight:normal;opacity:0.7">Yield</span>' },
   // Rebalance-only
   // Excess sub-row = coverage delivered (≈ missing-years × DARA): excessAmt{Before,After} from
   // rebalance-lib (P+I − AMD net-out + block-LMI add-back), same rule as build's Amount column.
@@ -60,7 +60,7 @@ export const COLS = [
     subDrillKeyFn:  d => d.isFuture30yCover ? 'future30yCostBefore' : 'gapCostBefore',
     total: true, totalFn: d => (d.fundedYearQtyBefore * d.costPerBond) + (d.excessQtyBefore * d.costPerBond || 0),
     drill: true, drillCond: v => typeof v === 'number' && v > 0,
-    headerHTML: 'Cost Before<br><span style="font-weight:normal">Cost Before</span>' },
+    headerHTML: 'Cost Before<br><span style="font-weight:normal;opacity:0.7">Cost Before</span>' },
 
   { label: 'Cost After',    key: 'costAfter',  fmt: 'amt', rebalOnly: true,
     value:          d => d.fundedYearQtyAfter * d.costPerBond,
@@ -68,13 +68,13 @@ export const COLS = [
     subDrillKeyFn:  d => d.isFuture30yCover ? 'future30yCostAfter' : 'gapCostAfter',
     total: true, totalFn: d => (d.fundedYearQtyAfter * d.costPerBond) + (d.excessQtyAfter * d.costPerBond || 0),
     drill: true, drillCond: v => typeof v === 'number' && v > 0,
-    headerHTML: 'Cost After<br><span style="font-weight:normal">Cost After</span>' },
+    headerHTML: 'Cost After<br><span style="font-weight:normal;opacity:0.7">Cost After</span>' },
 
   { label: 'Quantity Before',    key: 'qtyBefore',  fmt: 'qty', rebalOnly: true,
     value:    d => d.fundedYearQtyBefore,
     subValue: d => d.excessQtyBefore,
     total: true, totalFn: d => d.qtyBefore || 0,
-    headerHTML: 'Qty Before<br><span style="font-weight:normal">Qty Before</span>' },
+    headerHTML: 'Qty Before<br><span style="font-weight:normal;opacity:0.7">Qty Before</span>' },
 
   { label: 'Quantity After',     key: 'qtyAfter',   fmt: 'qty', rebalOnly: true,
     value:    d => d.fundedYearQtyAfter,
@@ -82,13 +82,13 @@ export const COLS = [
     subDrillKey: 'qtyAfter',
     total: true, totalFn: d => d.qtyAfter || 0,
     drill: true, drillCond: (_v, d) => (d.qtyAfter || 0) > 0,
-    headerHTML: 'Qty After<br><span style="font-weight:normal">Qty After</span>' },
+    headerHTML: 'Qty After<br><span style="font-weight:normal;opacity:0.7">Qty After</span>' },
 
   { label: 'Quantity Delta',     key: 'qtyDelta',   fmt: 'sgn', rebalOnly: true,
     value:    d => d.fundedYearQtyAfter - d.fundedYearQtyBefore,
     subValue: d => d.excessQtyAfter - d.excessQtyBefore,
     total: true, totalFn: d => (d.qtyAfter || 0) - (d.qtyBefore || 0),
-    headerHTML: 'Qty Delta<br><span style="font-weight:normal">Qty Delta</span>' },
+    headerHTML: 'Qty Delta<br><span style="font-weight:normal;opacity:0.7">Qty Delta</span>' },
 
   { label: 'Cash Delta',    key: 'cashDelta',  fmt: 'sgn', rebalOnly: true,
     value:    d => -((d.fundedYearQtyAfter - d.fundedYearQtyBefore) * d.costPerBond),
@@ -96,7 +96,7 @@ export const COLS = [
     subDrillKey: 'gapCashDelta',
     total: true, totalFn: d => -((d.qtyAfter - d.qtyBefore) * d.costPerBond),
     drill: true, drillCond: v => typeof v === 'number' && v !== 0,
-    headerHTML: 'Cash Delta<br><span style="font-weight:normal">Cash Delta</span>' },
+    headerHTML: 'Cash Delta<br><span style="font-weight:normal;opacity:0.7">Cash Delta</span>' },
 
   // Build-only
   { label: 'Amount', key: 'amount', fmt: 'amt', buildOnly: true, fyLevel: true,
@@ -113,13 +113,13 @@ export const COLS = [
     subDrillKeyFn:  d => d.isFuture30yCover ? 'future30yCost' : 'gapCost',
     total: true, totalFn: d => (d.fundedYearCost ?? 0) + (d.excessCost ?? 0),
     drill: true, drillCond: () => true,
-    headerHTML: 'Cost<br><span style="font-weight:normal">Cost</span>' },
+    headerHTML: 'Cost<br><span style="font-weight:normal;opacity:0.7">Cost</span>' },
 
   { label: 'Quantity',    key: 'qty',    fmt: 'qty', buildOnly: true,
     value:    d => d.fundedYearQty,
     subValue: d => d.excessQty,
     total: true, totalFn: d => (d.fundedYearQty || 0) + (d.excessQty || 0),
-    headerHTML: 'Qty<br><span style="font-weight:normal">Qty</span>' },
+    headerHTML: 'Qty<br><span style="font-weight:normal;opacity:0.7">Qty</span>' },
 ];
 
 function isBracket(d, mode) {
