@@ -32,7 +32,13 @@ The dashboard should feel like it was written by someone who knows the system. T
 - **Runtime:** Node.js + Express, port `3737`
 - **Role:** Serve `index.html`; expose REST API for status aggregation and job execution
 - **Start command:** `npm run dashboard` from repo root
-- **Startup script:** `Dashboard/start.cmd` — checks if port 3737 is in use; if not, starts server; opens browser
+- **Manual launcher:** `Dashboard/start.cmd` — opens a browser tab and starts the server (unguarded; errors harmlessly with `EADDRINUSE` if 3737 is already up)
+- **Auto-start (headless):** `scripts/run-dashboard.cmd` — guarded launcher used by the `DashboardServer` scheduled task. Starts the server only if nothing is LISTENING on 3737 (idempotent), runs it hidden via `Start-Process`, and never opens a browser. Logs to `logs/dashboard.log` (+ `dashboard.out/err.log`).
+- **Keep-alive task:** `DashboardServer` (registered in `scripts/setup-windows-tasks.ps1`) fires weekday mornings at 6:00am PT and repeats every 30 min for 18h as a self-heal heartbeat — the guard makes repeats harmless. Chosen over a logon trigger because the machine stays logged in continuously.
+
+### Portal entry point (local-only)
+
+The top-level portal (`index.html`) shows a discreet **"Dashboard Monitor →"** link in the Mission box, but only on a local checkout. Gating: on load it `fetch()`es `local-admin.json` (a gitignored sentinel that carries `{ "dashboardUrl": "http://localhost:3737/" }`); if present, the link is revealed and a `mode:'no-cors'` probe of `/api/status` annotates it ("Dashboard Monitor →" when up, "… (start server) →" when down). On GitHub Pages the sentinel is absent (never deployed), so the link stays hidden.
 
 ### Dashboard Frontend (`Dashboard/index.html`)
 

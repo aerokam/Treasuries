@@ -178,6 +178,19 @@ Register-CmdTask "FidelityQuotes" `
     ) `
     "$ProjectDir\YieldCurves\scripts\run-fidelity.cmd"
 
+# DashboardServer  -  Weekday mornings 6:00am PT, self-healing every 30 min through the day.
+# Keeps the local Admin Dashboard (Dashboard/server.js, port 3737) running. The wrapper is
+# guarded (starts only if 3737 is free) and headless (no browser), so the repetition is a
+# harmless heartbeat that recovers from a mid-day crash without needing a logon trigger.
+$dashTrigger = New-ScheduledTaskTrigger -Weekly -DaysOfWeek $Weekdays -At "6:00am"
+$dashTrigger.Repetition = (New-ScheduledTaskTrigger -Once -At "6:00am" `
+    -RepetitionInterval (New-TimeSpan -Minutes 30) `
+    -RepetitionDuration (New-TimeSpan -Hours 18)).Repetition
+Register-CmdTask "DashboardServer" `
+    "Ensure the local Admin Dashboard (port 3737) is running; start it headless if not" `
+    @($dashTrigger) `
+    "$ProjectDir\scripts\run-dashboard.cmd"
+
 # ---------------------------------------------------------------------------
 # CPI release date tasks  -  date-specific triggers fetched live from R2
 # ---------------------------------------------------------------------------
