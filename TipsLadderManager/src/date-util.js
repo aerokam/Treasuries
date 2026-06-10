@@ -22,5 +22,5 @@ export function toDateStr(d) { return d.toISOString().split('T')[0]; }
 
 export function fmtDate(d) {
   if (!d) return '';
-  return d.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
+  return d.toLocaleDateString('en-US', { month: 'short', day: '2-digit' });
 }

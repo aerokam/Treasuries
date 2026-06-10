@@ -39,13 +39,13 @@ function coverageAmtRows(label, grossPI, lmiAdd, finalAmt) {
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 function bondVarRows(d, nPeriods, principalPerBond, couponPct) {
-  const matDate = new Date(d.maturityStr);
-  const matMonthName = MONTHS[matDate.getMonth()];
+  const matMonthName = d.maturityStr.split(' ')[0];
+  const matMonthIdx = MONTHS.indexOf(matMonthName);
   let nPerLbl;
   if (nPeriods === 1) {
     nPerLbl = '1 semi-annual (' + matMonthName + ')';
   } else {
-    const firstMonthName = MONTHS[(matDate.getMonth() - 6 + 12) % 12];
+    const firstMonthName = MONTHS[(matMonthIdx - 6 + 12) % 12];
     nPerLbl = '2 (' + firstMonthName + ' + ' + matMonthName + ')';
   }
   return row('Ref CPI', '', fd(d.refCPI, 5), false, 'refCPI', 'refcpi')

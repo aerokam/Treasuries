@@ -141,6 +141,14 @@ Register-NodeTask "YieldsHistory" `
     @(New-ScheduledTaskTrigger -Weekly -DaysOfWeek $Weekdays -At "2:00pm") `
     "YieldsMonitor/scripts/snapHistory.js"
 
+# IntradayArchive  -  Weekdays 2:05pm PT [ET: 5:05pm] (5 min after cash close)
+# Audit archive: captures raw 1D + 5D feeds per symbol so any past close window can be
+# inspected offline. Separate from YieldsHistory (daily-close baseline).
+Register-NodeTask "IntradayArchive" `
+    "Archive raw CNBC 1D+5D intraday feeds per symbol to R2 yield-history/intraday-raw" `
+    @(New-ScheduledTaskTrigger -Weekly -DaysOfWeek $Weekdays -At "2:05pm") `
+    "YieldsMonitor/scripts/archiveIntraday.js"
+
 # SaFactors  -  Daily 6:35am PT
 Register-NodeTask "SaFactors" `
     "Fetch CPI NSA/SA from BLS, calculate daily SA factors, upload RefCpiNsaSa.csv, refresh SA/SAO yields" `

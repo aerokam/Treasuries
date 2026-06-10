@@ -341,7 +341,7 @@ async function fetchOne(symbol, range, force = false) {
     const history = await fetchHistory(symbol);
     const startMs = customStartDate ? customStartDate.getTime() : 0;
     const endMs = customEndDate ? customEndDate.getTime() : Date.now();
-    let combined = (history || []).filter(p => p.x.getTime() >= startMs && p.x.getTime() < endMs);
+    let combined = (history || []).filter(p => p.x.getTime() >= startMs && p.x.getTime() < endMs && !isWeekendEt(p.x));
     if (endMs > Date.now() - 5 * 86400000) {
       const tipKey = `${symbol}_5D`;
       let liveTip = liveCache[tipKey];
@@ -352,7 +352,7 @@ async function fetchOne(symbol, range, force = false) {
       }
       if (liveTip) {
         const lastHistTime = combined.length > 0 ? combined[combined.length - 1].x.getTime() : 0;
-        const newPoints = liveTip.filter(p => p.x.getTime() > lastHistTime && p.x.getTime() < endMs);
+        const newPoints = liveTip.filter(p => p.x.getTime() > lastHistTime && p.x.getTime() < endMs && !isWeekendEt(p.x));
         combined = [...combined, ...newPoints];
       }
     }
@@ -376,7 +376,7 @@ async function fetchOne(symbol, range, force = false) {
     if (fetchTasks.length > 0) await Promise.all(fetchTasks);
     const data = liveCache[cacheKey] || [];
     const cutoff = new Date(); if (is2D) cutoff.setDate(cutoff.getDate() - 2); else cutoff.setDate(cutoff.getDate() - 10);
-    return data.filter(p => p.x >= cutoff);
+    return data.filter(p => p.x >= cutoff && !isWeekendEt(p.x));
   } else {
     console.log(`%c[R2] %cLoading history for ${symbol}...`, "color: #ea580c; font-weight: bold", "color: inherit");
     const history = await fetchHistory(symbol);
@@ -384,8 +384,8 @@ async function fetchOne(symbol, range, force = false) {
     if (!liveTip || force) { console.log(`%c[CNBC] %cFetching 5D tip for ${symbol}...`, "color: #2563eb; font-weight: bold", "color: inherit"); liveTip = await fetchLive(symbol, '5D'); if (liveTip) liveCache[tipKey] = liveTip; }
     const cutoff = new Date();
     if (range === '1Y') cutoff.setFullYear(cutoff.getFullYear() - 1); else if (range === '2Y') cutoff.setFullYear(cutoff.getFullYear() - 2); else if (range === '3Y') cutoff.setFullYear(cutoff.getFullYear() - 3); else if (range === '10Y') cutoff.setFullYear(cutoff.getFullYear() - 10); else if (range === 'ALL') cutoff.setFullYear(cutoff.getFullYear() - 50);
-    let combined = (history || []).filter(p => p.x >= cutoff);
-    if (liveTip && liveTip.length > 0) { const lastHistTime = combined.length > 0 ? combined[combined.length - 1].x.getTime() : 0; const newPoints = liveTip.filter(p => p.x.getTime() > lastHistTime); combined = [...combined, ...newPoints]; }
+    let combined = (history || []).filter(p => p.x >= cutoff && !isWeekendEt(p.x));
+    if (liveTip && liveTip.length > 0) { const lastHistTime = combined.length > 0 ? combined[combined.length - 1].x.getTime() : 0; const newPoints = liveTip.filter(p => p.x.getTime() > lastHistTime && !isWeekendEt(p.x)); combined = [...combined, ...newPoints]; }
     return combined;
   }
 }
@@ -403,7 +403,14 @@ function snapXMax(date) {
 }
 
 function applyDefaultBounds(sym, chart, data) {
-  if (!data || data.length === 0) return;
+  if (!data || data.length === 0) {
+    if (activeRange === 'Custom' && customStartDate && customEndDate) {
+      chart.options.scales.x.min = customStartDate.getTime();
+      chart.options.scales.x.max = customEndDate.getTime();
+      chart.update('none');
+    }
+    return;
+  }
   if (activeRange === '2D') {
     const lastDayStr = getEtDateStr(data[data.length-1].x), dayP = data.filter(p => getEtDateStr(p.x) === lastDayStr);
     if (dayP.length > 0) {
@@ -566,10 +573,21 @@ const BEI_PAIRS = [
   { n: 'US30Y', t: 'US30YTIPS', label: '30Y' }
 ];
 
+function adjustFirstPointToClosingTime(firstPoint) {
+  const parts = ET_FULL_FMT.formatToParts(firstPoint).reduce((a, pt) => ({ ...a, [pt.type]: pt.value }), {});
+  const y = +parts.year, m = +parts.month - 1, d = +parts.day;
+  const hour = +parts.hour, minute = +parts.minute;
+  if (hour === 0 && minute === 0) {
+    return makeEtMoment(y, m, d, 17);
+  }
+  return firstPoint;
+}
+
 function updateYieldCurves() {
   const buildYield = (id, key, syms) => {
-    let sT = null, eT = null;
-    const sD = syms.map(s => { const d = rangeData[s]; if (!d || d.length === 0) return null; if (!sT || d[0].x < sT) sT = d[0].x; return d[0].y; });
+    let sT = null, eT = null, sDate = null;
+    const sD = syms.map(s => { const d = rangeData[s]; if (!d || d.length === 0) return null; if (!sDate || d[0].x < sDate) sDate = d[0].x; return d[0].y; });
+    if (sDate) sT = adjustFirstPointToClosingTime(sDate);
     const eD = syms.map(s => { const d = rangeData[s]; if (!d || d.length === 0) return null; if (!eT || d[d.length-1].x > eT) eT = d[d.length-1].x; return d[d.length-1].y; });
     const sL = sT ? ET_HM_FMT.format(sT) + ' ET' : '—', eL = eT ? ET_HM_FMT.format(eT) + ' ET' : '—';
     if (yieldCurveCharts[key]) { const c = yieldCurveCharts[key]; c.data.datasets[0].data = sD; c.data.datasets[0].label = sL; c.data.datasets[1].data = eD; c.data.datasets[1].label = eL; c.update(); return; }
@@ -582,13 +600,14 @@ function updateYieldCurves() {
   };
 
   const buildBei = (id, key, pairs) => {
-    let sT = null, eT = null;
+    let sT = null, eT = null, sDate = null;
     const sD = pairs.map(p => {
       const n = rangeData[p.n], t = rangeData[p.t];
       if (!n || n.length === 0 || !t || t.length === 0) return null;
-      if (!sT || n[0].x < sT) sT = n[0].x;
+      if (!sDate || n[0].x < sDate) sDate = n[0].x;
       return n[0].y - t[0].y;
     });
+    if (sDate) sT = adjustFirstPointToClosingTime(sDate);
     const eD = pairs.map(p => {
       const n = rangeData[p.n], t = rangeData[p.t];
       if (!n || n.length === 0 || !t || t.length === 0) return null;
