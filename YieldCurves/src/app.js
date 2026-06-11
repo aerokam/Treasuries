@@ -597,28 +597,21 @@ function parseFidelityNominals(text) {
   const rows = parseCsv(text);
   const bonds = [];
   const seen = new Set();
-  
-  // Create lookup for valid nominal CUSIPs from our FedInvest data
-  const validNominalCusips = new Set(rawNominalsData.map(r => r.cusip));
 
   for (const row of rows) {
     const n = {};
     for (const k in row) n[k.toLowerCase().trim()] = row[k];
     const cusip   = clean(n['cusip']);
     const desc    = (n['description'] || '').toUpperCase();
-    
+
     if (!cusip || seen.has(cusip)) continue;
-    
-    // Explicitly reject if it's a known TIPS CUSIP or described as such
+
+    // Reject TIPS — they're handled separately
     if (rawYieldsData.some(r => r.cusip === cusip) || /\bTIPS\b/.test(desc)) {
       continue;
     }
 
-    // Only accept if it's a known nominal Treasury CUSIP or a recognized STRIP
     const isActuallyStrip = isStrip(cusip);
-    if (!validNominalCusips.has(cusip) && !isActuallyStrip) {
-      continue;
-    }
 
     const matStr     = clean(n['maturity date']);        // MM/DD/YYYY
     const yldStr     = clean(n['ask yield to maturity']);
