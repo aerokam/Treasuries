@@ -2380,7 +2380,9 @@ document.addEventListener('click', e => {
     const d = _currentDrillData;
 
     if (key === 'refCPI') {
-      showPopup(drillL3, 'Ref CPI Interpolation', (c) => buildRefCpiDrill(d || {refCPI: settlementDate}, c, refCpiRows), 'Ref CPI', 'quant');
+      const _rcDateIso = activeRefCpiDateStr ?? _defaultRefCpiDateStr;
+      const _dForRefCpi = _rcDateIso ? { ...(d || {}), settlementDate: _fmtMDY(_rcDateIso) } : (d || {});
+      showPopup(drillL3, 'Ref CPI Interpolation', (c) => buildRefCpiDrill(_dForRefCpi, c, refCpiRows), 'Ref CPI', 'quant');
     } else if (key === 'indexRatio') {
       showPopup(drillL3, 'Index Ratio Calculation', (c) => buildIndexRatioDrill(d), 'Index Ratio');
     } else if (key.startsWith('pipb-')) {
@@ -2514,6 +2516,26 @@ function _clearOutput() {
 
 document.getElementById('refcpi-date-input').addEventListener('keydown', e => {
   if (e.key === 'Enter') { e.stopPropagation(); document.getElementById('refcpi-apply-btn').click(); }
+});
+
+document.getElementById('refcpi-date-input').addEventListener('input', e => {
+  const input = e.target;
+  const raw = input.value;
+  const pos = input.selectionStart;
+  const digits = raw.replace(/\D/g, '').slice(0, 8);
+  let formatted = digits.slice(0, 2);
+  if (digits.length > 2) formatted += '/' + digits.slice(2, 4);
+  if (digits.length > 4) formatted += '/' + digits.slice(4, 8);
+  if (formatted === raw) return;
+  const digitsBeforeCursor = raw.slice(0, pos).replace(/\D/g, '').length;
+  input.value = formatted;
+  let newPos = 0, dc = 0;
+  for (let i = 0; i < formatted.length; i++) {
+    if (formatted[i] !== '/') { dc++; if (dc === digitsBeforeCursor) { newPos = i + 1; break; } }
+  }
+  if (dc < digitsBeforeCursor) newPos = formatted.length;
+  if (newPos < formatted.length && formatted[newPos] === '/') newPos++;
+  input.setSelectionRange(newPos, newPos);
 });
 
 document.getElementById('refcpi-apply-btn').addEventListener('click', () => {
