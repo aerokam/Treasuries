@@ -406,6 +406,34 @@ runFullRebalanceTest('SampleHoldings (richest IRA)', './data/SampleHoldings.csv'
   console.log(`        accounts: ${Object.keys(accounts).join(', ')}`);
 }
 
+// ── Test: Format 3 (Vanguard) — broker import parsing ────────────────────────
+{
+  console.log('\nFormat 3 (Vanguard) — broker import parsing');
+  // Uses real CUSIPs from test data: 91282CPU9 (1.875% Jan 2036), 912810QF8 (2.125% Feb 2040)
+  const csv3 = [
+    'Account Number,Investment Name,Symbol,Shares,Share Price,Total Value,',
+    '11111111,U S TREASURY NOTE INFLATION INDEX NOTE 1.875 01/15/36 01/15/06,null,5000,100.00,500000.00,',
+    '11111111,U S TREASURY NOTE INFLATION INDEX NOTE 2.125 02/15/40 02/15/10,null,8000,100.00,800000.00,',
+    '11111111,VANGUARD FEDERAL MONEY MARKET INVESTOR CL,VMFXX,1234.56,1,1234.56,',
+    '22222222,U S TREASURY NOTE INFLATION INDEX NOTE 1.875 01/15/36 01/15/06,null,3000,100.00,300000.00,',
+    '22222222,VANGUARD TOTAL STOCK MARKET ETF,VTI,50,200.00,10000.00,',
+  ].join('\n');
+  const { holdings, tipsValues, totalAccountValues } = parseBrokerCSV(csv3, tipsMap);
+  const accounts = holdings;
+
+  assert('F3: acct 11111111 has 2 TIPS', accounts['11111111']?.length, 2);
+  const cpu9 = accounts['11111111']?.find(h => h.cusip === '91282CPU9');
+  assert('F3: CPU9 qty === 5 (name-resolved)', cpu9?.qty, 5);
+  const qf8 = accounts['11111111']?.find(h => h.cusip === '912810QF8');
+  assert('F3: QF8 qty === 8 (name-resolved)', qf8?.qty, 8);
+  assert('F3: VMFXX filtered out', accounts['11111111']?.find(h => h.cusip === 'VMFXX'), undefined);
+  assert('F3: acct 22222222 CPU9 qty === 3', accounts['22222222']?.find(h => h.cusip === '91282CPU9')?.qty, 3);
+  assert('F3: VTI filtered out', accounts['22222222']?.find(h => h.cusip === 'VTI'), undefined);
+  assert('F3: tipsValues 11111111 ≈ 1300000', Math.abs((tipsValues['11111111'] || 0) - 1300000) < 1, true);
+  assert('F3: totalAccountValues 11111111 > tipsValues', totalAccountValues['11111111'] > tipsValues['11111111'], true);
+  console.log(`        accounts: ${Object.keys(accounts).join(', ')}`);
+}
+
 // ── Test: Build from scratch — deterministic output ───────────────────────────
 console.log('\nBuild — DARA=50000, lastYear=2040');
 {

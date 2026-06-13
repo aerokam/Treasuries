@@ -22,11 +22,21 @@ function parseCSVLine(str) {
 
 export function parseBrokerCSV(csvText, tipsMap) {
   const lines = csvText.split(/\r?\n/).filter(l => l.trim().length > 0);
-  let map = { accountNum: -1, accountName: -1, symbol: -1, quantity: -1, currentValue: -1 };
+  let map = { accountNum: -1, accountName: -1, symbol: -1, quantity: -1, currentValue: -1, investmentName: -1 };
   let currentSchwabAccount = null;
   const accounts = {}; // Key: AccountName -> Map<cusip, qty>
   const tipsValues = {}; // Key: AccountName -> sum of current value for TIPS only
   const totalAccountValues = {}; // Key: AccountName -> total current value (all positions)
+
+  // Vanguard reverse lookup: "{couponPct}|{year}-{month}" → cusip
+  // tipsMap stores coupon as fraction (0.02125); Vanguard names use percentage (2.125)
+  const vanguardLookup = new Map();
+  for (const [cusip, bond] of tipsMap) {
+    const yr = bond.maturity.getFullYear();
+    const mo = String(bond.maturity.getMonth() + 1).padStart(2, '0');
+    const cpnPct = parseFloat((bond.coupon * 100).toPrecision(6));
+    vanguardLookup.set(`${cpnPct}|${yr}-${mo}`, cusip);
+  }
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -52,7 +62,7 @@ export function parseBrokerCSV(csvText, tipsMap) {
     const cols = parseCSVLine(line);
     const lowerCols = cols.map(c => c.toLowerCase());
 
-    const qIdx = lowerCols.findIndex(c => c === 'quantity' || c.startsWith('qty'));
+    const qIdx = lowerCols.findIndex(c => c === 'quantity' || c.startsWith('qty') || c === 'shares');
     const sIdx = lowerCols.findIndex(c => c === 'symbol' || c === 'cusip');
 
     if (qIdx > -1 && sIdx > -1) {
@@ -60,7 +70,8 @@ export function parseBrokerCSV(csvText, tipsMap) {
       map.symbol = sIdx;
       map.accountNum = lowerCols.findIndex(c => c.includes('account number') || c === 'account');
       map.accountName = lowerCols.findIndex(c => c.includes('account name'));
-      map.currentValue = lowerCols.findIndex(c => c.includes('current value') || c.includes('market value'));
+      map.currentValue = lowerCols.findIndex(c => c.includes('current value') || c.includes('market value') || c.includes('total value'));
+      map.investmentName = lowerCols.findIndex(c => c === 'investment name');
       continue;
     }
 
@@ -91,9 +102,22 @@ export function parseBrokerCSV(csvText, tipsMap) {
       }
     }
 
-    // Validate CUSIP against our loaded TIPS map
-    if (tipsMap.has(rawSym)) {
-      const rawQtyStr = cols[map.quantity].replace(/[^0-9.-]/g, ''); // Remove non-numeric chars
+    // Resolve CUSIP: direct match (Fidelity/Schwab) or name-based match (Vanguard)
+    let resolvedCusip = tipsMap.has(rawSym) ? rawSym : null;
+
+    if (!resolvedCusip && map.investmentName > -1 && cols[map.investmentName]) {
+      const invName = cols[map.investmentName];
+      if (/inflation index/i.test(invName)) {
+        const m = invName.match(/(\d+\.\d+)\s+(\d{2})\/\d{2}\/(\d{2})/);
+        if (m) {
+          const year4d = 2000 + parseInt(m[3], 10);
+          resolvedCusip = vanguardLookup.get(`${parseFloat(m[1])}|${year4d}-${m[2]}`) || null;
+        }
+      }
+    }
+
+    if (resolvedCusip) {
+      const rawQtyStr = cols[map.quantity].replace(/[^0-9.-]/g, '');
       const faceValue = parseFloat(rawQtyStr);
       if (isNaN(faceValue) || faceValue <= 0) continue;
 
@@ -101,9 +125,8 @@ export function parseBrokerCSV(csvText, tipsMap) {
       if (qty <= 0) continue;
 
       if (!accounts[acctKey]) accounts[acctKey] = new Map();
-      accounts[acctKey].set(rawSym, (accounts[acctKey].get(rawSym) || 0) + qty);
+      accounts[acctKey].set(resolvedCusip, (accounts[acctKey].get(resolvedCusip) || 0) + qty);
 
-      // Track TIPS value for this account
       if (map.currentValue > -1 && cols[map.currentValue]) {
         const valueStr = cols[map.currentValue].replace(/[^0-9.-]/g, '');
         const value = parseFloat(valueStr);
