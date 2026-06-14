@@ -390,15 +390,24 @@ async function fetchOne(symbol, range, force = false) {
     const cutoff = new Date(); if (is2D) cutoff.setDate(cutoff.getDate() - 2); else cutoff.setDate(cutoff.getDate() - 10);
     return data.filter(p => p.x >= cutoff && !isWeekendEt(p.x));
   } else {
-    console.log(`%c[R2] %cLoading history for ${symbol}...`, "color: #ea580c; font-weight: bold", "color: inherit");
-    const history = await fetchHistory(symbol);
-    const tipKey = `${symbol}_5D`; let liveTip = liveCache[tipKey];
-    if (!liveTip || force) { console.log(`%c[CNBC] %cFetching 5D tip for ${symbol}...`, "color: #2563eb; font-weight: bold", "color: inherit"); liveTip = await fetchLive(symbol, '5D'); if (liveTip) liveCache[tipKey] = liveTip; }
     const cutoff = new Date();
     if (range === '1Y') cutoff.setFullYear(cutoff.getFullYear() - 1); else if (range === '2Y') cutoff.setFullYear(cutoff.getFullYear() - 2); else if (range === '3Y') cutoff.setFullYear(cutoff.getFullYear() - 3); else if (range === '10Y') cutoff.setFullYear(cutoff.getFullYear() - 10); else if (range === 'ALL') cutoff.setFullYear(cutoff.getFullYear() - 50);
-    let combined = (history || []).filter(p => p.x >= cutoff && !isWeekendEt(p.x));
-    if (liveTip && liveTip.length > 0) { const lastHistTime = combined.length > 0 ? combined[combined.length - 1].x.getTime() : 0; const newPoints = liveTip.filter(p => p.x.getTime() > lastHistTime && !isWeekendEt(p.x)); combined = [...combined, ...newPoints]; }
-    return combined;
+    if (range === '1Y' || range === '2Y' || range === '3Y') {
+      // Reread provider 6M (daily ~3Y) fresh each load — same feed cnbc.com uses; no history.json, no 5D tip.
+      const cacheKey = `${symbol}_6Mdaily`;
+      let daily = liveCache[cacheKey];
+      if (!daily || force) {
+        console.log(`%c[CNBC] %cFetching 6M daily for ${symbol}...`, "color: #2563eb; font-weight: bold", "color: inherit");
+        daily = await fetchLive(symbol, '6M');
+        if (daily) liveCache[cacheKey] = daily;
+      }
+      return (daily || []).filter(p => p.x >= cutoff && !isWeekendEt(p.x));
+    } else {
+      // 10Y, ALL: history.json (accumulated daily-resolution store; coarser CNBC feeds supplemented by past daily captures).
+      console.log(`%c[R2] %cLoading history for ${symbol}...`, "color: #ea580c; font-weight: bold", "color: inherit");
+      const history = await fetchHistory(symbol);
+      return (history || []).filter(p => p.x >= cutoff && !isWeekendEt(p.x));
+    }
   }
 }
 

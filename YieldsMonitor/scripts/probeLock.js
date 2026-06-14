@@ -1,14 +1,18 @@
-// probeLock.js — investigation probe (temporary).
-// Goal: find WHEN CNBC locks the settled daily close. Through the trading day the daily/
-// longer-range feeds' "today" bar TRACKS the live 1D value; overnight it freezes to the
-// settled (~3PM benchmark) close. We don't want to guess that lock time — we measure it.
+// probeLock.js — investigation probe (temporary). See Close_Price_Investigation.md §3, §8.
+// Goal: pin the WALL-CLOCK ET time at which CNBC revises a just-completed day's DAILY bar
+// from its provisional live-tracked value to the final ~3PM benchmark close — so the app
+// can lock "yesterday's" daily value in lockstep with cnbc.com (which reads this same feed).
 //
-// Each run logs, per reference symbol, the 1D (intraday) latest vs the daily-feed "today"
-// value for 6M (3Y, daily) and 5Y (10Y, weekly). While tracking, delta ≈ 0; when CNBC
-// locks, the daily value freezes while 1D keeps moving and the delta jumps. Scheduled
-// hourly from the 5PM ET close through the next morning (task `LockProbe`).
+// Mechanism: the 6M (daily) feed's current-day bar tracks the live price all day AND
+// overnight; the just-completed day is revised to the ~3PM benchmark sometime overnight.
+// Each run logs ONE ROW PER daily bar for the last N bars (keyed by bar_date), plus the
+// live 1D latest. Keying by date — not by last/prev position — survives the ~01:00 ET
+// rollover AND the feed's habit of intermittently dropping a recent completed day (§5).
+// Post-hoc analysis: filter symbol+bar_date, order by fetchedAtET — the run where that
+// date's value snaps to the benchmark and then stops moving is the revision time. While a
+// bar still tracks live, (bar_val − live_val) ≈ 0; once frozen, live moves and Δ grows.
 //
-// References: US10YTIPS (real) + US10Y (nominal) — to check if they lock at the same time.
+// Anchors: US10YTIPS (reliable TIPS ref) + US10Y (nominal). US5YTIPS is flaky (§6) — excluded.
 // Output (append): data/yields-history/lock-probe/lock-probe.csv  + same key on R2.
 
 import dotenv from 'dotenv';
@@ -22,6 +26,7 @@ dotenv.config({ path: path.join(__dirname, '../../.env') });
 
 const LOCAL_DIR = path.join(__dirname, '../data/yields-history/lock-probe');
 const SYMBOLS = ['US10YTIPS', 'US10Y'];
+const TAIL_BARS = 7;   // recent daily bars to log per run (covers current day + ~6 prior)
 
 const ET_FMT = new Intl.DateTimeFormat('en-US', {
   timeZone: 'America/New_York', hourCycle: 'h23',
@@ -51,14 +56,12 @@ function buildUrl(symbol, timeRange) {
   return 'https://webql-redesign.cnbcfm.com/graphql?' + Object.entries(params).map(([k, v]) => k + '=' + encodeURIComponent(v)).join('&');
 }
 
-async function lastBar(symbol, range) {
+async function fetchBars(symbol, range) {
   const res = await fetch(buildUrl(symbol, range));
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const json = await res.json();
-  const bars = json?.data?.chartData?.priceBars || [];
-  const b = bars[bars.length - 1];
-  if (!b) return null;
-  return { raw: String(b.tradeTime), val: parseFloat(String(b.close).replace('%', '')) };
+  return (json?.data?.chartData?.priceBars || [])
+    .map(b => ({ raw: String(b.tradeTime), val: parseFloat(String(b.close).replace('%', '')) }));
 }
 
 async function uploadToR2(key, body, contentType) {
@@ -81,16 +84,21 @@ async function main() {
   const rows = [];
   for (const symbol of SYMBOLS) {
     try {
-      const [d1, d6m, d5y] = await Promise.all([lastBar(symbol, '1D'), lastBar(symbol, '6M'), lastBar(symbol, '5Y')]);
-      const intradayET = d1 ? ET_FMT.format(parseT(d1.raw)) : '';
-      rows.push([
-        `"${fetchedAtET}"`, symbol,
-        `"${intradayET}"`, fmt(d1?.val),
-        d6m?.raw.slice(0, 8) || '', fmt(d6m?.val),
-        d5y?.raw.slice(0, 8) || '', fmt(d5y?.val),
-        dlt(d6m?.val, d1?.val), dlt(d5y?.val, d1?.val),
-      ].join(','));
-      console.log(`${symbol.padEnd(10)} 1D=${fmt(d1?.val)}  6M=${fmt(d6m?.val)} (Δ${dlt(d6m?.val, d1?.val)})  5Y=${fmt(d5y?.val)} (Δ${dlt(d5y?.val, d1?.val)})`);
+      // 6M = daily bars (per-weekday). 1D = live intraday (latest tick).
+      const [daily, intraday] = await Promise.all([fetchBars(symbol, '6M'), fetchBars(symbol, '1D')]);
+      const live = intraday[intraday.length - 1] || null;
+      const liveET = live ? ET_FMT.format(parseT(live.raw)) : '';
+      const tail = daily.slice(-TAIL_BARS);
+      for (const bar of tail) {
+        rows.push([
+          `"${fetchedAtET}"`, symbol,
+          bar.raw.slice(0, 8), fmt(bar.val),
+          `"${liveET}"`, fmt(live?.val),
+          dlt(bar.val, live?.val),
+        ].join(','));
+      }
+      const summary = tail.slice(-2).map(b => `${b.raw.slice(0, 8)}=${fmt(b.val)}(Δlive ${dlt(b.val, live?.val)})`).join('  ');
+      console.log(`${symbol.padEnd(10)} live=${fmt(live?.val)}  ${summary}`);
     } catch (err) {
       console.error(`  ${symbol}: ${err.message}`);
     }
@@ -99,7 +107,7 @@ async function main() {
   fs.mkdirSync(LOCAL_DIR, { recursive: true });
   const localFile = path.join(LOCAL_DIR, 'lock-probe.csv');
   if (!fs.existsSync(localFile)) {
-    fs.writeFileSync(localFile, 'fetchedAtET,symbol,intraday_et,intraday_val,d6m_date,d6m_val,d5y_date,d5y_val,delta_6m,delta_5y\n');
+    fs.writeFileSync(localFile, 'fetchedAtET,symbol,bar_date,bar_val,live_et,live_val,delta_bar_live\n');
   }
   fs.appendFileSync(localFile, rows.join('\n') + '\n');
 

@@ -96,11 +96,11 @@ Measured bar spacing per provider range (US10Y / US10YTIPS, consistent):
 
 ### Decision
 
-| Scope | Close basis | Mechanism |
-|---|---|---|
-| **1Y / 2Y / 3Y** | ~3 PM benchmark | **Reread fresh** from CNBC daily feeds each run. No persistent store; identical to CNBC's window (no drift). |
-| **10Y / ALL** | ~3 PM benchmark | **Persistent merge store**: CNBC's coarse deep history (weekly/quarterly) + accumulated **daily** recent closes we retain → finer recent resolution than CNBC shows. **Persist completed days only** (skip the provisional current day), so run-timing is non-critical (late-day fine). |
-| **2D / 10D** | actual **17:05** session close (tentative) | already renders real intraday bars incl. the 17:05 print; keep that, though it differs from the long-range basis. |
+| Scope | Close basis | Mechanism | Status |
+|---|---|---|---|
+| **1Y / 2Y / 3Y** | ~3 PM benchmark | **Reread fresh** from CNBC provider `6M` (daily, ~3 yr) on each page load. No `history.json`, no 5D tip. Covers all three ranges from one cached fetch per symbol. Includes the current day's provisional bar (tracks live). | **Implemented** — `app.js` `fetchOne()` `_6Mdaily` cache |
+| **10Y / ALL** | ~3 PM benchmark | **Persistent merge store**: CNBC's coarse deep history (weekly/quarterly) + accumulated **daily** recent closes (`history.json`). `updateYieldsHistory.js` runs weekdays at 5 PM ET to persist completed days. | Live |
+| **2D / 10D** | actual **17:05** session close (tentative) | already renders real intraday bars incl. the 17:05 print; keep that, though it differs from the long-range basis. | Live |
 
 Rationale:
 - The 3 PM basis is **internally consistent**, **matches CNBC**, **matches Treasury's CMT/real methodology (~3:30pm)**, and is the **IOSCO Tradeweb benchmark**.
@@ -120,10 +120,18 @@ Rationale:
 | `scripts/archiveIntraday.js` | daily immutable raw 1D+5D snapshot per symbol → R2 `yields-history/intraday-raw/{sym}/{YYYYMMDD}.json` (task `IntradayArchive`, 17:05 ET) |
 | `scripts/analyzeCloseWindow.js <sym>` | per-day close-window structure from an archived snapshot |
 | `scripts/probeClose.js <sym>` | log last `1D` bar over time → `yields-history/close-probe/{sym}.csv` (task `CloseProbe`, 17:05+15min×1h) to pin when the 17:05 print posts |
+| `scripts/probeLock.js` | hourly overnight, log the last 5 daily (`6M`) bars **by date** vs live `1D` for US10YTIPS+US10Y → `yields-history/lock-probe/lock-probe.csv` (task `LockProbe`, 17:00 ET +1h×18h) to pin the **overnight revision time** — when a completed day's bar flips from live-tracked to the ~3PM benchmark (§8). Per-date keying survives the ~01:00 ET rollover and the feed's intermittent dropping of recent days (§5). |
+| `scripts/analyzeLock.js` | read `lock-probe.csv` and report, per completed day, the **lock time** (earliest run after which that day's bar value never changes) + a live→frozen timeline. Run after an overnight `LockProbe` collection. |
 | `scripts/compareDailyVsIntraday.js <sym>` | compare daily-feed close vs intraday 15:00/16:00/16:59/17:05 (Section 3) |
 
 ## 8. Open items
 
 - Confirm exact CNBC daily-close time (our 5D-grid match says ~3:00pm; Treasury is ~3:30pm; Tradeweb 3/4pm). Sub-bp distinction; the `close-probe`/archive can refine over time.
-- **Do not overwrite history yet** — decision recorded, implementation pending.
+- **Pin the overnight REVISION time** — `LockProbe` task runs hourly 2PM–8AM ET weekdays. Findings so far:
+  - **Benchmark snap: 14:59 ET** — confirmed across June 10, 11, 12 (3 consecutive days). Both US10YTIPS and US10Y locked to their finalized daily close value exactly at the 14:59 ET minute bar in the 1D intraday archive.
+  - **Two-bar phenomenon**: after ~17:00 ET the `6M` feed temporarily returns two bars for the just-closed date — benchmark (correct, first) + session-close ghost (second). Last-write-wins means session close overwrites if processed during this window.
+  - **Convergence**: the two-bar state collapses to a single (benchmark) bar at ~01:00 ET next morning (Mon–Thu) when the overnight session opens and a new current-day bar is created, displacing the ghost. **Friday: no convergence until Sunday ~18:30 ET market reopen.**
+  - **Safe update windows**: Mon–Thu closes → after ~01:30 ET next morning. Friday close → after Sunday ~19:00 ET.
+  - `updateYieldsHistory.js` runs at 5 PM ET (same day as the close), so today's bar is always skipped by the `>= todayET` guard — the two-bar window never affects it. The risk window only matters for ad-hoc runs during the post-close evening.
+- **1Y/2Y/3Y reread implemented** (`app.js` 2026-06-14). Reads provider `6M` live on page load; `history.json` retained for 10Y/ALL only. `history.json` refreshed through 6/12 same date.
 - Day-change `closeP` anchor (sidebar) currently uses `≤17:00` (picks ~16:59). Decide whether short-view day-change should reference 17:05 or the 3 PM basis, for consistency with whichever close the view adopts.

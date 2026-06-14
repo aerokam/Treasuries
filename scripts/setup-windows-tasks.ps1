@@ -178,17 +178,18 @@ Register-CmdTask "FidelityQuotes" `
     ) `
     "$ProjectDir\YieldCurves\scripts\run-fidelity.cmd"
 
-# LockProbe  -  Weekdays 2:00pm PT [ET: 5:00pm market close], hourly for 18h (overnight).
-# Temporary investigation: logs the 1D-intraday value vs the daily-feed "today" value (6M & 5Y
-# ranges) for US10YTIPS + US10Y each hour. While CNBC tracks live, delta ≈ 0; when CNBC locks
-# the settled close overnight, the daily value freezes and the delta jumps — pinning the lock
-# time. Retire once the lock window is known.
-$lockTrigger = New-ScheduledTaskTrigger -Weekly -DaysOfWeek $Weekdays -At "2:00pm"
+# LockProbe  -  Weekdays 11:00am PT [ET: 2:00pm], hourly for 18h (through overnight).
+# Temporary investigation (Close_Price_Investigation.md §8): each hour logs the last 7 daily
+# (6M-feed) bars by date for US10YTIPS + US10Y vs the live 1D value. The just-completed day's
+# bar tracks live until CNBC revises it to the ~3PM benchmark; the run where that date's value
+# snaps to the benchmark and stops moving pins the revision time. Starting at 2pm ET (before
+# the ~14:59 benchmark snap) ensures we catch the transition live, not just the aftermath.
+$lockTrigger = New-ScheduledTaskTrigger -Weekly -DaysOfWeek $Weekdays -At "11:00am"
 $lockTrigger.Repetition = (New-ScheduledTaskTrigger -Once -At "2:00pm" `
     -RepetitionInterval (New-TimeSpan -Hours 1) `
     -RepetitionDuration (New-TimeSpan -Hours 18)).Repetition
 Register-NodeTask "LockProbe" `
-    "Probe daily-vs-1D divergence hourly overnight to find when CNBC locks the settled close" `
+    "Track the just-completed day's daily bar hourly overnight to pin when CNBC revises it to the ~3PM benchmark" `
     @($lockTrigger) `
     "YieldsMonitor/scripts/probeLock.js"
 
