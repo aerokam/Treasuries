@@ -8,7 +8,7 @@ import { buildTipsMapFromYields, localDate, runRebalance, inferDARAFromCash, inf
 import { segmentRanges, constantMap, applySegmentMap } from '../src/segment-dara.js';
 import { runBuild } from '../src/build-lib.js';
 import { parseBrokerCSV } from '../src/broker-import.js';
-import { nextBondTradingDay, parseBondHolidays } from '../src/data.js';
+import { nextBondTradingDay, parseBondHolidays, lookupRefCpi } from '../src/data.js';
 
 // ── CSV helpers (match index.html exactly) ────────────────────────────────────
 function parseCsv(text) {
@@ -89,12 +89,6 @@ function parseHoldingsCSV(text, tipsMap) {
 // Keep old name as alias for callers that don't need tipsMap (Format 3 files only)
 function parseHoldings(text) { return parseHoldingsCSV(text, tipsMap); }
 
-function lookupRefCpi(refCpiRows, dateStr) {
-  const matches = refCpiRows.filter(r => r.date <= dateStr);
-  if (!matches.length) throw new Error(`No RefCPI on or before ${dateStr}`);
-  return matches[matches.length - 1].refCpi;
-}
-
 // ── Load shared data ──────────────────────────────────────────────────────────
 const yieldsPath = path.resolve('tests/e2e/YieldsFromFedInvestPrices.csv');
 const refCpiPath = path.resolve('tests/e2e/RefCPI.csv');
@@ -132,6 +126,14 @@ const settlementDate = localDate(settleDateStr);
 console.log(`[Test Setup] Settlement:    ${settleDateStr} (T+1 from today ${_todayISO})`);
 const tipsMap = buildTipsMapFromYields(yieldsRows);
 const refCPI = lookupRefCpi(refCpiRows, settleDateStr);
+if (refCPI == null) {
+  const last = refCpiRows.length ? refCpiRows[refCpiRows.length - 1].date : '(none)';
+  throw new Error(
+    `RefCPI fixture is stale: settlement ${settleDateStr} is beyond the last fixture date ${last}. ` +
+    `Refresh tests/e2e/RefCPI.csv from R2 (production keeps RefCPI through the last day of m+2). ` +
+    `Exact-date lookup intentionally returns null beyond range — there is no snap-back.`
+  );
+}
 
 // ── Test harness ──────────────────────────────────────────────────────────────
 let passed = 0, failed = 0;

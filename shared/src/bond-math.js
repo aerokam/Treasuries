@@ -7,7 +7,7 @@
 // Uses fractional first coupon period w = DSC/E to avoid the ±0.5y error
 // that ceil(months/6) produces for bonds mid-period.
 
-function _nextCouponOnOrAfter(settle, mature) {
+export function _nextCouponOnOrAfter(settle, mature) {
   const matMon  = mature.getMonth() + 1; // 1-indexed
   const cm1 = matMon <= 6 ? matMon : matMon - 6;
   const cm2 = cm1 + 6;

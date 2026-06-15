@@ -45,8 +45,8 @@
 - <a id="s1"></a>**S1: YieldsFromFedInvestPrices.csv** = `Settlement_Date + { @CUSIP + Type + Maturity + Coupon + DatedDateCPI + Price + Yield }`
   *Primary R2 key for daily FedInvest prices and yields. Legacy alias: `YieldsDerivedFromFedInvestPrices.csv`, `Yields.csv`.*
 - <a id="s2"></a>**S2: TipsRef.csv** = `{ @CUSIP + Maturity + DatedDate + Coupon + BaseCPI + Term }`
-- <a id="s3"></a>**S3: RefCPI.csv** = `{ @Date + Ref_CPI }`
-- <a id="s4"></a>**S4: RefCpiNsaSa.csv** = `{ @Date + CPI_NSA + CPI_SA + SA_Factor }`
+- <a id="s3"></a>**S3: RefCPI.csv** = `{ @Date + Ref_CPI }` *— authoritative retrieved NSA Ref CPI (TreasuryDirect). Consumed by all apps.*
+- <a id="s4"></a>**S4: RefCpiNsaSa.csv** = `{ @Date + CPI_NSA + CPI_SA + SA_Factor }` *— calculated (App. B daily interpolation), built for the SA pipeline: `CPI_NSA` and `CPI_SA` interpolated daily so `SA_Factor = CPI_NSA / CPI_SA`. The daily SA series has no official or retrieved equivalent — this is its **sole source**.*
 - <a id="s5"></a>**S5: Auctions.csv** = `{ @CUSIP + @Auction_Date + Security_Type + High_Yield + Bid_to_Cover + Primary_Dealer_Accepted + ... }`
 - <a id="s6"></a>**S6: YieldHistory** = `{ @Symbol + { [ Timestamp + Yield_Value ] } }`
 - <a id="s8"></a>**S8: CPI_history.csv** = `{ @Year + @Period + PeriodName + NSA + SA }`
@@ -159,9 +159,19 @@
 
 <a id="ref-cpi"></a>
 ### Ref CPI
-`Ref_CPI` = *Daily interpolated Consumer Price Index (CPI-U NSA) value used for TIPS calculations. Authority: 31 CFR § 356 Appendix B.*
+`Ref_CPI` = *Daily interpolated Consumer Price Index (CPI-U NSA) value used for TIPS calculations. Authority: 31 CFR § 356 Appendix B.* One value per **specific calendar day** (not "nearest" — see lookup rule below).
 - **Dated:** `Ref_CPI_dated` — Reference CPI on the TIPS Dated Date (constant for the bond's lifetime)
 - **Settle:** `Ref_CPI_settle` — Reference CPI on the Settlement Date
+
+**Two derivations — retrieved is authoritative, calculated is the fallback:**
+- **Retrieved (authoritative):** TreasuryDirect SecIndex ([E2](#e2)) → `RefCPI.csv` ([S3](#s3)). **All apps use this.**
+- **Calculated (NSA fallback + educational):** 31 CFR App. B interpolation of the monthly CPI-U NSA series ([E4](#e4)). For **NSA only**, this is a **fallback** used if retrieval is unavailable, and is retained for educational value. The retrieved and calculated NSA series **must agree** (verified by test).
+
+**Seasonally adjusted daily Ref CPI is a calculated construct — the *only* source, never a fallback.** BLS publishes **monthly** CPI-SA alongside CPI-NSA, but there is **no official daily SA Ref CPI**: App. B daily interpolation officially applies to **NSA only**, because NSA is what drives TIPS inflation accrual. The daily **SA Ref CPI** and **`SA_Factor`** (`RefCpiNsaSa.csv` [S4](#s4)) were devised here for seasonal yield comparison, so they are **necessarily calculated** and must always be produced. The App. B interpolation is defined once in `shared/src/ref-cpi.js` and applied to both series (NSA and SA); the math is shared, but SA production is never removed.
+
+**Lookup rule:** exact entry for the requested date; `null` if the date is **outside the published range** (before the series starts or past the last published day). The series carries one row per calendar day, so within range there is always an exact match — there is no "snap to an earlier date."
+
+**Single implementation:** all Ref CPI logic (retrieve-lookup, calc-fallback, index ratio) lives once in `shared/src/ref-cpi.js`; every app imports it. No per-app copies.
 
 <a id="index-ratio"></a>
 ### Index Ratio
@@ -282,5 +292,6 @@ L225: *When bracket or cover TIPS of a given maturity substitute for TIPS that h
 ## 5.0 Global Constants
 
 `LOWEST_LOWER_BRACKET_YEAR` = 2026
-`REFCPI_CUSIP` = "912828V98" *Reference CUSIP for CPI-U index tracking*
+`REFCPI_CUSIP` = "912810FD5" *(3.625% TIPS, issued 1998, matures 2028-04-15)* — CUSIP used to pull the authoritative daily Ref CPI from TreasuryDirect ([E2](#e2)).
+  **Selection principle (the rule, not the value):** Ref CPI is *market-wide* — identical across all TIPS on a given date — so the CUSIP only determines how far back history reaches. Use the **oldest TIPS not yet matured** to maximize available history. `912810FD5` fits today; **when it matures (2028-04-15), rotate to the next-oldest un-matured TIPS** and update `scripts/fetchRefCpi.js`. *(The stale value `912828V98` previously recorded here does not correspond to any TIPS.)*
 `SIFMA_HOLIDAYS` = *Calendar of bond market closures*

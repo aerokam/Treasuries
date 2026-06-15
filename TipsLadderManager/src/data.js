@@ -1,5 +1,9 @@
 // data.js -- CSV fetch and parse (4.0_Computation_Modules.md)
-// Exports: parseCsv, fetchTipsData
+// Exports: parseCsv, fetchTipsData, lookupRefCpi (re-exported from shared)
+
+// Ref CPI lookup is defined once in shared/src/ref-cpi.js (no-redundancy directive,
+// projects/CLAUDE.md §2a). Re-exported here so existing `from './data.js'` imports resolve.
+export { lookupRefCpi } from '../../shared/src/ref-cpi.js';
 
 const R2_ROOT = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev';
 const BASE_URL = R2_ROOT + '/Treasuries';
@@ -50,14 +54,6 @@ export function parseCsv(text) {
 // Fetches YieldsFromFedInvestPrices.csv and RefCPI.csv from R2, parses and types the rows.
 // Returns: { yieldsRows, refCpiRows }
 // Throws on HTTP errors.
-
-// Looks up the reference CPI for a given settlement date string (YYYY-MM-DD).
-// Returns the most recent refCpi on or before the date.
-export function lookupRefCpi(refCpiRows, dateStr) {
-  const matches = refCpiRows.filter(r => r.date <= dateStr);
-  if (matches.length === 0) throw new Error('No RefCPI data on or before ' + dateStr);
-  return matches[matches.length - 1].refCpi;
-}
 
 export async function fetchTipsData() {
   const [yieldsRes, refCpiRes, tipsRefRes] = await Promise.all([

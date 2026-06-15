@@ -143,7 +143,14 @@
   </div>
 </div>
 
-<script>
+<script type="module">
+// Ref CPI logic is imported from the single shared home (no-redundancy directive,
+// projects/CLAUDE.md §2a) — never copied inline. lookupRefCpi is exact-date match
+// (null beyond the published range; no snap-back).
+import { lookupRefCpi, indexRatio } from '../shared/src/ref-cpi.js';
+// Duration + coupon-date helpers from the single shared bond-math home (no inline copies).
+import { calculateDuration, _nextCouponOnOrAfter } from '../shared/src/bond-math.js';
+
 const R2_ROOT = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev';
 const BASE_URL = R2_ROOT + '/Treasuries';
 const TIPS_URL = R2_ROOT + '/TIPS';
@@ -191,65 +198,6 @@ var COLS = [
 ];
 
 // Duration helpers — inline copy of shared/src/bond-math.js (must stay in sync)
-function _addSemiannualPeriods(date, n, matureDay) {
-  var d = new Date(date);
-  d.setDate(1);
-  d.setMonth(d.getMonth() + n * 6);
-  var lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
-  d.setDate(Math.min(matureDay, lastDay));
-  return d;
-}
-
-function _nextCouponOnOrAfter(settle, mature) {
-  var matMon = mature.getMonth() + 1;
-  var cm1 = matMon <= 6 ? matMon : matMon - 6;
-  var cm2 = cm1 + 6;
-  var mDay = mature.getDate();
-  var candidates = [];
-  for (var y = settle.getFullYear() - 1; y <= settle.getFullYear() + 1; y++) {
-    [cm1, cm2].forEach(function(mon) {
-      var lastDay = new Date(y, mon, 0).getDate();
-      candidates.push(new Date(y, mon - 1, Math.min(mDay, lastDay)));
-    });
-  }
-  candidates.sort(function(a, b) { return a - b; });
-  for (var i = 0; i < candidates.length; i++) {
-    if (candidates[i] >= settle && candidates[i] <= mature) return candidates[i];
-  }
-  return null;
-}
-
-function calculateDuration(settlement, maturity, coupon, yld) {
-  if (settlement >= maturity || yld <= -2) return null;
-  var nextCpn = _nextCouponOnOrAfter(settlement, maturity);
-  if (!nextCpn) return null;
-  var mDay = maturity.getDate();
-  var lastCpn = _addSemiannualPeriods(nextCpn, -1, mDay);
-  var days = function(a, b) { return (b - a) / 86400000; };
-  var E   = days(lastCpn, nextCpn);
-  var DSC = days(settlement, nextCpn);
-  var w   = DSC / E;
-  var coupons = [];
-  for (var k = 0; ; k++) {
-    var d = _addSemiannualPeriods(nextCpn, k, mDay);
-    if (d > maturity) break;
-    coupons.push(d);
-  }
-  var N = coupons.length;
-  if (N === 0) return null;
-  var semiCpn = coupon / 2 * 1000;
-  var r = yld / 2;
-  var wSum = 0, pvSum = 0;
-  for (var j = 0; j < N; j++) {
-    var cf = j === N - 1 ? semiCpn + 1000 : semiCpn;
-    var t  = w + j;
-    var pv = cf / Math.pow(1 + r, t);
-    wSum  += t * pv;
-    pvSum += pv;
-  }
-  return wSum / pvSum / 2;
-}
-
 // Observed US Treasury market closure dates (bond market holidays)
 var BOND_HOLIDAYS = new Set([
   '2025-01-01','2025-01-20','2025-02-17','2025-04-18','2025-05-26',
@@ -284,17 +232,6 @@ function parseCsv(text) {
   });
 }
 
-function lookupRefCpi(refCpiRows, dateStr) {
-  // RefCPI.csv contains pre-computed daily entries published forward in time.
-  // Snap to most recent on or before dateStr — but return null if dateStr is
-  // beyond the last published entry (value not yet known, e.g. future coupon).
-  if (!refCpiRows.length) return null;
-  if (dateStr > refCpiRows[refCpiRows.length - 1].date) return null;
-  var matches = refCpiRows.filter(function(r) { return r.date <= dateStr; });
-  if (!matches.length) return null;
-  return matches[matches.length - 1].refCpi;
-}
-
 function fmtDate(isoStr) {
   if (!isoStr) return '';
   var parts = isoStr.split('-');
@@ -308,7 +245,7 @@ function recomputeWithRefCpi(dateStr) {
   var _rp = dateStr.split('-');
   var refDate = new Date(+_rp[0], +_rp[1] - 1, +_rp[2]); // local midnight, matches _nextCouponOnOrAfter candidates
   allRows.forEach(function(r) {
-    r.indexRatio = (r.baseCpi && cpi) ? cpi / r.baseCpi : null;
+    r.indexRatio = indexRatio(cpi, r.baseCpi);
     r.adjPrice = (r.indexRatio != null && r.price != null) ? r.price * r.indexRatio : null;
     var matDate = r.maturity ? new Date(r.maturity + 'T12:00:00Z') : null;
     if (matDate && matDate > refDate) {

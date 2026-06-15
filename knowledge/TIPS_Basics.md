@@ -39,6 +39,8 @@ For days 2-31:
                        (day - 1) / daysInMonth
 ```
 
+> **Two derivations, one authority.** The daily Ref CPI is obtained two ways that must agree: **retrieved** from TreasuryDirect (`RefCPI.csv`) is **authoritative** and used by all apps; **calculated** via the interpolation above is retained for educational value and as a **fallback** if retrieval fails. Both are implemented once in `shared/src/ref-cpi.js`. See [DATA_DICTIONARY.md#ref-cpi](./DATA_DICTIONARY.md#ref-cpi).
+
 **Dated Date:** 15th of the month in which TIPS was issued.
 
 **Ref CPI on Dated Date:** Reference CPI on the dated date (constant for bond lifetime).
