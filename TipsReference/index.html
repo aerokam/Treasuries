@@ -15,6 +15,7 @@
   .meta-item { display: flex; flex-direction: column; }
   .meta-label { font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--tab-inactive-text); opacity: 0.7; }
   .meta-val { font-size: 12px; font-weight: 700; color: var(--portal-card-text); font-variant-numeric: tabular-nums; }
+  .meta-date-input { font-size: 12px; font-weight: 700; color: var(--portal-card-text); font-variant-numeric: tabular-nums; background: transparent; border: none; border-bottom: 1px solid var(--border-light, #e2e8f0); padding: 0; outline: none; cursor: pointer; width: 108px; }
   #status { font-size: 11px; color: var(--tab-inactive-text); font-style: italic; margin-left: auto; }
   #status.error { color: #f87171; font-style: normal; font-weight: 600; }
   .btn { padding: 4px 10px; font-size: 11px; }
@@ -68,6 +69,26 @@
   .filter-input:focus { border-color: #1a56db; }
   .filter-input.active { border-color: #f59e0b; background: #fffbeb; }
 
+  /* ── Clickable coupon cells ── */
+  td.cpn-clickable { cursor: pointer; color: #1a56db; }
+  td.cpn-clickable:hover { background: #eff6ff !important; text-decoration: underline; }
+
+  /* ── Coupon calc modal ── */
+  #cpn-modal { display: none; position: fixed; inset: 0; z-index: 200; align-items: center; justify-content: center; }
+  #cpn-modal.open { display: flex; }
+  #cpn-modal-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.35); }
+  #cpn-modal-card { position: relative; background: #fff; border-radius: 6px; padding: 20px 22px 18px; min-width: 340px; max-width: 420px; box-shadow: 0 8px 32px rgba(0,0,0,0.18); z-index: 1; }
+  #cpn-modal-title { font-size: 13px; font-weight: 700; color: var(--portal-text-main); margin-bottom: 14px; padding-right: 24px; }
+  #cpn-modal-close { position: absolute; top: 10px; right: 12px; background: none; border: none; font-size: 18px; line-height: 1; cursor: pointer; color: var(--tab-inactive-text); padding: 2px 6px; }
+  #cpn-modal-close:hover { color: var(--portal-text-main); }
+  .cmt { border-collapse: collapse; width: 100%; font-size: 12px; }
+  .cmt .cml { font-weight: 600; color: var(--portal-text-main, #1e293b); padding: 3px 14px 3px 0; white-space: nowrap; vertical-align: top; }
+  .cmt .cmv { text-align: right; font-variant-numeric: tabular-nums; padding: 3px 0; }
+  .cmt .cms td { padding-top: 2px; border-top: 1px solid #f1f5f9; height: 6px; }
+  .cmt .cmf td { padding-top: 4px; font-size: 11px; color: var(--portal-text-main, #1e293b); }
+  .cmt .cmr .cml { font-size: 13px; font-weight: 700; color: var(--portal-text-main); }
+  .cmt .cmr .cmv { font-size: 13px; font-weight: 700; color: var(--portal-text-main); }
+
   /* Body rows */
   tbody td { padding: 4px 8px; border-bottom: 1px solid #f1f5f9; font-variant-numeric: tabular-nums; white-space: nowrap; background: #fff; }
   tbody td.right { text-align: right; }
@@ -89,8 +110,12 @@
       <span class="meta-val" id="meta-sett-date">—</span>
     </div>
     <div class="meta-item">
-      <span class="meta-label">Settlement Ref CPI</span>
-      <span class="meta-val" id="meta-sett-cpi">—</span>
+      <span class="meta-label">Ref CPI Date</span>
+      <input type="date" id="ref-cpi-date-input" class="meta-val meta-date-input">
+    </div>
+    <div class="meta-item">
+      <span class="meta-label">Ref CPI</span>
+      <span class="meta-val" id="meta-ref-cpi">—</span>
     </div>
   </div>
   <span id="status" style="margin-left:auto;">Loading…</span>
@@ -109,14 +134,26 @@
   </table>
 </div>
 
+<div id="cpn-modal">
+  <div id="cpn-modal-overlay"></div>
+  <div id="cpn-modal-card">
+    <button id="cpn-modal-close">&times;</button>
+    <div id="cpn-modal-title"></div>
+    <div id="cpn-modal-body"></div>
+  </div>
+</div>
+
 <script>
 const R2_ROOT = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev';
 const BASE_URL = R2_ROOT + '/Treasuries';
 const TIPS_URL = R2_ROOT + '/TIPS';
 
 var allRows = [];
+var refCpiRows = [];
+var lastRenderedRows = [];
 var priceDateStr = '';
 var settlementDateStr = '';
+var refCpiDateStr = '';
 var sortCol = 'maturity';
 var sortDir = 'asc';
 var filters = {};
@@ -146,6 +183,11 @@ var COLS = [
     fmt: function(v) { return v != null ? v.toFixed(2) : '—'; } },
   { key: 'modDuration', label: 'Mod Duration',        align: 'right', sortType: 'num',
     fmt: function(v) { return v != null ? v.toFixed(2) : '—'; } },
+  { key: 'nextCoupon',  label: 'Cpn Date',             align: 'left',  sortType: 'str',
+    title: 'Coupon payment date on or after the selected Ref CPI Date',
+    fmt: function(v) { return v != null ? fmtDate(v) : '—'; } },
+  { key: 'cpnPayment',  label: 'Cpn $ / Bond',        align: 'right', sortType: 'num', wrapHeader: true,
+    fmt: function(v) { return v != null ? v.toFixed(4) : '—'; } },
 ];
 
 // Duration helpers — inline copy of shared/src/bond-math.js (must stay in sync)
@@ -243,6 +285,11 @@ function parseCsv(text) {
 }
 
 function lookupRefCpi(refCpiRows, dateStr) {
+  // RefCPI.csv contains pre-computed daily entries published forward in time.
+  // Snap to most recent on or before dateStr — but return null if dateStr is
+  // beyond the last published entry (value not yet known, e.g. future coupon).
+  if (!refCpiRows.length) return null;
+  if (dateStr > refCpiRows[refCpiRows.length - 1].date) return null;
   var matches = refCpiRows.filter(function(r) { return r.date <= dateStr; });
   if (!matches.length) return null;
   return matches[matches.length - 1].refCpi;
@@ -253,6 +300,39 @@ function fmtDate(isoStr) {
   var parts = isoStr.split('-');
   if (parts.length !== 3) return isoStr;
   return parts[1] + '/' + parts[2] + '/' + parts[0];
+}
+
+function recomputeWithRefCpi(dateStr) {
+  refCpiDateStr = dateStr;
+  var cpi = lookupRefCpi(refCpiRows, dateStr);
+  var _rp = dateStr.split('-');
+  var refDate = new Date(+_rp[0], +_rp[1] - 1, +_rp[2]); // local midnight, matches _nextCouponOnOrAfter candidates
+  allRows.forEach(function(r) {
+    r.indexRatio = (r.baseCpi && cpi) ? cpi / r.baseCpi : null;
+    r.adjPrice = (r.indexRatio != null && r.price != null) ? r.price * r.indexRatio : null;
+    var matDate = r.maturity ? new Date(r.maturity + 'T12:00:00Z') : null;
+    if (matDate && matDate > refDate) {
+      var nextCpn = _nextCouponOnOrAfter(refDate, matDate);
+      if (nextCpn) {
+        var y = nextCpn.getFullYear();
+        var m = nextCpn.getMonth() + 1 < 10 ? '0' + (nextCpn.getMonth() + 1) : String(nextCpn.getMonth() + 1);
+        var d = nextCpn.getDate() < 10 ? '0' + nextCpn.getDate() : String(nextCpn.getDate());
+        r.nextCoupon = y + '-' + m + '-' + d;
+        r.cpnRefCpi = lookupRefCpi(refCpiRows, r.nextCoupon);
+        r.cpnPayment = (r.cpnRefCpi != null && r.baseCpi && r.coupon != null)
+          ? (r.coupon / 2) * (r.cpnRefCpi / r.baseCpi) * 1000
+          : null;
+      } else {
+        r.nextCoupon = null;
+        r.cpnRefCpi = null; r.cpnPayment = null;
+      }
+    } else {
+      r.nextCoupon = null;
+      r.cpnRefCpi = null; r.cpnPayment = null;
+    }
+  });
+  document.getElementById('meta-ref-cpi').textContent = cpi != null ? cpi.toFixed(5) : '—';
+  renderTable();
 }
 
 function cellDisplay(row, col) {
@@ -285,6 +365,39 @@ function getFilteredSorted() {
   return rows;
 }
 
+function showCpnModal(row) {
+  function r2(label, val) { return '<tr><td class="cml">' + label + '</td><td class="cmv">' + val + '</td></tr>'; }
+  function sep() { return '<tr class="cms"><td colspan="2"></td></tr>'; }
+
+  var ir = (row.cpnRefCpi != null && row.baseCpi) ? row.cpnRefCpi / row.baseCpi : null;
+  var semiRate = row.coupon != null ? row.coupon / 2 : null;
+
+  var formulaVars = 'Index Ratio &times; (Coupon Rate / 2) &times; $1,000';
+  var formulaNums = (ir != null && semiRate != null)
+    ? ir.toFixed(5) + ' &times; ' + (semiRate * 100).toFixed(4) + '% &times; $1,000'
+    : '—';
+
+  var html = '<table class="cmt">' +
+    r2('CUSIP', row.cusip || '—') +
+    r2('Coupon Date', row.nextCoupon ? fmtDate(row.nextCoupon) : '—') +
+    sep() +
+    r2('Coupon Rate', row.coupon != null ? (row.coupon * 100).toFixed(3) + '%' : '—') +
+    r2('Semi-Annual Rate', semiRate != null ? (semiRate * 100).toFixed(4) + '%' : '—') +
+    sep() +
+    r2('Index Ratio', ir != null ? ir.toFixed(5) : '—') +
+    sep() +
+    '<tr class="cmf"><td colspan="2">' + formulaVars + '</td></tr>' +
+    '<tr class="cmf"><td colspan="2">= ' + formulaNums + '</td></tr>' +
+    '<tr class="cmr"><td class="cml">Coupon Payment</td><td class="cmv">' +
+      (row.cpnPayment != null ? '$' + row.cpnPayment.toFixed(4) + ' per bond' : '—') +
+    '</td></tr>' +
+    '</table>';
+
+  document.getElementById('cpn-modal-title').textContent = 'Coupon Calculation';
+  document.getElementById('cpn-modal-body').innerHTML = html;
+  document.getElementById('cpn-modal').classList.add('open');
+}
+
 function buildHeader() {
   var headerRow = document.getElementById('header-row');
   var filterRow = document.getElementById('filter-row');
@@ -296,6 +409,7 @@ function buildHeader() {
     th.textContent = col.label;
     if (col.align === 'left') th.classList.add('left');
     if (col.wrapHeader) th.classList.add('wrap-header');
+    if (col.title) th.title = col.title;
     if (sortCol === col.key) th.classList.add(sortDir === 'asc' ? 'sort-asc' : 'sort-desc');
     th.addEventListener('click', function() {
       if (sortCol === col.key) {
@@ -338,15 +452,17 @@ function buildHeader() {
 
 function renderTable() {
   var rows = getFilteredSorted();
+  lastRenderedRows = rows;
   var tbody = document.getElementById('main-tbody');
   var rc = document.getElementById('row-count');
 
   var html = '';
-  rows.forEach(function(r) {
-    html += '<tr>';
+  rows.forEach(function(r, i) {
+    html += '<tr data-idx="' + i + '">';
     COLS.forEach(function(col) {
-      var cls = col.align === 'right' ? ' class="right"' : '';
-      html += '<td' + cls + '>' + cellDisplay(r, col) + '</td>';
+      var cls = col.align === 'right' ? 'right' : '';
+      if (col.key === 'cpnPayment' && r.cpnPayment != null) cls += (cls ? ' ' : '') + 'cpn-clickable';
+      html += '<td' + (cls ? ' class="' + cls + '"' : '') + '>' + cellDisplay(r, col) + '</td>';
     });
     html += '</tr>';
   });
@@ -384,7 +500,7 @@ async function loadData() {
         };
       });
 
-    var refCpiRows = parseCsv(await responses[1].text()).map(function(r) {
+    refCpiRows = parseCsv(await responses[1].text()).map(function(r) {
       return { date: r.date, refCpi: parseFloat(r.refCpi) };
     });
 
@@ -394,15 +510,11 @@ async function loadData() {
     var tipsRefMap = {};
     tipsRefRows.forEach(function(r) { tipsRefMap[r.cusip] = r; });
 
-    var settlementRefCpi = lookupRefCpi(refCpiRows, settlementDateStr);
-
     var settlDate = new Date(settlementDateStr + 'T12:00:00Z');
 
     allRows = yieldsRows.map(function(r) {
       var ref = tipsRefMap[r.cusip];
       var baseCpi = ref ? ref.baseCpi : null;
-      var indexRatio = (baseCpi && settlementRefCpi) ? settlementRefCpi / baseCpi : null;
-      var adjPrice = (indexRatio != null && r.price != null) ? r.price * indexRatio : null;
       var matDate = r.maturity ? new Date(r.maturity + 'T12:00:00Z') : null;
       var term = (matDate && matDate > settlDate) ? (matDate - settlDate) / (365.25 * 86400000) : null;
       var macDur = (matDate && r.coupon != null && r.yield != null && !isNaN(r.yield))
@@ -415,24 +527,35 @@ async function loadData() {
         datedDate:   ref ? ref.datedDate : '',
         baseCpi:     baseCpi,
         price:       r.price,
-        indexRatio:  indexRatio,
-        adjPrice:    adjPrice,
+        indexRatio:  null,
+        adjPrice:    null,
         yield:       r.yield,
         term:        term,
         macDuration: macDur,
         modDuration: modDur,
+        nextCoupon:  null,
+        cpnPayment:  null,
       };
     });
 
     document.getElementById('meta-price-date').textContent = fmtDate(priceDateStr);
     document.getElementById('meta-sett-date').textContent = fmtDate(settlementDateStr);
-    document.getElementById('meta-sett-cpi').textContent = settlementRefCpi != null ? settlementRefCpi.toFixed(5) : '—';
     document.getElementById('header-meta').style.display = 'flex';
     statusEl.textContent = '';
     document.getElementById('export-btn').disabled = false;
 
+    var dateInput = document.getElementById('ref-cpi-date-input');
+    if (refCpiRows.length) {
+      dateInput.min = refCpiRows[0].date;
+      dateInput.max = refCpiRows[refCpiRows.length - 1].date;
+    }
+    dateInput.value = settlementDateStr;
+    dateInput.addEventListener('change', function() {
+      if (this.value) recomputeWithRefCpi(this.value);
+    });
+
     buildHeader();
-    renderTable();
+    recomputeWithRefCpi(settlementDateStr);
   } catch (err) {
     statusEl.textContent = err.message;
     statusEl.classList.add('error');
@@ -455,6 +578,22 @@ document.getElementById('export-btn').addEventListener('click', function() {
   a.download = 'tips-reference' + (settlementDateStr ? '-' + settlementDateStr : '') + '.csv';
   a.click();
   URL.revokeObjectURL(a.href);
+});
+
+document.getElementById('main-tbody').addEventListener('click', function(e) {
+  var td = e.target.closest('td.cpn-clickable');
+  if (!td) return;
+  var idx = parseInt(td.closest('tr').getAttribute('data-idx'), 10);
+  if (!isNaN(idx) && lastRenderedRows[idx]) showCpnModal(lastRenderedRows[idx]);
+});
+document.getElementById('cpn-modal-close').addEventListener('click', function() {
+  document.getElementById('cpn-modal').classList.remove('open');
+});
+document.getElementById('cpn-modal-overlay').addEventListener('click', function() {
+  document.getElementById('cpn-modal').classList.remove('open');
+});
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') document.getElementById('cpn-modal').classList.remove('open');
 });
 
 loadData();
