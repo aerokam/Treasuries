@@ -71,11 +71,11 @@ async function getXBounds(page) {
   });
 }
 
-// Trigger a range change via the hidden date-picker input (most reliable path).
+// Trigger a range change via the native date-picker input (most reliable path).
 // isoDate: 'YYYY-MM-DD'
 async function setRangeEnd(page, isoDate) {
   await page.evaluate((iso) => {
-    const cal = document.getElementById('endMaturityCal');
+    const cal = document.getElementById('endMaturity');
     cal.value = iso;
     cal.dispatchEvent(new Event('change', { bubbles: true }));
   }, isoDate);
@@ -84,7 +84,7 @@ async function setRangeEnd(page, isoDate) {
 
 async function setRangeStart(page, isoDate) {
   await page.evaluate((iso) => {
-    const cal = document.getElementById('startMaturityCal');
+    const cal = document.getElementById('startMaturity');
     cal.value = iso;
     cal.dispatchEvent(new Event('change', { bubbles: true }));
   }, isoDate);

@@ -2489,9 +2489,8 @@ function _showRefCpiPicker(anchor) {
   const picker = document.getElementById('refcpi-picker');
   const input = document.getElementById('refcpi-date-input');
   picker.style.display = 'block';
-  input.value = _fmtMDY(activeRefCpiDateStr ?? _defaultRefCpiDateStr);
+  input.value = activeRefCpiDateStr ?? _defaultRefCpiDateStr; // native date wants ISO
   input.focus();
-  input.select();
   
   const ar = anchor.getBoundingClientRect();
   picker.style.left = ar.left + 'px';
@@ -2518,31 +2517,10 @@ document.getElementById('refcpi-date-input').addEventListener('keydown', e => {
   if (e.key === 'Enter') { e.stopPropagation(); document.getElementById('refcpi-apply-btn').click(); }
 });
 
-document.getElementById('refcpi-date-input').addEventListener('input', e => {
-  const input = e.target;
-  const raw = input.value;
-  const pos = input.selectionStart;
-  const digits = raw.replace(/\D/g, '').slice(0, 8);
-  let formatted = digits.slice(0, 2);
-  if (digits.length > 2) formatted += '/' + digits.slice(2, 4);
-  if (digits.length > 4) formatted += '/' + digits.slice(4, 8);
-  if (formatted === raw) return;
-  const digitsBeforeCursor = raw.slice(0, pos).replace(/\D/g, '').length;
-  input.value = formatted;
-  let newPos = 0, dc = 0;
-  for (let i = 0; i < formatted.length; i++) {
-    if (formatted[i] !== '/') { dc++; if (dc === digitsBeforeCursor) { newPos = i + 1; break; } }
-  }
-  if (dc < digitsBeforeCursor) newPos = formatted.length;
-  if (newPos < formatted.length && formatted[newPos] === '/') newPos++;
-  input.setSelectionRange(newPos, newPos);
-});
-
 document.getElementById('refcpi-apply-btn').addEventListener('click', () => {
-  const v = document.getElementById('refcpi-date-input').value;
-  const [m,d,y] = v.split('/');
-  if (m && d && y) {
-    activeRefCpiDateStr = `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`;
+  const v = document.getElementById('refcpi-date-input').value; // native date → ISO YYYY-MM-DD
+  if (v) {
+    activeRefCpiDateStr = v;
     _clearOutput();
     _buildRows();
     document.getElementById('refcpi-picker').style.display = 'none';
@@ -2566,9 +2544,7 @@ loadData();
   </div>
   <div style="padding:10px 14px;">
     <div style="font-size:11px;color:#64748b;margin-bottom:8px;line-height:1.4">Default is T+1 of the FedInvest price date (settlement date). Change to a past date (e.g., purchase date) to measure inflation-adjusted values relative to that point. Affects ladder calculations.</div>
-    <input type="text" id="refcpi-date-input" placeholder="MM/DD/YYYY" maxlength="10"
-      style="width:100%;padding:4px 6px;border:1px solid #ccc;border-radius:4px;font-size:13px;font-variant-numeric:tabular-nums;box-sizing:border-box;">
-    <div id="refcpi-date-preview" style="margin-top:6px;font-size:12px;color:#555;min-height:16px;"></div>
+    <input type="date" id="refcpi-date-input" class="date-picker" style="width:100%;font-size:13px;">
     <div style="margin-top:8px;display:flex;justify-content:space-between;align-items:center;">
       <button id="refcpi-reset-btn" style="background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;font-size:12px;padding:4px 10px;">Use settlement date</button>
       <button id="refcpi-apply-btn">Apply</button>

@@ -15,7 +15,8 @@
   .meta-item { display: flex; flex-direction: column; }
   .meta-label { font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--tab-inactive-text); opacity: 0.7; }
   .meta-val { font-size: 12px; font-weight: 700; color: var(--portal-card-text); font-variant-numeric: tabular-nums; }
-  .meta-date-input { font-size: 12px; font-weight: 700; color: var(--portal-card-text); font-variant-numeric: tabular-nums; background: transparent; border: none; border-bottom: 1px solid var(--border-light, #e2e8f0); padding: 0; outline: none; cursor: pointer; width: 108px; }
+  /* Look comes from shared .date-picker.flush (portal-theme.css); only width is app-specific. */
+  #ref-cpi-date-input { width: 108px; }
   #status { font-size: 11px; color: var(--tab-inactive-text); font-style: italic; margin-left: auto; }
   #status.error { color: #f87171; font-style: normal; font-weight: 600; }
   .btn { padding: 4px 10px; font-size: 11px; }
@@ -111,7 +112,7 @@
     </div>
     <div class="meta-item">
       <span class="meta-label">Ref CPI Date</span>
-      <input type="date" id="ref-cpi-date-input" class="meta-val meta-date-input">
+      <input type="date" id="ref-cpi-date-input" class="meta-val date-picker flush">
     </div>
     <div class="meta-item">
       <span class="meta-label">Ref CPI</span>
@@ -150,6 +151,8 @@
 import { lookupRefCpi, indexRatio } from '../shared/src/ref-cpi.js';
 // Duration + coupon-date helpers from the single shared bond-math home (no inline copies).
 import { calculateDuration, _nextCouponOnOrAfter } from '../shared/src/bond-math.js';
+// Shared date picker (the canonical native type=date; projects/CLAUDE.md §2a).
+import { initDatePicker } from '../shared/src/date-picker.js';
 
 const R2_ROOT = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev';
 const BASE_URL = R2_ROOT + '/Treasuries';
@@ -481,14 +484,11 @@ async function loadData() {
     statusEl.textContent = '';
     document.getElementById('export-btn').disabled = false;
 
-    var dateInput = document.getElementById('ref-cpi-date-input');
-    if (refCpiRows.length) {
-      dateInput.min = refCpiRows[0].date;
-      dateInput.max = refCpiRows[refCpiRows.length - 1].date;
-    }
-    dateInput.value = settlementDateStr;
-    dateInput.addEventListener('change', function() {
-      if (this.value) recomputeWithRefCpi(this.value);
+    initDatePicker(document.getElementById('ref-cpi-date-input'), {
+      value: settlementDateStr,
+      min: refCpiRows.length ? refCpiRows[0].date : undefined,
+      max: refCpiRows.length ? refCpiRows[refCpiRows.length - 1].date : undefined,
+      onChange: recomputeWithRefCpi,
     });
 
     buildHeader();

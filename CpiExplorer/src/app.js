@@ -5,6 +5,7 @@ import { fetchCpiHistory, fetchRefCpi } from './data.js';
 import { isoDate, filterRows, calcIndex, calcYoY, calcMoM, calcRolling, calcP2P, calcStats } from './calc.js';
 import { createChart, updateChart, resetZoom, getChart } from './chart.js';
 import { handleChartKeydown } from '../../shared/src/chart-keys.js';
+import { initDatePicker } from '../../shared/src/date-picker.js';
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
@@ -60,55 +61,24 @@ function combinedExtent() {
   return { min, max };
 }
 
-function dateToMonth(d) {
-  if (!d) return '';
-  const y = d.getFullYear();
-  const m = d.getMonth() + 1;
-  return { year: y, month: m };
-}
-
+// Date UI uses the shared native date picker; one input per prefix: `${prefix}Date`.
 function updateDateUI(prefix, d) {
   if (!d) return;
-  const { year, month } = dateToMonth(d);
-  const mEl = document.getElementById(`${prefix}Month`);
-  const yEl = document.getElementById(`${prefix}Year`);
-  if (mEl) mEl.value = month;
-  if (yEl) yEl.value = year;
+  const el = document.getElementById(`${prefix}Date`);
+  if (el) el.value = isoDate(d);
 }
 
 function getValuesFromUI(prefix) {
-  const m = parseInt(document.getElementById(`${prefix}Month`).value, 10);
-  const yStr = document.getElementById(`${prefix}Year`).value;
-  if (!/^\d{4}$/.test(yStr)) return null;
-  const y = parseInt(yStr, 10);
-  return new Date(y, m - 1, 1);
+  const v = document.getElementById(`${prefix}Date`).value; // ISO YYYY-MM-DD
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return null;
+  const [y, m, day] = v.split('-').map(Number);
+  return new Date(y, m - 1, day);
 }
 
-function populateDateSelectors() {
-  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  const monthOptions = months.map((m, i) => `<option value="${i+1}">${m}</option>`).join('');
-  
-  ['start', 'end', 'p2pStart', 'p2pEnd'].forEach(id => {
-    const el = document.getElementById(`${id}Month`);
-    if (el) el.innerHTML = monthOptions;
-  });
-
-  const yearList = document.getElementById('yearList');
-  if (yearList) {
-    let years = '';
-    const currentYear = new Date().getFullYear();
-    for (let y = currentYear; y >= 1913; y--) {
-      years += `<option value="${y}">`;
-    }
-    yearList.innerHTML = years;
-  }
-
-  // Overwrite behavior: select on focus + digit-only filtering
-  document.querySelectorAll('.year-input').forEach(el => {
-    el.addEventListener('focus', () => el.select());
-    el.addEventListener('input', () => {
-      el.value = el.value.replace(/\D/g, '');
-    });
+function initDatePickers() {
+  ['start', 'end', 'p2pStart', 'p2pEnd'].forEach(prefix => {
+    const el = document.getElementById(`${prefix}Date`);
+    if (el) initDatePicker(el);
   });
 }
 
@@ -238,6 +208,12 @@ function renderStats(labels, values) {
 function applySourceExtentToInputs() {
   const { min, max } = combinedExtent();
   if (!min || !max) return;
+  // Bound all pickers to the available data range.
+  const minIso = isoDate(min), maxIso = isoDate(max);
+  ['start', 'end', 'p2pStart', 'p2pEnd'].forEach(prefix => {
+    const el = document.getElementById(`${prefix}Date`);
+    if (el) { el.min = minIso; el.max = maxIso; }
+  });
   state.startDate = min;
   state.endDate   = max;
   updateDateUI('start', min);
@@ -287,7 +263,7 @@ async function init() {
   }
 
   setDataStatus();
-  populateDateSelectors();
+  initDatePickers();
   applySourceExtentToInputs();
   updateSectionVisibility();
   render();
@@ -355,17 +331,13 @@ function wireControls() {
   });
 
   // Date range
-  ['startMonth', 'startYear'].forEach(id => {
-    document.getElementById(id).addEventListener('input', () => {
-      const d = getValuesFromUI('start');
-      if (d) { state.startDate = d; render(); }
-    });
+  document.getElementById('startDate').addEventListener('change', () => {
+    const d = getValuesFromUI('start');
+    if (d) { state.startDate = d; render(); }
   });
-  ['endMonth', 'endYear'].forEach(id => {
-    document.getElementById(id).addEventListener('input', () => {
-      const d = getValuesFromUI('end');
-      if (d) { state.endDate = d; render(); }
-    });
+  document.getElementById('endDate').addEventListener('change', () => {
+    const d = getValuesFromUI('end');
+    if (d) { state.endDate = d; render(); }
   });
   document.getElementById('btnFullHistory').addEventListener('click', () => {
     applySourceExtentToInputs();
@@ -374,17 +346,13 @@ function wireControls() {
   });
 
   // P2P date inputs
-  ['p2pStartMonth', 'p2pStartYear'].forEach(id => {
-    document.getElementById(id).addEventListener('input', () => {
-      const d = getValuesFromUI('p2pStart');
-      if (d) { state.p2pStart = d; render(); }
-    });
+  document.getElementById('p2pStartDate').addEventListener('change', () => {
+    const d = getValuesFromUI('p2pStart');
+    if (d) { state.p2pStart = d; render(); }
   });
-  ['p2pEndMonth', 'p2pEndYear'].forEach(id => {
-    document.getElementById(id).addEventListener('input', () => {
-      const d = getValuesFromUI('p2pEnd');
-      if (d) { state.p2pEnd = d; render(); }
-    });
+  document.getElementById('p2pEndDate').addEventListener('change', () => {
+    const d = getValuesFromUI('p2pEnd');
+    if (d) { state.p2pEnd = d; render(); }
   });
 
   // Reset Zoom button

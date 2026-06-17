@@ -1,6 +1,7 @@
 ﻿// Yield Curves — Frontend Logic
 import { yieldFromPrice } from '../../shared/src/bond-math.js';
 import { handleChartKeydown, setupAxisWheelZoom, snapYBounds, snapYAfterZoom } from '../../shared/src/chart-keys.js';
+import { initDatePicker } from '../../shared/src/date-picker.js';
 
 console.log("YieldCurves app.js loading...");
 
@@ -155,30 +156,12 @@ function fmtBrokerTime(s) {
   const [m, d] = datePart.split('/');
   return `${m}/${d} ${rest.join(' ')}`;
 }
-// Parse MM/DD/YYYY text input → Date (or null if incomplete/invalid)
-function parseDateInput(s) {
-  const digits = (s || '').replace(/\D/g, '');
-  if (digits.length !== 8) return null;
-  const dt = new Date(+digits.slice(4), +digits.slice(0, 2) - 1, +digits.slice(2, 4));
+// Parse a native date input's ISO value (YYYY-MM-DD) → Date (or null if empty/invalid)
+function parseIsoInput(iso) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso || '')) return null;
+  const [y, m, d] = iso.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
   return isNaN(dt) ? null : dt;
-}
-// Wire up auto-slash formatting + calendar sync for a text/date input pair
-function setupDateInput(textEl, calEl, onChange) {
-  textEl.addEventListener('input', () => {
-    const raw = textEl.value;
-    const digits = raw.replace(/\D/g, '').slice(0, 8);
-    let fmt = digits;
-    if (digits.length >= 3) fmt = digits.slice(0, 2) + '/' + digits.slice(2);
-    if (digits.length >= 5) fmt = digits.slice(0, 2) + '/' + digits.slice(2, 4) + '/' + digits.slice(4);
-    const isNaturalSlash = raw === digits.slice(0, 2) + '/' || raw === digits.slice(0, 2) + '/' + digits.slice(2, 4) + '/';
-    if (raw !== fmt && !isNaturalSlash) textEl.value = fmt;
-    const dt = parseDateInput(fmt);
-    textEl.classList.toggle('invalid', fmt.length === 10 && !dt);
-    if (dt) { calEl.value = toIsoDate(dt); onChange(); }
-  });
-  calEl.addEventListener('change', () => {
-    if (calEl.value) { textEl.value = isoToMDY(calEl.value); textEl.classList.remove('invalid'); onChange(); }
-  });
 }
 
 function fmtMMM(dateStr) {
@@ -464,13 +447,11 @@ async function init() {
       console.warn('Fidelity TIPS not available on R2');
     }
 
-    const startEl = document.getElementById('startMaturity');
-    const endEl = document.getElementById('endMaturity');
-    const startCalEl = document.getElementById('startMaturityCal');
-    const endCalEl = document.getElementById('endMaturityCal');
-
-    setupDateInput(startEl, startCalEl, () => { savedZoom[activeTab] = null; processAndRender(); });
-    setupDateInput(endEl, endCalEl, () => { savedZoom[activeTab] = null; processAndRender(); });
+    const onRangeChange = () => { savedZoom[activeTab] = null; processAndRender(); };
+    [document.getElementById('startMaturity'), document.getElementById('endMaturity')].forEach(el => {
+      initDatePicker(el);
+      el.addEventListener('change', onRangeChange); // fires on pick and on clear
+    });
 
     document.querySelectorAll('input[name="xAxisMode"]').forEach(r => {
       r.addEventListener('change', () => { xAxisMode = r.value; savedZoom[activeTab] = null; processAndRender(); });
@@ -484,8 +465,6 @@ async function init() {
         savedZoom[activeTab] = null;
         document.getElementById('startMaturity').value = '';
         document.getElementById('endMaturity').value = '';
-        document.getElementById('startMaturityCal').value = '';
-        document.getElementById('endMaturityCal').value = '';
         processAndRender();
       }
     };
@@ -558,8 +537,6 @@ function switchTab(tab) {
   savedDateRange[activeTab] = {
     start: document.getElementById('startMaturity').value,
     end: document.getElementById('endMaturity').value,
-    startCal: document.getElementById('startMaturityCal').value,
-    endCal: document.getElementById('endMaturityCal').value,
   };
 
   activeTab = tab;
@@ -583,8 +560,6 @@ function switchTab(tab) {
   const dr = savedDateRange[tab];
   document.getElementById('startMaturity').value = dr ? dr.start : '';
   document.getElementById('endMaturity').value = dr ? dr.end : '';
-  document.getElementById('startMaturityCal').value = dr ? dr.startCal : '';
-  document.getElementById('endMaturityCal').value = dr ? dr.endCal : '';
 
   processAndRender();
 }
@@ -676,17 +651,13 @@ function processAndRenderNominals() {
     const allBonds = [...(fedProcessed || []), ...(fidProcessed || [])].sort((a, b) => a.maturityDate - b.maturityDate);
     const startEl = document.getElementById('startMaturity');
     const endEl = document.getElementById('endMaturity');
-    const startCalEl = document.getElementById('startMaturityCal');
-    const endCalEl = document.getElementById('endMaturityCal');
     if (!startEl.value && allBonds.length > 0) {
-      startEl.value = isoToMDY(allBonds[0].maturity);
-      endEl.value = isoToMDY(allBonds[allBonds.length - 1].maturity);
-      startCalEl.value = allBonds[0].maturity;
-      endCalEl.value = allBonds[allBonds.length - 1].maturity;
+      startEl.value = allBonds[0].maturity;
+      endEl.value = allBonds[allBonds.length - 1].maturity;
     }
 
-    const startDate = parseDateInput(startEl.value) || new Date(0);
-    const endDate = parseDateInput(endEl.value) || new Date(9999, 0);
+    const startDate = parseIsoInput(startEl.value) || new Date(0);
+    const endDate = parseIsoInput(endEl.value) || new Date(9999, 0);
     const inRange = b => b.maturityDate >= startDate && b.maturityDate <= endDate;
     const fedFiltered = fedProcessed ? fedProcessed.filter(inRange) : null;
     const fidFiltered = fidProcessed ? fidProcessed.filter(inRange) : null;
@@ -881,8 +852,8 @@ function renderNominalsChart(fedBonds, fidBonds) {
   } else {
     const minDate = new Date(Math.min(...allPoints.map(d => d.x)));
     const maxDate = new Date(Math.max(...allPoints.map(d => d.x)));
-    const _startDtN = parseDateInput(document.getElementById('startMaturity').value);
-    const _endDtN   = parseDateInput(document.getElementById('endMaturity').value);
+    const _startDtN = parseIsoInput(document.getElementById('startMaturity').value);
+    const _endDtN   = parseIsoInput(document.getElementById('endMaturity').value);
     const minX = _startDtN
       ? new Date(_startDtN.getFullYear(), _startDtN.getMonth(), 1).getTime()
       : new Date(minDate.getFullYear(), minDate.getMonth(), 1).getTime();
@@ -1076,19 +1047,15 @@ function processAndRenderTips() {
 
     const startEl = document.getElementById('startMaturity');
     const endEl = document.getElementById('endMaturity');
-    const startCalEl = document.getElementById('startMaturityCal');
-    const endCalEl = document.getElementById('endMaturityCal');
 
     const allCurrent = [...(fedBonds || []), ...(brokerBonds || [])].sort((a, b) => a.maturityDate - b.maturityDate);
     if (!startEl.value && allCurrent.length > 0) {
-      startEl.value = isoToMDY(allCurrent[0].maturity);
-      endEl.value = isoToMDY(allCurrent[allCurrent.length - 1].maturity);
-      startCalEl.value = allCurrent[0].maturity;
-      endCalEl.value = allCurrent[allCurrent.length - 1].maturity;
+      startEl.value = allCurrent[0].maturity;
+      endEl.value = allCurrent[allCurrent.length - 1].maturity;
     }
 
-    const startDate = parseDateInput(startEl.value) || new Date(0);
-    const endDate = parseDateInput(endEl.value) || new Date(9999, 0);
+    const startDate = parseIsoInput(startEl.value) || new Date(0);
+    const endDate = parseIsoInput(endEl.value) || new Date(9999, 0);
     const inRange = b => b.maturityDate >= startDate && b.maturityDate <= endDate;
     const fedFiltered = fedBonds ? fedBonds.filter(inRange) : null;
     const brokerFiltered = brokerBonds ? brokerBonds.filter(inRange) : null;
@@ -1270,8 +1237,8 @@ function renderChart(fedBonds, brokerBonds) {
   } else {
     const minDate = new Date(Math.min(...allPoints.map(d => d.x)));
     const maxDate = new Date(Math.max(...allPoints.map(d => d.x)));
-    const _startDt = parseDateInput(document.getElementById('startMaturity').value);
-    const _endDt   = parseDateInput(document.getElementById('endMaturity').value);
+    const _startDt = parseIsoInput(document.getElementById('startMaturity').value);
+    const _endDt   = parseIsoInput(document.getElementById('endMaturity').value);
     const minX = _startDt
       ? new Date(_startDt.getFullYear(), _startDt.getMonth(), 1).getTime()
       : new Date(minDate.getFullYear(), 0, 1).getTime();
@@ -1475,8 +1442,8 @@ function _rescaleSpread(chartInst) {
 function _makeSpreadChart(ctx, seriesDef, yAxisLabel, yUnit, shouldClip) {
   const allPoints = seriesDef.flatMap(s => s.data);
   if (allPoints.length === 0) return null;
-  const _startDt = parseDateInput(document.getElementById('startMaturity').value);
-  const _endDt   = parseDateInput(document.getElementById('endMaturity').value);
+  const _startDt = parseIsoInput(document.getElementById('startMaturity').value);
+  const _endDt   = parseIsoInput(document.getElementById('endMaturity').value);
   const allX = allPoints.map(d => d.x);
   const minDate = new Date(Math.min(...allX));
   const maxDate = new Date(Math.max(...allX));
@@ -1782,8 +1749,6 @@ document.getElementById('nominalsControls').addEventListener('change', (e) => {
     savedZoom['treasuries'] = null;
     document.getElementById('startMaturity').value = '';
     document.getElementById('endMaturity').value = '';
-    document.getElementById('startMaturityCal').value = '';
-    document.getElementById('endMaturityCal').value = '';
     processAndRenderNominals();
     return;
   }
@@ -1794,8 +1759,6 @@ document.getElementById('nominalsControls').addEventListener('change', (e) => {
   savedZoom['treasuries'] = null;
   document.getElementById('startMaturity').value = '';
   document.getElementById('endMaturity').value = '';
-  document.getElementById('startMaturityCal').value = '';
-  document.getElementById('endMaturityCal').value = '';
   processAndRenderNominals();
 });
 

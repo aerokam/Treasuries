@@ -653,7 +653,7 @@ test('rebalance: changing RefCPI date clears output and does not alter DARA', as
   // Open RefCPI picker and apply a new date
   await page.locator('#refcpi-link').click();
   await expect(page.locator('#refcpi-picker')).toBeVisible();
-  await page.locator('#refcpi-date-input').fill('01/01/2024');
+  await page.locator('#refcpi-date-input').fill('2024-01-01');
   await page.locator('#refcpi-apply-btn').click();
 
   // Output must be cleared
@@ -691,7 +691,7 @@ test('rebalance: Full method net cash is non-negative after clearing DARA and re
   // Change RefCPI, then clear DARA field and re-run
   // Clearing DARA falls back to _daraByYearPanelDefault (set from portfolio at file load)
   await page.locator('#refcpi-link').click();
-  await page.locator('#refcpi-date-input').fill('01/01/2024');
+  await page.locator('#refcpi-date-input').fill('2024-01-01');
   await page.locator('#refcpi-apply-btn').click();
   await page.locator('#dara').fill('');
 
@@ -737,7 +737,7 @@ test('rebalance: pressing Enter in RefCPI date picker applies date but does not 
   // Open picker, type date, press Enter
   await page.locator('#refcpi-link').click();
   await expect(page.locator('#refcpi-picker')).toBeVisible();
-  await page.locator('#refcpi-date-input').fill('01/01/2024');
+  await page.locator('#refcpi-date-input').fill('2024-01-01');
   await page.locator('#refcpi-date-input').press('Enter');
 
   // Picker must be closed and output cleared

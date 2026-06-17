@@ -38,13 +38,10 @@
   .custom-row input[type="number"] { width: 58px; padding: 3px 5px; font-size: 11px; border: 1px solid var(--border-light); border-radius: 4px; }
   .custom-row span { font-size: 11px; color: var(--portal-text-muted); }
 
-  /* Date range inputs */
+  /* Date range inputs (date picker look comes from shared .date-picker) */
   .date-row { display: flex; flex-direction: column; gap: 4px; }
   .date-row label { font-size: 11px; color: var(--portal-text-muted); }
-  .date-inputs { display: flex; gap: 4px; width: 100%; }
-  .month-select { flex: 1; padding: 3px 2px; font-size: 11px; border: 1px solid var(--border-light); border-radius: 4px; outline: none; background: #fff; cursor: pointer; }
-  .year-input { width: 52px; padding: 3px 5px; font-size: 11px; border: 1px solid var(--border-light); border-radius: 4px; outline: none; }
-  .month-select:focus, .year-input:focus { border-color: var(--tab-active-bg); }
+  .date-row .date-picker { width: 100%; }
   .btn-link { background: none; border: none; color: var(--tab-active-bg); font-size: 11px; cursor: pointer; padding: 0; text-align: left; }
   .btn-link:hover { text-decoration: underline; }
 
@@ -122,17 +119,11 @@
       <div class="sidebar-label">Date Range</div>
       <div class="date-row">
         <label>Start</label>
-        <div class="date-inputs">
-          <select id="startMonth" class="month-select"></select>
-          <input id="startYear" class="year-input" type="text" maxlength="4" placeholder="YYYY" list="yearList" inputmode="numeric" pattern="[0-9]*">
-        </div>
+        <input id="startDate" type="date" class="date-picker">
       </div>
       <div class="date-row">
         <label>End</label>
-        <div class="date-inputs">
-          <select id="endMonth" class="month-select"></select>
-          <input id="endYear" class="year-input" type="text" maxlength="4" placeholder="YYYY" list="yearList" inputmode="numeric" pattern="[0-9]*">
-        </div>
+        <input id="endDate" type="date" class="date-picker">
       </div>
       <button class="btn-link" id="btnFullHistory">Full History</button>
     </div>
@@ -142,22 +133,14 @@
       <div class="sidebar-label">Point-to-Point</div>
       <div class="date-row">
         <label>Start</label>
-        <div class="date-inputs">
-          <select id="p2pStartMonth" class="month-select"></select>
-          <input id="p2pStartYear" class="year-input" type="text" maxlength="4" placeholder="YYYY" list="yearList" inputmode="numeric" pattern="[0-9]*">
-        </div>
+        <input id="p2pStartDate" type="date" class="date-picker">
       </div>
       <div class="date-row">
         <label>End</label>
-        <div class="date-inputs">
-          <select id="p2pEndMonth" class="month-select"></select>
-          <input id="p2pEndYear" class="year-input" type="text" maxlength="4" placeholder="YYYY" list="yearList" inputmode="numeric" pattern="[0-9]*">
-        </div>
+        <input id="p2pEndDate" type="date" class="date-picker">
       </div>
       <div id="p2pResult"></div>
     </div>
-
-    <datalist id="yearList"></datalist>
 
   </aside>
 
