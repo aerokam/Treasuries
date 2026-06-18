@@ -46,8 +46,10 @@ test.describe('Yield Curves Chart and UI', () => {
   });
 
   test('should show correct yield curve labels', async ({ page }) => {
-    const infoStrip = page.locator('#info-strip');
-    await expect(infoStrip).toContainText('FedInvest settle 03/19/2026 (T)');
+    // FedInvest source label + settle date now live in the TIPS source checkbox row.
+    const fedLabel = page.locator('#chkTipsFed').locator('..');
+    await expect(fedLabel).toContainText('FedInvest');
+    await expect(page.locator('#tipsFedMeta')).toContainText('settle 03/19/2026 (T)');
   });
 
   test('should allow maturity range filtering', async ({ page }) => {

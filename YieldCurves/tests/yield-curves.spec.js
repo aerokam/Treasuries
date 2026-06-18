@@ -73,8 +73,8 @@ async function loadTreasuries(page) {
   await expect(page.locator('#chkFidelity')).not.toBeDisabled({ timeout: 5000 });
 }
 
-function spreadBtn(page) { return page.locator('.mode-btn[data-mode="spread"]'); }
-function yieldBtn(page)  { return page.locator('.mode-btn[data-mode="yield"]'); }
+function spreadBtn(page) { return page.locator('.tab-btn[data-mode="spread"]'); }
+function yieldBtn(page)  { return page.locator('.tab-btn[data-mode="yield"]'); }
 
 // ─── Spread mode: persistence across tabs ────────────────────────────────────
 

@@ -144,7 +144,7 @@ async function loadTreasuries(page) {
   await expect(page.locator('#saTable tbody tr')).toHaveCount(3, { timeout: 10000 });
   await page.click('[data-tab="treasuries"]');
   await expect(page.locator('#nominalsTable tbody tr')).toHaveCount(52, { timeout: 10000 });
-  await expect(page.locator('.mode-btn[data-mode="spread"]')).not.toBeDisabled({ timeout: 8000 });
+  await expect(page.locator('.tab-btn[data-mode="spread"]')).not.toBeDisabled({ timeout: 8000 });
 }
 
 // ─── Group 1: Initial state ───────────────────────────────────────────────────
@@ -238,9 +238,9 @@ test.describe('Clip Outliers — spread mode interaction', () => {
   test.beforeEach(async ({ page }) => { await loadTreasuries(page); });
 
   test('clip ON → enter Spreads → exit Spreads → still ON', async ({ page }) => {
-    await page.click('.mode-btn[data-mode="spread"]');
+    await page.click('.tab-btn[data-mode="spread"]');
     await expect(page.locator('#spreadChartWrap')).toBeVisible();
-    await page.click('.mode-btn[data-mode="yield"]');
+    await page.click('.tab-btn[data-mode="yield"]');
     await expect(page.locator('#yieldChartWrap')).toBeVisible();
     await assertCheckboxChecked(page);
     await assertClipOn(page);
@@ -249,29 +249,29 @@ test.describe('Clip Outliers — spread mode interaction', () => {
   test('clip OFF → enter Spreads → exit Spreads → still OFF', async ({ page }) => {
     await page.click('#clipOutliers'); // OFF
     await assertClipOff(page);
-    await page.click('.mode-btn[data-mode="spread"]');
+    await page.click('.tab-btn[data-mode="spread"]');
     await expect(page.locator('#spreadChartWrap')).toBeVisible();
-    await page.click('.mode-btn[data-mode="yield"]');
+    await page.click('.tab-btn[data-mode="yield"]');
     await expect(page.locator('#yieldChartWrap')).toBeVisible();
     await assertCheckboxUnchecked(page);
     await assertClipOff(page);
   });
 
   test('clip ON → Spreads → TIPS → Treasuries → Yield Curves → still ON', async ({ page }) => {
-    await page.click('.mode-btn[data-mode="spread"]');
+    await page.click('.tab-btn[data-mode="spread"]');
     await page.click('[data-tab="tips"]');
     await page.click('[data-tab="treasuries"]');
-    await page.click('.mode-btn[data-mode="yield"]');
+    await page.click('.tab-btn[data-mode="yield"]');
     await assertCheckboxChecked(page);
     await assertClipOn(page);
   });
 
   test('clip OFF → Spreads → TIPS → Treasuries → Yield Curves → still OFF', async ({ page }) => {
     await page.click('#clipOutliers'); // OFF
-    await page.click('.mode-btn[data-mode="spread"]');
+    await page.click('.tab-btn[data-mode="spread"]');
     await page.click('[data-tab="tips"]');
     await page.click('[data-tab="treasuries"]');
-    await page.click('.mode-btn[data-mode="yield"]');
+    await page.click('.tab-btn[data-mode="yield"]');
     await assertCheckboxUnchecked(page);
     await assertClipOff(page);
   });
@@ -354,8 +354,8 @@ test.describe('Clip Outliers — checkbox/state consistency', () => {
 
   test('after spread mode: checkbox state matches actual clipping', async ({ page }) => {
     await page.click('#clipOutliers'); // OFF
-    await page.click('.mode-btn[data-mode="spread"]');
-    await page.click('.mode-btn[data-mode="yield"]');
+    await page.click('.tab-btn[data-mode="spread"]');
+    await page.click('.tab-btn[data-mode="yield"]');
     const checked = await page.locator('#clipOutliers').isChecked();
     expect(checked, 'checkbox should still be unchecked after spread round-trip').toBe(false);
     await assertClipOff(page);
@@ -367,8 +367,8 @@ test.describe('Clip Outliers — checkbox/state consistency', () => {
     await page.click('[data-tab="treasuries"]');
     await page.click('#filterNotes');  // hide Notes
     await page.click('#filterNotes');  // show Notes
-    await page.click('.mode-btn[data-mode="spread"]');
-    await page.click('.mode-btn[data-mode="yield"]');
+    await page.click('.tab-btn[data-mode="spread"]');
+    await page.click('.tab-btn[data-mode="yield"]');
     await assertCheckboxUnchecked(page);
     await assertClipOff(page);
   });
