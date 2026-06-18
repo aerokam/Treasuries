@@ -1187,25 +1187,31 @@ function _initRebalDaraFromPortfolio() {
     return;
   }
 
-  const rawARA = computePortfolioARAByYear(currentHoldingsArray, tipsMap, rc);
-  if (Object.keys(rawARA).length === 0) { renderDaraByYearPanel(); return; }
+  // File load MIRRORS current holdings — no inference, no self-financing solve (3.0 §Per-Year DARA
+  // from Portfolio). derivePerYearDara gives the held-year median (scalar fallback) + bracket caps;
+  // the range form of computePortfolioARAByYear then fills every empty in-range year with its
+  // incoming LMI, so each rung shows its true current ARA and the first Run Rebalance is a no-op.
+  const heldARA = computePortfolioARAByYear(currentHoldingsArray, tipsMap, rc);
+  if (Object.keys(heldARA).length === 0) { renderDaraByYearPanel(); return; }
 
   const bracketCandidates = getGapYearBracketCandidates(tipsMap);
-  const { daraMap, autoCappedYears } = derivePerYearDara(rawARA, bracketCandidates);
+  const { median, daraMap, autoCappedYears } = derivePerYearDara(heldARA, bracketCandidates);
   _bracketAutoCapYears = autoCappedYears;
 
-  // Binary-search the equilibrium median; function computes median and returns scaledMap.
-  const lastYearOverride = parseInt(document.getElementById('rebal-last-year').value) || undefined;
-  const firstYearOverride = parseInt(document.getElementById('rebal-first-year').value) || undefined;
-  const bracketMode = document.getElementById('bracket-mode').value;
-  const { scaledMedian, scaledMap } = inferScaledDARAFromPortfolio({
-    daraMap, holdings: currentHoldingsArray, tipsMap, refCPI: rc, settlementDate,
-    bracketMode, lastYearOverride, firstYearOverride,
-    preLadderInterest: document.getElementById('pre-ladder-interest').checked,
-  });
-  _daraByYearStore = scaledMap;
+  const heldYearNums = Object.keys(heldARA).map(Number);
+  const firstYear = Math.min(...heldYearNums);
+  const lastYear = parseInt(document.getElementById('rebal-last-year').value) || Math.max(...heldYearNums);
+  const fullARA = computePortfolioARAByYear(currentHoldingsArray, tipsMap, rc, { firstYear, lastYear });
+
+  // Held years take the bracket-capped daraMap value; empty in-range years take their incoming-LMI ARA.
+  const store = new Map();
+  for (let y = firstYear; y <= lastYear; y++) {
+    store.set(y, daraMap.has(y) ? daraMap.get(y) : Math.round(fullARA[y] ?? 0));
+  }
+  _daraByYearStore = store;
+  _daraByYearPanelDefault = median;
   _daraLoadedSnapshot = new Map(_daraByYearStore);
-  document.getElementById('dara').value = scaledMedian;
+  document.getElementById('dara').value = median;
   renderDaraByYearPanel();
 }
 

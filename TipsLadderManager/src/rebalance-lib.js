@@ -414,7 +414,14 @@ export function inferDARAFromCash({ bracketMode = '2bracket', holdings: holdings
 // NOTE: this is only (P+I)+LMI. The cover-year income terms (own excess coupon + 2052
 // AMD) that build also credits are added downstream in inferScaledDARAFromPortfolio,
 // which has the settlement/last-year context the AMD schedule needs.
-export function computePortfolioARAByYear(holdingsArr, tipsMap, refCPI) {
+//
+// Default form (no `range`): emit ONLY years that hold a TIPS — used for median/bracket detection
+// and the segment infer solves. Range form (`{ firstYear, lastYear }`): emit EVERY year in the
+// range, including empty ones (a year with no own TIPS gets `ARA = incoming LMI` alone). Holdings
+// maturing after `lastYear` are not emitted but still cascade their coupon into earlier years' LMI.
+// The range form is the file-load "mirror current holdings" population (3.0 §Per-Year DARA from
+// Portfolio) — every rung shows its true current income so the first Run Rebalance is a no-op.
+export function computePortfolioARAByYear(holdingsArr, tipsMap, refCPI, range = null) {
   const byYear = {};
   for (const h of holdingsArr) {
     const b = tipsMap.get(h.cusip);
@@ -431,14 +438,26 @@ export function computePortfolioARAByYear(holdingsArr, tipsMap, refCPI) {
     byYear[year].totalPI += fundedQty * piPB;
     byYear[year].annInt  += h.qty * 1000 * ir * (b.coupon ?? 0);
   }
-  const years = Object.keys(byYear).map(Number).sort((a, b) => b - a); // long to short
-  let lmi = 0;
   const ara = {};
-  for (const y of years) {
-    ara[y] = byYear[y].totalPI + lmi;
-    lmi += byYear[y].annInt;
+  const heldYears = Object.keys(byYear).map(Number);
+  if (!range) {
+    let lmi = 0;
+    for (const y of heldYears.sort((a, b) => b - a)) { // long to short
+      ara[y] = byYear[y].totalPI + lmi;
+      lmi += byYear[y].annInt;
+    }
+    return ara; // { year: rawARA } — held years only
   }
-  return ara; // { year: rawARA }
+  // Range form: walk top→bottom so the running LMI is correct at each year. Start at the latest of
+  // lastYear or the latest holding (so post-range holdings' coupon still cascades down).
+  const { firstYear, lastYear } = range;
+  const topYear = Math.max(lastYear, ...(heldYears.length ? heldYears : [lastYear]));
+  let lmi = 0;
+  for (let y = topYear; y >= firstYear; y--) {
+    if (y <= lastYear) ara[y] = (byYear[y]?.totalPI ?? 0) + lmi;
+    if (byYear[y]) lmi += byYear[y].annInt;
+  }
+  return ara;
 }
 
 // Years adjacent to the structural gap (2037-2039) that may carry bracket excess: the
