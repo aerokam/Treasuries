@@ -181,19 +181,19 @@ test.describe('Treasuries tab — checkbox rescale', () => {
     expect(both).toBeGreaterThan(marketOnly);
   });
 
-  test('uncheck Market rescales Y axis', async ({ page }) => {
+  test('uncheck Market preserves Y axis (source toggle does not rescale)', async ({ page }) => {
     const before = await getYBounds(page);
     await page.click('#chkFidelity');
     const after = await getYBounds(page);
-    expect(after).not.toEqual(before);
+    expect(after).toEqual(before);
   });
 
-  test('recheck Market rescales Y axis', async ({ page }) => {
-    await page.click('#chkFidelity');
-    const fedOnly = await getYBounds(page);
-    await page.click('#chkFidelity');
-    const both = await getYBounds(page);
-    expect(both).not.toEqual(fedOnly);
+  test('recheck Market preserves Y axis (source toggle does not rescale)', async ({ page }) => {
+    const both0 = await getYBounds(page);
+    await page.click('#chkFidelity');   // off
+    await page.click('#chkFidelity');   // on
+    const both1 = await getYBounds(page);
+    expect(both1).toEqual(both0);
   });
 
   test('uncheck Clip Outliers widens Y range', async ({ page }) => {

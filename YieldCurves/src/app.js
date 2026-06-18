@@ -1668,15 +1668,29 @@ document.getElementById('nominalsShowNone').onclick = (e) => {
 
 
 
+// Snapshot the current view so the next processAndRender() restores it instead of
+// auto-fitting. Used by source toggles: adding/removing a source rebuilds the chart,
+// but should not change the scale — same as showing/hiding a series.
+function preserveZoom() {
+  if (chart && chartTab) {
+    savedZoom[chartTab] = {
+      xMin: chart.scales.x.min, xMax: chart.scales.x.max,
+      yMin: chart.scales.y.min, yMax: chart.scales.y.max,
+    };
+  }
+}
+
 // Unified Source Change Handlers
 ['chkTipsFed', 'chkTipsBroker'].forEach(id => {
   document.getElementById(id).addEventListener('change', () => {
+    preserveZoom();
     updateModeToggle();
     processAndRender();
   });
 });
 ['chkFedInvest', 'chkFidelity'].forEach(id => {
   document.getElementById(id).addEventListener('change', () => {
+    preserveZoom();
     updateModeToggle();
     processAndRender();
   });
