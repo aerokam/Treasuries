@@ -364,7 +364,10 @@ async function fetchOne(symbol, range, force = false) {
       }
       if (liveTip) {
         const lastHistTime = combined.length > 0 ? combined[combined.length - 1].x.getTime() : 0;
-        const newPoints = liveTip.filter(p => p.x.getTime() > lastHistTime && p.x.getTime() < endMs && !isWeekendEt(p.x));
+        // Live points must respect the chosen start date too — not just the last stored
+        // history point. Without the startMs floor, a symbol whose history has no point
+        // inside the window (e.g. the sparse US5YTIPS) would let pre-start live bars leak in.
+        const newPoints = liveTip.filter(p => p.x.getTime() > lastHistTime && p.x.getTime() >= startMs && p.x.getTime() < endMs && !isWeekendEt(p.x));
         combined = [...combined, ...newPoints];
       }
     }
@@ -604,38 +607,49 @@ function adjustFirstPointToClosingTime(firstPoint) {
   return firstPoint;
 }
 
+// Read one maturity's yield on a specific ET calendar date. pickLast=false returns that
+// day's first print (the close, for a historical day); pickLast=true returns the last print
+// (the latest reading on the end day). Returns null when the maturity has no print that day,
+// so the curve shows a gap rather than borrowing a value from another date.
+function valueOnDate(sym, dateStr, pickLast) {
+  const d = rangeData[sym];
+  if (!d || !d.length || !dateStr) return null;
+  const pts = d.filter(p => getEtDateStr(p.x) === dateStr);
+  if (!pts.length) return null;
+  return (pickLast ? pts[pts.length - 1] : pts[0]).y;
+}
+
 function updateYieldCurves() {
+  // The displayed Start/End dates are decided once, from the 10Y TIPS — the one reliable
+  // feed. The 5Y TIPS feed is too sparse to drive dates (see knowledge/1.0_Operation.md).
+  // Start = the chosen start date (or, for preset ranges, the first 10Y-TIPS trading day in
+  // range); End = the chosen end date. fetchOne already clamps the 10Y-TIPS series to the
+  // active window, so its first/last points ARE those dates (and snap past non-trading days).
+  // Every maturity on every curve is then read on those exact dates; a maturity with no print
+  // that day is left as a gap.
+  const refData = rangeData['US10YTIPS'];
+  const refStart = refData && refData.length ? refData[0] : null;
+  const refEnd = refData && refData.length ? refData[refData.length - 1] : null;
+  const startDateStr = refStart ? getEtDateStr(refStart.x) : null;
+  const endDateStr = refEnd ? getEtDateStr(refEnd.x) : null;
+  const sT = refStart ? adjustFirstPointToClosingTime(refStart.x) : null, eT = refEnd ? refEnd.x : null;
+  const sL = sT ? ET_HM_FMT.format(sT) + ' ET' : '—', eL = eT ? ET_HM_FMT.format(eT) + ' ET' : '—';
+
   const buildYield = (id, key, syms) => {
-    let sT = null, eT = null, sDate = null;
-    const sD = syms.map(s => { const d = rangeData[s]; if (!d || d.length === 0) return null; if (!sDate || d[0].x < sDate) sDate = d[0].x; return d[0].y; });
-    if (sDate) sT = adjustFirstPointToClosingTime(sDate);
-    const eD = syms.map(s => { const d = rangeData[s]; if (!d || d.length === 0) return null; if (!eT || d[d.length-1].x > eT) eT = d[d.length-1].x; return d[d.length-1].y; });
-    const sL = sT ? ET_HM_FMT.format(sT) + ' ET' : '—', eL = eT ? ET_HM_FMT.format(eT) + ' ET' : '—';
+    const sD = syms.map(s => valueOnDate(s, startDateStr, false));
+    const eD = syms.map(s => valueOnDate(s, endDateStr, true));
     if (yieldCurveCharts[key]) { const c = yieldCurveCharts[key]; c.data.datasets[0].data = sD; c.data.datasets[0].label = sL; c.data.datasets[1].data = eD; c.data.datasets[1].label = eL; c.update(); return; }
     const ctx = document.getElementById(id).getContext('2d');
     yieldCurveCharts[key] = new Chart(ctx, {
       type: 'line',
-      data: { labels: syms.map(s => SYMBOL_LABELS[s]), datasets: [{ label: sL, data: sD, borderColor: '#1a56db', borderDash: [6,3], fill: false, tension: 0.3, spanGaps: true }, { label: eL, data: eD, borderColor: '#dc2626', fill: false, tension: 0.3, spanGaps: true }] },
+      data: { labels: syms.map(s => SYMBOL_LABELS[s]), datasets: [{ label: sL, data: sD, borderColor: '#1a56db', borderDash: [6,3], fill: false, tension: 0.3, spanGaps: false }, { label: eL, data: eD, borderColor: '#dc2626', fill: false, tension: 0.3, spanGaps: false }] },
       options: { animation: false, responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, scales: { x: { grid: { color: '#f1f5f9' }, ticks: { font: { size: 10, weight: 'bold' }, color: '#000' } }, y: { grid: { color: '#f1f5f9' }, ticks: { font: { size: 9, family: 'monospace', weight: 'bold' }, color: '#000', callback: v => v.toFixed(3) + '%' } } }, plugins: { legend: { display: true, labels: { font: { size: 10, weight: 'bold' } } }, zoom: { zoom: { wheel: { enabled: true }, mode: 'xy' }, pan: { enabled: true, mode: 'xy' } } } }
     });
   };
 
   const buildBei = (id, key, pairs) => {
-    let sT = null, eT = null, sDate = null;
-    const sD = pairs.map(p => {
-      const n = rangeData[p.n], t = rangeData[p.t];
-      if (!n || n.length === 0 || !t || t.length === 0) return null;
-      if (!sDate || n[0].x < sDate) sDate = n[0].x;
-      return n[0].y - t[0].y;
-    });
-    if (sDate) sT = adjustFirstPointToClosingTime(sDate);
-    const eD = pairs.map(p => {
-      const n = rangeData[p.n], t = rangeData[p.t];
-      if (!n || n.length === 0 || !t || t.length === 0) return null;
-      if (!eT || n[n.length-1].x > eT) eT = n[n.length-1].x;
-      return n[n.length-1].y - t[t.length-1].y;
-    });
-    const sL = sT ? ET_HM_FMT.format(sT) + ' ET' : '—', eL = eT ? ET_HM_FMT.format(eT) + ' ET' : '—';
+    const sD = pairs.map(p => { const n = valueOnDate(p.n, startDateStr, false), t = valueOnDate(p.t, startDateStr, false); return (n == null || t == null) ? null : n - t; });
+    const eD = pairs.map(p => { const n = valueOnDate(p.n, endDateStr, true), t = valueOnDate(p.t, endDateStr, true); return (n == null || t == null) ? null : n - t; });
     if (yieldCurveCharts[key]) {
       const c = yieldCurveCharts[key];
       c.data.datasets[0].data = sD; c.data.datasets[0].label = sL;
@@ -649,8 +663,8 @@ function updateYieldCurves() {
       data: {
         labels: pairs.map(p => p.label),
         datasets: [
-          { label: sL, data: sD, borderColor: '#1a56db', borderDash: [6,3], fill: false, tension: 0.3, spanGaps: true },
-          { label: eL, data: eD, borderColor: '#dc2626', fill: false, tension: 0.3, spanGaps: true }
+          { label: sL, data: sD, borderColor: '#1a56db', borderDash: [6,3], fill: false, tension: 0.3, spanGaps: false },
+          { label: eL, data: eD, borderColor: '#dc2626', fill: false, tension: 0.3, spanGaps: false }
         ]
       },
       options: {
