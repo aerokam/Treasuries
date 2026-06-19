@@ -623,21 +623,22 @@ function parseNetCash(text) {
   return parseFloat(t);
 }
 
-// ── 16. Net cash near zero after Full rebalance with portfolio-derived DARA ────
-test('rebalance: Full method net cash is non-negative and within $2,000', async ({ page }) => {
+// ── 16. Net cash small and NON-NEGATIVE after rebalance with portfolio-derived DARA ────
+test('rebalance: net cash is non-negative and small (self-financing scale)', async ({ page }) => {
   await page.locator('#holdings-file').setInputFiles(HOLDINGS_PATH);
-  await expect(page.locator('#method')).toHaveValue('Full');
 
-  // DARA is set from portfolio ARA at file load — run without any manual override
+  // Default mirror shape — run without any manual override. The Run-time shape-preserving
+  // self-financing scale (3.0 §Funding the rebalance) must drive net cash to small, ≥ 0:
+  // the funded rungs sell down proportionally to fund the duration-match bracket excess.
   await page.locator('#run-btn').click();
   await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 4_000 });
 
   const raw = await page.locator('#net-cash-val').textContent();
   const netCash = parseNetCash(raw);
   expect(netCash, 'Net cash must be a number').not.toBeNaN();
-  // Portfolio-derived DARA targets should produce near-zero net cash; allow up to $15k for
-  // bracket-year rounding differences between the ARA estimator and the rebalance algorithm.
-  expect(Math.abs(netCash), `Net cash ${netCash} is unreasonably large`).toBeLessThanOrEqual(15000);
+  // Self-financing: net cash is a small POSITIVE number. -50 tolerance for integer-bond rounding.
+  expect(netCash, `Net cash ${netCash} must be non-negative (rebalance must self-finance)`).toBeGreaterThanOrEqual(-50);
+  expect(netCash, `Net cash ${netCash} is unreasonably large`).toBeLessThanOrEqual(3000);
 });
 
 // ── 17. RefCPI date change clears output but preserves DARA ──────────────────

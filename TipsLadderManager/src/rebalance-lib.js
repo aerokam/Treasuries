@@ -460,11 +460,11 @@ export function computePortfolioARAByYear(holdingsArr, tipsMap, refCPI, range = 
   return ara;
 }
 
-// Years adjacent to the structural gap (2037-2039) that may carry bracket excess: the
-// 2040 upper bracket and any Jan TIPS in [2032, minGap) that could have been an old lower
-// bracket. Holdings in these years with ARA > 1.5× median are auto-capped to median.
-export function getGapYearBracketCandidates(tipsMap) {
-  if (!tipsMap) return new Set();
+// Structural gap years: contiguous run of years (counting down from 2039) for which NO TIPS
+// have been issued (currently 2037-2039). These rungs cannot be held directly; they are funded
+// by bracket excess at the adjacent years. Single source for "which years are gap years".
+export function getGapYears(tipsMap) {
+  if (!tipsMap) return [];
   const tipsYears = new Set();
   for (const b of tipsMap.values()) { if (b.maturity) tipsYears.add(b.maturity.getFullYear()); }
   const gapYears = [];
@@ -472,6 +472,15 @@ export function getGapYearBracketCandidates(tipsMap) {
     if (!tipsYears.has(y)) gapYears.push(y);
     else break;
   }
+  return gapYears;
+}
+
+// Years adjacent to the structural gap (2037-2039) that may carry bracket excess: the
+// 2040 upper bracket and any Jan TIPS in [2032, minGap) that could have been an old lower
+// bracket. Holdings in these years with ARA > 1.5× median are auto-capped to median.
+export function getGapYearBracketCandidates(tipsMap) {
+  if (!tipsMap) return new Set();
+  const gapYears = getGapYears(tipsMap);
   if (gapYears.length === 0) return new Set();
   const minGap = Math.min(...gapYears);
   const maxGap = Math.max(...gapYears);
