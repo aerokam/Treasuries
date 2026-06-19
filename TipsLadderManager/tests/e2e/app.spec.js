@@ -553,7 +553,6 @@ test('rebalance: pressing Enter (no overlay open) triggers Run Rebalance', async
 // ── 13. DARA populated from portfolio on file load ────────────────────────────
 test('rebalance: DARA populated from portfolio ARA on file load', async ({ page }) => {
   await page.locator('#holdings-file').setInputFiles(HOLDINGS_PATH);
-  await expect(page.locator('#method')).toHaveValue('Full');
 
   // DARA is set from portfolio ARA at file load — shows numeric median or "by year"
   const daraVal = await page.locator('#dara').inputValue();
@@ -708,7 +707,6 @@ test('rebalance: Full method net cash is non-negative after clearing DARA and re
 // ── 20b. DARA stays stable when bracket mode changes ──────────────────────────
 test('rebalance: auto-inferred DARA is re-inferred when bracket mode changes', async ({ page }) => {
   await page.locator('#holdings-file').setInputFiles(HOLDINGS_PATH);
-  await expect(page.locator('#method')).toHaveValue('Full');
 
   // First run — DARA from portfolio ARA
   await page.locator('#run-btn').click();

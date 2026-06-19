@@ -196,7 +196,7 @@ function runFullRebalanceTest(name, filePath) {
     daraMap, holdings, tipsMap, refCPI, settlementDate,
   });
   const { summary, details } = runRebalance({
-    dara: scaledMedian, method: 'Full', holdings, tipsMap, refCPI, settlementDate,
+    dara: scaledMedian, holdings, tipsMap, refCPI, settlementDate,
     daraByYear: scaledMap,
   });
 
@@ -246,7 +246,7 @@ runFullRebalanceTest('SampleHoldings (richest IRA)', './data/SampleHoldings.csv'
   const bc2 = getGapYearBracketCandidates(tipsMap);
   const { daraMap: daraMap2 } = derivePerYearDara(rawARA2, bc2);
   const { scaledMap: sMap2, scaledMedian: sDara2 } = inferScaledDARAFromPortfolio({ daraMap: daraMap2, holdings, tipsMap, refCPI, settlementDate });
-  const { summary, details } = runRebalance({ dara: sDara2, method: 'Full', holdings, tipsMap, refCPI, settlementDate, daraByYear: sMap2 });
+  const { summary, details } = runRebalance({ dara: sDara2, holdings, tipsMap, refCPI, settlementDate, daraByYear: sMap2 });
 
   assert('lastYear === 2035',   summary.lastYear, 2035);
   assert('no 2040 funded rung', details.some(d => d.fundedYear === 2040), false);
@@ -286,7 +286,7 @@ runFullRebalanceTest('SampleHoldings (richest IRA)', './data/SampleHoldings.csv'
 
     // Run rebalance — excessQtyBefore uses funded-first rule (LMI formula), not h.excessQty
     const dara = 20000;
-    const { summary, details } = runRebalance({ dara, method: 'Gap', bracketMode: '3bracket', holdings, tipsMap, refCPI, settlementDate });
+    const { summary, details } = runRebalance({ dara, bracketMode: '3bracket', holdings, tipsMap, refCPI, settlementDate });
 
     assert('F4: origLower IS Jan 2036', summary.brackets.lowerCUSIP === '91282CPU9', true);
     // When orig lower == new lower (both Jan 2036), 3-bracket falls back to 2-bracket.
@@ -341,7 +341,7 @@ runFullRebalanceTest('SampleHoldings (richest IRA)', './data/SampleHoldings.csv'
 
     // Run a full rebalance and verify excessQtyBefore is non-zero for bracket targets
     const { dara } = inferDARAFromCash({ holdings, tipsMap, refCPI, settlementDate });
-    const { summary, details } = runRebalance({ dara, method: 'Gap', holdings, tipsMap, refCPI, settlementDate });
+    const { summary, details } = runRebalance({ dara, holdings, tipsMap, refCPI, settlementDate });
     const bracketTargets = details.filter(d => d.isBracketTarget);
     const hasImportedExcess = bracketTargets.some(d => d.excessQtyBefore > 0);
     assert('F5 file: bracket excessQtyBefore > 0 (from import or LMI fallback)', hasImportedExcess, true);
@@ -583,7 +583,6 @@ console.log('\nBuild→Rebalance symmetry — firstYear=2036, lastYear=2065, PLI
   // 3. Rebalance with identical params
   const { summary: rebalSummary, results: rebalResults } = runRebalance({
     dara: DARA,
-    method: 'Gap',
     bracketMode: '2bracket',
     holdings,
     tipsMap,
@@ -632,7 +631,7 @@ console.log('\nBuild→Rebalance NO-override round-trip — firstYear=2026, last
 
   // Rebalance with NO firstYearOverride / NO lastYearOverride — must self-infer.
   const { summary: rS, results: rR } = runRebalance({
-    dara: DARA, method: 'Full', bracketMode: '2bracket', holdings, tipsMap, refCPI, settlementDate,
+    dara: DARA, bracketMode: '2bracket', holdings, tipsMap, refCPI, settlementDate,
   });
   assert('NO-override rebal infers lastYear 2066', rS.lastYear, 2066);
   assert('NO-override rebal preserves 2052 upper cover excess', rS.future30yUpperExQty, bS.future30yUpperExQty);
@@ -667,7 +666,7 @@ console.log('\nBuild→Rebalance export-string round-trip — firstYear=2036, la
 
   // Rebalance the way the (fixed) UI would: recovered last year, PLI on, no first-year override.
   const { summary: rS, results: rR } = runRebalance({
-    dara: DARA, method: 'Full', bracketMode: '2bracket', holdings, tipsMap, refCPI, settlementDate,
+    dara: DARA, bracketMode: '2bracket', holdings, tipsMap, refCPI, settlementDate,
     preLadderInterest: true, lastYearOverride: infLast,
   });
   const totalAbsQtyDelta = rR.reduce((s, r) => s + Math.abs(r[9] ?? 0), 0);
@@ -731,7 +730,7 @@ console.log('\nBuild→Rebalance export-string round-trip — firstYear=2036, la
 
     // Rebalance honoring explicit DARA (what _initRebalDaraFromPortfolio + Run handler now do).
     const { summary: rS, results: rR, details: rD } = runRebalance({
-      dara: med, method: 'Full', bracketMode: '3bracket', holdings, tipsMap, refCPI, settlementDate,
+      dara: med, bracketMode: '3bracket', holdings, tipsMap, refCPI, settlementDate,
       daraByYear: importedDara, lastYearOverride: yrs[yrs.length - 1], firstYearOverride: yrs[0], preLadderInterest: pli,
     });
 
@@ -844,7 +843,6 @@ console.log('\nBuild→Rebalance symmetry — firstYear=2036, lastYear=2065, PLI
   // 3. Rebalance with Full method
   const { summary: rebalSummaryFull, results: rebalResultsFull, details: rebalDetailsFull } = runRebalance({
     dara: DARA,
-    method: 'Full',
     bracketMode: '3bracket',
     holdings: holdingsFull,
     tipsMap,
@@ -904,7 +902,6 @@ console.log('\nBuild→Rebalance DARA inference — firstYear=2035→2036, lastY
   // 3. Rebalance with no explicit DARA — shift to firstYear=2036, lastYear=2065
   const { summary: inferRebalSummary } = runRebalance({
     dara: null,
-    method: 'Gap',
     bracketMode: '2bracket',
     holdings: inferHoldings,
     tipsMap, refCPI, settlementDate,
@@ -967,7 +964,7 @@ for (const gapFirstYear of [2037, 2038, 2039]) {
   const holdings = bldDetails.map(d => ({ cusip: d.cusip, qty: d.fundedYearQty + d.excessQty, excessQty: d.excessQty }));
 
   const { summary: rSummary } = runRebalance({
-    dara: DARA, method: 'Full', bracketMode: '2bracket',
+    dara: DARA, bracketMode: '2bracket',
     holdings, tipsMap, refCPI, settlementDate,
     firstYearOverride: 2037, lastYearOverride: lastYear,
   });
@@ -1040,7 +1037,6 @@ for (const gapFirstYear of [2037, 2038, 2039]) {
     const { dara } = inferDARAFromCash({ holdings: holdingsWithAccount, tipsMap, refCPI, settlementDate });
     const maResult = runMultiAccountRebalance({
       dara,
-      method: 'Full',
       holdings: holdingsWithAccount,
       tipsMap,
       refCPI,
@@ -1160,7 +1156,7 @@ for (const gapFirstYear of [2037, 2038, 2039]) {
 
     const { dara } = inferDARAFromCash({ holdings: holdingsWithAccount, tipsMap, refCPI, settlementDate });
     const maResult = runMultiAccountRebalance({
-      dara, method: 'Full', holdings: holdingsWithAccount,
+      dara, holdings: holdingsWithAccount,
       tipsMap, refCPI, settlementDate, accountSizes, minMonthsToMaturity: 6,
     });
 
@@ -1235,7 +1231,7 @@ for (const gapFirstYear of [2037, 2038, 2039]) {
 
     const { dara } = inferDARAFromCash({ holdings: holdingsWithAccount, tipsMap, refCPI, settlementDate });
     const maResult = runMultiAccountRebalance({
-      dara, method: 'Full', holdings: holdingsWithAccount,
+      dara, holdings: holdingsWithAccount,
       tipsMap, refCPI, settlementDate, accountSizes,
       rmdByAccount: { [OWNER4_IRA]: RMD },
       minMonthsToMaturity: 6,
@@ -1354,7 +1350,7 @@ for (const gapFirstYear of [2037, 2038, 2039]) {
 
   // Run the actual rebalance with the merged map and partition cost delta by segment.
   const { results, details } = runRebalance({
-    dara: seg.lmpMedian, method: 'Full', holdings, tipsMap, refCPI, settlementDate,
+    dara: seg.lmpMedian, holdings, tipsMap, refCPI, settlementDate,
     daraByYear: seg.combinedMap, lastYearOverride: lastYear, firstYearOverride: firstYear,
   });
   let lmpNet = 0, specNet = 0;

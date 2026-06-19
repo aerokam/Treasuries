@@ -280,7 +280,6 @@
         <label>Last Year</label>
         <select id="last-year"><option value="">—</option></select>
       </div>
-      <input type="hidden" id="method" value="Full">
 <div class="field" id="field-bracket-mode">
         <label>Brackets</label>
         <div style="display:flex;align-items:center;gap:4px">
@@ -2305,7 +2304,6 @@ document.getElementById('run-btn').addEventListener('click', async () => {
         }
         result = runMultiAccountRebalance({
           dara: finalDara,
-          method: document.getElementById('method').value,
           bracketMode: document.getElementById('bracket-mode').value,
           holdings: currentHoldingsWithAccounts,
           tipsMap,
@@ -2346,7 +2344,6 @@ document.getElementById('run-btn').addEventListener('click', async () => {
         }
         result = runRebalance({
           dara: _runDara,
-          method: document.getElementById('method').value,
           bracketMode: _bracketMode,
           holdings: currentHoldingsArray,
           tipsMap,
