@@ -291,53 +291,39 @@ function _showSaoDrill(cusip) {
 
   const now = new Date();
   const yearsToMat = (bond.maturityDate - now) / 31557600000;
-  
-  // Find the index in the sorted array to show the window
-  const idx = window._currentBonds.indexOf(bond);
-  const n = window._currentBonds.length;
-  
-  let logicHtml = '';
-  let trendWeight = 0.2;
-  if (yearsToMat < 0.5) trendWeight = 0.9; 
-  else if (yearsToMat < 2) trendWeight = 0.15; 
-  else if (yearsToMat < 5) trendWeight = 0.25;
+  const dev = bond._saoDevBps || 0;
+  const richCheap = dev > 0 ? 'cheap (yield above curve)' : 'rich (yield below curve)';
 
-  if (yearsToMat > 7 || idx > n - 4) {
+  let logicHtml = '';
+
+  if (bond._saoMode === 'noise') {
     logicHtml = `
-      <div style="background:#f0f9ff;padding:12px;border-radius:6px;border:1px solid #bae6fd;margin-bottom:16px;">
-        <p style="margin:0;color:#0369a1;font-weight:600;">Anchor Region (Long End)</p>
-        <p style="margin:8px 0 0;font-size:12px;">This TIPS matures in > 7 years (or is among the last 4). At this maturity, the curve is considered stable enough that the <strong>SAO Yield equals the SA Yield</strong>.</p>
+      <div style="background:#fef3f2;padding:12px;border-radius:6px;border:1px solid #fecdca;margin-bottom:16px;">
+        <p style="margin:0;color:#b42318;font-weight:600;">Near-Maturity (excluded from fit)</p>
+        <p style="margin:8px 0 0;font-size:12px;">Maturity ${yearsToMat.toFixed(2)}y &lt; ${SAO_NOISE_YRS}y: the SA yield is dominated by price noise on a tiny remaining duration, so this point does not drive the curve fit. Its SAO is read off the smooth curve.</p>
+        <div style="margin-top:8px;display:flex;justify-content:space-between;color:#1a56db;font-weight:700;"><span>SAO (on curve)</span><span>${(bond.saoYield * 100).toFixed(3)}%</span></div>
       </div>
     `;
   } else {
     logicHtml = `
       <div style="background:#f8fafc;padding:12px;border-radius:6px;border:1px solid #e2e8f0;margin-bottom:16px;">
-        <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
-          <span>Trend Weight (Maturity ${yearsToMat.toFixed(1)}y)</span>
-          <strong>${(trendWeight * 100).toFixed(0)}%</strong>
-        </div>
         <div style="font-size:12px;color:#64748b;margin-bottom:12px;">
-          The <strong>Outlier (O)</strong> factor is approximated by established institutional smoothing. 
-          We use a sliding window of the <strong>next 4 longer-dated TIPS</strong> to establish a linear trend.
+          The <strong>SAO</strong> is a <strong>smooth fair-value curve</strong> (Nelson-Siegel-Svensson) fitted through the SA real yields.
+          Each TIPS is snapped to the curve: for a buy-and-hold holder, any deviation not explained by a value-relevant
+          factor (coupon, index ratio — both immaterial here) is treated as not particularly relevant and smoothed away.
+          Inspired by Canty's outlier-factor analysis, but — lacking identifiable outlier factors — operationally a curve fit (see <em>2.0 / 2.2</em>).
         </div>
-        <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
-          <span>Raw SA Yield</span>
-          <span>${(bond.saYield * 100).toFixed(3)}%</span>
-        </div>
-        <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
-          <span>Projected Trend Yield</span>
-          <span>${(((bond.saoYield - bond.saYield * (1 - trendWeight)) / trendWeight) * 100).toFixed(3)}%</span>
-        </div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>Raw SA Yield</span><span>${(bond.saYield * 100).toFixed(3)}%</span></div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>Deviation from curve</span><span>${dev >= 0 ? '+' : ''}${dev.toFixed(1)} bp — ${richCheap}</span></div>
         <div style="border-top:1px dashed #cbd5e1;margin:8px 0;padding-top:8px;display:flex;justify-content:space-between;color:#1a56db;font-weight:700;">
-          <span>Blended SAO Yield</span>
-          <span>${(bond.saoYield * 100).toFixed(3)}%</span>
+          <span>SAO Yield (smooth curve)</span><span>${(bond.saoYield * 100).toFixed(3)}%</span>
         </div>
       </div>
-      <p style="font-size:11px;color:#94a3b8;margin:0;">* Projecting a smooth curve removes residual "wiggles" caused by specific maturity-month anomalies that standard SA factors may miss.</p>
+      <p style="font-size:11px;color:#94a3b8;margin:0;">* The deviation is a rich/cheap relative-value signal — informative, but smoothed out of the SAO fair-value curve.</p>
     `;
   }
 
-  _showDrillPopup(`SAO Drill-down: ${bond.cusip} (Outlier Adjustment)`, logicHtml);
+  _showDrillPopup(`SAO Drill-down: ${bond.cusip} (Smooth Curve Fit)`, logicHtml);
 }
 
 // ─── Main Logic ──────────────────────────────────────────────────────────────
@@ -486,40 +472,92 @@ async function init() {
   }
 }
 
+// SAO "O" step — a SMOOTH-CURVE FIT, not Canty's inflation-shock outlier factor.
+// See knowledge/2.0_SAO_Adjustment.md and 2.2_SAO_Residual_Analysis.md.
+//
+// Canty's O_t (Eq 20–21) adjusts for *known, non-seasonal* inflation shocks not yet
+// in the CPI (VAT hike, a gasoline move since the last print) — determined analytically
+// per event. We do NOT compute that. Our "O" step instead snaps each SA real-yield
+// point to a smooth fair-value curve: for a buy-and-hold holder, indifferent to
+// liquidity/relative-value, any deviation from a smooth curve that ISN'T explained by
+// a value-relevant factor (coupon, index ratio — both empirically immaterial here)
+// is noise to be removed. So SAO_i = smoothCurve(maturity_i) for every TIPS.
+//
+// The smooth curve is Nelson-Siegel-Svensson (the Fed/GSW real-yield-curve standard).
+const SAO_NOISE_YRS = 0.5;  // exclude < this from the FIT (near-maturity SA is price-noise-dominated)
+
+// NSS basis at maturity τ for decay params λ1, λ2: [level, slope, curv1, curv2].
+function _nssBasis(tau, l1, l2) {
+  const a = tau / l1, b = tau / l2;
+  const f1 = a > 1e-6 ? (1 - Math.exp(-a)) / a : 1;
+  const fb = b > 1e-6 ? (1 - Math.exp(-b)) / b : 1;
+  return [1, f1, f1 - Math.exp(-a), fb - Math.exp(-b)];
+}
+// OLS for the 4 linear betas (given λ's) via 4×4 normal equations + Gaussian elimination.
+function _ols4(X, y) {
+  const A = [[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]], bv = [0,0,0,0];
+  for (let k = 0; k < X.length; k++) {
+    const xi = X[k];
+    for (let i = 0; i < 4; i++) { bv[i] += xi[i] * y[k]; for (let j = 0; j < 4; j++) A[i][j] += xi[i] * xi[j]; }
+  }
+  const M = A.map((r, i) => [...r, bv[i]]);
+  for (let c = 0; c < 4; c++) {
+    let p = c;
+    for (let r = c + 1; r < 4; r++) if (Math.abs(M[r][c]) > Math.abs(M[p][c])) p = r;
+    if (Math.abs(M[p][c]) < 1e-12) return null;
+    [M[c], M[p]] = [M[p], M[c]];
+    for (let r = 0; r < 4; r++) if (r !== c) { const f = M[r][c] / M[c][c]; for (let k = c; k < 5; k++) M[r][k] -= f * M[c][k]; }
+  }
+  return [M[0][4]/M[0][0], M[1][4]/M[1][1], M[2][4]/M[2][2], M[3][4]/M[3][3]];
+}
+// Fit NSS: grid-search the two decay params (betas are linear given λ's), keep best SSR.
+// Returns an evaluator τ → yield, or null if degenerate.
+function fitNSS(taus, ys) {
+  if (taus.length < 4) return null;
+  const grid = [0.5, 1, 1.5, 2, 2.5, 3, 4, 5, 7, 10, 15, 20, 30];
+  let best = null;
+  for (const l1 of grid) for (const l2 of grid) {
+    if (l2 <= l1) continue;
+    const X = taus.map(t => _nssBasis(t, l1, l2));
+    const beta = _ols4(X, ys);
+    if (!beta) continue;
+    let ssr = 0;
+    for (let k = 0; k < taus.length; k++) {
+      const xb = _nssBasis(taus[k], l1, l2);
+      const yh = xb[0]*beta[0] + xb[1]*beta[1] + xb[2]*beta[2] + xb[3]*beta[3];
+      ssr += (ys[k] - yh) ** 2;
+    }
+    if (!best || ssr < best.ssr) best = { l1, l2, beta, ssr };
+  }
+  if (!best) return null;
+  const fn = tau => {
+    const xb = _nssBasis(tau, best.l1, best.l2);
+    return xb[0]*best.beta[0] + xb[1]*best.beta[1] + xb[2]*best.beta[2] + xb[3]*best.beta[3];
+  };
+  fn._params = best;
+  return fn;
+}
+
 function calculateSAO(bonds) {
   const n = bonds.length;
   const sao = new Array(n);
-  const now = new Date();
+  if (n === 0) return sao;
 
-  for (let i = n - 1; i >= 0; i--) {
-    const bond = bonds[i];
-    const yearsToMat = (bond.maturityDate - now) / 31557600000;
+  const settle = localDate(bonds[0].settlementDate) || new Date();
+  const yrs = bonds.map(b => (b.maturityDate - settle) / 31557600000);
 
-    if (yearsToMat > 7 || i > n - 4) {
-      sao[i] = bond.saYield;
-      continue;
-    }
+  // Fit on reliable points only; near-maturity SA yields are price-noise-dominated.
+  const fitIdx = [];
+  for (let i = 0; i < n; i++) if (yrs[i] >= SAO_NOISE_YRS) fitIdx.push(i);
+  const curve = fitNSS(fitIdx.map(i => yrs[i]), fitIdx.map(i => bonds[i].saYield));
 
-    const windowSize = 4;
-    const actualWindow = Math.min(windowSize, n - 1 - i);
-    
-    let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
-    for (let j = 1; j <= actualWindow; j++) {
-      const x = (bonds[i + j].maturityDate - bond.maturityDate) / 86400000;
-      const y = sao[i + j];
-      sumX += x; sumY += y; sumXY += x * y; sumX2 += x * x;
-    }
-
-    const slope = (actualWindow * sumXY - sumX * sumY) / (actualWindow * sumX2 - sumX * sumX);
-    const intercept = (sumY - slope * sumX) / actualWindow;
-    const projected = intercept;
-
-    let trendWeight = 0.2;
-    if (yearsToMat < 0.5) trendWeight = 0.9; 
-    else if (yearsToMat < 2) trendWeight = 0.15; 
-    else if (yearsToMat < 5) trendWeight = 0.25;
-
-    sao[i] = (projected * trendWeight) + (bond.saYield * (1 - trendWeight));
+  for (let i = 0; i < n; i++) {
+    const b = bonds[i];
+    const fit = curve ? curve(yrs[i]) : b.saYield;
+    b._saoFit = fit;
+    b._saoDevBps = (b.saYield - fit) * 10000;   // how far the SA point sat off the smooth curve (rich/cheap)
+    b._saoMode = yrs[i] < SAO_NOISE_YRS ? 'noise' : 'smooth';
+    sao[i] = fit;
   }
   return sao;
 }
