@@ -809,19 +809,19 @@ function renderNominalsChart(fedBonds, fidBonds) {
   if (fedBonds) {
     const sfx = bothShown ? ' (FedInvest)' : '';
     seriesDef.push(
-      { label: `Bills${sfx}`,  data: fedBonds.filter(b => b.type === 'MARKET BASED BILL' && !isStrip(b.cusip)).map(toPoint), color: '#0ea5e9', r: 2, w: 1.5, dash: [4, 4] },
-      { label: `Notes${sfx}`,  data: fedBonds.filter(b => b.type === 'MARKET BASED NOTE' && !isStrip(b.cusip)).map(toPoint), color: '#1a56db', r: 2, w: 2.5, dash: [4, 4] },
-      { label: `Bonds${sfx}`,  data: fedBonds.filter(b => b.type === 'MARKET BASED BOND' && !isStrip(b.cusip)).map(toPoint), color: '#7c3aed', r: 2, w: 2.5, dash: [4, 4] },
-      { label: `STRIPS${sfx}`, data: fedBonds.filter(b => isStrip(b.cusip)).map(toPoint), color: '#64748b', r: 2, w: 2.2, dash: [4, 4] }
+      { label: `Bills${sfx}`,  data: fedBonds.filter(b => b.type === 'MARKET BASED BILL' && !isStrip(b.cusip)).map(toPoint), color: '#0ea5e9', r: 1, w: 1.5, dash: [4, 4] },
+      { label: `Notes${sfx}`,  data: fedBonds.filter(b => b.type === 'MARKET BASED NOTE' && !isStrip(b.cusip)).map(toPoint), color: '#1a56db', r: 1, w: 2.5, dash: [4, 4] },
+      { label: `Bonds${sfx}`,  data: fedBonds.filter(b => b.type === 'MARKET BASED BOND' && !isStrip(b.cusip)).map(toPoint), color: '#7c3aed', r: 1, w: 2.5, dash: [4, 4] },
+      { label: `STRIPS${sfx}`, data: fedBonds.filter(b => isStrip(b.cusip)).map(toPoint), color: '#64748b', r: 1, w: 2.2, dash: [4, 4] }
     );
   }
   if (fidBonds) {
     const sfx = bothShown ? ' (Market)' : '';
     seriesDef.push(
-      { label: `Bills${sfx}`,  data: fidBonds.filter(b => b.type === 'MARKET BASED BILL' && !isStrip(b.cusip)).map(toPoint), color: '#f97316', r: 2, w: 1.5, dash: [] },
-      { label: `Notes${sfx}`,  data: fidBonds.filter(b => b.type === 'MARKET BASED NOTE' && !isStrip(b.cusip)).map(toPoint), color: '#dc2626', r: 2, w: 2.5, dash: [] },
-      { label: `Bonds${sfx}`,  data: fidBonds.filter(b => b.type === 'MARKET BASED BOND' && !isStrip(b.cusip)).map(toPoint), color: '#059669', r: 2, w: 2.5, dash: [] },
-      { label: `STRIPS${sfx}`, data: fidBonds.filter(b => isStrip(b.cusip)).map(toPoint), color: '#78350f', r: 2, w: 2.2, dash: [] }
+      { label: `Bills${sfx}`,  data: fidBonds.filter(b => b.type === 'MARKET BASED BILL' && !isStrip(b.cusip)).map(toPoint), color: '#f97316', r: 1, w: 1.5, dash: [] },
+      { label: `Notes${sfx}`,  data: fidBonds.filter(b => b.type === 'MARKET BASED NOTE' && !isStrip(b.cusip)).map(toPoint), color: '#dc2626', r: 1, w: 2.5, dash: [] },
+      { label: `Bonds${sfx}`,  data: fidBonds.filter(b => b.type === 'MARKET BASED BOND' && !isStrip(b.cusip)).map(toPoint), color: '#059669', r: 1, w: 2.5, dash: [] },
+      { label: `STRIPS${sfx}`, data: fidBonds.filter(b => isStrip(b.cusip)).map(toPoint), color: '#78350f', r: 1, w: 2.2, dash: [] }
     );
   }
 
@@ -1213,17 +1213,17 @@ function renderChart(fedBonds, brokerBonds) {
   if (fedBonds) {
     const sfx = both ? ' (Fed)' : '';
     seriesDef.push(
-      { label: `Ask${sfx}`, data: fedBonds.map(b => toPt(b, 'askYield')), color: '#94a3b8', style: 'circle', w: 1.5, r: 2.5, dash: [4, 4] },
-      { label: `SA${sfx}`,  data: fedBonds.map(b => toPt(b, 'saYield')),  color: '#475569', style: 'circle', w: 1.8, r: 2.5, dash: [4, 4] },
-      { label: `SAO${sfx}`, data: fedBonds.map(b => toPt(b, 'saoYield')), color: '#1a56db', style: 'circle', w: 2.2, r: 2.5, dash: [4, 4] }
+      { label: `Ask${sfx}`, data: fedBonds.map(b => toPt(b, 'askYield')), color: '#94a3b8', style: 'circle', w: 1.5, r: 1.25, dash: [4, 4] },
+      { label: `SA${sfx}`,  data: fedBonds.map(b => toPt(b, 'saYield')),  color: '#475569', style: 'circle', w: 1.8, r: 1.25, dash: [4, 4] },
+      { label: `SAO${sfx}`, data: fedBonds.map(b => toPt(b, 'saoYield')), color: '#1a56db', style: 'circle', w: 2.2, r: 1.25, dash: [4, 4] }
     );
   }
   if (brokerBonds) {
     const sfx = both ? ' (Market)' : '';
     seriesDef.push(
-      { label: `Ask${sfx}`, data: brokerBonds.map(b => toPt(b, 'askYield')), color: '#f97316', style: 'circle', w: 1.5, r: 2.5, dash: [] },
-      { label: `SA${sfx}`,  data: brokerBonds.map(b => toPt(b, 'saYield')),  color: '#dc2626', style: 'circle', w: 1.8, r: 2.5, dash: [] },
-      { label: `SAO${sfx}`, data: brokerBonds.map(b => toPt(b, 'saoYield')), color: '#059669', style: 'circle', w: 2.2, r: 2.5, dash: [] }
+      { label: `Ask${sfx}`, data: brokerBonds.map(b => toPt(b, 'askYield')), color: '#f97316', style: 'circle', w: 1.5, r: 1.25, dash: [] },
+      { label: `SA${sfx}`,  data: brokerBonds.map(b => toPt(b, 'saYield')),  color: '#dc2626', style: 'circle', w: 1.8, r: 1.25, dash: [] },
+      { label: `SAO${sfx}`, data: brokerBonds.map(b => toPt(b, 'saoYield')), color: '#059669', style: 'circle', w: 2.2, r: 1.25, dash: [] }
     );
   }
 
@@ -1570,14 +1570,14 @@ function renderSpreadCharts(bonds, tab) {
   if (tab === 'tips') {
     const valid = bonds.filter(b => !isNaN(b.yieldSpreadBps));
     const validP = bonds.filter(b => !isNaN(b.priceSpreadPct));
-    if (valid.length)  yieldSeries.push({ label: 'Yield Spread', data: valid.map(b => toPt(b, 'yieldSpreadBps')), color: '#1a56db', r: 3 });
-    if (validP.length) priceSeries.push({ label: 'Price Spread', data: validP.map(b => toPt(b, 'priceSpreadPct')), color: '#059669', r: 3 });
+    if (valid.length)  yieldSeries.push({ label: 'Yield Spread', data: valid.map(b => toPt(b, 'yieldSpreadBps')), color: '#1a56db', r: 1.5 });
+    if (validP.length) priceSeries.push({ label: 'Price Spread', data: validP.map(b => toPt(b, 'priceSpreadPct')), color: '#059669', r: 1.5 });
   } else {
     const types = [
-      { type: 'MARKET BASED BILL',  label: 'Bills',  yc: '#0ea5e9', pc: '#38bdf8', r: 2.5 },
-      { type: 'MARKET BASED NOTE',  label: 'Notes',  yc: '#1a56db', pc: '#60a5fa', r: 2.5 },
-      { type: 'MARKET BASED BOND',  label: 'Bonds',  yc: '#7c3aed', pc: '#a78bfa', r: 2.5 },
-      { type: 'MARKET BASED STRIP', label: 'STRIPS', yc: '#64748b', pc: '#94a3b8', r: 2   },
+      { type: 'MARKET BASED BILL',  label: 'Bills',  yc: '#0ea5e9', pc: '#38bdf8', r: 1.25 },
+      { type: 'MARKET BASED NOTE',  label: 'Notes',  yc: '#1a56db', pc: '#60a5fa', r: 1.25 },
+      { type: 'MARKET BASED BOND',  label: 'Bonds',  yc: '#7c3aed', pc: '#a78bfa', r: 1.25 },
+      { type: 'MARKET BASED STRIP', label: 'STRIPS', yc: '#64748b', pc: '#94a3b8', r: 1   },
     ];
     for (const { type, label, yc, pc, r } of types) {
       const yb = bonds.filter(b => b.type === type && !isNaN(b.yieldSpreadBps));
