@@ -54,17 +54,20 @@ This document provides the technical schemas and field-level specifications for 
 ---
 
 ## <a id="s4"></a>S4: RefCpiNsaSa.csv
-**Description**: Monthly BLS CPI-U data (NSA and SA series) for seasonal adjustment derivation.
-**Update Frequency**: Monthly.
+**Description**: Daily interpolated Reference CPI (NSA and SA) derived from monthly BLS CPI-U data via 31 CFR §356 App. B interpolation. SA daily Ref CPI is a calculated sole source (no official daily SA series).
+**Update Frequency**: Monthly (on BLS release).
+**R2 Key**: `TIPS/RefCpiNsaSa.csv`
 
 | Field | Type | Description |
 |---|---|---|
-| `Date` | Date | Month-end date. |
-| `CPI_NSA` | Number | Non-seasonally adjusted CPI-U. |
-| `CPI_SA` | Number | Seasonally adjusted CPI-U. |
-| `SA_Factor` | Number | Computed seasonal factor (`CPI_SA / CPI_NSA`). |
+| `Ref CPI Date` | Date | The specific date for the Ref CPI values. |
+| `Ref CPI NSA` | Number | Daily interpolated NSA Reference CPI (App. B). |
+| `Ref CPI SA` | Number | Daily interpolated SA Reference CPI (App. B). |
+| `SA Factor` | Number | Computed seasonal factor (`Ref CPI NSA / Ref CPI SA`). |
 
-**Live Data**: [View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/RefCpiNsaSa.csv)
+**Sort order**: Descending by date (newest row first).
+
+**Live Data**: [View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/TIPS/RefCpiNsaSa.csv)
 
 ---
 
