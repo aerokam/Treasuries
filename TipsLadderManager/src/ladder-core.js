@@ -140,7 +140,7 @@ export function selectLadderBonds({ tipsMap, firstYear, lastYear, settlementDate
 
 // ─── The shared sizing pipeline ─────────────────────────────────────────────────
 export function sizeLadder({
-  dara, daraByYear = null, firstYear, lastYear,
+  dara, daraByYear = null, firstYear, lastYear, optionalYears = null,
   rangeYears, gapYears, future30yYears,
   yearBondMap, tipsMap, refCPI, settlementDate, settlementYear,
   preLadderInterest = false,
@@ -162,9 +162,13 @@ export function sizeLadder({
     laterMatInt += annInt;
   }
 
-  // 3a. Validate: every funded year must fund at least one bond.
+  // 3a. Validate: every funded year must fund at least one bond. EXCEPT optionalYears — in a
+  // rebalance these are in-range years the user holds none of (intentional empty rungs). A target
+  // that rounds to 0 there is a hole (LMI passthrough), not a too-low-DARA error; if the user raises
+  // its per-year DARA enough to fund a bond it fills normally (target ≥ 1, never reaches this throw).
   for (const year of rangeYears) {
     if (year > lastYear || year < firstYear) continue;
+    if (optionalYears?.has(year)) continue;
     const { targetFundedYearQty, laterMatInt, pi } = prelim[year];
     const yearDara = daraByYear?.get(year) ?? dara;
     if (targetFundedYearQty === 0 && yearDara > laterMatInt) {

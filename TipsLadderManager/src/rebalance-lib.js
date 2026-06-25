@@ -715,6 +715,22 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
     }
   }
 
+  // Rebalance respects existing holes: when the ladder has NO gap / Future-30Y block to
+  // duration-match, an in-range year the user holds none of is an INTENTIONAL empty rung. Its
+  // per-year target is honored as-is (so an explicitly raised DARA — e.g. from Infer LMP — still
+  // fills it), but sizeLadder's "fund at least one bond" validation is WAIVED for it: an empty year
+  // whose target rounds to 0 is a hole, not a too-low-DARA error. This is the knife-edge that the
+  // load mirror sits on (an empty year's stub DARA ≈ its own incoming LMI). With a gap/Future block
+  // present the bracket machinery owns the unheld years. 3.0 §Per-Year DARA from Portfolio / §Funding.
+  let optionalRungYears = null;
+  if (gapYears.length === 0 && future30yYears.length === 0) {
+    const _heldYearSet = new Set(holdingsYears);
+    optionalRungYears = new Set();
+    for (let year = firstYear; year <= lastYear; year++) {
+      if (!_heldYearSet.has(year)) optionalRungYears.add(year);
+    }
+  }
+
   const araLaterMaturityInterestByYear = {};
   const araByYear = {};
   const allYearsSorted = Object.keys(yearInfo).map(Number).sort((a, b) => b - a);
@@ -905,7 +921,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
   // holdings, which drifted from build's at the partial-credit boundary year (e.g. 2040).
   const _canon = selectLadderBonds({ tipsMap, firstYear, lastYear, settlementDate, maturityPref });
   const _sl = sizeLadder({
-    dara: DARA, daraByYear, firstYear, lastYear,
+    dara: DARA, daraByYear, firstYear, lastYear, optionalYears: optionalRungYears,
     rangeYears: _canon.rangeYears, gapYears: _canon.gapYears, future30yYears: _canon.future30yYears,
     yearBondMap: _canon.yearBondMap, tipsMap, refCPI, settlementDate, settlementYear,
     preLadderInterest,

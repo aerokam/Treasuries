@@ -640,6 +640,76 @@ test('rebalance: net cash is non-negative and small (self-financing scale)', asy
   expect(netCash, `Net cash ${netCash} is unreasonably large`).toBeLessThanOrEqual(3000);
 });
 
+// ── 16b. Gap-free portfolio with interior holes: no scale, no large trades ────
+// Regression: a broker portfolio whose TIPS span 2027–2033 but hold NONE in 2029/2032
+// (intentional interior holes — 2032 is a nominal note, dropped). There are no gap years
+// (2037–39) or Future-30Y years in range, so the self-financing scale must NOT run: the
+// load mirror already nets to ≈0. The old bug fed a held-years-only map to the scale, which
+// sized the empty interior years to the scalar DARA (phantom BUYs) and then sold every rung
+// ~30% to "fund" them — small net cash but huge trades. Assert the Qty Delta column is ~0.
+// (3.0 §Funding the rebalance — the scale is gated on gap/Future-30Y years existing.)
+test('rebalance: gap-free portfolio with interior holes makes no large trades', async ({ page }) => {
+  await page.locator('#holdings-file').setInputFiles(path.join(FIXTURES, 'OfxInteriorHoles.csv'));
+  await page.locator('#run-btn').click();
+  await expect(page.locator('#simple-table')).toBeVisible({ timeout: 4_000 });
+
+  // Locate the Qty Delta column.
+  const headers = page.locator('#simple-table thead th');
+  const headerCount = await headers.count();
+  let qtyDeltaIdx = -1;
+  for (let i = 0; i < headerCount; i++) {
+    const text = (await headers.nth(i).textContent() ?? '').replace(/\s+/g, ' ').trim().toLowerCase();
+    if (text.includes('qty') && text.includes('delta')) { qtyDeltaIdx = i; break; }
+  }
+  expect(qtyDeltaIdx, 'Qty Delta column not found').toBeGreaterThanOrEqual(0);
+
+  const rows = page.locator('#simple-table tbody tr:not(.fy-group-header)');
+  const rowCount = await rows.count();
+  let maxAbsDelta = 0;
+  for (let i = 0; i < rowCount; i++) {
+    const cellText = await rows.nth(i).locator('td').nth(qtyDeltaIdx).textContent().catch(() => '');
+    const val = parseFloat((cellText ?? '').replace(/[^0-9.-]/g, ''));
+    if (!isNaN(val)) maxAbsDelta = Math.max(maxAbsDelta, Math.abs(val));
+  }
+  // Honoring the by-year mirror is a no-op; allow ±3 bonds for integer rounding only.
+  expect(maxAbsDelta, `Largest |Qty Delta| was ${maxAbsDelta} bonds — the gap-free mirror must not trade`).toBeLessThanOrEqual(3);
+
+  const netCash = parseNetCash(await page.locator('#net-cash-val').textContent());
+  expect(Math.abs(netCash), `Net cash ${netCash} should be ≈0 for a gap-free no-op`).toBeLessThanOrEqual(3000);
+});
+
+// ── 16c. Infer LMP across an empty interior year fills it to the segment DARA ──
+// Regression: the gap-free portfolio holds nothing in 2029 (an interior hole). Inferring an LMP
+// segment that spans 2029 stamps the flat LMP DARA onto EVERY LMP rung including 2029. Running must
+// then FILL 2029 to that DARA (target ≥ 1 bond) — an explicitly-raised empty year is the user's
+// stated intent, not a hole. (The earlier hole-handling wrongly forced every unheld year to 0,
+// so the panel showed the LMP value but the rebalance ignored it.) 3.0 §Intentional empty rungs.
+test('rebalance: Infer LMP fills an empty interior year to the segment DARA', async ({ page }) => {
+  test.setTimeout(20_000);
+  await page.locator('#holdings-file').setInputFiles(path.join(FIXTURES, 'OfxInteriorHoles.csv'));
+  await expect(page.locator('#dara-by-year')).toBeVisible({ timeout: 4_000 });
+  await page.locator('#dara-by-year-hdr').click();
+  await expect(page.locator('#dara-seg-tools')).toBeVisible({ timeout: 2_000 });
+
+  // Split so the empty year 2029 sits inside the LMP segment, then infer the LMP.
+  await page.locator('#split-year').selectOption({ value: '2030' });
+  await page.locator('#seg-lmp-median').click();
+  // Panel now shows a flat LMP DARA on 2029 (the empty year).
+  const lmp2029 = await page.locator('#dara-by-year-table input[data-year="2029"]').inputValue();
+  expect(parseFloat(lmp2029.replace(/[^0-9.-]/g, '')), '2029 shows the LMP DARA in the panel').toBeGreaterThan(1000);
+
+  await page.locator('#run-btn').click();
+  await expect(page.locator('#simple-table')).toBeVisible({ timeout: 4_000 });
+
+  // The per-funded-year total lives in the group-header row (e.g. "▶ 2029 … 0  64  +64 …").
+  // Find the 2029 group row and assert it shows a positive Qty Delta — i.e. 2029 was BOUGHT to the
+  // LMP DARA rather than left as an empty hole (the bug rendered Δ0).
+  const row2029 = page.locator('#simple-table tr.fy-group-header[data-fy="2029"]').first();
+  await expect(row2029).toBeVisible();
+  const rowText = (await row2029.textContent() ?? '').replace(/\s+/g, ' ');
+  expect(rowText, `2029 must FILL to the LMP DARA (got "${rowText.trim()}"), not stay an empty hole`).toMatch(/\+\s*[1-9]\d*/);
+});
+
 // ── 17. RefCPI date change clears output but preserves DARA ──────────────────
 test('rebalance: changing RefCPI date clears output and does not alter DARA', async ({ page }) => {
   await page.locator('#holdings-file').setInputFiles(HOLDINGS_PATH);
