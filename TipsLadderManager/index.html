@@ -290,13 +290,6 @@
           <button id="bracket-mode-help" style="background:none;border:1px solid #64748b;border-radius:50%;width:16px;height:16px;font-size:10px;color:#64748b;cursor:pointer;padding:0;line-height:1;flex-shrink:0" title="Bracket mode help">?</button>
         </div>
       </div>
-      <div class="field" id="field-multi-account-mode" style="display:none">
-        <label style="white-space:nowrap" title="Allocate ladder across multiple accounts by tax preference">Multi-Acct</label>
-        <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
-          <input type="checkbox" id="multi-account-mode" style="width:auto;margin:0">
-          <span style="font-size:10px;font-weight:800;color:#fff;text-transform:uppercase;letter-spacing:.08em">Enable</span>
-        </label>
-      </div>
       <div class="field" id="field-build-maturity" style="display:none">
         <label>Maturity pick</label>
         <select id="build-maturity">
@@ -340,16 +333,6 @@
       </div>
     </div>
     <div id="status"></div>
-  </div>
-</div>
-
-<!-- Multi-Account Config: account size sliders, shown right after the form card when multi-account mode is on -->
-<div id="multi-account-config" style="display:none;margin-bottom:16px;padding:12px 16px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;">
-  <div id="multi-account-accounts"></div>
-  <div style="margin-top:10px;display:flex;align-items:center;gap:8px;font-size:13px;">
-    <label for="min-months-to-maturity" style="color:#374151;">Min months to maturity (no buy):</label>
-    <input type="number" id="min-months-to-maturity" value="6" min="0" max="36" step="1"
-      style="width:60px;padding:3px 6px;border:1px solid #d1d5db;border-radius:4px;font-size:13px;">
   </div>
 </div>
 
@@ -414,21 +397,8 @@
   </div>
 </div>
 
-<!-- Multi-Account Results Panel -->
-<div id="multi-account-panel" style="display:none;margin-top:20px;padding:16px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;">
-  <div id="multi-account-feasibility" style="margin-bottom:16px;padding:12px;border-radius:6px;"></div>
-  <div id="multi-account-results">
-    <div class="table-wrap">
-      <div class="table-scroll-wrap">
-        <table class="simple" id="multi-account-table"></table>
-      </div>
-    </div>
-  </div>
-  <div id="multi-account-trade-tables" style="margin-top:20px;"></div>
-</div>
-
 <script type="module">
-import { buildTipsMapFromYields, localDate, runRebalance, runMultiAccountRebalance, inferScaledDARAFromPortfolio, computePortfolioARAByYear, getGapYearBracketCandidates, getGapYears, derivePerYearDara, parseFundedYearDaraBlock, parseParamsBlock, inferFirstYearFromHoldings, inferLastYearFromHoldings, yieldFromPrice, fmtDate } from './src/rebalance-lib.js';
+import { buildTipsMapFromYields, localDate, runRebalance, inferScaledDARAFromPortfolio, computePortfolioARAByYear, getGapYearBracketCandidates, getGapYears, derivePerYearDara, parseFundedYearDaraBlock, parseParamsBlock, inferFirstYearFromHoldings, inferLastYearFromHoldings, yieldFromPrice, fmtDate } from './src/rebalance-lib.js';
 import { segmentRanges, constantMap, applySegmentMap } from './src/segment-dara.js';
 import { runBuild, MAX_LAST_YEAR } from './src/build-lib.js';
 import { renderTable, COLS } from './src/render.js';
@@ -437,7 +407,6 @@ import { showPopup, hidePopup } from './src/popup.js';
 import { fetchTipsData, lookupRefCpi, nextBondTradingDay } from './src/data.js';
 window.lookupRefCpi = lookupRefCpi;
 import { parseBrokerCSV } from './src/broker-import.js';
-import { detectAccountType } from './src/account-allocation.js';
 
 const toIso = d => d ? d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0') : '';
 
@@ -1223,8 +1192,6 @@ function _initRebalDaraFromPortfolio() {
 let currentHoldingsArray = null;
 let currentImportedDaraByYear = null; // explicit per-year DARA from our own export's #fundedYear,dara block (null for broker/legacy)
 let currentImportedParams = null; // construction params from our own export's #params line ({preLadderInterest, maturityPref}); null for broker/legacy
-let brokerTipsValues = {}; // { accountName: valueOfTipsOnly }
-let brokerTotalAccountValues = {}; // { accountName: totalAccountValue }
 
 document.getElementById('holdings-file-btn').addEventListener('click', () => {
   const fi = document.getElementById('holdings-file');
@@ -1236,11 +1203,7 @@ document.getElementById('holdings-file').addEventListener('change', async (e) =>
   const file = e.target.files[0];
   document.getElementById('holdings-file-name').textContent = file ? file.name : 'No file chosen';
   currentHoldingsArray = null;
-  currentHoldingsWithAccounts = null;
-  detectedAccounts = {};
   window._pendingBrokerAccounts = null; // Clear any stale account data
-  brokerTipsValues = {};
-  brokerTotalAccountValues = {};
   setStatus('');
   // Clear stale output and reset all inference state when a new file is loaded
   simpleEl.innerHTML = '';
@@ -1249,9 +1212,6 @@ document.getElementById('holdings-file').addEventListener('change', async (e) =>
   document.getElementById('export-csv-btn').style.display = 'none';
   document.getElementById('export-cusip-qty-btn').style.display = 'none';
   document.getElementById('purchase-list-btn').style.display = 'none';
-  document.getElementById('multi-account-panel').style.display = 'none';
-  document.getElementById('multi-account-feasibility').innerHTML = '';
-  document.getElementById('multi-account-trade-tables').innerHTML = '';
   // Clear all form fields and per-year DARA state for fresh file
   document.getElementById('dara').value = '';
   _daraAutoInferred = false;
@@ -1275,8 +1235,6 @@ document.getElementById('holdings-file').addEventListener('change', async (e) =>
 
     const brokerResult = parseBrokerCSV(text, tipsMap);
     const parsedAccounts = brokerResult.holdings || brokerResult; // Handle both old and new format
-    brokerTipsValues = brokerResult.tipsValues || {}; // TIPS value only (for default size)
-    brokerTotalAccountValues = brokerResult.totalAccountValues || {}; // Total account value (for max slider)
     const acctNames = Object.keys(parsedAccounts);
     if (acctNames.length === 0) {
       const CUSIP_RE = /^[A-Z0-9]{9}$/i;
@@ -1383,20 +1341,10 @@ document.getElementById('holdings-file').addEventListener('change', async (e) =>
     const selected = Array.from(document.querySelectorAll('#account-list input:checked')).map(cb => cb.value);
     if (selected.length === 0) { setStatus('No accounts selected.', true); return; }
 
-    // Store account-aware holdings and build account metadata
-    currentHoldingsWithAccounts = [];
-    detectedAccounts = {};
-    let combined = [];
+    // Combine the selected accounts' holdings into a single ladder (one portfolio).
+    const combined = [];
     for (const name of selected) {
-      const acctHoldings = window._pendingBrokerAccounts[name];
-      const acctType = detectAccountType(name);
-      const tipsValue = brokerTipsValues[name] || 50000; // Default allocation size (TIPS value only)
-      const maxValue = brokerTotalAccountValues[name] || tipsValue; // Max slider value (total account value)
-      detectedAccounts[name] = { type: acctType, holdings: acctHoldings, sizeInDollars: tipsValue, maxSizeInDollars: maxValue };
-      for (const h of acctHoldings) {
-        currentHoldingsWithAccounts.push({ ...h, account: name });
-        combined.push(h);
-      }
+      for (const h of window._pendingBrokerAccounts[name]) combined.push(h);
     }
     currentHoldingsArray = combined;
     document.getElementById('rebal-last-year').value = '';
@@ -1404,7 +1352,6 @@ document.getElementById('holdings-file').addEventListener('change', async (e) =>
     updateRebalLastYearDropdown();
     updateRebalFirstYearDropdown();
     _initRebalDaraFromPortfolio();
-    updateMultiAccountUI();
   });
   const clearAllBtn = document.getElementById('account-clear-all');
   if (clearAllBtn) {
@@ -1899,349 +1846,6 @@ document.getElementById('dara-dec').addEventListener('click', () => { _daraStep(
 
 document.getElementById('dara').addEventListener('input', () => { _daraAutoInferred = false; renderDaraByYearPanel(); });
 
-// ─── Multi-Account Mode ──────────────────────────────────────────────────────
-let currentHoldingsWithAccounts = null; // [ { cusip, qty, account }, ... ]
-let detectedAccounts = {}; // { accountName: { type, holdings: [...] } }
-
-function updateMultiAccountUI() {
-  const hasMultipleAccounts = currentHoldingsWithAccounts && Object.keys(detectedAccounts).length > 1;
-  document.getElementById('field-multi-account-mode').style.display = hasMultipleAccounts ? '' : 'none';
-
-  if (hasMultipleAccounts) {
-    const checkbox = document.getElementById('multi-account-mode');
-    checkbox.checked = true;
-    renderAccountSizes(); // shows #multi-account-config
-  } else {
-    document.getElementById('multi-account-panel').style.display = 'none';
-    const checkbox = document.getElementById('multi-account-mode');
-    checkbox.checked = false;
-    renderAccountSizes(); // hides #multi-account-config
-  }
-}
-
-function renderAccountSizes() {
-  const checkbox = document.getElementById('multi-account-mode');
-  const panel = document.getElementById('multi-account-accounts');
-  const configDiv = document.getElementById('multi-account-config');
-
-  if (!checkbox.checked) {
-    panel.innerHTML = '';
-    configDiv.style.display = 'none';
-    return;
-  }
-
-  configDiv.style.display = '';
-  let html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;">';
-  for (const [accName, accInfo] of Object.entries(detectedAccounts)) {
-    const type = accInfo.type;
-    const typeLabel = type === 'roth_ira' ? 'Roth IRA' : type === 'traditional_ira' ? 'Traditional IRA' : 'Taxable';
-    const size = Math.round((accInfo.sizeInDollars || 50000) / 1000) * 1000;
-    const maxSize = Math.round((accInfo.maxSizeInDollars || 50000) / 1000) * 1000;
-    const displayMax = Math.max(maxSize, size);
-
-    const rmdSection = type === 'traditional_ira' ? `
-        <label style="display:block;font-size:11px;margin-top:10px;margin-bottom:4px;">Annual RMD ($)</label>
-        <input type="number" class="account-rmd-input" data-account="${esc(accName)}" value="${Math.round(accInfo.rmdAnnualAmount || 0)}" style="width:100%;padding:4px;font-size:11px;border:1px solid #cbd5e1;border-radius:4px;box-sizing:border-box;" min="0" step="1000" placeholder="0">
-      ` : '';
-    html += `
-      <div style="padding:12px;background:#fff;border:1px solid #d1d5db;border-radius:6px;">
-        <div style="font-size:12px;font-weight:600;margin-bottom:4px;">${esc(accName)}</div>
-        <div style="font-size:11px;color:#666;margin-bottom:8px;">${typeLabel}</div>
-        <label style="display:block;font-size:11px;margin-bottom:4px;">Allocation ($)</label>
-        <input type="range" class="account-size-slider" data-account="${esc(accName)}" value="${size}" min="0" max="${displayMax}" step="1000" style="width:100%;margin-bottom:6px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">
-          <input type="text" class="account-size-input" data-account="${esc(accName)}" value="${size.toLocaleString('en-US', {maximumFractionDigits: 0})}" style="flex:1;padding:4px;font-size:11px;border:1px solid #cbd5e1;border-radius:4px;">
-          <span style="font-size:11px;color:#666;">/ $${displayMax.toLocaleString('en-US', {maximumFractionDigits: 0})}</span>
-        </div>
-        ${rmdSection}
-      </div>
-    `;
-  }
-  html += '</div>';
-  panel.innerHTML = html;
-
-  // Wire up slider and input changes
-  document.querySelectorAll('.account-size-slider').forEach(slider => {
-    const accName = slider.dataset.account;
-    const inputEl = document.querySelector(`.account-size-input[data-account="${CSS.escape(accName)}"]`);
-
-    slider.addEventListener('input', (e) => {
-      const val = parseInt(e.target.value, 10);
-      if (inputEl) {
-        inputEl.value = val.toLocaleString('en-US', {maximumFractionDigits: 0});
-      }
-      if (detectedAccounts[accName]) {
-        detectedAccounts[accName].sizeInDollars = val;
-      }
-    });
-  });
-
-  document.querySelectorAll('.account-size-input').forEach(input => {
-    const accName = input.dataset.account;
-    const sliderEl = document.querySelector(`.account-size-slider[data-account="${CSS.escape(accName)}"]`);
-
-    input.addEventListener('change', (e) => {
-      let val = parseInt(e.target.value.replace(/,/g, ''), 10) || 0;
-      val = Math.round(val / 1000) * 1000;
-      if (sliderEl) sliderEl.value = val;
-      input.value = val.toLocaleString('en-US', {maximumFractionDigits: 0});
-      if (detectedAccounts[accName]) {
-        detectedAccounts[accName].sizeInDollars = val;
-      }
-    });
-  });
-
-  document.querySelectorAll('.account-rmd-input').forEach(input => {
-    const accName = input.dataset.account;
-    input.addEventListener('change', (e) => {
-      const val = Math.max(0, parseInt(e.target.value, 10) || 0);
-      input.value = val;
-      if (detectedAccounts[accName]) {
-        detectedAccounts[accName].rmdAnnualAmount = val;
-      }
-    });
-  });
-}
-
-document.getElementById('multi-account-mode').addEventListener('change', (e) => {
-  renderAccountSizes();
-  if (!e.target.checked) {
-    document.getElementById('multi-account-panel').style.display = 'none';
-  }
-});
-
-function renderMultiAccountOutput(maResult) {
-  const feasEl = document.getElementById('multi-account-feasibility');
-
-  // ─── Feasibility Report ───
-  const feasRpt = maResult.feasibility;
-  let feasHtml = '';
-  feasHtml += feasRpt.feasible
-    ? '<div style="background:#dcfce7;border:1px solid #86efac;border-radius:6px;padding:10px;color:#166534;font-size:12px;"><strong>✓ Feasible</strong> — All account allocations fit within their budgets.</div>'
-    : '<div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:6px;padding:10px;color:#991b1b;font-size:12px;"><strong>✗ Infeasible</strong> — Some accounts exceed their budget:<br>';
-  if (!feasRpt.feasible) {
-    for (const acc of feasRpt.infeasibleAccounts) {
-      feasHtml += `<div style="margin-top:6px;">• <strong>${esc(acc.account)}</strong>: shortfall of $${acc.shortfall.toFixed(0)}</div>`;
-    }
-    feasHtml += '</div>';
-  }
-  feasEl.innerHTML = feasHtml;
-
-  const accountNames = Object.keys(maResult.accountAllocation).sort();
-
-  // ─── Expand/collapse controls ───
-  document.getElementById('multi-account-results').innerHTML =
-    `<div style="display:flex;justify-content:flex-end;gap:6px;margin-bottom:6px;">` +
-    `<button id="ma-expand-all" style="padding:2px 8px;font-size:11px;cursor:pointer;border:1px solid #cbd5e1;border-radius:3px;background:#f8fafc;">Expand All</button>` +
-    `<button id="ma-collapse-all" style="padding:2px 8px;font-size:11px;cursor:pointer;border:1px solid #cbd5e1;border-radius:3px;background:#f8fafc;">Collapse All</button>` +
-    `</div>`;
-
-  // ─── Clear previous sub-rows and rebuild ───
-  simpleEl.querySelectorAll('tr.acct-subrow').forEach(tr => tr.remove());
-  simpleEl.querySelectorAll('.acct-toggle').forEach(el => el.remove());
-  simpleEl.querySelectorAll('tr[data-ri]').forEach(tr => { tr.style.backgroundColor = ''; });
-
-  const alloc = maResult.accountAllocation;
-  const currentByAcct = maResult.currentHoldingsByAccount || {};
-  const details = maResult.rebalanceResult?.details || [];
-  const colCount = simpleEl.querySelector('thead tr')?.childElementCount || 11;
-  const allAccountNames = [...new Set([...Object.keys(alloc), ...Object.keys(currentByAcct)])].sort();
-  const allSubRows = [];
-
-  for (const mainTr of simpleEl.querySelectorAll('tr[data-ri]:not([data-sub])')) {
-    const ri = parseInt(mainTr.dataset.ri);
-    const d = details[ri];
-    if (!d) continue;
-    const { cusip, fundedYear } = d;
-
-    // Per-account before/after for this CUSIP/year
-    const acctData = [];
-    for (const accountName of allAccountNames) {
-      const qtyBefore = currentByAcct[accountName]?.[cusip]?.[fundedYear] || 0;
-      const qtyAfter = alloc[accountName]?.[cusip]?.[fundedYear] || 0;
-      if (qtyBefore === 0 && qtyAfter === 0) continue;
-      acctData.push({ accountName, qtyBefore, qtyAfter, qtyDelta: qtyAfter - qtyBefore });
-    }
-    if (acctData.length === 0) continue;
-
-    // Toggle indicator on first cell
-    const firstTd = mainTr.querySelector('td:first-child');
-    if (firstTd) {
-      const toggle = document.createElement('span');
-      toggle.className = 'acct-toggle';
-      toggle.textContent = ' ▼';
-      toggle.style.cssText = 'font-size:9px;color:#94a3b8;user-select:none;cursor:pointer;';
-      firstTd.appendChild(toggle);
-    }
-
-    // Insert sub-rows after this row (or after its excess sub-row if present)
-    let insertAfter = mainTr;
-    const next = mainTr.nextElementSibling;
-    if (next?.dataset?.sub === '1' && next.dataset.ri === mainTr.dataset.ri) {
-      insertAfter = next;
-    }
-
-    const subRowEls = [];
-    for (const { accountName, qtyBefore, qtyAfter, qtyDelta } of acctData) {
-      const typeInfo = detectedAccounts[accountName];
-      const typeLabel = typeInfo?.type === 'roth_ira' ? 'R' : typeInfo?.type === 'traditional_ira' ? 'T' : 'X';
-      const actionText = qtyDelta > 0 ? `BUY +${qtyDelta}` : qtyDelta < 0 ? `SELL ${qtyDelta}` : 'HOLD';
-      const actionColor = qtyDelta > 0 ? '#166534' : qtyDelta < 0 ? '#991b1b' : '#64748b';
-
-      const subTr = document.createElement('tr');
-      subTr.className = 'acct-subrow';
-      subTr.dataset.parentRi = ri;
-      subTr.dataset.fy = String(fundedYear);
-
-      const td = document.createElement('td');
-      td.colSpan = colCount;
-      td.style.cssText = `padding:2px 8px 2px 30px;background:#f8fafc;border-bottom:1px solid rgba(0,0,0,0.06);font-size:11px;`;
-      td.innerHTML =
-        `<span style="font-weight:600;margin-right:8px;">${esc(accountName)}</span>` +
-        `<span style="background:#e2e8f0;border-radius:3px;padding:1px 5px;font-size:10px;margin-right:12px;">${typeLabel}</span>` +
-        `<span style="color:#64748b;margin-right:10px;">Before: <b>${qtyBefore}</b></span>` +
-        `<span style="color:#64748b;margin-right:12px;">After: <b>${qtyAfter}</b></span>` +
-        `<span style="color:${actionColor};font-weight:700;">${actionText}</span>`;
-
-      subTr.appendChild(td);
-      insertAfter.after(subTr);
-      insertAfter = subTr;
-      subRowEls.push(subTr);
-      allSubRows.push(subTr);
-    }
-
-    // Per-row collapse on click of toggle arrow only
-    const toggleEl = firstTd?.querySelector('.acct-toggle');
-    if (toggleEl) {
-      toggleEl.addEventListener('click', e => {
-        e.stopPropagation();
-        const expanded = subRowEls[0]?.style.display !== 'none';
-        subRowEls.forEach(sr => { sr.style.display = expanded ? 'none' : ''; });
-        toggleEl.textContent = expanded ? ' ▶' : ' ▼';
-      });
-    }
-  }
-
-  // ─── Expand / Collapse All ───
-  document.getElementById('ma-expand-all')?.addEventListener('click', () => {
-    allSubRows.forEach(sr => { sr.style.display = ''; });
-    simpleEl.querySelectorAll('.acct-toggle').forEach(t => { t.textContent = ' ▼'; });
-  });
-  document.getElementById('ma-collapse-all')?.addEventListener('click', () => {
-    allSubRows.forEach(sr => { sr.style.display = 'none'; });
-    simpleEl.querySelectorAll('.acct-toggle').forEach(t => { t.textContent = ' ▶'; });
-  });
-
-  // ─── Per-Account Trade Tables ───
-  const tradeTablesEl = document.getElementById('multi-account-trade-tables');
-
-  // Build cusip → costPerBond from details
-  const costByCusip = {};
-  for (const d of details) { if (d.cusip) costByCusip[d.cusip] = d.costPerBond; }
-
-  // Collect trade rows per account by iterating details (avoids key-type issues)
-  const tradesByAccount = {};
-  for (const name of accountNames) tradesByAccount[name] = [];
-
-  for (const d of details) {
-    const { cusip, fundedYear, maturity } = d;
-    for (const accountName of accountNames) {
-      const qtyBefore = currentByAcct[accountName]?.[cusip]?.[fundedYear] || 0;
-      const qtyAfter  = alloc[accountName]?.[cusip]?.[fundedYear] || 0;
-      const qtyDelta  = qtyAfter - qtyBefore;
-      if (qtyBefore === 0 && qtyAfter === 0) continue;
-      tradesByAccount[accountName].push({ fundedYear, maturity, cusip, qtyBefore, qtyAfter, qtyDelta });
-    }
-  }
-
-  let tradeHtml = '<div style="font-size:13px;font-weight:600;margin-bottom:12px;">Per-Account Trade Instructions</div>';
-
-  for (const accountName of accountNames) {
-    const typeInfo  = detectedAccounts[accountName];
-    const typeLabel = typeInfo?.type === 'roth_ira' ? 'Roth IRA' : typeInfo?.type === 'traditional_ira' ? 'Traditional IRA' : 'Taxable';
-    const flows     = maResult.accountCashFlows[accountName] || {};
-    const rows      = tradesByAccount[accountName];
-
-    if (rows.length === 0) {
-      tradeHtml += `<div style="margin-bottom:12px;padding:8px 12px;background:#f1f5f9;border:1px solid #ddd;border-radius:6px;font-size:12px;">` +
-        `<strong>${esc(accountName)}</strong> <span style="color:#666;font-size:11px;">(${typeLabel})</span>` +
-        ` — No trades required</div>`;
-      continue;
-    }
-
-    rows.sort((a, b) => a.fundedYear - b.fundedYear);
-
-    let totalBuyCost = 0, totalSellProceeds = 0;
-    for (const r of rows) {
-      if (r.qtyDelta === 0) continue;
-      const cost = Math.abs(r.qtyDelta) * (costByCusip[r.cusip] || 0);
-      if (r.qtyDelta > 0) totalBuyCost += cost; else totalSellProceeds += cost;
-    }
-    const netCash      = totalSellProceeds - totalBuyCost;
-    const netColor     = netCash >= 0 ? '#166534' : '#991b1b';
-    const netStr       = (netCash >= 0 ? '+' : '') + '$' + Math.abs(netCash).toLocaleString('en-US', { maximumFractionDigits: 0 });
-
-    tradeHtml += `<div style="margin-bottom:20px;">`;
-
-    // Account header bar
-    tradeHtml +=
-      `<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:#f1f5f9;` +
-      `border:1px solid #ddd;border-bottom:none;border-radius:6px 6px 0 0;font-size:12px;">` +
-      `<span style="font-size:13px;font-weight:700;">${esc(accountName)}</span>` +
-      `<span style="background:#e2e8f0;border-radius:3px;padding:1px 6px;font-size:10px;">${typeLabel}</span>` +
-      `<span style="margin-left:auto;color:#475569;">Budget: <b>$${(flows.budget ?? 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}</b></span>` +
-      `<span style="margin-left:16px;color:${netColor};">Net cash: <b>${netStr}</b></span>` +
-      `</div>`;
-
-    // Trade table
-    tradeHtml +=
-      `<table style="width:100%;border-collapse:collapse;font-size:12px;border:1px solid #ddd;border-radius:0 0 6px 6px;overflow:hidden;">` +
-      `<thead><tr style="background:#f1f5f9;">`;
-    for (const [h, align] of [['Year','right'],['CUSIP','left'],['Maturity','right'],['Qty Before','right'],['Qty After','right'],['Action','right'],['Cash Impact','right']]) {
-      tradeHtml += `<th style="padding:5px 8px;text-align:${align};font-weight:600;border-bottom:1px solid #ddd;white-space:nowrap;">${h}</th>`;
-    }
-    tradeHtml += `</tr></thead><tbody>`;
-
-    for (const r of rows) {
-      const cost         = (costByCusip[r.cusip] || 0);
-      const isHold       = r.qtyDelta === 0;
-      const cashImpact   = r.qtyDelta === 0 ? 0 : -r.qtyDelta * cost;
-      const impactStr    = isHold ? '—' : (cashImpact >= 0 ? '+' : '') + '$' + Math.abs(cashImpact).toLocaleString('en-US', { maximumFractionDigits: 0 });
-      const impactColor  = isHold ? '#64748b' : cashImpact >= 0 ? '#166534' : '#991b1b';
-      const actionText   = isHold ? 'HOLD' : r.qtyDelta > 0 ? `BUY +${r.qtyDelta}` : `SELL ${r.qtyDelta}`;
-      const actionColor  = isHold ? '#64748b' : r.qtyDelta > 0 ? '#991b1b' : '#166534';
-      const rowBg        = isHold ? 'background:#fafafa;' : '';
-      const matStr       = r.maturity ? fmtDate(r.maturity) : r.fundedYear;
-
-      tradeHtml +=
-        `<tr style="border-bottom:1px solid #f1f5f9;${rowBg}">` +
-        `<td style="padding:4px 8px;text-align:right;">${r.fundedYear}</td>` +
-        `<td style="padding:4px 8px;font-family:monospace;font-size:11px;">${esc(r.cusip)}</td>` +
-        `<td style="padding:4px 8px;text-align:right;white-space:nowrap;">${matStr}</td>` +
-        `<td style="padding:4px 8px;text-align:right;">${r.qtyBefore}</td>` +
-        `<td style="padding:4px 8px;text-align:right;">${r.qtyAfter}</td>` +
-        `<td style="padding:4px 8px;text-align:right;font-weight:700;color:${actionColor};">${actionText}</td>` +
-        `<td style="padding:4px 8px;text-align:right;color:${impactColor};">${impactStr}</td>` +
-        `</tr>`;
-    }
-
-    // Footer totals
-    const sellsStr = '+$' + totalSellProceeds.toLocaleString('en-US', { maximumFractionDigits: 0 });
-    const buysStr  = '-$' + totalBuyCost.toLocaleString('en-US', { maximumFractionDigits: 0 });
-    tradeHtml +=
-      `<tr style="background:#f8fafc;border-top:2px solid #ddd;font-weight:600;font-size:11px;">` +
-      `<td colspan="5" style="padding:5px 8px;text-align:right;color:#475569;">` +
-      `Sells: <span style="color:#166534;">${sellsStr}</span>&nbsp;&nbsp;Buys: <span style="color:#991b1b;">${buysStr}</span>` +
-      `</td>` +
-      `<td colspan="2" style="padding:5px 8px;text-align:right;color:${netColor};">Net: ${netStr}</td>` +
-      `</tr>`;
-
-    tradeHtml += `</tbody></table></div>`;
-  }
-
-  tradeTablesEl.innerHTML = tradeHtml;
-}
-
 // ─── Run handler ──────────────────────────────────────────────────────────────
 document.getElementById('run-btn').addEventListener('click', async () => {
   setStatus('');
@@ -2289,78 +1893,43 @@ document.getElementById('run-btn').addEventListener('click', async () => {
       _daraByYearPanelDefault = finalDara;
       updateDaraInput();
 
-      // Check if multi-account mode is enabled
-      const useMultiAccountMode = document.getElementById('multi-account-mode')?.checked && currentHoldingsWithAccounts && Object.keys(detectedAccounts).length > 1;
-
       let result;
-      if (useMultiAccountMode) {
-        // Run multi-account rebalance
-        // Build rmdByAccount from detectedAccounts for tIRA accounts with rmdAnnualAmount set
-        const rmdByAccount = {};
-        for (const [name, info] of Object.entries(detectedAccounts)) {
-          if (info.type === 'traditional_ira' && info.rmdAnnualAmount > 0) {
-            rmdByAccount[name] = info.rmdAnnualAmount;
-          }
-        }
-        result = runMultiAccountRebalance({
-          dara: finalDara,
-          bracketMode: document.getElementById('bracket-mode').value,
-          holdings: currentHoldingsWithAccounts,
-          tipsMap,
-          refCPI,
-          settlementDate,
-          daraByYear: getDaraByYear(),
-          lastYearOverride: parseInt(document.getElementById('rebal-last-year').value),
-          preLadderInterest: document.getElementById('pre-ladder-interest').checked,
-          firstYearOverride: parseInt(document.getElementById('rebal-first-year').value),
-          maturityPref: currentImportedParams?.maturityPref ?? 'last',
-          accountSizes: detectedAccounts,
-          rmdByAccount,
-          minMonthsToMaturity: parseInt(document.getElementById('min-months-to-maturity').value) || 6,
+      // Run standard blended rebalance on the per-year store (load mirror, or a user-reshaped /
+      // our-export shape honored as-is). The shape-preserving self-financing scale (3.0 §Funding
+      // the rebalance) exists ONLY to raise cash for the gap-year / Future-30Y duration-match
+      // excess. So it is applied only when (a) the store is the untouched load mirror AND (b) the
+      // ladder actually has gap / Future-30Y years to fund. With no such block there is nothing to
+      // buy: the direct run on the mirror already nets to ≈0, and scaling would wrongly sell rungs
+      // to "fund" empty interior years — which are intentional holes (the user holds none), not
+      // rungs to fill. We learn whether funding is needed from the engine's own summary (gapYears /
+      // future30yYears) rather than re-deriving the range here.
+      const _bracketMode = document.getElementById('bracket-mode').value;
+      const _lastYO = parseInt(document.getElementById('rebal-last-year').value);
+      const _firstYO = parseInt(document.getElementById('rebal-first-year').value);
+      const _pli = document.getElementById('pre-ladder-interest').checked;
+      const _matPref = currentImportedParams?.maturityPref ?? 'last';
+      result = runRebalance({
+        dara: finalDara, bracketMode: _bracketMode, holdings: currentHoldingsArray, tipsMap, refCPI,
+        settlementDate, daraByYear: getDaraByYear(), lastYearOverride: _lastYO,
+        preLadderInterest: _pli, firstYearOverride: _firstYO, maturityPref: _matPref,
+      });
+      const _needsFunding = result.summary.gapYears.length > 0 || result.summary.future30yYears.length > 0;
+      if (_storeIsPristineMirror() && _needsFunding) {
+        const _rawARA = computePortfolioARAByYear(currentHoldingsArray, tipsMap, refCPI);
+        const { daraMap: _natMap } = derivePerYearDara(_rawARA, getGapYearBracketCandidates(tipsMap));
+        const { scaledMap, scaledMedian } = inferScaledDARAFromPortfolio({
+          daraMap: _natMap, holdings: currentHoldingsArray, tipsMap, refCPI, settlementDate,
+          bracketMode: _bracketMode, lastYearOverride: _lastYO, firstYearOverride: _firstYO,
+          preLadderInterest: _pli, flat: false,
         });
-        _lastKnownDara = finalDara;
-        renderOutput(result.rebalanceResult);
-        renderMultiAccountOutput(result);
-        document.getElementById('multi-account-panel').style.display = 'block';
-      } else {
-        // Run standard blended rebalance on the per-year store (load mirror, or a user-reshaped /
-        // our-export shape honored as-is). The shape-preserving self-financing scale (3.0 §Funding
-        // the rebalance) exists ONLY to raise cash for the gap-year / Future-30Y duration-match
-        // excess. So it is applied only when (a) the store is the untouched load mirror AND (b) the
-        // ladder actually has gap / Future-30Y years to fund. With no such block there is nothing to
-        // buy: the direct run on the mirror already nets to ≈0, and scaling would wrongly sell rungs
-        // to "fund" empty interior years — which are intentional holes (the user holds none), not
-        // rungs to fill. We learn whether funding is needed from the engine's own summary (gapYears /
-        // future30yYears) rather than re-deriving the range here.
-        const _bracketMode = document.getElementById('bracket-mode').value;
-        const _lastYO = parseInt(document.getElementById('rebal-last-year').value);
-        const _firstYO = parseInt(document.getElementById('rebal-first-year').value);
-        const _pli = document.getElementById('pre-ladder-interest').checked;
-        const _matPref = currentImportedParams?.maturityPref ?? 'last';
         result = runRebalance({
-          dara: finalDara, bracketMode: _bracketMode, holdings: currentHoldingsArray, tipsMap, refCPI,
-          settlementDate, daraByYear: getDaraByYear(), lastYearOverride: _lastYO,
+          dara: scaledMedian, bracketMode: _bracketMode, holdings: currentHoldingsArray, tipsMap, refCPI,
+          settlementDate, daraByYear: scaledMap, lastYearOverride: _lastYO,
           preLadderInterest: _pli, firstYearOverride: _firstYO, maturityPref: _matPref,
         });
-        const _needsFunding = result.summary.gapYears.length > 0 || result.summary.future30yYears.length > 0;
-        if (_storeIsPristineMirror() && _needsFunding) {
-          const _rawARA = computePortfolioARAByYear(currentHoldingsArray, tipsMap, refCPI);
-          const { daraMap: _natMap } = derivePerYearDara(_rawARA, getGapYearBracketCandidates(tipsMap));
-          const { scaledMap, scaledMedian } = inferScaledDARAFromPortfolio({
-            daraMap: _natMap, holdings: currentHoldingsArray, tipsMap, refCPI, settlementDate,
-            bracketMode: _bracketMode, lastYearOverride: _lastYO, firstYearOverride: _firstYO,
-            preLadderInterest: _pli, flat: false,
-          });
-          result = runRebalance({
-            dara: scaledMedian, bracketMode: _bracketMode, holdings: currentHoldingsArray, tipsMap, refCPI,
-            settlementDate, daraByYear: scaledMap, lastYearOverride: _lastYO,
-            preLadderInterest: _pli, firstYearOverride: _firstYO, maturityPref: _matPref,
-          });
-        }
-        _lastKnownDara = finalDara;
-        renderOutput(result);
-        document.getElementById('multi-account-panel').style.display = 'none';
       }
+      _lastKnownDara = finalDara;
+      renderOutput(result);
 
       if (result?.summary) {
         document.getElementById('val-range').textContent = result.summary.firstYear + '–' + result.summary.lastYear;
