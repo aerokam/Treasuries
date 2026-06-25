@@ -398,7 +398,7 @@
 </div>
 
 <script type="module">
-import { buildTipsMapFromYields, localDate, runRebalance, inferScaledDARAFromPortfolio, computePortfolioARAByYear, getGapYearBracketCandidates, getGapYears, derivePerYearDara, parseFundedYearDaraBlock, parseParamsBlock, inferFirstYearFromHoldings, inferLastYearFromHoldings, yieldFromPrice, fmtDate } from './src/rebalance-lib.js';
+import { buildTipsMapFromYields, localDate, runFundedRebalance, inferScaledDARAFromPortfolio, computePortfolioARAByYear, getGapYearBracketCandidates, getGapYears, derivePerYearDara, parseFundedYearDaraBlock, parseParamsBlock, inferFirstYearFromHoldings, inferLastYearFromHoldings, yieldFromPrice, fmtDate } from './src/rebalance-lib.js';
 import { segmentRanges, constantMap, applySegmentMap } from './src/segment-dara.js';
 import { runBuild, MAX_LAST_YEAR } from './src/build-lib.js';
 import { renderTable, COLS } from './src/render.js';
@@ -1893,41 +1893,20 @@ document.getElementById('run-btn').addEventListener('click', async () => {
       _daraByYearPanelDefault = finalDara;
       updateDaraInput();
 
-      let result;
-      // Run standard blended rebalance on the per-year store (load mirror, or a user-reshaped /
-      // our-export shape honored as-is). The shape-preserving self-financing scale (3.0 §Funding
-      // the rebalance) exists ONLY to raise cash for the gap-year / Future-30Y duration-match
-      // excess. So it is applied only when (a) the store is the untouched load mirror AND (b) the
-      // ladder actually has gap / Future-30Y years to fund. With no such block there is nothing to
-      // buy: the direct run on the mirror already nets to ≈0, and scaling would wrongly sell rungs
-      // to "fund" empty interior years — which are intentional holes (the user holds none), not
-      // rungs to fill. We learn whether funding is needed from the engine's own summary (gapYears /
-      // future30yYears) rather than re-deriving the range here.
-      const _bracketMode = document.getElementById('bracket-mode').value;
-      const _lastYO = parseInt(document.getElementById('rebal-last-year').value);
-      const _firstYO = parseInt(document.getElementById('rebal-first-year').value);
-      const _pli = document.getElementById('pre-ladder-interest').checked;
-      const _matPref = currentImportedParams?.maturityPref ?? 'last';
-      result = runRebalance({
-        dara: finalDara, bracketMode: _bracketMode, holdings: currentHoldingsArray, tipsMap, refCPI,
-        settlementDate, daraByYear: getDaraByYear(), lastYearOverride: _lastYO,
-        preLadderInterest: _pli, firstYearOverride: _firstYO, maturityPref: _matPref,
+      // Run the rebalance with self-financing funding (gap/Future-30Y scale applied only when the
+      // store is the untouched mirror AND there's a block to fund). All orchestration lives in the
+      // library (3.0 §Funding the rebalance); the shell just passes the store + pristine flag.
+      const result = runFundedRebalance({
+        dara: finalDara,
+        bracketMode: document.getElementById('bracket-mode').value,
+        holdings: currentHoldingsArray, tipsMap, refCPI, settlementDate,
+        daraByYear: getDaraByYear(),
+        isPristineMirror: _storeIsPristineMirror(),
+        lastYearOverride: parseInt(document.getElementById('rebal-last-year').value),
+        firstYearOverride: parseInt(document.getElementById('rebal-first-year').value),
+        preLadderInterest: document.getElementById('pre-ladder-interest').checked,
+        maturityPref: currentImportedParams?.maturityPref ?? 'last',
       });
-      const _needsFunding = result.summary.gapYears.length > 0 || result.summary.future30yYears.length > 0;
-      if (_storeIsPristineMirror() && _needsFunding) {
-        const _rawARA = computePortfolioARAByYear(currentHoldingsArray, tipsMap, refCPI);
-        const { daraMap: _natMap } = derivePerYearDara(_rawARA, getGapYearBracketCandidates(tipsMap));
-        const { scaledMap, scaledMedian } = inferScaledDARAFromPortfolio({
-          daraMap: _natMap, holdings: currentHoldingsArray, tipsMap, refCPI, settlementDate,
-          bracketMode: _bracketMode, lastYearOverride: _lastYO, firstYearOverride: _firstYO,
-          preLadderInterest: _pli, flat: false,
-        });
-        result = runRebalance({
-          dara: scaledMedian, bracketMode: _bracketMode, holdings: currentHoldingsArray, tipsMap, refCPI,
-          settlementDate, daraByYear: scaledMap, lastYearOverride: _lastYO,
-          preLadderInterest: _pli, firstYearOverride: _firstYO, maturityPref: _matPref,
-        });
-      }
       _lastKnownDara = finalDara;
       renderOutput(result);
 

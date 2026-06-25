@@ -4,7 +4,7 @@
 
 import { readFileSync, readdirSync, existsSync } from 'fs';
 import path from 'path';
-import { buildTipsMapFromYields, localDate, runRebalance, inferDARAFromCash, inferScaledDARAFromPortfolio, inferSegmentedDARAFromPortfolio, computePortfolioARAByYear, getGapYearBracketCandidates, derivePerYearDara, parseFundedYearDaraBlock, parseParamsBlock, inferFirstYearFromHoldings, inferLastYearFromHoldings } from '../src/rebalance-lib.js';
+import { buildTipsMapFromYields, localDate, runRebalance, runFundedRebalance, inferDARAFromCash, inferScaledDARAFromPortfolio, inferSegmentedDARAFromPortfolio, computePortfolioARAByYear, getGapYearBracketCandidates, getGapYears, derivePerYearDara, parseFundedYearDaraBlock, parseParamsBlock, inferFirstYearFromHoldings, inferLastYearFromHoldings } from '../src/rebalance-lib.js';
 import { segmentRanges, constantMap, applySegmentMap } from '../src/segment-dara.js';
 import { runBuild } from '../src/build-lib.js';
 import { parseBrokerCSV } from '../src/broker-import.js';
@@ -1105,6 +1105,40 @@ for (const gapFirstYear of [2037, 2038, 2039]) {
     assert('spec-only infer returns a positive flat DARA', median > 0, true);
     console.log(`        spec flat DARA: ${Math.round(median || 0).toLocaleString()}`);
   }
+}
+
+// ── Test: runFundedRebalance — gap-free pristine mirror is a no-op (no scale) ──────────────────
+// A portfolio with no gap years (2037-39) / Future-30Y block has nothing to duration-match, so the
+// self-financing scale must NOT run: the load mirror already nets to ≈0. Guards the 3.0 §Funding gate
+// (previously only e2e-covered). Holdings 2027-2033 with holes at 2029/2032 (intentional empties).
+{
+  console.log('\nrunFundedRebalance — gap-free pristine mirror makes no large trades');
+  const rawHoldings = [
+    { cusip: '912828V49', qty: 61 }, { cusip: '9128283R9', qty: 63 },
+    { cusip: '91282CPH8', qty: 100 }, { cusip: '91282CCM1', qty: 84 },
+    { cusip: '91282CHP9', qty: 96 },
+  ].filter(h => tipsMap.get(h.cusip)?.maturity);
+
+  // Build the load mirror exactly as the UI does at file load (range form fills empty years w/ LMI).
+  const heldARA = computePortfolioARAByYear(rawHoldings, tipsMap, refCPI);
+  const heldYears = Object.keys(heldARA).map(Number);
+  const firstYear = Math.min(...heldYears), lastYear = Math.max(...heldYears);
+  const fullARA = computePortfolioARAByYear(rawHoldings, tipsMap, refCPI, { firstYear, lastYear });
+  const { median, daraMap } = derivePerYearDara(heldARA, getGapYearBracketCandidates(tipsMap));
+  const gapSet = new Set(getGapYears(tipsMap));
+  const mirror = new Map();
+  for (let y = firstYear; y <= lastYear; y++) {
+    mirror.set(y, daraMap.has(y) ? daraMap.get(y) : (gapSet.has(y) ? median : Math.round(fullARA[y] ?? 0)));
+  }
+
+  const res = runFundedRebalance({
+    dara: median, holdings: rawHoldings, tipsMap, refCPI, settlementDate,
+    daraByYear: mirror, isPristineMirror: true,
+  });
+  assert('gap-free: engine reports no gap years', res.summary.gapYears.length, 0);
+  const maxAbsDelta = Math.max(0, ...res.details.map(d => Math.abs((d.qtyAfter ?? 0) - (d.qtyBefore ?? 0))));
+  assert('gap-free pristine mirror: max |qtyDelta| <= 3 bonds (scale skipped, no sell-down)', maxAbsDelta <= 3, true);
+  assert('gap-free pristine mirror: net cash ~0', Math.abs(res.summary.costDeltaSum) <= 3000, true);
 }
 
 // ── Summary ───────────────────────────────────────────────────────────────────

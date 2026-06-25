@@ -1714,3 +1714,35 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
 
   return { results, HDR, summary: { settleDateDisp, refCPI, DARA, daraByYearResolved, inferredDARA, daraIsInferred: dara === null, firstYear, lastYear, derivedFirstYear, rungCount, gapYears, future30yYears, brackets, lowerWeight, upperWeight, costDeltaSum, costForNewRungs, gapCoverageSurplus, gapParams, bracketMode, lowerDuration, upperDuration, newLowerYear, newLowerCUSIP, newLowerDuration, newLowerWeight3, origLowerWeight, bracketFellBack3to2, beforeLowerWeight, beforeUpperWeight, beforeNewLowerWeight, afterLowerWeight, afterUpperWeight, afterNewLowerWeight, totalPreviousExcessCost, totalExcessCost, araByYear, future30yLowerYear, future30yUpperYear, future30yLowerCoverCUSIP: future30yLowerCoverBond?.cusip, future30yUpperCoverCUSIP: future30yUpperCoverBond?.cusip, future30yParams, future30yLowerDuration, future30yUpperDuration, future30yUpperWeight, future30yLowerWeight, future30yUpperExQty, future30yLowerExQty, future30yFellBack, future30yUpperAnnualAmdByYear, future30yLMITotal, preLadderInterest, maturityPref, preLadderPool, preLadderCouponPool, preLadderAmdPool, preLadderRollCouponPool, zeroedFundedYears: [...zeroedFundedYears].sort((a, b) => a - b), weightedAvgDuration, weightedAvgYield }, details };
 }
+
+// Execute a rebalance with shape-preserving self-financing FUNDING (3.0 §Funding the rebalance).
+// This is the orchestration the Run button performs, lifted out of the UI so it has one home and is
+// unit-testable:
+//   1. Run the rebalance on the given per-year DARA map directly. This honors the map as-is —
+//      including intentional empty rungs (a year the user holds none of stays a hole) and any
+//      user-reshaped / our-export shape.
+//   2. ONLY if that map is the untouched load mirror (`isPristineMirror`) AND the ladder actually
+//      has a gap-year / Future-30Y block to duration-match (learned from the engine's own
+//      `summary.gapYears` / `summary.future30yYears`), re-run with the shape-preserving scaled map so
+//      the funded rungs sell down to fund the bracket excess. With no such block there is nothing to
+//      buy — the direct run already nets to ≈0 and is returned unchanged (no spurious sell-down).
+export function runFundedRebalance({
+  dara, bracketMode = '2bracket', holdings, tipsMap, refCPI, settlementDate,
+  daraByYear = null, isPristineMirror = false,
+  lastYearOverride = null, firstYearOverride = null, preLadderInterest = false, maturityPref = 'last',
+}) {
+  const base = { dara, bracketMode, holdings, tipsMap, refCPI, settlementDate,
+    lastYearOverride, firstYearOverride, preLadderInterest, maturityPref };
+  let result = runRebalance({ ...base, daraByYear });
+  const needsFunding = result.summary.gapYears.length > 0 || result.summary.future30yYears.length > 0;
+  if (isPristineMirror && needsFunding) {
+    const rawARA = computePortfolioARAByYear(holdings, tipsMap, refCPI);
+    const { daraMap } = derivePerYearDara(rawARA, getGapYearBracketCandidates(tipsMap));
+    const { scaledMap, scaledMedian } = inferScaledDARAFromPortfolio({
+      daraMap, holdings, tipsMap, refCPI, settlementDate,
+      bracketMode, lastYearOverride, firstYearOverride, preLadderInterest, flat: false,
+    });
+    result = runRebalance({ ...base, dara: scaledMedian, daraByYear: scaledMap });
+  }
+  return result;
+}
