@@ -5,8 +5,7 @@ import { fileURLToPath } from 'url';
 import { uploadToR2 } from './r2.js';
 
 const FILES = [
-  { name: 'FidelityTreasuries.csv', r2Key: 'Treasuries/FidelityTreasuries.csv' },
-  { name: 'FidelityTips.csv',       r2Key: 'Treasuries/FidelityTips.csv' },
+  { name: 'FidelityTreasuriesTips.csv', r2Key: 'Treasuries/FidelityTreasuriesTips.csv' },
 ];
 
 const downloadsDir = path.join(os.homedir(), 'Downloads');

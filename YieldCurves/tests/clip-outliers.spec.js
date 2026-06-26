@@ -47,20 +47,21 @@ function makeFedOutlierCsv() {
 
 // Fidelity yields must be in PERCENTAGE form (parseFidelityNominals divides by 100).
 // Description must contain "NOTE" (for notes) or no "BILL"/"NOTE" (for bonds → BDS).
-function makeFidNormalsCsv() {
-  const hdr = "Cusip,State,Description,Coupon,Maturity Date,Moody's Rating,S&P Rating,"
-    + "Price Bid,Price Ask,Yield Bid,Ask Yield to Worst,Ask Yield to Maturity,"
-    + "Quantity Bid(min),Quantity Ask(min),Attributes";
-  const rows = [hdr];
+function makeFidCombinedCsv() {
+  const HDR = 'Product,Description,Cusip|State,Coupon,Frequency,Maturity date,Call protected,'
+    + "Moody's/S&P rating,Yield,Bid price/Quantity (min),Adjusted bid price,Inflation factor,"
+    + 'Ask price/Quantity (min),Adjusted ask price,Ask yield to worst,Ask yield to sink,'
+    + 'Ask yield to maturity,3rd party price,Depth of book,Attributes,';
+  const rows = [HDR];
   for (let i = 0; i < 30; i++) {
     const yDec   = 0.0400 + i * 0.0002;
-    const yPct   = (yDec * 100).toFixed(3);               // "4.000" — percentage form
-    const bidPct = ((yDec + 0.0001) * 100).toFixed(3);    // "4.010"
-    const coupon = (yDec * 100).toFixed(3);               // kept in % form like real Fidelity
+    const yPct   = (yDec * 100).toFixed(3);
+    const bidPct = ((yDec + 0.0001) * 100).toFixed(3);
+    const coupon = (yDec * 100).toFixed(3);
     const cusip  = `NORM${String(i).padStart(5, '0')}`;
     const yr     = 2029 + Math.floor(i / 2);
     const mo     = i % 2 === 0 ? '01' : '07';
-    rows.push(`${cusip},"N/A","US TREAS NOTE ${yPct}% ${mo}/15/${yr}","${coupon}","${mo}/15/${yr}","AA1","--","99.900","100.000","${bidPct}","${yPct}","${yPct}","1000","1000",CP D `);
+    rows.push(`Treasury,"US TREAS NOTE ${yPct}% ${mo}/15/${yr}",${cusip},${coupon},semi-annually,${yr}-${mo}-15,Yes,AA1/ --,${bidPct},99.900/1000(1000),--,--,100.000/1000(1000),--,${yPct},--,${yPct},--,--,CP`);
   }
   for (let i = 0; i < 20; i++) {
     const yDec   = 0.0460 + i * 0.0003;
@@ -69,13 +70,17 @@ function makeFidNormalsCsv() {
     const coupon = (yDec * 100).toFixed(3);
     const cusip  = `BNDX${String(i).padStart(5, '0')}`;
     const yr     = 2057 + i * 2;
-    rows.push(`${cusip},"N/A","US TREAS BDS ${yPct}% 01/15/${yr}","${coupon}","01/15/${yr}","AA1","--","99.900","100.000","${bidPct}","${yPct}","${yPct}","1000","1000",CP D `);
+    rows.push(`Treasury,"US TREAS BDS ${yPct}% 01/15/${yr}",${cusip},${coupon},semi-annually,${yr}-01-15,Yes,AA1/ --,${bidPct},99.900/1000(1000),--,--,100.000/1000(1000),--,${yPct},--,${yPct},--,--,CP`);
   }
+  // TIPS for broker price overlay
+  rows.push('TIPS,"US TREAS TIPS 0.125% 04/15/2026",91282CCA7,0.125,semi-annually,2026-04-15,Yes,AA1/ --,-1.019,100.062/6000(100),124.011839,1.23935,100.132/6000(100),124.098594,-2.274,--,-2.274,--,--,"CP, IE"');
+  rows.push('TIPS,"US TREAS TIPS 0.125% 07/15/2026",912828S50,0.125,semi-annually,2026-07-15,Yes,AA1/ --,-3.842,101.231/6000(100),137.263162,1.35594,101.284/6000(100),137.335026,-4.011,--,-4.011,--,--,"CP, IE"');
+  rows.push('TIPS,"US TREAS TIPS 0.125% 10/15/2026",91282CDC2,0.125,semi-annually,2026-10-15,Yes,AA1/ --,-1.095,100.680/6000(100),119.751812,1.18943,100.738/6000(100),119.820799,-1.197,--,-1.197,--,--,"CP, IE"');
   return rows.join('\n');
 }
 
 const FED_OUTLIER_CSV = makeFedOutlierCsv();
-const FID_NORMALS_CSV = makeFidNormalsCsv();
+const FID_COMBINED_CSV = makeFidCombinedCsv();
 
 const REF_CPI_CSV = [
   'Ref CPI Date,Ref CPI NSA,Ref CPI SA,SA Factor',
@@ -88,21 +93,13 @@ const REF_CPI_CSV = [
 
 const HOLIDAYS_CSV = '"Wednesday, January 1, 2025",New Year\'s Day\n';
 
-const FID_TIPS_CSV = [
-  'Cusip,State,Description,Coupon,Maturity Date,Moody\'s Rating,S&P Rating,Price Bid,Price Ask,Yield Bid,Ask Yield to Worst,Ask Yield to Maturity,Inflation Factor,Adjusted Price Bid,Adjusted Price Ask,Attributes',
-  '91282CCA7,"N/A","US TREAS TIPS 0.125% 04/15/2026","0.125","04/15/2026","AA1","--","100.062","100.132","-1.019","-2.274","-2.274","1.23935","124.011839","124.098594",CP D ',
-  '912828S50,"N/A","US TREAS TIPS 0.125% 07/15/2026","0.125","07/15/2026","AA1","--","101.231","101.284","-3.842","-4.011","-4.011","1.35594","137.263162","137.335026",CP D ',
-  '91282CDC2,"N/A","US TREAS TIPS 0.125% 10/15/2026","0.125","10/15/2026","AA1","--","100.680","100.738","-1.095","-1.197","-1.197","1.18943","119.751812","119.820799",CP D ',
-].join('\n');
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 async function setupRoutes(page) {
   await page.route('**/Treasuries/YieldsFromFedInvestPrices.csv', r => r.fulfill({ status: 200, contentType: 'text/csv', body: FED_OUTLIER_CSV }));
   await page.route('**/TIPS/RefCpiNsaSa.csv',                      r => r.fulfill({ status: 200, contentType: 'text/csv', body: REF_CPI_CSV }));
   await page.route('**/misc/BondHolidaysSifma.csv',                       r => r.fulfill({ status: 200, contentType: 'text/csv', body: HOLIDAYS_CSV }));
-  await page.route('**/Treasuries/FidelityTreasuries.csv',                r => r.fulfill({ status: 200, contentType: 'text/csv', body: FID_NORMALS_CSV }));
-  await page.route('**/Treasuries/FidelityTips.csv',                      r => r.fulfill({ status: 200, contentType: 'text/csv', body: FID_TIPS_CSV }));
+  await page.route('**/Treasuries/FidelityTreasuriesTips.csv',            r => r.fulfill({ status: 200, contentType: 'text/csv', body: FID_COMBINED_CSV }));
 }
 
 // Y values are stored as percentage (e.g. 4.0 = 4.0%). Extreme notes have Y = 1.5 and 2.0.

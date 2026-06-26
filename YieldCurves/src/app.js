@@ -9,8 +9,7 @@ const R2_BASE_URL = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev';
 const YIELDS_CSV_URL = `${R2_BASE_URL}/Treasuries/YieldsFromFedInvestPrices.csv`;
 const REF_CPI_CSV_URL = `${R2_BASE_URL}/TIPS/RefCpiNsaSa.csv`;
 const HOLIDAYS_CSV_URL = `${R2_BASE_URL}/misc/BondHolidaysSifma.csv`;
-const FIDELITY_TREASURIES_URL = `${R2_BASE_URL}/Treasuries/FidelityTreasuries.csv`;
-const FIDELITY_TIPS_URL = `${R2_BASE_URL}/Treasuries/FidelityTips.csv`;
+const FIDELITY_URL = `${R2_BASE_URL}/Treasuries/FidelityTreasuriesTips.csv`;
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
@@ -337,12 +336,11 @@ async function init() {
   
   try {
     console.log("Fetching market data...");
-    const [yieldsRes, refCpiRes, holidayRes, fidTreasuriesRes, fidTipsRes] = await Promise.all([
+    const [yieldsRes, refCpiRes, holidayRes, fidRes] = await Promise.all([
       fetch(YIELDS_CSV_URL, { cache: 'no-cache' }).then(r => { console.log("Yields fetched"); return r; }).catch(e => ({ ok: false, error: e })),
       fetch(REF_CPI_CSV_URL, { cache: 'no-cache' }).then(r => { console.log("RefCPI fetched"); return r; }).catch(e => ({ ok: false, error: e })),
       fetch(HOLIDAYS_CSV_URL, { cache: 'no-cache' }).then(r => { console.log("Holidays fetched"); return r; }).catch(e => ({ ok: false, error: e })),
-      fetch(FIDELITY_TREASURIES_URL, { cache: 'no-cache' }).then(r => { console.log("Fidelity Treasuries fetched"); return r; }).catch(e => ({ ok: false, error: e })),
-      fetch(FIDELITY_TIPS_URL, { cache: 'no-cache' }).then(r => { console.log("Fidelity TIPS fetched"); return r; }).catch(e => ({ ok: false, error: e })),
+      fetch(FIDELITY_URL, { cache: 'no-cache' }).then(r => { console.log("Fidelity fetched"); return r; }).catch(e => ({ ok: false, error: e })),
     ]);
 
     if (!yieldsRes.ok) throw new Error(`Failed to fetch yields: ${yieldsRes.status || yieldsRes.error}`);
@@ -378,8 +376,11 @@ async function init() {
     });
     console.log(`Holiday set populated with ${holidaySet.size} dates.`);
 
-    if (fidTreasuriesRes.ok) {
-      const fidText = await fidTreasuriesRes.text();
+    if (fidRes.ok) {
+      const fidText = await fidRes.text();
+      const clean = val => (val || '').replace(/^=?["']*/, '').replace(/["']*$/, '').trim();
+
+      // Nominals (Treasuries)
       const { bonds, downloadDate } = parseFidelityNominals(fidText);
       if (bonds.length > 0) {
         fidelityNominalsData = bonds;
@@ -390,29 +391,26 @@ async function init() {
         console.log(`Loaded ${bonds.length} Fidelity Treasuries (${downloadDate})`);
         updateModeToggle();
       }
-    } else {
-      console.warn('Fidelity Treasuries not available on R2');
-    }
 
-    if (fidTipsRes.ok) {
-      const fidTipsText = await fidTipsRes.text();
-      const rows = parseCsv(fidTipsText);
-      const clean = val => (val || '').replace(/^=?["']*/, '').replace(/["']*$/, '').trim();
+      // TIPS prices
+      const rows = parseCsv(fidText);
       const priceMap = new Map();
       const seenCusips = new Set();
       rows.forEach(row => {
         const n = {};
         for (const k in row) n[k.toLowerCase().trim()] = row[k];
-        const cusip = clean(n['cusip']);
+        const product = (n['product'] || '').toLowerCase();
+        if (product && product !== 'tips') return;
+        const cusip = clean(n['cusip'] || n['cusip|state']);
         if (!cusip || seenCusips.has(cusip)) return;
         if (!rawYieldsData || !rawYieldsData.some(r => r.cusip === cusip)) return;
-        const askPrice = parseFloat(clean(n['price ask'] || n['ask price'] || n['price'] || '').replace(/,/g, ''));
+        const askPrice = parseFloat(fidPriceField(n['price ask'] || n['ask price'] || n['ask price/quantity (min)'] || n['price'] || ''));
         if (!isNaN(askPrice)) {
           priceMap.set(cusip, {
             ask: askPrice,
-            bid: parseFloat(clean(n['price bid'] || '').replace(/,/g, '')),
-            adjAsk: parseFloat(clean(n['adjusted price ask'] || '').replace(/,/g, '')),
-            adjBid: parseFloat(clean(n['adjusted price bid'] || '').replace(/,/g, '')),
+            bid: parseFloat(fidPriceField(n['price bid'] || n['bid price/quantity (min)'] || '')),
+            adjAsk: parseFloat(clean(n['adjusted price ask'] || n['adjusted ask price'] || '').replace(/,/g, '')),
+            adjBid: parseFloat(clean(n['adjusted price bid'] || n['adjusted bid price'] || '').replace(/,/g, '')),
             inflationFactor: parseFloat(clean(n['inflation factor'] || '')),
           });
         }
@@ -420,17 +418,16 @@ async function init() {
       });
       if (priceMap.size > 0) {
         brokerPrices = priceMap;
-        const m = fidTipsText.match(/Date downloaded\s+([\d/]+ [\d:]+ [AP]M)/i);
-        const downloadDate = m ? m[1] : null;
-        brokerDownloadDate = downloadDate;
+        const m = fidText.match(/Date downloaded\s+([\d/]+ [\d:]+ [AP]M)/i);
+        brokerDownloadDate = m ? m[1] : null;
         const chkBroker = document.getElementById('chkTipsBroker');
         chkBroker.disabled = false;
         chkBroker.checked = true;
-        console.log(`Loaded ${priceMap.size} Fidelity TIPS prices (${downloadDate})`);
+        console.log(`Loaded ${priceMap.size} Fidelity TIPS prices (${brokerDownloadDate})`);
         updateModeToggle();
       }
     } else {
-      console.warn('Fidelity TIPS not available on R2');
+      console.warn('Fidelity data not available on R2');
     }
 
     const onRangeChange = () => { savedZoom[activeTab] = null; processAndRender(); };
@@ -602,6 +599,19 @@ function switchTab(tab) {
   processAndRender();
 }
 
+// Extract price from "price/qty(min)" (new format) or plain "price" (old format).
+function fidPriceField(raw) {
+  return (raw || '').split('/')[0].replace(/,/g, '').trim();
+}
+
+// Parse maturity from YYYY-MM-DD (new) or MM/DD/YYYY (old) → ISO string.
+function fidParseMaturity(s) {
+  if (!s) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const [mo, dy, yr] = s.split('/');
+  return yr ? `${yr}-${mo.padStart(2,'0')}-${dy.padStart(2,'0')}` : null;
+}
+
 // Pure parser — works with text from file upload or R2 fetch
 function parseFidelityNominals(text) {
   const clean = val => (val || '').replace(/^=?["']*/, '').replace(/["']*$/, '').trim();
@@ -614,41 +624,50 @@ function parseFidelityNominals(text) {
   for (const row of rows) {
     const n = {};
     for (const k in row) n[k.toLowerCase().trim()] = row[k];
-    const cusip   = clean(n['cusip']);
-    const desc    = (n['description'] || '').toUpperCase();
+
+    // Combined file: skip TIPS rows — handled by broker price parser
+    const product = (n['product'] || '').toLowerCase();
+    if (product === 'tips') continue;
+
+    const cusip = clean(n['cusip'] || n['cusip|state']);
+    const desc  = (n['description'] || '').toUpperCase();
 
     if (!cusip || seen.has(cusip)) continue;
 
-    // Reject TIPS — they're handled separately
-    if (rawYieldsData.some(r => r.cusip === cusip) || /\bTIPS\b/.test(desc)) {
-      continue;
-    }
+    // Old-format fallback: reject anything FedInvest knows as TIPS
+    if (rawYieldsData.some(r => r.cusip === cusip) || /\bTIPS\b/.test(desc)) continue;
 
     const isActuallyStrip = isStrip(cusip);
 
-    const matStr     = clean(n['maturity date']);        // MM/DD/YYYY
+    const matStr    = clean(n['maturity date']);
+    const maturity  = fidParseMaturity(matStr);
+    if (!maturity) continue;
+    const maturityDate = localDate(maturity);
+
     const yldStr     = clean(n['ask yield to maturity']);
     const couponStr  = clean(n['coupon']);
-    const priceStr   = clean(n['price ask']);
-    const bidPriceStr = clean(n['price bid']);
-    const bidYldStr  = clean(n['yield bid']);
-    if (!matStr) continue;
-    const [mo, dy, yr] = matStr.split('/');
-    if (!yr) continue;
-    const maturity = `${yr}-${mo.padStart(2,'0')}-${dy.padStart(2,'0')}`;
-    const maturityDate = localDate(maturity);
+    const priceStr   = fidPriceField(n['price ask'] || n['ask price/quantity (min)']);
+    const bidPriceStr = fidPriceField(n['price bid'] || n['bid price/quantity (min)']);
+    const bidYldStr  = clean(n['yield bid'] || n['yield']);
+
     const yld = parseFloat(yldStr) / 100;
     if (!maturityDate || isNaN(yld)) continue;
-    
+
     let type = /BILL/.test(desc) ? 'MARKET BASED BILL'
              : /\bNOTE\b/.test(desc) ? 'MARKET BASED NOTE'
              : 'MARKET BASED BOND';
     if (isActuallyStrip) type = 'MARKET BASED STRIP';
 
-    const bidPrice = parseFloat(bidPriceStr.replace(/,/g,''));
-    const bidYield = parseFloat(bidYldStr) / 100;
     seen.add(cusip);
-    bonds.push({ cusip, type, coupon: parseFloat(couponStr) || 0, price: parseFloat(priceStr.replace(/,/g,'')) || NaN, yield: yld, bidPrice, bidYield, maturity, maturityDate });
+    bonds.push({
+      cusip, type,
+      coupon: parseFloat(couponStr) || 0,
+      price: parseFloat(priceStr) || NaN,
+      yield: yld,
+      bidPrice: parseFloat(bidPriceStr),
+      bidYield: parseFloat(bidYldStr) / 100,
+      maturity, maturityDate,
+    });
   }
   bonds.sort((a, b) => a.maturityDate - b.maturityDate);
   return { bonds, downloadDate };

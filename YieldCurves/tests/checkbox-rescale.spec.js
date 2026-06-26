@@ -31,20 +31,16 @@ const REF_CPI_CSV = [
 const HOLIDAYS_CSV = '"Wednesday, January 1, 2025",New Year\'s Day\n';
 
 // Same CUSIPs as FedInvest so parseFidelityNominals accepts them
-const FID_TREASURIES_CSV = [
-  'Cusip,State,Description,Coupon,Maturity Date,Moody\'s Rating,S&P Rating,Price Bid,Price Ask,Yield Bid,Ask Yield to Worst,Ask Yield to Maturity,Quantity Bid(min),Quantity Ask(min),Attributes',
-  '912797TB3,"N/A","UNITED STATES TREAS BILLS ZERO CPN 0.00000% 06/26/2026","0.000","06/26/2026","--","--","99.040","99.060","3.820","3.810","3.810","1000","1000",CP D ',
-  '91282CBT7,"N/A","UNITED STATES TREAS SER W-2028 4.25000% 03/25/2028 NTS NOTE","4.250","03/25/2028","AA1","--","99.900","100.000","4.310","4.300","4.300","1000","1000",CP D ',
-  '91282CKH3,"N/A","UNITED STATES TREAS SER AZ-2031 4.35000% 03/25/2031 NTS NOTE","4.350","03/25/2031","AA1","--","99.900","100.000","4.410","4.400","4.400","1000","1000",CP D ',
-  '912810PS1,"N/A","UNITED STATES TREAS BDS 4.75000% 03/25/2036","4.750","03/25/2036","AA1","--","99.900","100.000","4.810","4.800","4.800","1000","1000",CP D ',
-  '912810XX1,"N/A","UNITED STATES TREAS BDS 4.85000% 03/25/2056","4.850","03/25/2056","AA1","--","99.900","100.000","4.910","4.900","4.900","1000","1000",CP D ',
-].join('\n');
-
-const FID_TIPS_CSV = [
-  'Cusip,State,Description,Coupon,Maturity Date,Moody\'s Rating,S&P Rating,Price Bid,Price Ask,Yield Bid,Ask Yield to Worst,Ask Yield to Maturity,Inflation Factor,Adjusted Price Bid,Adjusted Price Ask,Attributes',
-  '91282CCA7,"N/A","UNITED STATES TREAS NTS SER X-2026 0.12500% 04/15/2026","0.125","04/15/2026","AA1","--","100.062","100.132","-1.019","-2.274","-2.274","1.23935","124.011839","124.098594",CP D ',
-  '912828S50,"N/A","UNITED STATES TREAS NTS 0.12500% 07/15/2026 TIPS","0.125","07/15/2026","AA1","--","101.231","101.284","-3.842","-4.011","-4.011","1.35594","137.263162","137.335026",CP D ',
-  '91282CDC2,"N/A","UNITED STATES TREAS NTS SER AE-2026 0.12500% 10/15/2026","0.125","10/15/2026","AA1","--","100.680","100.738","-1.095","-1.197","-1.197","1.18943","119.751812","119.820799",CP D ',
+const FID_COMBINED_CSV = [
+  'Product,Description,Cusip|State,Coupon,Frequency,Maturity date,Call protected,Moody\'s/S&P rating,Yield,Bid price/Quantity (min),Adjusted bid price,Inflation factor,Ask price/Quantity (min),Adjusted ask price,Ask yield to worst,Ask yield to sink,Ask yield to maturity,3rd party price,Depth of book,Attributes,',
+  'Treasury,"UNITED STATES TREAS BILLS ZERO CPN 0.00000% 06/26/2026",912797TB3,0.000,,2026-06-26,Yes,--/ --,3.820,99.040/1000(1000),--,--,99.060/1000(1000),--,3.810,--,3.810,--,--,CP',
+  'Treasury,"UNITED STATES TREAS SER W-2028 4.25000% 03/25/2028 NTS NOTE",91282CBT7,4.250,semi-annually,2028-03-25,Yes,AA1/ --,4.310,99.900/1000(1000),--,--,100.000/1000(1000),--,4.300,--,4.300,--,--,"CP, IE"',
+  'Treasury,"UNITED STATES TREAS SER AZ-2031 4.35000% 03/25/2031 NTS NOTE",91282CKH3,4.350,semi-annually,2031-03-25,Yes,AA1/ --,4.410,99.900/1000(1000),--,--,100.000/1000(1000),--,4.400,--,4.400,--,--,"CP, IE"',
+  'Treasury,"UNITED STATES TREAS BDS 4.75000% 03/25/2036",912810PS1,4.750,semi-annually,2036-03-25,Yes,AA1/ --,4.810,99.900/1000(1000),--,--,100.000/1000(1000),--,4.800,--,4.800,--,--,"CP, IE"',
+  'Treasury,"UNITED STATES TREAS BDS 4.85000% 03/25/2056",912810XX1,4.850,semi-annually,2056-03-25,Yes,AA1/ --,4.910,99.900/1000(1000),--,--,100.000/1000(1000),--,4.900,--,4.900,--,--,"CP, IE"',
+  'TIPS,"UNITED STATES TREAS NTS SER X-2026 0.12500% 04/15/2026",91282CCA7,0.125,semi-annually,2026-04-15,Yes,AA1/ --,-1.019,100.062/6000(100),124.011839,1.23935,100.132/6000(100),124.098594,-2.274,--,-2.274,--,--,"CP, IE"',
+  'TIPS,"UNITED STATES TREAS NTS 0.12500% 07/15/2026 TIPS",912828S50,0.125,semi-annually,2026-07-15,Yes,AA1/ --,-3.842,101.231/6000(100),137.263162,1.35594,101.284/6000(100),137.335026,-4.011,--,-4.011,--,--,"CP, IE"',
+  'TIPS,"UNITED STATES TREAS NTS SER AE-2026 0.12500% 10/15/2026",91282CDC2,0.125,semi-annually,2026-10-15,Yes,AA1/ --,-1.095,100.680/6000(100),119.751812,1.18943,100.738/6000(100),119.820799,-1.197,--,-1.197,--,--,"CP, IE"',
 ].join('\n');
 
 // ─── Outlier mock: 52 nominals including 2 extreme low-yield notes ─────────────
@@ -85,8 +81,7 @@ async function setupRoutes(page) {
   await page.route('**/Treasuries/YieldsFromFedInvestPrices.csv', r => r.fulfill({ status: 200, contentType: 'text/csv', body: FED_YIELDS_CSV }));
   await page.route('**/TIPS/RefCpiNsaSa.csv', r => r.fulfill({ status: 200, contentType: 'text/csv', body: REF_CPI_CSV }));
   await page.route('**/misc/BondHolidaysSifma.csv', r => r.fulfill({ status: 200, contentType: 'text/csv', body: HOLIDAYS_CSV }));
-  await page.route('**/Treasuries/FidelityTreasuries.csv', r => r.fulfill({ status: 200, contentType: 'text/csv', body: FID_TREASURIES_CSV }));
-  await page.route('**/Treasuries/FidelityTips.csv', r => r.fulfill({ status: 200, contentType: 'text/csv', body: FID_TIPS_CSV }));
+  await page.route('**/Treasuries/FidelityTreasuriesTips.csv', r => r.fulfill({ status: 200, contentType: 'text/csv', body: FID_COMBINED_CSV }));
 }
 
 async function setupOutlierRoutes(page) {
@@ -94,8 +89,7 @@ async function setupOutlierRoutes(page) {
   await page.route('**/TIPS/RefCpiNsaSa.csv', r => r.fulfill({ status: 200, contentType: 'text/csv', body: REF_CPI_CSV }));
   await page.route('**/misc/BondHolidaysSifma.csv', r => r.fulfill({ status: 200, contentType: 'text/csv', body: HOLIDAYS_CSV }));
   // No matching Fidelity CUSIPs — Market source inactive for this test
-  await page.route('**/Treasuries/FidelityTreasuries.csv', r => r.fulfill({ status: 200, contentType: 'text/csv', body: FID_TREASURIES_CSV.split('\n')[0] }));
-  await page.route('**/Treasuries/FidelityTips.csv', r => r.fulfill({ status: 200, contentType: 'text/csv', body: FID_TIPS_CSV.split('\n')[0] }));
+  await page.route('**/Treasuries/FidelityTreasuriesTips.csv', r => r.fulfill({ status: 200, contentType: 'text/csv', body: FID_COMBINED_CSV.split('\n')[0] }));
 }
 
 async function getYBounds(page) {

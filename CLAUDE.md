@@ -47,7 +47,39 @@ npx serve .
 ### Data Infrastructure
 
 - **R2 bucket**: `https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/` — files: `YieldsFromFedInvestPrices.csv`, `RefCPI.csv`, `TipsRef.csv`
-- **GitHub Actions**: daily yield fetch (`get-tips-yields.yml`), monthly CPI fetch (`fetch-ref-cpi.yml`)
+- **Scheduled updates**: Windows Task Scheduler (local)
+
+## Architecture (YieldCurves)
+
+**No build step.** Pure ES modules served statically via GitHub Pages.
+
+### Commands
+
+```bash
+npm run test:e2e          # E2E regression tests (headless, ~14s)
+npx playwright test --headed   # headed debug
+npx serve .               # Serve locally (run from root of Treasuries repo)
+```
+
+### Data Infrastructure (R2)
+
+| R2 Key | Updated by | Task |
+|--------|-----------|------|
+| `Treasuries/YieldsFromFedInvestPrices.csv` | `scripts/run-fedinvest.cmd` | `YieldsFromFedInvestPrices` |
+| `Treasuries/FidelityTreasuriesTips.csv` | `scripts/run-fidelity.cmd` | `FidelityQuotes` (3× weekdays) |
+| `TIPS/RefCpiNsaSa.csv` | shared with TipsLadderManager | — |
+| `misc/BondHolidaysSifma.csv` | shared | — |
+
+`FidelityTreasuriesTips.csv` is a **combined file** — Treasury and TIPS rows in one CSV, distinguished by the `Product` column (`Treasury` / `TIPS`). Parsers split them by product; do **not** expect two separate Fidelity files.
+
+### Fidelity Download Flow
+
+Playwright + real Chrome via CDP (`fidelityDownload.js`):
+1. Navigate to `https://digital.fidelity.com/ftgw/digital/finewexp/secondaries`
+2. **Product type** → check **Treasury** + **TIPS** → **Apply**
+3. Three-dot menu → **Download Offerings** (browser download intercepted by Playwright)
+4. Saved to `~/Downloads/FidelityTreasuriesTips.csv` → uploaded to R2
+5. Upload triggers `updateSaSaoYields.js` → refreshes `TIPS/YieldsSaSao.csv`
 
 ### Naming Conventions
 

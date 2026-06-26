@@ -7,7 +7,7 @@ import { yieldFromPrice } from '../../shared/src/bond-math.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const R2_BASE_URL = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev';
-const FIDELITY_TIPS_URL = `${R2_BASE_URL}/Treasuries/FidelityTips.csv`;
+const FIDELITY_TIPS_URL = `${R2_BASE_URL}/Treasuries/FidelityTreasuriesTips.csv`;
 const REF_CPI_URL = `${R2_BASE_URL}/TIPS/RefCpiNsaSa.csv`;
 const HOLIDAYS_URL = `${R2_BASE_URL}/misc/BondHolidaysSifma.csv`;
 
@@ -36,6 +36,9 @@ function parseCsv(text) {
   };
 
   const headers = parseRow(lines[0]);
+  // Fidelity CSV has a trailing comma → empty last header; strip it so row-length
+  // validation doesn't reject every data row.
+  while (headers.length > 0 && !headers[headers.length - 1]) headers.pop();
   for (let i = 1; i < lines.length; i++) {
     const values = parseRow(lines[i]);
     if (values.length < headers.length) continue;
@@ -161,19 +164,31 @@ async function main() {
   const processed = rows.map(row => {
     const n = {};
     for (const k in row) n[k.toLowerCase().trim()] = row[k];
-    const cusip = clean(n['cusip']);
+
+    // Combined file: skip Treasury rows
+    const product = (n['product'] || '').toLowerCase();
+    if (product && product !== 'tips') return null;
+
+    const cusip = clean(n['cusip'] || n['cusip|state']);
     if (!cusip) return null;
 
     const matStr = clean(n['maturity date']);
     if (!matStr) return null;
-    const [mo, dy, yr] = matStr.split('/');
-    const maturity = `${yr}-${mo.padStart(2,'0')}-${dy.padStart(2,'0')}`;
+    let maturity;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(matStr)) {
+      maturity = matStr;
+    } else {
+      const [mo, dy, yr] = matStr.split('/');
+      if (!yr) return null;
+      maturity = `${yr}-${mo.padStart(2,'0')}-${dy.padStart(2,'0')}`;
+    }
     const maturityDate = localDate(maturity);
 
     const couponStr = clean(n['coupon']);
     const coupon = parseFloat(couponStr) / 100;
 
-    const priceStr = clean(n['price ask'] || n['ask price'] || n['price']).replace(/,/g, '');
+    const rawPrice = n['price ask'] || n['ask price'] || n['ask price/quantity (min)'] || n['price'] || '';
+    const priceStr = clean(rawPrice).split('/')[0].replace(/,/g, '');
     const price = parseFloat(priceStr);
 
     if (isNaN(price) || isNaN(coupon) || !maturityDate) return null;

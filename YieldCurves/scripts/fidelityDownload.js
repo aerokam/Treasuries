@@ -47,18 +47,9 @@ const CHROME_EXE = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
 const CHROME_PROFILE = path.join(__dirname, '../.chrome-profile');
 const DOWNLOADS_DIR = path.join(os.homedir(), 'Downloads');
 const LOGIN_URL = 'https://digital.fidelity.com/prgw/digital/signin/retail';
+const SEARCH_URL = 'https://digital.fidelity.com/ftgw/digital/finewexp/secondaries';
 const DEBUG_PORT = 9222;
-
-const SEARCHES = [
-  {
-    url: 'https://fixedincome.fidelity.com/ftgw/fi/FIIndividualBondsSearch?prodmajor=TREAS&requestpage=FISearchTreasury&pageName=FISearchTreasury&sortby=MA&operation=&minmaturity=11%2F2025&maxmaturity=&askYield=ALL&minyield=&maxyield=&prodminor=ALL&dummybondtierind=All&bondotherind=Y&bondtierind=Y&askQuantity=ALL&minQuantity=&maxQuantity=&bidQuantity=ALL&minQuantityBid=&maxQuantityBid=&zerocpn=&askPrice=ALL&minprice=&maxprice=&coupon=ALL&mincoupon=&maxcoupon=&callind=&displayFormat=TABLE&isAdvSearch=Y&advDataId=REQ691f6ab15fd58a129e23ccd1d1c1aa33',
-    filename: 'FidelityTreasuries.csv',
-  },
-  {
-    url: 'https://fixedincome.fidelity.com/ftgw/fi/FIIndividualBondsSearch?prodmajor=TREAS&prodminor=TIPS&requestpage=FISearchTIPS&sortby=MA&operation=&minmaturity=11%2F2025&maxmaturity=&askYield=ALL&minyield=&maxyield=&askPrice=ALL&minprice=&maxprice=&coupon=ALL&mincoupon=&maxcoupon=&displayFormat=TABLE&isAdvSearch=Y&advDataId=REQ691e1609c14fe22d8a1deb32f095aa33',
-    filename: 'FidelityTips.csv',
-  },
-];
+const DOWNLOAD_FILENAME = 'FidelityTreasuriesTips.csv';
 
 async function ensureLoggedIn(page) {
   await page.goto(LOGIN_URL, { waitUntil: 'domcontentloaded' });
@@ -83,29 +74,84 @@ async function ensureLoggedIn(page) {
   console.log('Logged in.');
 }
 
-async function downloadSearch(context, page, { url, filename }) {
-  console.log(`Loading ${filename}...`);
-  await page.goto(url, { waitUntil: 'domcontentloaded' });
-  await page.waitForSelector('table', { timeout: 30_000 });
-  await jitter(1500, 2500);
+async function downloadCombined(page) {
+  console.log('Navigating to Fixed Income secondary market page...');
+  await page.goto(SEARCH_URL, { waitUntil: 'domcontentloaded' });
 
-  const href = await page.getAttribute('a[href*="CSVDOWNLOAD"]', 'href');
-  if (!href) throw new Error(`Download link not found on page for ${filename}`);
+  // Click the Product type filter button
+  console.log('Selecting product types (Treasury + TIPS)...');
+  await page.getByRole('button', { name: /product type/i }).click();
+  await jitter(500, 1000);
 
-  const downloadUrl = new URL(href, 'https://fixedincome.fidelity.com').href;
-  await jitter(800, 1500);
+  // Click checkbox labels via evaluate(). The pvd-checkbox web component updates its
+  // pvd-checked attribute when label.click() fires (confirmed: Treasury/TIPS become "true").
+  await page.evaluate(() => {
+    document.querySelectorAll('label').forEach(lbl => {
+      const text = lbl.textContent.trim().toLowerCase();
+      if (text === 'treasury' || text === 'tips') {
+        const inputId = lbl.getAttribute('for');
+        const input = inputId ? document.getElementById(inputId) : lbl.querySelector('input');
+        if (input && !input.checked) lbl.click();
+      }
+    });
+  });
+  await jitter(600, 900);
 
-  // Use cookies from the live session to fetch the CSV directly
-  const cookies = await context.cookies();
-  const cookieHeader = cookies.map(c => `${c.name}=${c.value}`).join('; ');
-  const response = await fetch(downloadUrl, { headers: { Cookie: cookieHeader } });
-  if (!response.ok) throw new Error(`Download request failed: ${response.status} for ${filename}`);
+  // Product type filter Apply button id = "secondary-product-apply-filter".
+  // It starts visibility:hidden; forcing visible lets page.mouse.click() reach it.
+  const applyCoords = await page.evaluate(() => {
+    const btn = document.getElementById('secondary-product-apply-filter');
+    if (!btn) return null;
+    btn.style.visibility = 'visible';
+    const r = btn.getBoundingClientRect();
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width };
+  });
+  if (applyCoords && applyCoords.w > 0) {
+    await page.mouse.click(applyCoords.x, applyCoords.y);
+  } else {
+    await page.evaluate(() => document.getElementById('secondary-product-apply-filter').click());
+  }
 
-  const buffer = await response.arrayBuffer();
-  const savePath = path.join(DOWNLOADS_DIR, filename);
-  await fs.writeFile(savePath, Buffer.from(buffer));
+  await page.waitForSelector('#secondary-product-type-filter-modal', { state: 'hidden', timeout: 15_000 });
+
+  // Wait for "Product type (2)" on the filter button — this confirms the filter was
+  // accepted by Angular (not just the modal closing for an unrelated reason).
+  await page.waitForFunction(() => {
+    const btn = document.getElementById('product-type-filter-web-view');
+    return btn && btn.textContent.includes('(2)');
+  }, null, { timeout: 30_000 });
+  console.log('Filter applied, waiting for results...');
+
+  // Fixed wait for results to render — pagination means row-count checks aren't reliable.
+  await jitter(4000, 6000);
+
+  // Set up download intercept before the click that triggers it
+  const downloadPromise = page.waitForEvent('download', { timeout: 45_000 });
+
+  // Click the three-dot "Menu" button. Its ID matches menu-*-trigger.
+  // Use evaluate() + page.mouse.click() — same pattern that worked for Apply.
+  console.log('Opening download menu...');
+  const menuCoords = await page.evaluate(() => {
+    const btn = document.querySelector('button[aria-haspopup="true"][id*="-trigger"]');
+    if (!btn) return null;
+    btn.scrollIntoView({ block: 'center' });
+    const r = btn.getBoundingClientRect();
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width };
+  });
+  if (menuCoords && menuCoords.w > 0) {
+    await page.mouse.click(menuCoords.x, menuCoords.y);
+  } else {
+    await page.locator('button[aria-haspopup="true"][id*="-trigger"]').click({ timeout: 10_000 });
+  }
+  await jitter(400, 800);
+
+  // Click Download Offerings menuitem
+  await page.locator('[role="menuitem"]').filter({ hasText: /download offerings/i }).click({ timeout: 10_000 });
+
+  const download = await downloadPromise;
+  const savePath = path.join(DOWNLOADS_DIR, DOWNLOAD_FILENAME);
+  await download.saveAs(savePath);
   console.log(`Saved: ${savePath}`);
-  await jitter(1000, 2000);
 }
 
 async function runUpload() {
@@ -122,8 +168,6 @@ async function runUpload() {
 }
 
 // Patch Chrome's Preferences to mark the last exit as clean.
-// When Chrome is killed (chrome.kill()), it leaves exit_type="Crashed" which triggers
-// the "restore last session?" modal on next launch. Setting it to "Normal" suppresses it.
 const profileDefault = path.join(CHROME_PROFILE, 'Default');
 const prefsPath = path.join(profileDefault, 'Preferences');
 try {
@@ -133,9 +177,9 @@ try {
   prefs.profile.exit_type = 'Normal';
   prefs.profile.exited_cleanly = true;
   await fs.writeFile(prefsPath, JSON.stringify(prefs));
-} catch { /* profile not yet created — fine, Chrome will create it fresh */ }
+} catch { /* profile not yet created — fine */ }
 
-// Launch real Chrome (no automation flags) and connect via CDP
+// Launch real Chrome and connect via CDP
 const chrome = spawn(CHROME_EXE, [
   `--remote-debugging-port=${DEBUG_PORT}`,
   `--user-data-dir=${CHROME_PROFILE}`,
@@ -155,18 +199,13 @@ const page = context.pages()[0] ?? await context.newPage();
 
 try {
   await ensureLoggedIn(page);
-
-  for (const search of SEARCHES) {
-    await downloadSearch(context, page, search);
-  }
+  await downloadCombined(page);
 
   console.log('\nUploading to R2...');
   await runUpload();
   console.log('Done.');
 } finally {
   await browser.close();
-  // Wait for Chrome to exit cleanly (saves session state as clean so no restore dialog on next run).
-  // Fall back to force-kill after 4s only if it hasn't already exited.
   let chromeClosed = false;
   await Promise.race([
     new Promise(resolve => chrome.on('close', () => { chromeClosed = true; resolve(); })),
