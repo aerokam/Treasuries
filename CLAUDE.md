@@ -46,7 +46,7 @@ npx serve .
 
 ### Data Infrastructure
 
-- **R2 bucket**: `https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/` — files: `YieldsFromFedInvestPrices.csv`, `RefCPI.csv`, `TipsRef.csv`
+- **R2 bucket**: `https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/` — files: `Treasuries/YieldsFromFedInvestPrices.csv`, `TIPS/RefCPI.csv`, `TIPS/TipsRef.csv`
 - **Scheduled updates**: Windows Task Scheduler (local)
 
 ## Architecture (YieldCurves)
@@ -68,6 +68,7 @@ npx serve .               # Serve locally (run from root of Treasuries repo)
 | `Treasuries/YieldsFromFedInvestPrices.csv` | `scripts/run-fedinvest.cmd` | `YieldsFromFedInvestPrices` |
 | `Treasuries/FidelityTreasuriesTips.csv` | `scripts/run-fidelity.cmd` | `FidelityQuotes` (3× weekdays) |
 | `TIPS/RefCpiNsaSa.csv` | shared with TipsLadderManager | — |
+| `TIPS/YieldsSaSao.csv` | `scripts/updateSaSaoYields.js` | triggered by `FidelityQuotes` |
 | `misc/BondHolidaysSifma.csv` | shared | — |
 
 `FidelityTreasuriesTips.csv` is a **combined file** — Treasury and TIPS rows in one CSV, distinguished by the `Product` column (`Treasury` / `TIPS`). Parsers split them by product; do **not** expect two separate Fidelity files.

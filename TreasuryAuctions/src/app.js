@@ -21,29 +21,25 @@ function upcomingUrl() {
 // column chooser regardless of view.
 
 const DEFAULT_COLS = {
-  all: [
-    'cusip','security_type','security_term','announcemt_date','dated_date',
-    'auction_date','issue_date','maturity_date','int_rate','high_investment_rate',
-    'high_yield','high_price','accrued_int_per1000','reopening',
-    'inflation_index_security','original_security_term','closing_time_comp',
-  ],
   bills: [
-    'cusip','security_term','announcemt_date','auction_date','issue_date',
-    'maturity_date','high_investment_rate','high_yield','high_price',
-    'offering_amt','reopening','original_security_term','closing_time_comp',
+    'cusip', 'security_term', 'original_security_term', 'maturity_date',
+    'auction_date', 'issue_date', 'high_investment_rate', 'high_price',
   ],
   notesbonds: [
-    'cusip','security_type','security_term','original_security_term',
-    'announcemt_date','dated_date','auction_date','issue_date','maturity_date',
-    'int_rate','high_yield','high_price','accrued_int_per1000',
-    'offering_amt','reopening','inflation_index_security','closing_time_comp',
+    'cusip', 'security_term', 'original_security_term', 'maturity_date',
+    'auction_date', 'issue_date', 'high_yield', 'int_rate', 'high_price',
+    'inflation_index_security',
   ],
   tips: [
-    'cusip','security_term','announcemt_date','dated_date','auction_date',
-    'issue_date','maturity_date','int_rate','high_yield','unadj_price',
-    'adj_price','offering_amt','adj_accrued_int_per1000','ref_cpi_on_dated_date',
-    'ref_cpi_on_issue_date','index_ratio_on_issue_date','reopening',
-    'original_security_term',
+    'cusip', 'security_term', 'original_security_term', 'maturity_date',
+    'auction_date', 'issue_date', 'dated_date', 'high_yield', 'int_rate',
+    'unadj_price', 'index_ratio_on_issue_date', 'adj_price',
+    'ref_cpi_on_dated_date', 'ref_cpi_on_issue_date',
+  ],
+  all: [
+    'cusip', 'security_type', 'inflation_index_security', 'security_term',
+    'original_security_term', 'maturity_date', 'auction_date', 'issue_date',
+    'high_yield', 'int_rate', 'high_investment_rate', 'high_price',
   ],
 };
 
@@ -678,7 +674,11 @@ async function loadData() {
     allColumns = headers;
     allData = rows;
     ['all', 'bills', 'notesbonds', 'tips'].forEach(v => {
-      if (!orderedColumns[v].length) orderedColumns[v] = [...allColumns];
+      if (!orderedColumns[v].length) {
+        const defs = DEFAULT_COLS[v];
+        const rest = allColumns.filter(c => !defs.includes(c));
+        orderedColumns[v] = [...defs, ...rest];
+      }
     });
     renderColList();
     renderTable();
@@ -780,8 +780,10 @@ function init() {
   // Reset defaults
   document.getElementById('resetColsBtn').addEventListener('click', () => {
     viewCols[activeView] = new Set(DEFAULT_COLS[activeView]);
-    orderedColumns[activeView] = [...allColumns]; // reset to original order
-    colWidths = {}; // clear widths
+    const defs = DEFAULT_COLS[activeView];
+    const rest = allColumns.filter(c => !defs.includes(c));
+    orderedColumns[activeView] = [...defs, ...rest];
+    colWidths = {};
     renderColList();
     renderTable();
   });
