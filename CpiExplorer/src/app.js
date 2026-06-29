@@ -330,14 +330,14 @@ function wireControls() {
     }, 400);
   });
 
-  // Date range
+  // Date range — reset zoom so the x-axis fits the new window
   document.getElementById('startDate').addEventListener('change', () => {
     const d = getValuesFromUI('start');
-    if (d) { state.startDate = d; render(); }
+    if (d) { state.startDate = d; resetZoom(); render(); }
   });
   document.getElementById('endDate').addEventListener('change', () => {
     const d = getValuesFromUI('end');
-    if (d) { state.endDate = d; render(); }
+    if (d) { state.endDate = d; resetZoom(); render(); }
   });
   document.getElementById('btnFullHistory').addEventListener('click', () => {
     applySourceExtentToInputs();

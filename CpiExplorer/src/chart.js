@@ -2,6 +2,7 @@
 // Chart.js lifecycle with full zoom/pan/resize matching YieldsMonitor.
 
 import { snapYBounds, snapYAfterZoom, setupAxisWheelZoom } from '../../shared/src/chart-keys.js';
+import { calendarTimeAxis } from '../../shared/src/chart-time-axis.js';
 
 let _chart = null;
 let _currentDatasets = null; // { label, labels, values }[]
@@ -89,7 +90,7 @@ export function createChart(canvasId, { datasets, yLabel, logScale, tooltipForma
     data: ds.labels.map((l, idx) => ({ x: l, y: ds.values[idx] })),
     borderColor: COLORS[i % COLORS.length],
     borderWidth: 1.5,
-    pointRadius: ds.values.length > 500 ? 0 : 3,
+    pointRadius: ds.values.length > 500 ? 0 : 1.5,
     pointHoverRadius: 4,
     fill: false,
     tension: 0,
@@ -153,8 +154,7 @@ export function createChart(canvasId, { datasets, yLabel, logScale, tooltipForma
             tooltipFormat: tooltipFormat,
             displayFormats: { year: 'yyyy', month: 'MMM yyyy', day: 'MMM d yyyy' },
           },
-          grid: { color: '#f1f5f9' },
-          ticks: { autoSkip: true, maxTicksLimit: 12, color: '#64748b', font: { size: 11 } },
+          ...calendarTimeAxis(),
         },
         y: {
           type: logScale ? 'logarithmic' : 'linear',
@@ -202,20 +202,31 @@ export function updateChart({ datasets, yLabel, logScale, tooltipFormat = 'MMM y
   _chart.options.plugins.legend.display = datasets.length > 1;
   _chart.options.scales.x.time.tooltipFormat = tooltipFormat;
 
+  // Preserve current x bounds so adding/removing a series doesn't reset the zoom.
+  // Read from options (only set when user has zoomed) not scales (always has a value).
+  const xMin = _chart.options.scales.x?.min;
+  const xMax = _chart.options.scales.x?.max;
+
   _chart.data.datasets = datasets.map((ds, i) => ({
     label: ds.label,
     data: ds.labels.map((l, idx) => ({ x: l, y: ds.values[idx] })),
     borderColor: COLORS[i % COLORS.length],
     borderWidth: 1.5,
-    pointRadius: ds.values.length > 500 ? 0 : 3,
+    pointRadius: ds.values.length > 500 ? 0 : 1.5,
     pointHoverRadius: 4,
     fill: false,
     tension: 0,
   }));
 
-  _chart.resetZoom();
-  applyYBoundsFromData(datasets);
+  rescaleYToVisible();
   _chart.update('none');
+
+  // Restore x bounds after update (update() can reset them)
+  if (xMin != null && xMax != null) {
+    _chart.options.scales.x.min = xMin;
+    _chart.options.scales.x.max = xMax;
+    _chart.update('none');
+  }
 }
 
 // ── Reset ─────────────────────────────────────────────────────────────────────

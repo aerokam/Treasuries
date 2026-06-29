@@ -2,6 +2,7 @@
 import { yieldFromPrice } from '../../shared/src/bond-math.js';
 import { handleChartKeydown, setupAxisWheelZoom, snapYBounds, snapYAfterZoom } from '../../shared/src/chart-keys.js';
 import { initDatePicker } from '../../shared/src/date-picker.js';
+import { calendarTimeAxis } from '../../shared/src/chart-time-axis.js';
 
 console.log("YieldCurves app.js loading...");
 
@@ -917,14 +918,11 @@ function renderNominalsChart(fedBonds, fidBonds) {
     const maxX = _endDtN
       ? new Date(_endDtN.getFullYear(), _endDtN.getMonth() + 1, 1).getTime()
       : new Date(maxDate.getFullYear(), maxDate.getMonth() + 1, 1).getTime();
-    const spanMonths = (new Date(maxX) - new Date(minX)) / (1000 * 60 * 60 * 24 * 30.5);
-    const timeUnit = spanMonths <= 18 ? 'month' : 'year';
     xScale = {
       type: 'time',
       min: minX, max: maxX,
-      time: { unit: timeUnit, displayFormats: { year: 'MMM yyyy', month: 'MMM yyyy' } },
-      grid: { color: 'rgba(0,0,0,0.05)' },
-      ticks: { autoSkip: true, maxRotation: 0 }
+      time: { displayFormats: { year: 'yyyy', month: 'MMM yyyy' } },
+      ...calendarTimeAxis({ gridColor: 'rgba(0,0,0,0.05)' }),
     };
   }
 
@@ -1302,14 +1300,11 @@ function renderChart(fedBonds, brokerBonds) {
     const maxX = _endDt
       ? new Date(_endDt.getFullYear(), _endDt.getMonth() + 1, 1).getTime()
       : new Date(maxDate.getFullYear() + 1, 0, 1).getTime();
-    const spanMonths = (maxX - minX) / (1000 * 60 * 60 * 24 * 30.5);
-    const timeUnit = spanMonths <= 18 ? 'month' : 'year';
     xScale = {
       type: 'time',
       min: minX, max: maxX,
-      time: { unit: timeUnit, displayFormats: { year: 'MMM yyyy', month: 'MMM yyyy' } },
-      grid: { color: 'rgba(0,0,0,0.05)' },
-      ticks: { autoSkip: true, maxRotation: 0 }
+      time: { displayFormats: { year: 'yyyy', month: 'MMM yyyy' } },
+      ...calendarTimeAxis({ gridColor: 'rgba(0,0,0,0.05)' }),
     };
   }
   const allY = allPoints.map(d => d.y);
@@ -1510,9 +1505,6 @@ function _makeSpreadChart(ctx, seriesDef, yAxisLabel, yUnit, shouldClip) {
   const maxX = _endDt
     ? new Date(_endDt.getFullYear(), _endDt.getMonth() + 1, 1).getTime()
     : new Date(maxDate.getFullYear() + 1, 0, 1).getTime();
-  const spanMonths = (maxX - minX) / (1000 * 60 * 60 * 24 * 30.5);
-  const timeUnit = spanMonths <= 18 ? 'month' : 'year';
-
   // IQR-clip Y axis to suppress near-maturity outliers (respects Clip Outliers checkbox)
   const allY = allPoints.map(d => d.y);
   let yForScale = allY;
@@ -1540,8 +1532,12 @@ function _makeSpreadChart(ctx, seriesDef, yAxisLabel, yUnit, shouldClip) {
       scales: {
         x: {
           type: 'time', min: minX, max: maxX,
-          time: xAxisMode === 'ttm' ? { displayFormats: {} } : { unit: timeUnit, displayFormats: { year: 'MMM yyyy', month: 'MMM yyyy' } },
-          grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { autoSkip: true, maxRotation: 0, ...(xAxisMode === 'ttm' ? { callback: (val, idx, ticks) => { if (!ticks || ticks.length < 2) return ttmLabel(val); const spanDays = (ticks[ticks.length-1].value - ticks[0].value) / 86400000; const days = (val - Date.now()) / 86400000; if (days <= 0) return ''; if (spanDays <= 91) return `${Math.round(days / 7)}w`; if (spanDays <= 365) return `${Math.round(days / 30.44)}m`; const yrs = days / 365.25; const wy = Math.floor(yrs); const rm = Math.round((yrs - wy) * 12); if (rm === 0) return `${wy}y`; if (rm === 12) return `${wy + 1}y`; if (wy === 0) return `${rm}m`; return `${wy}y ${rm}m`; } } : {}) }
+          time: xAxisMode === 'ttm' ? { displayFormats: {} } : { displayFormats: { year: 'yyyy', month: 'MMM yyyy' } },
+          grid: { color: 'rgba(0,0,0,0.05)' },
+          ...(xAxisMode === 'ttm'
+            ? { ticks: { autoSkip: true, maxRotation: 0, callback: (val, idx, ticks) => { if (!ticks || ticks.length < 2) return ttmLabel(val); const spanDays = (ticks[ticks.length-1].value - ticks[0].value) / 86400000; const days = (val - Date.now()) / 86400000; if (days <= 0) return ''; if (spanDays <= 91) return `${Math.round(days / 7)}w`; if (spanDays <= 365) return `${Math.round(days / 30.44)}m`; const yrs = days / 365.25; const wy = Math.floor(yrs); const rm = Math.round((yrs - wy) * 12); if (rm === 0) return `${wy}y`; if (rm === 12) return `${wy + 1}y`; if (wy === 0) return `${rm}m`; return `${wy}y ${rm}m`; } } }
+            : calendarTimeAxis()
+          ),
         },
         y: {
           type: 'linear', title: { display: true, text: yAxisLabel },
