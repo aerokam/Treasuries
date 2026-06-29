@@ -14,6 +14,10 @@
     .card h2 { margin: 0 0 8px; font-size: 18px; color: inherit; }
     .card p { margin: 0; font-size: 14px; color: inherit; line-height: 1.5; opacity: 0.9; }
     .nav-section { margin-bottom: 20px; border: 1px solid var(--border-light); border-radius: 12px; padding: 18px 22px 22px; }
+    .nav-section.workflow  { background: #fef8ec; border-color: #e8c87a; }
+    .nav-section.reference { background: #ebf4fb; border-color: #84bcd8; }
+    .nav-section.educational { background: #f2eefc; border-color: #b09edc; }
+    .nav-section.external  { background: #f2f4f2; border-color: #b0bdb0; }
     .nav-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--portal-text-muted); padding-bottom: 12px; margin-bottom: 16px; border-bottom: 1px solid var(--border-light); }
     .nav-row { display: flex; gap: 20px; align-items: flex-start; margin-bottom: 20px; }
     .nav-row .nav-section { margin-bottom: 0; flex: 1; }
@@ -25,7 +29,7 @@
     <p style="margin: 0; color: var(--portal-text-muted); font-size: 15px; font-weight: 500;">Productivity and Learning Tools for US Treasury Securities</p>
   </header>
 
-  <div class="nav-section">
+  <div class="nav-section workflow">
     <div class="nav-label">Daily Workflow</div>
     <div class="nav">
       <a href="./YieldsMonitor/" class="card">
@@ -45,7 +49,7 @@
     </div>
   </div>
 
-  <div class="nav-section">
+  <div class="nav-section reference">
     <div class="nav-label">Reference</div>
     <div class="nav">
       <a href="./TreasuryAuctions/" class="card">
@@ -66,7 +70,7 @@
   </div>
 
   <div class="nav-row">
-    <div class="nav-section">
+    <div class="nav-section educational">
       <div class="nav-label">Educational</div>
       <div class="nav">
         <a href="./SeasonalAdjustments/" class="card">
@@ -77,7 +81,7 @@
       </div>
     </div>
 
-    <div class="nav-section">
+    <div class="nav-section external">
       <div class="nav-label">External Resources</div>
       <div class="nav">
         <a href="https://motips.pythonanywhere.com/" class="card">
