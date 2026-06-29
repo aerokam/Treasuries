@@ -1,6 +1,6 @@
 # Treasury Investors Portal
 
-The portal is the browser-based entry point to all Treasury investment tools. It links to five standalone apps plus one third-party tool, each focused on a distinct phase of Treasury portfolio management. All portal apps run privately in the browser; no user data is uploaded to any server.
+The portal is the browser-based entry point to all Treasury investment tools. It links to eight standalone apps plus one third-party tool, each focused on a distinct phase of Treasury portfolio management. All portal apps run privately in the browser; no user data is uploaded to any server.
 
 **URL (GH Pages):** `https://aerokam.github.io/Treasuries/`
 
@@ -14,9 +14,11 @@ The portal is the browser-based entry point to all Treasury investment tools. It
 | A2 | Yield Curves | [YieldCurves/](../YieldCurves/knowledge/) | Treasury yield curves with seasonal adjustment (SA/SAO) overlays |
 | A3 | Yields Monitor | [YieldsMonitor/](../YieldsMonitor/knowledge/) | Live intraday and historical yield charts for selected maturities |
 | A4 | Treasury Auctions | [TreasuryAuctions/](../TreasuryAuctions/knowledge/) | Upcoming and historical auction results with spreadsheet-style filtering |
-| A5 | CPI Explorer | [CpiExplorer/](../CpiExplorer/knowledge/) | CPI index levels, YoY/MoM changes, rolling windows, and CAGR over any date range |
-| A6 | Taxation of Treasuries | [TaxationOfTreasuries/](../TaxationOfTreasuries/) | Reference docs for federal and state tax treatment of Treasury bills, notes, bonds, and TIPS — OID, inflation adjustments, 1099 reconciliation |
-| A7 | After-Tax TIPS Ladder Calculator *(third-party)* | https://motips.pythonanywhere.com/data-entry/ | After-tax return calculator for TIPS ladders; linked from the portal because it complements the suite but is not a portal app |
+| A5 | TIPS Reference | [TipsReference/](../TipsReference/knowledge/) | Live TIPS reference table: CUSIP, maturity, coupon, Dated Date Ref CPI, price, index ratio, adjusted price, and yield |
+| A6 | CPI Explorer | [CpiExplorer/](../CpiExplorer/knowledge/) | CPI index levels, YoY/MoM changes, rolling windows, and CAGR over any date range |
+| A7 | Taxation of Treasuries | [TaxationOfTreasuries/](../TaxationOfTreasuries/) | Reference docs for federal and state tax treatment of Treasury bills, notes, bonds, and TIPS — OID, inflation adjustments, 1099 reconciliation |
+| A8 | Seasonal Adjustments | [SeasonalAdjustments/](../SeasonalAdjustments/knowledge/) | Interactive explainer for TIPS seasonal adjustment and the SA/SAO yield series |
+| A9 | After-Tax TIPS Ladder Calculator *(third-party)* | https://motips.pythonanywhere.com/data-entry/ | After-tax return calculator for TIPS ladders; linked from the portal because it complements the suite but is not a portal app |
 
 ---
 
@@ -24,7 +26,7 @@ The portal is the browser-based entry point to all Treasury investment tools. It
 
 ```
 External Sources (E)  →  Ingestion Jobs (P)  →  Cloudflare R2 (S)  →  Browser Apps (A)
-     E1–E6                 GH Actions /               S1–S8                 A1–A5
+     E1–E6                 GH Actions /               S1–S8                 A1–A8
                          Local Tasks (Win)
 ```
 
@@ -85,7 +87,7 @@ See [Data_Pipeline.md](./Data_Pipeline.md) for schedules, owners, and script pat
 
 ## 7.0 App-Level Knowledge (Internal Specs)
 
-Each app has a `knowledge/` subdirectory with its own DFD, process specs, and calculation documentation.
+Most apps have a `knowledge/` subdirectory with their own DFD, process specs, and calculation documentation. TaxationOfTreasuries serves its content directly from `docs/` (the reference MDs are the spec).
 
 | App | Key Specs |
 |-----|-----------|
@@ -94,3 +96,5 @@ Each app has a `knowledge/` subdirectory with its own DFD, process specs, and ca
 | YieldsMonitor | [1.0 Operation](../YieldsMonitor/knowledge/1.0_Operation.md) |
 | TreasuryAuctions | [Data Pipeline](../TreasuryAuctions/knowledge/Data_Pipeline.md) |
 | CpiExplorer | [1.0 Overview](../CpiExplorer/knowledge/1.0_Overview.md) · [2.0 Technical Spec](../CpiExplorer/knowledge/2.0_Technical_Spec.md) |
+| SeasonalAdjustments | [knowledge/](../SeasonalAdjustments/knowledge/) *(self-contained interactive explainer; see knowledge dir for details)* |
+| TaxationOfTreasuries | [Foundation](../TaxationOfTreasuries/docs/TaxationOfTreasuries_Foundation.md) · [Treasury Bills](../TaxationOfTreasuries/docs/TaxationOfTreasuryBills.md) · [Notes & Bonds](../TaxationOfTreasuries/docs/TaxationOfTreasuryNotesAndBonds.md) · [TIPS OID Reference](../TaxationOfTreasuries/docs/TIPS_OID_Tax_Reference.md) |
