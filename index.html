@@ -13,6 +13,8 @@
     .card:hover { transform: translateY(-4px); filter: brightness(1.1); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); border-color: var(--portal-card-text); }
     .card h2 { margin: 0 0 8px; font-size: 18px; color: inherit; }
     .card p { margin: 0; font-size: 14px; color: inherit; line-height: 1.5; opacity: 0.9; }
+    .nav-section { width: 100%; max-width: 960px; margin-bottom: 32px; }
+    .nav-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--portal-text-muted); border-bottom: 1px solid var(--border-light); padding-bottom: 6px; margin-bottom: 16px; }
   </style>
 </head>
 <body>
@@ -21,39 +23,65 @@
     <p style="margin: 0; color: var(--portal-text-muted); font-size: 15px; font-weight: 500;">Productivity and Learning Tools for US Treasury Securities</p>
   </header>
 
-  <div class="nav">
-    <a href="./YieldsMonitor/" class="card">
-      <h2>Yields Monitor</h2>
-      <p>Live intraday and historical yield charts for selected maturities of TIPS and nominal Treasuries, powered by
-        real-time public market data.</p>
-    </a>
-    <a href="./YieldCurves/" class="card">
-      <h2>Yield Curves</h2>
-      <p>View Treasury yield curves for TIPS and nominal Treasuries. Includes seasonally-adjusted (SA) and outlier-smoothed
-        (SAO) series for TIPS.</p>
-    </a>
-    <a href="./TreasuryAuctions/" class="card">
-      <h2>Treasury Auctions</h2>
-      <p>Upcoming and historical Treasury auction results with configurable columns and spreadsheet-style filtering across
-        all security types.</p>
-    </a>
-    <a href="./TipsReference/" class="card">
-      <h2>TIPS Reference</h2>
-      <p>Live TIPS reference table: CUSIP, maturity, coupon, dated date, Dated Date Ref CPI, price, index ratio, adjusted
-        price, and yield — with sorting, filtering, and CSV export.</p>
-    </a>
-    <a href="./TipsLadderManager/" class="card">
-      <h2>Ladder Manager</h2>
-      <p>Design and rebalance TIPS ladders. Featuring <b>Deep Drill</b> traceability from ladder totals down to official 31 CFR calculation chains.</p>
-    </a>
-    <a href="./CpiExplorer/" class="card">
-      <h2>CPI Explorer</h2>
-      <p>Explore U.S. CPI history from 1913: index levels, year-over-year and month-over-month percent changes, rolling windows, and point-to-point annualized change over any date range.</p>
-    </a>
-    <a href="https://motips.pythonanywhere.com/" class="card">
-      <h2>After-Tax TIPS Ladder Calculator</h2>
-      <p>This is a hosted web application for calculating after-tax returns on TIPS ladders. It is not one of my Portal apps, but I'm hosting it here because it complements the other apps in the suite.</p>
-    </a>
+  <div class="nav-section">
+    <div class="nav-label">Daily Workflow</div>
+    <div class="nav">
+      <a href="./YieldsMonitor/" class="card">
+        <h2>Yields Monitor</h2>
+        <p>Live intraday and historical yield charts for selected maturities of TIPS and nominal Treasuries, powered by
+          real-time public market data.</p>
+      </a>
+      <a href="./YieldCurves/" class="card">
+        <h2>Yield Curves</h2>
+        <p>View Treasury yield curves for TIPS and nominal Treasuries. Includes seasonally-adjusted (SA) and outlier-smoothed
+          (SAO) series for TIPS.</p>
+      </a>
+      <a href="./TipsLadderManager/" class="card">
+        <h2>Ladder Manager</h2>
+        <p>Design and rebalance TIPS ladders. Featuring <b>Deep Drill</b> traceability from ladder totals down to official 31 CFR calculation chains.</p>
+      </a>
+    </div>
+  </div>
+
+  <div class="nav-section">
+    <div class="nav-label">Reference</div>
+    <div class="nav">
+      <a href="./TreasuryAuctions/" class="card">
+        <h2>Treasury Auctions</h2>
+        <p>Upcoming and historical Treasury auction results with configurable columns and spreadsheet-style filtering across
+          all security types.</p>
+      </a>
+      <a href="./TipsReference/" class="card">
+        <h2>TIPS Reference</h2>
+        <p>Live TIPS reference table: CUSIP, maturity, coupon, dated date, Dated Date Ref CPI, price, index ratio, adjusted
+          price, and yield — with sorting, filtering, and CSV export.</p>
+      </a>
+      <a href="./CpiExplorer/" class="card">
+        <h2>CPI Explorer</h2>
+        <p>Explore U.S. CPI history from 1913: index levels, year-over-year and month-over-month percent changes, rolling windows, and point-to-point annualized change over any date range.</p>
+      </a>
+    </div>
+  </div>
+
+  <div class="nav-section">
+    <div class="nav-label">Educational</div>
+    <div class="nav">
+      <a href="./SeasonalAdjustments/" class="card">
+        <h2>Seasonal Adjustments</h2>
+        <p>Interactive explainer for TIPS seasonal adjustment: slide the settlement date and watch how the ratio
+          S(settle)/S(maturity) strips the seasonally-predictable slice of nominal return out of the quoted yield.</p>
+      </a>
+    </div>
+  </div>
+
+  <div class="nav-section">
+    <div class="nav-label">External Resources</div>
+    <div class="nav">
+      <a href="https://motips.pythonanywhere.com/" class="card">
+        <h2>After-Tax TIPS Ladder Calculator</h2>
+        <p>A hosted web application for calculating after-tax returns on TIPS ladders, developed and maintained independently. Listed here as a complement to the other tools in this suite.</p>
+      </a>
+    </div>
   </div>
 
   <div class="card" style="max-width: 600px; width: auto; margin: 48px auto 0;">
