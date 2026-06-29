@@ -13,8 +13,10 @@
     .card:hover { transform: translateY(-4px); filter: brightness(1.1); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); border-color: var(--portal-card-text); }
     .card h2 { margin: 0 0 8px; font-size: 18px; color: inherit; }
     .card p { margin: 0; font-size: 14px; color: inherit; line-height: 1.5; opacity: 0.9; }
-    .nav-section { width: 100%; max-width: 960px; margin-bottom: 32px; }
-    .nav-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--portal-text-muted); border-bottom: 1px solid var(--border-light); padding-bottom: 6px; margin-bottom: 16px; }
+    .nav-section { margin-bottom: 20px; border: 1px solid var(--border-light); border-radius: 12px; padding: 18px 22px 22px; }
+    .nav-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--portal-text-muted); padding-bottom: 12px; margin-bottom: 16px; border-bottom: 1px solid var(--border-light); }
+    .nav-row { display: flex; gap: 20px; align-items: flex-start; margin-bottom: 20px; }
+    .nav-row .nav-section { margin-bottom: 0; flex: 1; }
   </style>
 </head>
 <body>
@@ -63,24 +65,26 @@
     </div>
   </div>
 
-  <div class="nav-section">
-    <div class="nav-label">Educational</div>
-    <div class="nav">
-      <a href="./SeasonalAdjustments/" class="card">
-        <h2>Seasonal Adjustments</h2>
-        <p>Interactive explainer for TIPS seasonal adjustment: slide the settlement date and watch how the ratio
-          S(settle)/S(maturity) strips the seasonally-predictable slice of nominal return out of the quoted yield.</p>
-      </a>
+  <div class="nav-row">
+    <div class="nav-section">
+      <div class="nav-label">Educational</div>
+      <div class="nav">
+        <a href="./SeasonalAdjustments/" class="card">
+          <h2>Seasonal Adjustments</h2>
+          <p>Interactive explainer for TIPS seasonal adjustment: slide the settlement date and watch how the ratio
+            S(settle)/S(maturity) strips the seasonally-predictable slice of nominal return out of the quoted yield.</p>
+        </a>
+      </div>
     </div>
-  </div>
 
-  <div class="nav-section">
-    <div class="nav-label">External Resources</div>
-    <div class="nav">
-      <a href="https://motips.pythonanywhere.com/" class="card">
-        <h2>After-Tax TIPS Ladder Calculator</h2>
-        <p>A hosted web application for calculating after-tax returns on TIPS ladders, developed and maintained independently. Listed here as a complement to the other tools in this suite.</p>
-      </a>
+    <div class="nav-section">
+      <div class="nav-label">External Resources</div>
+      <div class="nav">
+        <a href="https://motips.pythonanywhere.com/" class="card">
+          <h2>After-Tax TIPS Ladder Calculator</h2>
+          <p>A hosted web application for calculating after-tax returns on TIPS ladders, developed and maintained independently. Listed here as a complement to the other tools in this suite.</p>
+        </a>
+      </div>
     </div>
   </div>
 
