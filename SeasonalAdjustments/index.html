@@ -476,29 +476,29 @@ function drawCurve(settleDoy){
   }}
   let p=''; for(let i=0;i<365;i++) p+=(i?'L':'M')+x(i).toFixed(1)+' '+y(daily[i]).toFixed(1)+' ';
   s+=`<path d="${p}" fill="none" stroke="var(--price)" stroke-width="2.5"/>`;
-  // Seasonal gap triangle
-  {const matDoy=doy(matIdx,15), Ss=Sat(settleDoy), Sm=Sat(matDoy);
-  if(Math.abs(Ss-Sm)>0.00005){
-    const col=Ss<Sm?'var(--up)':'var(--down)';
-    const sx=x(settleDoy), sy=y(Ss);  // settlement point
-    const mx=x(matDoy),    my=y(Sm);  // maturity point
-    const ry=y(Ss);                    // right-angle corner y (same as settle y)
-    // filled triangle
-    s+=`<polygon points="${sx},${sy} ${mx},${ry} ${mx},${my}" fill="${col}" opacity=".12"/>`;
-    // horizontal leg (dashed): settlement → maturity x, at settle y
-    s+=`<line x1="${sx}" y1="${sy}" x2="${mx}" y2="${ry}" stroke="${col}" stroke-width="1" stroke-dasharray="4 3" opacity=".45"/>`;
-    // vertical leg (solid): the seasonal gap at maturity x
-    s+=`<line x1="${mx}" y1="${ry}" x2="${mx}" y2="${my}" stroke="${col}" stroke-width="2.5" opacity=".85"/>`;
-    // label on vertical leg
-    const pct=(Ss/Sm-1)*100;
-    const lx=mx+(mx<W-70?7:-58), ly=(ry+my)/2+4;
-    s+=`<text x="${lx}" y="${ly}" class="axis" style="fill:${col};font-size:11px;font-weight:600">${pct>=0?'+':''}${pct.toFixed(3)}%</text>`;
-  }}
   for(const mm of MATS){const dd=doy(mm.m,15); const solid=mm.m===matIdx;
     s+=`<line x1="${x(dd)}" y1="${T}" x2="${x(dd)}" y2="${H-B}" stroke="var(--mat)" stroke-width="${solid?2:1}" opacity="${solid?1:.3}"/>`;
     s+=`<circle cx="${x(dd)}" cy="${y(Sat(dd))}" r="${solid?5:3}" fill="var(--mat)" opacity="${solid?1:.4}"/>`;}
   s+=`<line x1="${x(settleDoy)}" y1="${T}" x2="${x(settleDoy)}" y2="${H-B}" stroke="var(--settle)" stroke-width="2"/>`;
   s+=`<circle cx="${x(settleDoy)}" cy="${y(Sat(settleDoy))}" r="5" fill="var(--settle)"/>`;
+  // Bracket drawn last so it sits on top of maturity line and dots
+  {const matDoy=doy(matIdx,15), Ss=Sat(settleDoy), Sm=Sat(matDoy);
+  if(Math.abs(Ss-Sm)>0.00005){
+    const col=Ss<Sm?'var(--up)':'var(--down)';
+    const sx=x(settleDoy), sy=y(Ss);
+    const mx=x(matDoy),    my=y(Sm);
+    const projY=y(Ss);
+    // dashed horizontal: settlement dot → top of bracket
+    s+=`<line x1="${sx}" y1="${sy}" x2="${mx}" y2="${projY}" stroke="${col}" stroke-width="1.5" stroke-dasharray="5 3" opacity=".6"/>`;
+    // top tick (projected settle level at maturity x), vertical bar, bottom tick (maturity level)
+    s+=`<line x1="${mx-6}" y1="${projY}" x2="${mx+6}" y2="${projY}" stroke="${col}" stroke-width="2" opacity=".9"/>`;
+    s+=`<line x1="${mx}" y1="${projY}" x2="${mx}" y2="${my}" stroke="${col}" stroke-width="2.5" opacity=".9"/>`;
+    s+=`<line x1="${mx-6}" y1="${my}" x2="${mx+6}" y2="${my}" stroke="${col}" stroke-width="2" opacity=".9"/>`;
+    // % label centered on bracket
+    const pct=(Ss/Sm-1)*100;
+    const lx=mx+(mx<W-70?8:-60), ly=(projY+my)/2+4;
+    s+=`<text x="${lx}" y="${ly}" class="axis" style="fill:${col};font-size:11px;font-weight:600">${pct>=0?'+':''}${pct.toFixed(3)}%</text>`;
+  }}
   document.getElementById('curve').innerHTML=s;
 }
 
