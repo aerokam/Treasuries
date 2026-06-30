@@ -518,8 +518,8 @@ function update(){
   const v=document.getElementById('verdict');
   const near=stub===0;
   if(near){v.className='verdict flat';v.innerHTML=`Settlement is on the maturity month/day — a <b>whole number of years to maturity</b>. S(settle) = S(maturity), ratio = 1.0, <b>no seasonal adjustment</b>. The seasonal component repeats every year and fully cancels over whole years.`;}
-  else if(ratio<1){v.className='verdict up';v.innerHTML=`S(settle) &lt; S(maturity): the <b>seasonal component of the Ref CPI rises</b> from settlement to maturity (<b>+${pct.toFixed(3)}%</b>). The market prices this in — quoted real yield is lower because that rise is already embedded. The SA transform multiplies price by <b>${ratio.toFixed(4)}</b> to remove it → <b>SA yield rises</b>.`;}
-  else{v.className='verdict down';v.innerHTML=`S(settle) &gt; S(maturity): the <b>seasonal component of the Ref CPI falls</b> from settlement to maturity (<b>${pct.toFixed(3)}%</b>). The market prices this in — quoted real yield is higher because that fall is already embedded. The SA transform multiplies price by <b>${ratio.toFixed(4)}</b> to compensate → <b>SA yield falls</b>.`;}
+  else if(ratio<1){v.className='verdict up';v.innerHTML=`S(settle) &lt; S(maturity): the <b>seasonal component of the Ref CPI rises</b> from settlement to the maturity month/day (<b>+${pct.toFixed(3)}%</b>). The market prices this in — quoted real yield is lower because that rise is already embedded. The SA transform multiplies price by <b>${ratio.toFixed(4)}</b> to remove it → <b>SA yield rises</b>.`;}
+  else{v.className='verdict down';v.innerHTML=`S(settle) &gt; S(maturity): the <b>seasonal component of the Ref CPI falls</b> from settlement to the maturity month/day (<b>${pct.toFixed(3)}%</b>). The market prices this in — quoted real yield is higher because that fall is already embedded. The SA transform multiplies price by <b>${ratio.toFixed(4)}</b> to compensate → <b>SA yield falls</b>.`;}
   drawCurve(settleDoy);
 }
 
