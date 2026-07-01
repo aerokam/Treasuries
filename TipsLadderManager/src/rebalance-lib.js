@@ -546,6 +546,19 @@ export function inferScaledDARAFromPortfolio({ daraMap, median: _median, holding
 
   const inScope = scopeYears ? (y => scopeYears.has(y)) : (() => true);
 
+  // Cash-scope: like inScope, but ALSO claims trade rows whose year sits beyond the ladder's own
+  // lastYear — e.g. the upper gap bracket (2040) when lastYear lands inside the structural gap
+  // (3.0 §lastYear as a Gap Year), which produces a trade with no daraByYear target of its own
+  // (buildMap never assigns it `level`, so it must stay out of `inScope`) but whose cash delta
+  // still has to land in SOME segment's self-finance metric, or the search silently ignores it and
+  // converges on a DARA that leaves the reported whole-portfolio net cash far from zero. Attributed
+  // to whichever segment reaches the top of the range — mirrors the documented rule that the
+  // speculative cover pair / Future-30Y excess belongs to the speculative segment.
+  const topYear = scopeYears ? (lastYearOverride ?? Math.max(...scopeYears)) : null;
+  const inCashScope = scopeYears
+    ? (y => scopeYears.has(y) || (y > topYear && scopeYears.has(topYear)))
+    : (() => true);
+
   // Scaling pivots on the IN-SCOPE natural-ARA median, so the returned scaledMedian is the
   // segment's own median (the whole-portfolio median when unscoped).
   const _vals = [...daraMap.entries()].filter(([y, v]) => inScope(y) && v > 0).map(([, v]) => v).sort((a, b) => a - b);
@@ -563,13 +576,13 @@ export function inferScaledDARAFromPortfolio({ daraMap, median: _median, holding
   };
 
   // Self-finance metric: whole costDeltaSum, or — when scoped — cost delta summed over rebalance
-  // rows whose funded year is in scope (results[i][11] ↔ details[i].fundedYear, kept index-parallel).
+  // rows whose funded year is in cash-scope (results[i][11] ↔ details[i].fundedYear, kept index-parallel).
   const netCash = ({ results, details, summary }) => {
     if (!scopeYears) return summary.costDeltaSum;
     let s = 0;
     for (let i = 0; i < results.length; i++) {
       const cd = results[i][11];
-      if (inScope(details[i]?.fundedYear) && typeof cd === 'number') s += cd;
+      if (inCashScope(details[i]?.fundedYear) && typeof cd === 'number') s += cd;
     }
     return s;
   };

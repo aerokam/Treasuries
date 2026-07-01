@@ -1141,6 +1141,46 @@ for (const gapFirstYear of [2037, 2038, 2039]) {
   assert('gap-free pristine mirror: net cash ~0', Math.abs(res.summary.costDeltaSum) <= 3000, true);
 }
 
+// ── Test: Infer LMP DARA when lastYear lands inside the gap — orphaned bracket trade ────────────
+// Regression: when lastYearOverride sits inside the structural gap (2037-2039), the upper bracket
+// (2040) is NOT a funded rung, but the rebalance still emits a trade for it (3.0 §lastYear as a Gap
+// Year). That trade's fundedYear (2040) falls outside [firstYear, lastYear], so a segment-scoped
+// self-financing search (flat=true, scopeYears = the whole LMP range, no speculative segment — what
+// "Infer LMP DARA" runs with no split set) must still count that trade's cash delta, or the search
+// converges on a DARA that leaves large, oversized 2040 holdings unaccounted for and the reported
+// whole-portfolio net cash lands far from zero (real-world case: a $38k, 26-bond 2040 position sized
+// for build-era duration matching outlived its ladder — Dana's combined Schwab accounts, net cash
+// +$12k+ before the fix). Oversize the 2040 position relative to the tiny 3-year gap it must cover.
+{
+  console.log('\nInfer LMP DARA — lastYear inside gap, oversized 2040 bracket must be counted');
+  const holdings = [
+    { cusip: '9128283R9', qty: 10 }, { cusip: '9128285W6', qty: 10 },
+    { cusip: '912828Z37', qty: 10 }, { cusip: '91282CBF7', qty: 10 },
+    { cusip: '91282CDX6', qty: 10 }, { cusip: '912810QF8', qty: 40 }, // 2040, oversized
+  ].filter(h => tipsMap.get(h.cusip)?.maturity);
+
+  const firstYear = 2028, lastYear = 2039;
+  const heldARA = computePortfolioARAByYear(holdings, tipsMap, refCPI);
+  const { daraMap } = derivePerYearDara(heldARA, getGapYearBracketCandidates(tipsMap));
+
+  const lmpYears = new Set();
+  for (let y = firstYear; y <= lastYear; y++) lmpYears.add(y);
+  const { scaledMap, scaledMedian } = inferScaledDARAFromPortfolio({
+    daraMap, holdings, tipsMap, refCPI, settlementDate,
+    lastYearOverride: lastYear, firstYearOverride: firstYear,
+    scopeYears: lmpYears, fixedDaraByYear: daraMap, flat: true,
+  });
+  assert('Infer LMP (last inside gap): returns a positive flat DARA', scaledMedian > 0, true);
+
+  const result = runRebalance({
+    dara: scaledMedian, holdings, tipsMap, refCPI, settlementDate,
+    daraByYear: scaledMap, lastYearOverride: lastYear, firstYearOverride: firstYear,
+  });
+  assert('Infer LMP (last inside gap): whole-portfolio net cash small & non-negative',
+    result.summary.costDeltaSum >= -50 && result.summary.costDeltaSum <= 3000, true);
+  console.log(`        flat DARA: ${Math.round(scaledMedian).toLocaleString()}  whole-portfolio net cash: ${Math.round(result.summary.costDeltaSum).toLocaleString()}`);
+}
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 console.log(`\n${passed + failed} tests: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);
