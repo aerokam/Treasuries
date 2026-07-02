@@ -102,18 +102,22 @@ export function yieldFromPrice(cleanPrice, coupon, settle, mature) {
 
   const days = (a, b) => (b.getTime() - a.getTime()) / 86400000;
   const daysToMat = days(settle, mature);
-
-  function hasLeapDayBetween(d1, d2) {
-    for (let yr = d1.getFullYear(); yr <= d2.getFullYear(); yr++) {
-      const feb29 = new Date(yr, 1, 29);
-      if (feb29.getMonth() === 1 && feb29 > d1 && feb29 <= d2) return true;
-    }
-    return false;
-  }
-  const leapSpan = hasLeapDayBetween(settle, mature);
-  const freq = daysToMat < (leapSpan ? 183 : 182.5) ? 1 : 2;
-
   const semiCoupon = (coupon / 2) * 100;
+
+  // Zero-coupon bills: simple investment rate 365/d (matches market convention).
+  // No coupon schedule exists to check against, so this stays a pure day-count test.
+  if (semiCoupon === 0) {
+    function hasLeapDayBetween(d1, d2) {
+      for (let yr = d1.getFullYear(); yr <= d2.getFullYear(); yr++) {
+        const feb29 = new Date(yr, 1, 29);
+        if (feb29.getMonth() === 1 && feb29 > d1 && feb29 <= d2) return true;
+      }
+      return false;
+    }
+    const leapSpan = hasLeapDayBetween(settle, mature);
+    if (daysToMat < (leapSpan ? 183 : 182.5)) return (100 / cleanPrice - 1) * 365 / daysToMat;
+  }
+
   const matMon = mature.getMonth() + 1;
   const cm1 = matMon <= 6 ? matMon : matMon - 6;
   const cm2 = cm1 + 6;
@@ -131,28 +135,9 @@ export function yieldFromPrice(cleanPrice, coupon, settle, mature) {
     return candidates.find(c => c >= d && c <= mature) || null;
   }
 
-  // ── Freq=1: last coupon period ──
-  if (freq === 1) {
-    // Zero-coupon bills: simple investment rate 365/d (matches market convention)
-    if (semiCoupon === 0) return (100 / cleanPrice - 1) * 365 / daysToMat;
-    const nextCoupon = nextCouponOnOrAfter(settle);
-    if (!nextCoupon) return null;
-    const lastCoupon = addSemiannualPeriods(nextCoupon, -1, mature.getDate());
-    const E = days(lastCoupon, nextCoupon);
-    const A = days(lastCoupon, settle);
-    const DSC = days(settle, nextCoupon);
-    const accrued = semiCoupon * (A / E);
-    const dirtyPrice = cleanPrice + accrued;
-    const w = DSC / E;
-    // Linear formula: dirty * (1 + y/2 * w) = semiCoupon + 100
-    return 2 * ((semiCoupon + 100) / dirtyPrice - 1) / w;
-  }
-
-  // ── Freq=2: semi-annual BEY ──
   const nextCoupon = nextCouponOnOrAfter(settle);
   if (!nextCoupon) return null;
   const lastCoupon = addSemiannualPeriods(nextCoupon, -1, mature.getDate());
-
   const E = days(lastCoupon, nextCoupon);
   const A = days(lastCoupon, settle);
   const DSC = days(settle, nextCoupon);
@@ -160,6 +145,9 @@ export function yieldFromPrice(cleanPrice, coupon, settle, mature) {
   const dirtyPrice = cleanPrice + accrued;
   const w = DSC / E;
 
+  // Frequency is always 2 (semiannual), matching Excel YIELD(...,2,1) — there is no
+  // separate near-maturity convention for coupon-bearing TIPS/notes/bonds. This also
+  // correctly handles the final (N=1) period: same PV formula, just one cash flow.
   const coupons = [];
   for (let k = 0; ; k++) {
     const d = addSemiannualPeriods(nextCoupon, k, mature.getDate());

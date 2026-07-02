@@ -104,7 +104,7 @@
 
 <a id="yield"></a>
 ### Yield
-`Yield` = *Yield-to-Maturity (YTM): the discount rate equating present value of all future cash flows to the current price. Computed with Actual/Actual day count, semi-annual compounding (Excel YIELD convention). Near-maturity bonds (≤ 6 months to maturity) use simple annual discounting.*
+`Yield` = *Yield-to-Maturity (YTM): the discount rate equating present value of all future cash flows to the current price. Computed with Actual/Actual day count, semi-annual compounding (Excel `YIELD(settlement, maturity, rate, pr, redemption, 2, 1)` convention) for every coupon-bearing security regardless of remaining time to maturity — frequency is always 2, never a separate near-maturity simple-discounting case. Zero-coupon Treasury Bills are the one exception: priced via the simple investment-rate convention (`365/days-to-maturity`), since they have no coupon schedule to apply frequency/day-count to in the first place.*
 
 <a id="tips"></a>
 ### TIPS

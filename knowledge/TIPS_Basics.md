@@ -102,16 +102,11 @@ costPerBond = price/100 × indexRatio × 1,000
 
 ## Yield Calculation Conventions
 
-TIPS yield-to-maturity (YTM) follows the standard U.S. Treasury convention for notes and bonds:
+TIPS yield-to-maturity (YTM) always uses semi-annual compounding, Actual/Actual day count — matching Excel's `YIELD(settlement, maturity, rate, pr, redemption, 2, 1)` with `frequency=2` fixed, regardless of how close settlement is to maturity. There is **no separate near-maturity/short-dated convention** for coupon-bearing TIPS, notes, or bonds — every remaining-period count (including the final period) is priced with the same multi-period PV formula.
 
-- **Standard ( > 6 months to maturity)**: Semi-annual compounding (Actual/Actual day count). Matches Excel's `YIELD` function with `frequency=2` and `basis=1`.
-- **Short-dated ( ≤ 6 months to maturity)**: Simple annual discounting (single-period). This occurs when the security is within its final coupon period.
-  - **Rule**: If the time from settlement to maturity is less than one semi-annual period (approximately 182.5 days), use the single-period formula.
-  - **Formula**:
-    \[ Price_{dirty} = \frac{FaceValue + Coupon_{semi}}{1 + Yield \times \frac{DaysToMaturity}{DaysInYear}} \]
-    where $DaysInYear$ is 365 (or 366 if a leap day is involved).
+A prior version of this app special-cased settlements within ~6 months of maturity with a simple/linear single-period formula. That was removed: deciding "is this the last period" from days-to-maturity alone is unsafe (a settlement date landing just before an *intermediate*, non-final coupon can also be under 6 months from maturity, which wrongly priced that intermediate coupon as the final payment), and it made `yieldFromPrice`/`priceFromYield` round-trip inconsistently near maturity even when correctly triggered. Always using `frequency=2` matches real-world spreadsheet YIELD calculations validated against broker data.
 
-This dual-mode calculation ensures that the application's yield curve aligns with official Treasury (FedInvest) and institutional broker data.
+**Exception — zero-coupon Treasury Bills**: Bills have no coupon schedule to apply frequency/day-count to, so they use the simple investment-rate convention instead: `Yield = (100/Price − 1) × 365/DaysToMaturity` (366 if a leap day falls within the period). This is a different instrument, not a "near-maturity TIPS" case.
 
 ---
 

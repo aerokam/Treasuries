@@ -1,6 +1,10 @@
 // Treasury Yields Monitor - app.js
 import { handleChartKeydown, setupAxisWheelZoom, snapYBounds, snapYAfterZoom, applyLockRight } from '../../shared/src/chart-keys.js';
 import { applyXTimeUnit, getXTimeUnit } from '../../shared/src/chart-time-axis.js';
+import { priceFromYield, yieldFromPrice } from '../../shared/src/bond-math.js';
+import { saFactorForDate } from '../../shared/src/ref-cpi.js';
+import { parseCsv } from '../../shared/src/csv.js';
+import { localDate, toIsoDate, nextBusinessDay, parseHolidaySet } from '../../shared/src/settlement.js';
 
 const AVAILABLE_SYMBOLS = {
   // TIPS
@@ -24,6 +28,8 @@ const COLORS = [
   '#1a56db', '#dc2626', '#16a34a', '#d97706', '#9333ea', '#0891b2', '#be123c',
   '#4f46e5', '#db2777', '#059669', '#ea580c', '#7c3aed', '#0284c7', '#e11d48'
 ];
+
+const SA_COLOR = '#f59e0b'; // fixed accent for the SA overlay line, distinct from every raw-line color
 
 const TIME_RANGE_MAP = {
   '2D': '1D',
@@ -56,6 +62,51 @@ let isUpdatingData = false;
 const yOverrideSyms = new Set();
 const panStartY = {}; // sym -> {min, max} at pan gesture start; cleared on pan end
 
+// Seasonal Adjustment (SA) — see YieldCurves/knowledge/1.0_Seasonal_Adjustments.md.
+// CNBC's TIPS symbols (e.g. US2YTIPS) are the bid yield of one specific, real TIPS —
+// CNBC's own quote page shows which one (e.g. US2YTIPS = the Jan 2028 0.50% TIPS).
+// So this is the exact same transform YieldCurves applies to actual TIPS: derive the
+// clean price from the quoted yield via standard bond math using the bond's REAL
+// coupon and maturity date, apply the Price -> SA Price -> SA Yield ratio, and derive
+// the SA yield back from the adjusted price.
+// SA has minimal effect beyond 5Y (the seasonal effect amortizes with maturity — see
+// YieldCurves/knowledge/2.2_SAO_Residual_Analysis.md), so the option is only exposed
+// for the short end.
+//
+// Bond identity — today vs. history:
+// CNBC's restQuote endpoint (fetchTipsBondMeta) only exposes each symbol's CURRENT
+// underlying bond, not a historical CUSIP-per-date mapping — so it's used as the
+// authoritative source for TODAY's point only. For every other (historical) point,
+// the bond identity is reconstructed from TipsRef.csv (the full TIPS auction record)
+// via the observed rollover rule: CNBC only re-picks the underlying bond at fixed
+// 6-month checkpoints tied to that tenor's original auction cycle (10yr-origin notes,
+// which back 1Y/2Y, auction Jan/Jul; the 5yr-origin note behind 5Y auctions Apr/Oct) —
+// NOT continuously by "nearest date to N years out". At each checkpoint, the target
+// maturity is checkpoint + tenor years; when two CUSIPs share that maturity (a 10yr-
+// origin and an older 20yr-origin note can mature the same date), the more recently
+// dated one is used. Verified against CNBC's live data for all three tenors on
+// 2026-07-01 (checkpoint = most recent Jan/Apr 15): reproduces Jan-2027/0.375% (1Y),
+// Jan-2028/0.50% (2Y), and Apr-2031/1.25% (5Y) exactly.
+const SA_SYMBOLS = new Set(['US1YTIPS', 'US2YTIPS', 'US5YTIPS']);
+const SA_AUCTION_CYCLE = {
+  US1YTIPS: { tenorYears: 1, months: [1, 7] },  // 10yr-origin: Jan/Jul auctions
+  US2YTIPS: { tenorYears: 2, months: [1, 7] },
+  US5YTIPS: { tenorYears: 5, months: [4, 10] }, // 5yr-origin: Apr/Oct auctions
+};
+const REF_CPI_SA_URL = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/TIPS/RefCpiNsaSa.csv';
+const HOLIDAYS_CSV_URL = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/misc/BondHolidaysSifma.csv';
+const TIPS_REF_URL = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/TIPS/TipsRef.csv';
+const CNBC_QUOTE_URL = 'https://quote.cnbc.com/quote-html-webservice/restQuote/symbolType/symbol';
+let showSaYield = false;
+let refCpiSaRows = null;
+let refCpiSaPromise = null;
+let tipsBondMeta = null; // { [symbol]: { maturity: Date, coupon: number(decimal) } } — TODAY's bond, from CNBC live
+let tipsBondMetaPromise = null;
+let tipsRefRows = null; // TipsRef.csv rows — used to resolve HISTORICAL bond identity
+let tipsRefPromise = null;
+let saHolidaySet = new Set();
+let saHolidaySetPromise = null;
+
 const ET_YMD_FMT = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' });
 const ET_FULL_FMT = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric' });
 const ET_HM_FMT = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: 'numeric', minute: 'numeric' });
@@ -66,13 +117,14 @@ const ET_TICK_MON_FMT = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Ne
 let lastDayCache = { start: 0, end: 0, str: "" };
 
 const SYMBOL_LABELS = {
-  'US1M': '1-Month', 'US2M': '2-Month', 'US3M': '3-Month', 'US6M': '6-Month', 'US1Y': '1-Year', 'US2Y': '2-Year', 'US5Y': '5-Year', 'US10Y': '10-Year', 'US30Y': '30-Year',
+  'US1M': '1-Mth', 'US2M': '2-Mth', 'US3M': '3-Mth', 'US6M': '6-Mth', 'US1Y': '1-Year', 'US2Y': '2-Year', 'US5Y': '5-Year', 'US10Y': '10-Year', 'US30Y': '30-Year',
   'US1YTIPS': '1-Year', 'US2YTIPS': '2-Year', 'US5YTIPS': '5-Year', 'US10YTIPS': '10-Year', 'US30YTIPS': '30-Year'
 };
 
 async function init() {
   setupUI();
   setupTabs();
+  setupSidebarResize();
   syncChartContainers();
   updateAllData();
   window.addEventListener('resize', () => Object.values(charts).forEach(c => c.resize()));
@@ -101,6 +153,38 @@ function setupTabs() {
         setTimeout(() => Object.values(yieldCurveCharts).forEach(c => c && c.resize()), 50);
       }
     });
+  });
+}
+
+const SIDEBAR_WIDTH_KEY = 'ymSidebarWidthPx';
+
+function setupSidebarResize() {
+  const resizer = document.getElementById('sidebarResizer');
+  const sidebar = document.getElementById('sidebar');
+  if (!resizer || !sidebar) return;
+  const saved = parseInt(localStorage.getItem(SIDEBAR_WIDTH_KEY), 10);
+  if (saved) sidebar.style.width = `${saved}px`;
+  let dragging = false;
+  resizer.addEventListener('mousedown', (e) => {
+    dragging = true;
+    resizer.classList.add('dragging');
+    document.body.style.userSelect = 'none';
+    e.preventDefault();
+  });
+  window.addEventListener('mousemove', (e) => {
+    if (!dragging) return;
+    const containerLeft = sidebar.parentElement.getBoundingClientRect().left;
+    const width = Math.min(Math.max(e.clientX - containerLeft, 220), 560);
+    sidebar.style.width = `${width}px`;
+  });
+  window.addEventListener('mouseup', () => {
+    if (!dragging) return;
+    dragging = false;
+    resizer.classList.remove('dragging');
+    document.body.style.userSelect = '';
+    localStorage.setItem(SIDEBAR_WIDTH_KEY, parseInt(sidebar.style.width, 10));
+    Object.values(charts).forEach(c => c.resize());
+    Object.values(yieldCurveCharts).forEach(c => c && c.resize());
   });
 }
 
@@ -166,10 +250,12 @@ function setupUI() {
   const createGrid = (syms) => syms.map(sym => {
     const idx = Object.keys(AVAILABLE_SYMBOLS).indexOf(sym);
     const color = COLORS[idx % COLORS.length];
-    return `<label class="sym-item-check" id="label-${sym}"><input type="checkbox" value="${sym}" ${activeSymbols.has(sym) ? 'checked' : ''}><span class="color-dot" style="background:${color}"></span><span class="sym-code">${SYMBOL_LABELS[sym] || sym}</span><span class="sym-yield" id="yield-${sym}">---</span><span class="sym-change" id="change-${sym}"></span></label>`;
+    // Always reserve the SA column (even empty) so TIPS/Treasury rows stay column-aligned
+    // whether or not that row has an SA reading.
+    return `<label class="sym-item-check" id="label-${sym}"><input type="checkbox" value="${sym}" ${activeSymbols.has(sym) ? 'checked' : ''}><span class="color-dot" style="background:${color}"></span><span class="sym-code">${SYMBOL_LABELS[sym] || sym}</span><span class="sym-yield" id="yield-${sym}">---</span><span class="sym-change" id="change-${sym}"></span><span class="sym-sa-yield" id="sa-yield-${sym}"></span></label>`;
   }).join('');
 
-  root.innerHTML = `<style>.range-picker { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 20px; } .range-btn { flex: 1; min-width: 45px; padding: 6px 0; border: none; background: var(--tab-inactive-bg); border-radius: 4px; cursor: pointer; font-weight: 700; font-size: 13px; color: var(--tab-inactive-text); text-transform: uppercase; letter-spacing: 0.04em; transition: background 0.1s; } .range-btn:hover:not(.active) { background: var(--btn-hover-bg); } .range-btn.active { background: var(--tab-active-bg); color: var(--tab-inactive-text); border-top: 3px solid var(--tab-active-accent); } .sym-group h4 { display: flex; justify-content: space-between; align-items: center; margin: 12px 0 6px; font-size: 13px; text-transform: uppercase; color: #000; font-weight: 800; letter-spacing: 0.05em; border-bottom: 1px solid #cbd5e1; padding-bottom: 2px; } .clear-btn { font-size: 11px; color: #64748b; cursor: pointer; text-transform: none; font-weight: 600; } .sym-item-check { display: flex; align-items: center; gap: 4px; padding: 4px 0; font-size: 15px; cursor: pointer; color: #000; } .color-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; } .sym-code { font-weight: 600; color: #000; width: 75px; flex-shrink: 0; white-space: nowrap; } .sym-yield { font-family: monospace; font-weight: 700; font-size: 15px; color: #000; margin-left: auto; padding-right: 4px; } .sym-change { font-family: monospace; font-weight: 700; font-size: 14px; min-width: 60px; text-align: right; } .sym-change.up { color: #16a34a; } .sym-change.down { color: #dc2626; } #fetchStatus { font-size: 13px; color: #000; margin-top: 20px; font-weight: 700; display: grid; grid-template-columns: auto auto; column-gap: 4px; row-gap: 2px; } #fetchStatus .fs-label { text-align: right; } #fetchStatus .fs-val { text-align: left; } .no-data-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: #000; background: rgba(255,255,255,0.9); pointer-events: none; z-index: 10; } .sync-zoom-label { display: flex; align-items: center; gap: 6px; margin-top: 15px; font-size: 14px; font-weight: 700; color: #334155; cursor: pointer; background: #f8fafc; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; } .custom-date-range { display: none; flex-direction: column; gap: 6px; padding: 10px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; margin-bottom: 4px; } .custom-date-label { font-size: 12px; font-weight: 800; color: #334155; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.04em; } .custom-date-inputs { display: flex; flex-direction: column; gap: 6px; } .custom-date-inputs label { font-size: 12px; font-weight: 700; color: #334155; display: flex; flex-direction: column; gap: 2px; } .custom-date-inputs .date-picker { width: 100%; font-size: 13px; } .custom-date-apply { margin-top: 4px; padding: 6px; background: var(--tab-active-bg); color: var(--tab-inactive-text); border: none; border-top: 3px solid var(--tab-active-accent); border-radius: 4px; font-size: 13px; font-weight: 700; cursor: pointer; width: 100%; } .custom-date-apply:hover { opacity: 0.85; }</style><div class="range-picker">${rangeHtml}</div><div class="custom-date-range" id="custom-date-range"><div class="custom-date-label">Custom Date Range</div><div class="custom-date-inputs"><label>Start Date<input type="date" id="customStart" class="date-picker"></label><label>End Date<input type="date" id="customEnd" class="date-picker"></label></div><button class="custom-date-apply" id="applyCustomRange">Apply</button></div><div class="sym-group"><h4>TIPS <span class="clear-btn" data-type="TIPS">Clear All</span></h4>${createGrid(tips)}<h4>Treasuries <span class="clear-btn" data-type="Nominal">Clear All</span></h4>${createGrid(nominals)}</div><label class="sync-zoom-label"><input type="checkbox" id="syncXAxis" ${syncXAxis ? 'checked' : ''}> Sync Zoom & Pan</label><label class="sync-zoom-label"><input type="checkbox" id="lockRight"> Lock Right</label><div id="fetchStatus">Ready</div>`;
+  root.innerHTML = `<style>.range-picker { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 20px; } .range-btn { flex: 1; min-width: 45px; padding: 6px 0; border: none; background: var(--tab-inactive-bg); border-radius: 4px; cursor: pointer; font-weight: 700; font-size: 13px; color: var(--tab-inactive-text); text-transform: uppercase; letter-spacing: 0.04em; transition: background 0.1s; } .range-btn:hover:not(.active) { background: var(--btn-hover-bg); } .range-btn.active { background: var(--tab-active-bg); color: var(--tab-inactive-text); border-top: 3px solid var(--tab-active-accent); } .sym-group h4 { display: flex; justify-content: space-between; align-items: center; margin: 12px 0 6px; font-size: 13px; text-transform: uppercase; color: #000; font-weight: 800; letter-spacing: 0.05em; border-bottom: 1px solid #cbd5e1; padding-bottom: 2px; } .clear-btn { font-size: 11px; color: #64748b; cursor: pointer; text-transform: none; font-weight: 600; } .sym-item-check { display: flex; align-items: center; gap: 4px; padding: 4px 0; font-size: 15px; cursor: pointer; color: #000; } .color-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; } .sym-code { font-weight: 600; color: #000; width: 62px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .sym-yield { font-family: monospace; font-weight: 700; font-size: 15px; color: #000; width: 54px; flex-shrink: 0; text-align: right; } .sym-change { font-family: monospace; font-weight: 700; font-size: 13px; width: 50px; flex-shrink: 0; text-align: right; } .sym-change.up { color: #16a34a; } .sym-change.down { color: #dc2626; } .sym-sa-yield { font-family: monospace; font-weight: 700; font-size: 12px; color: #f59e0b; width: 48px; flex-shrink: 0; text-align: right; } .sa-legend { display: none; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: #64748b; margin-top: -8px; padding-left: 8px; } .sa-legend .sa-swatch { display: inline-block; width: 16px; height: 3px; background: #f59e0b; border-radius: 2px; flex-shrink: 0; } #fetchStatus { font-size: 13px; color: #000; margin-top: 20px; font-weight: 700; display: grid; grid-template-columns: auto auto; column-gap: 4px; row-gap: 2px; } #fetchStatus .fs-label { text-align: right; } #fetchStatus .fs-val { text-align: left; } .no-data-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: #000; background: rgba(255,255,255,0.9); pointer-events: none; z-index: 10; } .sync-zoom-label { display: flex; align-items: center; gap: 6px; margin-top: 15px; font-size: 14px; font-weight: 700; color: #334155; cursor: pointer; background: #f8fafc; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; } .custom-date-range { display: none; flex-direction: column; gap: 6px; padding: 10px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; margin-bottom: 4px; } .custom-date-label { font-size: 12px; font-weight: 800; color: #334155; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.04em; } .custom-date-inputs { display: flex; flex-direction: column; gap: 6px; } .custom-date-inputs label { font-size: 12px; font-weight: 700; color: #334155; display: flex; flex-direction: column; gap: 2px; } .custom-date-inputs .date-picker { width: 100%; font-size: 13px; } .custom-date-apply { margin-top: 4px; padding: 6px; background: var(--tab-active-bg); color: var(--tab-inactive-text); border: none; border-top: 3px solid var(--tab-active-accent); border-radius: 4px; font-size: 13px; font-weight: 700; cursor: pointer; width: 100%; } .custom-date-apply:hover { opacity: 0.85; }</style><div class="range-picker">${rangeHtml}</div><div class="custom-date-range" id="custom-date-range"><div class="custom-date-label">Custom Date Range</div><div class="custom-date-inputs"><label>Start Date<input type="date" id="customStart" class="date-picker"></label><label>End Date<input type="date" id="customEnd" class="date-picker"></label></div><button class="custom-date-apply" id="applyCustomRange">Apply</button></div><div class="sym-group"><h4>TIPS <span class="clear-btn" data-type="TIPS">Clear All</span></h4>${createGrid(tips)}<h4>Treasuries <span class="clear-btn" data-type="Nominal">Clear All</span></h4>${createGrid(nominals)}</div><label class="sync-zoom-label"><input type="checkbox" id="syncXAxis" ${syncXAxis ? 'checked' : ''}> Sync Zoom & Pan</label><label class="sync-zoom-label"><input type="checkbox" id="lockRight"> Lock Right</label><label class="sync-zoom-label"><input type="checkbox" id="showSaYield" ${showSaYield ? 'checked' : ''}> Show SA Yield (1Y/2Y/5Y TIPS)</label><div class="sa-legend" id="saLegend" style="display:${showSaYield ? 'flex' : 'none'};"><span class="sa-swatch"></span> Amber = Seasonally Adjusted (SA) Yield</div><div id="fetchStatus">Ready</div>`;
 
   document.getElementById('syncXAxis').addEventListener('change', (e) => {
     syncXAxis = e.target.checked;
@@ -179,6 +265,17 @@ function setupUI() {
     }
   });
   document.getElementById('lockRight').addEventListener('change', (e) => { lockRight = e.target.checked; });
+  document.getElementById('showSaYield').addEventListener('change', async (e) => {
+    showSaYield = e.target.checked;
+    if (showSaYield) {
+      if (!refCpiSaRows) refCpiSaRows = await fetchRefCpiSaRows();
+      if (!tipsBondMeta) tipsBondMeta = await fetchTipsBondMeta();
+      if (!tipsRefRows) tipsRefRows = await fetchTipsRefRows();
+      if (saHolidaySet.size === 0) saHolidaySet = await fetchSaHolidaySet();
+    }
+    document.getElementById('saLegend').style.display = showSaYield ? 'flex' : 'none';
+    refreshSaOverlays(true);
+  });
 
   document.querySelectorAll('.clear-btn').forEach(btn => btn.addEventListener('click', (e) => {
     const isTips = e.target.dataset.type === 'TIPS';
@@ -219,7 +316,10 @@ function setupUI() {
     if (e.target.checked) activeSymbols.add(e.target.value); else activeSymbols.delete(e.target.value);
     syncChartContainers(); updateAllData();
   }));
-  document.getElementById('refreshAll').addEventListener('click', () => updateAllData(true));
+  document.getElementById('refreshAll').addEventListener('click', async () => {
+    updateAllData(true);
+    if (showSaYield) { tipsBondMeta = await fetchTipsBondMeta(true); refreshSaOverlays(); }
+  });
   document.getElementById('resetAllZoom').addEventListener('click', () => { yOverrideSyms.clear(); isUpdatingData = true; Object.entries(charts).forEach(([sym, chart]) => applyDefaultBounds(sym, chart, rangeData[sym])); isUpdatingData = false; });
 }
 
@@ -246,16 +346,17 @@ function syncChartContainers() {
 function createChartInstance(sym) {
   const ctx = document.getElementById(`chart-${sym}`).getContext('2d');
   const color = COLORS[Object.keys(AVAILABLE_SYMBOLS).indexOf(sym) % COLORS.length];
+  const saDataset = SA_SYMBOLS.has(sym) ? [{ label: `${sym} SA`, data: [], borderColor: SA_COLOR, backgroundColor: 'transparent', borderWidth: 1.5, pointRadius: 0, pointHoverRadius: 4, fill: false, tension: 0.1 }] : [];
   charts[sym] = new Chart(ctx, {
     type: 'line',
-    data: { datasets: [{ label: sym, data: [], borderColor: color, backgroundColor: color + '1A', borderWidth: 1.5, pointRadius: 0, pointHoverRadius: 4, fill: false, tension: 0.1, segment: { borderColor: ctx => { if (activeRange !== '2D' && activeRange !== '10D') return color; const mid = (ctx.p0.parsed.x + ctx.p1.parsed.x) / 2; return (isAfterHoursEt(mid) || isWeekendEt(new Date(mid))) ? color + '55' : color; } } }] },
+    data: { datasets: [{ label: sym, data: [], borderColor: color, backgroundColor: color + '1A', borderWidth: 1.5, pointRadius: 0, pointHoverRadius: 4, fill: false, tension: 0.1, segment: { borderColor: ctx => { if (activeRange !== '2D' && activeRange !== '10D') return color; const mid = (ctx.p0.parsed.x + ctx.p1.parsed.x) / 2; return (isAfterHoursEt(mid) || isWeekendEt(new Date(mid))) ? color + '55' : color; } } }, ...saDataset] },
     options: {
       animation: false, responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
       scales: {
         x: { type: 'time', time: { tooltipFormat: 'MM/dd/yy HH:mm:ss', displayFormats: { hour: 'MM/dd HH:mm', day: 'MMM dd', month: 'MMM yyyy', year: 'yyyy' } }, grid: { color: '#f1f5f9' }, ticks: { autoSkip: true, font: { size: 9, weight: 'bold' }, color: '#000', callback(value, index, ticks) { const d = new Date(value); if (activeRange === '2D') { const p = ET_HM_FMT.formatToParts(d).reduce((a, pt) => ({...a, [pt.type]: pt.value}), {}); return `${p.month}/${p.day} ${p.hour}:${p.minute}`; } if (activeRange === '10D') return ET_TICK_DAY_FMT.format(d); if ((this.max - this.min) < 90 * 86400000) { const label = ET_TICK_DAY_FMT.format(d); if (index > 0 && ET_TICK_DAY_FMT.format(new Date(ticks[index - 1].value)) === label) return ''; return label; } const label = ET_TICK_MON_FMT.format(d); if (index > 0 && ET_TICK_MON_FMT.format(new Date(ticks[index - 1].value)) === label) return ''; return label; } } },
         y: { grid: { color: '#f1f5f9' }, ticks: { font: { size: 9, family: 'monospace', weight: 'bold' }, color: '#000', callback: v => v.toFixed(3) + '%' } }
       },
-      plugins: { legend: { display: false }, zoom: { zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'xy', onZoom: ({chart}) => { if (lockRight) applyLockRight(chart, xMaxAnchors[sym]); if (syncXAxis) syncAllChartsX(chart); }, onZoomComplete: ({chart}) => { if (lockRight) applyLockRight(chart, xMaxAnchors[sym]); if (activeRange !== '2D' && activeRange !== '10D') applyXTimeUnit(chart); rescaleYToVisible(chart, sym); if (syncXAxis) syncAllChartsX(chart); } }, pan: { enabled: true, mode: 'xy', onPanStart: ({chart}) => { Object.entries(charts).forEach(([s, c]) => { panStartY[s] = { min: c.scales.y.min, max: c.scales.y.max }; }); }, onPan: ({chart}) => { if (syncXAxis) syncAllCharts(chart); }, onPanComplete: ({chart}) => { if (activeRange !== '2D' && activeRange !== '10D') applyXTimeUnit(chart); rescaleYToVisible(chart, sym); if (syncXAxis) syncAllCharts(chart); Object.keys(panStartY).forEach(k => delete panStartY[k]); } } }, annotation: { annotations: {} }, tooltip: { backgroundColor: 'rgba(255, 255, 255, 0.95)', titleColor: '#64748b', titleFont: { size: 11, weight: 'bold' }, bodyColor: '#000', borderColor: '#cbd5e1', borderWidth: 1, padding: 8, bodyFont: { size: 12, weight: 'bold' }, cornerRadius: 6, displayColors: false, callbacks: { title: (items) => { if (!items.length) return ''; const date = new Date(items[0].parsed.x); return date.toLocaleString('en-US', { timeZone: 'America/New_York', hourCycle: 'h23', month: '2-digit', day: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' ET'; }, label: ctx => `Yield: ${ctx.parsed.y.toFixed(3)}%` } } }
+      plugins: { legend: { display: false }, zoom: { zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'xy', onZoom: ({chart}) => { if (lockRight) applyLockRight(chart, xMaxAnchors[sym]); if (syncXAxis) syncAllChartsX(chart); }, onZoomComplete: ({chart}) => { if (lockRight) applyLockRight(chart, xMaxAnchors[sym]); if (activeRange !== '2D' && activeRange !== '10D') applyXTimeUnit(chart); rescaleYToVisible(chart, sym); if (syncXAxis) syncAllChartsX(chart); } }, pan: { enabled: true, mode: 'xy', onPanStart: ({chart}) => { Object.entries(charts).forEach(([s, c]) => { panStartY[s] = { min: c.scales.y.min, max: c.scales.y.max }; }); }, onPan: ({chart}) => { if (syncXAxis) syncAllCharts(chart); }, onPanComplete: ({chart}) => { if (activeRange !== '2D' && activeRange !== '10D') applyXTimeUnit(chart); rescaleYToVisible(chart, sym); if (syncXAxis) syncAllCharts(chart); Object.keys(panStartY).forEach(k => delete panStartY[k]); } } }, annotation: { annotations: {} }, tooltip: { backgroundColor: 'rgba(255, 255, 255, 0.95)', titleColor: '#64748b', titleFont: { size: 11, weight: 'bold' }, bodyColor: '#000', borderColor: '#cbd5e1', borderWidth: 1, padding: 8, bodyFont: { size: 12, weight: 'bold' }, cornerRadius: 6, displayColors: false, callbacks: { title: (items) => { if (!items.length) return ''; const date = new Date(items[0].parsed.x); return date.toLocaleString('en-US', { timeZone: 'America/New_York', hourCycle: 'h23', month: '2-digit', day: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' ET'; }, label: ctx => `${ctx.datasetIndex === 1 ? 'SA Yield' : 'Yield'}: ${ctx.parsed.y.toFixed(3)}%` } } }
     }
   });
   setupAxisWheelZoom(ctx.canvas, ({chart}) => {
@@ -348,6 +449,189 @@ async function fetchHistory(symbol) {
   return await historyCache[symbol];
 }
 
+async function fetchRefCpiSaRows() {
+  if (!refCpiSaPromise) {
+    refCpiSaPromise = (async () => {
+      try {
+        const response = await fetchWithTimeout(REF_CPI_SA_URL);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return parseCsv(await response.text());
+      } catch (err) {
+        console.error('RefCpiNsaSa fetch failed:', err);
+        refCpiSaPromise = null; // allow retry
+        return null;
+      }
+    })();
+  }
+  return refCpiSaPromise;
+}
+
+async function fetchSaHolidaySet() {
+  if (!saHolidaySetPromise) {
+    saHolidaySetPromise = (async () => {
+      try {
+        const response = await fetchWithTimeout(HOLIDAYS_CSV_URL);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return parseHolidaySet(parseCsv(await response.text(), false));
+      } catch (err) {
+        console.error('Bond holidays fetch failed:', err);
+        saHolidaySetPromise = null; // allow retry
+        return new Set();
+      }
+    })();
+  }
+  return saHolidaySetPromise;
+}
+
+// CNBC's own quote page for each SA-eligible symbol identifies the real, specific TIPS
+// it quotes (e.g. US2YTIPS = the Jan 2028 0.50% TIPS) via this REST endpoint, which
+// returns maturity_date + coupon alongside the price/yield fields already used elsewhere.
+async function fetchTipsBondMeta(force = false) {
+  if (!tipsBondMetaPromise || force) {
+    tipsBondMetaPromise = (async () => {
+      try {
+        const syms = Array.from(SA_SYMBOLS);
+        const url = `${CNBC_QUOTE_URL}?symbols=${syms.join('%7C')}&requestMethod=itv&noform=1&partnerId=2&fund=1&exthrs=1&output=json&events=1`;
+        const response = await fetchWithTimeout(url);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const json = await response.json();
+        const quotes = json?.FormattedQuoteResult?.FormattedQuote || [];
+        const meta = {};
+        quotes.forEach(q => {
+          if (!q.symbol || !q.maturity_date || !q.coupon) return;
+          meta[q.symbol] = { maturity: localDate(q.maturity_date), coupon: parseFloat(q.coupon) / 100 };
+        });
+        return meta;
+      } catch (err) {
+        console.error('CNBC TIPS bond metadata fetch failed:', err);
+        tipsBondMetaPromise = null; // allow retry
+        return null;
+      }
+    })();
+  }
+  return tipsBondMetaPromise;
+}
+
+// TipsRef.csv: { cusip, maturity, datedDate, coupon, baseCpi, term } for every TIPS ever
+// auctioned — used to reconstruct which bond was actually behind a symbol on a past date.
+async function fetchTipsRefRows() {
+  if (!tipsRefPromise) {
+    tipsRefPromise = (async () => {
+      try {
+        const response = await fetchWithTimeout(TIPS_REF_URL);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return parseCsv(await response.text());
+      } catch (err) {
+        console.error('TipsRef fetch failed:', err);
+        tipsRefPromise = null; // allow retry
+        return null;
+      }
+    })();
+  }
+  return tipsRefPromise;
+}
+
+// The most recent auction-cycle checkpoint (day 15 of one of `months`) on or before tradeDate.
+function mostRecentCheckpoint(tradeDate, months) {
+  const year = tradeDate.getFullYear();
+  const candidates = [];
+  for (const y of [year - 1, year]) {
+    for (const m of months) candidates.push(new Date(y, m - 1, 15));
+  }
+  let best = null;
+  for (const c of candidates) {
+    if (c <= tradeDate && (!best || c > best)) best = c;
+  }
+  return best;
+}
+
+// Resolves the TIPS bond (maturity + coupon) that was actually behind `sym` on tradeDate,
+// per the rollover rule documented above SA_AUCTION_CYCLE. Returns null if TipsRef.csv
+// doesn't have a matching maturity (e.g. tradeDate predates the reference data).
+function resolveTipsBond(tradeDate, sym, refRows) {
+  const cycle = SA_AUCTION_CYCLE[sym];
+  if (!cycle || !refRows) return null;
+  const checkpoint = mostRecentCheckpoint(tradeDate, cycle.months);
+  if (!checkpoint) return null;
+  const targetMaturity = new Date(checkpoint.getFullYear() + cycle.tenorYears, checkpoint.getMonth(), checkpoint.getDate());
+  const targetStr = toIsoDate(targetMaturity);
+  const candidates = refRows.filter(r => r.maturity === targetStr);
+  if (!candidates.length) return null;
+  candidates.sort((a, b) => (a.datedDate < b.datedDate ? 1 : -1)); // most recently dated first
+  const chosen = candidates[0];
+  return { maturity: localDate(chosen.maturity), coupon: parseFloat(chosen.coupon) };
+}
+
+// Seasonally-adjusted yield for a single quote, using the real bond's coupon/maturity
+// (bondMeta, from fetchTipsBondMeta). tradeDateStr is "MM/DD/YYYY" (getEtDateStr format);
+// settlement is T+1 bond trading day from the trade date (see knowledge/DATA_DICTIONARY.md
+// #settlement-date). Returns null if any required input isn't available yet.
+function saYieldForQuote(yieldPct, tradeDateStr, bondMeta, holidaySet, saRows) {
+  if (!saRows || !bondMeta) return null;
+  const [mm, dd, yyyy] = tradeDateStr.split('/').map(Number);
+  const tradeDate = new Date(yyyy, mm - 1, dd);
+  const settle = nextBusinessDay(tradeDate, holidaySet);
+  const mature = bondMeta.maturity;
+  if (!mature || settle >= mature) return null;
+  const saSettle = saFactorForDate(saRows, toIsoDate(settle));
+  const saMature = saFactorForDate(saRows, toIsoDate(mature));
+  if (saSettle == null || saMature == null || isNaN(saSettle) || isNaN(saMature)) return null;
+  const yld = yieldPct / 100;
+  const price = priceFromYield(yld, bondMeta.coupon, settle, mature);
+  if (price == null) return null;
+  const saPrice = price * (saSettle / saMature);
+  const saYield = yieldFromPrice(saPrice, bondMeta.coupon, settle, mature);
+  return saYield == null ? null : saYield * 100;
+}
+
+// Bond identity per point: today's point uses CNBC's live-fetched bond (empirically
+// confirmed); every other point resolves the bond that was actually in effect on that
+// trade date via TipsRef.csv + the rollover rule (see SA_AUCTION_CYCLE above). Cached
+// per unique trade date since many intraday points share the same date.
+function computeSaSeries(sym, data) {
+  const liveMeta = tipsBondMeta && tipsBondMeta[sym];
+  if (!SA_SYMBOLS.has(sym) || !data || !refCpiSaRows || (!liveMeta && !tipsRefRows)) return [];
+  const todayStr = getEtDateStr(new Date());
+  const metaByDate = new Map();
+  return data.map(p => {
+    const tradeDateStr = getEtDateStr(p.x);
+    let bondMeta = metaByDate.get(tradeDateStr);
+    if (bondMeta === undefined) {
+      if (tradeDateStr === todayStr && liveMeta) {
+        bondMeta = liveMeta;
+      } else {
+        const [mm, dd, yyyy] = tradeDateStr.split('/').map(Number);
+        bondMeta = resolveTipsBond(new Date(yyyy, mm - 1, dd), sym, tipsRefRows);
+      }
+      metaByDate.set(tradeDateStr, bondMeta);
+    }
+    const saY = saYieldForQuote(p.y, tradeDateStr, bondMeta, saHolidaySet, refCpiSaRows);
+    return saY == null ? null : { x: p.x, y: saY };
+  }).filter(Boolean);
+}
+
+// Refreshes the SA overlay line + sidebar reading on every SA-eligible chart from the
+// currently loaded rangeData. Called after data updates and on toggle change. forceRescale
+// bypasses yOverrideSyms (a prior manual Y-zoom) — used when the toggle itself changes what's
+// displayed, per the "checkbox that changes displayed data always auto-fits Y" convention.
+function refreshSaOverlays(forceRescale = false) {
+  SA_SYMBOLS.forEach(sym => {
+    const chart = charts[sym];
+    if (chart && chart.data.datasets[1]) {
+      chart.data.datasets[1].data = showSaYield ? computeSaSeries(sym, rangeData[sym]) : [];
+      if (forceRescale || !yOverrideSyms.has(sym)) rescaleYToVisible(chart, sym);
+      else chart.update('none');
+    }
+    const el = document.getElementById(`sa-yield-${sym}`);
+    if (!el) return;
+    const data = rangeData[sym];
+    const latest = data && data.length ? data[data.length - 1] : null;
+    const bondMeta = tipsBondMeta && tipsBondMeta[sym];
+    const saY = (showSaYield && latest) ? saYieldForQuote(latest.y, getEtDateStr(latest.x), bondMeta, saHolidaySet, refCpiSaRows) : null;
+    el.textContent = saY == null ? '' : `${saY.toFixed(3)}%`;
+  });
+}
+
 async function fetchOne(symbol, range, force = false) {
   if (range === 'Custom') {
     const history = await fetchHistory(symbol);
@@ -382,11 +666,14 @@ async function fetchOne(symbol, range, force = false) {
       // Use cache
     } else {
       console.log(`%c[CNBC] %cFetching ${providerRange} for ${symbol}`, "color: #2563eb; font-weight: bold", "color: inherit");
-      fetchTasks.push(fetchLive(symbol, providerRange).then(live => { if (live) liveCache[cacheKey] = live; }));
+      // Only cache a non-empty result — a transient CNBC hiccup that returns 0 bars
+      // would otherwise get stuck cached for the rest of the session (every later
+      // range switch reads the same empty cache entry instead of retrying).
+      fetchTasks.push(fetchLive(symbol, providerRange).then(live => { if (live && live.length > 0) liveCache[cacheKey] = live; }));
     }
     if (is2D && (force || !liveCache[tipKey])) {
       console.log(`%c[CNBC] %cFetching 5D tip for metrics: ${symbol}`, "color: #2563eb; font-weight: bold", "color: inherit");
-      fetchTasks.push(fetchLive(symbol, '5D').then(live => { if (live) liveCache[tipKey] = live; }));
+      fetchTasks.push(fetchLive(symbol, '5D').then(live => { if (live && live.length > 0) liveCache[tipKey] = live; }));
     }
     if (fetchTasks.length > 0) await Promise.all(fetchTasks);
     const data = liveCache[cacheKey] || [];
@@ -402,7 +689,8 @@ async function fetchOne(symbol, range, force = false) {
       if (!daily || force) {
         console.log(`%c[CNBC] %cFetching 6M daily for ${symbol}...`, "color: #2563eb; font-weight: bold", "color: inherit");
         daily = await fetchLive(symbol, '6M');
-        if (daily) liveCache[cacheKey] = daily;
+        // Same reasoning as the 2D/10D branch above: don't cache an empty result.
+        if (daily && daily.length > 0) liveCache[cacheKey] = daily;
       }
       return (daily || []).filter(p => p.x >= cutoff && !isWeekendEt(p.x));
     } else {
@@ -461,7 +749,11 @@ function applyDefaultBounds(sym, chart, data) {
 function rescaleYToVisible(chart, sym) {
   const data = rangeData[sym]; if (!data || data.length === 0) return;
   const xMin = chart.options.scales.x.min ?? chart.scales.x.min, xMax = chart.options.scales.x.max ?? chart.scales.x.max;
-  const visible = data.filter(p => { const t = +p.x; return t >= xMin && t <= xMax; }); if (visible.length === 0) return;
+  // Include the SA overlay's values too, when shown — otherwise the Y bounds are fit to
+  // the raw series alone and the SA line (which can differ by tens of bps) renders off-canvas.
+  const saData = (showSaYield && chart.data.datasets[1]) ? chart.data.datasets[1].data : [];
+  const allPoints = saData.length ? data.concat(saData) : data;
+  const visible = allPoints.filter(p => { const t = +p.x; return t >= xMin && t <= xMax; }); if (visible.length === 0) return;
   const bounds = snapYBounds(Math.min(...visible.map(p=>p.y)), Math.max(...visible.map(p=>p.y)));
   chart.options.scales.y.min = bounds.min; chart.options.scales.y.max = bounds.max; chart.options.scales.y.ticks.stepSize = bounds.step; chart.update('none');
 }
@@ -579,6 +871,7 @@ function updateCharts() {
   });
 
   if (activeTab === 'yieldcurves' || activeTab === 'breakeven') updateYieldCurves();
+  refreshSaOverlays();
   isUpdatingData = false;
 }
 

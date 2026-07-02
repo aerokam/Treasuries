@@ -7,7 +7,8 @@
 // bad data or a bug in the interpolation — exactly the failure mode that
 // derailed the TipsReference session.
 
-import { lookupRefCpi, refCpiFromMonthly, monthlyCpiMap, indexRatio } from '../src/ref-cpi.js';
+import { lookupRefCpi, refCpiFromMonthly, monthlyCpiMap, indexRatio, saFactorForDate } from '../src/ref-cpi.js';
+import { parseCsv } from '../src/csv.js';
 
 const R2 = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev';
 const REFCPI_URL    = `${R2}/TIPS/RefCPI.csv`;
@@ -97,6 +98,25 @@ async function main() {
   ok(Math.abs(indexRatio(300, 150) - 2) < 1e-12, 'indexRatio basic');
   ok(indexRatio(300, 0) === null, 'indexRatio zero base → null');
   ok(indexRatio(null, 150) === null, 'indexRatio null refCpi → null');
+
+  // ── saFactorForDate ── (uses the raw CSV-column shape, via the shared parser)
+  const saRows = parseCsv(nsaSaText); // [{ "Ref CPI Date", "Ref CPI NSA", "Ref CPI SA", "SA Factor" }, ...]
+  const midRow = saRows[Math.floor(saRows.length / 2)];
+  const midDate = midRow['Ref CPI Date'], midFactor = parseFloat(midRow['SA Factor']);
+  // In-range date: must match an exact lookup against the row itself, and be
+  // order-independent (reversing the rows must not change the result).
+  ok(saFactorForDate(saRows, midDate) === midFactor, 'saFactorForDate exact-date match');
+  const reversed = [...saRows].reverse();
+  ok(saFactorForDate(reversed, midDate) === midFactor, 'saFactorForDate exact-date match is order-independent');
+  // Out-of-range future date (e.g. a synthetic maturity years out): falls back
+  // to the most recent past occurrence of the same calendar month/day.
+  const mmdd = midDate.slice(5, 10);
+  const sameMonthDay = saRows.filter(r => r['Ref CPI Date'].endsWith(`-${mmdd}`)).sort((a, b) => (a['Ref CPI Date'] < b['Ref CPI Date'] ? 1 : -1));
+  const mostRecentFactor = parseFloat(sameMonthDay[0]['SA Factor']);
+  const futureDate = `2999-${mmdd}`;
+  ok(saFactorForDate(saRows, futureDate) === mostRecentFactor, 'saFactorForDate future date falls back to most recent same month/day');
+  ok(saFactorForDate(reversed, futureDate) === mostRecentFactor, 'saFactorForDate fallback is order-independent');
+  ok(saFactorForDate(saRows, '2999-02-30') === null, 'saFactorForDate month/day never published → null');
 
   console.log(`\n${fail === 0 ? 'PASS' : 'FAIL'} — ${pass} passed, ${fail} failed`);
   process.exit(fail === 0 ? 0 : 1);

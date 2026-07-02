@@ -1,5 +1,8 @@
 ﻿// Yield Curves — Frontend Logic
 import { yieldFromPrice } from '../../shared/src/bond-math.js';
+import { saFactorForDate } from '../../shared/src/ref-cpi.js';
+import { parseCsv } from '../../shared/src/csv.js';
+import { localDate, toIsoDate, nextBusinessDay, parseHolidaySet } from '../../shared/src/settlement.js';
 import { handleChartKeydown, setupAxisWheelZoom, snapYBounds, snapYAfterZoom } from '../../shared/src/chart-keys.js';
 import { initDatePicker } from '../../shared/src/date-picker.js';
 import { calendarTimeAxis } from '../../shared/src/chart-time-axis.js';
@@ -55,71 +58,10 @@ let xAxisMode = 'maturity';
 window._currentBonds = [];
 
 // --- Helpers ---
-function parseCsv(text, hasHeader = true) {
-  const result = [];
-  const lines = text.split(/\r?\n/).filter(l => l.trim());
-  if (lines.length === 0) return result;
-
-  const parseRow = (line) => {
-    const parts = [];
-    let cur = '';
-    let inQuotes = false;
-    for (let i = 0; i < line.length; i++) {
-      const char = line[i];
-      if (char === '"') inQuotes = !inQuotes;
-      else if (char === ',' && !inQuotes) {
-        parts.push(cur.trim());
-        cur = '';
-      } else {
-        cur += char;
-      }
-    }
-    parts.push(cur.trim());
-    return parts.map(p => p.replace(/^"|"$/g, '').trim());
-  };
-
-  if (hasHeader) {
-    const headers = parseRow(lines[0]);
-    for (let i = 1; i < lines.length; i++) {
-      const values = parseRow(lines[i]);
-      const obj = {};
-      headers.forEach((h, idx) => {
-        if (h) obj[h] = values[idx];
-      });
-      result.push(obj);
-    }
-  } else {
-    return lines.map(parseRow);
-  }
-  return result;
-}
-
-function localDate(s) {
-  if (!s) return null;
-  const [y, m, d] = s.split('-').map(Number);
-  return new Date(y, m - 1, d);
-}
-
-function toIsoDate(date) {
-  return date.getFullYear() + '-' +
-    String(date.getMonth() + 1).padStart(2, '0') + '-' +
-    String(date.getDate()).padStart(2, '0');
-}
-
-
 // Parse "MM/DD/YYYY HH:MM AM/PM" (Fidelity footer) → Date (date part only)
 function parseFidelityDateStr(s) {
   const [mo, dy, yr] = (s || '').split(' ')[0].split('/').map(Number);
   return new Date(yr, mo - 1, dy);
-}
-
-function nextBusinessDay(date, holidaySet) {
-  if (!date) return new Date();
-  const d = new Date(date.getTime());
-  do {
-    d.setDate(d.getDate() + 1);
-  } while (d.getDay() === 0 || d.getDay() === 6 || holidaySet.has(toIsoDate(d)));
-  return d;
 }
 
 // ── Date range input helpers ──────────────────────────────────────────────────
@@ -259,10 +201,10 @@ function _showSaDrill(cusip) {
   const bond = window._currentBonds.find(b => b.cusip === cusip);
   if (!bond) return;
 
-  const mmddSettle = toIsoDate(localDate(bond.settlementDate)).slice(5, 10);
+  const mmddSettle = bond.settlementDate.slice(5, 10);
   const mmddMature = bond.maturity.slice(5, 10);
-  const saS = parseFloat(rawRefCpiData.find(r => r["Ref CPI Date"].includes(`-${mmddSettle}`))?.["SA Factor"]);
-  const saM = parseFloat(rawRefCpiData.find(r => r["Ref CPI Date"].includes(`-${mmddMature}`))?.["SA Factor"]);
+  const saS = saFactorForDate(rawRefCpiData, bond.settlementDate);
+  const saM = saFactorForDate(rawRefCpiData, bond.maturity);
   const ratio = saS / saM;
 
   const html = `
@@ -367,14 +309,7 @@ async function init() {
     
     console.log(`Parsed ${rawYieldsData.length} yield rows and ${rawRefCpiData.length} RefCPI rows.`);
 
-    const holidayRows = parseCsv(holidayText, false);
-    holidaySet = new Set();
-    holidayRows.forEach((row, i) => {
-      if (!row || !row[0]) return;
-      const datePart = row[0].split(',').slice(1).join(',').trim(); 
-      const d = new Date(datePart);
-      if (!isNaN(d.getTime())) holidaySet.add(toIsoDate(d));
-    });
+    holidaySet = parseHolidaySet(parseCsv(holidayText, false));
     console.log(`Holiday set populated with ${holidaySet.size} dates.`);
 
     if (fidRes.ok) {
@@ -1056,14 +991,10 @@ function processAndRenderTips() {
           settleDateStr = toIsoDate(tPlus1);
         }
 
-        const mmddSettle = settleDateStr.slice(5, 10);
-        const mmddMature = bond.maturity.slice(5, 10);
-        const rSettle = rawRefCpiData.find(r => r["Ref CPI Date"] && r["Ref CPI Date"].includes(`-${mmddSettle}`));
-        const rMature = rawRefCpiData.find(r => r["Ref CPI Date"] && r["Ref CPI Date"].includes(`-${mmddMature}`));
-        const saSettle = parseFloat(rSettle?.["SA Factor"]);
-        const saMature = parseFloat(rMature?.["SA Factor"]);
+        const saSettle = saFactorForDate(rawRefCpiData, settleDateStr);
+        const saMature = saFactorForDate(rawRefCpiData, bond.maturity);
 
-        if (isNaN(saSettle) || isNaN(saMature)) return null;
+        if (saSettle == null || isNaN(saSettle) || saMature == null || isNaN(saMature)) return null;
 
         const settleDate = localDate(settleDateStr);
         const matureDate = localDate(bond.maturity);

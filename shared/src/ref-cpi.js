@@ -74,3 +74,28 @@ export function monthlyCpiMap(rows, valueKey = 'value') {
 export function indexRatio(refCpi, baseCpi) {
   return (refCpi != null && baseCpi) ? refCpi / baseCpi : null;
 }
+
+// ─── SA Factor lookup (RefCpiNsaSa.csv rows) ─────────────────────────────────
+// `rows` = TIPS/RefCpiNsaSa.csv parsed via shared/src/csv.js (any order):
+//   [{ "Ref CPI Date": 'YYYY-MM-DD', "SA Factor": '1.00343', ... }, ...]
+//
+// For a date inside the published series, returns that exact day's SA Factor.
+// For a date beyond the series (e.g. a synthetic maturity years in the future —
+// the SA factor has no future value to look up), falls back to the most recent
+// past occurrence of the same calendar month/day: the daily SA factor is a
+// slowly-drifting, annually-repeating seasonal pattern, so a recent same-
+// month/day reading is the best available proxy (see YieldCurves knowledge/
+// 1.0_Seasonal_Adjustments.md and 2.1_SA_Intuition.md).
+// Returns null if that month/day never appears in the series.
+export function saFactorForDate(rows, dateStr) {
+  const exact = rows.find(r => r['Ref CPI Date'] === dateStr);
+  if (exact) return parseFloat(exact['SA Factor']);
+  const mmdd = dateStr.slice(5, 10);
+  let best = null;
+  for (const r of rows) {
+    const d = r['Ref CPI Date'];
+    if (!d || !d.endsWith(`-${mmdd}`)) continue;
+    if (!best || d > best['Ref CPI Date']) best = r;
+  }
+  return best ? parseFloat(best['SA Factor']) : null;
+}

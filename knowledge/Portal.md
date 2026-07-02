@@ -12,7 +12,7 @@ The portal is the browser-based entry point to all Treasury investment tools. It
 |----|-----|--------|---------|
 | A1 | Ladder Manager | [TipsLadderManager/](../TipsLadderManager/knowledge/) | Design and rebalance TIPS ladders; deep-drill calculation chains |
 | A2 | Yield Curves | [YieldCurves/](../YieldCurves/knowledge/) | Treasury yield curves with seasonal adjustment (SA/SAO) overlays |
-| A3 | Yields Monitor | [YieldsMonitor/](../YieldsMonitor/knowledge/) | Live intraday and historical yield charts for selected maturities |
+| A3 | Yields Monitor | [YieldsMonitor/](../YieldsMonitor/knowledge/) | Live intraday and historical yield charts for selected maturities, with an optional SA yield overlay for 1Y/2Y/5Y TIPS |
 | A4 | Treasury Auctions | [TreasuryAuctions/](../TreasuryAuctions/knowledge/) | Upcoming and historical auction results with spreadsheet-style filtering |
 | A5 | TIPS Reference | [TipsReference/](../TipsReference/knowledge/) | Live TIPS reference table: CUSIP, maturity, coupon, Dated Date Ref CPI, price, index ratio, adjusted price, and yield |
 | A6 | CPI Explorer | [CpiExplorer/](../CpiExplorer/knowledge/) | CPI index levels, YoY/MoM changes, rolling windows, and CAGR over any date range |
@@ -93,7 +93,7 @@ Most apps have a `knowledge/` subdirectory with their own DFD, process specs, an
 |-----|-----------|
 | TipsLadderManager | [1.0 Bond Ladders](../TipsLadderManager/knowledge/1.0_Bond_Ladders.md) · [2.0 TIPS Ladders](../TipsLadderManager/knowledge/2.0_TIPS_Ladders.md) · [3.0 Rebalancing](../TipsLadderManager/knowledge/3.0_TIPS_Ladder_Rebalancing.md) · [4.0 Computation](../TipsLadderManager/knowledge/4.0_Computation_Modules.md) · [5.0 UI Schema](../TipsLadderManager/knowledge/5.0_UI_Schema.md) |
 | YieldCurves | [1.0 Seasonal Adjustments](../YieldCurves/knowledge/1.0_Seasonal_Adjustments.md) · [2.0 SAO Adjustment](../YieldCurves/knowledge/2.0_SAO_Adjustment.md) · [3.0 Visual Standards](../YieldCurves/knowledge/3.0_Visual_Standards.md) |
-| YieldsMonitor | [1.0 Operation](../YieldsMonitor/knowledge/1.0_Operation.md) |
+| YieldsMonitor | [1.0 Operation](../YieldsMonitor/knowledge/1.0_Operation.md) · [2.1 Time Series](../YieldsMonitor/knowledge/2.1_Time_Series.md) · [2.2 Yield Curves](../YieldsMonitor/knowledge/2.2_Yield_Curves.md) · [2.3 Breakeven Inflation](../YieldsMonitor/knowledge/2.3_Breakeven_Inflation.md) · [2.4 Seasonal Adjustment](../YieldsMonitor/knowledge/2.4_Seasonal_Adjustment.md) |
 | TreasuryAuctions | [Data Pipeline](../TreasuryAuctions/knowledge/Data_Pipeline.md) |
 | CpiExplorer | [1.0 Overview](../CpiExplorer/knowledge/1.0_Overview.md) · [2.0 Technical Spec](../CpiExplorer/knowledge/2.0_Technical_Spec.md) |
 | SeasonalAdjustments | [knowledge/](../SeasonalAdjustments/knowledge/) *(self-contained interactive explainer; see knowledge dir for details)* |
