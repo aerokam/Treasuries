@@ -173,16 +173,16 @@ const COL_HELP = {
 <p style="margin-top:12px;font-size:11px;color:#94a3b8;">Authority: 31 CFR § 356 Appendix B; Canty (1998)</p>`
   },
   'sao-yield': {
-    title: 'SAO Yield — SA Ordinal (Trend-Fitted)',
-    html: `<p>SAO applies a backwards-anchored linear regression to the SA yields of the <strong>next 4 longer-maturity TIPS</strong>, then blends the projected value with the TIPS's own SA yield.</p>
-<p>The blend weight tilts heavily toward the trend for short-maturity TIPS, where residual seasonal distortions are largest, and tapers off for longer maturities.</p>
+    title: 'SAO Yield — Smooth Curve Fit',
+    html: `<p>SAO fits a <strong>Nelson-Siegel-Svensson</strong> curve (the Fed/GSW real-yield-curve standard) through all SA yields, then snaps each TIPS to that curve — treating any deviation as noise not explained by a value-relevant factor (coupon, index ratio — both empirically immaterial).</p>
+<p>The deseasonalization residual this corrects is a <strong>front-end phenomenon</strong> that amortizes with maturity, so the snap-to-curve weight fades out rather than applying uniformly:</p>
 <ul style="margin:12px 0 0;padding-left:18px;">
-  <li style="margin-bottom:6px;"><strong>Under 6 months:</strong> 90% trend projection, 10% raw SA yield</li>
-  <li style="margin-bottom:6px;"><strong>6 months – 2 years:</strong> 15% trend</li>
-  <li style="margin-bottom:6px;"><strong>2 – 5 years:</strong> 25% trend</li>
-  <li style="margin-bottom:6px;"><strong>Over 7 years:</strong> equals SA yield (no adjustment)</li>
+  <li style="margin-bottom:6px;"><strong>Under 0.5 years:</strong> price-noise-dominated, excluded from the fit, still read off the curve</li>
+  <li style="margin-bottom:6px;"><strong>0.5 – 5 years:</strong> full snap to curve</li>
+  <li style="margin-bottom:6px;"><strong>5 – 6 years:</strong> weight fades linearly from 100% curve to 0%</li>
+  <li style="margin-bottom:6px;"><strong>Beyond 6 years:</strong> equals raw SA yield (no smoothing) — the curve is already smooth here on its own</li>
 </ul>
-<p>The result is a <strong>smoothed yield curve</strong> that reveals where the short end should price relative to the longer end, independent of residual seasonal noise.</p>`
+<p>The result is a <strong>smoothed yield curve</strong> where it matters (the front end, where seasonal residual is largest) without flattening genuine long-end structure.</p>`
   },
   'diff': {
     title: 'Diff (bps)',
@@ -246,7 +246,19 @@ function _showSaoDrill(cusip) {
         <div style="margin-top:8px;display:flex;justify-content:space-between;color:#1a56db;font-weight:700;"><span>SAO (on curve)</span><span>${(bond.saoYield * 100).toFixed(3)}%</span></div>
       </div>
     `;
+  } else if (bond._saoMode === 'raw') {
+    logicHtml = `
+      <div style="background:#f0fdf4;padding:12px;border-radius:6px;border:1px solid #bbf7d0;margin-bottom:16px;">
+        <p style="margin:0;color:#166534;font-weight:600;">Beyond fade range — no smoothing applied</p>
+        <p style="margin:8px 0 0;font-size:12px;">Maturity ${yearsToMat.toFixed(2)}y &ge; ${SAO_FADE_END_YRS}y: the deseasonalization residual that motivates smoothing amortizes away by the long end (see 2.2 §6), so SAO reports the raw SA yield unchanged.</p>
+        <div style="margin-top:8px;display:flex;justify-content:space-between;color:#1a56db;font-weight:700;"><span>SAO (= SA, unsmoothed)</span><span>${(bond.saoYield * 100).toFixed(3)}%</span></div>
+      </div>
+    `;
   } else {
+    const weight = bond._saoWeight != null ? bond._saoWeight : 1;
+    const fadeNote = bond._saoMode === 'fade'
+      ? `<div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>Curve weight (fading ${SAO_FADE_START_YRS}y&rarr;${SAO_FADE_END_YRS}y)</span><span>${(weight * 100).toFixed(0)}%</span></div>`
+      : '';
     logicHtml = `
       <div style="background:#f8fafc;padding:12px;border-radius:6px;border:1px solid #e2e8f0;margin-bottom:16px;">
         <div style="font-size:12px;color:#64748b;margin-bottom:12px;">
@@ -254,11 +266,13 @@ function _showSaoDrill(cusip) {
           Each TIPS is snapped to the curve: for a buy-and-hold holder, any deviation not explained by a value-relevant
           factor (coupon, index ratio — both immaterial here) is treated as not particularly relevant and smoothed away.
           Inspired by Canty's outlier-factor analysis, but — lacking identifiable outlier factors — operationally a curve fit (see <em>2.0 / 2.2</em>).
+          Since the residual this corrects amortizes with maturity, the snap weight fades out between ${SAO_FADE_START_YRS}y and ${SAO_FADE_END_YRS}y (see <em>2.2 §6</em>).
         </div>
         <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>Raw SA Yield</span><span>${(bond.saYield * 100).toFixed(3)}%</span></div>
         <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>Deviation from curve</span><span>${dev >= 0 ? '+' : ''}${dev.toFixed(1)} bp — ${richCheap}</span></div>
+        ${fadeNote}
         <div style="border-top:1px dashed #cbd5e1;margin:8px 0;padding-top:8px;display:flex;justify-content:space-between;color:#1a56db;font-weight:700;">
-          <span>SAO Yield (smooth curve)</span><span>${(bond.saoYield * 100).toFixed(3)}%</span>
+          <span>SAO Yield${bond._saoMode === 'fade' ? ' (blended)' : ' (smooth curve)'}</span><span>${(bond.saoYield * 100).toFixed(3)}%</span>
         </div>
       </div>
       <p style="font-size:11px;color:#94a3b8;margin:0;">* The deviation is a rich/cheap relative-value signal — informative, but smoothed out of the SAO fair-value curve.</p>
@@ -419,6 +433,14 @@ async function init() {
 // The smooth curve is Nelson-Siegel-Svensson (the Fed/GSW real-yield-curve standard).
 const SAO_NOISE_YRS = 0.5;  // exclude < this from the FIT (near-maturity SA is price-noise-dominated)
 
+// The deseasonalization residual that motivates smoothing is a front-end phenomenon that
+// amortizes with maturity (see 2.2 §2, extended full-curve analysis in 2.2 §6): beyond
+// ~5-6yrs the SA curve is already smooth on its own, so snapping it to NSS there would
+// smooth away genuine coupon/relative-value structure instead of seasonal residual.
+// So the curve-fit weight fades from 1 (full snap) to 0 (report raw SA) over this band.
+const SAO_FADE_START_YRS = 5.0;
+const SAO_FADE_END_YRS = 6.0;
+
 // NSS basis at maturity τ for decay params λ1, λ2: [level, slope, curv1, curv2].
 function _nssBasis(tau, l1, l2) {
   const a = tau / l1, b = tau / l2;
@@ -487,10 +509,14 @@ function calculateSAO(bonds) {
   for (let i = 0; i < n; i++) {
     const b = bonds[i];
     const fit = curve ? curve(yrs[i]) : b.saYield;
+    const weight = yrs[i] < SAO_NOISE_YRS
+      ? 1
+      : Math.min(1, Math.max(0, (SAO_FADE_END_YRS - yrs[i]) / (SAO_FADE_END_YRS - SAO_FADE_START_YRS)));
     b._saoFit = fit;
+    b._saoWeight = weight;
     b._saoDevBps = (b.saYield - fit) * 10000;   // how far the SA point sat off the smooth curve (rich/cheap)
-    b._saoMode = yrs[i] < SAO_NOISE_YRS ? 'noise' : 'smooth';
-    sao[i] = fit;
+    b._saoMode = yrs[i] < SAO_NOISE_YRS ? 'noise' : weight >= 1 ? 'smooth' : weight <= 0 ? 'raw' : 'fade';
+    sao[i] = fit * weight + b.saYield * (1 - weight);
   }
   return sao;
 }
