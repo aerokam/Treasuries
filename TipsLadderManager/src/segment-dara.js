@@ -1,27 +1,33 @@
-// segment-dara.js -- Shared (build + rebalance) two-segment per-year DARA helpers.
+// segment-dara.js -- Shared (build + rebalance) per-year DARA segmentation helpers.
 //
-// A "split year" partitions a ladder into an LMP (liability-matching portfolio) segment
-// [firstYear..splitYear] — the rungs intended to be spent down — and a speculative/heirs
-// segment [splitYear+1..lastYear] — longer-maturity TIPS held for yield. These helpers are
-// pure range/map operations and are intentionally mode-agnostic: Build can reuse them as-is.
+// Any number of "split years" partitions a ladder into consecutive segments the user manages
+// on independent DARA targets — e.g. a near-term liability-matching stretch, then one or more
+// tapering or speculative/heirs stretches beyond it. These helpers are pure range/map
+// operations and are intentionally mode-agnostic: Build can reuse them as-is.
 //
 // The rebalance-only self-finance solve that computes a segment's "median" DARA lives in
 // rebalance-lib.js (it depends on current holdings + net-cash → 0, which Build has no analog for).
-// See 3.0 TIPS Ladder Rebalancing § Two-Segment DARA (LMP / Speculative split).
+// See 3.0 TIPS Ladder Rebalancing § Segmented DARA.
 
 /**
- * Partition [firstYear, lastYear] at splitYear into LMP and speculative year sets.
- * LMP = years <= splitYear; speculative = years > splitYear. When splitYear >= lastYear the
- * whole ladder is LMP and specYears is empty.
- * @returns {{ lmpYears: Set<number>, specYears: Set<number> }}
+ * Partition [firstYear, lastYear] at one or more split years into consecutive segments.
+ * Split years outside (firstYear, lastYear) are dropped (they'd produce an empty segment);
+ * duplicates are collapsed. With no usable split years the whole ladder is a single segment.
+ * @param {number|number[]} splitYears - one split year, or an array of them (any order).
+ * @returns {Set<number>[]} segments in ascending year order, length = usable splits + 1.
  */
-export function segmentRanges(splitYear, firstYear, lastYear) {
-  const lmpYears = new Set();
-  const specYears = new Set();
-  for (let y = firstYear; y <= lastYear; y++) {
-    (y <= splitYear ? lmpYears : specYears).add(y);
+export function segmentRanges(splitYears, firstYear, lastYear) {
+  const splits = [...new Set([].concat(splitYears))]
+    .filter(y => y > firstYear && y < lastYear)
+    .sort((a, b) => a - b);
+  const bounds = [firstYear - 1, ...splits, lastYear];
+  const segments = [];
+  for (let i = 0; i < bounds.length - 1; i++) {
+    const years = new Set();
+    for (let y = bounds[i] + 1; y <= bounds[i + 1]; y++) years.add(y);
+    segments.push(years);
   }
-  return { lmpYears, specYears };
+  return segments;
 }
 
 /** Map of every year in `years` (Set or array) → constant `value`. */

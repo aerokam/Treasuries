@@ -1010,15 +1010,27 @@ for (const gapFirstYear of [2037, 2038, 2039]) {
 // ── Test: segment-dara pure helpers (shared build/rebalance layer) ────────────
 {
   console.log('\nsegment-dara helpers — partition / constant / no-clobber merge');
-  const { lmpYears, specYears } = segmentRanges(2047, 2026, 2055);
+  const [lmpYears, specYears] = segmentRanges(2047, 2026, 2055);
+  assert('segmentRanges: 2-way split count', segmentRanges(2047, 2026, 2055).length, 2);
   assert('segmentRanges: LMP count 2026–2047', lmpYears.size, 22);
   assert('segmentRanges: spec count 2048–2055', specYears.size, 8);
   assert('segmentRanges: split year is LMP', lmpYears.has(2047), true);
   assert('segmentRanges: split+1 is spec', specYears.has(2048), true);
 
-  const { lmpYears: allLmp, specYears: noneSpec } = segmentRanges(2055, 2026, 2055);
+  const [allLmp] = segmentRanges(2055, 2026, 2055);
+  assert('segmentRanges: split=last (out of range) → single whole-ladder segment', segmentRanges(2055, 2026, 2055).length, 1);
   assert('segmentRanges: split=last → whole ladder LMP', allLmp.size, 30);
-  assert('segmentRanges: split=last → spec empty', noneSpec.size, 0);
+
+  // N-way split: two split years produce three consecutive segments.
+  const [n1, n2, n3] = segmentRanges([2035, 2047], 2026, 2055);
+  assert('segmentRanges: 3-way split count', segmentRanges([2035, 2047], 2026, 2055).length, 3);
+  assert('segmentRanges: 3-way seg1 count 2026–2035', n1.size, 10);
+  assert('segmentRanges: 3-way seg2 count 2036–2047', n2.size, 12);
+  assert('segmentRanges: 3-way seg3 count 2048–2055', n3.size, 8);
+  assert('segmentRanges: 3-way segments partition with no overlap', n1.size + n2.size + n3.size, 30);
+  // Order of split years supplied shouldn't matter — they're sorted internally.
+  const [r1, r2, r3] = segmentRanges([2047, 2035], 2026, 2055);
+  assert('segmentRanges: split-year order is normalized', r1.size === n1.size && r2.size === n2.size && r3.size === n3.size, true);
 
   const cm = constantMap(specYears, 50000);
   assert('constantMap: covers every spec year', cm.size, 8);
