@@ -212,7 +212,7 @@ function level2YieldCurves() {
   ];
   const procs = [
     { id: '7.1', name: ['Load and parse', 'source data'], href: 'DFD_LEVEL3_YC_LOAD.html', reads: ['fedinv', 'quotes', 'nsasa', 'hol', 'gsw'],
-      out: { '7.2': 'priced bonds, SA factors', '7.4': 'priced bonds, GSW parameters', '7.6': 'bid and ask quotes', '7.7': 'source dates' } },
+      out: { '7.2': 'yields, prices, SA factors', '7.4': 'yields, prices, GSW parameters', '7.6': 'bid and ask quotes', '7.7': 'source dates' } },
     { id: '7.2', name: ['Adjust for', 'seasonality'], href: V('YieldCurves/knowledge/1.0_Seasonal_Adjustments.md'), reads: [],
       out: { '7.3': 'SA yields', '7.4': 'SA yields', '7.5': 'SA yields', '7.7': 'SA yields' } },
     { id: '7.3', name: ['Smooth', 'outliers'], href: V('YieldCurves/knowledge/2.0_SAO_Adjustment.md'), reads: [],
@@ -271,13 +271,13 @@ function level3YieldCurvesLoad() {
   ];
   // href null marks a process with no spec of its own; the page lists them.
   const procs = [
-    { id: '7.1.1', name: ['Parse FedInvest', 'prices'], href: V('YieldCurves/knowledge/5.0_Load_And_Parse.md#parse-fedinvest-prices'), reads: ['fedinv'], out: { '7.1.7': 'priced rows' } },
+    { id: '7.1.1', name: ['Parse FedInvest', 'prices'], href: V('YieldCurves/knowledge/5.0_Load_And_Parse.md#parse-fedinvest-prices'), reads: ['fedinv'], out: { '7.1.7': 'prices, yields' } },
     { id: '7.1.2', name: ['Parse market', 'quotes'], href: V('YieldCurves/knowledge/5.0_Load_And_Parse.md#parse-market-quotes'), reads: ['quotes'], out: { '7.1.6': 'quote file date', '7.1.7': 'bid and ask quotes' } },
     { id: '7.1.3', name: ['Parse Ref CPI', 'and SA factors'], href: V('YieldCurves/knowledge/5.0_Load_And_Parse.md#parse-ref-cpi-and-sa-factors'), reads: ['nsasa'], out: { '7.1.7': 'daily Ref CPI' } },
     { id: '7.1.4', name: ['Parse bond', 'holidays'], href: V('YieldCurves/knowledge/5.0_Load_And_Parse.md#parse-bond-holidays'), reads: ['hol'], out: { '7.1.6': 'bond trading days' } },
     { id: '7.1.5', name: ['Parse GSW', 'parameters'], href: V('YieldCurves/knowledge/5.0_Load_And_Parse.md#parse-gsw-parameters'), reads: ['gsw'], out: { '7.1.7': 'GSW parameters' } },
     { id: '7.1.6', name: ['Determine', 'settlement', 'dates'], href: V('YieldCurves/knowledge/5.0_Load_And_Parse.md#determine-settlement-dates'), reads: [], out: { '7.1.7': 'settlement dates' } },
-    { id: '7.1.7', name: ['Build priced', 'bonds'], href: V('YieldCurves/knowledge/5.0_Load_And_Parse.md#build-priced-bonds'), reads: [], out: {} },
+    { id: '7.1.7', name: ['Build the', 'security set'], href: V('YieldCurves/knowledge/5.0_Load_And_Parse.md#build-priced-bonds'), reads: [], out: {} },
   ];
   const SX = 40, SW = 205, PR = 56, W = 1340, H = 900;
   const sy = i => 150 + i * 150;
@@ -297,7 +297,7 @@ function level3YieldCurvesLoad() {
     P.push(flow(x1, y1, x2, y2, { obstacles: OBS.filter(o => !(o.x === px[p.id] && o.y === py[p.id]) && !(o.x === px[t] && o.y === py[t])), placed: LBL, text: lab }));
   }));
   // outputs leaving 7.1 for the rest of the app, balanced against Level 2
-  [['priced bonds, SA factors', -34], ['priced bonds, GSW parameters', -12], ['bid and ask quotes', 10], ['source dates', 32]].forEach(([lab, dy]) => {
+  [['yields, prices, SA factors', -34], ['yields, prices, GSW parameters', -12], ['bid and ask quotes', 10], ['source dates', 32]].forEach(([lab, dy]) => {
     P.push(flow(px['7.1.7'] + PR + 3, py['7.1.7'] + dy, W - 12, py['7.1.7'] + dy));
     P.push(`  <text class="flow-label" x="${W - 16}" y="${py['7.1.7'] + dy - 7}" text-anchor="end">${lab}</text>`);
   });
