@@ -185,7 +185,7 @@ function level1() {
   P.push(`  <text class="flow-label" x="${(AX + AR + UX) / 2}" y="${ay(0) - 34}" text-anchor="middle">app inputs</text>`);
   P.push(`  <text class="flow-label" x="${(AX + AR + UX) / 2}" y="${ay(0) + 44}" text-anchor="middle">app outputs</text>`);
   P.push(`  <g class="entity"><rect x="${UX}" y="70" width="${UW}" height="${H - 140}" rx="3"/><text class="e-name" x="${UX + UW / 2}" y="${H / 2}">User</text></g>`);
-  P.push(procShape(acq.cx, acq.cy, acq.r, V('knowledge/Data_Pipeline.md'), '1', ['Acquire and', 'derive', 'reference data']));
+  P.push(procShape(acq.cx, acq.cy, acq.r, 'DFD_LEVEL2_INGESTION.html', '1', ['Acquire and', 'derive', 'reference data']));
   stores.forEach((s, i) => P.push(storeShape(SX, sy(i), SW, s.href, s.name)));
   apps.forEach((a, j) => P.push(procShape(AX, ay(j), AR, a.spec, String(a.n), a.name)));
   P.push('</svg>');
@@ -314,9 +314,81 @@ function level3YieldCurvesLoad() {
   });
 }
 
+
+// ── Level 2: process 1, the ingestion jobs ──────────────────────────────────
+function level2Ingestion() {
+  // Each job is a process; each writes the store named beside it. Sources are not
+  // redrawn as entities here — their flows enter from the page edge, as at Level 1.
+  const jobs = [
+    { id: '1.1',  name: ['Download', 'FedInvest', 'prices'],   from: 'FedInvest',        writes: ['fedinv'] },
+    { id: '1.2',  name: ['Download', 'market quotes'],         from: 'Fidelity',         writes: ['quotes'] },
+    { id: '1.3',  name: ['Fit yield', 'curves'],               from: null,               reads: ['fedinv', 'quotes', 'nsasa', 'hol'], writes: ['yc', 'bei', 'spread'] },
+    { id: '1.4',  name: ['Fetch auction', 'results'],          from: 'FiscalData',       writes: ['auctions'] },
+    { id: '1.5',  name: ['Mirror tentative', 'schedule'],      from: 'Treasury',         writes: ['tent'] },
+    { id: '1.6',  name: ['Fetch TIPS', 'reference data'],      from: 'FiscalData',       writes: ['tipsref'] },
+    { id: '1.7',  name: ['Update yield', 'history'],           from: 'CNBC',             writes: ['yhist'] },
+    { id: '1.8',  name: ['Archive', 'intraday yields'],        from: 'CNBC',             writes: ['intraday'] },
+    { id: '1.9',  name: ['Fetch monthly', 'CPI'],              from: 'BLS',              writes: ['blscpi'] },
+    { id: '1.10', name: ['Interpolate', 'daily Ref CPI', 'NSA and SA'], from: null,      reads: ['blscpi'], writes: ['nsasa'] },
+    { id: '1.11', name: ['Derive SA and', 'SAO yields'],       from: null,               reads: ['quotes', 'refcpi', 'hol'], writes: ['sasao'] },
+    { id: '1.12', name: ['Fetch CPI', 'history'],              from: 'BLS',              writes: ['cpihist'] },
+    { id: '1.13', name: ['Fetch daily', 'Ref CPI'],            from: 'TreasuryDirect',   writes: ['refcpi'] },
+    { id: '1.14', name: ['Collect fund', 'holdings'],          from: 'fund providers',   reads: ['quotes', 'sasao'], writes: ['funds'] },
+    { id: '1.15', name: ['Fetch published', 'curve parameters'], from: 'Federal Reserve', writes: ['gsw'] },
+  ];
+  const stores = {
+    fedinv: ['FedInvest prices', DS('s1')], tipsref: ['TIPS reference data', DS('s2')],
+    refcpi: ['Ref CPI', DS('s3')], nsasa: ['Ref CPI NSA and SA', DS('s4')],
+    auctions: ['Auction results', DS('s5')], yhist: ['Yield history', DS('s6')],
+    quotes: ['Market quotes', DS('s7')], cpihist: ['CPI history', DS('s8')],
+    tent: ['Tentative auction schedule', DS('s9')], sasao: ['SA and SAO yields', DS('s10')],
+    funds: ['Fund holdings', DS('s11')], gsw: ['GSW curve parameters', DS('s12')],
+    yc: ['Yield curves', DS('s13')], bei: ['Breakeven inflation', DS('s14')],
+    spread: ['Bid and ask spreads', DS('s15')], hol: ['Bond holidays', DS()],
+    blscpi: ['Monthly CPI', DS()], intraday: ['Intraday yields', DS('s6')],
+  };
+  const order = ['fedinv','quotes','yc','bei','spread','auctions','tent','tipsref','yhist','intraday','blscpi','nsasa','sasao','cpihist','refcpi','funds','gsw','hol'];
+  const JX = 470, JR = 54, SX = 730, SW = 235;
+  const jy = i => 90 + i * 116;
+  const sy = i => 80 + i * 97;
+  const H = Math.max(jy(jobs.length - 1), sy(order.length - 1)) + 110, W = 1010;
+  const OBS = jobs.map((j, i) => ({ x: JX, y: jy(i), r: JR }));
+  const sIdx = Object.fromEntries(order.map((k, i) => [k, i]));
+
+  const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 2 for process 1: the ingestion jobs and the data stores each one writes.">`, marker()];
+  jobs.forEach((j, i) => {
+    const y = jy(i);
+    if (j.from) {
+      P.push(flow(8, y, JX - JR - 3, y, { obstacles: OBS.filter(o => o.y !== y) }));
+      P.push(`  <text class="flow-label" x="12" y="${y - 12}">${esc(j.from)}</text>`);
+    }
+    (j.reads || []).forEach(k => {
+      const from = toCircle(SX + SW + 5, sy(sIdx[k]), JX, y, JR);
+      P.push(flow(SX - 5, sy(sIdx[k]), from[0], from[1], { obstacles: OBS.filter(o => o.y !== y) }));
+    });
+    (j.writes || []).forEach(k => {
+      const s = fromCircle(JX, y, JR, SX, sy(sIdx[k]));
+      P.push(flow(s[0], s[1], SX - 5, sy(sIdx[k]), { obstacles: OBS.filter(o => o.y !== y) }));
+    });
+  });
+  order.forEach((k, i) => P.push(storeShape(SX, sy(i), SW, stores[k][1], stores[k][0])));
+  jobs.forEach((j, i) => P.push(procShape(JX, jy(i), JR, V('knowledge/Data_Pipeline.md'), j.id, j.name)));
+  P.push('</svg>');
+
+  return page({
+    title: 'Ingestion jobs — Level 2', h1: 'Level 2 &mdash; 1 Acquire and derive reference data', maxWidth: W,
+    up: 'DFD_LEVEL1.html', upLabel: 'Level 1', svg: P.join(NL),
+    notes: ['  One process per scheduled job, and the store each writes. A job that reads a store as well as writing one is deriving rather than retrieving.',
+      '  1.3, 1.10, 1.11 and 1.14 read no external source: they compute from what the retrieving jobs have already stored.',
+      '  Sources are not redrawn here; their flows enter from the edge, named, and each is defined against its entity on the <a href="KNOWLEDGE_MAP.html">context diagram</a>.',
+      '  Every job drills to <a href="viewer.html#/md/knowledge/Data_Pipeline.md">Data Pipeline</a> for its schedule and script path. Per-job process specs do not exist yet.'].join(NL)
+  });
+}
+
 // ── emit ────────────────────────────────────────────────────────────────────
 const outputs = [
   ['knowledge/DFD_LEVEL1.html', level1()],
+  ['knowledge/DFD_LEVEL2_INGESTION.html', level2Ingestion()],
   ['knowledge/DFD_LEVEL2_YIELDCURVES.html', level2YieldCurves()],
   ['knowledge/DFD_LEVEL3_YC_LOAD.html', level3YieldCurvesLoad()],
 ];
