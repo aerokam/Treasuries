@@ -97,18 +97,6 @@ function seriesToMap(series) {
   return m;
 }
 
-// One-time migration seed: legacy per-symbol files at the OLD path. Preserves accumulated
-// coverage (esp. flaky US5YTIPS) that CNBC's feeds no longer return. Fresh CNBC ~3PM
-// values overlay on top; legacy values survive only for dates CNBC no longer provides.
-const R2_PUBLIC = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev';
-async function fetchLegacySeries(sym) {
-  try {
-    const r = await fetch(`${R2_PUBLIC}/Treasuries/yield-history/${sym}_history.json`);
-    if (!r.ok) return [];
-    return await r.json();
-  } catch { return []; }
-}
-
 async function main() {
   const client = s3();
   const existing = await getExisting(client);
@@ -117,10 +105,7 @@ async function main() {
   const out = {};
   let totalPts = 0;
   for (const sym of SYMBOLS) {
-    let merged = seriesToMap(existing[sym]); // keep accumulated history
-    if (Object.keys(merged).length === 0) {  // first run: seed from legacy per-symbol file
-      merged = seriesToMap(await fetchLegacySeries(sym));
-    }
+    const merged = seriesToMap(existing[sym]); // keep accumulated history
 
     for (const range of DAILY_RANGES) {       // coarse -> fine; fine overrides
       const bars = await fetchRange(sym, range);

@@ -129,3 +129,13 @@ Two objects the 2026-05-21 cleanup listed for deletion were still in the bucket,
 Order followed, since this one was live: copy to the new key; repoint the writer (`scripts/updateTentativeSchedule.js`), the reader (`TreasuryAuctions/src/app.js`), the Dashboard monitor, and the specs; run the writer end to end and confirm it published 74,558 bytes to the new key; only then delete the old key and confirm the 404.
 
 `scripts/migrateR2.js` was **not** used and should not be reused as it stands: it copies everything under `TIPS/` to `Treasuries/` with no filtering and no source deletion, which would duplicate the TIPS-specific stores that correctly live under `TIPS/` and recreate exactly the cross-prefix confusion this entry records.
+
+---
+
+## Correction (2026-09-07, second)
+
+`Treasuries/yield-history/` (**singular**) held 29 objects, all frozen at 2026-06-09: fourteen per-symbol `<SYM>_history.json` files, fourteen `intraday-raw/` days, and one `close-probe/` file. 2026-06-09 is the date commit `28751ca` retired the per-symbol model and renamed the prefix to `Treasuries/yields-history/` (**plural**), so nothing had written to the singular prefix since. All 29 deleted, each verified by fetching the key afterwards and confirming a 404.
+
+The two prefixes differ by one letter and sort next to each other in a bucket listing, and the plural one contains `intraday-raw/`, which gains a file per symbol per weekday. The stale dates under the singular prefix were therefore read as a broken scheduled job twice before the cause was found. It was never broken.
+
+Every live writer already used the plural prefix (`updateYieldsHistory.js`, `archiveIntraday.js`, `probeClose.js`, `probeLock.js`). The single remaining reference to the singular prefix was `fetchLegacySeries()` in `updateYieldsHistory.js`, a one-time migration seed that could no longer fire — it ran only for a symbol with no accumulated history, and every symbol has some. Removed with its call site.
