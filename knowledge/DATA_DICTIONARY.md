@@ -85,7 +85,7 @@
   CSV columns (exact header names): `Product, Description, Cusip, State, Coupon, Frequency, Maturity date, Call protected, Call date, Moody's rating, S&P rating, Yield, Bid price/Quantity (min), Adjusted bid price, Inflation factor, Ask price/Quantity (min), Adjusted ask price, Ask yield to worst, Ask yield to sink, Ask yield to maturity, 3rd party price, Depth of book, Attributes`
   *`Product` = `Treasury` or `TIPS`; parsers filter on this column before further processing (Treasury rows lack `Inflation factor`/`Adjusted bid price`/`Adjusted ask price`; both row types carry `Yield`, which doubles as the bid yield column — there is no separate "Yield Bid" header in the combined export). Parser normalises headers to lowercase. Key fields used: `cusip`, `coupon`, `ask price/quantity (min)` (ask clean real price), `bid price/quantity (min)` (bid clean real price), `adjusted bid price`/`adjusted ask price` (TIPS only), `inflation factor` (TIPS only), `ask yield to maturity` (ask yield, percentage form), `yield` (bid yield, percentage form). For TIPS, bid yield is computed from `bid price/quantity (min)` via `yieldFromPrice` (not from `yield`) to ensure consistency with the ask yield method; for Treasuries, bid yield is read directly from `yield`. Price spread uses adjusted prices for TIPS (actual dollar cost) and raw prices for Treasuries: `yield_spread_bps = (yield_bid − ask_ytm) × 10000`; `price_spread_pct = (price_ask − price_bid) / price_ask × 100`. Footer line `Date downloaded MM/DD/YYYY HH:MM AM/PM` supplies the download timestamp.*
 
-  **Column synonyms.** The export uses its source's column names, not this dictionary's. Each one carries a defined term:
+  **Column names.** The export uses its source's column names, not this dictionary's. Each one carries a defined term, and where a column name is a broker's own name for a quantity rather than a header, the synonym is recorded on that term:
 
   | Column in the export | Defined term |
   |---|---|
@@ -95,7 +95,7 @@
   | `Ask price/Quantity (min)` | [Clean Price](#clean-price), ask side |
   | `Bid price/Quantity (min)` | [Clean Price](#clean-price), bid side |
   | `Adjusted ask price` / `Adjusted bid price` | Clean Price × [Index Ratio](#index-ratio), TIPS only |
-  | `Inflation factor` | [Index Ratio](#index-ratio), TIPS only |
+  | `Inflation factor` | [Index Ratio](#index-ratio), TIPS only — the synonym is recorded there |
   | `Ask yield to maturity` | [Yield](#yield), [ask](#ask) side |
   | `Yield` | [Yield](#yield), [bid](#bid) side |
   | `Product` | security type: TIPS, or a nominal Treasury |
@@ -238,8 +238,11 @@ For nominal Treasuries, 31 CFR §356.2 applies: *"Dated date means the date from
 **Single implementation:** all Ref CPI logic (retrieve-lookup, calc-fallback, index ratio) lives once in `shared/src/ref-cpi.js`; every app imports it. No per-app copies.
 
 <a id="index-ratio"></a>
+<a id="inflation-factor"></a>
 ### Index Ratio
 `Index_Ratio` = `Ref_CPI_settle / Ref_CPI_dated`
+
+*Index ratio is the Treasury’s own term and the one used throughout. Brokers name the same quantity differently, so a broker’s name for it is a synonym rather than a second definition: the Fidelity export ([S7](#s7)) calls it the **inflation factor**.*
 
 <a id="par-value-adjusted"></a>
 ### Par Value (Adjusted)
