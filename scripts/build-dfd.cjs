@@ -41,6 +41,28 @@ function clears(c, obstacles) {
   }
   return true;
 }
+// Every fragment of a flow label should name something the Data Dictionary defines,
+// and clicking it should open that entry. Fragments with no entry are reported by
+// the build rather than linked, so the shortfall stays visible.
+const DD = 'viewer.html#/md/knowledge/DATA_DICTIONARY.md#';
+const TERMS = {
+  'yields': 'yield', 'prices': 'price', 'yield': 'yield', 'price': 'price',
+  'SA factors': 'sa-factor', 'SA yields': 'sa-yield', 'SAO yields': 'sao-yield',
+  'spot curves': 'spot-yield', 'breakeven inflation': 'breakeven-inflation',
+  'daily Ref CPI': 'ref-cpi', 'settlement dates': 'settlement-date',
+  'bid and ask quotes': 'ask', 'GSW parameters': 's12',
+};
+const unlinked = new Set();
+function labelMarkup(text) {
+  return text.split(/,s*/).map(frag => {
+    const bare = frag.replace(/s*→.*$/, '').trim();       // a trailing destination is not a term
+    const tail = frag.slice(bare.length);
+    const a = TERMS[bare];
+    if (!a) { if (bare && !/^(to |from |7.)/.test(bare)) unlinked.add(bare); return esc(frag); }
+    return `<a href="${DD}${a}"><tspan class="lk">${esc(bare)}</tspan></a>${esc(tail)}`;
+  }).join(', ');
+}
+
 // A label sits by the process that consumes the flow, where the flows have fanned
 // apart, rather than at the midpoint where they cross and it is unclear which flow
 // a label belongs to. Placed labels are remembered so a later one steps aside.
@@ -62,7 +84,7 @@ function flow(x1, y1, x2, y2, opts = {}) {
       if (!best) best = { lx, ly, box };
     }
     if (placed) placed.push(best.box);
-    out.push(`  <text class="flow-label" x="${best.lx.toFixed(0)}" y="${best.ly.toFixed(0)}" text-anchor="middle">${esc(opts.text)}</text>`);
+    out.push(`  <text class="flow-label" x="${best.lx.toFixed(0)}" y="${best.ly.toFixed(0)}" text-anchor="middle">${labelMarkup(opts.text)}</text>`);
   }
   return out.join(NL);
 }
@@ -115,6 +137,9 @@ function page({ title, h1, up, upLabel, svg, notes, maxWidth }) {
     '  a.store { cursor: pointer; text-decoration: none; }',
     '  .process .p-name { font-size: 12.5px; }',
     '  .flow-label { font-size: 12px; }',
+    '  .flow-label a { cursor: pointer; }',
+    '  tspan.lk { fill: #a8b2e0; text-decoration: underline; text-decoration-style: dotted; }',
+    '  .flow-label a:hover tspan.lk { fill: #ffffff; }',
     `  .diagram { max-width: ${maxWidth}px; }`, '</style>', '</head>', '<body>', '',
     '<div class="nav-header">', '  <a href="../" class="portal-link">&#8592; Portal</a>',
     `  <a href="${up}">&#8593; ${upLabel}</a>`, '</div>', '',
@@ -450,6 +475,10 @@ const outputs = [
   ['knowledge/DFD_LEVEL3_YC_LOAD.html', level3YieldCurvesLoad()],
   ['knowledge/DFD_LEVEL3_YC_RENDER.html', level3YieldCurvesRender()],
 ];
+if (unlinked.size) {
+  console.log(String.fromCharCode(10) + "flow label fragments with no Data Dictionary entry:");
+  [...unlinked].sort().forEach(u => console.log('  ' + u));
+}
 for (const [rel, html] of outputs) {
   fs.writeFileSync(path.join(ROOT, rel), html);
   console.log('wrote ' + rel);
