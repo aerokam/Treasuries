@@ -297,7 +297,7 @@ function level3YieldCurvesLoad() {
     P.push(flow(x1, y1, x2, y2, { obstacles: OBS.filter(o => !(o.x === px[p.id] && o.y === py[p.id]) && !(o.x === px[t] && o.y === py[t])), placed: LBL, text: lab }));
   }));
   // outputs leaving 7.1 for the rest of the app, balanced against Level 2
-  [['yields, prices, SA factors', -34], ['yields, prices, GSW parameters', -12], ['bid and ask quotes', 10], ['source dates', 32]].forEach(([lab, dy]) => {
+  [['yields, prices, SA factors  →  7.2', -34], ['yields, prices, GSW parameters  →  7.4', -12], ['bid and ask quotes  →  7.6', 10], ['source dates  →  7.7', 32]].forEach(([lab, dy]) => {
     P.push(flow(px['7.1.7'] + PR + 3, py['7.1.7'] + dy, W - 12, py['7.1.7'] + dy));
     P.push(`  <text class="flow-label" x="${W - 16}" y="${py['7.1.7'] + dy - 7}" text-anchor="end">${lab}</text>`);
   });
@@ -407,7 +407,7 @@ function level3YieldCurvesRender() {
 
   // The series arriving from the rest of the app enter from the page edge, each at the
   // view that draws it, so no series is drawn without showing which view consumes it.
-  const arriving = [['SA and SAO yields', '7.7.3'], ['spot curves', '7.7.4'], ['breakeven inflation', '7.7.5'], ['spreads', '7.7.6']];
+  const arriving = [['7.2, 7.3  →  SA and SAO yields', '7.7.3'], ['7.4  →  spot curves', '7.7.4'], ['7.5  →  breakeven inflation', '7.7.5'], ['7.6  →  spreads', '7.7.6']];
   arriving.forEach(([lab, to]) => {
     const y = py[to];
     const [x2, y2] = toCircle(20, y, px[to], y, PR);
