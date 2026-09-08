@@ -29,10 +29,12 @@ const STORY = { mat: '2028-04-15', matDate: localDate('2028-04-15'), matMonth: 3
 // The quoted TIPS real-yield curve exactly as the YieldCurves app draws it
 // today: one point per bond, market prices, plotted against maturity date.
 // Start at Jul 2027 — real yields inside ~1 year are dominated by other
-// effects and only muddy the picture. The curve visibly zig-zags: every
-// Jul/Oct maturity prints below its Jan/Apr neighbours, a ~30 bp saw-tooth at
-// the front that shrinks steadily out to 2036. Nothing about the month a bond
-// matures in should move its yield — that is the puzzle the guide answers.
+// effects and only muddy the picture. Jan and Jul are the only maturity
+// months that run the whole span (past ~2032 no new Apr / Oct maturities are
+// left), so the Jan / Jul points are drawn bold and connected: Jul sits below
+// the neighbouring Jan by ~30 bp near the front, a few bp by the mid-2030s.
+// Nothing about the month a bond matures in should move its yield — that is
+// the puzzle the guide answers.
 export function drawS1(el) {
   const W = 900, H = 520, L = 60, R = 24, T = 62, B = 74;
   const x0 = localDate('2027-07-15').getTime();
@@ -69,43 +71,57 @@ export function drawS1(el) {
   const midY = (T + (H - B)) / 2;
   s += `<text x="15" y="${midY}" text-anchor="middle" transform="rotate(-90 15 ${midY})" style="fill:${MUTED};font-size:12px">quoted ask yield (%)</text>`;
 
-  // the quoted curve — one point per bond, connected in maturity order
-  let p = '';
-  bonds.forEach((b, i) => { p += (i ? 'L' : 'M') + tx(b.matDate.getTime()).toFixed(1) + ' ' + ty(b.ask * 100).toFixed(1) + ' '; });
-  s += `<path d="${p}" fill="none" stroke="${QUOTED}" stroke-width="1.8"/>`;
+  // one bond per maturity month per year, lowest coupon (keeps the lines clean
+  // where two bonds share a maturity date)
+  const pick = (mo, yr) => {
+    const c = bonds.filter(b => b.matMonth === mo && b.matDate.getFullYear() === yr);
+    return c.length ? c.reduce((a, b) => (b.coupon < a.coupon ? b : a)) : null;
+  };
+
+  // faint backdrop: every bond connected in maturity order
+  let pAll = '';
+  bonds.forEach((b, i) => { pAll += (i ? 'L' : 'M') + tx(b.matDate.getTime()).toFixed(1) + ' ' + ty(b.ask * 100).toFixed(1) + ' '; });
+  s += `<path d="${pAll}" fill="none" stroke="${QUOTED}" stroke-width="1.1" opacity=".3"/>`;
+
+  // the Jan / Jul maturities alone, connected — the saw-tooth that runs the
+  // whole curve (Jan higher, Jul lower, repeating out to 2036)
+  const jjPts = [];
+  for (let yr = 2027; yr <= 2037; yr++) for (const mo of [0, 6]) { const b = pick(mo, yr); if (b) jjPts.push(b); }
+  let pJJ = '';
+  jjPts.forEach((b, i) => { pJJ += (i ? 'L' : 'M') + tx(b.matDate.getTime()).toFixed(1) + ' ' + ty(b.ask * 100).toFixed(1) + ' '; });
+  s += `<path d="${pJJ}" fill="none" stroke="${QUOTED}" stroke-width="2"/>`;
+
   for (const b of bonds) {
     const cx = tx(b.matDate.getTime()), cy = ty(b.ask * 100);
-    s += `<g><circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="3" fill="${QUOTED}"/>` +
+    const jj = b.matMonth === 0 || b.matMonth === 6;
+    s += `<g><circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${jj ? 3.6 : 2.4}" fill="${QUOTED}" opacity="${jj ? 1 : .38}"/>` +
          `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="9" fill="transparent"/>` +
          `<title>${fmtMY(b.mat)} · ${(b.coupon * 100).toFixed(3)}% — quoted ${(b.ask * 100).toFixed(2)}%</title></g>`;
   }
 
-  // measure the saw-tooth early vs. later, between two real adjacent TIPS three
-  // months apart (Apr → Jul of the same year: Apr misses the spring surge, Jul
-  // captures it), to show the difference shrinking as maturity lengthens.
-  const lowestCoupon = list => list.reduce((a, b) => (b.coupon < a.coupon ? b : a));
-  const aprJul = yr => {
-    const apr = bonds.filter(b => b.matMonth === 3 && b.matDate.getFullYear() === yr);
-    const jul = bonds.filter(b => b.matMonth === 6 && b.matDate.getFullYear() === yr);
-    if (!apr.length || !jul.length) return null;
-    const a = lowestCoupon(apr), j = lowestCoupon(jul);
-    return { a, j, bp: Math.round((a.ask - j.ask) * 10000) };
+  // measure the Jan -> Jul step near the front and again in the mid-2030s
+  // (same-year Jan and Jul maturities, lowest coupon each): ~33 bp then ~1 bp.
+  const janJulStep = yr => {
+    const j = pick(0, yr), u = pick(6, yr);
+    if (!j || !u) return null;
+    return { j, u, bp: Math.round((j.ask - u.ask) * 10000) };
   };
-  for (const yr of [2028, 2032]) {
-    const m = aprJul(yr);
+  for (const yr of [2028, 2034]) {
+    const m = janJulStep(yr);
     if (!m) continue;
-    const xa = tx(m.a.matDate.getTime()), xj = tx(m.j.matDate.getTime());
-    const ya = ty(m.a.ask * 100), yj = ty(m.j.ask * 100);
-    const bx = (xa + xj) / 2;
-    s += `<circle cx="${xa.toFixed(1)}" cy="${ya.toFixed(1)}" r="5.5" fill="none" stroke="${INK}" stroke-width="1.5"/>`;
+    const xj = tx(m.j.matDate.getTime()), xu = tx(m.u.matDate.getTime());
+    const yj = ty(m.j.ask * 100), yu = ty(m.u.ask * 100);
+    const bx = (xj + xu) / 2;
     s += `<circle cx="${xj.toFixed(1)}" cy="${yj.toFixed(1)}" r="5.5" fill="none" stroke="${INK}" stroke-width="1.5"/>`;
-    s += vBracket(bx, ya, yj, INK, 4);
-    s += note(bx + 9, Math.min(ya, yj) - 6, `${m.bp} bp`, INK, 'start', 12);
+    s += `<circle cx="${xu.toFixed(1)}" cy="${yu.toFixed(1)}" r="5.5" fill="none" stroke="${INK}" stroke-width="1.5"/>`;
+    s += vBracket(bx, yj, yu, INK, 4);
+    s += note(bx + 9, Math.min(yj, yu) - 6, `${m.bp} bp`, INK, 'start', 12);
   }
 
   // caption (title comes from the page h2)
   s += note(W / 2, 40, [`Quoted ask yields as of ${SNAPSHOT_LABEL} (settlement = ${SETTLE_LABEL}).`], MUTED, 'middle', 12);
-  s += note(W / 2, H - 14, ['Every Jul / Oct maturity is lower than its Jan / Apr neighbours, and the differences shrink as maturity increases.'], AMBER, 'middle', 13);
+  s += note(W / 2, H - 30, ['Jan and Jul are the maturities that span the whole curve. Jul yields sit about 30 bp below the neighbouring Jan'], AMBER, 'middle', 12);
+  s += note(W / 2, H - 14, ['near the front, and about 1 bp by 2034: the seasonal effect is smaller where the maturity is longer.'], AMBER, 'middle', 12);
 
   el.innerHTML = s;
 }
