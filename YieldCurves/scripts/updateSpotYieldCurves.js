@@ -116,12 +116,12 @@ function buildProcessedTipsBonds(rawTipsData, refCpiData, priceMap, isBroker, br
     if (askYield == null || isNaN(askYield) || saYield == null || isNaN(saYield)) return null;
 
     let bidPrice = NaN, bidYield = NaN, adjAskPrice = NaN, adjBidPrice = NaN;
-    let inflationFactor = NaN, yieldSpreadBps = NaN, priceSpreadPct = NaN;
+    let indexRatio = NaN, yieldSpreadBps = NaN, priceSpreadPct = NaN;
     if (isBroker && quote) {
       bidPrice = quote.bidPrice;
       adjAskPrice = quote.adjAskPrice;
       adjBidPrice = quote.adjBidPrice;
-      inflationFactor = quote.inflationFactor;
+      indexRatio = quote.indexRatio;
       bidYield = yieldFromPrice(bidPrice, coupon, settleDate, matureDate);
       if (!isNaN(bidYield) && !isNaN(askYield)) yieldSpreadBps = (bidYield - askYield) * 10000;
       if (!isNaN(adjAskPrice) && !isNaN(adjBidPrice) && adjAskPrice > 0)
@@ -130,7 +130,7 @@ function buildProcessedTipsBonds(rawTipsData, refCpiData, priceMap, isBroker, br
 
     return {
       ...bond, coupon, price, saRatio, askYield, saYield, bidPrice, bidYield,
-      adjAskPrice, adjBidPrice, inflationFactor, yieldSpreadBps, priceSpreadPct,
+      adjAskPrice, adjBidPrice, indexRatio, yieldSpreadBps, priceSpreadPct,
       maturityDate: matureDate, settlementDate: settleDateStr, isBroker,
     };
   }).filter(Boolean).sort((a, b) => a.maturityDate - b.maturityDate);

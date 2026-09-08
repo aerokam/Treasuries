@@ -101,14 +101,14 @@ async function loadFidelityTipsPriceMap() {
     const maturity = r["Maturity date"];
     const coupon = Number(r.Coupon);
     const adjustedAskPrice = Number(r["Adjusted ask price"]);
-    const inflationFactor = Number(r["Inflation factor"]);
-    if (!maturity || Number.isNaN(coupon) || !adjustedAskPrice || !inflationFactor) continue;
+    const indexRatio = Number(r["Inflation factor"]);
+    if (!maturity || Number.isNaN(coupon) || !adjustedAskPrice || !indexRatio) continue;
     // SCHP's Quantity is already inflation-adjusted (current) face value, not
     // original par (confirmed by cross-checking against the fund's own
     // abbreviated Market Value display) — so Market Value uses the raw price,
     // not the inflation-adjusted price, or the inflation factor would be
     // double-counted.
-    const rawAskPrice = adjustedAskPrice / inflationFactor;
+    const rawAskPrice = adjustedAskPrice / indexRatio;
     map.set(`${maturity}|${coupon}`, { cusip: r.Cusip, rawAskPrice });
   }
   return map;

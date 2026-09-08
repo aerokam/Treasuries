@@ -434,7 +434,7 @@ async function init() {
           bid: r.bidPrice,
           adjAsk: r.adjAskPrice,
           adjBid: r.adjBidPrice,
-          inflationFactor: r.inflationFactor,
+          indexRatio: r.indexRatio,
         });
       });
       if (priceMap.size > 0) {
@@ -1022,19 +1022,19 @@ function buildProcessedTipsBonds(sourceMap, isBroker) {
     const saYield = yieldFromPrice(price * saRatio, coupon, settleDate, matureDate);
 
     let bidPrice = NaN, bidYield = NaN, adjAskPrice = NaN, adjBidPrice = NaN;
-    let inflationFactor = NaN, yieldSpreadBps = NaN, priceSpreadPct = NaN;
+    let indexRatio = NaN, yieldSpreadBps = NaN, priceSpreadPct = NaN;
     if (isBroker && quote) {
       bidPrice = quote.bid;
       adjAskPrice = quote.adjAsk;
       adjBidPrice = quote.adjBid;
-      inflationFactor = quote.inflationFactor;
+      indexRatio = quote.indexRatio;
       bidYield = yieldFromPrice(bidPrice, coupon, settleDate, matureDate);
       if (!isNaN(bidYield) && !isNaN(askYield)) yieldSpreadBps = (bidYield - askYield) * 10000;
       if (!isNaN(adjAskPrice) && !isNaN(adjBidPrice) && adjAskPrice > 0)
         priceSpreadPct = (adjAskPrice - adjBidPrice) / adjAskPrice * 100;
     }
 
-    return { ...bond, coupon, price, saRatio, askYield, saYield, bidPrice, bidYield, adjAskPrice, adjBidPrice, inflationFactor, yieldSpreadBps, priceSpreadPct, maturityDate: matureDate, settlementDate: settleDateStr, isBroker };
+    return { ...bond, coupon, price, saRatio, askYield, saYield, bidPrice, bidYield, adjAskPrice, adjBidPrice, indexRatio, yieldSpreadBps, priceSpreadPct, maturityDate: matureDate, settlementDate: settleDateStr, isBroker };
   }).filter(Boolean).sort((a, b) => a.maturityDate - b.maturityDate);
 }
 
@@ -2050,7 +2050,7 @@ function renderSpreadTable(bonds, tab) {
         <td>${fmtMMM(b.maturity)}</td>
         <td>${b.cusip}</td>
         <td>${(b.coupon * 100).toFixed(3)}%</td>
-        <td>${isNaN(b.inflationFactor) ? '—' : b.inflationFactor.toFixed(5)}</td>
+        <td>${isNaN(b.indexRatio) ? '—' : b.indexRatio.toFixed(5)}</td>
         <td>${fmtP(b.adjBidPrice)}</td>
         <td>${fmtP(b.adjAskPrice)}</td>
         <td>${fmtPct(b.priceSpreadPct)}</td>
