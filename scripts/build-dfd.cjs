@@ -221,7 +221,7 @@ function level2YieldCurves() {
       out: { '7.5': 'spot curves', '7.7': 'spot curves' } },
     { id: '7.5', name: ['Compute', 'breakeven', 'inflation'], href: V('YieldsMonitor/knowledge/2.3_Breakeven_Inflation.md'), reads: [], out: { '7.7': 'breakeven inflation' } },
     { id: '7.6', name: ['Compute bid', 'and ask', 'spreads'], href: V('knowledge/YieldCurves.md'), reads: [], out: { '7.7': 'spreads' } },
-    { id: '7.7', name: ['Render charts', 'and tables'], href: V('YieldCurves/knowledge/3.0_Visual_Standards.md'), reads: [], out: {} },
+    { id: '7.7', name: ['Render charts', 'and tables'], href: 'DFD_LEVEL3_YC_RENDER.html', reads: [], out: {} },
   ];
   const SX = 40, SW = 215, PR = 58, UX = 1090, UW = 145;
   const sy = i => 150 + i * 118;
@@ -385,12 +385,69 @@ function level2Ingestion() {
   });
 }
 
+
+// ── Level 3: Yield Curves 7.7 ───────────────────────────────────────────────
+function level3YieldCurvesRender() {
+  const S = 'YieldCurves/knowledge/6.0_Rendering.md';
+  const procs = [
+    { id: '7.7.1', name: ['Select the', 'view'],        a: 'select-view',    out: { '7.7.2': 'tab and mode', '7.7.3': '', '7.7.4': '', '7.7.5': '', '7.7.6': '' } },
+    { id: '7.7.2', name: ['Build the', 'axis scales'],  a: 'build-scales',   out: { '7.7.3': 'scales', '7.7.4': 'scales', '7.7.5': 'scales', '7.7.6': 'scales' } },
+    { id: '7.7.3', name: ['Draw the', 'Treasuries', 'view'], a: 'draw-treasuries', out: {} },
+    { id: '7.7.4', name: ['Draw the', 'TIPS view'],     a: 'draw-tips',      out: { '7.7.7': 'picked security' } },
+    { id: '7.7.5', name: ['Draw the', 'breakeven', 'view'], a: 'draw-breakeven', out: {} },
+    { id: '7.7.6', name: ['Draw the', 'spread view'],   a: 'draw-spreads',   out: {} },
+    { id: '7.7.7', name: ['Answer a', 'drill request'], a: 'answer-a-drill', out: {} },
+  ];
+  const PR = 56, UX = 850, UW = 145, W = 1010, H = 980;
+  const px = { '7.7.1': 300, '7.7.2': 300, '7.7.3': 620, '7.7.4': 620, '7.7.5': 620, '7.7.6': 620, '7.7.7': 380 };
+  const py = { '7.7.1': 240, '7.7.2': 600, '7.7.3': 150, '7.7.4': 330, '7.7.5': 510, '7.7.6': 690, '7.7.7': 870 };
+  const OBS = procs.map(q => ({ x: px[q.id], y: py[q.id], r: PR }));
+  const LBL = [];
+  const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 3: the rendering stage of Yield Curves, one process per view drawn.">`, marker()];
+
+  // The series arriving from the rest of the app enter from the page edge, each at the
+  // view that draws it, so no series is drawn without showing which view consumes it.
+  const arriving = [['SA and SAO yields', '7.7.3'], ['spot curves', '7.7.4'], ['breakeven inflation', '7.7.5'], ['spreads', '7.7.6']];
+  arriving.forEach(([lab, to]) => {
+    const y = py[to];
+    const [x2, y2] = toCircle(20, y, px[to], y, PR);
+    P.push(flow(20, y, x2, y2, { obstacles: OBS.filter(o => !(o.x === px[to] && o.y === y)) }));
+    P.push(`  <text class="flow-label" x="24" y="${y - 10}">${esc(lab)}</text>`);
+  });
+
+  // The user, drawn once as a tall shape so each view reaches it without crossing another.
+  P.push(flow(UX - 5, py['7.7.1'], px['7.7.1'] + PR + 3, py['7.7.1'], { obstacles: OBS.filter(o => o.x !== px['7.7.1']), placed: LBL, text: 'tab and date selections' }));
+  ['7.7.3', '7.7.4', '7.7.5', '7.7.6', '7.7.7'].forEach(id => {
+    P.push(flow(px[id] + PR + 3, py[id], UX - 5, py[id], { obstacles: OBS.filter(o => o.x !== px[id]) }));
+  });
+  P.push(`  <text class="flow-label" x="${(px['7.7.3'] + PR + UX) / 2}" y="${py['7.7.3'] - 14}" text-anchor="middle">charts and tables</text>`);
+  P.push(`  <text class="flow-label" x="${(px['7.7.7'] + PR + UX) / 2}" y="${py['7.7.7'] - 14}" text-anchor="middle">drill popup</text>`);
+  P.push(`  <g class="entity"><rect x="${UX}" y="90" width="${UW}" height="${H - 180}" rx="3"/><text class="e-name" x="${UX + UW / 2}" y="${H / 2}">User</text></g>`);
+  procs.forEach(pr => Object.entries(pr.out).forEach(([to, lab]) => {
+    const [x1, y1] = fromCircle(px[pr.id], py[pr.id], PR, px[to], py[to]);
+    const [x2, y2] = toCircle(x1, y1, px[to], py[to], PR);
+    const others = OBS.filter(o => !(o.x === px[pr.id] && o.y === py[pr.id]) && !(o.x === px[to] && o.y === py[to]));
+    P.push(flow(x1, y1, x2, y2, { obstacles: others, placed: LBL, text: lab }));
+  }));
+  procs.forEach(pr => P.push(procShape(px[pr.id], py[pr.id], PR, V(S + '#' + pr.a), pr.id, pr.name)));
+  P.push('</svg>');
+
+  return page({
+    title: 'Yield Curves 7.7 — Level 3', h1: 'Level 3 &mdash; Yield Curves 7.7 Rendering', maxWidth: W,
+    up: 'DFD_LEVEL2_YIELDCURVES.html', upLabel: 'Level 2 — Yield Curves', svg: P.join(NL),
+    notes: ['  Every process drills to its own section of <a href="viewer.html#/md/YieldCurves/knowledge/6.0_Rendering.md">6.0 Rendering</a>, the process spec. <a href="viewer.html#/md/YieldCurves/knowledge/3.0_Visual_Standards.md">3.0 Visual Standards</a> is the separate question of what the drawn output must look like.',
+      '  <b>Nothing here calculates a yield.</b> Every figure drawn is produced upstream and passed in; a view showing a figure no other process produced is a defect in this stage.',
+      '  7.7.2 decides what is visible before anything is drawn. Its axis clipping moves the axis and never removes a security, so a table figure can sit outside what the chart shows.'].join(NL)
+  });
+}
+
 // ── emit ────────────────────────────────────────────────────────────────────
 const outputs = [
   ['knowledge/DFD_LEVEL1.html', level1()],
   ['knowledge/DFD_LEVEL2_INGESTION.html', level2Ingestion()],
   ['knowledge/DFD_LEVEL2_YIELDCURVES.html', level2YieldCurves()],
   ['knowledge/DFD_LEVEL3_YC_LOAD.html', level3YieldCurvesLoad()],
+  ['knowledge/DFD_LEVEL3_YC_RENDER.html', level3YieldCurvesRender()],
 ];
 for (const [rel, html] of outputs) {
   fs.writeFileSync(path.join(ROOT, rel), html);
