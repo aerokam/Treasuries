@@ -203,6 +203,7 @@ function level1() {
 
 // ── Level 2: Yield Curves ───────────────────────────────────────────────────
 function level2YieldCurves() {
+  const S = 'YieldCurves/knowledge/7.0_Breakeven_And_Spreads.md';
   const stores = [
     { id: 'fedinv', name: 'FedInvest prices', href: DS('s1') },
     { id: 'quotes', name: 'Market quotes', href: DS('s7') },
@@ -219,8 +220,8 @@ function level2YieldCurves() {
       out: { '7.4': 'SAO yields', '7.5': 'SAO yields', '7.7': 'SAO yields' } },
     { id: '7.4', name: ['Fit spot', 'curves'], href: V('YieldCurves/knowledge/4.0_Spot_Yield_Curves.md'), reads: [],
       out: { '7.5': 'spot curves', '7.7': 'spot curves' } },
-    { id: '7.5', name: ['Compute', 'breakeven', 'inflation'], href: V('YieldsMonitor/knowledge/2.3_Breakeven_Inflation.md'), reads: [], out: { '7.7': 'breakeven inflation' } },
-    { id: '7.6', name: ['Compute bid', 'and ask', 'spreads'], href: V('knowledge/YieldCurves.md'), reads: [], out: { '7.7': 'spreads' } },
+    { id: '7.5', name: ['Compute', 'breakeven', 'inflation'], href: V(S + '#breakeven-inflation'), reads: [], out: { '7.7': 'breakeven inflation' } },
+    { id: '7.6', name: ['Compute bid', 'and ask', 'spreads'], href: V(S + '#bid-ask-spreads'), reads: [], out: { '7.7': 'spreads' } },
     { id: '7.7', name: ['Render charts', 'and tables'], href: 'DFD_LEVEL3_YC_RENDER.html', reads: [], out: {} },
   ];
   const SX = 40, SW = 215, PR = 58, UX = 1090, UW = 145;
