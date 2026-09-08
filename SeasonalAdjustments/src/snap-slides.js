@@ -5,7 +5,7 @@
 
 import {
   SNAP, SNAPSHOT_LABEL, SETTLE_LABEL, SETTLE_DATE, MONTHS, DIM, cum, MATS,
-  localDate, doy, dateLabel, Sat, waveMin, waveMax, BLS_SEASONAL_FACTOR,
+  localDate, doy, dateLabel, Sat, waveMin, waveMax,
 } from './snap-data.js';
 import { note, arrow, callout, vBracket, ring, AMBER, CYAN, GREEN, INK } from './sa-annotate.js';
 import { priceFromYield, yieldFromPrice } from '../../shared/src/bond-math.js';
@@ -126,74 +126,67 @@ export function drawS1(el) {
   el.innerHTML = s;
 }
 
-// ── Slide 2: The Seasonal Factor ──────────────────────────────────────────
-// What BLS publishes, and how stable it is. Once a year, with the January CPI
-// release, BLS recalculates the seasonal factors for the prior five years
-// (X-13ARIMA-SEATS) and republishes the seasonally adjusted CPI. That revision
-// is published for the CPI-U "All items" category (series CUSR0000SA0) as
-// monthly values of three data types: UNADJUSTED INDEX, SEASONALLY ADJUSTED
-// INDEX, and SEASONAL FACTOR ( = UNADJUSTED INDEX / SEASONALLY ADJUSTED INDEX,
-// ×100 ). Chart: each calendar month's SEASONAL FACTOR plotted across the five
-// years — one nearly-flat line per month. Data + verification in snap-data.js.
+// ── Slide 2: Index = Trend × Seasonal ─────────────────────────────────────
+// The synthetic model starts here. Canty decomposes the inflation index as
+// I = T · S (trend × seasonal component). Hold the trend flat — T = 100 in
+// every month — and the index is only the seasonal component, scaled by 100.
+// The seasonal pattern used for the rest of the model: from a January start
+// the index rises 1% a month to a July peak, then reverses month by month
+// back to 100 the following January. Net zero over the year. No indexation
+// lag; month 0 is January.
 export function drawS2(el) {
-  const W = 900, H = 520, L = 66, R = 82, T = 96, B = 66;
-  const years = [2021, 2022, 2023, 2024, 2025];
-  const vals = years.flatMap(yr => BLS_SEASONAL_FACTOR[yr].filter(v => v != null));
-  const lo = Math.floor(Math.min(...vals) * 5) / 5 - 0.1;
-  const hi = Math.ceil(Math.max(...vals) * 5) / 5 + 0.1;
-  const x = i => L + i / (years.length - 1) * (W - L - R);
+  const W = 900, H = 520, L = 72, R = 96, T = 92, B = 78;
+  const MLAB = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan'];
+
+  // 13 monthly points: month 0 = Jan, up ×1.01 to month 6 = Jul, down ÷1.01
+  // to month 12 = the next Jan (exactly back to 100).
+  const idx = [100];
+  for (let m = 1; m <= 6; m++) idx.push(idx[m - 1] * 1.01);
+  for (let m = 7; m <= 12; m++) idx.push(idx[m - 1] / 1.01);
+  const seasonal = idx.map(v => v / 100);
+
+  const lo = 98, hi = 107;
+  const x = m => L + m / 12 * (W - L - R);
   const y = v => T + (1 - (v - lo) / (hi - lo)) * (H - T - B);
 
   let s = '';
 
-  s += note(W / 2, 24, ['Once a year, with the January CPI release, BLS recalculates the seasonal factors for the prior five years (X-13ARIMA-SEATS) and'], MUTED, 'middle', 11);
-  s += note(W / 2, 40, ['republishes the seasonally adjusted CPI. The revision is published for the CPI-U All items category (series CUSR0000SA0) as monthly'], MUTED, 'middle', 11);
-  s += note(W / 2, 56, ['UNADJUSTED INDEX, SEASONALLY ADJUSTED INDEX, and SEASONAL FACTOR ( = UNADJUSTED INDEX ÷ SEASONALLY ADJUSTED INDEX, ×100 ).'], MUTED, 'middle', 11);
+  s += note(W / 2, 26, ['Canty decomposes the inflation index as  I = T × S :  a trend and a seasonal component.'], MUTED, 'middle', 12);
+  s += note(W / 2, 44, ['Hold the trend flat at T = 100 every month. What is left in the index is only the seasonal component.'], MUTED, 'middle', 12);
 
   // y grid
-  for (let v = Math.ceil(lo * 5) / 5; v <= hi + 1e-9; v = +(v + 0.2).toFixed(3)) {
+  for (let v = lo + 1; v <= hi - 0.5; v += 1) {
     const yy = y(v);
-    s += `<line x1="${L}" y1="${yy.toFixed(1)}" x2="${W - R}" y2="${yy.toFixed(1)}" stroke="${GRID}" stroke-width="1" opacity="${Math.abs(v - 100) < 1e-9 ? 0 : .2}"/>`;
-    s += `<text x="${L - 6}" y="${(yy + 3).toFixed(1)}" text-anchor="end" style="fill:${MUTED};font-size:9px">${v.toFixed(1)}</text>`;
+    s += `<line x1="${L}" y1="${yy.toFixed(1)}" x2="${W - R}" y2="${yy.toFixed(1)}" stroke="${GRID}" stroke-width="1" opacity="${v === 100 ? 0 : .18}"/>`;
+    s += `<text x="${L - 8}" y="${(yy + 3).toFixed(1)}" text-anchor="end" style="fill:${MUTED};font-size:10px">${v}</text>`;
   }
+  // month gridlines + labels (every 3rd month)
+  for (let m = 0; m <= 12; m++) {
+    const xx = x(m), major = m % 3 === 0;
+    s += `<line x1="${xx.toFixed(1)}" y1="${T}" x2="${xx.toFixed(1)}" y2="${H - B}" stroke="${GRID}" stroke-width="1" opacity="${major ? .4 : .14}"/>`;
+    if (major) s += `<text x="${xx.toFixed(1)}" y="${H - B + 18}" text-anchor="middle" style="fill:${MUTED};font-size:11px">${MLAB[m]}</text>`;
+  }
+  const midY = (T + (H - B)) / 2;
+  s += `<text x="18" y="${midY}" text-anchor="middle" transform="rotate(-90 18 ${midY})" style="fill:${MUTED};font-size:11px">index level</text>`;
+
+  // trend line, flat at 100
   const y100 = y(100);
-  s += `<line x1="${L}" y1="${y100.toFixed(1)}" x2="${W - R}" y2="${y100.toFixed(1)}" stroke="${MUTED}" stroke-width="1" stroke-dasharray="3 3" opacity=".55"/>`;
-  s += `<text x="${L - 6}" y="${(y100 + 3).toFixed(1)}" text-anchor="end" style="fill:${MUTED};font-size:9px">100.0</text>`;
+  s += `<line x1="${L}" y1="${y100.toFixed(1)}" x2="${W - R}" y2="${y100.toFixed(1)}" stroke="${MUTED}" stroke-width="1.4" stroke-dasharray="4 3" opacity=".7"/>`;
+  s += `<text x="${W - R + 8}" y="${(y100 + 3).toFixed(1)}" style="fill:${MUTED};font-size:10px">trend  T = 100</text>`;
 
-  // x = year
-  years.forEach((yr, i) => {
-    s += `<line x1="${x(i).toFixed(1)}" y1="${T}" x2="${x(i).toFixed(1)}" y2="${H - B}" stroke="${GRID}" stroke-width="1" opacity=".14"/>`;
-    s += `<text x="${x(i).toFixed(1)}" y="${H - B + 17}" text-anchor="middle" style="fill:${MUTED};font-size:11px">${yr}</text>`;
-  });
-  s += note(L, T - 10, ['SEASONAL FACTOR — one line per calendar month  (Oct line ends at 2024: no Oct 2025 CPI)'], MUTED, 'start', 10);
+  // the index curve
+  let p = '';
+  idx.forEach((v, m) => { p += (m ? 'L' : 'M') + x(m).toFixed(1) + ' ' + y(v).toFixed(1) + ' '; });
+  s += `<path d="${p}" fill="none" stroke="${WAVE}" stroke-width="2.5"/>`;
+  idx.forEach((v, m) => { s += `<circle cx="${x(m).toFixed(1)}" cy="${y(v).toFixed(1)}" r="3" fill="${WAVE}"/>`; });
+  s += `<text x="${(x(9)).toFixed(1)}" y="${(y(idx[9]) - 12).toFixed(1)}" text-anchor="middle" style="fill:${WAVE};font-size:11px;font-weight:700">index  I = T × S</text>`;
 
-  // one line per calendar month, across the five years
-  const labels = [];
-  for (let m = 0; m < 12; m++) {
-    let p = '', started = false, endPt = null;
-    years.forEach((yr, i) => {
-      const v = BLS_SEASONAL_FACTOR[yr][m];
-      if (v == null) { started = false; return; }
-      const px = x(i), py = y(v);
-      p += (started ? 'L' : 'M') + px.toFixed(1) + ' ' + py.toFixed(1) + ' ';
-      s += `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="2" fill="${WAVE}"/>`;
-      started = true; endPt = [px, py];
-    });
-    s += `<path d="${p}" fill="none" stroke="${WAVE}" stroke-width="1.6" opacity=".8"/>`;
-    labels.push({ m, ex: endPt[0], ey: endPt[1], ly: endPt[1] });
-  }
-  // spread the right-edge month labels so they don't overlap
-  labels.sort((a, b) => a.ey - b.ey);
-  const GAP = 11.5;
-  for (let i = 1; i < labels.length; i++) if (labels[i].ly - labels[i - 1].ly < GAP) labels[i].ly = labels[i - 1].ly + GAP;
-  const overflow = labels[labels.length - 1].ly - (H - B);
-  if (overflow > 0) for (const L2 of labels) L2.ly -= overflow;
-  for (const L2 of labels) {
-    s += `<line x1="${(L2.ex + 2).toFixed(1)}" y1="${L2.ey.toFixed(1)}" x2="${(L2.ex + 8).toFixed(1)}" y2="${L2.ly.toFixed(1)}" stroke="${MUTED}" stroke-width=".7" opacity=".5"/>`;
-    s += `<text x="${(L2.ex + 11).toFixed(1)}" y="${(L2.ly + 3).toFixed(1)}" style="fill:${MUTED};font-size:9px">${MONTHS[L2.m]}</text>`;
-  }
+  // peak and the return to 100
+  s += note(x(6), y(idx[6]) - 12, [`July peak:  index ${idx[6].toFixed(1)}   (S = ${seasonal[6].toFixed(3)})`], INK, 'middle', 11);
+  s += note(x(0) - 2, y(100) + 18, ['100'], INK, 'end', 10);
+  s += note(x(12) + 2, y(100) + 18, ['100'], INK, 'start', 10);
 
-  s += note(W / 2, H - 12, ['Each calendar month’s seasonal factor changes little from year to year.'], AMBER, 'middle', 12);
+  s += note(W / 2, H - 14, ['The index rises 1% a month to July, then reverses month by month back to 100 in January: net zero over the year.'], AMBER, 'middle', 12.5);
 
   el.innerHTML = s;
 }
