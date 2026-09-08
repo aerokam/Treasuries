@@ -5,6 +5,56 @@
 
 ---
 
+<!-- DD-INDEX:START -->
+
+## Index
+
+*Every term below, alphabetically, including synonyms. The entries themselves are grouped by category in the sections that follow.*
+
+**A** &nbsp; [AA](#aa) &middot; [Accrued Interest (Adjusted)](#accrued-interest-adjusted) &middot; [Accrued Interest (Nominal)](#accrued-interest-nominal) &middot; [accrued market discount](#amd) *(see Accrued Market Discount (AMD))* &middot; [Accrued Market Discount (AMD)](#amd) &middot; [Active Lower Bracket](#active-lower-bracket) &middot; [Annual Interest (Nominal)](#annual-interest-nominal) &middot; [Annual Interest (Real)](#annual-interest-real) &middot; [ARA](#ara) &middot; [Ask / Bid](#ask) &middot; [Available Cash](#available-cash)
+
+**B** &nbsp; [bei](#breakeven-inflation) *(see Breakeven Inflation (BEI))* &middot; [bid](#ask) *(see Ask / Bid)* &middot; [Blend Weights](#blend-weights) &middot; [Bond Ladder](#bond-ladder) &middot; [bracket maturity](#bracket-year-tips) *(see Bracket Year TIPS)* &middot; [Bracket Weight](#bracket-weight) &middot; [Bracket Year](#bracket-year) &middot; [Bracket Year TIPS](#bracket-year-tips) &middot; [Breakeven Inflation (BEI)](#breakeven-inflation)
+
+**C** &nbsp; [Cash Flow Calendar](#cash-flow-calendar) &middot; [Clean Price](#clean-price) &middot; [Cost per TIPS](#cost-per-tips) &middot; [Coupon Rate](#coupon-rate) &middot; [Cover Excess](#cover-excess) &middot; [cover maturity](#cover-year-tips) *(see Cover Year TIPS)* &middot; [Cover Weight](#cover-weight) &middot; [Cover Year](#cover-year) &middot; [Cover Year TIPS](#cover-year-tips) &middot; [CPI CAGR](#cpi-cagr) &middot; [CPI Change (Month-over-Month)](#cpi-change-mom) &middot; [CPI Change (Point-to-Point)](#cpi-change-p2p) &middot; [CPI Change (Year-over-Year)](#cpi-change-yoy) &middot; [CPI-U NSA](#cpi-nsa) &middot; [CPI-U SA](#cpi-sa) &middot; [CUSIP](#cusip)
+
+**D** &nbsp; [DAA](#daa) &middot; [DARA](#dara) &middot; [Dated Date](#dated-date) &middot; [Duration Matching](#duration-matching)
+
+**E** &nbsp; [E1: FedInvest](#e1) &middot; [E10: Schwab Asset Management holdings export](#e10) &middot; [E11: BondBloxx product-page holdings table](#e11) &middot; [E12: BlackRock iShares fund-document API](#e12) &middot; [E2: TreasuryDirect SecIndex](#e2) &middot; [E3: FiscalData API](#e3) &middot; [E4: BLS Public API](#e4) &middot; [E5: CNBC GraphQL](#e5) &middot; [E6: Fidelity Fixed Income](#e6) &middot; [E7: Vanguard Advisors API](#e7) &middot; [E8: fminvest.com API](#e8) &middot; [E9: PIMCO fund-detail API](#e9) &middot; [Excess TIPS](#excess-tips)
+
+**F** &nbsp; [Face Value](#face-value) &middot; [FACP](#facp) &middot; [Forward Rate](#forward-rate) &middot; [Funded Year](#funded-year) &middot; [Funded Year TIPS](#funded-year-tips)
+
+**G** &nbsp; [Gap Years](#gap-years)
+
+**I** &nbsp; [Index Ratio](#index-ratio) &middot; [Inflation Compensation](#inflation-compensation) &middot; [inflation factor](#index-ratio) *(see Index Ratio)* &middot; [IQR Clip](#iqr-clip)
+
+**L** &nbsp; [Ladder](#ladder) &middot; [ladder eligible tips](#outstanding-tips) *(see Outstanding TIPS)* &middot; [ladder period](#ladder) *(see Ladder)* &middot; [Last-Year Interest](#last-year-interest) &middot; [LMI](#lmi)
+
+**M** &nbsp; [Maturity Date](#maturity-date) &middot; [Maturity Year](#maturity-year)
+
+**N** &nbsp; [Net Cash](#net-cash)
+
+**O** &nbsp; [Outstanding TIPS](#outstanding-tips)
+
+**P** &nbsp; [P+I](#pi) &middot; [P+I per TIPS](#pi-per-tips) &middot; [Par Value (Adjusted)](#par-value-adjusted) &middot; [Par Value (Nominal)](#par-value) &middot; [Par Yield](#par-yield) &middot; [pre ladder interest](#pre-ladder-credit) *(see Pre-Ladder Interest (PLI))* &middot; [Pre-Ladder Interest (PLI)](#pre-ladder-credit) &middot; [Price](#price)
+
+**Q** &nbsp; [Quantity](#quantity)
+
+**R** &nbsp; [Ref CPI](#ref-cpi) &middot; [Reference Date](#reference-date) &middot; [Retained Bracket Excess](#retained-bracket-excess) &middot; [Retained Lower Bracket](#retained-lower-bracket) &middot; [Rolling CPI Change](#rolling-cpi-change) &middot; [Rung](#rung)
+
+**S** &nbsp; [S1: YieldsFromFedInvestPrices.csv](#s1) &middot; [S10: YieldsSaSao.csv](#s10) &middot; [S11: FundHoldings/Holdings-\<TICKER\>(-Enriched).csv](#s11) &middot; [S12: GswTipsCurve.json](#s12) &middot; [S13: YieldCurves.csv](#s13) &middot; [S14: BreakevenInflation.csv](#s14) &middot; [S15: BidAskSpreads.csv](#s15) &middot; [S2: TipsRef.csv](#s2) &middot; [S3: RefCPI.csv](#s3) &middot; [S4: RefCpiNsaSa.csv](#s4) &middot; [S5: Auctions.csv](#s5) &middot; [S6: YieldHistory](#s6) &middot; [S7: FidelityTreasuriesTips.csv](#s7) &middot; [S8: CPI_history.csv](#s8) &middot; [S9: Tentative-Auction-Schedule.xml](#s9) &middot; [SA Anchor](#sa-anchor) &middot; [SA Factor](#sa-factor) &middot; [SA Price Factor](#sa-price-factor) &middot; [SA Yield](#sa-yield) &middot; [SACP](#sacp) &middot; [same year excess interest](#same-maturity-excess-interest) *(see Same-Maturity Excess Interest)* &middot; [Same-Maturity Excess Interest](#same-maturity-excess-interest) &middot; [SAO Yield](#sao-yield) &middot; [Settlement Date](#settlement-date) &middot; [Sliding Window](#sliding-window) &middot; [Spot Yield](#spot-yield) &middot; [Synthetic TIPS](#synthetic-tips)
+
+**T** &nbsp; [TIPS](#tips) &middot; [TIPS Ladder](#tips-ladder) &middot; [Total Cost](#total-cost) &middot; [Trade Ticket](#trade-ticket) &middot; [Treasury Bill](#treasury-bill) &middot; [Treasury Bond](#treasury-bond) &middot; [Treasury Note](#treasury-note)
+
+**W** &nbsp; [Within-Year Allocation Policy](#within-year-allocation-policy)
+
+**Y** &nbsp; [Yield](#yield) &middot; [Yield Curve](#yield-curve)
+
+**Z** &nbsp; [zero coupon yield](#spot-yield) *(see Spot Yield)*
+
+---
+
+<!-- DD-INDEX:END -->
+
 ## 0.0 DD Notation
 
 | Symbol | Meaning |
@@ -160,6 +210,33 @@ For nominal Treasuries, 31 CFR §356.2 applies: *"Dated date means the date from
 <a id="yield-curve"></a>
 ### Yield Curve
 `Yield_Curve` = *A plot of yield against term or maturity.*
+
+<a id="spot-yield"></a>
+<a id="zero-coupon-yield"></a>
+### Spot Yield
+`Spot_Yield` = *`z(t)`, the rate applying to a single cash flow at horizon `t`. Also **zero-coupon yield**: a security paying one cash flow and nothing before it earns exactly this rate, which is where the second name comes from. Distinct from [Yield](#yield), which applies one rate to every cash flow of a coupon-bearing security regardless of when it falls.*
+
+<a id="par-yield"></a>
+### Par Yield
+`Par_Yield` = *The coupon rate at which a security of maturity `t` prices at par, given the [Spot Yield](#spot-yield) curve.*
+
+<a id="forward-rate"></a>
+### Forward Rate
+`Forward_Rate` = *`f(t)`, the instantaneous rate implied for horizon `t` by the [Spot Yield](#spot-yield) curve.*
+
+<a id="breakeven-inflation"></a>
+<a id="bei"></a>
+### Breakeven Inflation (BEI)
+`Breakeven_Inflation` = *A nominal yield less a real yield. The difference is the inflation rate at which holding the nominal security and holding the TIPS return the same amount, hence the name.*
+
+*Two constructions are in use and they do not give the same figure, so a breakeven is stated with the construction that produced it:*
+
+- ***per security*** — *a TIPS yield subtracted from the yield of the nominal whose maturity is nearest to it. The pairing has no distance limit, so where nominal maturities are sparse the two yields are for different terms (specified in [7.0 Breakeven and Spreads](../YieldCurves/knowledge/7.0_Breakeven_And_Spreads.md#breakeven-inflation), and in [2.3 Breakeven Inflation](../YieldsMonitor/knowledge/2.3_Breakeven_Inflation.md) for YieldsMonitor).*
+- ***across terms*** — *the fitted real [Spot Yield](#spot-yield) curve subtracted from the fitted nominal one, read at the same term. No pairing is involved.*
+
+<a id="inflation-compensation"></a>
+### Inflation Compensation
+`Inflation_Compensation` = *The Federal Reserve’s name for [Breakeven Inflation](#breakeven-inflation), used in the Gürkaynak-Sack-Wright work ([S12](#s12)). The same quantity, and a synonym rather than a second definition. It is not expected inflation on its own: it also contains an inflation risk premium and a TIPS liquidity premium.*
 
 <a id="ask"></a>
 <a id="bid"></a>
@@ -470,7 +547,7 @@ coverExcessCost_c = Future 30Y total cost × coverWeight_c
 
 <a id="sa-yield"></a>
 ### SA Yield
-`SA_Yield` = *Real yield derived from a Seasonally Adjusted Clean Price. Removes predictable seasonal CPI inflation carry from the raw YTM.*
+`SA_Yield` = *Real yield derived from a Seasonally Adjusted Clean Price. Removes the predictable seasonal component of CPI from the raw YTM.*
 
 <a id="sao-yield"></a>
 ### SAO Yield
@@ -478,15 +555,19 @@ coverExcessCost_c = Future 30Y total cost × coverWeight_c
 
 <a id="sacp"></a>
 ### SACP
-`SACP` = *Seasonally Adjusted Clean Price (Canty 2009, Eq. 14 approximation): `SACP ≈ CP × SA_Price_Factor`. Strips predictable seasonal carry from the quoted clean price.*
+`SACP` = *Seasonally Adjusted Clean Price (Canty 2009, Eq. 14 approximation): `SACP ≈ CP × SA_Price_Factor`. Removes the predictable seasonal component from the quoted clean price.*
 
 <a id="sa-price-factor"></a>
 ### SA Price Factor
-`SA_Price_Factor` = `SA_Factor(settlement date) / SA_Factor(maturity month & day)` *(the multiplier the seasonal adjustment applies to the quoted price to produce [`SACP`](#sacp), Canty 2009 Eq. 14. Keyed on month/day only, since `SA_Factor` repeats each year. Equals 1.0 — no adjustment — when settlement and maturity fall on the same calendar month/day, i.e. a whole number of years apart; departs from 1 with the seasonal gap between the two dates.)*
+`SA_Price_Factor` = `SA_Factor(settlement date) / SA_Factor(maturity date)` *(the multiplier applied to the quoted clean price to produce [`SACP`](#sacp), Canty 2009 Eq. 14. Equals 1.0 — no adjustment — when settlement and maturity fall on the same calendar month and day, that is a whole number of years apart.)*
+
+**The two factors are not obtained the same way.** The settlement date factor is computed from the published [Ref CPI](#ref-cpi) series for that specific date. A maturity date lying beyond the last published Ref CPI has no factor at all, and the implementation substitutes the factor for the same month and day taken from the known cycle.
+
+That substitution is Canty’s assumption that the seasonal cycle repeats exactly each year. It is a simplification rather than a property of the series: BLS re-estimates its factors annually and revises the prior five years, so the factor for a given month and day differs between years. The approximation applies to nearly every outstanding TIPS, since most mature beyond the published series, and its error grows with the distance from the estimation window.
 
 <a id="facp"></a>
 ### FACP
-`FACP` = *Fully Adjusted Clean Price (Canty 2009, Eq. 21): `FACP = CP × (S_settle / S_maturity) × (1 / O_maturity)`. Strips both seasonal carry and one-off outlier shocks. Provides the cleanest "trend" price for relative value analysis.*
+`FACP` = *Fully Adjusted Clean Price (Canty 2009, Eq. 21): `FACP = CP × (S_settle / S_maturity) × (1 / O_maturity)`. Removes both the seasonal component and one-off outlier shocks. Provides the cleanest "trend" price for relative value analysis.*
 
 <a id="sa-anchor"></a>
 ### SA Anchor
