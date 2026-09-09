@@ -1,6 +1,7 @@
 // SA / SAO residual analysis harness — reproduces every table in
 // knowledge/2.2_SAO_Residual_Analysis.md against live R2 data.
 import { yieldFromPrice, calculateDuration, daysBetween } from '../../shared/src/bond-math.js';
+import { calculateSAO } from '../../shared/src/spot-curve.js';
 
 const R2 = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev';
 const fetchText = async u => (await fetch(u, { cache: 'no-cache' })).text();
@@ -42,31 +43,10 @@ const bonds = tipsRows.map(b => {
   const askYield = yieldFromPrice(price, coupon, settleDate, matureDate);
   const saYield = yieldFromPrice(price * (saSettle / saMature), coupon, settleDate, matureDate);
   const dur = calculateDuration(settleDate, matureDate, coupon, saYield);
-  return { cusip: b.cusip, maturity: b.maturity, coupon, price, askYield, saYield, saMature, saRatio: saSettle/saMature, maturityDate: matureDate, dur };
+  return { cusip: b.cusip, maturity: b.maturity, coupon, price, askYield, saYield, saMature, saRatio: saSettle/saMature, maturityDate: matureDate, dur, settlementDate: settleStr };
 }).filter(Boolean).sort((a,b) => a.maturityDate - b.maturityDate);
 
 // SAO replicate
-function calculateSAO(bonds) {
-  const n = bonds.length; const sao = new Array(n); const now = settleDate;
-  for (let i = n-1; i >= 0; i--) {
-    const bond = bonds[i];
-    const yearsToMat = (bond.maturityDate - now) / 31557600000;
-    if (yearsToMat > 7 || i > n-4) { sao[i] = bond.saYield; bond.tw = null; bond.proj = null; continue; }
-    const windowSize = 4; const actualWindow = Math.min(windowSize, n-1-i);
-    let sumX=0,sumY=0,sumXY=0,sumX2=0;
-    for (let j=1;j<=actualWindow;j++){
-      const x=daysBetween(bond.maturityDate, bonds[i+j].maturityDate); const y=sao[i+j];
-      sumX+=x;sumY+=y;sumXY+=x*y;sumX2+=x*x;
-    }
-    const slope=(actualWindow*sumXY-sumX*sumY)/(actualWindow*sumX2-sumX*sumX);
-    const intercept=(sumY-slope*sumX)/actualWindow; const projected=intercept;
-    let tw=0.2;
-    if (yearsToMat<0.5) tw=0.9; else if(yearsToMat<2) tw=0.15; else if(yearsToMat<5) tw=0.25;
-    sao[i]=projected*tw+bond.saYield*(1-tw);
-    bond.tw=tw; bond.proj=projected;
-  }
-  return sao;
-}
 const sao = calculateSAO(bonds);
 bonds.forEach((b,i)=>b.saoYield=sao[i]);
 

@@ -3,6 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { uploadToR2 } from './r2.js';
 import { yieldFromPrice, daysBetween } from '../../shared/src/bond-math.js';
+import { calculateSAO } from '../../shared/src/spot-curve.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -77,43 +78,6 @@ function nextBusinessDay(date, holidaySet) {
   return d;
 }
 
-function calculateSAO(bonds) {
-  const n = bonds.length;
-  const sao = new Array(n);
-  const now = new Date();
-
-  for (let i = n - 1; i >= 0; i--) {
-    const bond = bonds[i];
-    const yearsToMat = (bond.maturityDate - now) / 31557600000;
-
-    if (yearsToMat > 7 || i > n - 4) {
-      sao[i] = bond.saYield;
-      continue;
-    }
-
-    const windowSize = 4;
-    const actualWindow = Math.min(windowSize, n - 1 - i);
-    
-    let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
-    for (let j = 1; j <= actualWindow; j++) {
-      const x = daysBetween(bond.maturityDate, bonds[i + j].maturityDate);
-      const y = sao[i + j];
-      sumX += x; sumY += y; sumXY += x * y; sumX2 += x * x;
-    }
-
-    const slope = (actualWindow * sumXY - sumX * sumY) / (actualWindow * sumX2 - sumX * sumX);
-    const intercept = (sumY - slope * sumX) / actualWindow;
-    const projected = intercept;
-
-    let trendWeight = 0.2;
-    if (yearsToMat < 0.5) trendWeight = 0.9; 
-    else if (yearsToMat < 2) trendWeight = 0.15; 
-    else if (yearsToMat < 5) trendWeight = 0.25;
-
-    sao[i] = (projected * trendWeight) + (bond.saYield * (1 - trendWeight));
-  }
-  return sao;
-}
 
 async function main() {
   console.log(`Starting Market SA/SAO Yield update at ${new Date().toISOString()}`);
@@ -210,7 +174,7 @@ async function main() {
     
     if (saYield === null) return null;
 
-    return { cusip, maturity, coupon, askYield, saYield, maturityDate };
+    return { cusip, maturity, coupon, askYield, saYield, maturityDate, settlementDate: settleDateStr };
   }).filter(Boolean).sort((a, b) => a.maturityDate - b.maturityDate);
 
   console.log(`Processed ${processed.length} market TIPS bonds.`);
