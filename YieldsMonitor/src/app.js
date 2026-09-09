@@ -2,7 +2,7 @@
 import { handleChartKeydown, setupAxisWheelZoom, snapYBounds, snapYAfterZoom, applyLockRight } from '../../shared/src/chart-keys.js';
 import { applyXTimeUnit, getXTimeUnit } from '../../shared/src/chart-time-axis.js';
 import { priceFromYield, yieldFromPrice } from '../../shared/src/bond-math.js';
-import { saFactorForDate } from '../../shared/src/ref-cpi.js';
+import { saFactorForDate, maturitySaFactor } from '../../shared/src/ref-cpi.js';
 import { parseCsv } from '../../shared/src/csv.js';
 import { localDate, toIsoDate, nextBusinessDay, parseHolidaySet } from '../../shared/src/settlement.js';
 
@@ -933,7 +933,7 @@ function saYieldForQuote(yieldPct, tradeDateStr, bondMeta, holidaySet, saRows) {
   const mature = bondMeta.maturity;
   if (!mature || settle >= mature) return null;
   const saSettle = saFactorForDate(saRows, toIsoDate(settle));
-  const saMature = saFactorForDate(saRows, toIsoDate(mature));
+  const saMature = maturitySaFactor(saRows, toIsoDate(mature), toIsoDate(settle));
   if (saSettle == null || saMature == null || isNaN(saSettle) || isNaN(saMature)) return null;
   const yld = yieldPct / 100;
   const price = priceFromYield(yld, bondMeta.coupon, settle, mature);

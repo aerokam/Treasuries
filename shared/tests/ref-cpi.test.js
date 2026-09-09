@@ -7,7 +7,8 @@
 // bad data or a bug in the interpolation — exactly the failure mode that
 // derailed the TipsReference session.
 
-import { lookupRefCpi, refCpiFromMonthly, monthlyCpiMap, indexRatio, saFactorForDate } from '../src/ref-cpi.js';
+import { lookupRefCpi, refCpiFromMonthly, monthlyCpiMap, indexRatio, saFactorForDate,
+         maturitySaFactor, seasonalHorizonWeight, seasonalDriftSigma } from '../src/ref-cpi.js';
 import { parseCsv } from '../src/csv.js';
 
 const R2 = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev';
@@ -161,6 +162,28 @@ async function main() {
   ok(saFactorForDate(saRows, futureDate) === mostRecentFactor, 'saFactorForDate future date falls back to most recent same month/day');
   ok(saFactorForDate(reversed, futureDate) === mostRecentFactor, 'saFactorForDate fallback is order-independent');
   ok(saFactorForDate(saRows, '2999-02-30') === null, 'saFactorForDate month/day never published → null');
+
+  // ── maturitySaFactor / seasonalHorizonWeight ──
+  // Weight is 1 at zero horizon and strictly decreasing in h (drift only grows).
+  ok(seasonalHorizonWeight(2, 0) === 1, 'seasonalHorizonWeight(month, 0) = 1');
+  const wSeq = [1, 3, 6, 12, 25].map(h => seasonalHorizonWeight(2, h));
+  ok(wSeq.every((w, i) => i === 0 || w < wSeq[i - 1]), `w(h) strictly decreasing in h (${wSeq.map(w => w.toFixed(3))})`);
+  ok(wSeq.every(w => w > 0 && w < 1), 'w(h) in (0,1) for h > 0');
+  // Independent recomputation from the published formula w = A²/(A²+σ²) with the
+  // documented amplitude 0.002632 and the Feb σ_drift(30) the module reports.
+  const sigFeb30 = seasonalDriftSigma(2, 30);
+  const A = 0.002632, wExpected = A * A / (A * A + sigFeb30 * sigFeb30);
+  ok(Math.abs(seasonalHorizonWeight(2, 30) - wExpected) < 1e-12, `Feb w(30) matches A²/(A²+σ²) (${wExpected.toFixed(4)})`);
+  ok(wExpected > 0.42 && wExpected < 0.50, `Feb w(30) ≈ 0.45 per 1.1 §5 (got ${wExpected.toFixed(3)})`);
+  // A maturity date inside the series is returned exact and unfaded.
+  ok(maturitySaFactor(saRows, midDate, midDate) === midFactor, 'maturitySaFactor exact in-series date is unfaded');
+  // A future maturity is the substituted factor faded toward 1.0: strictly
+  // between the raw substitution and 1.0, on the same side.
+  const rawSub = saFactorForDate(saRows, futureDate);
+  const faded = maturitySaFactor(saRows, futureDate, '2026-09-08');
+  const between = (rawSub < 1) ? (faded > rawSub && faded < 1) : (faded < rawSub && faded > 1);
+  ok(rawSub === 1 || between, `maturitySaFactor future date faded strictly toward 1.0 (raw ${rawSub}, faded ${faded.toFixed(6)})`);
+  ok(maturitySaFactor(saRows, '2999-02-30', '2026-09-08') === null, 'maturitySaFactor unknown month/day → null');
 
   console.log(`\n${fail === 0 ? 'PASS' : 'FAIL'} — ${pass} passed, ${fail} failed`);
   process.exit(fail === 0 ? 0 : 1);

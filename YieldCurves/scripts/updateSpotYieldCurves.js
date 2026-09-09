@@ -20,7 +20,7 @@
 
 import { uploadToR2 } from './r2.js';
 import { yieldFromPrice } from '../../shared/src/bond-math.js';
-import { saFactorForDate } from '../../shared/src/ref-cpi.js';
+import { saFactorForDate, maturitySaFactor } from '../../shared/src/ref-cpi.js';
 import { parseCsv } from '../../shared/src/csv.js';
 import { localDate, toIsoDate, nextBusinessDay, parseHolidaySet } from '../../shared/src/settlement.js';
 import { classifyByCusipRoot, isStrip } from '../../shared/src/treasury-cusip.js';
@@ -105,7 +105,7 @@ function buildProcessedTipsBonds(rawTipsData, refCpiData, priceMap, isBroker, br
     }
 
     const saSettle = saFactorForDate(refCpiData, settleDateStr);
-    const saMature = saFactorForDate(refCpiData, bond.maturity);
+    const saMature = maturitySaFactor(refCpiData, bond.maturity, settleDateStr);
     if (saSettle == null || isNaN(saSettle) || saMature == null || isNaN(saMature)) return null;
 
     const settleDate = localDate(settleDateStr);

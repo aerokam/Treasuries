@@ -1,6 +1,6 @@
 // Yield Curves — Frontend Logic
 import { yieldFromPrice, cashflowSchedule } from '../../shared/src/bond-math.js';
-import { saFactorForDate } from '../../shared/src/ref-cpi.js';
+import { saFactorForDate, maturitySaFactor } from '../../shared/src/ref-cpi.js';
 import {
   SAO_NOISE_YRS, SAO_FADE_START_YRS, SAO_FADE_END_YRS,
   nssBasis, zToSA, spotCurveFit, spotCurveGrid, calculateSAO,
@@ -286,14 +286,16 @@ function _showSaDrill(cusip) {
   const mmddSettle = bond.settlementDate.slice(5, 10);
   const mmddMature = bond.maturity.slice(5, 10);
   const saS = saFactorForDate(rawRefCpiData, bond.settlementDate);
-  const saM = saFactorForDate(rawRefCpiData, bond.maturity);
+  const saMraw = saFactorForDate(rawRefCpiData, bond.maturity);
+  const saM = maturitySaFactor(rawRefCpiData, bond.maturity, bond.settlementDate);
+  const faded = Math.abs(saM - saMraw) > 5e-5;
   const ratio = saS / saM;
 
   const html = `
     <div style="background:#f8fafc;padding:12px;border-radius:6px;border:1px solid #e2e8f0;margin-bottom:16px;">
       <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>Market Price</span> <strong>${bond.price.toFixed(3)}</strong></div>
       <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>S-Factor (Settle ${mmddSettle})</span> <strong>${saS.toFixed(4)}</strong></div>
-      <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>S-Factor (Maturity ${mmddMature})</span> <strong>${saM.toFixed(4)}</strong></div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>S-Factor (Maturity ${mmddMature})${faded ? ` <span style="color:#94a3b8;">from ${saMraw.toFixed(4)}, faded to horizon</span>` : ''}</span> <strong>${saM.toFixed(4)}</strong></div>
       <div style="border-top:1px dashed #cbd5e1;margin:8px 0;padding-top:8px;display:flex;justify-content:space-between;">
         <span>Adjustment Ratio (S_s / S_m)</span> <strong>${ratio.toFixed(4)}</strong>
       </div>
@@ -304,6 +306,7 @@ function _showSaDrill(cusip) {
     <div style="font-size:12px;color:#64748b;">
       <p>The <strong>SA Yield</strong> is calculated by finding the internal rate of return (IRR) of the TIPS using the <strong>Adjusted Price</strong> instead of the market price.</p>
       <p>A ratio &lt; 1.0 reduces the price (increasing yield), while a ratio &gt; 1.0 increases the price (decreasing yield).</p>
+      ${faded ? `<p>The maturity S-Factor is reused from a past year, since no seasonal factor exists for a date this far ahead. BLS re-estimates seasonal factors every year from a moving window of recent data, so the reused value is faded toward 1.0 as the horizon grows (see <em>1.1 Seasonal Factor Drift</em>).</p>` : ''}
     </div>
   `;
   _showDrillPopup(`SA Drill-down: ${bond.cusip} (${fmtMMM(bond.maturity)})`, html);
@@ -1016,7 +1019,7 @@ function buildProcessedTipsBonds(sourceMap, isBroker) {
     }
 
     const saSettle = saFactorForDate(rawRefCpiData, settleDateStr);
-    const saMature = saFactorForDate(rawRefCpiData, bond.maturity);
+    const saMature = maturitySaFactor(rawRefCpiData, bond.maturity, settleDateStr);
 
     if (saSettle == null || isNaN(saSettle) || saMature == null || isNaN(saMature)) return null;
 

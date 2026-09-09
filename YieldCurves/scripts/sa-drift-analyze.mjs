@@ -15,7 +15,7 @@
 //   H  SA-minus-ask under the w(h) fade of S_maturity
 
 import { yieldFromPrice, daysBetween } from '../../shared/src/bond-math.js';
-import { refCpiFromMonthly, monthlyCpiMap, saFactorForDate } from '../../shared/src/ref-cpi.js';
+import { refCpiFromMonthly, monthlyCpiMap, saFactorForDate, maturitySaFactor, seasonalHorizonWeight } from '../../shared/src/ref-cpi.js';
 
 const FRED = id => `https://fred.stlouisfed.org/graph/fredgraph.csv?id=${id}`;
 const R2 = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev';
@@ -117,6 +117,26 @@ for (const [lab, mo, dd] of DATES) {
 const poolByH = {}; for (const h of HOR) poolByH[h] = rms(poolDrift[h]);
 
 // ===== D. w(h) =====
+// ---- emit the constant table shared/src/ref-cpi.js embeds (interpolated-S drift, per calendar month) ----
+const EMIT_H = [1, 2, 3, 5, 7, 10, 15, 20, 25, 30];
+const emitRows = [];
+for (let mo = 1; mo <= 12; mo++) {
+  const byY = {};
+  for (let y = 1948; y <= lastY; y++) { const v = Sday(y, mo, 15); if (v != null) byY[y] = v; }
+  const row = EMIT_H.map(h => {
+    const d = [];
+    for (let y = 1948; y + h <= lastY; y++) if (byY[y] != null && byY[y + h] != null) d.push(byY[y + h] - byY[y]);
+    return d.length ? +(rms(d)).toFixed(6) : null;
+  });
+  emitRows.push(row);
+}
+console.log('\n=== EMIT: paste into shared/src/ref-cpi.js ===');
+console.log(`const SEASONAL_AMPLITUDE = ${(+Aint.toFixed(6))};   // within-year sd of interpolated S, 2015-2019`);
+console.log(`const SEASONAL_DRIFT_HORIZONS = [${EMIT_H.join(', ')}];`);
+console.log('const SEASONAL_DRIFT_SIGMA = [   // [monthIndex 0=Jan][horizon] RMS drift of S(month,15) over h years, FRED 1948-' + lastY);
+emitRows.forEach((r, i) => console.log(`  [${r.map(x => x.toFixed(6)).join(', ')}],  // ${MON[i]}`));
+console.log('];');
+
 console.log('\n=== D. w(h) = A^2 / (A^2 + sigma_drift(h)^2)   [A = interpolated-S amplitude, drift = pooled over the 5 dates] ===');
 const wTo1 = {}; for (const h of HOR) { wTo1[h] = Aint * Aint / (Aint * Aint + poolByH[h] ** 2); }
 console.log('   ' + HOR.map(h => `${h}y ${wTo1[h].toFixed(3)}`).join('  '));
@@ -186,17 +206,12 @@ for (const [lab, lo, hi] of [['FRONT 2027-2032', 2027, 2032], ['MID 2033-2039', 
   console.log(`  ${lab}: ${parts.join('   ') || '(no bonds)'}`);
 }
 
-console.log('\n=== H. SA-minus-ask under the w(h) fade of S_maturity (h > 2: signal-to-noise; h <= 2: w=1) ===');
-const interp = (obj, h) => { if (h <= HOR[0]) return obj[HOR[0]]; if (h >= 30) return obj[30]; for (let i = 0; i < HOR.length - 1; i++) if (h >= HOR[i] && h <= HOR[i + 1]) { const t = (h - HOR[i]) / (HOR[i + 1] - HOR[i]); return obj[HOR[i]] * (1 - t) + obj[HOR[i + 1]] * t; } };
-const monthMeanF = m => { const v = []; for (let y = firstY; y <= lastY; y++) { const x = fMY(m, y); if (x != null) v.push(x); } return v.reduce((a, b) => a + b) / v.length; };
-console.log('  maturity     yrs   dbp now   -> toward 1.0   -> toward long-run mean');
+console.log('\n=== H. SA-minus-ask under maturitySaFactor() — the operative fade (per-month w(h), no floor) ===');
+console.log('  maturity     yrs   w(h)    dbp now   dbp faded');
 for (const b of bonds) {
-  if (b.yrs < 8) continue;
-  const w1 = b.h <= 2 ? 1 : interp(wTo1, b.h);
-  const wm = b.h <= 2 ? 1 : interp(wMean, b.h);
-  const mm = monthMeanF(b.matDate.getMonth() + 1);
-  const s1 = 1 + w1 * (b.saMat - 1), sm = mm + wm * (b.saMat - mm);
-  const d1 = (yieldFromPrice(b.price * (saSettle / s1), b.coupon, settle, b.matDate) - b.ask) * 1e4;
-  const dm = (yieldFromPrice(b.price * (saSettle / sm), b.coupon, settle, b.matDate) - b.ask) * 1e4;
-  console.log(`  ${b.mat} ${b.yrs.toFixed(1).padStart(5)}  ${b.dbp.toFixed(1).padStart(7)}   ${d1.toFixed(1).padStart(10)}   ${dm.toFixed(1).padStart(10)}`);
+  if (b.yrs < 4) continue;
+  const sFaded = maturitySaFactor(rRows, b.mat, settleStr);
+  const w = seasonalHorizonWeight(b.matDate.getMonth() + 1, b.h);
+  const dFaded = (yieldFromPrice(b.price * (saSettle / sFaded), b.coupon, settle, b.matDate) - b.ask) * 1e4;
+  console.log(`  ${b.mat} ${b.yrs.toFixed(1).padStart(5)}  ${w.toFixed(3)}  ${b.dbp.toFixed(1).padStart(7)}  ${dFaded.toFixed(1).padStart(9)}`);
 }
