@@ -565,6 +565,8 @@ coverExcessCost_c = Future 30Y total cost × coverWeight_c
 
 That substitution is Canty’s assumption that the seasonal cycle repeats exactly each year. It is a simplification rather than a property of the series: BLS re-estimates its factors annually and revises the prior five years, so the factor for a given month and day differs between years. The approximation applies to nearly every outstanding TIPS, since most mature beyond the published series, and its error grows with the distance from the estimation window.
 
+*Measured: the factor for February 15, the maturity date of every 30-year TIPS, has a 30-year drift standard deviation of about 0.29% of price, against a current departure from 1.0 of −0.45%. The drift over the horizon the substitution is used at is therefore comparable to the whole adjustment being made ([1.1 Seasonal Factor Drift §4.1](../YieldCurves/knowledge/1.1_Seasonal_Factor_Drift.md#feb-15-dependency)).*
+
 <a id="facp"></a>
 ### FACP
 `FACP` = *Fully Adjusted Clean Price (Canty 2009, Eq. 21): `FACP = CP × (S_settle / S_maturity) × (1 / O_maturity)`. Removes both the seasonal component and one-off outlier shocks. Provides the cleanest "trend" price for relative value analysis.*
