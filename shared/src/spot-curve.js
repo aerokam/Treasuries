@@ -196,10 +196,15 @@ export function calculateSAO(bonds) {
   const fitIdx = [];
   for (let i = 0; i < n; i++) if (yrs[i] >= SAO_NOISE_YRS) fitIdx.push(i);
   const curve = fitNSS(fitIdx.map(i => yrs[i]), fitIdx.map(i => bonds[i].saYield));
+  // Below the shortest fitted maturity the global NSS form is unconstrained and its
+  // extrapolation diverges (a near-maturity TIPS can swing hundreds of bps negative).
+  // Hold the curve flat at its shortest-anchor value there instead of extrapolating
+  // (see 2.0_SAO_Adjustment.md §"The very short end").
+  const tMin = fitIdx.length ? Math.min(...fitIdx.map(i => yrs[i])) : 0;
 
   for (let i = 0; i < n; i++) {
     const b = bonds[i];
-    const fit = curve ? curve(yrs[i]) : b.saYield;
+    const fit = curve ? curve(Math.max(yrs[i], tMin)) : b.saYield;
     const weight = yrs[i] < SAO_NOISE_YRS
       ? 1
       : Math.min(1, Math.max(0, (SAO_FADE_END_YRS - yrs[i]) / (SAO_FADE_END_YRS - SAO_FADE_START_YRS)));

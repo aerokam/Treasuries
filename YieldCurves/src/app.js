@@ -320,7 +320,7 @@ function _showSaoDrill(cusip) {
     logicHtml = `
       <div style="background:#fef3f2;padding:12px;border-radius:6px;border:1px solid #fecdca;margin-bottom:16px;">
         <p style="margin:0;color:#b42318;font-weight:600;">Near-Maturity (excluded from fit)</p>
-        <p style="margin:8px 0 0;font-size:12px;">Maturity ${yearsToMat.toFixed(2)}y &lt; ${SAO_NOISE_YRS}y: the SA yield is dominated by price noise on a tiny remaining duration, so this point does not drive the curve fit. Its SAO is read off the smooth curve.</p>
+        <p style="margin:8px 0 0;font-size:12px;">Maturity ${yearsToMat.toFixed(2)}y &lt; ${SAO_NOISE_YRS}y: the SA yield is dominated by price noise on a tiny remaining duration, so this point does not drive the curve fit. Its SAO is read off the smooth curve, which is held flat below the shortest fitted maturity rather than extrapolated (see 2.0 &sect;&ldquo;The very short end&rdquo;).</p>
         <div style="margin-top:8px;display:flex;justify-content:space-between;color:#1a56db;font-weight:700;"><span>SAO (on curve)</span><span>${(bond.saoYield * 100).toFixed(3)}%</span></div>
       </div>
     `;
