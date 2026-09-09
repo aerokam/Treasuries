@@ -29,6 +29,10 @@ const SHOW_GSW = new URLSearchParams(location.search).has('gsw');
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
+// Chart gridline color — horizontal (Y) and vertical (X) alike, on every chart
+// (Yield Curves, Breakeven, Bid-Ask Spread). See knowledge/3.0_Visual_Standards.md §2.
+const GRID_COLOR = 'rgba(0,0,0,0.08)';
+
 // GSW (Gürkaynak-Sack-Wright, FEDS 2008-05) fitted TIPS zero-coupon curve — a snapshot for
 // visual comparison against our own spot fit. GSW publishes weekly (Tuesdays, covering
 // through the prior Friday); this is the latest row as of this commit. [maturity years,
@@ -862,7 +866,7 @@ function renderNominalsChart(fedBonds, fidBonds, fedSpotBonds, fidSpotBonds) {
           scale.ticks = ticks;
         }
       },
-      grid: { color: 'rgba(0,0,0,0.05)' },
+      grid: { color: GRID_COLOR },
       ticks: { maxRotation: 0, callback: tickCb, font: tickFont }
     };
   } else {
@@ -880,7 +884,7 @@ function renderNominalsChart(fedBonds, fidBonds, fedSpotBonds, fidSpotBonds) {
       type: 'time',
       min: minX, max: maxX,
       time: { displayFormats: { year: 'yyyy', month: 'MMM yyyy' } },
-      ...calendarTimeAxis({ gridColor: 'rgba(0,0,0,0.05)' }),
+      ...calendarTimeAxis({ gridColor: GRID_COLOR }),
     };
   }
 
@@ -947,6 +951,7 @@ function renderNominalsChart(fedBonds, fidBonds, fedSpotBonds, fidSpotBonds) {
           type: 'linear',
           title: { display: true, text: 'Yield (%)' },
           min: minY, max: maxY,
+          grid: { color: GRID_COLOR },
           ticks: { stepSize: step, callback: (val) => val.toFixed(2) }
         }
       },
@@ -1223,7 +1228,7 @@ function buildYieldXScale(allPoints) {
         }
         scale.ticks = ticks;
       },
-      grid: { color: 'rgba(0,0,0,0.05)' },
+      grid: { color: GRID_COLOR },
       ticks: { maxRotation: 0, callback: ttmTickCb }
     };
   }
@@ -1241,7 +1246,7 @@ function buildYieldXScale(allPoints) {
     type: 'time',
     min: minX, max: maxX,
     time: { displayFormats: { year: 'yyyy', month: 'MMM yyyy' } },
-    ...calendarTimeAxis({ gridColor: 'rgba(0,0,0,0.05)' }),
+    ...calendarTimeAxis({ gridColor: GRID_COLOR }),
   };
 }
 
@@ -1360,7 +1365,7 @@ function renderChart(fedBonds, brokerBonds) {
       interaction: { mode: 'nearest', axis: 'x', intersect: false },
       scales: {
         x: xScale,
-        y: { type: 'linear', title: { display: true, text: 'Yield (%)' }, min: minY, max: maxY, ticks: { stepSize: 0.25, callback: (v) => v.toFixed(2) } }
+        y: { type: 'linear', title: { display: true, text: 'Yield (%)' }, min: minY, max: maxY, grid: { color: GRID_COLOR }, ticks: { stepSize: 0.25, callback: (v) => v.toFixed(2) } }
       },
       plugins: {
         legend: {
@@ -1615,7 +1620,7 @@ function renderBeiChart(bonds, spotBeiGrid) {
       interaction: { mode: 'nearest', axis: 'x', intersect: false },
       scales: {
         x: xScale,
-        y: { type: 'linear', title: { display: true, text: 'Breakeven Inflation (%)' }, min: minY, max: maxY, ticks: { stepSize: 0.25, callback: (v) => v.toFixed(2) } }
+        y: { type: 'linear', title: { display: true, text: 'Breakeven Inflation (%)' }, min: minY, max: maxY, grid: { color: GRID_COLOR }, ticks: { stepSize: 0.25, callback: (v) => v.toFixed(2) } }
       },
       plugins: {
         legend: {
@@ -1941,15 +1946,16 @@ function _makeSpreadChart(ctx, seriesDef, yAxisLabel, yUnit, shouldClip) {
         x: {
           type: 'time', min: minX, max: maxX,
           time: xAxisMode === 'ttm' ? { displayFormats: {} } : { displayFormats: { year: 'yyyy', month: 'MMM yyyy' } },
-          grid: { color: 'rgba(0,0,0,0.05)' },
+          grid: { color: GRID_COLOR },
           ...(xAxisMode === 'ttm'
             ? { ticks: { autoSkip: true, maxRotation: 0, callback: (val, idx, ticks) => { if (!ticks || ticks.length < 2) return ttmLabel(val); const spanDays = (ticks[ticks.length-1].value - ticks[0].value) / 86400000; const days = (val - Date.now()) / 86400000; if (days <= 0) return ''; if (spanDays <= 91) return `${Math.round(days / 7)}w`; if (spanDays <= 365) return `${Math.round(days / 30.44)}m`; const yrs = days / 365.25; const wy = Math.floor(yrs); const rm = Math.round((yrs - wy) * 12); if (rm === 0) return `${wy}y`; if (rm === 12) return `${wy + 1}y`; if (wy === 0) return `${rm}m`; return `${wy}y ${rm}m`; } } }
-            : calendarTimeAxis()
+            : calendarTimeAxis({ gridColor: GRID_COLOR })
           ),
         },
         y: {
           type: 'linear', title: { display: true, text: yAxisLabel },
           min: initBounds.min, max: initBounds.max,
+          grid: { color: GRID_COLOR },
           ticks: { stepSize: initBounds.step, callback: v => v.toFixed(2) }
         }
       },
