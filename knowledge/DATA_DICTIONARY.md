@@ -25,11 +25,13 @@
 
 **G** &nbsp; [Gap Years](#gap-years)
 
+**H** &nbsp; [Horizon Confidence Weight](#horizon-confidence-weight)
+
 **I** &nbsp; [Index Ratio](#index-ratio) &middot; [Inflation Compensation](#inflation-compensation) &middot; [inflation factor](#index-ratio) *(see Index Ratio)* &middot; [IQR Clip](#iqr-clip)
 
 **L** &nbsp; [Ladder](#ladder) &middot; [ladder eligible tips](#outstanding-tips) *(see Outstanding TIPS)* &middot; [ladder period](#ladder) *(see Ladder)* &middot; [Last-Year Interest](#last-year-interest) &middot; [LMI](#lmi)
 
-**M** &nbsp; [Maturity Date](#maturity-date) &middot; [Maturity Year](#maturity-year)
+**M** &nbsp; [Maturity Date](#maturity-date) &middot; [Maturity SA Factor](#maturity-sa-factor) &middot; [Maturity Year](#maturity-year)
 
 **N** &nbsp; [Net Cash](#net-cash)
 
@@ -41,7 +43,7 @@
 
 **R** &nbsp; [Ref CPI](#ref-cpi) &middot; [Reference Date](#reference-date) &middot; [Retained Bracket Excess](#retained-bracket-excess) &middot; [Retained Lower Bracket](#retained-lower-bracket) &middot; [Rolling CPI Change](#rolling-cpi-change) &middot; [Rung](#rung)
 
-**S** &nbsp; [S1: YieldsFromFedInvestPrices.csv](#s1) &middot; [S10: YieldsSaSao.csv](#s10) &middot; [S11: FundHoldings/Holdings-\<TICKER\>(-Enriched).csv](#s11) &middot; [S12: GswTipsCurve.json](#s12) &middot; [S13: YieldCurves.csv](#s13) &middot; [S14: BreakevenInflation.csv](#s14) &middot; [S15: BidAskSpreads.csv](#s15) &middot; [S2: TipsRef.csv](#s2) &middot; [S3: RefCPI.csv](#s3) &middot; [S4: RefCpiNsaSa.csv](#s4) &middot; [S5: Auctions.csv](#s5) &middot; [S6: YieldHistory](#s6) &middot; [S7: FidelityTreasuriesTips.csv](#s7) &middot; [S8: CPI_history.csv](#s8) &middot; [S9: Tentative-Auction-Schedule.xml](#s9) &middot; [SA Anchor](#sa-anchor) &middot; [SA Factor](#sa-factor) &middot; [SA Price Factor](#sa-price-factor) &middot; [SA Yield](#sa-yield) &middot; [SACP](#sacp) &middot; [same year excess interest](#same-maturity-excess-interest) *(see Same-Maturity Excess Interest)* &middot; [Same-Maturity Excess Interest](#same-maturity-excess-interest) &middot; [SAO Yield](#sao-yield) &middot; [Settlement Date](#settlement-date) &middot; [Sliding Window](#sliding-window) &middot; [Spot Yield](#spot-yield) &middot; [Synthetic TIPS](#synthetic-tips)
+**S** &nbsp; [S1: YieldsFromFedInvestPrices.csv](#s1) &middot; [S10: YieldsSaSao.csv](#s10) &middot; [S11: FundHoldings/Holdings-\<TICKER\>(-Enriched).csv](#s11) &middot; [S12: GswTipsCurve.json](#s12) &middot; [S13: YieldCurves.csv](#s13) &middot; [S14: BreakevenInflation.csv](#s14) &middot; [S15: BidAskSpreads.csv](#s15) &middot; [S2: TipsRef.csv](#s2) &middot; [S3: RefCPI.csv](#s3) &middot; [S4: RefCpiNsaSa.csv](#s4) &middot; [S5: Auctions.csv](#s5) &middot; [S6: YieldHistory](#s6) &middot; [S7: FidelityTreasuriesTips.csv](#s7) &middot; [S8: CPI_history.csv](#s8) &middot; [S9: Tentative-Auction-Schedule.xml](#s9) &middot; [SA Anchor](#sa-anchor) &middot; [SA Factor](#sa-factor) &middot; [SA Price Factor](#sa-price-factor) &middot; [SA Yield](#sa-yield) &middot; [SACP](#sacp) &middot; [same year excess interest](#same-maturity-excess-interest) *(see Same-Maturity Excess Interest)* &middot; [Same-Maturity Excess Interest](#same-maturity-excess-interest) &middot; [SAO Yield](#sao-yield) &middot; [Seasonal Amplitude](#seasonal-amplitude) &middot; [Seasonal Factor Drift](#seasonal-factor-drift) &middot; [Settlement Date](#settlement-date) &middot; [Sliding Window](#sliding-window) &middot; [Spot Yield](#spot-yield) &middot; [Synthetic TIPS](#synthetic-tips)
 
 **T** &nbsp; [TIPS](#tips) &middot; [TIPS Ladder](#tips-ladder) &middot; [Total Cost](#total-cost) &middot; [Trade Ticket](#trade-ticket) &middot; [Treasury Bill](#treasury-bill) &middot; [Treasury Bond](#treasury-bond) &middot; [Treasury Note](#treasury-note)
 
@@ -559,13 +561,27 @@ coverExcessCost_c = Future 30Y total cost × coverWeight_c
 
 <a id="sa-price-factor"></a>
 ### SA Price Factor
-`SA_Price_Factor` = `SA_Factor(settlement date) / SA_Factor(maturity date)` *(the multiplier applied to the quoted clean price to produce [`SACP`](#sacp), Canty 2009 Eq. 14. Equals 1.0 — no adjustment — when settlement and maturity fall on the same calendar month and day, that is a whole number of years apart.)*
+`SA_Price_Factor` = `SA_Factor(settlement date) / Maturity_SA_Factor` *(the multiplier applied to the quoted clean price to produce [`SACP`](#sacp), Canty 2009 Eq. 14.)*
 
-**The two factors are not obtained the same way.** The settlement date factor is computed from the published [Ref CPI](#ref-cpi) series for that specific date. A maturity date lying beyond the last published Ref CPI has no factor at all, and the implementation substitutes the factor for the same month and day taken from the known cycle.
+**The two factors are not obtained the same way.** The settlement date factor is that date’s value in the published series. The maturity date factor is a projection for nearly every outstanding TIPS, and is faded toward 1.0 as the horizon lengthens — see [Maturity SA Factor](#maturity-sa-factor). The two are therefore never exactly equal, even where settlement and maturity fall on the same calendar month and day, so a whole number of years to maturity no longer implies no adjustment.
 
-That substitution is Canty’s assumption that the seasonal cycle repeats exactly each year. It is a simplification rather than a property of the series: BLS re-estimates its factors annually and revises the prior five years, so the factor for a given month and day differs between years. The approximation applies to nearly every outstanding TIPS, since most mature beyond the published series, and its error grows with the distance from the estimation window.
+<a id="maturity-sa-factor"></a>
+### Maturity SA Factor
+`Maturity_SA_Factor` = *The [SA Factor](#sa-factor) for the maturity date, the denominator of the [SA Price Factor](#sa-price-factor). A maturity date inside the published [Ref CPI](#ref-cpi) series takes that date’s exact value. A maturity date beyond it has no published factor: the same calendar month and day is taken from the most recent completed cycle, and its departure from 1.0 is scaled by the [Horizon Confidence Weight](#horizon-confidence-weight) — `1 + (S_maturity − 1) × w(h)`. The second case covers nearly every outstanding TIPS, since most mature beyond the published series. `shared/src/ref-cpi.js#maturitySaFactor`; specified in [1.0 Horizon-Dependent Maturity Factor](../YieldCurves/knowledge/1.0_Seasonal_Adjustments.md#horizon-dependent-maturity-factor).*
 
-*Measured: the factor for February 15, the maturity date of every 30-year TIPS, has a 30-year drift standard deviation of about 0.29% of price, against a current departure from 1.0 of −0.45%. The drift over the horizon the substitution is used at is therefore comparable to the whole adjustment being made ([1.1 Seasonal Factor Drift §4.1](../YieldCurves/knowledge/1.1_Seasonal_Factor_Drift.md#feb-15-dependency)).*
+*Measured: the factor for February 15, the maturity date of every 30-year TIPS, has a 30-year drift standard deviation of about 0.29% of price, against a current departure from 1.0 of −0.45%. The drift over the horizon the projection is used at is comparable to the whole adjustment being made, which is what the weight scales for ([1.1 Seasonal Factor Drift §4.1](../YieldCurves/knowledge/1.1_Seasonal_Factor_Drift.md#feb-15-dependency)).*
+
+<a id="seasonal-amplitude"></a>
+### Seasonal Amplitude
+`Seasonal_Amplitude` = *`A`, the within-year spread of the [SA Factor](#sa-factor) across the twelve calendar months, as a standard deviation. Measured at 0.263% from frozen CPI vintages ([1.1 §3](../YieldCurves/knowledge/1.1_Seasonal_Factor_Drift.md)). The signal term of the [Horizon Confidence Weight](#horizon-confidence-weight).*
+
+<a id="seasonal-factor-drift"></a>
+### Seasonal Factor Drift
+`Seasonal_Factor_Drift` = *`σ_drift(month, h)`, the RMS change in one calendar month’s [SA Factor](#sa-factor) over a horizon of `h` years, measured from CPI history 1947 onward ([1.1 §4](../YieldCurves/knowledge/1.1_Seasonal_Factor_Drift.md)). Held per calendar month, because the months do not drift at the same rate: December and the spring months drift fastest, and the long end of the TIPS curve is entirely February 15. The noise term of the [Horizon Confidence Weight](#horizon-confidence-weight). `shared/src/ref-cpi.js#seasonalDriftSigma`.*
+
+<a id="horizon-confidence-weight"></a>
+### Horizon Confidence Weight
+`Horizon_Confidence_Weight` = `A² / (A² + σ_drift(h)²)` *(`w(h)`, the fraction of a projected [SA Factor](#sa-factor)’s departure from 1.0 that survives at a horizon of `h` years. The signal-to-noise ratio of [Seasonal Amplitude](#seasonal-amplitude) against [Seasonal Factor Drift](#seasonal-factor-drift); both are measured rather than fitted, so the weight has no free parameter. 1.0 at zero horizon, about 0.91 at 1 year, about 0.45 for February 15 at 30 years. Applied at every horizon with no floor, and applied only to a projected factor: the settlement date factor is measured and is never scaled. `shared/src/ref-cpi.js#seasonalHorizonWeight`.)*
 
 <a id="facp"></a>
 ### FACP

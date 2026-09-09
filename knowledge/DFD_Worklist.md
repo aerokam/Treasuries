@@ -44,9 +44,7 @@ These came out of review and apply to every spec from here.
 3. **A spec for unbuilt work needs to say so.** `3.2_Multi_Account_Rebalancing.md` describes a feature that does not exist: `src/account-allocation.js` is absent and 27 of its names resolve to nothing. Under specs-drive-code that is legitimate, but nothing distinguishes it from a spec that has rotted, and the checker will flag it forever.
 4. **Whether to gate on the checker** once the 88 are triaged.
 5. **`1.0_Seasonal_Adjustments.md` may be repurposed** as the Yield Curves spec and renamed `1.0_Yield_Curves.md`, with seasonal adjustment demoted to a section. Proposed by a session that has since ended and never confirmed. If it happens, `1.1_Seasonal_Factor_Drift.md` renumbers with it and the Level 2 drill for 7.2 needs repointing.
-6. **The SA fade floor**: `w = 1` for `h <= 2` as the spec reads, against `h <= 5` to match `SAO_FADE_START_YRS` and leave the front end that 2.2 verified untouched.
-7. **`#sa-price-factor` needs a third pass when the fade is implemented.** It currently describes substituting the same month and day, which is what the code does; the decision is to fade toward 1.0. Spec and Data Dictionary should state the intended behaviour and the code follow.
-8. **`updateSaSaoYields.js` publishes corrected SAO on its next scheduled run.** The duplicate algorithm was retired in `f57ef4a`; measured against the published file, SA moved on none of 53 securities and SAO on 21, by up to 56 basis points, concentrated at the short end where the flat-hold fix applies.
+6. **`updateSaSaoYields.js` publishes corrected SAO on its next scheduled run.** The duplicate algorithm was retired in `f57ef4a`; measured against the published file, SA moved on none of 53 securities and SAO on 21, by up to 56 basis points, concentrated at the short end where the flat-hold fix applies.
 
 ---
 
@@ -57,6 +55,7 @@ These came out of review and apply to every spec from here.
 - **All fourteen R2 stores appear at Level 1**, whether one app reads a store or several, so no app looks as though it reads nothing.
 - **Identifiers are not shown on diagrams.** E and S numbers are link plumbing; they stay as anchors, not labels.
 - **The Data Dictionary body stays grouped by category**, with the generated A-Z index for lookup. Grouping is what makes a missing or inconsistent entry visible: bracket year and cover year sit together, which is how their definitions were caught failing to distinguish each other.
+- **The maturity SA Factor fades toward 1.0 with horizon, at every horizon, with no floor.** Settled in `b3136e3`: the weight is a signal-to-noise ratio of measured amplitude against measured drift, so a floor would discard measured 1-to-5-year drift with no measurement behind the boundary, and the weight is near 1 at the front end in any case. Four terms were added to the Data Dictionary for it: Maturity SA Factor, Horizon Confidence Weight, Seasonal Amplitude, Seasonal Factor Drift. **Horizon Confidence Weight is a new term the developer has not yet approved.**
 - **Level 1 is one process per app plus one acquisition process**, which explodes into the fifteen jobs. Portal menu groupings were considered and rejected: nearly every shared store is read across group boundaries, so grouping would have added a level without simplifying anything.
 
 ---
