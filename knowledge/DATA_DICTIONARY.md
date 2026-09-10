@@ -15,7 +15,7 @@
 
 **B** &nbsp; [bei](#breakeven-inflation) *(see Breakeven Inflation (BEI))* &middot; [bid](#ask) *(see Ask / Bid)* &middot; [Blend Weights](#blend-weights) &middot; [Bond Ladder](#bond-ladder) &middot; [bracket maturity](#bracket-year-tips) *(see Bracket Year TIPS)* &middot; [Bracket Weight](#bracket-weight) &middot; [Bracket Year](#bracket-year) &middot; [Bracket Year TIPS](#bracket-year-tips) &middot; [Breakeven Inflation (BEI)](#breakeven-inflation)
 
-**C** &nbsp; [Cash Flow Calendar](#cash-flow-calendar) &middot; [Clean Price](#clean-price) &middot; [Cost per TIPS](#cost-per-tips) &middot; [Coupon Rate](#coupon-rate) &middot; [Cover Excess](#cover-excess) &middot; [cover maturity](#cover-year-tips) *(see Cover Year TIPS)* &middot; [Cover Weight](#cover-weight) &middot; [Cover Year](#cover-year) &middot; [Cover Year TIPS](#cover-year-tips) &middot; [CPI CAGR](#cpi-cagr) &middot; [CPI Change (Month-over-Month)](#cpi-change-mom) &middot; [CPI Change (Point-to-Point)](#cpi-change-p2p) &middot; [CPI Change (Year-over-Year)](#cpi-change-yoy) &middot; [CPI-U NSA](#cpi-nsa) &middot; [CPI-U SA](#cpi-sa) &middot; [CUSIP](#cusip)
+**C** &nbsp; [Cash Flow Calendar](#cash-flow-calendar) &middot; [Clean Price](#clean-price) &middot; [Cost per TIPS](#cost-per-tips) &middot; [Coupon Rate](#coupon-rate) &middot; [Cover Excess](#cover-excess) &middot; [cover maturity](#cover-year-tips) *(see Cover Year TIPS)* &middot; [Cover Weight](#cover-weight) &middot; [Cover Year](#cover-year) &middot; [Cover Year TIPS](#cover-year-tips) &middot; [CPI CAGR](#cpi-cagr) &middot; [CPI Change (Month-over-Month)](#cpi-change-mom) &middot; [CPI Change (Point-to-Point)](#cpi-change-p2p) &middot; [CPI Change (Year-over-Year)](#cpi-change-yoy) &middot; [CPI-U NSA](#cpi-nsa) &middot; [CPI-U SA](#cpi-sa) &middot; [Credibility Factor](#credibility-factor) &middot; [CUSIP](#cusip)
 
 **D** &nbsp; [DAA](#daa) &middot; [DARA](#dara) &middot; [Dated Date](#dated-date) &middot; [Duration Matching](#duration-matching)
 
@@ -24,8 +24,6 @@
 **F** &nbsp; [Face Value](#face-value) &middot; [FACP](#facp) &middot; [Forward Rate](#forward-rate) &middot; [Funded Year](#funded-year) &middot; [Funded Year TIPS](#funded-year-tips)
 
 **G** &nbsp; [Gap Years](#gap-years)
-
-**H** &nbsp; [Horizon Confidence Weight](#horizon-confidence-weight)
 
 **I** &nbsp; [Index Ratio](#index-ratio) &middot; [Inflation Compensation](#inflation-compensation) &middot; [inflation factor](#index-ratio) *(see Index Ratio)* &middot; [IQR Clip](#iqr-clip)
 
@@ -567,21 +565,21 @@ coverExcessCost_c = Future 30Y total cost × coverWeight_c
 
 <a id="maturity-sa-factor"></a>
 ### Maturity SA Factor
-`Maturity_SA_Factor` = *The [SA Factor](#sa-factor) for the maturity date, the denominator of the [SA Price Factor](#sa-price-factor). A maturity date inside the published [Ref CPI](#ref-cpi) series takes that date’s exact value. A maturity date beyond it has no published factor: the same calendar month and day is taken from the most recent completed cycle, and its departure from 1.0 is scaled by the [Horizon Confidence Weight](#horizon-confidence-weight) — `1 + (S_maturity − 1) × w(h)`. The second case covers nearly every outstanding TIPS, since most mature beyond the published series. `shared/src/ref-cpi.js#maturitySaFactor`; specified in [1.0 Horizon-Dependent Maturity Factor](../YieldCurves/knowledge/1.0_Seasonal_Adjustments.md#horizon-dependent-maturity-factor).*
+`Maturity_SA_Factor` = *The [SA Factor](#sa-factor) for the maturity date, the denominator of the [SA Price Factor](#sa-price-factor). A maturity date inside the published [Ref CPI](#ref-cpi) series takes that date’s exact value. A maturity date beyond it has no published factor: the same calendar month and day is taken from the most recent completed cycle, and its departure from 1.0 is scaled by the [Credibility Factor](#credibility-factor) — `1 + (S_maturity − 1) × w(h)`. The second case covers nearly every outstanding TIPS, since most mature beyond the published series. `shared/src/ref-cpi.js#maturitySaFactor`; specified in [1.0 Horizon-Dependent Maturity Factor](../YieldCurves/knowledge/1.0_Seasonal_Adjustments.md#horizon-dependent-maturity-factor).*
 
 *Measured: the factor for February 15, the maturity date of every 30-year TIPS, has a 30-year drift standard deviation of about 0.29% of price, against a current departure from 1.0 of −0.45%. The drift over the horizon the projection is used at is comparable to the whole adjustment being made, which is what the weight scales for ([1.1 Seasonal Factor Drift §4.1](../YieldCurves/knowledge/1.1_Seasonal_Factor_Drift.md#feb-15-dependency)).*
 
 <a id="seasonal-amplitude"></a>
 ### Seasonal Amplitude
-`Seasonal_Amplitude` = *`A`, the within-year spread of the [SA Factor](#sa-factor) across the twelve calendar months, as a standard deviation. Measured at 0.263% from frozen CPI vintages ([1.1 §3](../YieldCurves/knowledge/1.1_Seasonal_Factor_Drift.md)). The signal term of the [Horizon Confidence Weight](#horizon-confidence-weight).*
+`Seasonal_Amplitude` = *`A`, the within-year spread of the [SA Factor](#sa-factor) across the twelve calendar months, as a standard deviation. Measured at 0.263% from frozen CPI vintages ([1.1 §3](../YieldCurves/knowledge/1.1_Seasonal_Factor_Drift.md)). The signal term of the [Credibility Factor](#credibility-factor).*
 
 <a id="seasonal-factor-drift"></a>
 ### Seasonal Factor Drift
-`Seasonal_Factor_Drift` = *`σ_drift(month, h)`, the RMS change in one calendar month’s [SA Factor](#sa-factor) over a horizon of `h` years, measured from CPI history 1947 onward ([1.1 §4](../YieldCurves/knowledge/1.1_Seasonal_Factor_Drift.md)). Held per calendar month, because the months do not drift at the same rate: December and the spring months drift fastest, and the long end of the TIPS curve is entirely February 15. The noise term of the [Horizon Confidence Weight](#horizon-confidence-weight). `shared/src/ref-cpi.js#seasonalDriftSigma`.*
+`Seasonal_Factor_Drift` = *`σ_drift(month, h)`, the RMS change in one calendar month’s [SA Factor](#sa-factor) over a horizon of `h` years, measured from CPI history 1947 onward ([1.1 §4](../YieldCurves/knowledge/1.1_Seasonal_Factor_Drift.md)). Held per calendar month, because the months do not drift at the same rate: December and the spring months drift fastest, and the long end of the TIPS curve is entirely February 15. The noise term of the [Credibility Factor](#credibility-factor). `shared/src/ref-cpi.js#seasonalDriftSigma`.*
 
-<a id="horizon-confidence-weight"></a>
-### Horizon Confidence Weight
-`Horizon_Confidence_Weight` = `A² / (A² + σ_drift(h)²)` *(`w(h)`, the fraction of a projected [SA Factor](#sa-factor)’s departure from 1.0 that survives at a horizon of `h` years. The signal-to-noise ratio of [Seasonal Amplitude](#seasonal-amplitude) against [Seasonal Factor Drift](#seasonal-factor-drift); both are measured rather than fitted, so the weight has no free parameter. 1.0 at zero horizon, about 0.91 at 1 year, about 0.45 for February 15 at 30 years. Applied at every horizon with no floor, and applied only to a projected factor: the settlement date factor is measured and is never scaled. `shared/src/ref-cpi.js#seasonalHorizonWeight`.)*
+<a id="credibility-factor"></a>
+### Credibility Factor
+`Credibility_Factor` = `A² / (A² + σ_drift(h)²)` *(`w(h)`, the fraction of a projected [SA Factor](#sa-factor)’s departure from 1.0 that survives at a horizon of `h` years. The signal-to-noise ratio of [Seasonal Amplitude](#seasonal-amplitude) against [Seasonal Factor Drift](#seasonal-factor-drift); both are measured rather than fitted, so the weight has no free parameter. The name is the established one: this is the credibility factor of actuarial credibility theory, Bühlmann’s `Z` at a single observation, and the expression is the posterior mean weight for a prior centred on 1.0. 1.0 at zero horizon, about 0.91 at 1 year, about 0.45 for February 15 at 30 years. Applied at every horizon with no floor, and applied only to a projected factor: the settlement date factor is measured and is never scaled. `shared/src/ref-cpi.js#credibilityFactor`.)*
 
 <a id="facp"></a>
 ### FACP
