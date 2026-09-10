@@ -54,8 +54,8 @@ const TERMS = {
 };
 const unlinked = new Set();
 function labelMarkup(text) {
-  return text.split(/,s*/).map(frag => {
-    const bare = frag.replace(/s*→.*$/, '').trim();       // a trailing destination is not a term
+  return text.split(/,\s*/).map(frag => {
+    const bare = frag.replace(/\s*→.*$/, '').trim();       // a trailing destination is not a term
     const tail = frag.slice(bare.length);
     const a = TERMS[bare];
     if (!a) { if (bare && !/^(to |from |7.)/.test(bare)) unlinked.add(bare); return esc(frag); }
@@ -183,17 +183,19 @@ function level1() {
     { key: 'tx', cat: 'reference', name: ['Taxation of', 'Treasuries'], spec: V('TaxationOfTreasuries/docs/TaxationOfTreasuries_Foundation.md'), reads: [] },
   ];
   barycentre(stores, apps);
-  // The column is grouped by the portal's own sections, so an app is found where
-  // the portal puts it. Barycentre still orders within a group, so the grouping
-  // costs only the crossings between groups.
+  // The column reproduces the portal index: the same three sections in the same
+  // order, and the same apps in the same order inside each. Barycentre still
+  // runs, because the store order it produces is what keeps the flows readable.
   const CATS = [
     { id: 'workflow',    label: 'Daily Workflow', fill: '#5a6e5a' },
     { id: 'reference',   label: 'Reference',      fill: '#2474a6' },
     { id: 'educational', label: 'Educational',    fill: '#6c4ab8' },
   ];
-  const rank = Object.fromEntries(CATS.map((c, i) => [c.id, i]));
-  const order = Object.fromEntries(apps.map((a, i) => [a.key, i]));
-  apps.sort((a, b) => (rank[a.cat] - rank[b.cat]) || (order[a.key] - order[b.key]));
+  const PORTAL_ORDER = ['ym', 'yc', 'lm', 'ta', 'tr', 'ce', 'tx', 'fh', 'pr', 'sa'];
+  for (const a of apps) {
+    if (!PORTAL_ORDER.includes(a.key)) { console.error(`app ${a.key} is missing from PORTAL_ORDER`); process.exit(1); }
+  }
+  apps.sort((a, b) => PORTAL_ORDER.indexOf(a.key) - PORTAL_ORDER.indexOf(b.key));
   apps.forEach((a, i) => a.n = i + 2);
 
   const SX = 425, SW = 215, AX = 865, AR = 46, UX = 1070, UW = 145;
@@ -242,7 +244,7 @@ function level1() {
       '  Process 1 explodes at Level 2 into those jobs, one per store it writes.',
       '  All fourteen R2 stores are drawn, whether one app reads a store or several.',
       '  External entities are not redrawn at this level; their twelve flows are shown against each entity on the <a href="KNOWLEDGE_MAP.html">context diagram</a> and enter here as one flow.',
-      '  The app column is grouped into the three sections the portal itself uses, in the same order, so an app is found where the portal puts it. Ordering within a section still minimises crossings.',
+      '  The app column reproduces the portal index: the same three sections in the same order, and the same apps in the same order inside each.',
       '  Every app carries the same pair of flows to the user, labelled once at the top. The user is drawn once, as a tall shape, so no flow to it crosses another.'].join(NL)
   });
 }
