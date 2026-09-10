@@ -8,9 +8,13 @@
 // checkable rather than aspirational, but the naming rots silently: rename a
 // function and the spec still reads correctly. This finds those.
 //
-// Two classes are checked, both high signal:
+// Checked in both directions, which is what makes the mapping a mapping rather
+// than a pair of hopes:
 //   paths        `YieldCurves/src/app.js`  ->  the file must exist
 //   identifiers  `calculateSAO`, `SAO_NOISE_YRS`  ->  the name must appear in source
+//   units       `YieldCurves/src/app.js#parseFedInvestPrices`  ->  file and symbol
+//   spec tags   `// spec: 5.0_Load_And_Parse.md#parse-bond-holidays` in source
+//               ->  the spec and the anchor must exist
 //
 // Everything else in backticks is left alone: column headers, R2 keys, CSV
 // field names and formula symbols are data, not code references.
@@ -65,6 +69,21 @@ for (const spec of specs) {
     if (fenced) return;
     for (const m of line.matchAll(/`([^`]+)`/g)) {
       const tok = m[1].trim().replace(/\(\)$/, '');
+      // `path/to/file.js#symbol` — the strongest form a spec can use, because it
+      // names both the file and the unit inside it. Both halves are checked.
+      const hash = tok.indexOf('#');
+      if (hash > 0 && PATH_RE.test(tok.slice(0, hash))) {
+        const file = tok.slice(0, hash), sym = tok.slice(hash + 1);
+        const specDir = path.dirname(spec);
+        const found = [ROOT, specDir, path.join(specDir, '..'), path.join(specDir, '..', '..')]
+          .map(b => path.resolve(b, file)).find(p => fs.existsSync(p));
+        if (!found) { findings.push({ rel, line: i + 1, tok, why: 'file does not exist' }); continue; }
+        const text = sourceText.get(found) ?? (fs.existsSync(found) ? fs.readFileSync(found, 'utf8') : '');
+        if (sym && !new RegExp('\\b' + sym.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b').test(text)) {
+          findings.push({ rel, line: i + 1, tok, why: `${file} does not define ${sym}` });
+        }
+        continue;
+      }
       if (PATH_RE.test(tok)) {
         // A spec writes a path relative to its own app as often as to the repo
         // root, so a reference counts as resolved if any of those find it.
@@ -80,6 +99,24 @@ for (const spec of specs) {
       if (looksLikeCode && !identifiers.has(tok)) {
         findings.push({ rel, line: i + 1, tok, why: 'name not found in any source file' });
       }
+    }
+  });
+}
+
+// The other direction. A `// spec: <file>#<anchor>` tag above a unit says which
+// spec governs it, so the mapping is readable from the code as well as from the
+// spec. Each tag must name a spec that exists and an anchor inside it.
+const specText = new Map(specs.map(f => [path.relative(ROOT, f).replace(/\\/g, '/'), fs.readFileSync(f, 'utf8')]));
+for (const [file, text] of sourceText) {
+  const rel = path.relative(ROOT, file).replace(/\\/g, '/');
+  text.split(/\r?\n/).forEach((line, i) => {
+    const m = line.match(/\/\/\s*spec:\s*([A-Za-z0-9_.\-/]+\.md)(?:#([A-Za-z0-9_-]+))?/);
+    if (!m) return;
+    const [, name, anchor] = m;
+    const hit = [...specText.keys()].find(k => k === name || k.endsWith('/' + name));
+    if (!hit) { findings.push({ rel, line: i + 1, tok: m[0].trim(), why: 'spec does not exist' }); return; }
+    if (anchor && !specText.get(hit).includes(`<a id="${anchor}">`)) {
+      findings.push({ rel, line: i + 1, tok: m[0].trim(), why: `${hit} has no anchor ${anchor}` });
     }
   });
 }
