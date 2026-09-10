@@ -144,6 +144,8 @@
   .index-group a:hover { border-color: var(--accent); color: #ffffff; }
 </style>
 <style>
+  .cat-band { fill-opacity: 0.13; stroke-opacity: 0.55; stroke-width: 1.5; }
+  .cat-label { font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.85; }
   .store line { stroke: #4a8a4a; stroke-width: 2; }
   .store:hover line { stroke: #7ada7a; }
   .store .s-name { fill: #a8e6a8; font-size: 13px; }
@@ -168,6 +170,12 @@
 <div class="diagram">
 <svg viewBox="0 0 1235 1700" role="img" aria-label="Level 1: one acquisition process and ten app processes, the R2 data stores between them, and the user.">
   <defs><marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#55558c"/></marker></defs>
+  <rect class="cat-band" x="777" y="154" width="176" height="402" rx="10" fill="#5a6e5a" stroke="#5a6e5a"/>
+  <text class="cat-label" x="865" y="174" text-anchor="middle" fill="#5a6e5a">Daily Workflow</text>
+  <rect class="cat-band" x="777" y="550" width="176" height="666" rx="10" fill="#2474a6" stroke="#2474a6"/>
+  <text class="cat-label" x="865" y="570" text-anchor="middle" fill="#2474a6">Reference</text>
+  <rect class="cat-band" x="777" y="1210" width="176" height="270" rx="10" fill="#6c4ab8" stroke="#6c4ab8"/>
+  <text class="cat-label" x="865" y="1230" text-anchor="middle" fill="#6c4ab8">Educational</text>
   <path class="flow" d="M 8.0 846.0 Q 81.5 834.2 155.0 846.0" marker-end="url(#a1)"/>
   <text class="flow-label" x="10" y="834">external source data</text>
   <path class="flow" d="M 250.8 774.4 Q 282.2 428.7 420.0 110.0" marker-end="url(#a1)"/>
@@ -188,33 +196,33 @@
   <path class="flow" d="M 256.4 915.9 Q 376.8 1143.8 420.0 1398.0" marker-end="url(#a1)"/>
   <path class="flow" d="M 253.2 916.9 Q 382.5 1190.1 420.0 1490.0" marker-end="url(#a1)"/>
   <path class="flow" d="M 250.8 917.6 Q 388.5 1236.3 420.0 1582.0" marker-end="url(#a1)"/>
+  <path class="flow" d="M 645.0 662.0 Q 713.3 450.6 844.1 271.0" marker-end="url(#a1)"/>
+  <path class="flow" d="M 645.0 294.0 Q 728.8 254.4 820.8 242.8" marker-end="url(#a1)"/>
   <path class="flow" d="M 645.0 202.0 Q 734.0 199.1 819.4 224.2" marker-end="url(#a1)"/>
-  <path class="flow" d="M 645.0 110.0 Q 742.6 144.6 824.6 208.0" marker-end="url(#a1)"/>
+  <path class="flow" d="M 645.0 386.0 Q 725.9 306.7 827.5 256.6" marker-end="url(#a1)"/>
+  <path class="flow" d="M 645.0 570.0 Q 718.4 403.7 840.0 268.6" marker-end="url(#a1)"/>
   <path class="flow" d="M 645.0 294.0 Q 737.4 307.1 821.1 348.4" marker-end="url(#a1)"/>
-  <path class="flow" d="M 645.0 202.0 Q 747.0 253.8 827.8 334.9" marker-end="url(#a1)"/>
-  <path class="flow" d="M 645.0 294.0 Q 751.5 363.7 831.0 463.1" marker-end="url(#a1)"/>
-  <path class="flow" d="M 645.0 202.0 Q 761.6 314.2 837.3 457.3" marker-end="url(#a1)"/>
-  <path class="flow" d="M 645.0 386.0 Q 748.4 401.3 823.7 473.7" marker-end="url(#a1)"/>
+  <path class="flow" d="M 645.0 1122.0 Q 634.1 730.9 852.2 406.2" marker-end="url(#a1)"/>
+  <path class="flow" d="M 645.0 570.0 Q 724.2 466.9 831.6 393.6" marker-end="url(#a1)"/>
+  <path class="flow" d="M 645.0 478.0 Q 727.1 416.4 824.3 383.5" marker-end="url(#a1)"/>
+  <path class="flow" d="M 645.0 662.0 Q 725.5 577.3 828.4 521.9" marker-end="url(#a1)"/>
+  <path class="flow" d="M 645.0 1122.0 Q 653.9 796.9 849.8 537.4" marker-end="url(#a1)"/>
+  <path class="flow" d="M 645.0 1214.0 Q 640.1 842.9 851.6 538.0" marker-end="url(#a1)"/>
+  <path class="flow" d="M 645.0 1306.0 Q 626.2 888.9 853.0 538.4" marker-end="url(#a1)"/>
   <path class="flow" d="M 645.0 570.0 Q 728.4 525.4 821.5 509.0" marker-end="url(#a1)"/>
-  <path class="flow" d="M 645.0 662.0 Q 730.0 633.7 819.6 633.4" marker-end="url(#a1)"/>
-  <path class="flow" d="M 645.0 294.0 Q 765.8 425.3 839.6 587.7" marker-end="url(#a1)"/>
   <path class="flow" d="M 645.0 202.0 Q 713.8 409.5 843.8 585.2" marker-end="url(#a1)"/>
-  <path class="flow" d="M 645.0 386.0 Q 755.9 473.9 833.9 592.1" marker-end="url(#a1)"/>
-  <path class="flow" d="M 645.0 570.0 Q 736.3 578.3 820.4 614.7" marker-end="url(#a1)"/>
+  <path class="flow" d="M 645.0 110.0 Q 708.1 363.0 847.0 583.7" marker-end="url(#a1)"/>
   <path class="flow" d="M 645.0 294.0 Q 711.4 521.2 845.3 716.4" marker-end="url(#a1)"/>
-  <path class="flow" d="M 645.0 1122.0 Q 717.1 944.0 841.2 797.4" marker-end="url(#a1)"/>
+  <path class="flow" d="M 645.0 202.0 Q 705.5 474.9 848.1 715.2" marker-end="url(#a1)"/>
+  <path class="flow" d="M 645.0 386.0 Q 769.9 536.5 841.6 718.4" marker-end="url(#a1)"/>
   <path class="flow" d="M 645.0 570.0 Q 750.2 634.3 830.0 728.1" marker-end="url(#a1)"/>
-  <path class="flow" d="M 645.0 478.0 Q 760.3 584.6 836.6 721.8" marker-end="url(#a1)"/>
-  <path class="flow" d="M 645.0 1122.0 Q 723.3 1007.6 833.3 923.4" marker-end="url(#a1)"/>
-  <path class="flow" d="M 645.0 570.0 Q 764.5 695.5 838.9 852.1" marker-end="url(#a1)"/>
-  <path class="flow" d="M 645.0 662.0 Q 768.7 806.7 841.0 982.7" marker-end="url(#a1)"/>
-  <path class="flow" d="M 645.0 1122.0 Q 703.3 1013.8 823.1 1041.0" marker-end="url(#a1)"/>
-  <path class="flow" d="M 645.0 1214.0 Q 724.7 1118.3 830.3 1052.2" marker-end="url(#a1)"/>
-  <path class="flow" d="M 645.0 1306.0 Q 721.1 1166.8 836.8 1058.4" marker-end="url(#a1)"/>
-  <path class="flow" d="M 645.0 570.0 Q 712.1 791.3 844.9 980.6" marker-end="url(#a1)"/>
-  <path class="flow" d="M 645.0 1398.0 Q 722.8 1277.9 834.2 1188.2" marker-end="url(#a1)"/>
-  <path class="flow" d="M 645.0 1490.0 Q 718.6 1325.7 839.8 1192.5" marker-end="url(#a1)"/>
-  <path class="flow" d="M 645.0 1582.0 Q 720.6 1437.1 837.6 1322.9" marker-end="url(#a1)"/>
+  <path class="flow" d="M 645.0 1398.0 Q 708.6 1149.0 846.7 932.2" marker-end="url(#a1)"/>
+  <path class="flow" d="M 645.0 1490.0 Q 702.5 1195.3 849.2 933.2" marker-end="url(#a1)"/>
+  <path class="flow" d="M 645.0 1582.0 Q 705.2 1307.2 848.2 1064.8" marker-end="url(#a1)"/>
+  <path class="flow" d="M 645.0 294.0 Q 503.8 822.2 855.0 1241.1" marker-end="url(#a1)"/>
+  <path class="flow" d="M 645.0 202.0 Q 480.3 776.3 855.9 1240.9" marker-end="url(#a1)"/>
+  <path class="flow" d="M 645.0 1122.0 Q 762.0 1236.1 837.6 1381.1" marker-end="url(#a1)"/>
+  <path class="flow" d="M 645.0 570.0 Q 620.7 1005.1 853.4 1373.5" marker-end="url(#a1)"/>
   <path class="flow" d="M 914.0 221.0 Q 989.5 208.9 1065.0 221.0" marker-end="url(#a1)"/>
   <path class="flow" d="M 1065.0 239.0 Q 989.5 251.1 914.0 239.0" marker-end="url(#a1)"/>
   <path class="flow" d="M 914.0 353.0 Q 989.5 340.9 1065.0 353.0" marker-end="url(#a1)"/>
@@ -347,65 +355,65 @@
     <line x1="425" y1="1602" x2="640" y2="1602"/>
     <text class="s-name" x="532.5" y="1587">Fund holdings</text>
   </a>
-  <a class="process" href="viewer.html#/md/CpiExplorer/knowledge/1.0_Overview.md">
+  <a class="process" href="viewer.html#/md/knowledge/TipsLadderManager.md">
     <circle cx="865" cy="230" r="46"/>
     <text class="p-id" x="865" y="210">2</text>
-    <text class="p-name" x="865" y="231">CPI</text>
-    <text class="p-name" x="865" y="247">Explorer</text>
-  </a>
-  <a class="process" href="viewer.html#/md/Primer/knowledge/1.0_Primer.md">
-    <circle cx="865" cy="362" r="46"/>
-    <text class="p-id" x="865" y="342">3</text>
-    <text class="p-name" x="865" y="363">Treasury</text>
-    <text class="p-name" x="865" y="379">Primer</text>
-  </a>
-  <a class="process" href="viewer.html#/md/TipsReference/knowledge/1.0_TIPS_Reference.md">
-    <circle cx="865" cy="494" r="46"/>
-    <text class="p-id" x="865" y="474">4</text>
-    <text class="p-name" x="865" y="495">TIPS</text>
-    <text class="p-name" x="865" y="511">Reference</text>
-  </a>
-  <a class="process" href="viewer.html#/md/knowledge/TipsLadderManager.md">
-    <circle cx="865" cy="626" r="46"/>
-    <text class="p-id" x="865" y="606">5</text>
-    <text class="p-name" x="865" y="627">Ladder</text>
-    <text class="p-name" x="865" y="643">Manager</text>
+    <text class="p-name" x="865" y="231">Ladder</text>
+    <text class="p-name" x="865" y="247">Manager</text>
   </a>
   <a class="process" href="viewer.html#/md/knowledge/YieldsMonitor.md">
-    <circle cx="865" cy="758" r="46"/>
-    <text class="p-id" x="865" y="738">6</text>
-    <text class="p-name" x="865" y="759">Yields</text>
-    <text class="p-name" x="865" y="775">Monitor</text>
-  </a>
-  <a class="process" href="viewer.html#/md/SeasonalAdjustments/knowledge/1.0_SeasonalAdjustments_Explorer.md">
-    <circle cx="865" cy="890" r="46"/>
-    <text class="p-id" x="865" y="870">7</text>
-    <text class="p-name" x="865" y="891">Seasonal</text>
-    <text class="p-name" x="865" y="907">Adjustments</text>
+    <circle cx="865" cy="362" r="46"/>
+    <text class="p-id" x="865" y="342">3</text>
+    <text class="p-name" x="865" y="363">Yields</text>
+    <text class="p-name" x="865" y="379">Monitor</text>
   </a>
   <a class="process" href="DFD_LEVEL2_YIELDCURVES.html">
-    <circle cx="865" cy="1022" r="46"/>
-    <text class="p-id" x="865" y="1002">8</text>
-    <text class="p-name" x="865" y="1023">Yield</text>
-    <text class="p-name" x="865" y="1039">Curves</text>
+    <circle cx="865" cy="494" r="46"/>
+    <text class="p-id" x="865" y="474">4</text>
+    <text class="p-name" x="865" y="495">Yield</text>
+    <text class="p-name" x="865" y="511">Curves</text>
+  </a>
+  <a class="process" href="viewer.html#/md/CpiExplorer/knowledge/1.0_Overview.md">
+    <circle cx="865" cy="626" r="46"/>
+    <text class="p-id" x="865" y="606">5</text>
+    <text class="p-name" x="865" y="627">CPI</text>
+    <text class="p-name" x="865" y="643">Explorer</text>
+  </a>
+  <a class="process" href="viewer.html#/md/TipsReference/knowledge/1.0_TIPS_Reference.md">
+    <circle cx="865" cy="758" r="46"/>
+    <text class="p-id" x="865" y="738">6</text>
+    <text class="p-name" x="865" y="759">TIPS</text>
+    <text class="p-name" x="865" y="775">Reference</text>
   </a>
   <a class="process" href="viewer.html#/md/knowledge/TreasuryAuctions.md">
-    <circle cx="865" cy="1154" r="46"/>
-    <text class="p-id" x="865" y="1134">9</text>
-    <text class="p-name" x="865" y="1155">Treasury</text>
-    <text class="p-name" x="865" y="1171">Auctions</text>
+    <circle cx="865" cy="890" r="46"/>
+    <text class="p-id" x="865" y="870">7</text>
+    <text class="p-name" x="865" y="891">Treasury</text>
+    <text class="p-name" x="865" y="907">Auctions</text>
   </a>
   <a class="process" href="viewer.html#/md/FundHoldings/knowledge/1.0_FundHoldings.md">
-    <circle cx="865" cy="1286" r="46"/>
-    <text class="p-id" x="865" y="1266">10</text>
-    <text class="p-name" x="865" y="1287">Fund</text>
-    <text class="p-name" x="865" y="1303">Holdings</text>
+    <circle cx="865" cy="1022" r="46"/>
+    <text class="p-id" x="865" y="1002">8</text>
+    <text class="p-name" x="865" y="1023">Fund</text>
+    <text class="p-name" x="865" y="1039">Holdings</text>
   </a>
   <a class="process" href="viewer.html#/md/TaxationOfTreasuries/docs/TaxationOfTreasuries_Foundation.md">
+    <circle cx="865" cy="1154" r="46"/>
+    <text class="p-id" x="865" y="1134">9</text>
+    <text class="p-name" x="865" y="1155">Taxation of</text>
+    <text class="p-name" x="865" y="1171">Treasuries</text>
+  </a>
+  <a class="process" href="viewer.html#/md/Primer/knowledge/1.0_Primer.md">
+    <circle cx="865" cy="1286" r="46"/>
+    <text class="p-id" x="865" y="1266">10</text>
+    <text class="p-name" x="865" y="1287">Treasury</text>
+    <text class="p-name" x="865" y="1303">Primer</text>
+  </a>
+  <a class="process" href="viewer.html#/md/SeasonalAdjustments/knowledge/1.0_SeasonalAdjustments_Explorer.md">
     <circle cx="865" cy="1418" r="46"/>
     <text class="p-id" x="865" y="1398">11</text>
-    <text class="p-name" x="865" y="1419">Taxation of</text>
-    <text class="p-name" x="865" y="1435">Treasuries</text>
+    <text class="p-name" x="865" y="1419">Seasonal</text>
+    <text class="p-name" x="865" y="1435">Adjustments</text>
   </a>
 </svg>
 </div>
@@ -415,6 +423,7 @@
   Process 1 explodes at Level 2 into those jobs, one per store it writes.
   All fourteen R2 stores are drawn, whether one app reads a store or several.
   External entities are not redrawn at this level; their twelve flows are shown against each entity on the <a href="KNOWLEDGE_MAP.html">context diagram</a> and enter here as one flow.
+  The app column is grouped into the three sections the portal itself uses, in the same order, so an app is found where the portal puts it. Ordering within a section still minimises crossings.
   Every app carries the same pair of flows to the user, labelled once at the top. The user is drawn once, as a tall shape, so no flow to it crosses another.
 </p>
 

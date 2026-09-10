@@ -131,6 +131,8 @@ function page({ title, h1, up, upLabel, svg, notes, maxWidth }) {
   return ['<!DOCTYPE html>', '<html lang="en">', '<head>', '<meta charset="UTF-8">',
     '<meta name="viewport" content="width=device-width, initial-scale=1">',
     `<title>${title}</title>`, sharedStyle, '<style>',
+    '  .cat-band { fill-opacity: 0.13; stroke-opacity: 0.55; stroke-width: 1.5; }',
+    '  .cat-label { font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.85; }',
     '  .store line { stroke: #4a8a4a; stroke-width: 2; }',
     '  .store:hover line { stroke: #7ada7a; }',
     '  .store .s-name { fill: #a8e6a8; font-size: 13px; }',
@@ -169,18 +171,29 @@ function level1() {
     { id: 'spread', name: 'Bid and ask spreads', href: DS('s15') },
   ];
   const apps = [
-    { key: 'lm', name: ['Ladder', 'Manager'], spec: V('knowledge/TipsLadderManager.md'), reads: ['fedinv', 'tipsref', 'refcpi', 'sasao', 'hol'] },
-    { key: 'tr', name: ['TIPS', 'Reference'], spec: V('TipsReference/knowledge/1.0_TIPS_Reference.md'), reads: ['tipsref', 'refcpi', 'sasao', 'hol'] },
-    { key: 'pr', name: ['Treasury', 'Primer'], spec: V('Primer/knowledge/1.0_Primer.md'), reads: ['tipsref', 'refcpi'] },
-    { key: 'ce', name: ['CPI', 'Explorer'], spec: V('CpiExplorer/knowledge/1.0_Overview.md'), reads: ['refcpi', 'cpihist'] },
-    { key: 'ym', name: ['Yields', 'Monitor'], spec: V('knowledge/YieldsMonitor.md'), reads: ['tipsref', 'nsasa', 'hol', 'yhist'] },
-    { key: 'yc', name: ['Yield', 'Curves'], spec: 'DFD_LEVEL2_YIELDCURVES.html', reads: ['fedinv', 'nsasa', 'quotes', 'gsw', 'hol'] },
-    { key: 'sa', name: ['Seasonal', 'Adjustments'], spec: V('SeasonalAdjustments/knowledge/1.0_SeasonalAdjustments_Explorer.md'), reads: ['nsasa', 'hol'] },
-    { key: 'fh', name: ['Fund', 'Holdings'], spec: V('FundHoldings/knowledge/1.0_FundHoldings.md'), reads: ['funds'] },
-    { key: 'ta', name: ['Treasury', 'Auctions'], spec: V('knowledge/TreasuryAuctions.md'), reads: ['auctions', 'tent'] },
-    { key: 'tx', name: ['Taxation of', 'Treasuries'], spec: V('TaxationOfTreasuries/docs/TaxationOfTreasuries_Foundation.md'), reads: [] },
+    { key: 'lm', cat: 'workflow', name: ['Ladder', 'Manager'], spec: V('knowledge/TipsLadderManager.md'), reads: ['fedinv', 'tipsref', 'refcpi', 'sasao', 'hol'] },
+    { key: 'tr', cat: 'reference', name: ['TIPS', 'Reference'], spec: V('TipsReference/knowledge/1.0_TIPS_Reference.md'), reads: ['tipsref', 'refcpi', 'sasao', 'hol'] },
+    { key: 'pr', cat: 'educational', name: ['Treasury', 'Primer'], spec: V('Primer/knowledge/1.0_Primer.md'), reads: ['tipsref', 'refcpi'] },
+    { key: 'ce', cat: 'reference', name: ['CPI', 'Explorer'], spec: V('CpiExplorer/knowledge/1.0_Overview.md'), reads: ['refcpi', 'cpihist'] },
+    { key: 'ym', cat: 'workflow', name: ['Yields', 'Monitor'], spec: V('knowledge/YieldsMonitor.md'), reads: ['tipsref', 'nsasa', 'hol', 'yhist'] },
+    { key: 'yc', cat: 'workflow', name: ['Yield', 'Curves'], spec: 'DFD_LEVEL2_YIELDCURVES.html', reads: ['fedinv', 'nsasa', 'quotes', 'gsw', 'hol'] },
+    { key: 'sa', cat: 'educational', name: ['Seasonal', 'Adjustments'], spec: V('SeasonalAdjustments/knowledge/1.0_SeasonalAdjustments_Explorer.md'), reads: ['nsasa', 'hol'] },
+    { key: 'fh', cat: 'reference', name: ['Fund', 'Holdings'], spec: V('FundHoldings/knowledge/1.0_FundHoldings.md'), reads: ['funds'] },
+    { key: 'ta', cat: 'reference', name: ['Treasury', 'Auctions'], spec: V('knowledge/TreasuryAuctions.md'), reads: ['auctions', 'tent'] },
+    { key: 'tx', cat: 'reference', name: ['Taxation of', 'Treasuries'], spec: V('TaxationOfTreasuries/docs/TaxationOfTreasuries_Foundation.md'), reads: [] },
   ];
   barycentre(stores, apps);
+  // The column is grouped by the portal's own sections, so an app is found where
+  // the portal puts it. Barycentre still orders within a group, so the grouping
+  // costs only the crossings between groups.
+  const CATS = [
+    { id: 'workflow',    label: 'Daily Workflow', fill: '#5a6e5a' },
+    { id: 'reference',   label: 'Reference',      fill: '#2474a6' },
+    { id: 'educational', label: 'Educational',    fill: '#6c4ab8' },
+  ];
+  const rank = Object.fromEntries(CATS.map((c, i) => [c.id, i]));
+  const order = Object.fromEntries(apps.map((a, i) => [a.key, i]));
+  apps.sort((a, b) => (rank[a.cat] - rank[b.cat]) || (order[a.key] - order[b.key]));
   apps.forEach((a, i) => a.n = i + 2);
 
   const SX = 425, SW = 215, AX = 865, AR = 46, UX = 1070, UW = 145;
@@ -190,6 +203,13 @@ function level1() {
   const OBS = [{ x: acq.cx, y: acq.cy, r: acq.r }, ...apps.map((a, j) => ({ x: AX, y: ay(j), r: AR }))];
   const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 1: one acquisition process and ten app processes, the R2 data stores between them, and the user.">`, marker()];
 
+  for (const c of CATS) {
+    const idx = apps.map((a, j) => a.cat === c.id ? j : -1).filter(j => j >= 0);
+    if (!idx.length) continue;
+    const top = ay(idx[0]) - AR - 30, bot = ay(idx[idx.length - 1]) + AR + 16;
+    P.push(`  <rect class="cat-band" x="${AX - 88}" y="${top}" width="176" height="${bot - top}" rx="10" fill="${c.fill}" stroke="${c.fill}"/>`);
+    P.push(`  <text class="cat-label" x="${AX}" y="${top + 20}" text-anchor="middle" fill="${c.fill}">${c.label}</text>`);
+  }
   P.push(flow(8, acq.cy, acq.cx - acq.r - 3, acq.cy));
   P.push(`  <text class="flow-label" x="10" y="${acq.cy - 12}">external source data</text>`);
   stores.forEach((s, i) => {
@@ -222,6 +242,7 @@ function level1() {
       '  Process 1 explodes at Level 2 into those jobs, one per store it writes.',
       '  All fourteen R2 stores are drawn, whether one app reads a store or several.',
       '  External entities are not redrawn at this level; their twelve flows are shown against each entity on the <a href="KNOWLEDGE_MAP.html">context diagram</a> and enter here as one flow.',
+      '  The app column is grouped into the three sections the portal itself uses, in the same order, so an app is found where the portal puts it. Ordering within a section still minimises crossings.',
       '  Every app carries the same pair of flows to the user, labelled once at the top. The user is drawn once, as a tall shape, so no flow to it crosses another.'].join(NL)
   });
 }
