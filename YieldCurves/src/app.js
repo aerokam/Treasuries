@@ -373,6 +373,59 @@ function _showSaoDrill(cusip) {
 Chart.defaults.font.size = 13;
 Chart.defaults.color = '#334155';
 
+// ── 7.1 Load and parse source data ─────────────────────────────────────────
+// One function per process of knowledge/DFD_LEVEL3_YC_LOAD, specified in
+// YieldCurves/knowledge/5.0_Load_And_Parse.md. Each parses and returns; applying
+// the result to app state and to the controls is init()'s job, not theirs.
+
+// spec: 5.0_Load_And_Parse.md#parse-fedinvest-prices (7.1.1)
+// Row 1 is the settlement date, row 2 the header, rows 3 on the data.
+function parseFedInvestPrices(text) {
+  const lines = text.split(/\r?\n/).filter(l => l.trim());
+  const settlementDate = lines[0].trim();
+  const rows = parseCsv(lines.slice(1).join(String.fromCharCode(10)))
+    .map(r => ({ ...r, settlementDate }));
+  return { tips: rows.filter(r => r.type === 'TIPS'), nominals: rows.filter(r => r.type !== 'TIPS'), settlementDate };
+}
+
+// spec: 5.0_Load_And_Parse.md#parse-ref-cpi-and-sa-factors (7.1.3)
+function parseRefCpiAndSaFactors(text) {
+  return parseCsv(text);
+}
+
+// spec: 5.0_Load_And_Parse.md#parse-bond-holidays (7.1.4)
+function parseBondHolidays(text) {
+  return parseHolidaySet(parseCsv(text, false));
+}
+
+// spec: 5.0_Load_And_Parse.md#parse-gsw-parameters (7.1.5)
+// A missing or malformed file leaves the app without a published curve rather
+// than without a page, so both cases return null.
+async function parseGswParameters(res) {
+  if (!res || !res.ok) return null;
+  try { return await res.json(); } catch { return null; }
+}
+
+// spec: 5.0_Load_And_Parse.md#parse-market-quotes (7.1.2)
+// A TIPS quote is kept only for a CUSIP the FedInvest file also carries, and
+// only when it has an ask price.
+function parseMarketQuotes(text, knownTips) {
+  const { bonds, downloadDate } = parseFidelityNominals(text);
+  const tipsPrices = new Map();
+  parseFidelityTipsRows(text).forEach(r => {
+    if (isNaN(r.askPrice)) return;
+    if (!knownTips || !knownTips.some(y => y.cusip === r.cusip)) return;
+    tipsPrices.set(r.cusip, {
+      ask: r.askPrice,
+      bid: r.bidPrice,
+      adjAsk: r.adjAskPrice,
+      adjBid: r.adjBidPrice,
+      indexRatio: r.indexRatio,
+    });
+  });
+  return { nominals: bonds, nominalsDate: downloadDate, tipsPrices, tipsDate: parseFidelityDownloadDate(text) };
+}
+
 async function init() {
   const statusEl = document.getElementById('status');
   console.log("init() started");
@@ -387,9 +440,7 @@ async function init() {
       fetch(GSW_TIPS_CURVE_URL, { cache: 'no-cache' }).then(r => { console.log("GSW curve fetched"); return r; }).catch(e => ({ ok: false, error: e })),
     ]);
 
-    if (gswRes.ok) {
-      try { gswTipsCurve = await gswRes.json(); } catch { gswTipsCurve = null; }
-    }
+    gswTipsCurve = await parseGswParameters(gswRes);
 
     if (!yieldsRes.ok) throw new Error(`Failed to fetch yields: ${yieldsRes.status || yieldsRes.error}`);
     if (!refCpiRes.ok) throw new Error(`Failed to fetch Ref CPI: ${refCpiRes.status || refCpiRes.error}`);
@@ -403,51 +454,37 @@ async function init() {
     ]);
 
     console.log("Parsing CSVs...");
-    // YieldsFromFedInvestPrices.csv: row 1 = settlement date, row 2 = header, rows 3+ = data
-    const yieldsLines = yieldsText.split(/\r?\n/).filter(l => l.trim());
-    const yieldsSettleDate = yieldsLines[0].trim();
-    const allYieldsRows = parseCsv(yieldsLines.slice(1).join('\n'))
-      .map(r => ({ ...r, settlementDate: yieldsSettleDate }));
-    rawYieldsData = allYieldsRows.filter(r => r.type === 'TIPS');
-    rawNominalsData = allYieldsRows.filter(r => r.type !== 'TIPS');
-    rawRefCpiData = parseCsv(refCpiText);
+    const fedInvest = parseFedInvestPrices(yieldsText);
+    rawYieldsData = fedInvest.tips;
+    rawNominalsData = fedInvest.nominals;
+    rawRefCpiData = parseRefCpiAndSaFactors(refCpiText);
     
     console.log(`Parsed ${rawYieldsData.length} yield rows and ${rawRefCpiData.length} RefCPI rows.`);
 
-    holidaySet = parseHolidaySet(parseCsv(holidayText, false));
+    holidaySet = parseBondHolidays(holidayText);
     console.log(`Holiday set populated with ${holidaySet.size} dates.`);
 
     if (fidRes.ok) {
       const fidText = await fidRes.text();
+      const quotes = parseMarketQuotes(fidText, rawYieldsData);
 
       // Nominals (Treasuries)
-      const { bonds, downloadDate } = parseFidelityNominals(fidText);
+      const bonds = quotes.nominals;
       if (bonds.length > 0) {
         fidelityNominalsData = bonds;
-        fidelityNominalsDate = downloadDate;
+        fidelityNominalsDate = quotes.nominalsDate;
         const chkFid = document.getElementById('chkFidelity');
         chkFid.disabled = false;
         chkFid.checked = true;
-        console.log(`Loaded ${bonds.length} Fidelity Treasuries (${downloadDate})`);
+        console.log(`Loaded ${bonds.length} Fidelity Treasuries (${quotes.nominalsDate})`);
         updateModeToggle();
       }
 
       // TIPS prices
-      const priceMap = new Map();
-      parseFidelityTipsRows(fidText).forEach(r => {
-        if (isNaN(r.askPrice)) return;
-        if (!rawYieldsData || !rawYieldsData.some(y => y.cusip === r.cusip)) return;
-        priceMap.set(r.cusip, {
-          ask: r.askPrice,
-          bid: r.bidPrice,
-          adjAsk: r.adjAskPrice,
-          adjBid: r.adjBidPrice,
-          indexRatio: r.indexRatio,
-        });
-      });
+      const priceMap = quotes.tipsPrices;
       if (priceMap.size > 0) {
         brokerPrices = priceMap;
-        brokerDownloadDate = parseFidelityDownloadDate(fidText);
+        brokerDownloadDate = quotes.tipsDate;
         const chkBroker = document.getElementById('chkTipsBroker');
         chkBroker.disabled = false;
         chkBroker.checked = true;
