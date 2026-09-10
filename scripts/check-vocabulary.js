@@ -34,6 +34,16 @@ const RULES = [
   { id: 'print', re: /\b(a|the|one|two|latest|last|next|known|unpublished|monthly|CPI|CPI-U|sparse|irregular|first|second|close|consolidation)[\s/,]+prints?\b|\bprints?\s+(below|above)\b|\b\d[\d:.]*\s+prints?\b|\bprints?\s+(sparsely|thinly)\b/i,
     why: 'is a metaphor for a published value or a quote',
     use: 'value or release for a CPI figure, quotes for feed records, "is below" for a data point' },
+  // A weight that decreases with horizon does not fade; it is a number that
+  // gets smaller. The SAO snap-to-curve weight has used the word since long
+  // before this rule, in 2.0, 2.2, 4.0 and two exported constants, and that
+  // population is left for a decision of its own -- `ignore` exempts a line
+  // that names SAO or smoothing so an edit there is not blocked meanwhile.
+  // A chart line drawn at reduced opacity literally fades, and stays legal.
+  { id: 'fade', re: /\bfad(e|es|ed|ing)\b/i,
+    why: 'is a metaphor for a quantity that decreases',
+    use: '"approaches 1.0", "scaled toward 1.0", or name the weight itself',
+    ignore: /\bSAO\b|smooth|opacity|chart (line|segment)/i },
   { id: 'tenor', re: /\btenors?\b/i,
     why: 'not used for a maturity or term in this repo',
     use: 'maturity' },

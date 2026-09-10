@@ -135,7 +135,7 @@ export function saFactorForDate(rows, dateStr) {
   return best ? parseFloat(best['SA Factor']) : null;
 }
 
-// ─── Seasonal factor horizon fade ───────────────────────────────────────────
+// ─── Seasonal factor horizon weight ─────────────────────────────────────────
 // The maturity-date SA factor of nearly every outstanding TIPS is a
 // substitution: the maturity lies beyond the published series, so
 // saFactorForDate() reuses the same month/day from the most recent cycle. BLS
@@ -180,7 +180,7 @@ export function seasonalDriftSigma(month, h) {
 }
 
 // Confidence weight w(h) = A² / (A² + σ_drift(h)²): the fraction of a reused
-// maturity factor's departure from 1.0 that survives the fade. 1.0 as h → 0.
+// maturity factor's departure from 1.0 that survives the weight. 1.0 as h → 0.
 export function seasonalHorizonWeight(month, h) {
   if (!(h > 0)) return 1;
   const s = seasonalDriftSigma(month, h);
@@ -188,9 +188,9 @@ export function seasonalHorizonWeight(month, h) {
   return A2 / (A2 + s * s);
 }
 
-// SA factor for a maturity date, faded toward 1.0 with the horizon from
+// SA factor for a maturity date, scaled toward 1.0 with the horizon from
 // `asOfDate` (the settlement date in the apps). A maturity date inside the
-// published series returns that exact day's value, unfaded. Returns null when
+// published series returns that exact day's value, unscaled. Returns null when
 // the month/day never appears in the series.
 export function maturitySaFactor(rows, maturityDate, asOfDate) {
   const exact = rows.find(r => r['Ref CPI Date'] === maturityDate);

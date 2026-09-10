@@ -563,7 +563,7 @@ coverExcessCost_c = Future 30Y total cost × coverWeight_c
 ### SA Price Factor
 `SA_Price_Factor` = `SA_Factor(settlement date) / Maturity_SA_Factor` *(the multiplier applied to the quoted clean price to produce [`SACP`](#sacp), Canty 2009 Eq. 14.)*
 
-**The two factors are not obtained the same way.** The settlement date factor involves no approximation: the [Ref CPI](#ref-cpi) NSA and SA values for that date both exist, and the factor is their ratio. The maturity date factor is an approximation for nearly every outstanding TIPS, and is faded toward 1.0 as the horizon lengthens — see [Maturity SA Factor](#maturity-sa-factor). The two are therefore never exactly equal, even where settlement and maturity fall on the same calendar month and day, so a whole number of years to maturity no longer implies no adjustment.
+**The two factors are not obtained the same way.** The settlement date factor involves no approximation: Treasury publishes the daily [Ref CPI](#ref-cpi) NSA for that date, the daily Ref CPI SA is calculated for the same date by the same interpolation ([SA Factor](#sa-factor)), and the factor is their ratio. The maturity date factor is an approximation for nearly every outstanding TIPS, and approaches 1.0 as the horizon lengthens — see [Maturity SA Factor](#maturity-sa-factor). The two are therefore never exactly equal, even where settlement and maturity fall on the same calendar month and day, so a whole number of years to maturity no longer implies no adjustment.
 
 <a id="maturity-sa-factor"></a>
 ### Maturity SA Factor
