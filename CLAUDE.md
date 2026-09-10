@@ -47,6 +47,11 @@ every portal app and the only person who can approve a new term.
 worked case: it holds itself out as the canonical summary of a paper, so a word the paper never uses
 does not belong in it, however standard the word sounds.
 
+**Vocabulary is one half; sentence construction is the other.** `knowledge/Writing_Style.md`
+governs how a sentence is built once the terms in it are right: verbs state operations, processes
+have no minds, numbers carry their basis, and a document does not discuss its own wording. Read it
+alongside the Data Dictionary before writing prose.
+
 **This rule is enforced, not just stated.** `.githooks/pre-commit` runs
 `scripts/check-vocabulary.js`, which blocks a commit that introduces a banned term into prose a
 reader meets: the `knowledge/` specs, `Primer/content/`, and the string literals in each app's

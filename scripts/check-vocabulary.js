@@ -44,6 +44,18 @@ const RULES = [
     why: 'is a metaphor for a quantity that decreases',
     use: '"approaches 1.0", "scaled toward 1.0", or name the weight itself',
     ignore: /\bSAO\b|smooth|opacity|chart (line|segment)/i },
+  // Style rules, from knowledge/Writing_Style.md. Only the mechanically
+  // detectable ones are here; the rest of that file is not gated and is not
+  // optional for that reason.
+  { id: 'anthropomorphism', re: /\b(process|spec|app|code|script|formula|chart|column|table|entry|weight|curve|fit|renderer|algorithm|model)\s+(knows|know|wants|want|needs|need|decides|decide|thinks|think|believes|believe|sees|see|tries|try|understands|understand|remembers|remember|cares|care)\b/i,
+    why: 'gives a process a mind; the operation itself has not been named yet',
+    use: 'state the operation: what selects, what is applied, what is computed' },
+  { id: 'figurative-placement', re: /\b(sits|lurks?|creeps?|sneaks?)\b/i,
+    why: 'is a metaphor for where a value is or how it changes',
+    use: '"is", "applies from", "grows with", or the operation itself' },
+  { id: 'flourish', re: /\bof course\b|\bimportantly\b|\bit(?:'s| is) worth noting\b|\bsimply put\b|\bneedless to say\b|\bas (?:noted|mentioned|discussed) (?:above|below|earlier)\b/i,
+    why: 'adds emphasis or self-reference in place of information',
+    use: 'delete it, or state the fact it is pointing at' },
   { id: 'tenor', re: /\btenors?\b/i,
     why: 'not used for a maturity or term in this repo',
     use: 'maturity' },
@@ -88,6 +100,9 @@ function isProse(s) {
 // A file whose prose a reader meets: the specs, and the apps' own text.
 function isScanned(f) {
   if (f.includes('node_modules') || f.includes('.chrome-profile')) return false;
+  // The style guide states the rules by showing the wrong form beside the right
+  // one, so it matches its own patterns by construction.
+  if (/(^|\/)knowledge\/Writing_Style\.md$/.test(f)) return false;
   if (/(^|\/)knowledge\/.*\.md$/.test(f)) return true;
   if (/^Primer\/content\/.*\.md$/.test(f)) return true;
   return /(^|\/)(index\.html|src\/[^/]+\.js)$/.test(f);
