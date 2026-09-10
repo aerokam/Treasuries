@@ -1,4 +1,6 @@
 # Seasonally Adjusted Prices for Inflation-Linked Bonds
+
+**Source for:** [1.0 Seasonal Adjustments](./1.0_Seasonal_Adjustments.md), [2.0 SAO](./2.0_SAO_Adjustment.md)
 **Author:** Paul Canty (Deutsche Bank, European Head of Inflation Trading) — *Risk*, January 2009.
 
 This is a thorough working summary of the paper, written to be the canonical reference for the seasonal-adjustment math used across the Treasuries apps. Equation numbers match the paper. Where the apps depend on a result, the dependency is noted.
