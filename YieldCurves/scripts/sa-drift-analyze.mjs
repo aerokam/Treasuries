@@ -206,12 +206,74 @@ for (const [lab, lo, hi] of [['FRONT 2027-2032', 2027, 2032], ['MID 2033-2039', 
   console.log(`  ${lab}: ${parts.join('   ') || '(no bonds)'}`);
 }
 
-console.log('\n=== H. SA-minus-ask under maturitySaFactor() — the operative fade (per-month w(h), no floor) ===');
-console.log('  maturity     yrs   w(h)    dbp now   dbp faded');
+console.log('\n=== H. SA-minus-ask under maturitySaFactor() — the operative weighting (per-month w(h), no floor) ===');
+console.log('  maturity     yrs   w(h)    dbp now   dbp weighted');
 for (const b of bonds) {
   if (b.yrs < 4) continue;
   const sFaded = maturitySaFactor(rRows, b.mat, settleStr);
   const w = seasonalHorizonWeight(b.matDate.getMonth() + 1, b.h);
   const dFaded = (yieldFromPrice(b.price * (saSettle / sFaded), b.coupon, settle, b.matDate) - b.ask) * 1e4;
-  console.log(`  ${b.mat} ${b.yrs.toFixed(1).padStart(5)}  ${w.toFixed(3)}  ${b.dbp.toFixed(1).padStart(7)}  ${dFaded.toFixed(1).padStart(9)}`);
+  console.log(`  ${b.mat} ${b.yrs.toFixed(1).padStart(5)}  ${w.toFixed(3)}  ${b.dbp.toFixed(1).padStart(7)}  ${dFaded.toFixed(1).padStart(12)}`);
+}
+
+// ===== I. option comparison for the long end (persistence, autocorrelation, shrink-to-mean) =====
+// Does today's reading of the maturity-month factor still carry information at 25-40 years,
+// and do the measurement-driven alternatives (b) autocorrelation weight and (c) shrink to the
+// month's own long-run mean actually move the long-end adjustment?
+console.log('\n=== I. Long-horizon option comparison ===');
+const HLONG = [5, 10, 15, 20, 25, 30, 35, 40];
+function seriesFor(mo, dd) { const o = {}; for (let y = 1948; y <= lastY; y++) { const v = Sday(y, mo, dd); if (v != null) o[y] = v; } return o; }
+function tsSd(byY, y0) { const v = Object.entries(byY).filter(([y]) => +y >= y0).map(([, s]) => s); const m = v.reduce((a, b) => a + b, 0) / v.length; return Math.sqrt(v.reduce((a, b) => a + (b - m) ** 2, 0) / v.length); }
+function driftAndCorr(byY, h) {
+  const a = [], b = [];
+  for (let y = 1948; y + h <= lastY; y++) if (byY[y] != null && byY[y + h] != null) { a.push(byY[y]); b.push(byY[y + h]); }
+  if (a.length < 3) return null;
+  const d = a.map((x, i) => b[i] - x);
+  const sig = rms(d);
+  const ma = a.reduce((s, x) => s + x, 0) / a.length, mb = b.reduce((s, x) => s + x, 0) / b.length;
+  let sab = 0, sa2 = 0, sb2 = 0;
+  for (let i = 0; i < a.length; i++) { sab += (a[i] - ma) * (b[i] - mb); sa2 += (a[i] - ma) ** 2; sb2 += (b[i] - mb) ** 2; }
+  return { sig, rho: sab / Math.sqrt(sa2 * sb2), n: a.length };
+}
+for (const [lab, mo, dd] of [['pooled (5 dates)', null, null], ['Feb-15', 2, 15]]) {
+  let get;
+  if (mo == null) { const S5 = DATES.map(([, m, d]) => seriesFor(m, d)); get = h => { const rows = S5.map(s => driftAndCorr(s, h)).filter(Boolean); return { sig: rms(rows.flatMap((r, i) => { const s = S5[i]; const out = []; for (let y = 1948; y + h <= lastY; y++) if (s[y] != null && s[y + h] != null) out.push(s[y + h] - s[y]); return out; })), rho: rows.reduce((a, r) => a + r.rho, 0) / rows.length }; }; }
+  else { const s = seriesFor(mo, dd); get = h => driftAndCorr(s, h); }
+  const Ats = mo == null ? Aint : tsSd(seriesFor(mo, dd), 2000);
+  console.log(`\n  ${lab}   time-series sd of the factor (2000+): ${pct(Ats)}%   A*sqrt(2) ceiling: ${pct(Ats * Math.SQRT2)}%`);
+  console.log('   h     sigma_drift   sigma/A*sqrt2   rho(direct)   w_snr=A^2/(A^2+s^2)   w_rho');
+  for (const h of HLONG) {
+    const r = get(h); if (!r) continue;
+    const wSnr = Aint * Aint / (Aint * Aint + r.sig ** 2);
+    console.log(`   ${String(h).padStart(2)}    ${pct(r.sig).padStart(7)}%      ${(r.sig / (Aint * Math.SQRT2)).toFixed(3)}         ${r.rho.toFixed(3)}          ${wSnr.toFixed(3)}            ${Math.max(0, r.rho).toFixed(3)}`);
+  }
+}
+// permanent vs transient split of the seasonal variance (pooled)
+const sigInf = get5PooledInf();
+function get5PooledInf() { const S5 = DATES.map(([, m, d]) => seriesFor(m, d)); const all = []; for (const s of S5) for (let y = 1948; y + 30 <= lastY; y++) if (s[y] != null && s[y + 30] != null) all.push(s[y + 30] - s[y]); return rms(all); }
+const transientSd = sigInf / Math.SQRT2;
+const permanentVar = Math.max(0, Aint * Aint - transientSd * transientSd);
+console.log(`\n  Variance split (pooled, using sigma_drift(30) = ${pct(sigInf)}% as the asymptote):`);
+console.log(`   transient (drifts away):  sd ${pct(transientSd)}%   ${(transientSd ** 2 / (Aint * Aint) * 100).toFixed(0)}% of seasonal variance`);
+console.log(`   permanent (month effect): sd ${pct(Math.sqrt(permanentVar))}%   ${(permanentVar / (Aint * Aint) * 100).toFixed(0)}% of seasonal variance`);
+
+// effect of each option on a representative long bond
+const longB = bonds.filter(b => b.matDate.getFullYear() >= 2053)[0];
+if (longB) {
+  const feb = seriesFor(2, 15);
+  const febMeanAll = Object.values(feb).reduce((a, b) => a + b, 0) / Object.values(feb).length;
+  const rho30 = driftAndCorr(feb, 30).rho;
+  const sMatRaw = saFactorForDate(rRows, longB.mat);
+  const variants = {
+    'current w(h)': maturitySaFactor(rRows, longB.mat, settleStr),
+    'w = rho(30) (option b)': 1 + (sMatRaw - 1) * Math.max(0, rho30),
+    'shrink to long-run Feb mean (5.1 alt)': febMeanAll,
+    'full weight (no adjustment removed... = raw)': sMatRaw,
+    'S_maturity -> 1.0 (option c floor)': 1.0,
+  };
+  console.log(`\n  ${longB.mat} (${longB.yrs.toFixed(1)}y): SA-minus-ask under each option`);
+  for (const [k, sMat] of Object.entries(variants)) {
+    const dbp = (yieldFromPrice(longB.price * (saSettle / sMat), longB.coupon, settle, longB.matDate) - longB.ask) * 1e4;
+    console.log(`   ${k.padEnd(42)} S_mat=${sMat.toFixed(5)}  dbp=${dbp.toFixed(2)}`);
+  }
 }
