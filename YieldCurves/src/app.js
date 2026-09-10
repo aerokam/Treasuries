@@ -229,7 +229,8 @@ const COL_HELP = {
   },
   'sao-yield': {
     title: 'SAO Yield — Smooth Curve Fit',
-    html: `<p>SAO fits a <strong>Nelson-Siegel-Svensson</strong> curve (the Fed/GSW real-yield-curve standard) through all SA yields, then snaps each TIPS to that curve — treating any deviation as noise not explained by a value-relevant factor (coupon, index ratio — both empirically immaterial).</p>
+    html: `<p>The <strong>O</strong> is <em>other</em>. Seasonality is a named cause of deviation from fair value and the SA transform removes it by name; everything else that moves a TIPS away from a smooth curve is removed here as a class, because those factors cannot be enumerated individually.</p>
+<p>SAO fits a <strong>Nelson-Siegel-Svensson</strong> curve (the Fed/GSW real-yield-curve standard) through all SA yields, then snaps each TIPS to that curve — treating any deviation as noise not explained by a value-relevant factor (coupon, index ratio — both empirically immaterial).</p>
 <p>The deseasonalization residual this corrects is a <strong>front-end phenomenon</strong> that amortizes with maturity, so the snap-to-curve weight declines with maturity rather than applying uniformly:</p>
 <ul style="margin:12px 0 0;padding-left:18px;">
   <li style="margin-bottom:6px;"><strong>Under 0.5 years:</strong> price-noise-dominated, excluded from the fit, still read off the curve</li>

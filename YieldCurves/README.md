@@ -1,6 +1,6 @@
 # YieldCurves: TIPS Seasonal Adjustments
 
-A browser-based tool for analyzing **Seasonally Adjusted (SA)** and **SA Outlier-adjusted (SAO)** TIPS yields. This project helps identify "cheap" or "rich" spots on the TIPS curve by removing predictable seasonal inflation noise.
+A browser-based tool for analyzing **Seasonally Adjusted (SA)** and **SA Other-adjusted (SAO)** TIPS yields. This project helps identify "cheap" or "rich" spots on the TIPS curve by removing predictable seasonal inflation noise.
 
 ## Features
 - **Interactive Yield Curve**: Compare Market Ask, SA, and SAO yields.
@@ -16,6 +16,6 @@ For local development, execute `npx serve .` from the root directory of the `Tre
 
 ## Knowledge Base
 - **[1.0 Seasonal Adjustments](./knowledge/1.0_Seasonal_Adjustments.md)**: The core multiplicative transform logic.
-- **[2.0 SAO Adjustment](./knowledge/2.0_SAO_Adjustment.md)**: Outlier smoothing and trend fitting.
+- **[2.0 SAO Adjustment](./knowledge/2.0_SAO_Adjustment.md)**: Smoothing of non-seasonal deviations, and the curve fit behind it.
 - **[2.1 SA Intuition](./knowledge/2.1_SA_Intuition.md)**: Conceptual intuition behind the SA ratio.
 - **[3.0 Visual Standards](./knowledge/3.0_Visual_Standards.md)**: Charting and UI conventions.

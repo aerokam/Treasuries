@@ -241,7 +241,7 @@ function level2YieldCurves() {
       out: { '7.2': 'yields, prices, SA factors', '7.4': 'yields, prices, GSW parameters', '7.6': 'bid and ask quotes', '7.7': 'source dates' } },
     { id: '7.2', name: ['Adjust for', 'seasonality'], href: V('YieldCurves/knowledge/1.0_Seasonal_Adjustments.md'), reads: [],
       out: { '7.3': 'SA yields', '7.4': 'SA yields', '7.5': 'SA yields', '7.7': 'SA yields' } },
-    { id: '7.3', name: ['Smooth', 'outliers'], href: V('YieldCurves/knowledge/2.0_SAO_Adjustment.md'), reads: [],
+    { id: '7.3', name: ['Adjust for', 'other effects'], href: V('YieldCurves/knowledge/2.0_SAO_Adjustment.md'), reads: [],
       out: { '7.4': 'SAO yields', '7.5': 'SAO yields', '7.7': 'SAO yields' } },
     { id: '7.4', name: ['Fit spot', 'curves'], href: V('YieldCurves/knowledge/4.0_Spot_Yield_Curves.md'), reads: [],
       out: { '7.5': 'spot curves', '7.7': 'spot curves' } },

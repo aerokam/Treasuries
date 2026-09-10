@@ -1,6 +1,6 @@
 # YieldCurves (App Overview)
 
-**YieldCurves** is a tool for analyzing TIPS (Treasury Inflation-Protected Securities) real yields through the lens of seasonal and outlier adjustments. It provides a more accurate "fair value" curve by removing predictable inflation noise and idiosyncratic market shocks.
+**YieldCurves** analyzes TIPS (Treasury Inflation-Protected Securities) real yields under two adjustments: seasonal, and other. It produces a fair-value curve by removing the predictable seasonal component of CPI and then the remaining non-seasonal deviations from a smooth curve.
 
 ---
 
@@ -15,7 +15,7 @@ graph LR
 
     %% Processes (P)
     P1((1.0 Seasonal Adjustment))
-    P2((2.0 SAO Outlier Adjustment))
+    P2((2.0 SAO Other Adjustment))
     P3((3.0 Interactive Charting))
 
     %% User (E)
@@ -51,7 +51,7 @@ Normalizes real yields by applying seasonal factors derived from BLS CPI-U (NSA 
 - **Goal**: Enable "fair" comparison of yields across different months of the year.
 - **Formula**: `SA Yield = Clean Price * (S_settle / S_maturity)`
 
-### [2.0 SAO Outlier Adjustment](../YieldCurves/knowledge/2.0_SAO_Adjustment.md)
+### [2.0 SAO Other Adjustment](../YieldCurves/knowledge/2.0_SAO_Adjustment.md)
 Applies a backwards-anchored linear regression to smooth the front-end of the SA curve.
 - **Goal**: Remove idiosyncratic "wiggles" caused by liquidity or one-off shocks to specific CUSIPs.
 - **Method**: Blending the SA yield with a projected trend line.

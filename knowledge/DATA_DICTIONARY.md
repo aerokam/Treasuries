@@ -13,7 +13,7 @@
 
 **A** &nbsp; [AA](#aa) &middot; [Accrued Interest (Adjusted)](#accrued-interest-adjusted) &middot; [Accrued Interest (Nominal)](#accrued-interest-nominal) &middot; [accrued market discount](#amd) *(see Accrued Market Discount (AMD))* &middot; [Accrued Market Discount (AMD)](#amd) &middot; [Active Lower Bracket](#active-lower-bracket) &middot; [Annual Interest (Nominal)](#annual-interest-nominal) &middot; [Annual Interest (Real)](#annual-interest-real) &middot; [ARA](#ara) &middot; [Ask / Bid](#ask) &middot; [Available Cash](#available-cash)
 
-**B** &nbsp; [bei](#breakeven-inflation) *(see Breakeven Inflation (BEI))* &middot; [bid](#ask) *(see Ask / Bid)* &middot; [Blend Weights](#blend-weights) &middot; [Bond Ladder](#bond-ladder) &middot; [bracket maturity](#bracket-year-tips) *(see Bracket Year TIPS)* &middot; [Bracket Weight](#bracket-weight) &middot; [Bracket Year](#bracket-year) &middot; [Bracket Year TIPS](#bracket-year-tips) &middot; [Breakeven Inflation (BEI)](#breakeven-inflation)
+**B** &nbsp; [bei](#breakeven-inflation) *(see Breakeven Inflation (BEI))* &middot; [bid](#ask) *(see Ask / Bid)* &middot; [Bond Ladder](#bond-ladder) &middot; [bracket maturity](#bracket-year-tips) *(see Bracket Year TIPS)* &middot; [Bracket Weight](#bracket-weight) &middot; [Bracket Year](#bracket-year) &middot; [Bracket Year TIPS](#bracket-year-tips) &middot; [Breakeven Inflation (BEI)](#breakeven-inflation)
 
 **C** &nbsp; [Cash Flow Calendar](#cash-flow-calendar) &middot; [Clean Price](#clean-price) &middot; [Cost per TIPS](#cost-per-tips) &middot; [Coupon Rate](#coupon-rate) &middot; [Cover Excess](#cover-excess) &middot; [cover maturity](#cover-year-tips) *(see Cover Year TIPS)* &middot; [Cover Weight](#cover-weight) &middot; [Cover Year](#cover-year) &middot; [Cover Year TIPS](#cover-year-tips) &middot; [CPI CAGR](#cpi-cagr) &middot; [CPI Change (Month-over-Month)](#cpi-change-mom) &middot; [CPI Change (Point-to-Point)](#cpi-change-p2p) &middot; [CPI Change (Year-over-Year)](#cpi-change-yoy) &middot; [CPI-U NSA](#cpi-nsa) &middot; [CPI-U SA](#cpi-sa) &middot; [Credibility Factor](#credibility-factor) &middot; [CUSIP](#cusip)
 
@@ -41,7 +41,7 @@
 
 **R** &nbsp; [Ref CPI](#ref-cpi) &middot; [Reference Date](#reference-date) &middot; [Retained Bracket Excess](#retained-bracket-excess) &middot; [Retained Lower Bracket](#retained-lower-bracket) &middot; [Rolling CPI Change](#rolling-cpi-change) &middot; [Rung](#rung)
 
-**S** &nbsp; [S1: YieldsFromFedInvestPrices.csv](#s1) &middot; [S10: YieldsSaSao.csv](#s10) &middot; [S11: FundHoldings/Holdings-\<TICKER\>(-Enriched).csv](#s11) &middot; [S12: GswTipsCurve.json](#s12) &middot; [S13: YieldCurves.csv](#s13) &middot; [S14: BreakevenInflation.csv](#s14) &middot; [S15: BidAskSpreads.csv](#s15) &middot; [S2: TipsRef.csv](#s2) &middot; [S3: RefCPI.csv](#s3) &middot; [S4: RefCpiNsaSa.csv](#s4) &middot; [S5: Auctions.csv](#s5) &middot; [S6: YieldHistory](#s6) &middot; [S7: FidelityTreasuriesTips.csv](#s7) &middot; [S8: CPI_history.csv](#s8) &middot; [S9: Tentative-Auction-Schedule.xml](#s9) &middot; [SA Anchor](#sa-anchor) &middot; [SA Factor](#sa-factor) &middot; [SA Price Factor](#sa-price-factor) &middot; [SA Yield](#sa-yield) &middot; [SACP](#sacp) &middot; [same year excess interest](#same-maturity-excess-interest) *(see Same-Maturity Excess Interest)* &middot; [Same-Maturity Excess Interest](#same-maturity-excess-interest) &middot; [SAO Yield](#sao-yield) &middot; [Seasonal Amplitude](#seasonal-amplitude) &middot; [Seasonal Factor Drift](#seasonal-factor-drift) &middot; [Settlement Date](#settlement-date) &middot; [Sliding Window](#sliding-window) &middot; [Spot Yield](#spot-yield) &middot; [Synthetic TIPS](#synthetic-tips)
+**S** &nbsp; [S1: YieldsFromFedInvestPrices.csv](#s1) &middot; [S10: YieldsSaSao.csv](#s10) &middot; [S11: FundHoldings/Holdings-\<TICKER\>(-Enriched).csv](#s11) &middot; [S12: GswTipsCurve.json](#s12) &middot; [S13: YieldCurves.csv](#s13) &middot; [S14: BreakevenInflation.csv](#s14) &middot; [S15: BidAskSpreads.csv](#s15) &middot; [S2: TipsRef.csv](#s2) &middot; [S3: RefCPI.csv](#s3) &middot; [S4: RefCpiNsaSa.csv](#s4) &middot; [S5: Auctions.csv](#s5) &middot; [S6: YieldHistory](#s6) &middot; [S7: FidelityTreasuriesTips.csv](#s7) &middot; [S8: CPI_history.csv](#s8) &middot; [S9: Tentative-Auction-Schedule.xml](#s9) &middot; [SA Factor](#sa-factor) &middot; [SA Price Factor](#sa-price-factor) &middot; [SA Yield](#sa-yield) &middot; [SACP](#sacp) &middot; [same year excess interest](#same-maturity-excess-interest) *(see Same-Maturity Excess Interest)* &middot; [Same-Maturity Excess Interest](#same-maturity-excess-interest) &middot; [SAO Blend Weight](#sao-blend-weight) &middot; [SAO Yield](#sao-yield) &middot; [Seasonal Amplitude](#seasonal-amplitude) &middot; [Seasonal Factor Drift](#seasonal-factor-drift) &middot; [Settlement Date](#settlement-date) &middot; [Spot Yield](#spot-yield) &middot; [Synthetic TIPS](#synthetic-tips)
 
 **T** &nbsp; [TIPS](#tips) &middot; [TIPS Ladder](#tips-ladder) &middot; [Total Cost](#total-cost) &middot; [Trade Ticket](#trade-ticket) &middot; [Treasury Bill](#treasury-bill) &middot; [Treasury Bond](#treasury-bond) &middot; [Treasury Note](#treasury-note)
 
@@ -551,7 +551,7 @@ coverExcessCost_c = Future 30Y total cost × coverWeight_c
 
 <a id="sao-yield"></a>
 ### SAO Yield
-`SAO_Yield` = *SA Yield with additional Outlier adjustment. Produced by backwards-anchored linear regression blending of the SA curve; smooths idiosyncratic front-end "wiggles".*
+`SAO_Yield` = *[SA Yield](#sa-yield) with a further adjustment for **other** effects: the non-seasonal factors that move a TIPS away from a smooth curve. The `O` is *other*. Seasonality is identified and removed by name; the remaining deviations are not individually identified, and are removed together by fitting the SA yields to a smooth curve and reading each TIPS from that fit. Institutional participants act on relative-value factors this project cannot enumerate, so the step removes them as a class rather than by a named list. Distinct from the outlier index `O_t` of [FACP](#facp), which Canty determines analytically per known event ([2.0](../YieldCurves/knowledge/2.0_SAO_Adjustment.md)).*
 
 <a id="sacp"></a>
 ### SACP
@@ -585,17 +585,9 @@ coverExcessCost_c = Future 30Y total cost × coverWeight_c
 ### FACP
 `FACP` = *Fully Adjusted Clean Price (Canty 2009, Eq. 21): `FACP = CP × (S_settle / S_maturity) × (1 / O_maturity)`. Removes both the seasonal component and one-off outlier shocks. Provides the cleanest "trend" price for relative value analysis.*
 
-<a id="sa-anchor"></a>
-### SA Anchor
-`SA_Anchor` = *Long-end region of the SAO curve where SAO = SA (bonds with maturity > 7 years, or the last 4 bonds in the series). Yields in this region are considered stable; no trend blending applied.*
-
-<a id="sliding-window"></a>
-### Sliding Window
-`Sliding_Window` = *4-bond window of longer-maturity bonds used to compute a linear regression trend line in the SAO algorithm. Applied as the algorithm sweeps from the anchor region toward shorter maturities.*
-
-<a id="blend-weights"></a>
-### Blend Weights
-`Blend_Weights` = *`trendWeight` values controlling how much of the SAO yield comes from the projected trend vs. the bond's actual SA yield. Vary by time-to-maturity: 90% trend (< 0.5y), 15% (0.5–2y), 25% (2–5y), 20% (> 5y non-anchor).*
+<a id="sao-blend-weight"></a>
+### SAO Blend Weight
+`SAO_Blend_Weight` = *`w`, the weight given to the fitted smooth curve when forming the [SAO Yield](#sao-yield): `SAO = w × curve(maturity) + (1 − w) × SA`. `w` is 1 out to `SAO_BLEND_START_YRS` (5 years), declines linearly to 0 at `SAO_BLEND_END_YRS` (6 years), and is 0 beyond, where the SAO Yield is the SA Yield unchanged. Securities inside `SAO_NOISE_YRS` (0.5 years) are excluded from the fit, their SA yield being dominated by price noise. `shared/src/spot-curve.js` ([2.0](../YieldCurves/knowledge/2.0_SAO_Adjustment.md)).*
 
 <a id="iqr-clip"></a>
 ### IQR Clip
