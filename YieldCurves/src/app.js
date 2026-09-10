@@ -373,12 +373,12 @@ function _showSaoDrill(cusip) {
 Chart.defaults.font.size = 13;
 Chart.defaults.color = '#334155';
 
-// ── 7.1 Load and parse source data ─────────────────────────────────────────
+// ── 3.1 Load and parse source data ─────────────────────────────────────────
 // One function per process of knowledge/DFD_LEVEL3_YC_LOAD, specified in
 // YieldCurves/knowledge/5.0_Load_And_Parse.md. Each parses and returns; applying
 // the result to app state and to the controls is init()'s job, not theirs.
 
-// spec: 5.0_Load_And_Parse.md#parse-fedinvest-prices (7.1.1)
+// spec: 5.0_Load_And_Parse.md#parse-fedinvest-prices (3.1.1)
 // Row 1 is the settlement date, row 2 the header, rows 3 on the data.
 function parseFedInvestPrices(text) {
   const lines = text.split(/\r?\n/).filter(l => l.trim());
@@ -388,17 +388,17 @@ function parseFedInvestPrices(text) {
   return { tips: rows.filter(r => r.type === 'TIPS'), nominals: rows.filter(r => r.type !== 'TIPS'), settlementDate };
 }
 
-// spec: 5.0_Load_And_Parse.md#parse-ref-cpi-and-sa-factors (7.1.3)
+// spec: 5.0_Load_And_Parse.md#parse-ref-cpi-and-sa-factors (3.1.3)
 function parseRefCpiAndSaFactors(text) {
   return parseCsv(text);
 }
 
-// spec: 5.0_Load_And_Parse.md#parse-bond-holidays (7.1.4)
+// spec: 5.0_Load_And_Parse.md#parse-bond-holidays (3.1.4)
 function parseBondHolidays(text) {
   return parseHolidaySet(parseCsv(text, false));
 }
 
-// spec: 5.0_Load_And_Parse.md#parse-gsw-parameters (7.1.5)
+// spec: 5.0_Load_And_Parse.md#parse-gsw-parameters (3.1.5)
 // A missing or malformed file leaves the app without a published curve rather
 // than without a page, so both cases return null.
 async function parseGswParameters(res) {
@@ -406,7 +406,7 @@ async function parseGswParameters(res) {
   try { return await res.json(); } catch { return null; }
 }
 
-// spec: 5.0_Load_And_Parse.md#parse-market-quotes (7.1.2)
+// spec: 5.0_Load_And_Parse.md#parse-market-quotes (3.1.2)
 // A TIPS quote is kept only for a CUSIP the FedInvest file also carries, and
 // only when it has an ask price.
 function parseMarketQuotes(text, knownTips) {

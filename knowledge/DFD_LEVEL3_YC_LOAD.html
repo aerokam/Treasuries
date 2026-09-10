@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Yield Curves 7.1 — Level 3</title>
+<title>Yield Curves 3.1 — Level 3</title>
 <style>
   :root {
     --bg: #0d0d1a;
@@ -144,6 +144,8 @@
   .index-group a:hover { border-color: var(--accent); color: #ffffff; }
 </style>
 <style>
+  .cat-band { fill-opacity: 0.13; stroke-opacity: 0.55; stroke-width: 1.5; }
+  .cat-label { font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.85; }
   .store line { stroke: #4a8a4a; stroke-width: 2; }
   .store:hover line { stroke: #7ada7a; }
   .store .s-name { fill: #a8e6a8; font-size: 13px; }
@@ -153,6 +155,7 @@
   .flow-label a { cursor: pointer; }
   tspan.lk { fill: #a8b2e0; text-decoration: underline; text-decoration-style: dotted; }
   .flow-label a:hover tspan.lk { fill: #ffffff; }
+  .nav-header .spec-link { margin-left: auto; }
   .diagram { max-width: 1340px; }
 </style>
 </head>
@@ -161,9 +164,10 @@
 <div class="nav-header">
   <a href="../" class="portal-link">&#8592; Portal</a>
   <a href="DFD_LEVEL2_YIELDCURVES.html">&#8593; Level 2 — Yield Curves</a>
+  <a href="viewer.html#/md/YieldCurves/knowledge/5.0_Load_And_Parse.md" class="spec-link">&#9776; 5.0 Load and Parse</a>
 </div>
 
-<h1>Level 3 &mdash; Yield Curves 7.1 Load and parse source data</h1>
+<h1>Level 3 &mdash; Yield Curves 3.1 Load and parse source data</h1>
 
 <div class="diagram">
 <svg viewBox="0 0 1340 900" role="img" aria-label="Level 3: the load and parse stage of Yield Curves, one process per source parsed.">
@@ -174,7 +178,7 @@
   <path class="flow" d="M 250.0 600.0 Q 297.0 592.5 344.0 600.0" marker-end="url(#a1)"/>
   <path class="flow" d="M 250.0 750.0 Q 297.0 742.5 344.0 750.0" marker-end="url(#a1)"/>
   <path class="flow" d="M 450.9 173.4 Q 664.7 233.1 849.1 356.6" marker-end="url(#a1)"/>
-  <text class="flow-label" x="786" y="301" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#price"><tspan class="lk">prices</tspan></a>, <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#yield"><tspan class="lk">yields</tspan></a>s</text>
+  <text class="flow-label" x="786" y="301" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#price"><tspan class="lk">prices</tspan></a>, <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#yield"><tspan class="lk">yields</tspan></a></text>
   <path class="flow" d="M 434.0 344.5 Q 550.1 454.6 626.0 595.5" marker-end="url(#a1)"/>
   <text class="flow-label" x="606" y="536" text-anchor="middle">quote file date</text>
   <path class="flow" d="M 455.3 308.8 Q 655.0 308.8 844.7 371.2" marker-end="url(#a1)"/>
@@ -188,13 +192,13 @@
   <path class="flow" d="M 698.0 598.9 Q 765.8 496.9 862.0 421.1" marker-end="url(#a1)"/>
   <text class="flow-label" x="835" y="426" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#settlement-date"><tspan class="lk">settlement dates</tspan></a></text>
   <path class="flow" d="M 959.0 346.0 Q 1143.5 316.5 1328.0 346.0" marker-end="url(#a1)"/>
-  <text class="flow-label" x="1324" y="339" text-anchor="end">yields, prices, SA factors  →  7.2</text>
+  <text class="flow-label" x="1324" y="339" text-anchor="end">yields, prices, SA factors  →  3.2</text>
   <path class="flow" d="M 959.0 368.0 Q 1143.5 338.5 1328.0 368.0" marker-end="url(#a1)"/>
-  <text class="flow-label" x="1324" y="361" text-anchor="end">yields, prices, GSW parameters  →  7.4</text>
+  <text class="flow-label" x="1324" y="361" text-anchor="end">yields, prices, GSW parameters  →  3.4</text>
   <path class="flow" d="M 959.0 390.0 Q 1143.5 360.5 1328.0 390.0" marker-end="url(#a1)"/>
-  <text class="flow-label" x="1324" y="383" text-anchor="end">bid and ask quotes  →  7.6</text>
+  <text class="flow-label" x="1324" y="383" text-anchor="end">bid and ask quotes  →  3.6</text>
   <path class="flow" d="M 959.0 412.0 Q 1143.5 382.5 1328.0 412.0" marker-end="url(#a1)"/>
-  <text class="flow-label" x="1324" y="405" text-anchor="end">source dates  →  7.7</text>
+  <text class="flow-label" x="1324" y="405" text-anchor="end">source dates  →  3.7</text>
   <a class="store" href="viewer.html#/md/knowledge/DataStores.md#s1">
     <rect x="40" y="130" width="205" height="40" fill="transparent" stroke="none"/>
     <line x1="40" y1="130" x2="245" y2="130"/>
@@ -227,44 +231,44 @@
   </a>
   <a class="process" href="viewer.html#/md/YieldCurves/knowledge/5.0_Load_And_Parse.md#parse-fedinvest-prices">
     <circle cx="400" cy="150" r="56"/>
-    <text class="p-id" x="400" y="130">7.1.1</text>
+    <text class="p-id" x="400" y="130">3.1.1</text>
     <text class="p-name" x="400" y="151">Parse FedInvest</text>
     <text class="p-name" x="400" y="167">prices</text>
   </a>
   <a class="process" href="viewer.html#/md/YieldCurves/knowledge/5.0_Load_And_Parse.md#parse-market-quotes">
     <circle cx="400" cy="300" r="56"/>
-    <text class="p-id" x="400" y="280">7.1.2</text>
+    <text class="p-id" x="400" y="280">3.1.2</text>
     <text class="p-name" x="400" y="301">Parse market</text>
     <text class="p-name" x="400" y="317">quotes</text>
   </a>
   <a class="process" href="viewer.html#/md/YieldCurves/knowledge/5.0_Load_And_Parse.md#parse-ref-cpi-and-sa-factors">
     <circle cx="400" cy="450" r="56"/>
-    <text class="p-id" x="400" y="430">7.1.3</text>
+    <text class="p-id" x="400" y="430">3.1.3</text>
     <text class="p-name" x="400" y="451">Parse Ref CPI</text>
     <text class="p-name" x="400" y="467">and SA factors</text>
   </a>
   <a class="process" href="viewer.html#/md/YieldCurves/knowledge/5.0_Load_And_Parse.md#parse-bond-holidays">
     <circle cx="400" cy="600" r="56"/>
-    <text class="p-id" x="400" y="580">7.1.4</text>
+    <text class="p-id" x="400" y="580">3.1.4</text>
     <text class="p-name" x="400" y="601">Parse bond</text>
     <text class="p-name" x="400" y="617">holidays</text>
   </a>
   <a class="process" href="viewer.html#/md/YieldCurves/knowledge/5.0_Load_And_Parse.md#parse-gsw-parameters">
     <circle cx="400" cy="750" r="56"/>
-    <text class="p-id" x="400" y="730">7.1.5</text>
+    <text class="p-id" x="400" y="730">3.1.5</text>
     <text class="p-name" x="400" y="751">Parse GSW</text>
     <text class="p-name" x="400" y="767">parameters</text>
   </a>
   <a class="process" href="viewer.html#/md/YieldCurves/knowledge/5.0_Load_And_Parse.md#determine-settlement-dates">
     <circle cx="660" cy="640" r="56"/>
-    <text class="p-id" x="660" y="612">7.1.6</text>
+    <text class="p-id" x="660" y="612">3.1.6</text>
     <text class="p-name" x="660" y="633">Determine</text>
     <text class="p-name" x="660" y="649">settlement</text>
     <text class="p-name" x="660" y="665">dates</text>
   </a>
   <a class="process" href="viewer.html#/md/YieldCurves/knowledge/5.0_Load_And_Parse.md#build-priced-bonds">
     <circle cx="900" cy="380" r="56"/>
-    <text class="p-id" x="900" y="360">7.1.7</text>
+    <text class="p-id" x="900" y="360">3.1.7</text>
     <text class="p-name" x="900" y="381">Build the</text>
     <text class="p-name" x="900" y="397">security set</text>
   </a>
@@ -272,9 +276,9 @@
 </div>
 
 <p class="notes">
-  One process per source parsed, then 7.1.6 and 7.1.7, which combine them. The four flows leaving 7.1.7 on the right are the outputs 7.1 shows at Level 2.
+  One process per source parsed, then 3.1.6 and 3.1.7, which combine them. The four flows leaving 3.1.7 on the right are the outputs 3.1 shows at Level 2.
   Every process here drills to its own section of <a href="viewer.html#/md/YieldCurves/knowledge/5.0_Load_And_Parse.md">5.0 Load and Parse</a>, which was written because these processes had no spec at all.
-  7.1.6 is where a known defect sits, recorded in 5.0 &sect;3.0: the settlement date for market quotes is derived from the FedInvest price date rather than from the quote file&rsquo;s own date.
+  3.1.6 carries a known defect, recorded in 5.0 &sect;3.0: the settlement date for market quotes is derived from the FedInvest price date rather than from the quote file&rsquo;s own date.
 </p>
 
 </body>

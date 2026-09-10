@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Yield Curves 7.7 — Level 3</title>
+<title>Yield Curves 3.7 — Level 3</title>
 <style>
   :root {
     --bg: #0d0d1a;
@@ -144,6 +144,8 @@
   .index-group a:hover { border-color: var(--accent); color: #ffffff; }
 </style>
 <style>
+  .cat-band { fill-opacity: 0.13; stroke-opacity: 0.55; stroke-width: 1.5; }
+  .cat-label { font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.85; }
   .store line { stroke: #4a8a4a; stroke-width: 2; }
   .store:hover line { stroke: #7ada7a; }
   .store .s-name { fill: #a8e6a8; font-size: 13px; }
@@ -153,6 +155,7 @@
   .flow-label a { cursor: pointer; }
   tspan.lk { fill: #a8b2e0; text-decoration: underline; text-decoration-style: dotted; }
   .flow-label a:hover tspan.lk { fill: #ffffff; }
+  .nav-header .spec-link { margin-left: auto; }
   .diagram { max-width: 1010px; }
 </style>
 </head>
@@ -161,21 +164,22 @@
 <div class="nav-header">
   <a href="../" class="portal-link">&#8592; Portal</a>
   <a href="DFD_LEVEL2_YIELDCURVES.html">&#8593; Level 2 — Yield Curves</a>
+  <a href="viewer.html#/md/YieldCurves/knowledge/6.0_Rendering.md" class="spec-link">&#9776; 6.0 Rendering</a>
 </div>
 
-<h1>Level 3 &mdash; Yield Curves 7.7 Rendering</h1>
+<h1>Level 3 &mdash; Yield Curves 3.7 Rendering</h1>
 
 <div class="diagram">
 <svg viewBox="0 0 1010 980" role="img" aria-label="Level 3: the rendering stage of Yield Curves, one process per view drawn.">
   <defs><marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#55558c"/></marker></defs>
   <path class="flow" d="M 20.0 150.0 Q 292.0 106.5 564.0 150.0" marker-end="url(#a1)"/>
-  <text class="flow-label" x="24" y="140">7.2, 7.3  →  SA and SAO yields</text>
+  <text class="flow-label" x="24" y="140">3.2, 3.3  →  SA and SAO yields</text>
   <path class="flow" d="M 20.0 330.0 Q 292.0 286.5 564.0 330.0" marker-end="url(#a1)"/>
-  <text class="flow-label" x="24" y="320">7.4  →  spot curves</text>
+  <text class="flow-label" x="24" y="320">3.4  →  spot curves</text>
   <path class="flow" d="M 20.0 510.0 Q 292.0 466.5 564.0 510.0" marker-end="url(#a1)"/>
-  <text class="flow-label" x="24" y="500">7.5  →  breakeven inflation</text>
+  <text class="flow-label" x="24" y="500">3.5  →  breakeven inflation</text>
   <path class="flow" d="M 20.0 690.0 Q 292.0 646.5 564.0 690.0" marker-end="url(#a1)"/>
-  <text class="flow-label" x="24" y="680">7.6  →  spreads</text>
+  <text class="flow-label" x="24" y="680">3.6  →  spreads</text>
   <path class="flow" d="M 845.0 240.0 Q 602.0 278.9 359.0 240.0" marker-end="url(#a1)"/>
   <text class="flow-label" x="446" y="259" text-anchor="middle">tab and date selections</text>
   <path class="flow" d="M 679.0 150.0 Q 762.0 136.7 845.0 150.0" marker-end="url(#a1)"/>
@@ -204,45 +208,45 @@
   <text class="flow-label" x="437" y="737" text-anchor="middle">picked security</text>
   <a class="process" href="viewer.html#/md/YieldCurves/knowledge/6.0_Rendering.md#select-view">
     <circle cx="300" cy="240" r="56"/>
-    <text class="p-id" x="300" y="220">7.7.1</text>
+    <text class="p-id" x="300" y="220">3.7.1</text>
     <text class="p-name" x="300" y="241">Select the</text>
     <text class="p-name" x="300" y="257">view</text>
   </a>
   <a class="process" href="viewer.html#/md/YieldCurves/knowledge/6.0_Rendering.md#build-scales">
     <circle cx="300" cy="600" r="56"/>
-    <text class="p-id" x="300" y="580">7.7.2</text>
+    <text class="p-id" x="300" y="580">3.7.2</text>
     <text class="p-name" x="300" y="601">Build the</text>
     <text class="p-name" x="300" y="617">axis scales</text>
   </a>
   <a class="process" href="viewer.html#/md/YieldCurves/knowledge/6.0_Rendering.md#draw-treasuries">
     <circle cx="620" cy="150" r="56"/>
-    <text class="p-id" x="620" y="122">7.7.3</text>
+    <text class="p-id" x="620" y="122">3.7.3</text>
     <text class="p-name" x="620" y="143">Draw the</text>
     <text class="p-name" x="620" y="159">Treasuries</text>
     <text class="p-name" x="620" y="175">view</text>
   </a>
   <a class="process" href="viewer.html#/md/YieldCurves/knowledge/6.0_Rendering.md#draw-tips">
     <circle cx="620" cy="330" r="56"/>
-    <text class="p-id" x="620" y="310">7.7.4</text>
+    <text class="p-id" x="620" y="310">3.7.4</text>
     <text class="p-name" x="620" y="331">Draw the</text>
     <text class="p-name" x="620" y="347">TIPS view</text>
   </a>
   <a class="process" href="viewer.html#/md/YieldCurves/knowledge/6.0_Rendering.md#draw-breakeven">
     <circle cx="620" cy="510" r="56"/>
-    <text class="p-id" x="620" y="482">7.7.5</text>
+    <text class="p-id" x="620" y="482">3.7.5</text>
     <text class="p-name" x="620" y="503">Draw the</text>
     <text class="p-name" x="620" y="519">breakeven</text>
     <text class="p-name" x="620" y="535">view</text>
   </a>
   <a class="process" href="viewer.html#/md/YieldCurves/knowledge/6.0_Rendering.md#draw-spreads">
     <circle cx="620" cy="690" r="56"/>
-    <text class="p-id" x="620" y="670">7.7.6</text>
+    <text class="p-id" x="620" y="670">3.7.6</text>
     <text class="p-name" x="620" y="691">Draw the</text>
     <text class="p-name" x="620" y="707">spread view</text>
   </a>
   <a class="process" href="viewer.html#/md/YieldCurves/knowledge/6.0_Rendering.md#answer-a-drill">
     <circle cx="380" cy="870" r="56"/>
-    <text class="p-id" x="380" y="850">7.7.7</text>
+    <text class="p-id" x="380" y="850">3.7.7</text>
     <text class="p-name" x="380" y="871">Answer a</text>
     <text class="p-name" x="380" y="887">drill request</text>
   </a>
@@ -252,7 +256,7 @@
 <p class="notes">
   Every process drills to its own section of <a href="viewer.html#/md/YieldCurves/knowledge/6.0_Rendering.md">6.0 Rendering</a>, the process spec. <a href="viewer.html#/md/YieldCurves/knowledge/3.0_Visual_Standards.md">3.0 Visual Standards</a> is the separate question of what the drawn output must look like.
   <b>Nothing here calculates a yield.</b> Every figure drawn is produced upstream and passed in; a view showing a figure no other process produced is a defect in this stage.
-  7.7.2 decides what is visible before anything is drawn. Its axis clipping moves the axis and never removes a security, so a table figure can sit outside what the chart shows.
+  3.7.2 decides what is visible before anything is drawn. Its axis clipping moves the axis and never removes a security, so a table figure can fall outside what the chart shows.
 </p>
 
 </body>
