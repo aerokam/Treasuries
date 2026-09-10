@@ -15,7 +15,7 @@
 //   H  SA-minus-ask under the w(h) fade of S_maturity
 
 import { yieldFromPrice, daysBetween } from '../../shared/src/bond-math.js';
-import { refCpiFromMonthly, monthlyCpiMap, saFactorForDate, maturitySaFactor, seasonalHorizonWeight } from '../../shared/src/ref-cpi.js';
+import { refCpiFromMonthly, monthlyCpiMap, saFactorForDate, maturitySaFactor, credibilityFactor } from '../../shared/src/ref-cpi.js';
 
 const FRED = id => `https://fred.stlouisfed.org/graph/fredgraph.csv?id=${id}`;
 const R2 = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev';
@@ -211,7 +211,7 @@ console.log('  maturity     yrs   w(h)    dbp now   dbp weighted');
 for (const b of bonds) {
   if (b.yrs < 4) continue;
   const sFaded = maturitySaFactor(rRows, b.mat, settleStr);
-  const w = seasonalHorizonWeight(b.matDate.getMonth() + 1, b.h);
+  const w = credibilityFactor(b.matDate.getMonth() + 1, b.h);
   const dFaded = (yieldFromPrice(b.price * (saSettle / sFaded), b.coupon, settle, b.matDate) - b.ask) * 1e4;
   console.log(`  ${b.mat} ${b.yrs.toFixed(1).padStart(5)}  ${w.toFixed(3)}  ${b.dbp.toFixed(1).padStart(7)}  ${dFaded.toFixed(1).padStart(12)}`);
 }

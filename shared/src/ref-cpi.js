@@ -135,7 +135,7 @@ export function saFactorForDate(rows, dateStr) {
   return best ? parseFloat(best['SA Factor']) : null;
 }
 
-// ─── Seasonal factor horizon weight ─────────────────────────────────────────
+// ─── Credibility factor for a projected maturity SA factor ──────────────────
 // The maturity-date SA factor of nearly every outstanding TIPS is a
 // substitution: the maturity lies beyond the published series, so
 // saFactorForDate() reuses the same month/day from the most recent cycle. BLS
@@ -143,8 +143,10 @@ export function saFactorForDate(rows, dateStr) {
 // publishes them only one year forward, so that reuse is an extrapolation of
 // the current seasonal pattern whose error grows with the horizon to maturity.
 // YieldCurves/knowledge/1.1_Seasonal_Factor_Drift.md measures the error and
-// derives the confidence weight applied here; the constants below are emitted
-// by YieldCurves/scripts/sa-drift-analyze.mjs (FRED CPI-U history, 1948-2026).
+// derives the weight applied here — the credibility factor of actuarial
+// credibility theory (Bühlmann's Z at one observation); the constants below
+// are emitted by YieldCurves/scripts/sa-drift-analyze.mjs (FRED CPI-U history,
+// 1948-2026).
 
 const SEASONAL_AMPLITUDE = 0.002632;   // within-year sd of the interpolated S series, 2015-2019
 const SEASONAL_DRIFT_HORIZONS = [1, 2, 3, 5, 7, 10, 15, 20, 25, 30];
@@ -179,9 +181,11 @@ export function seasonalDriftSigma(month, h) {
   return row[row.length - 1];
 }
 
-// Confidence weight w(h) = A² / (A² + σ_drift(h)²): the fraction of a reused
-// maturity factor's departure from 1.0 that survives the weight. 1.0 as h → 0.
-export function seasonalHorizonWeight(month, h) {
+// Credibility factor Z(h) = A² / (A² + σ_drift(h)²): the fraction of a reused
+// maturity factor's departure from 1.0 that survives, given a prior centred on
+// 1.0 with variance A² and an observation whose error variance is σ_drift(h)².
+// 1.0 as h → 0. See DATA_DICTIONARY.md#credibility-factor.
+export function credibilityFactor(month, h) {
   if (!(h > 0)) return 1;
   const s = seasonalDriftSigma(month, h);
   const A2 = SEASONAL_AMPLITUDE * SEASONAL_AMPLITUDE;
@@ -199,5 +203,5 @@ export function maturitySaFactor(rows, maturityDate, asOfDate) {
   if (base == null) return null;
   const month = parseInt(maturityDate.slice(5, 7), 10);
   const h = (Date.parse(maturityDate) - Date.parse(asOfDate)) / (365.2425 * 86400000);
-  return 1 + (base - 1) * seasonalHorizonWeight(month, h);
+  return 1 + (base - 1) * credibilityFactor(month, h);
 }
