@@ -12,7 +12,7 @@
 //   E  decade means of f by month (the motor-fuel structural shift)
 //   F  SA-minus-ask across the full TIPS curve, by maturity year
 //   G  maturity-month residual structure, front vs long
-//   H  SA-minus-ask under the w(h) fade of S_maturity
+//   H  SA-minus-ask under the credibility weighting of S_maturity
 
 import { yieldFromPrice, daysBetween } from '../../shared/src/bond-math.js';
 import { refCpiFromMonthly, monthlyCpiMap, saFactorForDate, maturitySaFactor, credibilityFactor } from '../../shared/src/ref-cpi.js';
@@ -210,10 +210,10 @@ console.log('\n=== H. SA-minus-ask under maturitySaFactor() — the operative we
 console.log('  maturity     yrs   w(h)    dbp now   dbp weighted');
 for (const b of bonds) {
   if (b.yrs < 4) continue;
-  const sFaded = maturitySaFactor(rRows, b.mat, settleStr);
-  const w = credibilityFactor(b.matDate.getMonth() + 1, b.h);
-  const dFaded = (yieldFromPrice(b.price * (saSettle / sFaded), b.coupon, settle, b.matDate) - b.ask) * 1e4;
-  console.log(`  ${b.mat} ${b.yrs.toFixed(1).padStart(5)}  ${w.toFixed(3)}  ${b.dbp.toFixed(1).padStart(7)}  ${dFaded.toFixed(1).padStart(12)}`);
+  const sWeighted = maturitySaFactor(rRows, b.mat, settleStr);
+  const z = credibilityFactor(b.matDate.getMonth() + 1, b.h);
+  const dWeighted = (yieldFromPrice(b.price * (saSettle / sWeighted), b.coupon, settle, b.matDate) - b.ask) * 1e4;
+  console.log(`  ${b.mat} ${b.yrs.toFixed(1).padStart(5)}  ${z.toFixed(3)}  ${b.dbp.toFixed(1).padStart(7)}  ${dWeighted.toFixed(1).padStart(12)}`);
 }
 
 // ===== I. option comparison for the long end (persistence, autocorrelation, shrink-to-mean) =====

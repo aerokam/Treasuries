@@ -25,9 +25,10 @@ export const SAO_NOISE_YRS = 0.5;  // exclude < this from the FIT (near-maturity
 // amortizes with maturity (see 2.2 §2, extended full-curve analysis in 2.2 §6): beyond
 // ~5-6yrs the SA curve is already smooth on its own, so snapping it to NSS there would
 // smooth away genuine coupon/relative-value structure instead of seasonal residual.
-// So the curve-fit weight fades from 1 (full snap) to 0 (report raw SA) over this band.
-export const SAO_FADE_START_YRS = 5.0;
-export const SAO_FADE_END_YRS = 6.0;
+// So the curve-fit weight declines from 1 (full snap) to 0 (report raw SA) over this band;
+// between the two the SAO yield is a blend of the two.
+export const SAO_BLEND_START_YRS = 5.0;
+export const SAO_BLEND_END_YRS = 6.0;
 
 // NSS basis at maturity τ for decay params λ1, λ2: [level, slope, curv1, curv2].
 export function nssBasis(tau, l1, l2) {
@@ -181,8 +182,8 @@ export function spotCurveGrid(bonds, opts) {
   return grid.length >= 3 ? grid : null;
 }
 
-// Snap each bond's SA yield to a smooth NSS fair-value curve, fading the snap weight out
-// with years-to-maturity (see 2.0_SAO_Adjustment.md). Mutates each bond with _saoFit /
+// Snap each bond's SA yield to a smooth NSS fair-value curve, with the snap weight declining
+// to 0 over the blend band in years-to-maturity (see 2.0_SAO_Adjustment.md). Mutates each bond with _saoFit /
 // _saoWeight / _saoDevBps / _saoMode diagnostics; returns the SAO yield array.
 export function calculateSAO(bonds) {
   const n = bonds.length;
@@ -207,11 +208,11 @@ export function calculateSAO(bonds) {
     const fit = curve ? curve(Math.max(yrs[i], tMin)) : b.saYield;
     const weight = yrs[i] < SAO_NOISE_YRS
       ? 1
-      : Math.min(1, Math.max(0, (SAO_FADE_END_YRS - yrs[i]) / (SAO_FADE_END_YRS - SAO_FADE_START_YRS)));
+      : Math.min(1, Math.max(0, (SAO_BLEND_END_YRS - yrs[i]) / (SAO_BLEND_END_YRS - SAO_BLEND_START_YRS)));
     b._saoFit = fit;
     b._saoWeight = weight;
     b._saoDevBps = (b.saYield - fit) * 10000;   // how far the SA point sat off the smooth curve (rich/cheap)
-    b._saoMode = yrs[i] < SAO_NOISE_YRS ? 'noise' : weight >= 1 ? 'smooth' : weight <= 0 ? 'raw' : 'fade';
+    b._saoMode = yrs[i] < SAO_NOISE_YRS ? 'noise' : weight >= 1 ? 'smooth' : weight <= 0 ? 'raw' : 'blend';
     sao[i] = fit * weight + b.saYield * (1 - weight);
   }
   return sao;
