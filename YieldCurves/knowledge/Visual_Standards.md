@@ -1,0 +1,103 @@
+# 3.0 Visual Standards & Interaction
+
+**Constrains:** [3.7 Render charts and tables](/knowledge/DFD_LEVEL3_YC_RENDER) and the seven processes it decomposes into, specified in [6.0 Rendering](./3.7_Rendering.md)  
+**Implemented by:** `YieldCurves/src/app.js`, `shared/src/chart-time-axis.js`
+
+## Overview
+The TIPS seasonally adjusted (SA) and SA with Other Adjustment (SAO) yield curve chart is designed for investment analysis, prioritizing precision, logical grid alignment, and fluid navigation across the maturity timeline.
+
+## Graphing Rules
+
+### 1. The 0.25 Grid (Vertical Axis)
+- **Primary Resolution**: The Y-axis (Yield %) must strictly align with **0.25** increments (e.g., 2.00, 2.25, 2.50).
+- **Initial Scaling**: Upon load or reset, the axis bounds are rounded **strictly up/down** to the nearest 0.25 based on the min/max of all datasets.
+- **Grid Snapping**: During zoom/pan, the axis endpoints must "snap" to the current `stepSize` to maintain clean, professional-looking boundaries.
+- **Horizontal gridlines** are drawn at every Y tick.
+
+### 1a. Gridline color
+Horizontal and vertical gridlines share one color, `rgba(0,0,0,0.08)` (`GRID_COLOR` in `src/app.js`), on every chart — Yield Curves, Breakeven, and both Bid-Ask Spread charts, in Maturity mode and Term mode alike. Visible against the chart background but subordinate to the plotted series.
+
+### 2. Time-Aligned X-Axis (Calendar Mode)
+Calendar mode uses `calendarTimeAxis()` from `shared/src/chart-time-axis.js`. Tick positions and gridlines are generated from calendar boundaries — not by Chart.js autoSkip — guaranteeing the same months appear at the same positions every year at every zoom level. All intervals anchor to January.
+
+- **Density**: Always produces ≥ 6 ticks across the visible span by picking the largest calendar-aligned interval (1 month → 10 years) that still satisfies the threshold.
+- **Gridline colour**: see §1a — the shared `GRID_COLOR`, passed to `calendarTimeAxis()` as `gridColor`.
+- **Formatting**: Label format determined by average spacing between ticks — year-only (≥ 300 days), `MMM YYYY` (25–299 days), `MMM D` (< 25 days).
+- **Mid-year axis start**: Year-level ticks anchor to January 1st, so when the visible range begins after January 1st of its own year (e.g. a bond curve starting 10/2026), that year's January anchor falls before the axis min and gets dropped — the first labeled tick is the next aligned year instead (e.g. 2028, not 2026). Tried adding a boundary tick at the true axis start to show that year too (2026-08-02); reverted — it crowded against the next regular label, and a follow-up attempt at unlabeled minor gridlines every year crashed Chart.js's own tick generator on resize. Parked; revisit only with a plan for how Chart.js will actually be exercised (resize timing included), not just the tick-math in isolation.
+
+### 2a. Term (TTM) X-Axis
+When X-axis mode is **Term**, the axis shows time-to-maturity instead of calendar dates.
+- **Year labels**: Always integers (e.g., `2y`, `5y` — never `2.0y`).
+- **Adaptive granularity** (Treasuries non-bills linear scale):
+  - Span > 260w (> 5y): tick every 52w, label as `Xy` (integer years only).
+  - 104w < span ≤ 260w (2–5y): tick every 26w (6-monthly), label as `Xy` or `Xy 6m`.
+  - 52w < span ≤ 104w (1–2y): tick every 13w (quarterly), label as `Xy`, `Xy 3m`, `Xy 6m`, `Xy 9m`.
+  - 12w < span ≤ 52w (~3m–1y): tick every 4w (monthly), label as `Xm` (sub-year) or `Xy Zm` (≥ 1y).
+  - Span ≤ 12w: tick every 1w, label as `Xw`.
+  - **Never** use `X.5y` notation — always write `Xy 6m`.
+- **TIPS / spread charts** (time scale): `unit` auto-determined by Chart.js based on visible range; callback formats ticks as `Xw` (span ≤ 91d) / `Xm` (span ≤ 365d) / `Xy Zm` (span > 365d) — same mixed format as the Treasuries linear scale to prevent duplicate year labels when Chart.js generates sub-yearly ticks.
+- **Source toggle** (FedInvest ↔ Market): does **not** reset zoom or pan state.
+
+### 3. Data Flow Order (Legend)
+The legend and visual priority follow the logical flow of data:
+1.  **Ask / Mid (Circle)**: The raw, unadjusted market quote. For FedInvest, this is the **Mid-Market Price** (midpoint of bid and ask); for broker data, it is the **Ask Price**. (Bottom-most Z-index).
+    - **Note**: Because FedInvest prices are mid-market, their yields will consistently appear higher than broker ask yields. This is expected behavior and is most prominent on the short end (Bills).
+2.  **Seasonally Adjusted (SA) (Circle)**: The primary math transform. (Middle Z-index).
+3.  **SA with other adjustment (SAO) (Circle)**: The final empirical trend. (Top-most Z-index).
+
+**Visual Differentiation**:
+- **FedInvest source**: Rendered as **dotted lines** to distinguish from market data.
+- **Market (Broker) source**: Rendered as **solid lines**.
+- **All series**: Use small circular points for data markers to maintain a clean, professional look.
+
+## Interaction Model
+
+### 1. Navigation
+- **Free-form XY Panning**: Click and drag in any direction to move the chart.
+- **Simultaneous XY Zoom**: Mouse wheel or pinch gestures zoom both axes at once, allowing the curve to fill the available space.
+- **Reset View**: Clears any saved zoom state, resets the zoom plugin, and re-fits the Y axis to visible data (applying outlier clipping if enabled).
+
+### 2. Visibility
+- **Adaptive Step Size**: Gridlines switch from 0.25 to 0.50/1.00 when zoomed out, or to 0.05 when zoomed in, ensuring grid density remains readable.
+- **Show/Hide Series**: Users can click legend items to toggle individual datasets. Hovering over legend items displays a pointer cursor to indicate interactivity.
+
+### 3. Auto-Rescale on Filter Change
+Any checkbox that changes what data is displayed must trigger a Y-axis auto-fit (clear saved zoom, re-render from data bounds). This includes:
+- **Type filters** (Bills, Notes, Bonds, STRIPS): Y-axis and X-axis rescale to the remaining data.
+- **Clip Outliers**: Y-axis rescales applying or removing IQR-based clipping.
+
+**Source toggles** (FedInvest, Market) do **not** rescale at all. Adding or removing a source rebuilds the chart, but the current view (X zoom/pan **and** Y scale) is preserved verbatim — the same behavior as showing/hiding a series (Ask, SA, SAO). A source toggle must never change the axis bounds. Mechanism: the source handlers snapshot the live scales into `savedZoom[tab]` before `processAndRender()`, so the rebuild restores them instead of auto-fitting.
+
+Zoom is also NOT cleared by: date range filter changes, table sort, or legend series hide/show (legend toggles call `rescaleToVisible` directly — a refit to visible data that is visually a no-op when the remaining series share the same range).
+
+### 4. Per-Tab Zoom State
+Each tab (TIPS, Treasuries) maintains its own independent zoom state:
+- Switching tabs preserves the zoom on the tab being left and restores the zoom on the tab being entered.
+- Switching tabs always resets the date range filter to whatever it was when that tab was last active.
+- Zoom state is cleared (auto-fit) when any filter checkbox is toggled on the active tab.
+
+### 5. Outlier Clipping (Treasuries only)
+The **Clip Outliers** toggle (default: on) clips the Y-axis floor to suppress near-maturity Bills/Notes with extreme negative YTM. A Bill or Note maturing in days and trading at a tiny premium can show yields like −5%, which collapses the visible yield range for all other data. Only the floor is clipped — no upper bound is applied.
+
+**Algorithm (`iqrClipBounds`):**
+- Only activates when Bills or Notes series are visible — they are the source of near-maturity garbage; Bonds/STRIPS alone are not clipped.
+- IQR source: positive-yield Bills + Notes values only (filters out near-maturity values before computing Q1/Q3).
+- Fence = max(1.0 × IQR, 0.5%); floor = Q1 − fence.
+- Floor is applied to all visible Y values; ceiling = natural data max (unconstrained).
+- Data points below the floor are still plotted — only the axis scale is adjusted.
+- Applied on initial render and via `rescaleToVisible()` (legend toggle, Reset View).
+- Not applicable to the TIPS tab.
+
+### 6. Outlier Clipping — Bid-Ask Spreads charts (TIPS and Treasuries)
+The Yield Spread and Price Spread charts (Bid-Ask Spreads sub-tab) use a separate, *local* clipping mechanism from §5 above — applicable to TIPS as well as Treasuries, and clipping both the ceiling and floor.
+
+**Why local, not whole-series**: A single IQR fence over an entire maturity curve is wrong in both directions. It is too loose to catch a spike that's only extreme relative to its own tight neighborhood (e.g. a single erratic near-maturity TIPS bond sitting inside a dense short-end cluster), and too tight when a real, gradual trend (e.g. price spread widening through the long end) is high only relative to an unrelated dense cluster elsewhere in the series, not relative to its own neighbors — a whole-series fence would wrongly hide that entire genuine move.
+
+**Curve fit** (`_kernelAverageTrend` in `src/app.js`): a Nadaraya-Watson–style trend line evaluated on a 200-point grid, using a fixed **1.5-year absolute bandwidth** (not a fraction of the series' x-range, and not a fixed point count — both fail once density varies this much between the dense short end and sparse long end). Before averaging each grid point's window, y-values are Winsorized to that window's own IQR fence (`iqrClipBounds`, no minimum fence) — this reshapes only the fitted line, never the raw scatter points.
+
+**Axis bounds** (`_clippedYRange` / `_localOutlierMask` in `src/app.js`): a raw point is excluded from the Y-axis min/max calculation only if it falls outside the IQR fence computed from its own nearby-maturity neighbors (same 1.5yr/4-point window idea as the curve fit). Applied identically on initial chart creation and on every rescale (Reset Zoom, wheel-zoom, pan, legend toggle) via `_rescaleSpread`, so "clip outliers" means the same thing everywhere — Reset Zoom cannot un-clip a genuine outlier or re-clip a genuine trend.
+
+## Terms
+- [SA Yield](../../knowledge/DATA_DICTIONARY.md#sa-yield)
+- [SAO Yield](../../knowledge/DATA_DICTIONARY.md#sao-yield)
+- [IQR Clip](../../knowledge/DATA_DICTIONARY.md#iqr-clip)
