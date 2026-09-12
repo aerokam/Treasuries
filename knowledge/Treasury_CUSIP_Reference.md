@@ -29,7 +29,7 @@ The first 6 characters of a U.S. Treasury CUSIP identify the instrument type. Th
 
 ## Why not description text
 
-Broker exports (e.g. Fidelity) carry a free-text description that is **not a reliable type signal**: as a security nears maturity, Fidelity renames it from a form that says "NOTE"/"BILL" to a generic `"UNITED STATES TREAS SER <code>-YYYY"` form with no type wording at all. Code that regex-matched on this description defaulted every near-maturity Note to "Bond" once the word "NOTE" disappeared from the text, which made Notes maturing within the next several months invisible from the Notes filter in YieldCurves. CUSIP root has no such failure mode: it's structural, always present, and doesn't degrade near maturity.
+Broker exports carry a free-text description that is **not a reliable type signal**: as a security nears maturity, the broker renames it from a form that says "NOTE"/"BILL" to a generic `"UNITED STATES TREAS SER <code>-YYYY"` form with no type wording at all. Code that regex-matched on this description defaulted every near-maturity Note to "Bond" once the word "NOTE" disappeared from the text, which made Notes maturing within the next several months invisible from the Notes filter in YieldCurves. CUSIP root has no such failure mode: it's structural, always present, and doesn't degrade near maturity.
 
 ## STRIPS
 

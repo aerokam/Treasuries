@@ -253,7 +253,7 @@ const COL_HELP = {
   'spot-bei': {
     title: 'Spot BEI — Curve-Based Breakeven Inflation',
     html: `<p>Ask / SA / SAO BEI are per-TIPS: each subtracts a single closest-maturity nominal yield from that one bond's real yield.</p>
-<p><strong>Spot BEI</strong> is instead the <strong>nominal zero-coupon curve minus the seasonally adjusted real zero-coupon curve</strong>, read off at each horizon. Both curves are fitted to the Market (Fidelity) securities. Every point is a genuine same-horizon breakeven — a 10-year point compares a 10-year nominal rate with a 10-year real rate — rather than a comparison of two bonds that only roughly line up in maturity.</p>`
+<p><strong>Spot BEI</strong> is instead the <strong>nominal zero-coupon curve minus the seasonally adjusted real zero-coupon curve</strong>, read off at each horizon. Both curves are fitted to the market-quote securities. Every point is a genuine same-horizon breakeven — a 10-year point compares a 10-year nominal rate with a 10-year real rate — rather than a comparison of two bonds that only roughly line up in maturity.</p>`
   },
   'gsw': {
     title: 'GSW — Federal Reserve TIPS Curve',
@@ -1512,7 +1512,7 @@ function processAndRenderBei() {
   const statusEl = document.getElementById('status');
 
   if (!brokerPrices || !fidelityNominalsData) {
-    statusEl.textContent = 'BEI requires Market (Fidelity) TIPS and nominal data.';
+    statusEl.textContent = 'BEI requires market-quote TIPS and nominal data.';
     statusEl.className = '';
     if (chart) { chart.destroy(); chart = null; }
     document.getElementById('beiTableBody').innerHTML = '';
