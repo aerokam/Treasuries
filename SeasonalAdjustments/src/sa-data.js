@@ -107,7 +107,7 @@ export async function loadData() {
     // published series. The Explorer draws the seasonal cycle itself, so it
     // uses this directly; the horizon fade (maturitySaFactor) applies only
     // where the factor feeds an SA yield (YieldCurves/knowledge/
-    // 1.0_Seasonal_Adjustments.md §Horizon-Dependent Maturity Factor).
+    // 3.2_Seasonal_Adjustments.md §Horizon-Dependent Maturity Factor).
     const maxYear = parseInt(latestDate.slice(0, 4));
     const out = new Array(365);
     for (let m = 0; m < 12; m++) for (let d = 0; d < DIM[m]; d++) {

@@ -103,7 +103,7 @@ Most apps have a `knowledge/` subdirectory with their own DFD, process specs, an
 | App | Key Specs |
 |-----|-----------|
 | TipsLadderManager | [1.0 Bond Ladders](../TipsLadderManager/knowledge/1.0_Bond_Ladders.md) · [2.0 TIPS Ladders](../TipsLadderManager/knowledge/2.0_TIPS_Ladders.md) · [3.0 Rebalancing](../TipsLadderManager/knowledge/3.0_TIPS_Ladder_Rebalancing.md) · [4.0 Computation](../TipsLadderManager/knowledge/4.0_Computation_Modules.md) · [5.0 UI Schema](../TipsLadderManager/knowledge/5.0_UI_Schema.md) |
-| YieldCurves | [1.0 Seasonal Adjustments](../YieldCurves/knowledge/1.0_Seasonal_Adjustments.md) · [2.0 SAO Adjustment](../YieldCurves/knowledge/2.0_SAO_Adjustment.md) · [3.0 Visual Standards](../YieldCurves/knowledge/3.0_Visual_Standards.md) |
+| YieldCurves | [1.0 Seasonal Adjustments](../YieldCurves/knowledge/3.2_Seasonal_Adjustments.md) · [2.0 SAO Adjustment](../YieldCurves/knowledge/3.3_SAO_Adjustment.md) · [3.0 Visual Standards](../YieldCurves/knowledge/Visual_Standards.md) |
 | YieldsMonitor | [1.0 Operation](../YieldsMonitor/knowledge/1.0_Operation.md) · [2.1 Time Series](../YieldsMonitor/knowledge/2.1_Time_Series.md) · [2.2 Yield Curves](../YieldsMonitor/knowledge/2.2_Yield_Curves.md) · [2.3 Breakeven Inflation](../YieldsMonitor/knowledge/2.3_Breakeven_Inflation.md) · [2.4 Seasonal Adjustment](../YieldsMonitor/knowledge/2.4_Seasonal_Adjustment.md) |
 | TreasuryAuctions | [Data Pipeline](../TreasuryAuctions/knowledge/Data_Pipeline.md) |
 | CpiExplorer | [1.0 Overview](../CpiExplorer/knowledge/1.0_Overview.md) · [2.0 Technical Spec](../CpiExplorer/knowledge/2.0_Technical_Spec.md) |

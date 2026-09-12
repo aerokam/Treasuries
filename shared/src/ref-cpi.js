@@ -1,6 +1,6 @@
 // ref-cpi.js — Single canonical home for Reference CPI logic.
 // Spec: knowledge/DATA_DICTIONARY.md#ref-cpi, knowledge/TIPS_Basics.md,
-//       YieldCurves/knowledge/1.0_Seasonal_Adjustments.md
+//       YieldCurves/knowledge/3.2_Seasonal_Adjustments.md
 //
 // Per the project-wide no-redundancy directive (projects/CLAUDE.md §2a), all
 // Ref CPI logic lives here and is imported — never copied inline.
@@ -120,7 +120,7 @@ export function indexRatio(refCpi, datedDateRefCpi) {
 // past occurrence of the same calendar month/day: the daily SA factor is a
 // slowly-drifting, annually-repeating seasonal pattern, so a recent same-
 // month/day reading is the best available proxy (see YieldCurves knowledge/
-// 1.0_Seasonal_Adjustments.md and 2.1_SA_Intuition.md).
+// 3.2_Seasonal_Adjustments.md and SA_Intuition.md).
 // Returns null if that month/day never appears in the series.
 export function saFactorForDate(rows, dateStr) {
   const exact = rows.find(r => r['Ref CPI Date'] === dateStr);
@@ -142,7 +142,7 @@ export function saFactorForDate(rows, dateStr) {
 // re-estimates seasonal factors every year from a moving 5–11 year window and
 // publishes them only one year forward, so that reuse is an extrapolation of
 // the current seasonal pattern whose error grows with the horizon to maturity.
-// YieldCurves/knowledge/1.1_Seasonal_Factor_Drift.md measures the error and
+// YieldCurves/knowledge/Seasonal_Factor_Drift.md measures the error and
 // derives the weight applied here — the credibility factor of actuarial
 // credibility theory (Bühlmann's Z at one observation); the constants below
 // are emitted by YieldCurves/scripts/sa-drift-analyze.mjs (FRED CPI-U history,

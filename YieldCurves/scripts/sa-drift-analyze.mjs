@@ -1,5 +1,5 @@
 // Seasonal-factor drift analysis — reproduces every table in
-// knowledge/1.1_Seasonal_Factor_Drift.md against live data.
+// knowledge/Seasonal_Factor_Drift.md against live data.
 //
 //   node scripts/sa-drift-analyze.mjs
 //

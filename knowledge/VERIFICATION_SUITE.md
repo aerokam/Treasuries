@@ -34,7 +34,7 @@ Follow these steps to verify that the navigation, rendering, and drill-down feat
 ## 4. Anchor Handling (Inside YieldCurves)
 - [ ] Open **YieldCurves Overview**.
 - [ ] **Process Click**: Click the **1.0 Seasonal Adjustment** bubble.
-    - *Expected*: Navigates to the detailed `1.0_Seasonal_Adjustments.md` document.
+    - *Expected*: Navigates to the detailed `3.2_Seasonal_Adjustments.md` document.
 
 ## 5. Ingestion Pipeline
 - [ ] Click **Ingestion Jobs** in the Context Map.

@@ -34,9 +34,9 @@ graph LR
     U <-->|Zoom / Pan / Filters| P3
 
     %% Links to Specs
-    click P1 "#/md/YieldCurves/knowledge/1.0_Seasonal_Adjustments.md" "View SA Logic"
-    click P2 "#/md/YieldCurves/knowledge/2.0_SAO_Adjustment.md" "View SAO Logic"
-    click P3 "#/md/YieldCurves/knowledge/3.0_Visual_Standards.md" "View UI Specs"
+    click P1 "#/md/YieldCurves/knowledge/3.2_Seasonal_Adjustments.md" "View SA Logic"
+    click P2 "#/md/YieldCurves/knowledge/3.3_SAO_Adjustment.md" "View SAO Logic"
+    click P3 "#/md/YieldCurves/knowledge/Visual_Standards.md" "View UI Specs"
     click S1 "#/md/knowledge/DataStores.md#s1" "View Schema"
     click S4 "#/md/knowledge/DataStores.md#s4" "View Schema"
     click S7 "#/md/knowledge/DataStores.md#s7" "View Schema"
@@ -46,17 +46,17 @@ graph LR
 
 ## 2.0 Core Processes
 
-### [1.0 Seasonal Adjustment (SA)](../YieldCurves/knowledge/1.0_Seasonal_Adjustments.md)
+### [1.0 Seasonal Adjustment (SA)](../YieldCurves/knowledge/3.2_Seasonal_Adjustments.md)
 Normalizes real yields by applying seasonal factors derived from BLS CPI-U (NSA vs SA) data.
 - **Goal**: Enable "fair" comparison of yields across different months of the year.
 - **Formula**: `SA Yield = Clean Price * (S_settle / S_maturity)`
 
-### [2.0 SAO Other Adjustment](../YieldCurves/knowledge/2.0_SAO_Adjustment.md)
+### [2.0 SAO Other Adjustment](../YieldCurves/knowledge/3.3_SAO_Adjustment.md)
 Applies a backwards-anchored linear regression to smooth the front-end of the SA curve.
 - **Goal**: Remove idiosyncratic "wiggles" caused by liquidity or one-off shocks to specific CUSIPs.
 - **Method**: Blending the SA yield with a projected trend line.
 
-### [3.0 Interactive Visualization](../YieldCurves/knowledge/3.0_Visual_Standards.md)
+### [3.0 Interactive Visualization](../YieldCurves/knowledge/Visual_Standards.md)
 A high-performance charting interface built with Chart.js and Hammer.js.
 - **Features**: Full X/Y zoom, vertical panning, and dataset visibility toggles.
 - **Visual Priority**: SAO > SA > Ask (Market).
@@ -65,6 +65,6 @@ A high-performance charting interface built with Chart.js and Hammer.js.
 
 ## 3.0 Foundational Logic (The Engine Room)
 
-- **[SA Intuition (2.1)](../YieldCurves/knowledge/2.1_SA_Intuition.md)**: Conceptual guide to why seasonality matters for TIPS.
+- **[SA Intuition (2.1)](../YieldCurves/knowledge/SA_Intuition.md)**: Conceptual guide to why seasonality matters for TIPS.
 - **[Canty Authority](../YieldCurves/knowledge/Canty.md)**: Technical reference for the mathematical foundations of SA/SAO (Canty, 2009).
-- **[Data Pipeline](../../knowledge/Data_Pipeline.md)**: Details on the GitHub Actions that update the R2 data stores.
+- **[Data Pipeline](./Data_Pipeline.md)**: Details on the GitHub Actions that update the R2 data stores.

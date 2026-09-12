@@ -1,6 +1,6 @@
 # Seasonally Adjusted Prices for Inflation-Linked Bonds
 
-**Source for:** [1.0 Seasonal Adjustments](./1.0_Seasonal_Adjustments.md), [2.0 SAO](./2.0_SAO_Adjustment.md)
+**Source for:** [1.0 Seasonal Adjustments](./3.2_Seasonal_Adjustments.md), [2.0 SAO](./3.3_SAO_Adjustment.md)
 **Author:** Paul Canty (Deutsche Bank, European Head of Inflation Trading) — *Risk*, January 2009.
 
 This is a thorough working summary of the paper, written to be the canonical reference for the seasonal-adjustment math used across the Treasuries apps. Equation numbers match the paper. Where the apps depend on a result, the dependency is noted.
@@ -48,7 +48,7 @@ Canty's paper uses generic notation for inflation-linked bonds across any market
 
 - **Trend component = SA Ref CPI.** Because the SA Factor $S = \text{NSA}/\text{SA}$ and the index decomposes as $I = T \times S$, the trend component $T$ is exactly the SA Ref CPI: $T = I / S = \text{NSA} / (\text{NSA}/\text{SA}) = \text{SA}$.
 
-- **Semiannual vs annual.** Canty's Eq. 1–14 simplify to annual coupons; TIPS pay semi-annually. Eq. 17 handles two coupon months. As shown in spec [2.2](2.2_SAO_Residual_Analysis.md), the single-factor approximation (Eq. 14) is adequate for TIPS because the second-factor correction is ≤1 bp, driven by the small coupon stream while the principal cashflow (which dominates) falls in the maturity month in both formulas identically.
+- **Semiannual vs annual.** Canty's Eq. 1–14 simplify to annual coupons; TIPS pay semi-annually. Eq. 17 handles two coupon months. As shown in spec [2.2](SAO_Residual_Analysis.md), the single-factor approximation (Eq. 14) is adequate for TIPS because the second-factor correction is ≤1 bp, driven by the small coupon stream while the principal cashflow (which dominates) falls in the maturity month in both formulas identically.
 
 ---
 
@@ -71,7 +71,7 @@ $$I_t = T_t S_t \qquad (2)$$
 - $T_t$ — **trend component** of the index (the underlying, deseasonalised inflation path).
 - $S_t$ — **seasonal component** of the index for the calendar position of $t$ (repeats every 12 months; *constant over time* — the paper's key simplifying assumption).
 
-> **App mapping.** In this project $S_t = \dfrac{\text{RefCPI}_{NSA}(t)}{\text{RefCPI}_{SA}(t)}$ — the ratio of the (App. B daily-interpolated) Non-Seasonally-Adjusted Ref CPI to the Seasonally-Adjusted Ref CPI. NSA $= T\cdot S$, SA $= T$, so their ratio isolates $S$. The daily SA series is a **calculated construct** (there is no official daily SA Ref CPI); see [1.0 Seasonal Adjustments](1.0_Seasonal_Adjustments.md) and `shared/src/ref-cpi.js`.
+> **App mapping.** In this project $S_t = \dfrac{\text{RefCPI}_{NSA}(t)}{\text{RefCPI}_{SA}(t)}$ — the ratio of the (App. B daily-interpolated) Non-Seasonally-Adjusted Ref CPI to the Seasonally-Adjusted Ref CPI. NSA $= T\cdot S$, SA $= T$, so their ratio isolates $S$. The daily SA series is a **calculated construct** (there is no official daily SA Ref CPI); see [1.0 Seasonal Adjustments](3.2_Seasonal_Adjustments.md) and `shared/src/ref-cpi.js`.
 
 The fully-adjusted extension adds the outlier index (used only by FACP, §8):
 
@@ -139,7 +139,7 @@ The nominal inflation accrual of a TIPS from settlement to maturity is $\frac{I_
 - **$S_{Mat} > S_{Settle}$** (buy in a low-factor month, mature in a high-factor month): the indexation period includes additional *seasonally guaranteed* nominal inflation. The market prices the bond **up** (lower quoted real yield). Eq 14 multiplies price by $\frac{S_{Settle}}{S_{Mat}}<1$ to **remove that additional inflation**.
 - **$S_{Mat} < S_{Settle}$** (buy high, mature low): you forgo seasonal inflation; the market prices it **down** (higher quoted yield). Eq 14 multiplies by $\frac{S_{Settle}}{S_{Mat}}>1$ to **compensate**.
 
-Thus the seasonal adjustment is fundamentally a correction to **expected nominal return** — it levels out the portion of return that is *seasonally predictable* so bonds maturing in different months compare on equal footing. (This framing is developed further in [2.0](2.0_SAO_Adjustment.md) §"Caveat" and [2.2](2.2_SAO_Residual_Analysis.md) §5.1, which note that other, *non*-seasonally-predictable factors may also move nominal return but cannot be modelled.)
+Thus the seasonal adjustment is fundamentally a correction to **expected nominal return** — it levels out the portion of return that is *seasonally predictable* so bonds maturing in different months compare on equal footing. (This framing is developed further in [2.0](3.3_SAO_Adjustment.md) §"Caveat" and [2.2](SAO_Residual_Analysis.md) §5.1, which note that other, *non*-seasonally-predictable factors may also move nominal return but cannot be modelled.)
 
 ### Why it works (empirical evidence in the paper)
 - **Fig 3** (BTPS 1.65% 2008): the SA breakeven series is far less volatile and the April-2007 seasonal peak is largely removed.
@@ -166,7 +166,7 @@ $$SACP \approx CP\left(\frac{w_1\frac{S_{Settle}}{S_1} + w_2\frac{S_{Settle}}{S_
 
 $$w_1 = \sum_{i\ \text{odd}} \frac{C_i}{(1+RY)^{t_i}}, \qquad w_2 = \sum_{i\ \text{even}} \frac{C_i}{(1+RY)^{t_i}} \qquad (18,19)$$
 
-> **App note.** The apps deliberately use the **single-factor Eq 14**, not Eq 17. Spec [2.2 §3.3](2.2_SAO_Residual_Analysis.md) tested Eq 17 against the live curve: it moves the worst outlier (2027-04) by **0.0 bp** and corrects at most **+1.1 bp** anywhere, only on high-coupon bonds — because the second-factor weight applies to the small *coupon* payments while the residual applies to the *principal*, which both formulas place in the maturity month identically. Eq 14 is therefore the right simplification.
+> **App note.** The apps deliberately use the **single-factor Eq 14**, not Eq 17. Spec [2.2 §3.3](SAO_Residual_Analysis.md) tested Eq 17 against the live curve: it moves the worst outlier (2027-04) by **0.0 bp** and corrects at most **+1.1 bp** anywhere, only on high-coupon bonds — because the second-factor weight applies to the small *coupon* payments while the residual applies to the *principal*, which both formulas place in the maturity month identically. Eq 14 is therefore the right simplification.
 
 ---
 
@@ -200,13 +200,13 @@ $$FACP = CP\frac{S_{Settle}}{S_{Maturity}}\frac{1}{O_{Maturity}} \qquad (21)$$
 
 This is needed when significant non-seasonal items affect the short end — e.g. **TIPS gasoline volatility** since the last CPI release.
 
-> **App note — "SAO" ≠ FACP.** This project's **SAO** step is *inspired by* Canty's outlier analysis but is **not** an implementation of $O_t$. Canty determines $O_t$ **analytically, per known event**; we cannot identify specific outlier events, so we instead **smooth the SA curve** with a Nelson-Siegel-Svensson fit and treat off-curve deviations as relative-value noise for a buy-and-hold holder. See [2.0](2.0_SAO_Adjustment.md) and [2.2](2.2_SAO_Residual_Analysis.md). **Do not conflate SAO with Canty's $O_t$.**
+> **App note — "SAO" ≠ FACP.** This project's **SAO** step is *inspired by* Canty's outlier analysis but is **not** an implementation of $O_t$. Canty determines $O_t$ **analytically, per known event**; we cannot identify specific outlier events, so we instead **smooth the SA curve** with a Nelson-Siegel-Svensson fit and treat off-curve deviations as relative-value noise for a buy-and-hold holder. See [2.0](3.3_SAO_Adjustment.md) and [2.2](SAO_Residual_Analysis.md). **Do not conflate SAO with Canty's $O_t$.**
 
 ---
 
 ## Appendix B — Canty's illustrative seasonal factors
 
-These are the paper's **example** factors (Table B), *not* the live US series. The real US CPI-NSA/SA factor used by the apps troughs in **late winter/early spring (Feb–Apr, ~0.994)** and peaks in **late summer/early autumn (Aug–Oct, ~1.0035)** — so US **April-maturity** TIPS sit near the seasonal trough and **October-maturity** near the peak (consistent with the residual signs in [2.2](2.2_SAO_Residual_Analysis.md)).
+These are the paper's **example** factors (Table B), *not* the live US series. The real US CPI-NSA/SA factor used by the apps troughs in **late winter/early spring (Feb–Apr, ~0.994)** and peaks in **late summer/early autumn (Aug–Oct, ~1.0035)** — so US **April-maturity** TIPS sit near the seasonal trough and **October-maturity** near the peak (consistent with the residual signs in [2.2](SAO_Residual_Analysis.md)).
 
 | Month | Multiplicative ($S$) | Additive (%) |
 | :--- | :--- | :--- |

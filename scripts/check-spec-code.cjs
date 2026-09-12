@@ -13,7 +13,7 @@
 //   paths        `YieldCurves/src/app.js`  ->  the file must exist
 //   identifiers  `calculateSAO`, `SAO_NOISE_YRS`  ->  the name must appear in source
 //   units       `YieldCurves/src/app.js#parseFedInvestPrices`  ->  file and symbol
-//   spec tags   `// spec: 5.0_Load_And_Parse.md#parse-bond-holidays` in source
+//   spec tags   `// spec: 3.1_Load_And_Parse.md#parse-bond-holidays` in source
 //               ->  the spec and the anchor must exist
 //
 // Everything else in backticks is left alone: column headers, R2 keys, CSV

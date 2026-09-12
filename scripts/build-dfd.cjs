@@ -254,7 +254,8 @@ function level1() {
 
 // ── Level 2: Yield Curves ───────────────────────────────────────────────────
 function level2YieldCurves() {
-  const S = 'YieldCurves/knowledge/7.0_Breakeven_And_Spreads.md';
+  const BEI = 'YieldCurves/knowledge/3.5_Breakeven_Inflation.md';
+  const SPR = 'YieldCurves/knowledge/3.6_Bid_And_Ask_Spreads.md';
   const stores = [
     { id: 'fedinv', name: 'FedInvest prices', href: DS('s1') },
     { id: 'quotes', name: 'Market quotes', href: DS('s7') },
@@ -265,14 +266,14 @@ function level2YieldCurves() {
   const procs = [
     { id: '3.1', name: ['Load and parse', 'source data'], href: 'DFD_LEVEL3_YC_LOAD.html', reads: ['fedinv', 'quotes', 'nsasa', 'hol', 'gsw'],
       out: { '3.2': 'yields, prices, SA factors', '3.4': 'yields, prices, GSW parameters', '3.6': 'bid and ask quotes', '3.7': 'source dates' } },
-    { id: '3.2', name: ['Adjust for', 'seasonality'], href: V('YieldCurves/knowledge/1.0_Seasonal_Adjustments.md'), reads: [],
+    { id: '3.2', name: ['Adjust for', 'seasonality'], href: V('YieldCurves/knowledge/3.2_Seasonal_Adjustments.md'), reads: [],
       out: { '3.3': 'SA yields', '3.4': 'SA yields', '3.5': 'SA yields', '3.7': 'SA yields' } },
-    { id: '3.3', name: ['Adjust for', 'other effects'], href: V('YieldCurves/knowledge/2.0_SAO_Adjustment.md'), reads: [],
+    { id: '3.3', name: ['Adjust for', 'other effects'], href: V('YieldCurves/knowledge/3.3_SAO_Adjustment.md'), reads: [],
       out: { '3.4': 'SAO yields', '3.5': 'SAO yields', '3.7': 'SAO yields' } },
-    { id: '3.4', name: ['Fit spot', 'curves'], href: V('YieldCurves/knowledge/4.0_Spot_Yield_Curves.md'), reads: [],
+    { id: '3.4', name: ['Fit spot', 'curves'], href: V('YieldCurves/knowledge/3.4_Spot_Yield_Curves.md'), reads: [],
       out: { '3.5': 'spot curves', '3.7': 'spot curves' } },
-    { id: '3.5', name: ['Compute', 'breakeven', 'inflation'], href: V(S + '#breakeven-inflation'), reads: [], out: { '3.7': 'breakeven inflation' } },
-    { id: '3.6', name: ['Compute bid', 'and ask', 'spreads'], href: V(S + '#bid-ask-spreads'), reads: [], out: { '3.7': 'spreads' } },
+    { id: '3.5', name: ['Compute', 'breakeven', 'inflation'], href: V(BEI + '#breakeven-inflation'), reads: [], out: { '3.7': 'breakeven inflation' } },
+    { id: '3.6', name: ['Compute bid', 'and ask', 'spreads'], href: V(SPR + '#bid-ask-spreads'), reads: [], out: { '3.7': 'spreads' } },
     { id: '3.7', name: ['Render charts', 'and tables'], href: 'DFD_LEVEL3_YC_RENDER.html', reads: [], out: {} },
   ];
   const SX = 40, SW = 215, PR = 58, UX = 1090, UW = 145;
@@ -305,7 +306,7 @@ function level2YieldCurves() {
   return page({
     title: 'Yield Curves — Level 2', h1: 'Level 2 &mdash; Yield Curves', maxWidth: W,
     up: 'DFD_LEVEL1.html', upLabel: 'Level 1',
-    spec: V('YieldCurves/knowledge/1.0_Seasonal_Adjustments.md'), specLabel: 'Yield Curves specs', svg: P.join(NL),
+    spec: V('YieldCurves/knowledge/3.2_Seasonal_Adjustments.md'), specLabel: 'Yield Curves specs', svg: P.join(NL),
     notes: ['  <b>No process here writes a data store.</b> Every flow ends at 3.7 and is gone when the page closes. What the app computes is not what it stores.',
       '  The spot curves, breakeven inflation and bid and ask spreads are nonetheless available from R2, because the same fitting math runs a second time as a scheduled job inside Level 1 process 1, writing <a href="viewer.html#/md/knowledge/DataStores.md#s13">S13</a>, S14 and S15. The math is defined once, in shared/src/spot-curve.js, and imported by both.',
       '  3.1 is the only process that reads a store; the rest take their input from each other. It explodes at <a href="DFD_LEVEL3_YC_LOAD.html">Level 3</a>.',
@@ -324,13 +325,13 @@ function level3YieldCurvesLoad() {
   ];
   // href null marks a process with no spec of its own; the page lists them.
   const procs = [
-    { id: '3.1.1', name: ['Parse FedInvest', 'prices'], href: V('YieldCurves/knowledge/5.0_Load_And_Parse.md#parse-fedinvest-prices'), reads: ['fedinv'], out: { '3.1.7': 'prices, yields' } },
-    { id: '3.1.2', name: ['Parse market', 'quotes'], href: V('YieldCurves/knowledge/5.0_Load_And_Parse.md#parse-market-quotes'), reads: ['quotes'], out: { '3.1.6': 'quote file date', '3.1.7': 'bid and ask quotes' } },
-    { id: '3.1.3', name: ['Parse Ref CPI', 'and SA factors'], href: V('YieldCurves/knowledge/5.0_Load_And_Parse.md#parse-ref-cpi-and-sa-factors'), reads: ['nsasa'], out: { '3.1.7': 'daily Ref CPI' } },
-    { id: '3.1.4', name: ['Parse bond', 'holidays'], href: V('YieldCurves/knowledge/5.0_Load_And_Parse.md#parse-bond-holidays'), reads: ['hol'], out: { '3.1.6': 'bond trading days' } },
-    { id: '3.1.5', name: ['Parse GSW', 'parameters'], href: V('YieldCurves/knowledge/5.0_Load_And_Parse.md#parse-gsw-parameters'), reads: ['gsw'], out: { '3.1.7': 'GSW parameters' } },
-    { id: '3.1.6', name: ['Determine', 'settlement', 'dates'], href: V('YieldCurves/knowledge/5.0_Load_And_Parse.md#determine-settlement-dates'), reads: [], out: { '3.1.7': 'settlement dates' } },
-    { id: '3.1.7', name: ['Build the', 'security set'], href: V('YieldCurves/knowledge/5.0_Load_And_Parse.md#build-priced-bonds'), reads: [], out: {} },
+    { id: '3.1.1', name: ['Parse FedInvest', 'prices'], href: V('YieldCurves/knowledge/3.1_Load_And_Parse.md#parse-fedinvest-prices'), reads: ['fedinv'], out: { '3.1.7': 'prices, yields' } },
+    { id: '3.1.2', name: ['Parse market', 'quotes'], href: V('YieldCurves/knowledge/3.1_Load_And_Parse.md#parse-market-quotes'), reads: ['quotes'], out: { '3.1.6': 'quote file date', '3.1.7': 'bid and ask quotes' } },
+    { id: '3.1.3', name: ['Parse Ref CPI', 'and SA factors'], href: V('YieldCurves/knowledge/3.1_Load_And_Parse.md#parse-ref-cpi-and-sa-factors'), reads: ['nsasa'], out: { '3.1.7': 'daily Ref CPI' } },
+    { id: '3.1.4', name: ['Parse bond', 'holidays'], href: V('YieldCurves/knowledge/3.1_Load_And_Parse.md#parse-bond-holidays'), reads: ['hol'], out: { '3.1.6': 'bond trading days' } },
+    { id: '3.1.5', name: ['Parse GSW', 'parameters'], href: V('YieldCurves/knowledge/3.1_Load_And_Parse.md#parse-gsw-parameters'), reads: ['gsw'], out: { '3.1.7': 'GSW parameters' } },
+    { id: '3.1.6', name: ['Determine', 'settlement', 'dates'], href: V('YieldCurves/knowledge/3.1_Load_And_Parse.md#determine-settlement-dates'), reads: [], out: { '3.1.7': 'settlement dates' } },
+    { id: '3.1.7', name: ['Build the', 'security set'], href: V('YieldCurves/knowledge/3.1_Load_And_Parse.md#build-priced-bonds'), reads: [], out: {} },
   ];
   const SX = 40, SW = 205, PR = 56, W = 1340, H = 900;
   const sy = i => 150 + i * 150;
@@ -359,11 +360,11 @@ function level3YieldCurvesLoad() {
   P.push('</svg>');
 
   return page({
-    spec: V('YieldCurves/knowledge/5.0_Load_And_Parse.md'), specLabel: '5.0 Load and Parse',
+    spec: V('YieldCurves/knowledge/3.1_Load_And_Parse.md'), specLabel: '5.0 Load and Parse',
     title: 'Yield Curves 3.1 — Level 3', h1: 'Level 3 &mdash; Yield Curves 3.1 Load and parse source data', maxWidth: W,
     up: 'DFD_LEVEL2_YIELDCURVES.html', upLabel: 'Level 2 — Yield Curves', svg: P.join(NL),
     notes: ['  One process per source parsed, then 3.1.6 and 3.1.7, which combine them. The four flows leaving 3.1.7 on the right are the outputs 3.1 shows at Level 2.',
-      '  Every process here drills to its own section of <a href="viewer.html#/md/YieldCurves/knowledge/5.0_Load_And_Parse.md">5.0 Load and Parse</a>, which was written because these processes had no spec at all.',
+      '  Every process here drills to its own section of <a href="viewer.html#/md/YieldCurves/knowledge/3.1_Load_And_Parse.md">5.0 Load and Parse</a>, which was written because these processes had no spec at all.',
       '  3.1.6 carries a known defect, recorded in 5.0 &sect;3.0: the settlement date for market quotes is derived from the FedInvest price date rather than from the quote file&rsquo;s own date.'].join(NL)
   });
 }
@@ -442,7 +443,7 @@ function level2Ingestion() {
 
 // ── Level 3: Yield Curves 3.7 ───────────────────────────────────────────────
 function level3YieldCurvesRender() {
-  const S = 'YieldCurves/knowledge/6.0_Rendering.md';
+  const S = 'YieldCurves/knowledge/3.7_Rendering.md';
   const procs = [
     { id: '3.7.1', name: ['Select the', 'view'],        a: 'select-view',    out: { '3.7.2': 'tab and mode', '3.7.3': '', '3.7.4': '', '3.7.5': '', '3.7.6': '' } },
     { id: '3.7.2', name: ['Build the', 'axis scales'],  a: 'build-scales',   out: { '3.7.3': 'scales', '3.7.4': 'scales', '3.7.5': 'scales', '3.7.6': 'scales' } },
@@ -487,10 +488,10 @@ function level3YieldCurvesRender() {
   P.push('</svg>');
 
   return page({
-    spec: V('YieldCurves/knowledge/6.0_Rendering.md'), specLabel: '6.0 Rendering',
+    spec: V('YieldCurves/knowledge/3.7_Rendering.md'), specLabel: '6.0 Rendering',
     title: 'Yield Curves 3.7 — Level 3', h1: 'Level 3 &mdash; Yield Curves 3.7 Rendering', maxWidth: W,
     up: 'DFD_LEVEL2_YIELDCURVES.html', upLabel: 'Level 2 — Yield Curves', svg: P.join(NL),
-    notes: ['  Every process drills to its own section of <a href="viewer.html#/md/YieldCurves/knowledge/6.0_Rendering.md">6.0 Rendering</a>, the process spec. <a href="viewer.html#/md/YieldCurves/knowledge/3.0_Visual_Standards.md">3.0 Visual Standards</a> is the separate question of what the drawn output must look like.',
+    notes: ['  Every process drills to its own section of <a href="viewer.html#/md/YieldCurves/knowledge/3.7_Rendering.md">6.0 Rendering</a>, the process spec. <a href="viewer.html#/md/YieldCurves/knowledge/Visual_Standards.md">3.0 Visual Standards</a> is the separate question of what the drawn output must look like.',
       '  <b>Nothing here calculates a yield.</b> Every figure drawn is produced upstream and passed in; a view showing a figure no other process produced is a defect in this stage.',
       '  3.7.2 decides what is visible before anything is drawn. Its axis clipping moves the axis and never removes a security, so a table figure can fall outside what the chart shows.'].join(NL)
   });

@@ -1,6 +1,6 @@
 // updateSpotYieldCurves.js — persists the values the YieldCurves app computes but never
 // writes to R2: evaluated spot (zero-coupon) yields, per-TIPS breakeven inflation, and
-// broker bid/ask spreads. See YieldCurves/knowledge/4.0_Spot_Yield_Curves.md.
+// broker bid/ask spreads. See YieldCurves/knowledge/3.4_Spot_Yield_Curves.md.
 //
 // Loads the same R2 inputs the browser app loads (YieldsFromFedInvestPrices.csv,
 // RefCpiNsaSa.csv, BondHolidaysSifma.csv, FidelityTreasuriesTips.csv) and reuses the same
@@ -28,7 +28,7 @@ import {
   cleanFidelityField as clean, fidPriceField, fidParseMaturity,
   parseFidelityDownloadDate, fidelityDownloadDateIso, parseFidelityTipsRows,
 } from '../../shared/src/fidelity-parse.js';
-import { spotCurveFit, calculateSAO, zToSA } from '../../shared/src/spot-curve.js';
+import { spotCurveFit, calculateSAO, zToSA, gridTerms } from '../../shared/src/spot-curve.js';
 
 const R2_BASE_URL = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev';
 const YIELDS_CSV_URL = `${R2_BASE_URL}/Treasuries/YieldsFromFedInvestPrices.csv`;
@@ -180,7 +180,7 @@ function buildGridRows(fits, source) {
   const tMin = Math.min(...present.map(f => f.tMin));
   const tMax = Math.max(...present.map(f => f.tMax));
   const rows = [];
-  for (let t = Math.ceil(tMin / GRID_STEP_YRS) * GRID_STEP_YRS; t <= tMax + 1e-9; t += GRID_STEP_YRS) {
+  for (const t of gridTerms(tMin, tMax, GRID_STEP_YRS)) {
     const nomVal = evalFitAt(nomFit, t);
     const tipsVal = evalFitAt(tipsFit, t);
     const saVal = evalFitAt(saFit, t);

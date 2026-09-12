@@ -89,7 +89,7 @@ let isUpdatingData = false;
 const yOverrideSyms = new Set();
 const panStartY = {}; // sym -> {min, max} at pan gesture start; cleared on pan end
 
-// Seasonal Adjustment (SA) — see YieldCurves/knowledge/1.0_Seasonal_Adjustments.md.
+// Seasonal Adjustment (SA) — see YieldCurves/knowledge/3.2_Seasonal_Adjustments.md.
 // CNBC's TIPS symbols (e.g. US2YTIPS) are the bid yield of one specific, real TIPS —
 // CNBC's own quote page shows which one (e.g. US2YTIPS = the Jan 2028 0.50% TIPS).
 // So this is the exact same transform YieldCurves applies to actual TIPS: derive the
@@ -97,7 +97,7 @@ const panStartY = {}; // sym -> {min, max} at pan gesture start; cleared on pan 
 // coupon and maturity date, apply the Price -> SA Price -> SA Yield ratio, and derive
 // the SA yield back from the adjusted price.
 // The seasonal effect amortizes with maturity (see YieldCurves/knowledge/
-// 2.2_SAO_Residual_Analysis.md) — by 10Y/30Y it's at or below noise level, so the SA
+// SAO_Residual_Analysis.md) — by 10Y/30Y it's at or below noise level, so the SA
 // line there will sit almost on top of the raw line. It's still offered at all five
 // TIPS maturities for curve completeness (the Yield Curves/BEI tabs otherwise show a
 // visibly incomplete curve past 5Y).
@@ -293,7 +293,7 @@ const SA_ROLLOVER_LOG = {
   // deliberately-wrong ~1.5yr-off candidate the same day showed an 8.5bp gap, so the
   // method itself works — the two adjacent 10Y candidates are just too close on the
   // curve to tell apart). Matches the front-end-only seasonal-residual finding in
-  // YieldCurves/knowledge/2.2_SAO_Residual_Analysis.md.
+  // YieldCurves/knowledge/SAO_Residual_Analysis.md.
   //
   // ISSUE-DATE FALLBACK (a second, lower-confidence pinning method, used only where the
   // empirical cross-check above is provably unresolvable — this is NOT a reversion to the

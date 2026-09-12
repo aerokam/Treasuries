@@ -61,5 +61,5 @@ Augments the live `upcoming_auctions` feed with accurate TIPS identification.
 
 ## 3.0 Foundational Logic (The Engine Room)
 
-- **[Auctions Query Reference](../../knowledge/AuctionsQuery_Reference.md)**: Technical guide to the FiscalData API fields and query logic.
-- **[Data Pipeline](../../knowledge/Data_Pipeline.md)**: Details on the local **Auction Refresh** job that maintains the historical database.
+- **[Auctions Query Reference](./AuctionsQuery_Reference.md)**: Technical guide to the FiscalData API fields and query logic.
+- **[Data Pipeline](./Data_Pipeline.md)**: Details on the local **Auction Refresh** job that maintains the historical database.

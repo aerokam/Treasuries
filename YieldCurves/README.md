@@ -15,7 +15,7 @@ To get started, visit the [Treasury Investors Portal](https://aerokam.github.io/
 For local development, execute `npx serve .` from the root directory of the `Treasuries` repository and navigate to `http://localhost:8080/YieldCurves/`. (Note: Root serving is required for shared components).
 
 ## Knowledge Base
-- **[1.0 Seasonal Adjustments](./knowledge/1.0_Seasonal_Adjustments.md)**: The core multiplicative transform logic.
-- **[2.0 SAO Adjustment](./knowledge/2.0_SAO_Adjustment.md)**: Smoothing of non-seasonal deviations, and the curve fit behind it.
-- **[2.1 SA Intuition](./knowledge/2.1_SA_Intuition.md)**: Conceptual intuition behind the SA ratio.
-- **[3.0 Visual Standards](./knowledge/3.0_Visual_Standards.md)**: Charting and UI conventions.
+- **[1.0 Seasonal Adjustments](./knowledge/3.2_Seasonal_Adjustments.md)**: The core multiplicative transform logic.
+- **[2.0 SAO Adjustment](./knowledge/3.3_SAO_Adjustment.md)**: Smoothing of non-seasonal deviations, and the curve fit behind it.
+- **[2.1 SA Intuition](./knowledge/SA_Intuition.md)**: Conceptual intuition behind the SA ratio.
+- **[3.0 Visual Standards](./knowledge/Visual_Standards.md)**: Charting and UI conventions.

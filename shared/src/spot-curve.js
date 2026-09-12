@@ -168,6 +168,24 @@ export function spotCurveFit(bonds, { priceOf, yieldOf, minT = SAO_NOISE_YRS }) 
   };
 }
 
+// Step terms from tMin to tMax in fixed increments, always including tMax itself as the
+// final term even when it falls between steps — a fit's domain ends at its longest fitted
+// bond's exact maturity, not at the nearest step below it. Never extends past tMax: GSW's
+// own published TIPS curve (TIPSY02-TIPSY20) likewise never extends past the instruments
+// it is fit to. Shared by spotCurveTermGrid (the chart/table grid) and the R2 persistence
+// pipeline (updateSpotYieldCurves.js's buildGridRows) so neither can drift from the other's
+// endpoint handling.
+export function gridTerms(tMin, tMax, step = 0.5) {
+  const terms = [];
+  let lastT = -Infinity;
+  for (let t = Math.ceil(tMin / step) * step; t <= tMax + 1e-9; t += step) {
+    terms.push(t);
+    lastT = t;
+  }
+  if (tMax - lastT > 1e-6) terms.push(tMax);
+  return terms;
+}
+
 // spotCurveFit → a half-year { t, y } grid (t = years-to-maturity, y in semi-annual %), or
 // null. Shared by spotCurveGrid (maps t to a chart's x-axis unit) and any consumer that
 // needs the term values themselves (e.g. a table row per grid point).
@@ -175,22 +193,11 @@ export function spotCurveTermGrid(bonds, opts) {
   const fit = spotCurveFit(bonds, opts);
   if (!fit) return null;
   const grid = [];
-  const point = t => {
+  for (const t of gridTerms(fit.tMin, fit.tMax)) {
     const y = parseFloat(zToSA(fit.z(t)).toFixed(3));
-    if (!fit.sane(y)) return false;   // blown-up fit — drop the whole line
+    if (!fit.sane(y)) return null;   // blown-up fit — drop the whole line
     grid.push({ t, y });
-    return true;
-  };
-  let lastT = -Infinity;
-  for (let t = Math.ceil(fit.tMin * 2) / 2; t <= fit.tMax + 1e-9; t += 0.5) {
-    if (!point(t)) return null;
-    lastT = t;
   }
-  // The 0.5-step grid can land short of tMax (the longest fitted bond) — always
-  // draw through the actual endpoint rather than stopping early. Never extrapolate
-  // past it: GSW's own published TIPS curve (TIPSY02-TIPSY20) likewise never
-  // extends past the instruments it is fit to.
-  if (fit.tMax - lastT > 1e-6 && !point(fit.tMax)) return null;
   return grid.length >= 3 ? grid : null;
 }
 

@@ -1,5 +1,5 @@
 // SA / SAO residual analysis harness — reproduces every table in
-// knowledge/2.2_SAO_Residual_Analysis.md against live R2 data.
+// knowledge/SAO_Residual_Analysis.md against live R2 data.
 import { yieldFromPrice, calculateDuration, daysBetween } from '../../shared/src/bond-math.js';
 import { calculateSAO } from '../../shared/src/spot-curve.js';
 

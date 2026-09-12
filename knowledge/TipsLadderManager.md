@@ -54,12 +54,12 @@ graph LR
 
 ### [1.0 Ladder Construction (Build Mode)](../TipsLadderManager/knowledge/2.0_TIPS_Ladders.md)
 The algorithm for building a new ladder from scratch.
-- **Inputs**: [DARA](../../knowledge/DATA_DICTIONARY.md#dara), First Year and Last Year, Current Market Yields.
-- **Key Constraints**: Longest-to-shortest construction, [Gap Year](../../knowledge/DATA_DICTIONARY.md#gap-years) handling via [Bracket Years](../../knowledge/DATA_DICTIONARY.md#bracket-year).
+- **Inputs**: [DARA](./DATA_DICTIONARY.md#dara), First Year and Last Year, Current Market Yields.
+- **Key Constraints**: Longest-to-shortest construction, [Gap Year](./DATA_DICTIONARY.md#gap-years) handling via [Bracket Years](./DATA_DICTIONARY.md#bracket-year).
 
 ### [2.0 Ladder Rebalancing (Rebalance Mode)](../TipsLadderManager/knowledge/3.0_TIPS_Ladder_Rebalancing.md)
 The logic for aligning existing holdings to a target.
-- **Inputs**: Current Holdings (Manual/Import), [DARA](../../knowledge/DATA_DICTIONARY.md#dara) (Inferred/User), [RefCPI](../../knowledge/DATA_DICTIONARY.md#ref-cpi).
+- **Inputs**: Current Holdings (Manual/Import), [DARA](./DATA_DICTIONARY.md#dara) (Inferred/User), [RefCPI](./DATA_DICTIONARY.md#ref-cpi).
 - **There is a single rebalance mode**: it rebuilds the ladder from the current portfolio toward the per-year DARA targets, buying and selling as required. An earlier "Gap-only" (minimal-trades) mode was scrapped.
 - **Technically Precise Algorithm**: [View 3.0 Specs](../TipsLadderManager/knowledge/3.0_TIPS_Ladder_Rebalancing.md).
 
@@ -75,7 +75,7 @@ These documents contain the "bottom-level" technical specifications required to 
 - **[Bond Ladder Foundations (1.0)](../TipsLadderManager/knowledge/1.0_Bond_Ladders.md)**: Conceptual groundwork for any ladder (Nominal or TIPS).
 - **[Computation Modules (4.0)](../TipsLadderManager/knowledge/4.0_Computation_Modules.md)**: Mathematical functions for PV, Duration, and Accrued Interest.
 - **[UI & Schema (5.0)](../TipsLadderManager/knowledge/5.0_UI_Schema.md)**: Data structures for the internal ladder model and DOM mapping.
-- **[Bond Math (shared)](../../shared/knowledge/Bond_Basics.md)**: Global financial formulas used across all apps.
+- **[Bond Math (shared)](./Bond_Basics.md)**: Global financial formulas used across all apps.
 
 ---
 

@@ -67,4 +67,4 @@ Intraday and historical charts featuring market-state annotations.
 
 - **[Operation Manual (1.0)](../YieldsMonitor/knowledge/1.0_Operation.md)**: Details on timezone handling, shading, and CNBC API range mappings.
 - **[API Mapping](../YieldsMonitor/knowledge/API_Mapping.md)**: Required CNBC `timeRange` parameter mappings for all UI ranges.
-- **[Data Pipeline](../../knowledge/Data_Pipeline.md)**: Automation scripts only (not app). No local fallbacks in app code.
+- **[Data Pipeline](./Data_Pipeline.md)**: Automation scripts only (not app). No local fallbacks in app code.

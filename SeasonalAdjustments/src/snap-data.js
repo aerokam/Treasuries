@@ -68,7 +68,7 @@ export const SNAP = { bonds: null, wave: null, waveYears: '', refRows: null, loa
 
 function buildWave(refRows) {
   // One single year's real SA Factors, one value per calendar day — matches the
-  // maturity-factor rule in YieldCurves/knowledge/1.0_Seasonal_Adjustments.md
+  // maturity-factor rule in YieldCurves/knowledge/3.2_Seasonal_Adjustments.md
   // §The Transformation (one year's value, not a multi-year average).
   //
   // The frozen snapshot ends in the autumn, so its most recent *calendar* year
