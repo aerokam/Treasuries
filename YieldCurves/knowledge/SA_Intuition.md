@@ -1,6 +1,6 @@
 # 2.1 Intuition: Seasonal Adjustments (SA)
 
-**Explains:** [1.0 Seasonal Adjustments](./3.2_Seasonal_Adjustments.md)
+**Explains:** [3.2 Seasonal Adjustments](./3.2_Seasonal_Adjustments.md)
 
 The seasonal adjustment in TIPS is often viewed as a "black box," but it is actually a precise mathematical filter designed to isolate the **idiosyncratic yield** of a bond from its **predictable seasonal component**.
 

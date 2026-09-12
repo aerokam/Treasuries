@@ -201,12 +201,19 @@ function level1() {
   apps.sort((a, b) => PORTAL_ORDER.indexOf(a.key) - PORTAL_ORDER.indexOf(b.key));
   apps.forEach((a, i) => a.n = i + 2);
 
-  const SX = 425, SW = 215, AX = 865, AR = 46, UX = 1070, UW = 145;
-  const sy = i => 110 + i * 92, ay = j => 230 + j * 132;
-  const H = 1700, W = 1235;
-  const acq = { cx: 232, cy: Math.round((sy(0) + sy(stores.length - 1)) / 2), r: 74 };
+  // Level 1 answers which app reads what, not which file. Fourteen store
+  // shapes and forty flows answered neither, so the stores are drawn as one
+  // shape that opens the full list, and the flows out of it are a trunk that
+  // fans to each app. Level 2 is where the individual stores appear.
+  const SX = 430, SW = 230, SH = 96, AX = 900, AR = 46, UX = 1090, UW = 145;
+  const ay = j => 170 + j * 118;
+  const H = 1500, W = 1265;
+  const mid = Math.round((ay(0) + ay(apps.length - 1)) / 2);
+  const acq = { cx: 200, cy: mid, r: 78 };
+  const store = { x: SX, y: mid, w: SW };
+  const JX = SX + SW + 90;                       // where the trunk fans out
   const OBS = [{ x: acq.cx, y: acq.cy, r: acq.r }, ...apps.map((a, j) => ({ x: AX, y: ay(j), r: AR }))];
-  const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 1: one acquisition process and ten app processes, the R2 data stores between them, and the user.">`, marker()];
+  const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 1: one acquisition process, the R2 data stores as one shape, ten app processes and the user.">`, marker()];
 
   for (const c of CATS) {
     const idx = apps.map((a, j) => a.cat === c.id ? j : -1).filter(j => j >= 0);
@@ -215,36 +222,49 @@ function level1() {
     P.push(`  <rect class="cat-band" x="${AX - 88}" y="${top}" width="176" height="${bot - top}" rx="10" fill="${c.fill}" stroke="${c.fill}"/>`);
     P.push(`  <text class="cat-label" x="${AX}" y="${top + 20}" text-anchor="middle" fill="${c.fill}">${c.label}</text>`);
   }
+
   P.push(flow(8, acq.cy, acq.cx - acq.r - 3, acq.cy));
   P.push(`  <text class="flow-label" x="10" y="${acq.cy - 12}">external source data</text>`);
-  stores.forEach((s, i) => {
-    const y = sy(i), [x1, y1] = fromCircle(acq.cx, acq.cy, acq.r, SX, y);
-    P.push(flow(x1, y1, SX - 5, y, { obstacles: OBS }));
-    if (s.id === 'blscpi') { const [x2, y2] = toCircle(SX - 5, y + 10, acq.cx, acq.cy, acq.r); P.push(flow(SX - 5, y + 10, x2, y2, { obstacles: OBS })); }
+
+  // Process 1 writes every store, and reads one of them back.
+  P.push(flow(acq.cx + acq.r + 3, acq.cy - 10, SX - 5, mid - 10));
+  P.push(flow(SX - 5, mid + 10, acq.cx + acq.r + 3, acq.cy + 10));
+  P.push(`  <text class="flow-label" x="${(acq.cx + acq.r + SX) / 2}" y="${mid - 22}" text-anchor="middle">reference data</text>`);
+
+  // One trunk out of the store, fanning to each app.
+  P.push(`  <path class="flow" d="M ${SX + SW + 5} ${mid} L ${JX} ${mid}"/>`);
+  apps.forEach((a, j) => {
+    const ty = ay(j), [x2, y2] = toCircle(JX, mid, AX, ty, AR);
+    P.push(flow(JX, mid, x2, y2, { obstacles: OBS }));
   });
-  const sIdx = Object.fromEntries(stores.map((s, i) => [s.id, i]));
-  apps.forEach((a, j) => a.reads.forEach(id => {
-    const y = sy(sIdx[id]), ty = ay(j), [x2, y2] = toCircle(SX + SW + 5, y, AX, ty, AR);
-    P.push(flow(SX + SW + 5, y, x2, y2, { obstacles: OBS }));
-  }));
+  P.push(`  <text class="flow-label" x="${(SX + SW + JX) / 2}" y="${mid - 12}" text-anchor="middle">app inputs</text>`);
+
   apps.forEach((a, j) => {
     const y = ay(j);
     P.push(flow(AX + AR + 3, y - 9, UX - 5, y - 9));
     P.push(flow(UX - 5, y + 9, AX + AR + 3, y + 9));
   });
-  // Stores no app reads. The file is written for the user to pull into a
-  // spreadsheet, so the consumer is the user and the flow says so.
-  const SINKS = ['spot', 'bei', 'spread'];
-  SINKS.forEach(id => {
-    const y = sy(sIdx[id]);
-    P.push(flow(SX + SW + 5, y, UX - 5, y, { obstacles: OBS }));
-  });
-  P.push(`  <text class="flow-label" x="${UX - 20}" y="${sy(sIdx[SINKS[0]]) - 16}" text-anchor="end">downloaded data sets</text>`);
-  P.push(`  <text class="flow-label" x="${(AX + AR + UX) / 2}" y="${ay(0) - 34}" text-anchor="middle">app inputs</text>`);
-  P.push(`  <text class="flow-label" x="${(AX + AR + UX) / 2}" y="${ay(0) + 44}" text-anchor="middle">app outputs</text>`);
+  P.push(`  <text class="flow-label" x="${(AX + AR + UX) / 2}" y="${ay(0) - 34}" text-anchor="middle">to the user</text>`);
+  P.push(`  <text class="flow-label" x="${(AX + AR + UX) / 2}" y="${ay(0) + 44}" text-anchor="middle">from the user</text>`);
+
+  // Three stores are read by no app. They are written for the user to pull
+  // into a spreadsheet, so that flow leaves the store and goes to the user.
+  P.push(flow(SX + SW / 2, mid + SH / 2 + 5, UX - 5, H - 150, { obstacles: OBS }));
+  P.push(`  <text class="flow-label" x="${SX + SW / 2 + 30}" y="${mid + SH / 2 + 46}">downloaded data sets</text>`);
+
   P.push(`  <g class="entity"><rect x="${UX}" y="70" width="${UW}" height="${H - 140}" rx="3"/><text class="e-name" x="${UX + UW / 2}" y="${H / 2}">User</text></g>`);
   P.push(procShape(acq.cx, acq.cy, acq.r, 'DFD_LEVEL2_INGESTION.html', '1', ['Acquire and', 'derive', 'reference data']));
-  stores.forEach((s, i) => P.push(storeShape(SX, sy(i), SW, s.href, s.name)));
+
+  // The store shape carries the count rather than the names; the names are one
+  // click away, and every one of them is drawn at Level 2.
+  P.push(`  <a class="store" href="${DS()}">`);
+  P.push(`    <rect x="${store.x}" y="${store.y - SH / 2}" width="${store.w}" height="${SH}" fill="transparent" stroke="none"/>`);
+  P.push(`    <line x1="${store.x}" y1="${store.y - SH / 2}" x2="${store.x + store.w}" y2="${store.y - SH / 2}"/>`);
+  P.push(`    <line x1="${store.x}" y1="${store.y + SH / 2}" x2="${store.x + store.w}" y2="${store.y + SH / 2}"/>`);
+  P.push(`    <text class="s-name" x="${store.x + store.w / 2}" y="${store.y - 8}">R2 data stores</text>`);
+  P.push(`    <text class="s-name" x="${store.x + store.w / 2}" y="${store.y + 16}" style="opacity:0.7">${stores.length} files</text>`);
+  P.push('  </a>');
+
   apps.forEach((a, j) => P.push(procShape(AX, ay(j), AR, a.spec, String(a.n), a.name)));
   P.push('</svg>');
 
@@ -253,8 +273,8 @@ function level1() {
     up: 'KNOWLEDGE_MAP.html', upLabel: 'Context Diagram', svg: P.join(NL),
     notes: ['  Process 1 writes every store drawn here. No app writes one: the apps read, and the scheduled jobs inside process 1 do all the writing.',
       '  Process 1 explodes at Level 2 into those jobs, one per store it writes.',
-      '  All fourteen R2 stores are drawn, whether one app reads a store or several.',
-      '  Three of them \u2014 YieldCurves.csv, BreakevenInflation.csv and BidAskSpreads.csv \u2014 are read by no app. They are written for the user to pull into a spreadsheet, so their flow goes to the user rather than to a process.',
+      '  The stores are drawn as one shape. Level 1 answers which app reads what rather than which file, and the shape opens the full list.',
+      '  Three of those files are read by no app: YieldCurves.csv, BreakevenInflation.csv and BidAskSpreads.csv. They are written for the user to pull into a spreadsheet, so their flow goes to the user rather than to a process.',
       '  External entities are not redrawn at this level; their twelve flows are shown against each entity on the <a href="KNOWLEDGE_MAP.html">context diagram</a> and enter here as one flow.',
       '  The app column reproduces the portal index: the same three sections in the same order, and the same apps in the same order inside each.',
       '  Every app carries the same pair of flows to the user, labelled once at the top. The user is drawn once, as a tall shape, so no flow to it crosses another.'].join(NL)
@@ -340,7 +360,7 @@ function level3YieldCurvesLoad() {
     { id: '3.1.4', name: ['Parse bond', 'holidays'], href: V('YieldCurves/knowledge/3.1_Load_And_Parse.md#parse-bond-holidays'), reads: ['hol'], out: { '3.1.6': 'bond trading days' } },
     { id: '3.1.5', name: ['Parse GSW', 'parameters'], href: V('YieldCurves/knowledge/3.1_Load_And_Parse.md#parse-gsw-parameters'), reads: ['gsw'], out: { '3.1.7': 'GSW parameters' } },
     { id: '3.1.6', name: ['Determine', 'settlement', 'dates'], href: V('YieldCurves/knowledge/3.1_Load_And_Parse.md#determine-settlement-dates'), reads: [], out: { '3.1.7': 'settlement dates' } },
-    { id: '3.1.7', name: ['Build the', 'security set'], href: V('YieldCurves/knowledge/3.1_Load_And_Parse.md#build-priced-bonds'), reads: [], out: {} },
+    { id: '3.1.7', name: ['Build the TIPS', 'security set'], href: V('YieldCurves/knowledge/3.1_Load_And_Parse.md#build-priced-bonds'), reads: [], out: {} },
   ];
   const SX = 40, SW = 205, PR = 56, W = 1340, H = 900;
   const sy = i => 150 + i * 150;
