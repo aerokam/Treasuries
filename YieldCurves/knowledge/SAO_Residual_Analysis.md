@@ -1,9 +1,9 @@
 # 2.2 The SAO Residual — Empirical Analysis and Rationale
 
-**Evidence for:** [2.0 SAO](./3.3_SAO_Adjustment.md)
+**Evidence for:** [3.3 SAO](./3.3_SAO_Adjustment.md)
 
-**Status:** Analysis supporting the **O (other)** step of [2.0 SAO](3.3_SAO_Adjustment.md).
-**Dependencies:** [1.0 Seasonal Adjustments](3.2_Seasonal_Adjustments.md), [2.0 SAO](3.3_SAO_Adjustment.md), [Canty](Canty.md).
+**Status:** Analysis supporting the **O (other)** step of [3.3 SAO](3.3_SAO_Adjustment.md).
+**Dependencies:** [3.2 Seasonal Adjustments](3.2_Seasonal_Adjustments.md), [3.3 SAO](3.3_SAO_Adjustment.md), [Canty](Canty.md).
 **Data snapshot:** FedInvest mid prices, settlement **2026-06-18**, region **2027–2031** maturities (the front end, where seasonality is material and the SA curve is otherwise flat at ~1.82–1.88%).
 
 ---

@@ -1,9 +1,9 @@
 # 1.1 Seasonal Factor Drift — Why S_maturity Loses Meaning at Long Horizons
 
-**Evidence for:** [1.0 Seasonal Adjustments](./3.2_Seasonal_Adjustments.md)
+**Evidence for:** [3.2 Seasonal Adjustments](./3.2_Seasonal_Adjustments.md)
 
-**Status:** Research supporting the **S_maturity** input to the seasonal adjustment ([1.0 Seasonal Adjustments](3.2_Seasonal_Adjustments.md)). Same relation to 1.0 that [2.2 SAO Residual Analysis](SAO_Residual_Analysis.md) has to [2.0](3.3_SAO_Adjustment.md).
-**Dependencies:** [1.0 Seasonal Adjustments](3.2_Seasonal_Adjustments.md), [Canty](Canty.md), [DATA_DICTIONARY.md#sa-factor](../../knowledge/DATA_DICTIONARY.md#sa-factor), [DATA_DICTIONARY.md#sa-price-factor](../../knowledge/DATA_DICTIONARY.md#sa-price-factor), [DATA_DICTIONARY.md#cpi-sa](../../knowledge/DATA_DICTIONARY.md#cpi-sa).
+**Status:** Research supporting the **S_maturity** input to the seasonal adjustment ([3.2 Seasonal Adjustments](3.2_Seasonal_Adjustments.md)). Same relation to 1.0 that [2.2 SAO Residual Analysis](SAO_Residual_Analysis.md) has to [2.0](3.3_SAO_Adjustment.md).
+**Dependencies:** [3.2 Seasonal Adjustments](3.2_Seasonal_Adjustments.md), [Canty](Canty.md), [DATA_DICTIONARY.md#sa-factor](../../knowledge/DATA_DICTIONARY.md#sa-factor), [DATA_DICTIONARY.md#sa-price-factor](../../knowledge/DATA_DICTIONARY.md#sa-price-factor), [DATA_DICTIONARY.md#cpi-sa](../../knowledge/DATA_DICTIONARY.md#cpi-sa).
 **Data snapshot:** FRED `CPIAUCNS` (NSA, 1913–) and `CPIAUCSL` (SA, 1947–), monthly, overlap 1947-01 … 2026-07 (954 months). Live [S1](../../knowledge/DataStores.md#s1) and [S4](../../knowledge/DataStores.md#s4), settlement 2026-09-08, 53 TIPS.
 
 ---

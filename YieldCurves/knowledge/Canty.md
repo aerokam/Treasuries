@@ -1,6 +1,6 @@
 # Seasonally Adjusted Prices for Inflation-Linked Bonds
 
-**Source for:** [1.0 Seasonal Adjustments](./3.2_Seasonal_Adjustments.md), [2.0 SAO](./3.3_SAO_Adjustment.md)
+**Source for:** [3.2 Seasonal Adjustments](./3.2_Seasonal_Adjustments.md), [3.3 SAO](./3.3_SAO_Adjustment.md)
 **Author:** Paul Canty (Deutsche Bank, European Head of Inflation Trading) — *Risk*, January 2009.
 
 This is a thorough working summary of the paper, written to be the canonical reference for the seasonal-adjustment math used across the Treasuries apps. Equation numbers match the paper. Where the apps depend on a result, the dependency is noted.
@@ -71,7 +71,7 @@ $$I_t = T_t S_t \qquad (2)$$
 - $T_t$ — **trend component** of the index (the underlying, deseasonalised inflation path).
 - $S_t$ — **seasonal component** of the index for the calendar position of $t$ (repeats every 12 months; *constant over time* — the paper's key simplifying assumption).
 
-> **App mapping.** In this project $S_t = \dfrac{\text{RefCPI}_{NSA}(t)}{\text{RefCPI}_{SA}(t)}$ — the ratio of the (App. B daily-interpolated) Non-Seasonally-Adjusted Ref CPI to the Seasonally-Adjusted Ref CPI. NSA $= T\cdot S$, SA $= T$, so their ratio isolates $S$. The daily SA series is a **calculated construct** (there is no official daily SA Ref CPI); see [1.0 Seasonal Adjustments](3.2_Seasonal_Adjustments.md) and `shared/src/ref-cpi.js`.
+> **App mapping.** In this project $S_t = \dfrac{\text{RefCPI}_{NSA}(t)}{\text{RefCPI}_{SA}(t)}$ — the ratio of the (App. B daily-interpolated) Non-Seasonally-Adjusted Ref CPI to the Seasonally-Adjusted Ref CPI. NSA $= T\cdot S$, SA $= T$, so their ratio isolates $S$. The daily SA series is a **calculated construct** (there is no official daily SA Ref CPI); see [3.2 Seasonal Adjustments](3.2_Seasonal_Adjustments.md) and `shared/src/ref-cpi.js`.
 
 The fully-adjusted extension adds the outlier index (used only by FACP, §8):
 
