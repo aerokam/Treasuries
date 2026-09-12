@@ -42,9 +42,27 @@ IB1 matures at t₁, where I₁ / I₀ = 101 / 100 = 1.01, so IB1 repays 101 * 1
 
 --- draft below, checking ---
 
-Assume the supply of each bond is fixed. At a price of 100, IB1 offers a larger risk-free gain than NB1, so demand for IB1 exceeds demand for NB1, and IB1's price rises. It rises until the arbitrage is gone: the loan needed to buy IB1, repaid at t₁, then equals IB1's repayment. P * (1 + r/2) = 102.01, so P * 1.01 = 102.01, so P = 101. A bond's yield y is computed from its price P and its par-plus-interest repayment M = 100 * (1 + n * r/2), with n the number of periods to maturity: M = P * (1 + n * y/2). The price index ratio is not part of M. For IB1, P = 101, n = 1, M = 100 * (1 + 0.01) = 101:
+Assume the supply of each bond is fixed. At a price of 100, IB1 offers a larger risk-free gain than NB1, so demand for IB1 exceeds demand for NB1, and IB1's price rises. It rises until the arbitrage is gone: the loan needed to buy IB1, repaid at t₁, then equals IB1's repayment.
+
+    P * (1 + r/2) = 102.01
+    P * 1.01 = 102.01
+    P = 101
+
+A bond's yield is the discount rate that equates its price today to the present value of its future repayment: price equals the repayment discounted at the yield. With a repayment M due n periods away and a periodic rate of y/2, that is
+
+    P = M / (1 + n * y/2)
+
+or, rearranged to solve for y once P and M are known,
+
+    M = P * (1 + n * y/2)
+
+M is always the par-plus-interest repayment, 100 * (1 + n * r/2) — the same amount whether the bond is nominal or indexed, since the price index ratio plays no part in it. For a bond priced at par (P = 100), this equation gives y = r directly, the fact used in Scenario 1.
+
+For IB1, the repayment is M = 100 * (1 + r/2) = 101, its price is P = 101, and it matures one period away (n = 1). Solving for y:
 
     101 = 101 * (1 + y/2)
+    1 = 1 + y/2
+    0 = y/2
     y = 0
 
-against r = 0.02 for every other bond. IB1's quoted price of 101 is its par value 100 multiplied by the price index ratio I₁ / I₀ = 101/100 = 1.01. Its yield is computed from this quoted price and its par-plus-interest repayment, 101 — the same calculation used for every bond, and it does not reference the price index. Because the price carries the price index ratio and the repayment used in the calculation does not, the computed yield is 0, below r = 0.02.
+IB1's price, 101, is its par value 100 multiplied by the price index ratio I₁ / I₀ = 101/100 = 1.01. Because that ratio raised the price but not the repayment used to compute yield, IB1's yield comes out below r = 0.02 — here, all the way to 0.
