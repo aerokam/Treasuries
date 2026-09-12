@@ -34,7 +34,7 @@ The price index starts at I₀ = 100. At t₀ it becomes known that I₁ = 101 a
 
 An inflation-indexed bond's value is its interest-only value multiplied by Iₜ / I₀. The nominal bonds keep to the interest-only path, 100 → 101 → 102. The indexed bonds follow that path multiplied by the price index ratio: 100 at t₀, then 101 * (I₁/I₀) = 101 * (101/100) = 102.01 at t₁, then 102 * (I₂/I₀) = 102 * (100/100) = 102 at t₂.
 
-IB2 matures at t₂, where I₂ / I₀ = 100 / 100 = 1, so IB2 repays 102 * 1 = 102, the same as NB2; its price stays at 100 and its yield at r = 0.02.
+IB2 matures at t₂, where I₂ / I₀ = 100 / 100 = 1, so IB2 repays 102 * 1 = 102, the same as NB2, and its price stays at 100. Priced at par, its yield equals the annual interest rate, r = 0.02.
 
 IB1 matures at t₁, where I₁ / I₀ = 101 / 100 = 1.01, so IB1 repays 101 * 1.01 = 102.01, more than the 101 NB1 repays. An investor can borrow and lend at rate r: 100 borrowed at t₀ is repaid as 100 * (1 + r/2) = 101 at t₁. An investor who borrows 100, buys IB1 at 100, and holds it to t₁ then receives 102.01, repays 101, and keeps 1.01, with nothing committed and no risk. This is an arbitrage: at a price of 100, IB1 is too cheap.
 
