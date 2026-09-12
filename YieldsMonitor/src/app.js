@@ -1402,7 +1402,13 @@ function updateCharts() {
     // only if the quote fetch failed for this symbol.
     const data = rangeData[sym];
     const quote = latestQuotes[sym];
-    const calculationData = (liveCache[`${sym}_5D`] || liveCache[`${sym}_1D`] || data);
+    // Prefer the 10-day-span `_5D` cache, then the 2D view's own already-fetched `_5Dtip`
+    // (same full 5D fetch, cached under a different key — see fetchOne), before falling
+    // back to the ~1-2 day `_1D` cache. CNBC's `1D` provider range is a rolling window that
+    // can slide forward far enough (e.g. over a weekend) to no longer contain the previous
+    // trading day's actual session-close bar — only its overnight tail — which otherwise
+    // starves the closeP walk below and silently falls through to the prevClose fallback.
+    const calculationData = (liveCache[`${sym}_5D`] || liveCache[`${sym}_5Dtip`] || liveCache[`${sym}_1D`] || data);
     const chartLatest = (calculationData && calculationData.length > 0) ? calculationData[calculationData.length - 1] : null;
     const currentY = quote?.yield != null ? quote.yield : (chartLatest ? chartLatest.y : null);
     if (currentY == null) return;
