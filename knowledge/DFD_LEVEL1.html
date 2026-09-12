@@ -244,6 +244,10 @@
   <path class="flow" d="M 1065.0 1295.0 Q 989.5 1307.1 914.0 1295.0" marker-end="url(#a1)"/>
   <path class="flow" d="M 914.0 1409.0 Q 989.5 1396.9 1065.0 1409.0" marker-end="url(#a1)"/>
   <path class="flow" d="M 1065.0 1427.0 Q 989.5 1439.1 914.0 1427.0" marker-end="url(#a1)"/>
+  <path class="flow" d="M 645.0 846.0 Q 855.0 812.4 1065.0 846.0" marker-end="url(#a1)"/>
+  <path class="flow" d="M 645.0 938.0 Q 855.0 971.6 1065.0 938.0" marker-end="url(#a1)"/>
+  <path class="flow" d="M 645.0 1030.0 Q 855.0 1139.2 1065.0 1030.0" marker-end="url(#a1)"/>
+  <text class="flow-label" x="1050" y="830" text-anchor="end">downloaded data sets</text>
   <text class="flow-label" x="990.5" y="196" text-anchor="middle">app inputs</text>
   <text class="flow-label" x="990.5" y="274" text-anchor="middle">app outputs</text>
   <g class="entity"><rect x="1070" y="70" width="145" height="1560" rx="3"/><text class="e-name" x="1142.5" y="850">User</text></g>
@@ -423,6 +427,7 @@
   Process 1 writes every store drawn here. No app writes one: the apps read, and the scheduled jobs inside process 1 do all the writing.
   Process 1 explodes at Level 2 into those jobs, one per store it writes.
   All fourteen R2 stores are drawn, whether one app reads a store or several.
+  Three of them — YieldCurves.csv, BreakevenInflation.csv and BidAskSpreads.csv — are read by no app. They are written for the user to pull into a spreadsheet, so their flow goes to the user rather than to a process.
   External entities are not redrawn at this level; their twelve flows are shown against each entity on the <a href="KNOWLEDGE_MAP.html">context diagram</a> and enter here as one flow.
   The app column reproduces the portal index: the same three sections in the same order, and the same apps in the same order inside each.
   Every app carries the same pair of flows to the user, labelled once at the top. The user is drawn once, as a tall shape, so no flow to it crosses another.

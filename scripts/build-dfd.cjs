@@ -232,6 +232,14 @@ function level1() {
     P.push(flow(AX + AR + 3, y - 9, UX - 5, y - 9));
     P.push(flow(UX - 5, y + 9, AX + AR + 3, y + 9));
   });
+  // Stores no app reads. The file is written for the user to pull into a
+  // spreadsheet, so the consumer is the user and the flow says so.
+  const SINKS = ['spot', 'bei', 'spread'];
+  SINKS.forEach(id => {
+    const y = sy(sIdx[id]);
+    P.push(flow(SX + SW + 5, y, UX - 5, y, { obstacles: OBS }));
+  });
+  P.push(`  <text class="flow-label" x="${UX - 20}" y="${sy(sIdx[SINKS[0]]) - 16}" text-anchor="end">downloaded data sets</text>`);
   P.push(`  <text class="flow-label" x="${(AX + AR + UX) / 2}" y="${ay(0) - 34}" text-anchor="middle">app inputs</text>`);
   P.push(`  <text class="flow-label" x="${(AX + AR + UX) / 2}" y="${ay(0) + 44}" text-anchor="middle">app outputs</text>`);
   P.push(`  <g class="entity"><rect x="${UX}" y="70" width="${UW}" height="${H - 140}" rx="3"/><text class="e-name" x="${UX + UW / 2}" y="${H / 2}">User</text></g>`);
@@ -246,6 +254,7 @@ function level1() {
     notes: ['  Process 1 writes every store drawn here. No app writes one: the apps read, and the scheduled jobs inside process 1 do all the writing.',
       '  Process 1 explodes at Level 2 into those jobs, one per store it writes.',
       '  All fourteen R2 stores are drawn, whether one app reads a store or several.',
+      '  Three of them \u2014 YieldCurves.csv, BreakevenInflation.csv and BidAskSpreads.csv \u2014 are read by no app. They are written for the user to pull into a spreadsheet, so their flow goes to the user rather than to a process.',
       '  External entities are not redrawn at this level; their twelve flows are shown against each entity on the <a href="KNOWLEDGE_MAP.html">context diagram</a> and enter here as one flow.',
       '  The app column reproduces the portal index: the same three sections in the same order, and the same apps in the same order inside each.',
       '  Every app carries the same pair of flows to the user, labelled once at the top. The user is drawn once, as a tall shape, so no flow to it crosses another.'].join(NL)
