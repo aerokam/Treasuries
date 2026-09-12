@@ -186,6 +186,21 @@ export function gridTerms(tMin, tMax, step = 0.5) {
   return terms;
 }
 
+// gridTerms across several fits' combined range, PLUS each fit's own exact tMax as an
+// extra breakpoint — for tabulating multiple curves on one shared term axis (e.g. one CSV
+// row per term, one column per curve). Without this, a shorter curve sharing the axis with
+// a longer one would still cut off at the last common step before its own true endpoint,
+// even though gridTerms alone gets the longer curve's endpoint right (that endpoint IS the
+// combined range's tMax). Used by updateSpotYieldCurves.js's buildGridRows, which tables
+// the nominal, TIPS-quoted and TIPS-SA curves together and their tMax values differ.
+export function unionGridTerms(fits, step = 0.5) {
+  const tMin = Math.min(...fits.map(f => f.tMin));
+  const tMax = Math.max(...fits.map(f => f.tMax));
+  const terms = new Set(gridTerms(tMin, tMax, step));
+  for (const f of fits) terms.add(f.tMax);
+  return [...terms].sort((a, b) => a - b);
+}
+
 // spotCurveFit → a half-year { t, y } grid (t = years-to-maturity, y in semi-annual %), or
 // null. Shared by spotCurveGrid (maps t to a chart's x-axis unit) and any consumer that
 // needs the term values themselves (e.g. a table row per grid point).

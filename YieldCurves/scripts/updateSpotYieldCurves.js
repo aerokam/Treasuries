@@ -28,7 +28,7 @@ import {
   cleanFidelityField as clean, fidPriceField, fidParseMaturity,
   parseFidelityDownloadDate, fidelityDownloadDateIso, parseFidelityTipsRows,
 } from '../../shared/src/fidelity-parse.js';
-import { spotCurveFit, calculateSAO, zToSA, gridTerms } from '../../shared/src/spot-curve.js';
+import { spotCurveFit, calculateSAO, zToSA, unionGridTerms } from '../../shared/src/spot-curve.js';
 
 const R2_BASE_URL = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev';
 const YIELDS_CSV_URL = `${R2_BASE_URL}/Treasuries/YieldsFromFedInvestPrices.csv`;
@@ -177,10 +177,8 @@ function buildGridRows(fits, source) {
   const { nominal: nomFit, tips: tipsFit, tips_sa: saFit } = fits;
   const present = [nomFit, tipsFit, saFit].filter(Boolean);
   if (!present.length) { console.warn(`  (skipped ${source} grid: no fits available)`); return []; }
-  const tMin = Math.min(...present.map(f => f.tMin));
-  const tMax = Math.max(...present.map(f => f.tMax));
   const rows = [];
-  for (const t of gridTerms(tMin, tMax, GRID_STEP_YRS)) {
+  for (const t of unionGridTerms(present, GRID_STEP_YRS)) {
     const nomVal = evalFitAt(nomFit, t);
     const tipsVal = evalFitAt(tipsFit, t);
     const saVal = evalFitAt(saFit, t);
