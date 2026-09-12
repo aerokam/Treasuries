@@ -168,16 +168,17 @@ export function spotCurveFit(bonds, { priceOf, yieldOf, minT = SAO_NOISE_YRS }) 
   };
 }
 
-// spotCurveFit → a half-year { x, y } grid (y in semi-annual %) for a chart line, or null.
-// `yToX` maps years-to-maturity to the caller's x-axis unit; drawn from the shortest fitted bond.
-export function spotCurveGrid(bonds, opts) {
+// spotCurveFit → a half-year { t, y } grid (t = years-to-maturity, y in semi-annual %), or
+// null. Shared by spotCurveGrid (maps t to a chart's x-axis unit) and any consumer that
+// needs the term values themselves (e.g. a table row per grid point).
+export function spotCurveTermGrid(bonds, opts) {
   const fit = spotCurveFit(bonds, opts);
   if (!fit) return null;
   const grid = [];
   const point = t => {
     const y = parseFloat(zToSA(fit.z(t)).toFixed(3));
     if (!fit.sane(y)) return false;   // blown-up fit — drop the whole line
-    grid.push({ x: opts.yToX(t), y });
+    grid.push({ t, y });
     return true;
   };
   let lastT = -Infinity;
@@ -191,6 +192,13 @@ export function spotCurveGrid(bonds, opts) {
   // extends past the instruments it is fit to.
   if (fit.tMax - lastT > 1e-6 && !point(fit.tMax)) return null;
   return grid.length >= 3 ? grid : null;
+}
+
+// spotCurveTermGrid → a chart-ready { x, y } grid; `yToX` maps years-to-maturity to the
+// caller's x-axis unit.
+export function spotCurveGrid(bonds, opts) {
+  const termGrid = spotCurveTermGrid(bonds, opts);
+  return termGrid && termGrid.map(({ t, y }) => ({ x: opts.yToX(t), y }));
 }
 
 // Snap each bond's SA yield to a smooth NSS fair-value curve, with the snap weight declining

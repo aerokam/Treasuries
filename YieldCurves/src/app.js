@@ -3,7 +3,7 @@ import { yieldFromPrice, cashflowSchedule } from '../../shared/src/bond-math.js'
 import { saFactorForDate, maturitySaFactor } from '../../shared/src/ref-cpi.js';
 import {
   SAO_NOISE_YRS, SAO_BLEND_START_YRS, SAO_BLEND_END_YRS,
-  nssBasis, zToSA, spotCurveFit, spotCurveGrid, calculateSAO,
+  nssBasis, zToSA, spotCurveFit, spotCurveGrid, spotCurveTermGrid, calculateSAO,
 } from '../../shared/src/spot-curve.js';
 import { parseCsv } from '../../shared/src/csv.js';
 import { localDate, toIsoDate, nextBusinessDay, parseHolidaySet } from '../../shared/src/settlement.js';
@@ -30,7 +30,7 @@ const SHOW_GSW = new URLSearchParams(location.search).has('gsw');
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 // Chart gridline color — horizontal (Y) and vertical (X) alike, on every chart
-// (Yield Curves, Breakeven, Bid-Ask Spread). See knowledge/3.0_Visual_Standards.md §2.
+// (Yield Curves, Breakeven, Bid-Ask Spread). See knowledge/Visual_Standards.md §2.
 const GRID_COLOR = 'rgba(0,0,0,0.08)';
 
 // GSW (Gürkaynak-Sack-Wright, FEDS 2008-05) fitted TIPS zero-coupon curve — a snapshot for
@@ -86,6 +86,10 @@ let nominalsTypeFilters = new Set(['MARKET BASED BILL', 'MARKET BASED NOTE', 'MA
 let nominalsSort = { col: 'maturity', dir: 'asc' };
 let xAxisMode = 'maturity';
 window._currentBonds = [];
+// Last-rendered TIPS yield-mode bond sets, so the series checkboxes (which restyle the
+// existing chart in place rather than rebuilding it) can re-render the table without a
+// full processAndRenderTips() pass — see the showTipsAsk/Sa/Sao/Spot/SpotSa handlers below.
+let tipsTableFed = null, tipsTableBroker = null;
 
 // --- Helpers ---
 // Parse "MM/DD/YYYY HH:MM AM/PM" (Fidelity footer) → Date (date part only)
@@ -195,21 +199,10 @@ const COL_HELP = {
     html: `<p>The maturity date of the TIPS — the date on which the Treasury repays principal.</p>
 <p>Most TIPS mature in <strong>January/February</strong> or <strong>July/October</strong>, which places them on opposite sides of the seasonal inflation cycle.</p>`
   },
-  'cusip': {
-    title: 'CUSIP',
-    html: `<p>A 9-character identifier assigned by DTCC that uniquely identifies this Treasury security.</p>
-<p>The first 6 digits identify the issuer (Treasury), the next 2 identify the specific issue, and the last digit is a check digit.</p>`
-  },
-  'coupon': {
-    title: 'Coupon',
-    html: `<p>The annual interest rate paid by the TIPS, expressed as a percentage of <strong>face value</strong>.</p>
-<p>TIPS coupons are paid semi-annually. Because the principal is inflation-adjusted, the actual dollar coupon payment grows (or shrinks) with CPI even though the coupon rate is fixed.</p>`
-  },
-  'price': {
-    title: 'Price',
-    html: `<p>The market price per <strong>$100 face value</strong>, sourced from FedInvest mid-market data or uploaded broker ask quotes.</p>
-<p><strong>FedInvest Note:</strong> FedInvest prices represent the midpoint of market bid and ask. This is typically lower than a broker's Ask Price, meaning the resulting yield is higher than a commercial Ask Yield.</p>
-<p>TIPS prices are quoted on the <em>real</em> (inflation-adjusted) principal. The actual dollar amount paid at settlement is: <code>Price / 100 × Index Ratio × Face Value</code>.</p>`
+  'term': {
+    title: 'Term',
+    html: `<p>Years to maturity, measured from today.</p>
+<p>A security row's Term is that TIPS's own time to maturity. A Spot / Spot SA row's Term is the horizon the fitted curve is evaluated at — it has no Maturity of its own, since it isn't any one security.</p>`
   },
   'ask-yield': {
     title: 'Ask Yield',
@@ -239,11 +232,6 @@ const COL_HELP = {
   <li style="margin-bottom:6px;"><strong>Beyond 6 years:</strong> equals raw SA yield (no smoothing) — the curve is already smooth here on its own</li>
 </ul>
 <p>The result is a <strong>smoothed yield curve</strong> where it matters (the front end, where seasonal residual is largest) without flattening genuine long-end structure.</p>`
-  },
-  'diff': {
-    title: 'Diff (bps)',
-    html: `<p>The difference between <strong>SA Yield</strong> and <strong>Ask Yield</strong>, expressed in basis points (1 bp = 0.01 percentage point).</p>
-<p>A positive value means the seasonal adjustment raised the yield (the TIPS had a seasonal price premium that was stripped out). A negative value means the adjustment lowered the yield (the TIPS had a seasonal penalty that was compensated).</p>`
   },
   'spot': {
     title: 'Spot — Zero-Coupon Yield Curve',
@@ -375,10 +363,10 @@ Chart.defaults.color = '#334155';
 
 // ── 3.1 Load and parse source data ─────────────────────────────────────────
 // One function per process of knowledge/DFD_LEVEL3_YC_LOAD, specified in
-// YieldCurves/knowledge/5.0_Load_And_Parse.md. Each parses and returns; applying
+// YieldCurves/knowledge/3.1_Load_And_Parse.md. Each parses and returns; applying
 // the result to app state and to the controls is init()'s job, not theirs.
 
-// spec: 5.0_Load_And_Parse.md#parse-fedinvest-prices (3.1.1)
+// spec: 3.1_Load_And_Parse.md#parse-fedinvest-prices (3.1.1)
 // Row 1 is the settlement date, row 2 the header, rows 3 on the data.
 function parseFedInvestPrices(text) {
   const lines = text.split(/\r?\n/).filter(l => l.trim());
@@ -388,17 +376,17 @@ function parseFedInvestPrices(text) {
   return { tips: rows.filter(r => r.type === 'TIPS'), nominals: rows.filter(r => r.type !== 'TIPS'), settlementDate };
 }
 
-// spec: 5.0_Load_And_Parse.md#parse-ref-cpi-and-sa-factors (3.1.3)
+// spec: 3.1_Load_And_Parse.md#parse-ref-cpi-and-sa-factors (3.1.3)
 function parseRefCpiAndSaFactors(text) {
   return parseCsv(text);
 }
 
-// spec: 5.0_Load_And_Parse.md#parse-bond-holidays (3.1.4)
+// spec: 3.1_Load_And_Parse.md#parse-bond-holidays (3.1.4)
 function parseBondHolidays(text) {
   return parseHolidaySet(parseCsv(text, false));
 }
 
-// spec: 5.0_Load_And_Parse.md#parse-gsw-parameters (3.1.5)
+// spec: 3.1_Load_And_Parse.md#parse-gsw-parameters (3.1.5)
 // A missing or malformed file leaves the app without a published curve rather
 // than without a page, so both cases return null.
 async function parseGswParameters(res) {
@@ -406,7 +394,7 @@ async function parseGswParameters(res) {
   try { return await res.json(); } catch { return null; }
 }
 
-// spec: 5.0_Load_And_Parse.md#parse-market-quotes (3.1.2)
+// spec: 3.1_Load_And_Parse.md#parse-market-quotes (3.1.2)
 // A TIPS quote is kept only for a CUSIP the FedInvest file also carries, and
 // only when it has an ask price.
 function parseMarketQuotes(text, knownTips) {
@@ -537,7 +525,7 @@ async function init() {
 // SAO / spot-curve math (fitNSS, fitSpotNSS, spotCurveFit, spotCurveGrid, calculateSAO,
 // zToSA, and the SAO_* constants) lives in shared/src/spot-curve.js — single source of
 // truth for both this app and any pipeline script computing the same fitted curves.
-// See knowledge/2.0_SAO_Adjustment.md and 4.0_Spot_Yield_Curves.md.
+// See knowledge/3.3_SAO_Adjustment.md and 3.4_Spot_Yield_Curves.md.
 
 // years-to-maturity → current x-axis unit (calendar ms in Maturity mode, weeks in Term mode).
 function yearsToX(now) {
@@ -1063,7 +1051,7 @@ function buildProcessedTipsBonds(sourceMap, isBroker) {
 
     const settleDate = localDate(settleDateStr);
     const matureDate = localDate(bond.maturity);
-    const saRatio = saSettle / saMature;   // SA clean price = price × saRatio (1.0_Seasonal_Adjustments)
+    const saRatio = saSettle / saMature;   // SA clean price = price × saRatio (3.2_Seasonal_Adjustments)
     const askYield = yieldFromPrice(price, coupon, settleDate, matureDate);
     const saYield = yieldFromPrice(price * saRatio, coupon, settleDate, matureDate);
 
@@ -1101,11 +1089,11 @@ function processAndRenderTips() {
     // Apply SAO to each set
     if (fedBonds) {
       const smoothed = calculateSAO(fedBonds);
-      fedBonds.forEach((b, i) => { b.saoYield = smoothed[i]; b.diffBps = (b.saYield - b.askYield) * 10000; });
+      fedBonds.forEach((b, i) => { b.saoYield = smoothed[i]; });
     }
     if (brokerBonds) {
       const smoothed = calculateSAO(brokerBonds);
-      brokerBonds.forEach((b, i) => { b.saoYield = smoothed[i]; b.diffBps = (b.saYield - b.askYield) * 10000; });
+      brokerBonds.forEach((b, i) => { b.saoYield = smoothed[i]; });
     }
 
     const startEl = document.getElementById('startMaturity');
@@ -1127,6 +1115,8 @@ function processAndRenderTips() {
       renderSpreadCharts(brokerFiltered, 'tips');
       renderSpreadTable(brokerFiltered, 'tips');
     } else {
+      tipsTableFed = fedFiltered;
+      tipsTableBroker = brokerFiltered;
       renderTable(fedFiltered, brokerFiltered);
       renderChart(fedFiltered, brokerFiltered);
     }
@@ -1148,69 +1138,84 @@ function processAndRenderTips() {
   }
 }
 
+// Table columns follow the chart's own series checkboxes (Ask/SA/SAO/Spot/Spot SA) rather
+// than a fixed set — see YieldCurves/knowledge/3.7_Rendering.md §2.4. Spot and Spot SA are
+// fitted curves, not a value tied to any one security, so they get their own rows (Term
+// only, evaluated at the curve's half-year grid plus its own longest-fitted endpoint —
+// spotCurveTermGrid, same fit the chart draws) interleaved by Term with the security rows.
+const TIPS_TABLE_SERIES = [
+  { key: 'ask',    label: 'Ask',      help: 'ask-yield', yieldKey: 'askYield' },
+  { key: 'sa',     label: 'SA',       help: 'sa-yield',  yieldKey: 'saYield',  drill: 'sa' },
+  { key: 'sao',    label: 'SAO',      help: 'sao-yield', yieldKey: 'saoYield', drill: 'sao' },
+  { key: 'spot',   label: 'Spot',     help: 'spot' },
+  { key: 'spotSa', label: 'Spot SA',  help: 'spot-sa' },
+];
 function renderTable(fedBonds, brokerBonds) {
   const tbody = document.getElementById('tableBody');
   const thead = document.querySelector('#saTable thead tr');
   const both = fedBonds && brokerBonds;
-  const allBonds = [...(fedBonds || []), ...(brokerBonds || [])].sort((a, b) => a.maturityDate - b.maturityDate);
-  window._currentBonds = allBonds;
+  const now = Date.now();
+  const fmtY = y => (y != null && !isNaN(y)) ? (y * 100).toFixed(3) + '%' : '—';
+  const termOf = d => (d.getTime() - now) / (365.25 * 86400000);
 
-  if (both) {
-    thead.innerHTML = `
-      <th><a class="col-help" href="#" data-col="maturity">Maturity</a></th>
-      <th><a class="col-help" href="#" data-col="cusip">CUSIP</a></th>
-      <th><a class="col-help" href="#" data-col="coupon">Coupon</a></th>
-      <th>Price (Fed/Mkt)</th>
-      <th>Ask Yield (Fed/Mkt)</th>
-      <th>SA Yield (Fed/Mkt)</th>
-      <th>SAO Yield (Fed/Mkt)</th>`;
-    
-    const fedMap = new Map(fedBonds.map(b => [b.cusip, b]));
-    const brokerMap = new Map(brokerBonds.map(b => [b.cusip, b]));
-    const uniqueCusips = [...new Set([...fedMap.keys(), ...brokerMap.keys()])].sort((a, b) => {
-      const ma = fedMap.get(a)?.maturityDate || brokerMap.get(a)?.maturityDate;
-      const mb = fedMap.get(b)?.maturityDate || brokerMap.get(b)?.maturityDate;
-      return ma - mb;
-    });
-    
-    tbody.innerHTML = uniqueCusips.map(cusip => {
-      const f = fedMap.get(cusip), b = brokerMap.get(cusip);
-      const ref = f || b;
-      const fmtY = y => (y != null && !isNaN(y)) ? (y * 100).toFixed(3) + '%' : '—';
-      return `
-        <tr>
-          <td>${fmtMMM(ref.maturity)}</td>
-          <td>${cusip}</td>
-          <td>${(ref.coupon * 100).toFixed(3)}%</td>
-          <td>${f ? f.price.toFixed(3) : '—'} / ${b ? b.price.toFixed(3) : '—'}</td>
-          <td>${fmtY(f?.askYield)} / ${fmtY(b?.askYield)}</td>
-          <td class="drillable" data-cusip="${cusip}">${fmtY(f?.saYield)} / ${fmtY(b?.saYield)}</td>
-          <td style="font-weight:700; color:#1a56db;" class="drillable" data-cusip="${cusip}">${fmtY(f?.saoYield)} / ${fmtY(b?.saoYield)}</td>
-        </tr>`;
-    }).join('');
-  } else {
-    thead.innerHTML = `
-      <th><a class="col-help" href="#" data-col="maturity">Maturity</a></th>
-      <th><a class="col-help" href="#" data-col="cusip">CUSIP</a></th>
-      <th><a class="col-help" href="#" data-col="coupon">Coupon</a></th>
-      <th><a class="col-help" href="#" data-col="price">Price</a></th>
-      <th><a class="col-help" href="#" data-col="ask-yield">Ask Yield</a></th>
-      <th><a class="col-help" href="#" data-col="sa-yield">SA Yield</a></th>
-      <th><a class="col-help" href="#" data-col="sao-yield">SAO Yield</a></th>
-      <th><a class="col-help" href="#" data-col="diff">Diff (bps)</a></th>`;
-    const bonds = fedBonds || brokerBonds;
-    tbody.innerHTML = bonds.map(b => `
-      <tr>
-        <td>${fmtMMM(b.maturity)}</td>
-        <td>${b.cusip}</td>
-        <td>${(b.coupon * 100).toFixed(3)}%</td>
-        <td>${b.price.toFixed(3)}</td>
-        <td>${(b.askYield * 100).toFixed(3)}%</td>
-        <td class="drillable" data-cusip="${b.cusip}">${(b.saYield * 100).toFixed(3)}%</td>
-        <td style="font-weight:700; color:#1a56db;" class="drillable" data-cusip="${b.cusip}">${(b.saoYield * 100).toFixed(3)}%</td>
-        <td class="${b.diffBps >= 0 ? 'pos' : 'neg'}">${b.diffBps.toFixed(1)}</td>
-      </tr>`).join('');
+  window._currentBonds = [...(fedBonds || []), ...(brokerBonds || [])].sort((a, b) => a.maturityDate - b.maturityDate);
+
+  const shown = { ask: 'showTipsAsk', sa: 'showTipsSa', sao: 'showTipsSao', spot: 'showTipsSpot', spotSa: 'showTipsSpotSa' };
+  const cols = TIPS_TABLE_SERIES.filter(s => document.getElementById(shown[s.key]).checked);
+
+  thead.innerHTML = `
+    <th><a class="col-help" href="#" data-col="maturity">Maturity</a></th>
+    <th><a class="col-help" href="#" data-col="term">Term</a></th>
+    ${cols.map(c => `<th><a class="col-help" href="#" data-col="${c.help}">${c.label}${both ? ' (Fed/Mkt)' : ''}</a></th>`).join('')}`;
+
+  // Security rows — one per CUSIP, Ask/SA/SAO cells where that security has them.
+  const fedMap = fedBonds ? new Map(fedBonds.map(b => [b.cusip, b])) : new Map();
+  const brokerMap = brokerBonds ? new Map(brokerBonds.map(b => [b.cusip, b])) : new Map();
+  const rows = [...new Set([...fedMap.keys(), ...brokerMap.keys()])].map(cusip => {
+    const f = fedMap.get(cusip), b = brokerMap.get(cusip);
+    const ref = f || b;
+    const cells = cols.map(c => c.yieldKey
+      ? { html: both ? `${fmtY(f?.[c.yieldKey])} / ${fmtY(b?.[c.yieldKey])}` : fmtY(ref[c.yieldKey]), drill: c.drill, cusip }
+      : { html: '—' });
+    return { term: termOf(ref.maturityDate), maturityHtml: fmtMMM(ref.maturity), cells };
+  });
+
+  // Curve rows — Spot / Spot SA only, added when checked.
+  const curveByTerm = new Map();   // term.toFixed(4) -> { term, spot_fed, spot_mkt, spotSa_fed, spotSa_mkt }
+  const addCurve = (key, bonds, source, opts) => {
+    const grid = bonds && spotCurveTermGrid(bonds, opts);
+    if (!grid) return;
+    for (const { t, y } of grid) {
+      const tk = t.toFixed(4);
+      if (!curveByTerm.has(tk)) curveByTerm.set(tk, { term: t });
+      curveByTerm.get(tk)[`${key}_${source}`] = y;
+    }
+  };
+  if (cols.some(c => c.key === 'spot')) {
+    addCurve('spot', fedBonds, 'fed', { priceOf: bd => bd.price, yieldOf: bd => bd.askYield });
+    addCurve('spot', brokerBonds, 'mkt', { priceOf: bd => bd.price, yieldOf: bd => bd.askYield });
   }
+  if (cols.some(c => c.key === 'spotSa')) {
+    addCurve('spotSa', fedBonds, 'fed', { priceOf: bd => bd.price * bd.saRatio, yieldOf: bd => bd.saYield });
+    addCurve('spotSa', brokerBonds, 'mkt', { priceOf: bd => bd.price * bd.saRatio, yieldOf: bd => bd.saYield });
+  }
+  for (const { term, ...vals } of curveByTerm.values()) {
+    const cells = cols.map(c => {
+      if (c.key !== 'spot' && c.key !== 'spotSa') return { html: '—' };
+      const fedV = vals[`${c.key}_fed`], mktV = vals[`${c.key}_mkt`];
+      const fmt = v => v != null ? v.toFixed(3) + '%' : '—';
+      return { html: both ? `${fmt(fedV)} / ${fmt(mktV)}` : fmt(fedV ?? mktV) };
+    });
+    rows.push({ term, maturityHtml: '—', cells });
+  }
+
+  rows.sort((a, b) => a.term - b.term);
+  tbody.innerHTML = rows.map(r => `
+    <tr>
+      <td>${r.maturityHtml}</td>
+      <td>${r.term.toFixed(1)}y</td>
+      ${r.cells.map(c => `<td${c.drill ? ` class="drillable" data-drill="${c.drill}" data-cusip="${c.cusip}"` : ''}${c.drill === 'sao' ? ' style="font-weight:700; color:#1a56db;"' : ''}>${c.html}</td>`).join('')}
+    </tr>`).join('');
 }
 
 // A dataset's SHOW-row key, from its legend label. "Spot SA (Fed)" → SpotSA before the
@@ -2143,6 +2148,7 @@ Object.keys(TIPS_SHOW).forEach((id) => {
     });
     chart.update('none');
     rescaleToVisible(chart);
+    renderTable(tipsTableFed, tipsTableBroker);
   });
 });
 
@@ -2262,13 +2268,8 @@ document.getElementById('chart-mode-tabs').addEventListener('click', e => {
 document.getElementById('tableBody').addEventListener('click', (e) => {
   const td = e.target.closest('td.drillable');
   if (!td) return;
-  
-  // Use cellIndex to distinguish columns (SA is 5, SAO is 6)
-  if (td.cellIndex === 5) {
-    _showSaDrill(td.dataset.cusip);
-  } else if (td.cellIndex === 6) {
-    _showSaoDrill(td.dataset.cusip);
-  }
+  if (td.dataset.drill === 'sa') _showSaDrill(td.dataset.cusip);
+  else if (td.dataset.drill === 'sao') _showSaoDrill(td.dataset.cusip);
 });
 
 document.addEventListener('click', (e) => {
