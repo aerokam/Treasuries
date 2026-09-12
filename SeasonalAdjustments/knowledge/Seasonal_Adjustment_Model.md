@@ -10,9 +10,9 @@ To illustrate the how and why of this, we will develop a very simple model that 
 
 ## The model
 
-Our model has three points in time, t₀, t₁, and t₂. The interval from t₀ to t₁ is equal to the interval from t₁ to t₂; we call each interval a period, and the two periods together span one year, Y.
+Our model has three points in time, t₀, t₁, and t₂. The interval from t₀ to t₁ is equal to the interval from t₁ to t₂; we call each interval a period, and the two periods together span the term, T. We take T to be one year.
 
-<div><svg viewBox="0 0 480 100" xmlns="http://www.w3.org/2000/svg" font-family="system-ui,Segoe UI,Arial" font-size="12"><line x1="70" y1="55" x2="410" y2="55" stroke="#334155" stroke-width="2"/><circle cx="70" cy="55" r="4" fill="#334155"/><text x="70" y="75" text-anchor="middle" fill="#334155">t₀</text><circle cx="240" cy="55" r="4" fill="#334155"/><text x="240" y="75" text-anchor="middle" fill="#334155">t₁</text><circle cx="410" cy="55" r="4" fill="#334155"/><text x="410" y="75" text-anchor="middle" fill="#334155">t₂</text><text x="155" y="45" text-anchor="middle" fill="#64748b">period</text><text x="325" y="45" text-anchor="middle" fill="#64748b">period</text><text x="240" y="95" text-anchor="middle" fill="#64748b">Y = one year (t₀ to t₂)</text></svg></div>
+<div><svg viewBox="0 0 480 100" xmlns="http://www.w3.org/2000/svg" font-family="system-ui,Segoe UI,Arial" font-size="12"><line x1="70" y1="55" x2="410" y2="55" stroke="#334155" stroke-width="2"/><circle cx="70" cy="55" r="4" fill="#334155"/><text x="70" y="75" text-anchor="middle" fill="#334155">t₀</text><circle cx="240" cy="55" r="4" fill="#334155"/><text x="240" y="75" text-anchor="middle" fill="#334155">t₁</text><circle cx="410" cy="55" r="4" fill="#334155"/><text x="410" y="75" text-anchor="middle" fill="#334155">t₂</text><text x="155" y="45" text-anchor="middle" fill="#64748b">period</text><text x="325" y="45" text-anchor="middle" fill="#64748b">period</text><text x="240" y="95" text-anchor="middle" fill="#64748b">T = one year (t₀ to t₂)</text></svg></div>
 
 A price index measures the general price level at each point in time, as the Consumer Price Index does. We write the value of the price index at time t as Iₜ, and we set its starting value I₀ = 100.
 
