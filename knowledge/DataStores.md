@@ -103,7 +103,7 @@ This document provides the technical schemas and field-level specifications for 
 
 | Column | Type | Description |
 |---|---|---|
-| `Term (y)` | Number | Years from settlement to maturity (actual security row), or the grid horizon (fitted row). |
+| `Term (y)` | Number | [Term](./DATA_DICTIONARY.md#term): from the source's settlement date to maturity on a security row, and the fitted curve's horizon on a grid row, measured from the same settlement date. |
 | `Maturity` | Date | Maturity date. Blank on a fitted grid row. |
 | `CUSIP` | String | 9-character security identifier on a security row. `Spot` on a fitted grid row, so a grid row reads consistently with a security row rather than leaving the field blank. |
 | `Type` | String | Security row: `Bill`, `Note`, `Bond`, `STRIPS`, or `TIPS` ([Treasury CUSIP Reference](./Treasury_CUSIP_Reference.md)). Grid row: `Treasury` (fitted nominal spot), `TIPS` (fitted TIPS quoted + SA spot), or `BEI` (nominal spot minus TIPS spot) — three rows per term per source. |
@@ -118,7 +118,7 @@ This document provides the technical schemas and field-level specifications for 
 
 **Term grid**: half-year steps (0.5, 1.0, 1.5, …), matching the chart's own `spotCurveGrid` convention and including every whole year in range (a whole-year term is itself a half-year multiple, so no separate annual pass is needed). Spans the union of the nominal, TIPS-quoted and TIPS-SA fits' valid ranges per `Source`, rather than clipping to their intersection — a term outside one curve's valid range simply leaves that curve's cell(s) blank rather than dropping the whole row. A cell is also left blank if its fit's sanity check fails at that term (see `shared/src/spot-curve.js#spotCurveFit`).
 
-**Logic**: Loads the same R2 inputs the YieldCurves app loads (S1, S4, S7, `misc/BondHolidaysSifma.csv`), reads the S7 nominal Treasury rows with `shared/src/fidelity-parse.js#parseFidelityNominalRows` and fits with `shared/src/spot-curve.js#spotCurveFit` — both the same modules `src/app.js` imports, so the app and this pipeline can never drift onto two different parses or two different fits. The script evaluates the fit objects' own `z(t)`/`sane()` on the term grid rather than refitting.
+**Logic**: Loads the same R2 inputs the YieldCurves app loads (S1, S4, S7, `misc/BondHolidaysSifma.csv`) and runs every step through the module `YieldCurves/src/app.js` imports for it, so the app and this pipeline cannot drift apart: `shared/src/fidelity-parse.js#parseFidelityNominalRows` for the S7 nominal Treasury rows, `shared/src/tips-securities.js#buildTipsSecurities` for the TIPS security set, `shared/src/spot-curve.js#spotCurveFit` for the fits, `shared/src/breakeven.js#findClosestNominal` for the nominal each [S14](#s14) row is stated against, and `shared/src/bond-math.js#termYears` for `Term (y)`. The script evaluates the fit objects' own `z(t)`/`sane()` on the term grid rather than refitting.
 
 **Live Data**: [View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/YieldCurves.csv)
 

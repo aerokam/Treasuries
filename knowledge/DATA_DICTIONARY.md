@@ -43,11 +43,11 @@
 
 **S** &nbsp; [S1: YieldsFromFedInvestPrices.csv](#s1) &middot; [S10: YieldsSaSao.csv](#s10) &middot; [S11: FundHoldings/Holdings-\<TICKER\>(-Enriched).csv](#s11) &middot; [S12: GswTipsCurve.json](#s12) &middot; [S13: YieldCurves.csv](#s13) &middot; [S14: BreakevenInflation.csv](#s14) &middot; [S15: BidAskSpreads.csv](#s15) &middot; [S2: TipsRef.csv](#s2) &middot; [S3: RefCPI.csv](#s3) &middot; [S4: RefCpiNsaSa.csv](#s4) &middot; [S5: Auctions.csv](#s5) &middot; [S6: YieldHistory](#s6) &middot; [S7: FidelityTreasuriesTips.csv](#s7) &middot; [S8: CPI_history.csv](#s8) &middot; [S9: Tentative-Auction-Schedule.xml](#s9) &middot; [SA Factor](#sa-factor) &middot; [SA Price Factor](#sa-price-factor) &middot; [SA Yield](#sa-yield) &middot; [SACP](#sacp) &middot; [same year excess interest](#same-maturity-excess-interest) *(see Same-Maturity Excess Interest)* &middot; [Same-Maturity Excess Interest](#same-maturity-excess-interest) &middot; [SAO Blend Weight](#sao-blend-weight) &middot; [SAO Yield](#sao-yield) &middot; [Seasonal Amplitude](#seasonal-amplitude) &middot; [Seasonal Factor Drift](#seasonal-factor-drift) &middot; [Settlement Date](#settlement-date) &middot; [Spot Yield](#spot-yield) &middot; [Synthetic TIPS](#synthetic-tips)
 
-**T** &nbsp; [TIPS](#tips) &middot; [TIPS Ladder](#tips-ladder) &middot; [Total Cost](#total-cost) &middot; [Trade Ticket](#trade-ticket) &middot; [Treasury Bill](#treasury-bill) &middot; [Treasury Bond](#treasury-bond) &middot; [Treasury Note](#treasury-note)
+**T** &nbsp; [Term](#term) &middot; [TIPS](#tips) &middot; [TIPS Ladder](#tips-ladder) &middot; [Total Cost](#total-cost) &middot; [Trade Ticket](#trade-ticket) &middot; [Treasury Bill](#treasury-bill) &middot; [Treasury Bond](#treasury-bond) &middot; [Treasury Note](#treasury-note)
 
 **W** &nbsp; [Within-Year Allocation Policy](#within-year-allocation-policy)
 
-**Y** &nbsp; [Yield](#yield) &middot; [Yield Curve](#yield-curve)
+**Y** &nbsp; [years to maturity](#term) *(see Term)* &middot; [Yield](#yield) &middot; [Yield Curve](#yield-curve)
 
 **Z** &nbsp; [zero coupon yield](#spot-yield) *(see Spot Yield)*
 
@@ -192,6 +192,13 @@
 <a id="maturity-date"></a>
 ### Maturity Date
 `Maturity_Date` = *Date on which principal is repaid to the bondholder*
+
+<a id="term"></a>
+<a id="years-to-maturity"></a>
+### Term
+`Term` = *The length of the period from a stated date to a security's [Maturity Date](#maturity-date), in years. **Years to maturity** is the same measure. Below one year the denominator is the actual number of days in the year beginning at the stated date, 365 or 366; from one year the denominator is 365.25, the average calendar year, so that a term spanning several years does not move with the placement of a single leap day. `shared/src/bond-math.js#termYears` is the one implementation.*
+
+*The use names the date the period runs from. A price, a yield and every point on a [Yield Curve](#yield-curve) are stated at a [Settlement Date](#settlement-date), so a term stated alongside them runs from that settlement date, and not from the date the figure is read: the same prices then give the same term at every reading. Measured from the [Dated Date](#dated-date) instead, the same period is the term the security was issued for, which is what [S2](#s2) records and what names a 10-Year Note.*
 
 <a id="dated-date"></a>
 ### Dated Date

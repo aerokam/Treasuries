@@ -19,8 +19,9 @@
 // Run: node YieldCurves/scripts/updateSpotYieldCurves.js  [--dry]
 
 import { uploadToR2 } from './r2.js';
-import { yieldFromPrice } from '../../shared/src/bond-math.js';
-import { saFactorForDate, maturitySaFactor } from '../../shared/src/ref-cpi.js';
+import { yieldFromPrice, termYears } from '../../shared/src/bond-math.js';
+import { buildTipsSecurities } from '../../shared/src/tips-securities.js';
+import { findClosestNominal } from '../../shared/src/breakeven.js';
 import { parseCsv } from '../../shared/src/csv.js';
 import { localDate, toIsoDate, nextBusinessDay, parseHolidaySet } from '../../shared/src/settlement.js';
 import { classifyByCusipRoot, isStrip } from '../../shared/src/treasury-cusip.js';
@@ -38,69 +39,10 @@ const FIDELITY_URL = `${R2_BASE_URL}/Treasuries/FidelityTreasuriesTips.csv`;
 
 const DRY = process.argv.includes('--dry');
 
-// ─── TIPS row processing — mirrors src/app.js's buildTipsSecurities.
-function buildTipsSecurities(rawTipsData, refCpiData, priceMap, isBroker, brokerSettleStr) {
-  return rawTipsData.map(bond => {
-    const coupon = parseFloat(bond.coupon);
-    let price = parseFloat(bond.price);
-    let settleDateStr = bond.settlementDate;
-    let quote = null;
-
-    if (isBroker) {
-      if (!priceMap.has(bond.cusip)) return null;
-      quote = priceMap.get(bond.cusip);
-      if (isNaN(quote.askPrice)) return null;
-      price = quote.askPrice;
-      settleDateStr = brokerSettleStr;
-    }
-
-    const saSettle = saFactorForDate(refCpiData, settleDateStr);
-    const saMature = maturitySaFactor(refCpiData, bond.maturity, settleDateStr);
-    if (saSettle == null || isNaN(saSettle) || saMature == null || isNaN(saMature)) return null;
-
-    const settleDate = localDate(settleDateStr);
-    const matureDate = localDate(bond.maturity);
-    const saRatio = saSettle / saMature;
-    const askYield = yieldFromPrice(price, coupon, settleDate, matureDate);
-    const saYield = yieldFromPrice(price * saRatio, coupon, settleDate, matureDate);
-    if (askYield == null || isNaN(askYield) || saYield == null || isNaN(saYield)) return null;
-
-    let bidPrice = NaN, bidYield = NaN, adjAskPrice = NaN, adjBidPrice = NaN;
-    let indexRatio = NaN, yieldSpreadBps = NaN, priceSpreadPct = NaN;
-    if (isBroker && quote) {
-      bidPrice = quote.bidPrice;
-      adjAskPrice = quote.adjAskPrice;
-      adjBidPrice = quote.adjBidPrice;
-      indexRatio = quote.indexRatio;
-      bidYield = yieldFromPrice(bidPrice, coupon, settleDate, matureDate);
-      if (!isNaN(bidYield) && !isNaN(askYield)) yieldSpreadBps = (bidYield - askYield) * 10000;
-      if (!isNaN(adjAskPrice) && !isNaN(adjBidPrice) && adjAskPrice > 0)
-        priceSpreadPct = (adjAskPrice - adjBidPrice) / adjAskPrice * 100;
-    }
-
-    return {
-      ...bond, coupon, price, saRatio, askYield, saYield, bidPrice, bidYield,
-      adjAskPrice, adjBidPrice, indexRatio, yieldSpreadBps, priceSpreadPct,
-      maturityDate: matureDate, settlementDate: settleDateStr, isBroker,
-    };
-  }).filter(Boolean).sort((a, b) => a.maturityDate - b.maturityDate);
-}
-
-function findClosestNominal(nominals, maturityDate) {
-  let best = null, bestDiff = Infinity;
-  for (const n of nominals) {
-    const diff = Math.abs(n.maturityDate.getTime() - maturityDate.getTime());
-    if (diff < bestDiff) { bestDiff = diff; best = n; }
-  }
-  return best;
-}
-
-// Years from settlement to maturity (decimal), for the term_years column.
-function termYears(maturityStr, settlementStr) {
-  const settle = localDate(settlementStr);
-  const mature = localDate(maturityStr);
-  return (mature.getTime() - settle.getTime()) / (365.25 * 86400000);
-}
+// The TIPS security set, the nearest-maturity nominal pairing and the term measure are each
+// defined once in shared/src/ and imported above — see 3.1_Load_And_Parse.md §3.1.7,
+// 3.5_Breakeven_Inflation.md and DATA_DICTIONARY.md#term.
+const termOf = (maturityStr, settlementStr) => termYears(localDate(settlementStr), localDate(maturityStr));
 
 const GRID_STEP_YRS = 0.5; // half-year grid — matches the chart's own spotCurveGrid convention.
 // 0.5 is exactly representable in IEEE754 binary floating point, so repeated += 0.5 never
@@ -207,7 +149,7 @@ async function main() {
     + `(${fidNominalBondsAll.length - fidNominalBonds.length} STRIPS).`);
 
   // ── Processed bonds, per source ──────────────────────────────────────────────
-  const fedTipsSecurities = buildTipsSecurities(rawTipsData, refCpiData, priceMap, false, fedSettleStr);
+  const fedTipsSecurities = buildTipsSecurities(rawTipsData, refCpiData, priceMap, false, brokerSettleStr);
   const mktTipsSecurities = buildTipsSecurities(rawTipsData, refCpiData, priceMap, true, brokerSettleStr);
   if (fedTipsSecurities.length) { const s = calculateSAO(fedTipsSecurities); fedTipsSecurities.forEach((b, i) => b.saoYield = s[i]); }
   if (mktTipsSecurities.length) { const s = calculateSAO(mktTipsSecurities); mktTipsSecurities.forEach((b, i) => b.saoYield = s[i]); }
@@ -251,22 +193,22 @@ async function main() {
   // See knowledge/DataStores.md#s13 for the column list and rationale. ──────────────────
   const evalRows = [];
   for (const b of fedNominalBondsAll) evalRows.push({
-    term_years: termYears(b.maturity, fedSettleStr), maturity_date: b.maturity, cusip: b.cusip,
+    term_years: termOf(b.maturity, fedSettleStr), maturity_date: b.maturity, cusip: b.cusip,
     type: classifyByCusipRoot(b.cusip) || '', source: 'FedInvest',
     ask_yield: b.yield, sa_yield: '', sao_yield: '', spot_yield: '', spot_sa_yield: '',
   });
   for (const b of mktNominalBondsAll) evalRows.push({
-    term_years: termYears(b.maturity, brokerSettleStr), maturity_date: b.maturity, cusip: b.cusip,
+    term_years: termOf(b.maturity, brokerSettleStr), maturity_date: b.maturity, cusip: b.cusip,
     type: b.cusipType, source: 'Market',
     ask_yield: b.yield, sa_yield: '', sao_yield: '', spot_yield: '', spot_sa_yield: '',
   });
   for (const b of fedTipsSecurities) evalRows.push({
-    term_years: termYears(b.maturity, fedSettleStr), maturity_date: b.maturity, cusip: b.cusip,
+    term_years: termOf(b.maturity, fedSettleStr), maturity_date: b.maturity, cusip: b.cusip,
     type: 'TIPS', source: 'FedInvest',
     ask_yield: b.askYield, sa_yield: b.saYield, sao_yield: b.saoYield, spot_yield: '', spot_sa_yield: '',
   });
   for (const b of mktTipsSecurities) evalRows.push({
-    term_years: termYears(b.maturity, brokerSettleStr), maturity_date: b.maturity, cusip: b.cusip,
+    term_years: termOf(b.maturity, brokerSettleStr), maturity_date: b.maturity, cusip: b.cusip,
     type: 'TIPS', source: 'Market',
     ask_yield: b.askYield, sa_yield: b.saYield, sao_yield: b.saoYield, spot_yield: '', spot_sa_yield: '',
   });

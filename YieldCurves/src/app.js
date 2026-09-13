@@ -1,6 +1,8 @@
 // Yield Curves — Frontend Logic
-import { yieldFromPrice, cashflowSchedule } from '../../shared/src/bond-math.js';
+import { yieldFromPrice, cashflowSchedule, termYears } from '../../shared/src/bond-math.js';
 import { saFactorForDate, maturitySaFactor } from '../../shared/src/ref-cpi.js';
+import { buildTipsSecurities } from '../../shared/src/tips-securities.js';
+import { findClosestNominal } from '../../shared/src/breakeven.js';
 import {
   SAO_NOISE_YRS, SAO_BLEND_START_YRS, SAO_BLEND_END_YRS,
   nssBasis, zToSA, spotCurveFit, spotCurveGrid, spotCurveTermGrid, calculateSAO,
@@ -404,13 +406,7 @@ function parseMarketQuotes(text, knownTips) {
   parseFidelityTipsRows(text).forEach(r => {
     if (isNaN(r.askPrice)) return;
     if (!knownTips || !knownTips.some(y => y.cusip === r.cusip)) return;
-    tipsPrices.set(r.cusip, {
-      ask: r.askPrice,
-      bid: r.bidPrice,
-      adjAsk: r.adjAskPrice,
-      adjBid: r.adjBidPrice,
-      indexRatio: r.indexRatio,
-    });
+    tipsPrices.set(r.cusip, r);
   });
   return { nominals: bonds, nominalsDate: downloadDate, tipsPrices, tipsDate: parseFidelityDownloadDate(text) };
 }
@@ -983,51 +979,11 @@ function renderNominalsChart(fedBonds, fidBonds, fedSpotBonds, fidSpotBonds) {
 
 }
 
-// Build the processed TIPS bond set for one source (FedInvest or broker/Market).
-// Shared by the TIPS tab (both sources side-by-side) and the BEI tab (Market only).
-function buildTipsSecurities(sourceMap, isBroker) {
-  return rawYieldsData.map(bond => {
-    const coupon = parseFloat(bond.coupon);
-    let price = parseFloat(bond.price);
-    let settleDateStr = bond.settlementDate;
-
-    let quote = null;
-    if (isBroker) {
-      if (!sourceMap.has(bond.cusip)) return null;
-      quote = sourceMap.get(bond.cusip);
-      price = quote.ask;
-      const fedSettleDate = localDate(bond.settlementDate);
-      const tPlus1 = nextBusinessDay(fedSettleDate, holidaySet);
-      settleDateStr = toIsoDate(tPlus1);
-    }
-
-    const saSettle = saFactorForDate(rawRefCpiData, settleDateStr);
-    const saMature = maturitySaFactor(rawRefCpiData, bond.maturity, settleDateStr);
-
-    if (saSettle == null || isNaN(saSettle) || saMature == null || isNaN(saMature)) return null;
-
-    const settleDate = localDate(settleDateStr);
-    const matureDate = localDate(bond.maturity);
-    const saRatio = saSettle / saMature;   // SA clean price = price × saRatio (3.2_Seasonal_Adjustments)
-    const askYield = yieldFromPrice(price, coupon, settleDate, matureDate);
-    const saYield = yieldFromPrice(price * saRatio, coupon, settleDate, matureDate);
-
-    let bidPrice = NaN, bidYield = NaN, adjAskPrice = NaN, adjBidPrice = NaN;
-    let indexRatio = NaN, yieldSpreadBps = NaN, priceSpreadPct = NaN;
-    if (isBroker && quote) {
-      bidPrice = quote.bid;
-      adjAskPrice = quote.adjAsk;
-      adjBidPrice = quote.adjBid;
-      indexRatio = quote.indexRatio;
-      bidYield = yieldFromPrice(bidPrice, coupon, settleDate, matureDate);
-      if (!isNaN(bidYield) && !isNaN(askYield)) yieldSpreadBps = (bidYield - askYield) * 10000;
-      if (!isNaN(adjAskPrice) && !isNaN(adjBidPrice) && adjAskPrice > 0)
-        priceSpreadPct = (adjAskPrice - adjBidPrice) / adjAskPrice * 100;
-    }
-
-    return { ...bond, coupon, price, saRatio, askYield, saYield, bidPrice, bidYield, adjAskPrice, adjBidPrice, indexRatio, yieldSpreadBps, priceSpreadPct, maturityDate: matureDate, settlementDate: settleDateStr, isBroker };
-  }).filter(Boolean).sort((a, b) => a.maturityDate - b.maturityDate);
-}
+// The TIPS security set for one source (FedInvest or Market) is built by
+// shared/src/tips-securities.js#buildTipsSecurities — one implementation for this page and
+// for the acquisition job that publishes S13, S14 and S15 (3.1_Load_And_Parse.md §3.1.7).
+const tipsSecuritiesFor = (quotesByCusip, isBroker) =>
+  buildTipsSecurities(rawYieldsData, rawRefCpiData, quotesByCusip, isBroker, marketSettleIso());
 
 function processAndRenderTips() {
   const statusEl = document.getElementById('status');
@@ -1040,8 +996,8 @@ function processAndRenderTips() {
   try {
     const fedSettleStr = rawYieldsData[0]?.settlementDate;
 
-    let fedBonds = showFed ? buildTipsSecurities(null, false) : null;
-    let brokerBonds = showBroker ? buildTipsSecurities(brokerPrices, true) : null;
+    let fedBonds = showFed ? tipsSecuritiesFor(null, false) : null;
+    let brokerBonds = showBroker ? tipsSecuritiesFor(brokerPrices, true) : null;
 
     // Apply SAO to each set
     if (fedBonds) {
@@ -1111,9 +1067,10 @@ function renderTable(fedBonds, brokerBonds) {
   const tbody = document.getElementById('tableBody');
   const thead = document.querySelector('#saTable thead tr');
   const both = fedBonds && brokerBonds;
-  const now = Date.now();
   const fmtY = y => (y != null && !isNaN(y)) ? (y * 100).toFixed(3) + '%' : '—';
-  const termOf = d => (d.getTime() - now) / (365.25 * 86400000);
+  // Term runs from the settlement date the security's own price is stated at, the same
+  // measure the curve rows below carry (DATA_DICTIONARY.md#term).
+  const termOf = b => termYears(localDate(b.settlementDate), b.maturityDate);
 
   window._currentBonds = [...(fedBonds || []), ...(brokerBonds || [])].sort((a, b) => a.maturityDate - b.maturityDate);
 
@@ -1134,7 +1091,7 @@ function renderTable(fedBonds, brokerBonds) {
     const cells = cols.map(c => c.yieldKey
       ? { html: both ? `${fmtY(f?.[c.yieldKey])} / ${fmtY(b?.[c.yieldKey])}` : fmtY(ref[c.yieldKey]), drill: c.drill, cusip }
       : { html: '—' });
-    return { term: termOf(ref.maturityDate), maturityHtml: fmtMMM(ref.maturity), cells };
+    return { term: termOf(ref), maturityHtml: fmtMMM(ref.maturity), cells };
   });
 
   // Curve rows — Spot / Spot SA only, added when checked.
@@ -1251,16 +1208,6 @@ function buildYieldXScale(allPoints) {
     time: { displayFormats: { year: 'yyyy', month: 'MMM yyyy' } },
     ...calendarTimeAxis({ gridColor: GRID_COLOR }),
   };
-}
-
-// Nearest-maturity nominal (Bills/Notes/Bonds, no STRIPS) for a TIPS maturity date — the BEI tab's "closest maturity nominal".
-function findClosestNominal(nominals, maturityDate) {
-  let best = null, bestDiff = Infinity;
-  for (const n of nominals) {
-    const diff = Math.abs(n.maturityDate.getTime() - maturityDate.getTime());
-    if (diff < bestDiff) { bestDiff = diff; best = n; }
-  }
-  return best;
 }
 
 function renderChart(fedBonds, brokerBonds) {
@@ -1478,7 +1425,7 @@ function processAndRenderBei() {
   if (!rawYieldsData || rawYieldsData.length === 0 || !rawRefCpiData) return;
 
   try {
-    const tipsSecurities = buildTipsSecurities(brokerPrices, true);
+    const tipsSecurities = tipsSecuritiesFor(brokerPrices, true);
     const smoothed = calculateSAO(tipsSecurities);
     tipsSecurities.forEach((b, i) => { b.saoYield = smoothed[i]; });
 

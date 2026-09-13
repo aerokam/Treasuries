@@ -4,7 +4,7 @@
 // this module rather than keeping their own copy.
 // See YieldCurves/knowledge/3.3_SAO_Adjustment.md and 3.4_Spot_Yield_Curves.md.
 
-import { cashflowSchedule } from './bond-math.js';
+import { cashflowSchedule, termYears } from './bond-math.js';
 import { localDate } from './settlement.js';
 
 // SAO "O" step — a SMOOTH-CURVE FIT, not Canty's inflation-shock outlier factor.
@@ -145,11 +145,13 @@ export const zToSA = zc => 200 * (Math.exp(zc / 200) - 1);
 // maturity-to-maturity discontinuity — a real curve stays inside the scatter). `priceOf` /
 // `yieldOf` pick which price / YTM to fit; bonds under `minT` years are left out.
 export function spotCurveFit(bonds, { priceOf, yieldOf, minT = SAO_NOISE_YRS }) {
-  const now = Date.now();
   const specs = [];
   for (const b of bonds) {
     const settle = localDate(b.settlementDate);
-    const t = (b.maturityDate.getTime() - now) / (365.25 * 86400000);
+    // Term runs from the settlement date the prices are stated at, not from the clock at
+    // run time: the same prices refit at a later hour would otherwise land on a shifted
+    // term grid. DATA_DICTIONARY.md#term.
+    const t = settle && !isNaN(settle) ? termYears(settle, b.maturityDate) : NaN;
     const px = priceOf(b), y = yieldOf(b);
     if (!settle || isNaN(settle) || t < minT || !(px > 0) || y == null || isNaN(y)) continue;
     const sch = cashflowSchedule(settle, b.maturityDate, b.coupon);
@@ -232,7 +234,7 @@ export function calculateSAO(bonds) {
   if (n === 0) return sao;
 
   const settle = localDate(bonds[0].settlementDate) || new Date();
-  const yrs = bonds.map(b => (b.maturityDate - settle) / 31557600000);
+  const yrs = bonds.map(b => termYears(settle, b.maturityDate));   // DATA_DICTIONARY.md#term
 
   // Fit on reliable points only; near-maturity SA yields are price-noise-dominated.
   const fitIdx = [];
