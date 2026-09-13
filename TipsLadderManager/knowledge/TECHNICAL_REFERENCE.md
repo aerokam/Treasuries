@@ -8,9 +8,9 @@ This document maps conceptual definitions from the [Master Glossary](../../knowl
 
 | Spec Constant | Variable Name | Value / Purpose |
 |---|---|---|
-| REFCPI_CUSIP | `REFCPI_CUSIP` | `912810FD5` (used for fetching daily RefCPI) |
+| REFCPI_CUSIP | `scripts/fetchRefCpi.js#CUSIP` | `912810FD5` (used for fetching daily Ref CPI) |
 | MIN_BRACKET_YEAR | `LOWEST_LOWER_BRACKET_YEAR` | `2032` (defines the search range for the lower bracket) |
-| MAX_LAST_YEAR | `MAX_LAST_YEAR` | `2066` (UI upper bound for lastYear; years 2057–2066 are Future 30Y Rungs covered by 2056 bracket) |
+| MAX_LAST_YEAR | `src/ladder-core.js#maxLastYear` | Longest-dated issued TIPS maturity year + 10, which is `2066` today. It is the upper bound of the Last Year selector; 2057–2066 are Future 30Y Rungs covered by the 2056 bracket. |
 
 ---
 
