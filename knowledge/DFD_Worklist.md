@@ -110,7 +110,7 @@ The three items the developer approved out of this sweep are closed in §3.9.
 
 ## 3.9 The last duplicates, and one term
 
-Closed in `d0619ef`. The TIPS security set moved to `shared/src/tips-securities.js#buildTipsSecurities` and the nearest-maturity nominal to `shared/src/breakeven.js#findClosestNominal`, each imported by the page and by `updateSpotYieldCurves.js` in place of a separate copy.
+Closed in `d0619ef`. The priced TIPS moved to `shared/src/tips-pricing.js#priceTips` and the nearest-maturity nominal to `shared/src/breakeven.js#findClosestNominal`, each imported by the page and by `updateSpotYieldCurves.js` in place of a separate copy.
 
 **The market TIPS settlement date.** The two copies of the security set differed on one thing, the [Known Defect](../YieldCurves/knowledge/3.1_Load_And_Parse.md) 3.1 had recorded: the page derived the settlement date of a market-quote TIPS from [S1](./DataStores.md#s1)'s date, against the quote file's own date in [3.1.6](../YieldCurves/knowledge/3.1_Load_And_Parse.md#determine-settlement-dates), which the acquisition job already followed. The page follows it now and the note is gone. Both files carried 2026-09-11, so nothing moves in today's figures; the measurement was made by holding the quoted prices and moving the settlement date. One business day of divergence moves the SA yield of all 53 quoted TIPS by a median 0.08 bp, p90 0.52, p99 and max 4.37, the largest at the shortest maturity; three business days, a median 0.25 bp and a max of 14.06. Breakeven inflation is a nominal yield less that TIPS yield, so it moves one for one.
 

@@ -1,7 +1,7 @@
 // Yield Curves — Frontend Logic
 import { yieldFromPrice, cashflowSchedule, termYears } from '../../shared/src/bond-math.js';
 import { saFactorForDate, maturitySaFactor } from '../../shared/src/ref-cpi.js';
-import { buildTipsSecurities } from '../../shared/src/tips-securities.js';
+import { priceTips } from '../../shared/src/tips-pricing.js';
 import { findClosestNominal } from '../../shared/src/breakeven.js';
 import {
   SAO_NOISE_YRS, SAO_BLEND_START_YRS, SAO_BLEND_END_YRS,
@@ -979,11 +979,11 @@ function renderNominalsChart(fedBonds, fidBonds, fedSpotBonds, fidSpotBonds) {
 
 }
 
-// The TIPS security set for one source (FedInvest or Market) is built by
-// shared/src/tips-securities.js#buildTipsSecurities — one implementation for this page and
+// The priced TIPS for one source (FedInvest or Market) is built by
+// shared/src/tips-pricing.js#priceTips — one implementation for this page and
 // for the acquisition job that publishes S13, S14 and S15 (3.1_Load_And_Parse.md §3.1.7).
-const tipsSecuritiesFor = (quotesByCusip, isBroker) =>
-  buildTipsSecurities(rawYieldsData, rawRefCpiData, quotesByCusip, isBroker, marketSettleIso());
+const tipsFor = (quotesByCusip, isBroker) =>
+  priceTips(rawYieldsData, rawRefCpiData, quotesByCusip, isBroker, marketSettleIso());
 
 function processAndRenderTips() {
   const statusEl = document.getElementById('status');
@@ -996,8 +996,8 @@ function processAndRenderTips() {
   try {
     const fedSettleStr = rawYieldsData[0]?.settlementDate;
 
-    let fedBonds = showFed ? tipsSecuritiesFor(null, false) : null;
-    let brokerBonds = showBroker ? tipsSecuritiesFor(brokerPrices, true) : null;
+    let fedBonds = showFed ? tipsFor(null, false) : null;
+    let brokerBonds = showBroker ? tipsFor(brokerPrices, true) : null;
 
     // Apply SAO to each set
     if (fedBonds) {
@@ -1425,9 +1425,9 @@ function processAndRenderBei() {
   if (!rawYieldsData || rawYieldsData.length === 0 || !rawRefCpiData) return;
 
   try {
-    const tipsSecurities = tipsSecuritiesFor(brokerPrices, true);
-    const smoothed = calculateSAO(tipsSecurities);
-    tipsSecurities.forEach((b, i) => { b.saoYield = smoothed[i]; });
+    const tips = tipsFor(brokerPrices, true);
+    const smoothed = calculateSAO(tips);
+    tips.forEach((b, i) => { b.saoYield = smoothed[i]; });
 
     const nominalCandidates = fidelityNominalsData.filter(b => b.type !== 'MARKET BASED STRIP');
     if (nominalCandidates.length === 0) {
@@ -1437,7 +1437,7 @@ function processAndRenderBei() {
       return;
     }
 
-    tipsSecurities.forEach(b => {
+    tips.forEach(b => {
       const nom = findClosestNominal(nominalCandidates, b.maturityDate);
       b.nominalCusip = nom.cusip;
       b.nominalMaturity = nom.maturity;
@@ -1455,7 +1455,7 @@ function processAndRenderBei() {
     const nomFit = spotCurveFit(
       nominalCandidates.filter(n => n.type === 'MARKET BASED NOTE' || n.type === 'MARKET BASED BOND'),
       { priceOf: n => n.price, yieldOf: n => n.yield, minT: 1 });
-    const saFit = spotCurveFit(tipsSecurities, { priceOf: b => b.price * b.saRatio, yieldOf: b => b.saYield });
+    const saFit = spotCurveFit(tips, { priceOf: b => b.price * b.saRatio, yieldOf: b => b.saYield });
     let spotBeiGrid = null;
     if (nomFit && saFit) {
       spotBeiGrid = [];
@@ -1470,13 +1470,13 @@ function processAndRenderBei() {
 
     const startEl = document.getElementById('startMaturity');
     const endEl = document.getElementById('endMaturity');
-    if (!startEl.value && tipsSecurities.length > 0) {
-      startEl.value = tipsSecurities[0].maturity;
-      endEl.value = tipsSecurities[tipsSecurities.length - 1].maturity;
+    if (!startEl.value && tips.length > 0) {
+      startEl.value = tips[0].maturity;
+      endEl.value = tips[tips.length - 1].maturity;
     }
     const startDate = parseIsoInput(startEl.value) || new Date(0);
     const endDate = parseIsoInput(endEl.value) || new Date(9999, 0);
-    const filtered = tipsSecurities.filter(b => b.maturityDate >= startDate && b.maturityDate <= endDate);
+    const filtered = tips.filter(b => b.maturityDate >= startDate && b.maturityDate <= endDate);
 
     renderBeiTable(filtered);
     renderBeiChart(filtered, spotBeiGrid);

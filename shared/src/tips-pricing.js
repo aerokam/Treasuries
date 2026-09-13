@@ -1,5 +1,5 @@
-// tips-securities.js -- assembles the TIPS security set of
-// YieldCurves/knowledge/3.1_Load_And_Parse.md#build-priced-bonds (3.1.7): the FedInvest TIPS
+// tips-pricing.js -- assembles the priced TIPS of
+// YieldCurves/knowledge/3.1_Load_And_Parse.md#price-the-tips (3.1.7): the FedInvest TIPS
 // rows of S1, the market quotes of S7, the daily Ref CPI and SA factors of S4, and one
 // settlement date per source, combined into the security objects every process downstream of
 // 3.1 works from.
@@ -27,7 +27,7 @@ import { localDate } from './settlement.js';
 // rule fidelity-parse.js#parseFidelityNominalRows applies to a nominal Treasury row.
 //
 // Returns the securities in maturity order.
-export function buildTipsSecurities(tipsRows, refCpiRows, quotesByCusip, isBroker, marketSettleIso) {
+export function priceTips(tipsRows, refCpiRows, quotesByCusip, isBroker, marketSettleIso) {
   return tipsRows.map(bond => {
     const coupon = parseFloat(bond.coupon);
     let price = parseFloat(bond.price);
@@ -61,7 +61,9 @@ export function buildTipsSecurities(tipsRows, refCpiRows, quotesByCusip, isBroke
       adjAskPrice = quote.adjAskPrice;
       adjBidPrice = quote.adjBidPrice;
       indexRatio = quote.indexRatio;
-      bidYield = yieldFromPrice(bidPrice, coupon, settleDate, matureDate);
+      // Null where there is no bid price to price from. Left as null it would pass the
+      // numeric test below and publish the spread as the negative of the ask yield.
+      bidYield = yieldFromPrice(bidPrice, coupon, settleDate, matureDate) ?? NaN;
       if (!isNaN(bidYield) && !isNaN(askYield)) yieldSpreadBps = (bidYield - askYield) * 10000;
       if (!isNaN(adjAskPrice) && !isNaN(adjBidPrice) && adjAskPrice > 0)
         priceSpreadPct = (adjAskPrice - adjBidPrice) / adjAskPrice * 100;

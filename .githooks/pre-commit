@@ -1,3 +1,5 @@
 #!/bin/sh
 node "$(git rev-parse --show-toplevel)/scripts/check-encoding.js" || exit 1
 node "$(git rev-parse --show-toplevel)/scripts/check-vocabulary.js" || exit 1
+node "$(git rev-parse --show-toplevel)/scripts/check-links.cjs" || exit 1
+node "$(git rev-parse --show-toplevel)/scripts/check-spec-code.cjs" || exit 1
