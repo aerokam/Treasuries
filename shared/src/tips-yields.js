@@ -1,5 +1,5 @@
-// tips-pricing.js -- assembles the priced TIPS of
-// YieldCurves/knowledge/3.1_Load_And_Parse.md#price-the-tips (3.1.7): the FedInvest TIPS
+// tips-yields.js -- calculates the TIPS yields of
+// YieldCurves/knowledge/3.1_Load_And_Parse.md#calculate-tips-yields (3.1.7): the FedInvest TIPS
 // rows of S1, the market quotes of S7, the daily Ref CPI and SA factors of S4, and one
 // settlement date per source, combined into the security objects every process downstream of
 // 3.1 works from.
@@ -27,7 +27,7 @@ import { localDate } from './settlement.js';
 // rule fidelity-parse.js#parseFidelityNominalRows applies to a nominal Treasury row.
 //
 // Returns the securities in maturity order.
-export function priceTips(tipsRows, refCpiRows, quotesByCusip, isBroker, marketSettleIso) {
+export function tipsYieldsFromPrices(tipsRows, refCpiRows, quotesByCusip, isBroker, marketSettleIso) {
   return tipsRows.map(bond => {
     const coupon = parseFloat(bond.coupon);
     let price = parseFloat(bond.price);

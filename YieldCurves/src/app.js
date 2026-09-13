@@ -1,7 +1,7 @@
 // Yield Curves — Frontend Logic
 import { yieldFromPrice, cashflowSchedule, termYears } from '../../shared/src/bond-math.js';
 import { saFactorForDate, maturitySaFactor } from '../../shared/src/ref-cpi.js';
-import { priceTips } from '../../shared/src/tips-pricing.js';
+import { tipsYieldsFromPrices } from '../../shared/src/tips-yields.js';
 import { findClosestNominal } from '../../shared/src/breakeven.js';
 import {
   SAO_NOISE_YRS, SAO_BLEND_START_YRS, SAO_BLEND_END_YRS,
@@ -979,11 +979,11 @@ function renderNominalsChart(fedBonds, fidBonds, fedSpotBonds, fidSpotBonds) {
 
 }
 
-// The priced TIPS for one source (FedInvest or Market) is built by
-// shared/src/tips-pricing.js#priceTips — one implementation for this page and
+// The TIPS yields for one source (FedInvest or Market) is built by
+// shared/src/tips-yields.js#tipsYieldsFromPrices — one implementation for this page and
 // for the acquisition job that publishes S13, S14 and S15 (3.1_Load_And_Parse.md §3.1.7).
 const tipsFor = (quotesByCusip, isBroker) =>
-  priceTips(rawYieldsData, rawRefCpiData, quotesByCusip, isBroker, marketSettleIso());
+  tipsYieldsFromPrices(rawYieldsData, rawRefCpiData, quotesByCusip, isBroker, marketSettleIso());
 
 function processAndRenderTips() {
   const statusEl = document.getElementById('status');

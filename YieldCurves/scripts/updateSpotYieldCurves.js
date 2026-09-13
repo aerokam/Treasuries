@@ -20,7 +20,7 @@
 
 import { uploadToR2 } from './r2.js';
 import { yieldFromPrice, termYears } from '../../shared/src/bond-math.js';
-import { priceTips } from '../../shared/src/tips-pricing.js';
+import { tipsYieldsFromPrices } from '../../shared/src/tips-yields.js';
 import { findClosestNominal } from '../../shared/src/breakeven.js';
 import { parseCsv } from '../../shared/src/csv.js';
 import { localDate, toIsoDate, nextBusinessDay, parseHolidaySet } from '../../shared/src/settlement.js';
@@ -39,7 +39,7 @@ const FIDELITY_URL = `${R2_BASE_URL}/Treasuries/FidelityTreasuriesTips.csv`;
 
 const DRY = process.argv.includes('--dry');
 
-// The priced TIPS, the nearest-maturity nominal pairing and the term measure are each
+// The TIPS yields, the nearest-maturity nominal pairing and the term measure are each
 // defined once in shared/src/ and imported above — see 3.1_Load_And_Parse.md §3.1.7,
 // 3.5_Breakeven_Inflation.md and DATA_DICTIONARY.md#term.
 const termOf = (maturityStr, settlementStr) => termYears(localDate(settlementStr), localDate(maturityStr));
@@ -149,8 +149,8 @@ async function main() {
     + `(${fidNominalBondsAll.length - fidNominalBonds.length} STRIPS).`);
 
   // ── Processed bonds, per source ──────────────────────────────────────────────
-  const fedTips = priceTips(rawTipsData, refCpiData, priceMap, false, brokerSettleStr);
-  const mktTips = priceTips(rawTipsData, refCpiData, priceMap, true, brokerSettleStr);
+  const fedTips = tipsYieldsFromPrices(rawTipsData, refCpiData, priceMap, false, brokerSettleStr);
+  const mktTips = tipsYieldsFromPrices(rawTipsData, refCpiData, priceMap, true, brokerSettleStr);
   if (fedTips.length) { const s = calculateSAO(fedTips); fedTips.forEach((b, i) => b.saoYield = s[i]); }
   if (mktTips.length) { const s = calculateSAO(mktTips); mktTips.forEach((b, i) => b.saoYield = s[i]); }
 

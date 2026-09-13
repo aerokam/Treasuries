@@ -360,7 +360,7 @@ function level3YieldCurvesLoad() {
     { id: '3.1.4', name: ['Parse bond', 'holidays'], href: V('YieldCurves/knowledge/3.1_Load_And_Parse.md#parse-bond-holidays'), reads: ['hol'], out: { '3.1.6': 'bond trading days' } },
     { id: '3.1.5', name: ['Parse GSW', 'parameters'], href: V('YieldCurves/knowledge/3.1_Load_And_Parse.md#parse-gsw-parameters'), reads: ['gsw'], out: { '3.1.7': 'GSW parameters' } },
     { id: '3.1.6', name: ['Determine', 'settlement', 'dates'], href: V('YieldCurves/knowledge/3.1_Load_And_Parse.md#determine-settlement-dates'), reads: [], out: { '3.1.7': 'settlement dates' } },
-    { id: '3.1.7', name: ['Price the', 'TIPS'], href: V('YieldCurves/knowledge/3.1_Load_And_Parse.md#price-the-tips'), reads: [], out: {} },
+    { id: '3.1.7', name: ['Calculate the', 'TIPS yields'], href: V('YieldCurves/knowledge/3.1_Load_And_Parse.md#calculate-tips-yields'), reads: [], out: {} },
   ];
   const SX = 40, SW = 205, PR = 56, W = 1340, H = 900;
   const sy = i => 150 + i * 150;

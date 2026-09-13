@@ -133,7 +133,7 @@
 
 - <a id="s7"></a>**S7: FidelityTreasuriesTips.csv** — Combined Treasury + TIPS bid/ask quotes (replaces the old separate `FidelityTips.csv`/`FidelityTreasuries.csv` pair as of ~2026-06-23). Local drop path: `~/Downloads/FidelityTreasuriesTips.csv` (gitignored, re-downloaded fresh each run). R2 key: `Treasuries/FidelityTreasuriesTips.csv`.
   CSV columns (exact header names): `Product, Description, Cusip, State, Coupon, Frequency, Maturity date, Call protected, Call date, Moody's rating, S&P rating, Yield, Bid price/Quantity (min), Adjusted bid price, Inflation factor, Ask price/Quantity (min), Adjusted ask price, Ask yield to worst, Ask yield to sink, Ask yield to maturity, 3rd party price, Depth of book, Attributes`
-  *`Product` = `Treasury` or `TIPS`; parsers filter on this column before further processing (Treasury rows lack `Inflation factor`/`Adjusted bid price`/`Adjusted ask price`; both row types carry `Yield`, which doubles as the bid yield column — there is no separate "Yield Bid" header in the combined export). Parser normalises headers to lowercase. Key fields used: `cusip`, `coupon`, `ask price/quantity (min)` (ask clean real price), `bid price/quantity (min)` (bid clean real price), `adjusted bid price`/`adjusted ask price` (TIPS only), `inflation factor` (TIPS only), `ask yield to maturity` (ask yield, percentage form), `yield` (bid yield, percentage form). In the Yield Curves app, both yields are computed from the quoted prices via `yieldFromPrice` for TIPS and Treasuries alike, so that the two sides of a quote share one method ([3.1.2](../YieldCurves/knowledge/3.1_Load_And_Parse.md#parse-market-quotes), [3.1.7](../YieldCurves/knowledge/3.1_Load_And_Parse.md#price-the-tips)); `ask yield to maturity` is read as a presence test only. `YieldCurves/scripts/updateSpotYieldCurves.js` computes the TIPS bid yield the same way but still reads both Treasury yields from the quote. Price spread uses adjusted prices for TIPS (actual dollar cost) and raw prices for Treasuries: `yield_spread_bps = (yield_bid − ask_ytm) × 10000`; `price_spread_pct = (price_ask − price_bid) / price_ask × 100`. Footer line `Date downloaded MM/DD/YYYY HH:MM AM/PM` supplies the download timestamp.*
+  *`Product` = `Treasury` or `TIPS`; parsers filter on this column before further processing (Treasury rows lack `Inflation factor`/`Adjusted bid price`/`Adjusted ask price`; both row types carry `Yield`, which doubles as the bid yield column — there is no separate "Yield Bid" header in the combined export). Parser normalises headers to lowercase. Key fields used: `cusip`, `coupon`, `ask price/quantity (min)` (ask clean real price), `bid price/quantity (min)` (bid clean real price), `adjusted bid price`/`adjusted ask price` (TIPS only), `inflation factor` (TIPS only), `ask yield to maturity` (ask yield, percentage form), `yield` (bid yield, percentage form). In the Yield Curves app, both yields are computed from the quoted prices via `yieldFromPrice` for TIPS and Treasuries alike, so that the two sides of a quote share one method ([3.1.2](../YieldCurves/knowledge/3.1_Load_And_Parse.md#parse-market-quotes), [3.1.7](../YieldCurves/knowledge/3.1_Load_And_Parse.md#calculate-tips-yields)); `ask yield to maturity` is read as a presence test only. `YieldCurves/scripts/updateSpotYieldCurves.js` computes the TIPS bid yield the same way but still reads both Treasury yields from the quote. Price spread uses adjusted prices for TIPS (actual dollar cost) and raw prices for Treasuries: `yield_spread_bps = (yield_bid − ask_ytm) × 10000`; `price_spread_pct = (price_ask − price_bid) / price_ask × 100`. Footer line `Date downloaded MM/DD/YYYY HH:MM AM/PM` supplies the download timestamp.*
 
   **Column names.** The export uses its source's column names, not this dictionary's. Each one carries a defined term, and where a column name is a broker's own name for a quantity rather than a header, the synonym is recorded on that term:
 
@@ -450,7 +450,7 @@ Displayed as **Amount**, and as **Real Amount** where a fuller header fits. The 
 <a id="bracket-year-tips"></a>
 <a id="bracket-maturity"></a>
 ### Bracket Year TIPS
-`Bracket_Year_TIPS` = *The specific TIPS securities in a [Bracket Year](#bracket-year). Each distinct TIPS security has its own maturity date, so a bracket year may hold a January and a July maturity, and naming a bracket names the security.*
+`Bracket_Year_TIPS` = *The specific TIPS in a [Bracket Year](#bracket-year). Each TIPS has its own maturity date, so a bracket year may hold a January and a July maturity, and naming a bracket names the TIPS.*
 
 <a id="excess-tips"></a>
 ### Excess TIPS
@@ -515,7 +515,7 @@ excessCost_b = gap total cost × bracketWeight_b
 <a id="cover-year-tips"></a>
 <a id="cover-maturity"></a>
 ### Cover Year TIPS
-`Cover_Year_TIPS` = *The specific TIPS securities in a [Cover Year](#cover-year). The Future 30Y counterpart of [Bracket Year TIPS](#bracket-year-tips), and named the same way: naming a cover names the security.*
+`Cover_Year_TIPS` = *The specific TIPS in a [Cover Year](#cover-year). The Future 30Y counterpart of [Bracket Year TIPS](#bracket-year-tips), and named the same way: naming a cover names the TIPS.*
 
 <a id="cover-excess"></a>
 ### Cover Excess
