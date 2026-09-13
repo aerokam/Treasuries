@@ -205,6 +205,10 @@ export function accruedInterest(coupon, settle, mature) {
 // mature: Date object
 export function yieldFromPrice(cleanPrice, coupon, settle, mature) {
   if (!cleanPrice || cleanPrice <= 0) return null;
+  // A missing or unparseable date is a degenerate input like any other and returns null.
+  // Without this it reaches daysBetween, where a null raises a TypeError that aborts the
+  // caller's whole pass rather than dropping the one security.
+  if (!settle || !mature || isNaN(settle) || isNaN(mature)) return null;
   if (settle >= mature) return null;
 
   const daysToMat = daysBetween(settle, mature);

@@ -100,8 +100,10 @@ function parseFidelityDateStr(s) {
 
 // Settlement date for market (Fidelity) quotes — TIPS and nominals alike: the trade date
 // in the Fidelity file plus one bond trading day (T+1). DATA_DICTIONARY.md#settlement-date.
-function marketSettleIso() {
-  const d = brokerDownloadDate || fidelityNominalsDate;
+// `downloadDate` lets a caller that holds the file's own footer date (the parser, which runs
+// before the module-level dates are assigned) settle from it; omitted, the assigned dates are used.
+function marketSettleIso(downloadDate) {
+  const d = downloadDate ?? (brokerDownloadDate || fidelityNominalsDate);
   return d ? toIsoDate(nextBusinessDay(parseFidelityDateStr(d), holidaySet)) : null;
 }
 
@@ -398,7 +400,7 @@ async function parseGswParameters(res) {
 // A TIPS quote is kept only for a CUSIP the FedInvest file also carries, and
 // only when it has an ask price.
 function parseMarketQuotes(text, knownTips) {
-  const { bonds, downloadDate } = parseFidelityNominals(text);
+  const { bonds, downloadDate } = parseFidelityNominals(text, marketSettleIso(parseFidelityDownloadDate(text)));
   const tipsPrices = new Map();
   parseFidelityTipsRows(text).forEach(r => {
     if (isNaN(r.askPrice)) return;
@@ -578,9 +580,14 @@ function switchTab(tab) {
   processAndRender();
 }
 
-// Pure parser — works with text from file upload or R2 fetch
-function parseFidelityNominals(text) {
+// Pure parser — works with text from file upload or R2 fetch.
+// `settleIso` is the settlement date the quoted prices are stated at (3.1.6). Both yields are
+// calculated from price at that date rather than read from the quote: the quoted price carries
+// more precision than the quoted yield, and only the ask side is quoted as a yield at all, so
+// calculating both puts them on one convention and their difference is a spread (3.6).
+function parseFidelityNominals(text, settleIso = null) {
   const downloadDate = parseFidelityDownloadDate(text);
+  const settleDate = localDate(settleIso);
   const rows = parseCsv(text);
   const bonds = [];
   const seen = new Set();
@@ -613,22 +620,28 @@ function parseFidelityNominals(text) {
     const couponStr  = clean(n['coupon']);
     const priceStr   = fidPriceField(n['price ask'] || n['ask price/quantity (min)']);
     const bidPriceStr = fidPriceField(n['price bid'] || n['bid price/quantity (min)']);
-    const bidYldStr  = clean(n['yield bid'] || n['yield']);
 
-    const yld = parseFloat(yldStr) / 100;
-    if (!maturityDate || isNaN(yld)) continue;
+    // The quoted ask yield is read as a presence test — a row without one carries no live
+    // offer — and is not the yield the app goes on to use.
+    const quotedYield = parseFloat(yldStr) / 100;
+    if (!maturityDate || isNaN(quotedYield)) continue;
+
+    const coupon = parseFloat(couponStr) / 100 || 0;
+    const price = parseFloat(priceStr) || NaN;
+    const bidPrice = parseFloat(bidPriceStr);
+    const askYield = yieldFromPrice(price, coupon, settleDate, maturityDate);
+    if (askYield === null || isNaN(askYield)) continue;
+    const bidYield = yieldFromPrice(bidPrice, coupon, settleDate, maturityDate);
 
     const type = CUSIP_TYPE_TO_MARKET_BASED[cusipType];
 
     seen.add(cusip);
     bonds.push({
-      cusip, type,
-      coupon: parseFloat(couponStr) / 100 || 0,
-      price: parseFloat(priceStr) || NaN,
-      yield: yld,
-      bidPrice: parseFloat(bidPriceStr),
-      bidYield: parseFloat(bidYldStr) / 100,
+      cusip, type, coupon, price, bidPrice,
+      yield: askYield,
+      bidYield: bidYield ?? NaN,
       maturity, maturityDate,
+      settlementDate: settleIso,
     });
   }
   bonds.sort((a, b) => a.maturityDate - b.maturityDate);
@@ -674,7 +687,6 @@ function processAndRenderNominals() {
       : null;
     let fidSpotSet = showFid
       ? fidelityNominalsData.filter(b => !isStrip(b.cusip) && b.type !== 'MARKET BASED STRIP')
-          .map(b => ({ ...b, settlementDate: mktSettle }))
       : null;
 
     // Filter STRIPS unless user opts in (already handled by the initial filter above for performance, but we keep the fidProcessed part consistent)
@@ -1548,11 +1560,8 @@ function processAndRenderBei() {
     // horizon grid — a true same-horizon breakeven at every point, unlike the per-bond
     // closest-maturity match above.
     const yToX = yearsToX(Date.now());
-    const mktSettle = marketSettleIso();
     const nomFit = spotCurveFit(
-      nominalCandidates
-        .filter(n => n.type === 'MARKET BASED NOTE' || n.type === 'MARKET BASED BOND')
-        .map(n => ({ ...n, settlementDate: mktSettle })),
+      nominalCandidates.filter(n => n.type === 'MARKET BASED NOTE' || n.type === 'MARKET BASED BOND'),
       { priceOf: n => n.price, yieldOf: n => n.yield, minT: 1 });
     const saFit = spotCurveFit(tipsSecurities, { priceOf: b => b.price * b.saRatio, yieldOf: b => b.saYield });
     let spotBeiGrid = null;

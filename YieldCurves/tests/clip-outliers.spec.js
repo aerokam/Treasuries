@@ -78,6 +78,9 @@ function makeFidCombinedCsv() {
   rows.push('TIPS,"US TREAS TIPS 0.125% 04/15/2026",91282CCA7,0.125,semi-annually,2026-04-15,Yes,AA1/ --,-1.019,100.062/6000(100),124.011839,1.23935,100.132/6000(100),124.098594,-2.274,--,-2.274,--,--,"CP, IE"');
   rows.push('TIPS,"US TREAS TIPS 0.125% 07/15/2026",912828S50,0.125,semi-annually,2026-07-15,Yes,AA1/ --,-3.842,101.231/6000(100),137.263162,1.35594,101.284/6000(100),137.335026,-4.011,--,-4.011,--,--,"CP, IE"');
   rows.push('TIPS,"US TREAS TIPS 0.125% 10/15/2026",91282CDC2,0.125,semi-annually,2026-10-15,Yes,AA1/ --,-1.095,100.680/6000(100),119.751812,1.18943,100.738/6000(100),119.820799,-1.197,--,-1.197,--,--,"CP, IE"');
+  // Download-date footer, as the real export carries it: the quote settles T+1 from this date
+  // (2026-03-26), and both quoted sides are priced to that date.
+  rows.push('Date downloaded   03/25/2026 08:27 AM');
   return rows.join('\n');
 }
 
