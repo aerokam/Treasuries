@@ -48,6 +48,35 @@ These came out of review and apply to every spec from here.
 
 ---
 
+## 3.5 Yield Curves is the template, and it is done
+
+Every process has a spec, every process spec names the functions that implement it, every diagram carries a link to its parent spec, and the naming is one scheme: a numbered spec is a process spec and its number is the process, an unnumbered one is a reference. The other nine apps and the fifteen acquisition jobs have none of this yet, and Yield Curves is what they are copied from.
+
+| Spec | Process |
+|---|---|
+| `3.1_Load_And_Parse.md` | 3.1 and its seven children |
+| `3.2_Seasonal_Adjustments.md` | 3.2 |
+| `3.3_SAO_Adjustment.md` | 3.3 |
+| `3.4_Spot_Yield_Curves.md` | 3.4 |
+| `3.5_Breakeven_Inflation.md` | 3.5 |
+| `3.6_Bid_And_Ask_Spreads.md` | 3.6 |
+| `3.7_Rendering.md` | 3.7 and its seven children |
+| `Visual_Standards.md`, `Canty.md`, `SA_Intuition.md`, `SAO_Residual_Analysis.md`, `Seasonal_Factor_Drift.md`, both `FedInvest_*` | none: reference |
+
+Spec headers carry typed relations in reciprocal pairs: Specifies and Implemented by, Constrains and Constrained by, Source for and Derived from, Evidence for and Evidence, Explains and Explained in. A reference spec is reachable through them and is never the end of a drill.
+
+**A fourth checker exists**: `scripts/check-links.cjs` fails when a relative markdown link does not resolve. `check-spec-code.cjs` now also resolves `path/to/file.js#symbol` against both halves, and reads `// spec: <file>#<anchor>` tags in source back to the anchor they claim.
+
+---
+
+## 3.6 Market-quote nominal yields are read, not calculated
+
+The one inconsistency left in Yield Curves. FedInvest nominals, FedInvest TIPS and market-quote TIPS all have their yield calculated from price; market-quote nominals read the quoted yield column. Measured difference over 650 securities: median 0.06 bp, p90 0.28, p99 3.28, max 20.47, with every large one within days of maturity.
+
+An attempt to calculate them in `processAndRenderNominals` rendered zero rows in the nominals table across most of the suite and took the run from 25 seconds to 4.8 minutes, which points at a loop rather than a thrown error. It was reverted rather than shipped. The unconfirmed suspicion is `marketSettleIso()`: before the change its result was only spread into an object, and afterwards it was passed to `localDate` and into the solver, so an unparsable broker date would newly matter.
+
+---
+
 ## 4.0 Structural decisions already taken
 
 - **Data stores are not on the context diagram.** They sit inside process 0, so they are drawn where they are first shared.
