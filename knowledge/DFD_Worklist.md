@@ -43,8 +43,7 @@ These came out of review and apply to every spec from here.
 2. **93 stale spec-to-code references** across 62 specs, from `node scripts/check-spec-code.cjs`. Not wired into the pre-commit hook, because that many findings would block every commit before triage. Concentrations: `3.2_Multi_Account_Rebalancing.md` 27, `3.0_TIPS_Ladder_Rebalancing.md` 17, `AMD_FORMULA_ANALYSIS.md` 14, `2.0_TIPS_Ladders.md` 8. Verified genuine: specs say `activeLowerWeight` where the code has `activeFloorWeight`, `MAX_LAST_YEAR` where it has `maxLastYear`, `fyQtyBefore` where it has `fundedYearQtyBefore` — the last being the `fy` abbreviation the root `CLAUDE.md` retired.
 3. **A spec for unbuilt work needs to say so.** `3.2_Multi_Account_Rebalancing.md` describes a feature that does not exist: `src/account-allocation.js` is absent and 27 of its names resolve to nothing. Under specs-drive-code that is legitimate, but nothing distinguishes it from a spec that has rotted, and the checker will flag it forever.
 4. **Whether to gate on the checker** once those are triaged.
-5. **`3.2_Seasonal_Adjustments.md` may be repurposed** as the Yield Curves spec and renamed `1.0_Yield_Curves.md`, with seasonal adjustment demoted to a section. Proposed by a session that has since ended and never confirmed. If it happens, `Seasonal_Factor_Drift.md` renumbers with it and the Level 2 drill for 7.2 needs repointing.
-6. **`updateSaSaoYields.js` publishes corrected SAO on its next scheduled run.** The duplicate algorithm was retired in `f57ef4a`; measured against the published file, SA moved on none of 53 securities and SAO on 21, by up to 56 basis points, concentrated at the short end where the flat-hold fix applies.
+5. **`3.2_Seasonal_Adjustments.md` may be repurposed** as the Yield Curves spec, with seasonal adjustment demoted to a section. Proposed by a session that has since ended and never confirmed. The proposal predates the naming scheme in §2.0 and conflicts with it: a numbered spec takes the number of the process it specifies, and process numbers are frozen, so the file cannot become `1.0_Yield_Curves.md` while it specifies process 3.2. Repurposing it would mean giving Yield Curves a spec of its own at process 3 and leaving 3.2 as the seasonal adjustment spec.
 
 ---
 
@@ -79,6 +78,20 @@ The earlier attempt that rendered zero rows and took the run from 25 seconds to 
 
 ---
 
+## 3.7 The SA factors in the published store are the canonical ones
+
+Closed in `72097c2`. `YieldCurves/scripts/updateSaSaoYields.js` computed the two SA factors with its own same-month/day lookup rather than calling `shared/src/ref-cpi.js#saFactorForDate` and `#maturitySaFactor`, so the [S10](./DataStores.md#s10) it publishes omitted the [Credibility Factor](./DATA_DICTIONARY.md#credibility-factor) that the app applies to a maturity beyond the SA-factor series. TipsLadderManager reads `sa_yield` from that store for its within-year allocation policy, so the two apps stated different SA Yields for the same security: 1.056% against 1.102% for the April 2027 TIPS. The script now imports both functions, and the store was republished.
+
+The two lookups agreed on which row to take, because `RefCpiNsaSa.csv` is sorted newest first and the series never runs more than about twelve months behind a settlement date. That agreement was a property of the data, not of the code, which is the argument for the import rather than against it.
+
+`f46b804` recomputed `SeasonalAdjustments/data/YieldsSaSao.snapshot.csv`, which is pinned to a 2026-08-31 quote and had the same omission recorded in it. Its provenance and its `ask_yield` column are unchanged.
+
+The earlier `f57ef4a` retired this script’s duplicate SAO algorithm. Measured against the published file at the time, SA moved on none of 53 securities and SAO on 21, by up to 56 basis points, concentrated at the short end. Both corrections are now published.
+
+**Standing defect:** three duplicates of shared logic have now been found in `YieldCurves/scripts/`, each noticed only when its output visibly disagreed with the app — the SAO algorithm (`f57ef4a`), these SA factors (`72097c2`), and the market-quote parser in `updateSpotYieldCurves.js` (§3.6, still open). Finding them one at a time by their symptoms leaves the ones whose output nobody has compared. Proposed to the developer: sweep every script in that folder for logic that already exists in `shared/src/` and close the set.
+
+---
+
 ## 4.0 Structural decisions already taken
 
 - **Data stores are not on the context diagram.** They sit inside process 0, so they are drawn where they are first shared.
@@ -89,7 +102,7 @@ The earlier attempt that rendered zero rows and took the run from 25 seconds to 
 - **The maturity SA Factor approaches 1.0 as the horizon lengthens, at every horizon, with no floor.** Settled in `b3136e3`: the weight is a signal-to-noise ratio of measured amplitude against measured drift, so a floor would discard measured 1-to-5-year drift with no measurement behind the boundary, and the weight is near 1 at the front end in any case. Four terms were added to the Data Dictionary for it in `b20dafc`: Maturity SA Factor, Credibility Factor, Seasonal Amplitude, Seasonal Factor Drift.
 - **Credibility Factor is the name for `w(h)`.** `w(h) = A² / (A² + σ_drift(h)²)` is the credibility factor of actuarial credibility theory, Bühlmann’s `Z` at one observation: the posterior mean weight for a prior centred on 1.0 with variance `A²` against an observation whose error variance is `σ_drift(h)²`. An earlier session named it Horizon Confidence Weight; the developer replaced that with the established term once the correspondence was shown to be exact rather than an analogy.
 - **"Fade" is out of the vocabulary, everywhere.** A weight that gets smaller does not fade. The horizon work was swept in `8ca7f69` and the SAO snap weight in `2b2aa86`, where the two exported constants became `SAO_BLEND_START_YRS` and `SAO_BLEND_END_YRS`. `scripts/check-vocabulary.js` carries the rule, exempting only a chart line drawn at reduced opacity, which literally fades.
-- **The long-end seasonal adjustment stands at about 3 bp**, and [1.1 §8](../YieldCurves/knowledge/Seasonal_Factor_Drift.md) records why: about 63% of the seasonal variance is a permanent month effect, February is negative in every era, and the factor still autocorrelates about 0.50 at 30 years. Every alternative that follows a measurement lands within 0.15 bp of the method in use, so the formula did not change.
+- **The long-end seasonal adjustment stands at about 3 bp**, and [Seasonal Factor Drift §8](../YieldCurves/knowledge/Seasonal_Factor_Drift.md) records why: about 63% of the seasonal variance is a permanent month effect, February is negative in every era, and the factor still autocorrelates about 0.50 at 30 years. Every alternative that follows a measurement lands within 0.15 bp of the method in use, so the formula did not change.
 - **Level 1 is one process per app plus one acquisition process**, which explodes into the fifteen jobs. Portal menu groupings were considered and rejected: nearly every shared store is read across group boundaries, so grouping would have added a level without simplifying anything.
 
 ---

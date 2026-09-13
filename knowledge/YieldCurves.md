@@ -65,6 +65,6 @@ A high-performance charting interface built with Chart.js and Hammer.js.
 
 ## 3.0 Foundational Logic (The Engine Room)
 
-- **[SA Intuition (2.1)](../YieldCurves/knowledge/SA_Intuition.md)**: Conceptual guide to why seasonality matters for TIPS.
+- **[SA Intuition](../YieldCurves/knowledge/SA_Intuition.md)**: Conceptual guide to why seasonality matters for TIPS.
 - **[Canty Authority](../YieldCurves/knowledge/Canty.md)**: Technical reference for the mathematical foundations of SA/SAO (Canty, 2009).
 - **[Data Pipeline](./Data_Pipeline.md)**: Details on the GitHub Actions that update the R2 data stores.
