@@ -1,4 +1,4 @@
-# 1.1 Seasonal Factor Drift — Why S_maturity Loses Meaning at Long Horizons
+# Seasonal Factor Drift — Why S_maturity Loses Meaning at Long Horizons
 
 **Evidence for:** [3.2 Seasonal Adjustments](./3.2_Seasonal_Adjustments.md)
 

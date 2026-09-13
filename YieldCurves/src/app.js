@@ -1028,7 +1028,7 @@ function renderNominalsChart(fedBonds, fidBonds, fedSpotBonds, fidSpotBonds) {
 
 // Build the processed TIPS bond set for one source (FedInvest or broker/Market).
 // Shared by the TIPS tab (both sources side-by-side) and the BEI tab (Market only).
-function buildProcessedTipsBonds(sourceMap, isBroker) {
+function buildTipsSecurities(sourceMap, isBroker) {
   return rawYieldsData.map(bond => {
     const coupon = parseFloat(bond.coupon);
     let price = parseFloat(bond.price);
@@ -1083,8 +1083,8 @@ function processAndRenderTips() {
   try {
     const fedSettleStr = rawYieldsData[0]?.settlementDate;
 
-    let fedBonds = showFed ? buildProcessedTipsBonds(null, false) : null;
-    let brokerBonds = showBroker ? buildProcessedTipsBonds(brokerPrices, true) : null;
+    let fedBonds = showFed ? buildTipsSecurities(null, false) : null;
+    let brokerBonds = showBroker ? buildTipsSecurities(brokerPrices, true) : null;
 
     // Apply SAO to each set
     if (fedBonds) {
@@ -1521,9 +1521,9 @@ function processAndRenderBei() {
   if (!rawYieldsData || rawYieldsData.length === 0 || !rawRefCpiData) return;
 
   try {
-    const tipsBonds = buildProcessedTipsBonds(brokerPrices, true);
-    const smoothed = calculateSAO(tipsBonds);
-    tipsBonds.forEach((b, i) => { b.saoYield = smoothed[i]; });
+    const tipsSecurities = buildTipsSecurities(brokerPrices, true);
+    const smoothed = calculateSAO(tipsSecurities);
+    tipsSecurities.forEach((b, i) => { b.saoYield = smoothed[i]; });
 
     const nominalCandidates = fidelityNominalsData.filter(b => b.type !== 'MARKET BASED STRIP');
     if (nominalCandidates.length === 0) {
@@ -1533,7 +1533,7 @@ function processAndRenderBei() {
       return;
     }
 
-    tipsBonds.forEach(b => {
+    tipsSecurities.forEach(b => {
       const nom = findClosestNominal(nominalCandidates, b.maturityDate);
       b.nominalCusip = nom.cusip;
       b.nominalMaturity = nom.maturity;
@@ -1554,7 +1554,7 @@ function processAndRenderBei() {
         .filter(n => n.type === 'MARKET BASED NOTE' || n.type === 'MARKET BASED BOND')
         .map(n => ({ ...n, settlementDate: mktSettle })),
       { priceOf: n => n.price, yieldOf: n => n.yield, minT: 1 });
-    const saFit = spotCurveFit(tipsBonds, { priceOf: b => b.price * b.saRatio, yieldOf: b => b.saYield });
+    const saFit = spotCurveFit(tipsSecurities, { priceOf: b => b.price * b.saRatio, yieldOf: b => b.saYield });
     let spotBeiGrid = null;
     if (nomFit && saFit) {
       spotBeiGrid = [];
@@ -1569,13 +1569,13 @@ function processAndRenderBei() {
 
     const startEl = document.getElementById('startMaturity');
     const endEl = document.getElementById('endMaturity');
-    if (!startEl.value && tipsBonds.length > 0) {
-      startEl.value = tipsBonds[0].maturity;
-      endEl.value = tipsBonds[tipsBonds.length - 1].maturity;
+    if (!startEl.value && tipsSecurities.length > 0) {
+      startEl.value = tipsSecurities[0].maturity;
+      endEl.value = tipsSecurities[tipsSecurities.length - 1].maturity;
     }
     const startDate = parseIsoInput(startEl.value) || new Date(0);
     const endDate = parseIsoInput(endEl.value) || new Date(9999, 0);
-    const filtered = tipsBonds.filter(b => b.maturityDate >= startDate && b.maturityDate <= endDate);
+    const filtered = tipsSecurities.filter(b => b.maturityDate >= startDate && b.maturityDate <= endDate);
 
     renderBeiTable(filtered);
     renderBeiChart(filtered, spotBeiGrid);

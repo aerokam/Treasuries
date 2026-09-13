@@ -1,4 +1,4 @@
-# 2.1 Intuition: Seasonal Adjustments (SA)
+# Intuition: Seasonal Adjustments (SA)
 
 **Explains:** [3.2 Seasonal Adjustments](./3.2_Seasonal_Adjustments.md)
 
