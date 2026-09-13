@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { yieldFromPrice } from '../../shared/src/bond-math.js';
+import { localDate } from '../../shared/src/settlement.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REF_CPI_PATH = path.join(__dirname, '../data/RefCpiNsaSa.csv');
@@ -22,12 +23,6 @@ function findMostRecentSaFactor(refCpiRows, targetDate) {
   // Rows are sorted descending (newest first)
   const match = refCpiRows.find(r => r.date.endsWith(mmdd));
   return match ? match.factor : null;
-}
-
-// --- Helper: localDate (handles YYYY-MM-DD reliably) ---
-function localDate(s) {
-  const [y, m, d] = s.split('-').map(Number);
-  return new Date(y, m - 1, d);
 }
 
 function main() {

@@ -1,7 +1,8 @@
 // SA / SAO residual analysis harness — reproduces every table in
 // knowledge/SAO_Residual_Analysis.md against live R2 data.
 import { yieldFromPrice, calculateDuration, daysBetween } from '../../shared/src/bond-math.js';
-import { calculateSAO } from '../../shared/src/spot-curve.js';
+import { calculateSAO, fitNSS } from '../../shared/src/spot-curve.js';
+import { localDate } from '../../shared/src/settlement.js';
 
 const R2 = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev';
 const fetchText = async u => (await fetch(u, { cache: 'no-cache' })).text();
@@ -20,7 +21,6 @@ const rRows = refRaw.slice(1).map(l => {
   const o = {}; rHeader.forEach((h, i) => o[h] = c[i]); return o;
 });
 
-const localDate = s => { const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); };
 
 // TIPS only
 const tips = yRows.filter(r => /TIPS|INFLATION/i.test(r.type) || r.datedDateCpi);
@@ -310,31 +310,13 @@ for(let i=0;i<bonds.length;i++){const b=bonds[i];if(b.maturityDate.getFullYear()
 })();
 
 // ===== PROTOTYPE: Nelson-Siegel-Svensson smooth curve as SAO =====
-function _nssBasis(tau,l1,l2){const a=tau/l1,b=tau/l2;
-  const f1=a>1e-6?(1-Math.exp(-a))/a:1; const t2=f1-Math.exp(-a);
-  const fb=b>1e-6?(1-Math.exp(-b))/b:1; const t3=fb-Math.exp(-b);
-  return [1,f1,t2,t3];}
-function _ols4(X,y){const A=[[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]],bv=[0,0,0,0];
-  for(let k=0;k<X.length;k++){const xi=X[k];for(let i=0;i<4;i++){bv[i]+=xi[i]*y[k];for(let j=0;j<4;j++)A[i][j]+=xi[i]*xi[j];}}
-  const M=A.map((r,i)=>[...r,bv[i]]);
-  for(let c=0;c<4;c++){let p=c;for(let r=c+1;r<4;r++)if(Math.abs(M[r][c])>Math.abs(M[p][c]))p=r;
-    if(Math.abs(M[p][c])<1e-12)return null;[M[c],M[p]]=[M[p],M[c]];
-    for(let r=0;r<4;r++)if(r!==c){const f=M[r][c]/M[c][c];for(let k=c;k<5;k++)M[r][k]-=f*M[c][k];}}
-  return [M[0][4]/M[0][0],M[1][4]/M[1][1],M[2][4]/M[2][2],M[3][4]/M[3][3]];}
-function fitNSS(taus,ys){let best=null;const grid=[0.5,1,1.5,2,2.5,3,4,5,7,10,15,20,30];
-  for(const l1 of grid)for(const l2 of grid){if(l2<=l1)continue;
-    const X=taus.map(t=>_nssBasis(t,l1,l2));const beta=_ols4(X,ys);if(!beta)continue;
-    let ssr=0;for(let k=0;k<taus.length;k++){const xb=_nssBasis(taus[k],l1,l2);const yh=xb[0]*beta[0]+xb[1]*beta[1]+xb[2]*beta[2]+xb[3]*beta[3];ssr+=(ys[k]-yh)**2;}
-    if(!best||ssr<best.ssr)best={l1,l2,beta,ssr};}
-  if(!best)return null;
-  const fn=tau=>{const xb=_nssBasis(tau,best.l1,best.l2);return xb[0]*best.beta[0]+xb[1]*best.beta[1]+xb[2]*best.beta[2]+xb[3]*best.beta[3];};
-  fn._p=best;return fn;}
+// nssBasis/ols4/fitNSS are shared/src/spot-curve.js exports (projects/CLAUDE.md §2a).
 
 const allYrs=bonds.map(b=>(b.maturityDate-settleDate)/31557600000);
 const fitIdx=[];for(let i=0;i<bonds.length;i++)if(allYrs[i]>=0.5)fitIdx.push(i);
 const nss=fitNSS(fitIdx.map(i=>allYrs[i]),fitIdx.map(i=>bonds[i].saYield));
 console.log('\n=== NSS smooth-curve SAO ===');
-console.log('best lambda1,lambda2 =',nss._p.l1,nss._p.l2,' RMSE(bp)=',(Math.sqrt(nss._p.ssr/fitIdx.length)*10000).toFixed(1));
+console.log('best lambda1,lambda2 =',nss._params.l1,nss._params.l2,' RMSE(bp)=',(Math.sqrt(nss._params.ssr/fitIdx.length)*10000).toFixed(1));
 console.log('\nmat        cpn    yrs   SA      NSS_SAO  dev(bp)');
 let maxdev=0,sumsq=0,cnt=0;
 for(let i=0;i<bonds.length;i++){const b=bonds[i];const y=allYrs[i];if(y>=0.5&&b.maturityDate.getFullYear()<=2055){const fit=nss(y);const dev=(b.saYield-fit)*10000;if(b.maturityDate.getFullYear()<=2031)console.log(`${b.maturity} ${b.coupon.toFixed(3)} ${y.toFixed(2).padStart(5)}  ${(b.saYield*100).toFixed(3)}  ${(fit*100).toFixed(3)}  ${dev.toFixed(1).padStart(6)}`);maxdev=Math.max(maxdev,Math.abs(dev));sumsq+=dev*dev;cnt++;}}

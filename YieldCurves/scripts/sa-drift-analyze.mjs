@@ -15,6 +15,7 @@
 //   H  SA-minus-ask under the credibility weighting of S_maturity
 
 import { yieldFromPrice, daysBetween } from '../../shared/src/bond-math.js';
+import { fitNSS } from '../../shared/src/spot-curve.js';
 import { refCpiFromMonthly, monthlyCpiMap, saFactorForDate, maturitySaFactor, credibilityFactor } from '../../shared/src/ref-cpi.js';
 
 const FRED = id => `https://fred.stlouisfed.org/graph/fredgraph.csv?id=${id}`;
@@ -189,10 +190,9 @@ for (const b of bonds) (byYr[b.matDate.getFullYear()] = byYr[b.matDate.getFullYe
 for (const y of Object.keys(byYr).sort())
   console.log(`  ${y}: mean ${(byYr[y].reduce((a, c) => a + c, 0) / byYr[y].length).toFixed(1).padStart(7)} bp   n=${byYr[y].length}`);
 
-// NSS fit for residuals (same as sa-analyze.mjs)
-function nssBasis(t, l1, l2) { const a = t / l1, b = t / l2; const f1 = a > 1e-6 ? (1 - Math.exp(-a)) / a : 1; const fb = b > 1e-6 ? (1 - Math.exp(-b)) / b : 1; return [1, f1, f1 - Math.exp(-a), fb - Math.exp(-b)]; }
-function ols4(X, y) { const A = [[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]], bv = [0,0,0,0]; for (let k = 0; k < X.length; k++) { const xi = X[k]; for (let i = 0; i < 4; i++) { bv[i] += xi[i] * y[k]; for (let j = 0; j < 4; j++) A[i][j] += xi[i] * xi[j]; } } const M = A.map((r, i) => [...r, bv[i]]); for (let c = 0; c < 4; c++) { let p = c; for (let r = c + 1; r < 4; r++) if (Math.abs(M[r][c]) > Math.abs(M[p][c])) p = r; if (Math.abs(M[p][c]) < 1e-12) return null;[M[c], M[p]] = [M[p], M[c]]; for (let r = 0; r < 4; r++) if (r !== c) { const f = M[r][c] / M[c][c]; for (let k = c; k < 5; k++) M[r][k] -= f * M[c][k]; } } return [M[0][4] / M[0][0], M[1][4] / M[1][1], M[2][4] / M[2][2], M[3][4] / M[3][3]]; }
-function fitNSS(taus, ys) { let best = null; const g = [0.5, 1, 1.5, 2, 2.5, 3, 4, 5, 7, 10, 15, 20, 30]; for (const l1 of g) for (const l2 of g) { if (l2 <= l1) continue; const X = taus.map(t => nssBasis(t, l1, l2)); const beta = ols4(X, ys); if (!beta) continue; let ssr = 0; for (let k = 0; k < taus.length; k++) { const xb = nssBasis(taus[k], l1, l2); ssr += (ys[k] - xb.reduce((s, v, i) => s + v * beta[i], 0)) ** 2; } if (!best || ssr < best.ssr) best = { l1, l2, beta, ssr }; } return t => { const xb = nssBasis(t, best.l1, best.l2); return xb.reduce((s, v, i) => s + v * best.beta[i], 0); }; }
+// NSS fit for residuals, by shared/src/spot-curve.js#fitNSS — the one curve fit this
+// project uses, so the constants printed below come out of the same arithmetic the app
+// and sa-analyze.mjs run on (no-redundancy directive, projects/CLAUDE.md §2a).
 const fitB = bonds.filter(b => b.yrs >= 0.5);
 const nssSA = fitNSS(fitB.map(b => b.yrs), fitB.map(b => b.sa));
 console.log('\n=== G. maturity-month residual (SA yield vs full-curve NSS), by region ===');

@@ -11,6 +11,7 @@
 // seasonal maximum — the clearest teaching case.
 
 import { parseCsv } from '../../shared/src/csv.js';
+import { localDate } from '../../shared/src/settlement.js';
 
 const YSAO_URL = './data/YieldsSaSao.snapshot.csv';
 const REFCPI_URL = './data/RefCpiNsaSa.snapshot.csv';
@@ -44,7 +45,9 @@ export const BLS_SEASONAL_FACTOR = {
   2025: [99.596, 99.813, 100.004, 100.154, 100.264, 100.350, 100.273, 100.212, 100.171, null, 99.711, 99.394],
 };
 
-export function localDate(s) { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); }
+// Re-exported so the slide modules keep reading their dates from this one data layer, while
+// the arithmetic stays the single shared implementation (projects/CLAUDE.md §2a).
+export { localDate };
 export function doy(month, day) { return cum[month] + (day - 1); }
 export function dateLabel(doyVal) {
   let d = ((doyVal % 365) + 365) % 365;
