@@ -1,6 +1,8 @@
 // CpiExplorer — data.js
 // Fetches and parses S8 (CPI_history.csv) and S3 (RefCPI.csv) from R2.
 
+import { parseCsv } from '../../shared/src/csv.js';
+
 const R2_BASE = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev';
 const CPI_HISTORY_URL = `${R2_BASE}/bls/CPI_history.csv`;
 const REF_CPI_URL     = `${R2_BASE}/TIPS/RefCPI.csv`;
@@ -10,15 +12,15 @@ const REF_CPI_URL     = `${R2_BASE}/TIPS/RefCPI.csv`;
  * @typedef {{ date: Date, value: number }} RefCpiRow
  */
 
-function parseCsv(text) {
-  const lines = text.split(/\r?\n/).filter(l => l.trim());
-  if (lines.length < 2) return [];
-  const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
-  return lines.slice(1).map(line => {
-    const vals = line.split(',');
-    const obj = {};
-    headers.forEach((h, i) => { obj[h] = (vals[i] || '').trim(); });
-    return obj;
+// The two stores read here state their headers in different cases (S8 "Year,Period,
+// PeriodName,NSA,SA", S3 "date,refCpi"), so every row is re-keyed in lower case and read
+// that way below. The parse itself is shared/src/csv.js#parseCsv, the one CSV parser
+// (projects/CLAUDE.md §2a).
+function parseCsvLowerKeys(text) {
+  return parseCsv(text).map(row => {
+    const out = {};
+    for (const k in row) out[k.toLowerCase()] = row[k];
+    return out;
   });
 }
 
@@ -31,7 +33,7 @@ export async function fetchCpiHistory() {
   const res = await fetch(CPI_HISTORY_URL, { cache: 'no-store' });
   if (!res.ok) throw new Error(`CPI_history.csv fetch failed: ${res.status}`);
   const text = await res.text();
-  const raw = parseCsv(text);
+  const raw = parseCsvLowerKeys(text);
   /** @type {CpiRow[]} */
   const rows = [];
   for (const r of raw) {
@@ -52,7 +54,7 @@ export async function fetchRefCpi() {
   const res = await fetch(REF_CPI_URL, { cache: 'no-store' });
   if (!res.ok) throw new Error(`RefCPI.csv fetch failed: ${res.status}`);
   const text = await res.text();
-  const raw  = parseCsv(text);
+  const raw  = parseCsvLowerKeys(text);
   /** @type {RefCpiRow[]} */
   const rows = [];
   for (const r of raw) {

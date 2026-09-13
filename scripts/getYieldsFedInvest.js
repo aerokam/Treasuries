@@ -3,6 +3,8 @@ import { existsSync, readFileSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { yieldFromPrice as _yieldFromPrice } from '../shared/src/bond-math.js';
+import { localDate, parseHolidaySet } from '../shared/src/settlement.js';
+import { parseCsv } from '../shared/src/csv.js';
 const _envPath = resolve(dirname(fileURLToPath(import.meta.url)), '../.env');
 if (existsSync(_envPath)) {
   readFileSync(_envPath, 'utf8').split('\n').forEach(line => {
@@ -51,11 +53,6 @@ async function uploadToR2(key, body) {
 // Today's date in ET (handles EDT/EST automatically)
 function todayET() {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' }); // YYYY-MM-DD
-}
-
-function localDate(str) {
-  const [y, m, d] = str.split('-').map(Number);
-  return new Date(y, m - 1, d);
 }
 
 // FedInvest maturity dates are MM/DD/YYYY → convert to YYYY-MM-DD
@@ -162,17 +159,7 @@ async function main() {
   const holidayRes = await fetch(`${R2_BASE}/misc/BondHolidaysSifma.csv`);
   if (holidayRes.ok) {
     const holidayText = await holidayRes.text();
-    // CSV format: "Day, Month DD, YYYY",Holiday Name — parse ISO date from full date string
-    const holidays = new Set(
-      holidayText.trim().split('\n')
-        .map(line => {
-          const m = line.match(/"[^,]+,\s+(\w+ \d+, \d{4})"/);
-          if (!m) return null;
-          const d = new Date(m[1]);
-          return isNaN(d) ? null : d.toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
-        })
-        .filter(Boolean)
-    );
+    const holidays = parseHolidaySet(parseCsv(holidayText, false));
     if (holidays.has(today)) {
       console.error(`Bond market holiday (${today}) — no FedInvest prices today.`);
       return;
