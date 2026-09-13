@@ -1,8 +1,17 @@
 // fidelity-parse.js -- shared parser for Fidelity's combined Treasury+TIPS CSV export
-// (R2 key Treasuries/FidelityTreasuriesTips.csv). Pure, source-format-only helpers;
-// business logic (which fields to trust, gating against FedInvest CUSIPs, yield
-// recomputation) stays in each consuming app.
+// (R2 key Treasuries/FidelityTreasuriesTips.csv). Spec: YieldCurves/knowledge/
+// 3.1_Load_And_Parse.md#parse-market-quotes (3.1.2), knowledge/DataStores.md#s7.
+//
+// Field-shape helpers (cleanFidelityField, fidPriceField, fidParseMaturity, the download-date
+// pair) are source-format-only. The two row parsers below are the single canonical home for
+// their respective row types, per the no-redundancy directive (projects/CLAUDE.md §2a): each
+// app and acquisition script imports them rather than keeping its own copy. What stays with
+// the caller is the part that genuinely differs between pipelines -- which CUSIPs to gate on,
+// which settlement date the quote is stated at, and what to do with a row that is dropped.
 import { parseCsv } from './csv.js';
+import { yieldFromPrice } from './bond-math.js';
+import { localDate } from './settlement.js';
+import { classifyByCusipRoot } from './treasury-cusip.js';
 
 // Strips Excel `="..."` literal-string wrapping Fidelity applies to some fields.
 export function cleanFidelityField(val) {
@@ -66,4 +75,80 @@ export function parseFidelityTipsRows(text) {
     });
   }
   return out;
+}
+
+// Parses nominal Treasury rows (every row whose Product is not TIPS) from the combined
+// Fidelity CSV. One row per CUSIP, first occurrence winning on duplicates, sorted by
+// maturity. STRIPS are Treasury rows too -- the Product column does not distinguish them --
+// so they are returned alongside Bills, Notes and Bonds, each row tagged with the type its
+// CUSIP root gives. A caller fitting a coupon-bond curve filters them out itself.
+//
+// Both yields are calculated from the quoted price at `settleIso`, rather than read from the
+// quote: the quoted price states more decimal places than the quoted yield, a yield is quoted
+// on the ask side only, and calculating both sides puts them on one convention so their
+// difference is the spread of 3.6_Bid_And_Ask_Spreads.md. The quoted ask yield is read only
+// as a presence test -- a row without one carries no live offer.
+//
+// A row is dropped when it has no CUSIP, no parseable maturity date, no quoted ask yield, a
+// CUSIP root the Treasury CUSIP reference does not recognise, a CUSIP listed in
+// `excludeCusips`, a description naming it as TIPS, or an ask yield that cannot be calculated
+// (for want of an ask price, or for a maturity on or before the settlement date).
+//
+// Options:
+//   settleIso      the settlement date the quoted prices are stated at, 'YYYY-MM-DD'
+//   excludeCusips  CUSIPs another source already knows to be TIPS, which the older export
+//                  format does not mark in its Product column
+//   onUnknownCusip called with a CUSIP whose root is unrecognised, in place of dropping it
+//                  silently
+//
+// Returns: [{ cusip, cusipType ('Bill'|'Note'|'Bond'|'STRIPS'), coupon, price, bidPrice,
+//   yield (calculated ask), bidYield (calculated, NaN where no bid price), maturity (ISO),
+//   maturityDate (Date), settlementDate (ISO) }]
+export function parseFidelityNominalRows(text, { settleIso = null, excludeCusips = new Set(), onUnknownCusip = null } = {}) {
+  const settleDate = localDate(settleIso);
+  const rows = parseCsv(text);
+  const bonds = [];
+  const seen = new Set();
+
+  for (const row of rows) {
+    const n = {};
+    for (const k in row) n[k.toLowerCase().trim()] = row[k];
+
+    if ((n['product'] || '').toLowerCase() === 'tips') continue;
+
+    const cusip = cleanFidelityField(n['cusip'] || n['cusip|state']);
+    const desc = (n['description'] || '').toUpperCase();
+    if (!cusip || seen.has(cusip)) continue;
+    if (excludeCusips.has(cusip) || /\bTIPS\b/.test(desc)) continue;
+
+    const cusipType = classifyByCusipRoot(cusip);
+    if (!cusipType) { if (onUnknownCusip) onUnknownCusip(cusip); continue; }
+
+    const maturity = fidParseMaturity(cleanFidelityField(n['maturity date']));
+    if (!maturity) continue;
+    const maturityDate = localDate(maturity);
+    if (!maturityDate) continue;
+
+    const quotedAskYield = parseFloat(cleanFidelityField(n['ask yield to maturity'])) / 100;
+    if (isNaN(quotedAskYield)) continue;
+
+    const coupon = parseFloat(cleanFidelityField(n['coupon'])) / 100 || 0;
+    const price = parseFloat(fidPriceField(n['price ask'] || n['ask price/quantity (min)'])) || NaN;
+    const bidPrice = parseFloat(fidPriceField(n['price bid'] || n['bid price/quantity (min)']));
+
+    const askYield = yieldFromPrice(price, coupon, settleDate, maturityDate);
+    if (askYield === null || isNaN(askYield)) continue;
+    const bidYield = yieldFromPrice(bidPrice, coupon, settleDate, maturityDate);
+
+    seen.add(cusip);
+    bonds.push({
+      cusip, cusipType, coupon, price, bidPrice,
+      yield: askYield,
+      bidYield: bidYield ?? NaN,
+      maturity, maturityDate,
+      settlementDate: settleIso,
+    });
+  }
+  bonds.sort((a, b) => a.maturityDate - b.maturityDate);
+  return bonds;
 }

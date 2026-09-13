@@ -10,8 +10,8 @@ import { localDate, toIsoDate, nextBusinessDay, parseHolidaySet } from '../../sh
 import { handleChartKeydown, setupAxisWheelZoom, snapYBounds, snapYAfterZoom } from '../../shared/src/chart-keys.js';
 import { initDatePicker } from '../../shared/src/date-picker.js';
 import { calendarTimeAxis } from '../../shared/src/chart-time-axis.js';
-import { classifyByCusipRoot, isStrip } from '../../shared/src/treasury-cusip.js';
-import { cleanFidelityField as clean, fidPriceField, fidParseMaturity, parseFidelityDownloadDate, parseFidelityTipsRows } from '../../shared/src/fidelity-parse.js';
+import { isStrip } from '../../shared/src/treasury-cusip.js';
+import { parseFidelityDownloadDate, fidelityDownloadDateIso, parseFidelityTipsRows, parseFidelityNominalRows } from '../../shared/src/fidelity-parse.js';
 
 console.log("YieldCurves app.js loading...");
 
@@ -94,8 +94,7 @@ let tipsTableFed = null, tipsTableBroker = null;
 // --- Helpers ---
 // Parse "MM/DD/YYYY HH:MM AM/PM" (Fidelity footer) → Date (date part only)
 function parseFidelityDateStr(s) {
-  const [mo, dy, yr] = (s || '').split(' ')[0].split('/').map(Number);
-  return new Date(yr, mo - 1, dy);
+  return localDate(fidelityDownloadDateIso(s));
 }
 
 // Settlement date for market (Fidelity) quotes — TIPS and nominals alike: the trade date
@@ -580,72 +579,18 @@ function switchTab(tab) {
   processAndRender();
 }
 
-// Pure parser — works with text from file upload or R2 fetch.
-// `settleIso` is the settlement date the quoted prices are stated at (3.1.6). Both yields are
-// calculated from price at that date rather than read from the quote: the quoted price carries
-// more precision than the quoted yield, and only the ask side is quoted as a yield at all, so
-// calculating both puts them on one convention and their difference is a spread (3.6).
+// Works with text from file upload or R2 fetch. The row parse and both yield calculations
+// live in shared/src/fidelity-parse.js#parseFidelityNominalRows, which the acquisition script
+// that writes S13/S15 imports too, so neither can move onto a different method (§2a). What
+// stays here is this app's own gating — the FedInvest CUSIPs that mark a row as TIPS in the
+// older export format — and the S1 type vocabulary the rest of the app filters on.
 function parseFidelityNominals(text, settleIso = null) {
-  const downloadDate = parseFidelityDownloadDate(text);
-  const settleDate = localDate(settleIso);
-  const rows = parseCsv(text);
-  const bonds = [];
-  const seen = new Set();
-
-  for (const row of rows) {
-    const n = {};
-    for (const k in row) n[k.toLowerCase().trim()] = row[k];
-
-    // Combined file: skip TIPS rows — handled by broker price parser
-    const product = (n['product'] || '').toLowerCase();
-    if (product === 'tips') continue;
-
-    const cusip = clean(n['cusip'] || n['cusip|state']);
-    const desc  = (n['description'] || '').toUpperCase();
-
-    if (!cusip || seen.has(cusip)) continue;
-
-    // Old-format fallback: reject anything FedInvest knows as TIPS
-    if (rawYieldsData.some(r => r.cusip === cusip) || /\bTIPS\b/.test(desc)) continue;
-
-    const cusipType = classifyByCusipRoot(cusip);
-    if (!cusipType) { console.warn(`Unrecognized CUSIP root, skipping: ${cusip}`); continue; }
-
-    const matStr    = clean(n['maturity date']);
-    const maturity  = fidParseMaturity(matStr);
-    if (!maturity) continue;
-    const maturityDate = localDate(maturity);
-
-    const yldStr     = clean(n['ask yield to maturity']);
-    const couponStr  = clean(n['coupon']);
-    const priceStr   = fidPriceField(n['price ask'] || n['ask price/quantity (min)']);
-    const bidPriceStr = fidPriceField(n['price bid'] || n['bid price/quantity (min)']);
-
-    // The quoted ask yield is read as a presence test — a row without one carries no live
-    // offer — and is not the yield the app goes on to use.
-    const quotedYield = parseFloat(yldStr) / 100;
-    if (!maturityDate || isNaN(quotedYield)) continue;
-
-    const coupon = parseFloat(couponStr) / 100 || 0;
-    const price = parseFloat(priceStr) || NaN;
-    const bidPrice = parseFloat(bidPriceStr);
-    const askYield = yieldFromPrice(price, coupon, settleDate, maturityDate);
-    if (askYield === null || isNaN(askYield)) continue;
-    const bidYield = yieldFromPrice(bidPrice, coupon, settleDate, maturityDate);
-
-    const type = CUSIP_TYPE_TO_MARKET_BASED[cusipType];
-
-    seen.add(cusip);
-    bonds.push({
-      cusip, type, coupon, price, bidPrice,
-      yield: askYield,
-      bidYield: bidYield ?? NaN,
-      maturity, maturityDate,
-      settlementDate: settleIso,
-    });
-  }
-  bonds.sort((a, b) => a.maturityDate - b.maturityDate);
-  return { bonds, downloadDate };
+  const bonds = parseFidelityNominalRows(text, {
+    settleIso,
+    excludeCusips: new Set(rawYieldsData.map(r => r.cusip)),
+    onUnknownCusip: cusip => console.warn(`Unrecognized CUSIP root, skipping: ${cusip}`),
+  }).map(b => ({ ...b, type: CUSIP_TYPE_TO_MARKET_BASED[b.cusipType] }));
+  return { bonds, downloadDate: parseFidelityDownloadDate(text) };
 }
 
 function processAndRenderNominals() {

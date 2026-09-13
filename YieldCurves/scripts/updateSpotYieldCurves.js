@@ -25,8 +25,8 @@ import { parseCsv } from '../../shared/src/csv.js';
 import { localDate, toIsoDate, nextBusinessDay, parseHolidaySet } from '../../shared/src/settlement.js';
 import { classifyByCusipRoot, isStrip } from '../../shared/src/treasury-cusip.js';
 import {
-  cleanFidelityField as clean, fidPriceField, fidParseMaturity,
-  parseFidelityDownloadDate, fidelityDownloadDateIso, parseFidelityTipsRows,
+  parseFidelityDownloadDate, fidelityDownloadDateIso,
+  parseFidelityTipsRows, parseFidelityNominalRows,
 } from '../../shared/src/fidelity-parse.js';
 import { spotCurveFit, calculateSAO, zToSA, unionGridTerms } from '../../shared/src/spot-curve.js';
 
@@ -37,56 +37,6 @@ const HOLIDAYS_CSV_URL = `${R2_BASE_URL}/misc/BondHolidaysSifma.csv`;
 const FIDELITY_URL = `${R2_BASE_URL}/Treasuries/FidelityTreasuriesTips.csv`;
 
 const DRY = process.argv.includes('--dry');
-
-// ─── Fidelity Treasury (nominal) row parsing — glue specific to this pipeline, same
-// shape as src/app.js's parseFidelityNominals but without the DOM/module-state ties.
-// Business logic (which fields to trust, gating against FedInvest CUSIPs) intentionally
-// stays here rather than in the shared fidelity-parse.js primitives — see that module's
-// own header comment.
-//
-// Returns EVERY nominal Treasury row, STRIPS included (Product = Treasury covers both —
-// see knowledge/DATA_DICTIONARY.md#s7/#e6, which describe Product as Treasury/TIPS but
-// don't call out that STRIPS rows sit inside the Treasury rows, identified only by CUSIP
-// root — see this script's STRIPS handling below and the task report). Callers filter
-// STRIPS out where a coupon-bond price-space curve fit needs them excluded; the raw
-// per-security rows keep them, tagged Type = STRIPS via classifyByCusipRoot.
-function parseFidelityNominalRows(text, tipsCusips) {
-  const rows = parseCsv(text);
-  const bonds = [];
-  const seen = new Set();
-  for (const row of rows) {
-    const n = {};
-    for (const k in row) n[k.toLowerCase().trim()] = row[k];
-
-    if ((n['product'] || '').toLowerCase() === 'tips') continue;
-
-    const cusip = clean(n['cusip'] || n['cusip|state']);
-    const desc = (n['description'] || '').toUpperCase();
-    if (!cusip || seen.has(cusip)) continue;
-    if (tipsCusips.has(cusip) || /\bTIPS\b/.test(desc)) continue;
-    if (!classifyByCusipRoot(cusip)) continue;
-
-    const matStr = clean(n['maturity date']);
-    const maturity = fidParseMaturity(matStr);
-    if (!maturity) continue;
-    const maturityDate = localDate(maturity);
-
-    const yld = parseFloat(clean(n['ask yield to maturity'])) / 100;
-    if (!maturityDate || isNaN(yld)) continue;
-
-    seen.add(cusip);
-    bonds.push({
-      cusip,
-      coupon: parseFloat(clean(n['coupon'])) / 100 || 0,
-      price: parseFloat(fidPriceField(n['price ask'] || n['ask price/quantity (min)'])) || NaN,
-      yield: yld,
-      bidPrice: parseFloat(fidPriceField(n['price bid'] || n['bid price/quantity (min)'])),
-      bidYield: parseFloat(clean(n['yield bid'] || n['yield'])) / 100,
-      maturity, maturityDate,
-    });
-  }
-  return bonds;
-}
 
 // ─── TIPS row processing — mirrors src/app.js's buildTipsSecurities.
 function buildTipsSecurities(rawTipsData, refCpiData, priceMap, isBroker, brokerSettleStr) {
@@ -240,7 +190,14 @@ async function main() {
     priceMap.set(r.cusip, r);
   }
   // Unfiltered: every nominal Treasury row, STRIPS included, for the per-security rows.
-  const fidNominalBondsAll = parseFidelityNominalRows(fidText, tipsCusips);
+  // Both yields come from the quoted price at the market settlement date, calculated by the
+  // same shared parser src/app.js uses, so the published figures and the ones the app shows
+  // are one method (3.1_Load_And_Parse.md#parse-market-quotes).
+  const fidNominalBondsAll = parseFidelityNominalRows(fidText, {
+    settleIso: brokerSettleStr,
+    excludeCusips: tipsCusips,
+    onUnknownCusip: cusip => console.warn(`  Unrecognized CUSIP root, skipping: ${cusip}`),
+  });
   // Filtered: STRIPS excluded, for the coupon-bond price-space curve fit only — a STRIP's
   // price/yield relationship is already a pure zero-coupon discount, but the *nominal fit*
   // is a coupon-bond price-space fit (cashflowSchedule) and STRIPS aren't part of its
@@ -266,8 +223,9 @@ async function main() {
     return { ...r, coupon, price, yield: yld, maturityDate };
   }).filter(Boolean);
   const fedNominalBonds = fedNominalBondsAll.filter(b => !isStrip(b.cusip));
-  const mktNominalBondsAll = fidNominalBondsAll.map(b => ({ ...b, settlementDate: brokerSettleStr }));
-  const mktNominalBonds = fidNominalBonds.map(b => ({ ...b, settlementDate: brokerSettleStr }));
+  // The parser already stamps each quote with the market settlement date it was priced at.
+  const mktNominalBondsAll = fidNominalBondsAll;
+  const mktNominalBonds = fidNominalBonds;
 
   // ── Spot curves: nominal fit uses minT 0.25y (Bills anchor the short end), TIPS quoted
   // and TIPS SA fits use the shared default (SAO_NOISE_YRS = 0.5y) — same as src/app.js's
@@ -299,7 +257,7 @@ async function main() {
   });
   for (const b of mktNominalBondsAll) evalRows.push({
     term_years: termYears(b.maturity, brokerSettleStr), maturity_date: b.maturity, cusip: b.cusip,
-    type: classifyByCusipRoot(b.cusip) || '', source: 'Market',
+    type: b.cusipType, source: 'Market',
     ask_yield: b.yield, sa_yield: '', sao_yield: '', spot_yield: '', spot_sa_yield: '',
   });
   for (const b of fedTipsSecurities) evalRows.push({
