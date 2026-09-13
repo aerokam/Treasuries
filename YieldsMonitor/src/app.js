@@ -1180,12 +1180,26 @@ async function fetchLive(symbol, range) {
     // and the weekend form (timestamp rolled forward to the current wall-clock day/time
     // despite no trading having occurred). Its own timestamp is unreliable either way, so
     // it's tagged here rather than silently trusted as a real dated bar downstream.
+    //
+    // The `%` marker is NOT permanent, though (confirmed 2026-09-13): once a newer tick
+    // supersedes it, CNBC reformats the previous tick's close to a bare numeric string
+    // identical to a real bar — so a weekend tick can "mature" into looking like a normal
+    // per-minute bar within a day. The gap-isolation check below catches that case: a bar
+    // separated from BOTH its neighbors by much more than the documented ~2.5h end-of-session
+    // break (17:05→19:30 ET) isn't part of any continuous session on either side and gets
+    // the same `synthetic` treatment, regardless of its close string's formatting.
     const parsed = priceBars.map(bar => { let v = bar.close; const synthetic = typeof v === "string" && v.endsWith("%"); if (synthetic) v = v.slice(0, -1); return { x: parseSourceTime(bar.tradeTime), y: parseFloat(v), synthetic }; });
     // isNaN(p.x) coerces the Date via valueOf — catches an Invalid Date (e.g. a broken
     // Intl/timezone environment feeding parseSourceTime a value it can't converge on),
     // which a bare `p.x` truthiness check misses since a Date object is always truthy
     // even when its internal time value is NaN.
     const valid = parsed.filter(p => p.x && !isNaN(p.x) && !isNaN(p.y));
+    const ISOLATION_GAP_MS = 4 * 3600 * 1000;
+    valid.forEach((p, i) => {
+      const prevGap = i > 0 ? p.x - valid[i - 1].x : Infinity;
+      const nextGap = i < valid.length - 1 ? valid[i + 1].x - p.x : Infinity;
+      if (prevGap > ISOLATION_GAP_MS && nextGap > ISOLATION_GAP_MS) p.synthetic = true;
+    });
     if (valid.length < parsed.length) console.warn(`${symbol} ${range}: dropped ${parsed.length - valid.length} bar(s) with an invalid date — check Intl/timezone support in this browser environment`);
     return valid;
   } catch (err) {
