@@ -1,84 +1,24 @@
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
+// updateSaSaoYields.js — writes TIPS/YieldsSaSao.csv: the ask, SA and SAO yield of every
+// TIPS quoted in the market-quote file. Spec: YieldCurves/knowledge/3.2_Seasonal_Adjustments.md,
+// knowledge/DataStores.md#s10.
+//
+// Every parse and every calculation here comes from shared/src (no-redundancy directive,
+// projects/CLAUDE.md §2a). What stays local is the choice of which store to read and which
+// column of it to use.
+//
+// Run: node YieldCurves/scripts/updateSaSaoYields.js
 import { uploadToR2 } from './r2.js';
-import { yieldFromPrice, daysBetween } from '../../shared/src/bond-math.js';
+import { yieldFromPrice } from '../../shared/src/bond-math.js';
 import { calculateSAO } from '../../shared/src/spot-curve.js';
 import { saFactorForDate, maturitySaFactor } from '../../shared/src/ref-cpi.js';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+import { parseCsv } from '../../shared/src/csv.js';
+import { localDate, toIsoDate, nextBusinessDay, parseHolidaySet } from '../../shared/src/settlement.js';
+import { parseFidelityDownloadDate, fidelityDownloadDateIso, parseFidelityTipsRows } from '../../shared/src/fidelity-parse.js';
 
 const R2_BASE_URL = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev';
 const FIDELITY_TIPS_URL = `${R2_BASE_URL}/Treasuries/FidelityTreasuriesTips.csv`;
 const REF_CPI_URL = `${R2_BASE_URL}/TIPS/RefCpiNsaSa.csv`;
 const HOLIDAYS_URL = `${R2_BASE_URL}/misc/BondHolidaysSifma.csv`;
-
-// Helper: parse CSV with quoted fields and header
-function parseCsv(text) {
-  const result = [];
-  const lines = text.split(/\r?\n/).filter(l => l.trim());
-  if (lines.length === 0) return result;
-
-  const parseRow = (line) => {
-    const parts = [];
-    let cur = '';
-    let inQuotes = false;
-    for (let i = 0; i < line.length; i++) {
-      const char = line[i];
-      if (char === '"') inQuotes = !inQuotes;
-      else if (char === ',' && !inQuotes) {
-        parts.push(cur.trim());
-        cur = '';
-      } else {
-        cur += char;
-      }
-    }
-    parts.push(cur.trim());
-    return parts.map(p => p.replace(/^"|"$/g, '').trim());
-  };
-
-  const headers = parseRow(lines[0]);
-  // Fidelity CSV has a trailing comma → empty last header; strip it so row-length
-  // validation doesn't reject every data row.
-  while (headers.length > 0 && !headers[headers.length - 1]) headers.pop();
-  for (let i = 1; i < lines.length; i++) {
-    const values = parseRow(lines[i]);
-    if (values.length < headers.length) continue;
-    const obj = {};
-    headers.forEach((h, idx) => {
-      if (h) obj[h] = values[idx];
-    });
-    result.push(obj);
-  }
-  return result;
-}
-
-function localDate(s) {
-  if (!s) return null;
-  const [y, m, d] = s.split('-').map(Number);
-  return new Date(y, m - 1, d);
-}
-
-function toIsoDate(date) {
-  return date.getFullYear() + '-' +
-    String(date.getMonth() + 1).padStart(2, '0') + '-' +
-    String(date.getDate()).padStart(2, '0');
-}
-
-function parseFidelityDateStr(s) {
-  const [mo, dy, yr] = (s || '').split(' ')[0].split('/').map(Number);
-  return new Date(yr, mo - 1, dy);
-}
-
-function nextBusinessDay(date, holidaySet) {
-  if (!date) return new Date();
-  const d = new Date(date.getTime());
-  do {
-    d.setDate(d.getDate() + 1);
-  } while (d.getDay() === 0 || d.getDay() === 6 || holidaySet.has(toIsoDate(d)));
-  return d;
-}
-
 
 async function main() {
   console.log(`Starting Market SA/SAO Yield update at ${new Date().toISOString()}`);
@@ -90,28 +30,19 @@ async function main() {
   const fidText = await fidRes.text();
   
   // Extract download date from footer
-  const m = fidText.match(/Date downloaded\s+([\d/]+ [\d:]+ [AP]M)/i);
-  const downloadDateStr = m ? m[1] : null;
+  const downloadDateStr = parseFidelityDownloadDate(fidText);
   if (!downloadDateStr) {
     console.log("Warning: Could not find download date in Fidelity TIPS footer. Using today.");
   }
-  const downloadDate = downloadDateStr ? parseFidelityDateStr(downloadDateStr) : new Date();
-  
+  const downloadDate = downloadDateStr ? localDate(fidelityDownloadDateIso(downloadDateStr)) : new Date();
+
   // Fetch Holidays for T+1 settlement
   console.log(`Fetching holidays from ${HOLIDAYS_URL}...`);
   const holidayRes = await fetch(HOLIDAYS_URL);
-  const holidaySet = new Set();
-  if (holidayRes.ok) {
-    const holidayText = await holidayRes.text();
-    const holidayRows = holidayText.split(/\r?\n/).filter(l => l.trim());
-    holidayRows.slice(1).forEach(line => {
-      const parts = line.split(',');
-      const datePart = parts.slice(0, 1).join(',').replace(/^"|"$/g, '').trim();
-      const d = new Date(datePart);
-      if (!isNaN(d.getTime())) holidaySet.add(toIsoDate(d));
-    });
-  }
-  
+  let holidaySet = new Set();
+  if (holidayRes.ok) holidaySet = parseHolidaySet(parseCsv(await holidayRes.text(), false));
+  console.log(`Bond market closure dates loaded: ${holidaySet.size}`);
+
   const settleDate = nextBusinessDay(downloadDate, holidaySet);
   const settleDateStr = toIsoDate(settleDate);
   console.log(`Market settlement date (T+1): ${settleDateStr}`);
@@ -122,41 +53,12 @@ async function main() {
   const refCpiText = await refCpiRes.text();
   const refCpiData = parseCsv(refCpiText);
 
-  // Parse Bonds
-  const rows = parseCsv(fidText);
-  const clean = val => (val || '').replace(/^=?["']*/, '').replace(/["']*$/, '').trim();
-  
-  const processed = rows.map(row => {
-    const n = {};
-    for (const k in row) n[k.toLowerCase().trim()] = row[k];
-
-    // Combined file: skip Treasury rows
-    const product = (n['product'] || '').toLowerCase();
-    if (product && product !== 'tips') return null;
-
-    const cusip = clean(n['cusip'] || n['cusip|state']);
-    if (!cusip) return null;
-
-    const matStr = clean(n['maturity date']);
-    if (!matStr) return null;
-    let maturity;
-    if (/^\d{4}-\d{2}-\d{2}$/.test(matStr)) {
-      maturity = matStr;
-    } else {
-      const [mo, dy, yr] = matStr.split('/');
-      if (!yr) return null;
-      maturity = `${yr}-${mo.padStart(2,'0')}-${dy.padStart(2,'0')}`;
-    }
+  // Parse Bonds — the same TIPS row parser the YieldCurves app reads this store with.
+  const processed = parseFidelityTipsRows(fidText).map(r => {
+    const { cusip, coupon, maturity, askPrice: price } = r;
+    if (!maturity || isNaN(price) || isNaN(coupon)) return null;
     const maturityDate = localDate(maturity);
-
-    const couponStr = clean(n['coupon']);
-    const coupon = parseFloat(couponStr) / 100;
-
-    const rawPrice = n['price ask'] || n['ask price'] || n['ask price/quantity (min)'] || n['price'] || '';
-    const priceStr = clean(rawPrice).split('/')[0].replace(/,/g, '');
-    const price = parseFloat(priceStr);
-
-    if (isNaN(price) || isNaN(coupon) || !maturityDate) return null;
+    if (!maturityDate) return null;
 
     const saS = saFactorForDate(refCpiData, settleDateStr);
     const saM = maturitySaFactor(refCpiData, maturity, settleDateStr);
@@ -166,8 +68,8 @@ async function main() {
     const askYield = yieldFromPrice(price, coupon, settleDate, maturityDate);
     const saPrice = price * (saS / saM);
     const saYield = yieldFromPrice(saPrice, coupon, settleDate, maturityDate);
-    
-    if (saYield === null) return null;
+
+    if (askYield === null || saYield === null) return null;
 
     return { cusip, maturity, coupon, askYield, saYield, maturityDate, settlementDate: settleDateStr };
   }).filter(Boolean).sort((a, b) => a.maturityDate - b.maturityDate);
