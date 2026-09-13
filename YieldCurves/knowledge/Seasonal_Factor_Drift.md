@@ -72,7 +72,7 @@ Every TIPS maturing in 2040 or later matures on **February 15**, the 30-year TIP
 | Jan-15 | 0.147% | 0.191% | 0.190% | −0.003% | −0.142% |
 | Apr-15 | 0.154% | 0.176% | 0.163% | −0.237% | −0.314% |
 | Jul-15 | 0.175% | 0.240% | 0.278% | +0.075% | +0.256% |
-| Oct-15 | 0.142% | 0.177% | 0.169% | +0.141% | +0.245% |
+| Oct-15 | 0.141% | 0.176% | 0.172% | +0.141% | +0.245% |
 
 `S(Feb-15)` is among the fastest-drifting dates over 30 years (0.29%), and its current value (−0.448%) is about 2.5 times its own 1948–2026 average (−0.194%).
 
