@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url';
 import { uploadToR2 } from './r2.js';
 import { yieldFromPrice, daysBetween } from '../../shared/src/bond-math.js';
 import { calculateSAO } from '../../shared/src/spot-curve.js';
+import { saFactorForDate, maturitySaFactor } from '../../shared/src/ref-cpi.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -157,16 +158,10 @@ async function main() {
 
     if (isNaN(price) || isNaN(coupon) || !maturityDate) return null;
 
-    const mmddSettle = settleDateStr.slice(5, 10);
-    const mmddMature = maturity.slice(5, 10);
-    
-    const rSettle = refCpiData.find(r => r["Ref CPI Date"] && r["Ref CPI Date"].includes(`-${mmddSettle}`));
-    const rMature = refCpiData.find(r => r["Ref CPI Date"] && r["Ref CPI Date"].includes(`-${mmddMature}`));
-    
-    const saS = parseFloat(rSettle?.["SA Factor"]);
-    const saM = parseFloat(rMature?.["SA Factor"]);
+    const saS = saFactorForDate(refCpiData, settleDateStr);
+    const saM = maturitySaFactor(refCpiData, maturity, settleDateStr);
 
-    if (isNaN(saS) || isNaN(saM)) return null;
+    if (saS == null || saM == null) return null;
 
     const askYield = yieldFromPrice(price, coupon, settleDate, maturityDate);
     const saPrice = price * (saS / saM);
@@ -193,7 +188,8 @@ async function main() {
   );
   const csvContent = [header, ...lines].join('\n') + '\n';
 
-  // Upload to R2. Not read by any app — published as a public resource for
+  // Upload to R2. Read by TipsLadderManager (shared/src/market-data.js) and
+  // FundHoldings (enrichHoldings.js); also published as a public resource for
   // folks building their own spreadsheets. (Restored 2026-06-01; the 2026-05-21
   // R2 cleanup wrongly classified it as an orphan write and removed it.)
   console.log("Uploading to R2: TIPS/YieldsSaSao.csv");
