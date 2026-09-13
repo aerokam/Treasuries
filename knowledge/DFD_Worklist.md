@@ -74,7 +74,7 @@ Done in the app. All four combinations of source and security type now have thei
 
 The earlier attempt that rendered zero rows and took the run from 25 seconds to 4.8 minutes was a null settlement date, not a loop. The inline market-quote fixtures carried no `Date downloaded` footer, so `marketSettleIso()` returned null and `yieldFromPrice` raised a `TypeError` in `daysBetween` instead of returning null; the catch in `processAndRenderNominals` swallowed it before the table was rendered, and the minutes were the resulting Playwright timeouts. `yieldFromPrice` now returns null for a missing or unparsable date, and the fixtures carry the footer the real store has.
 
-**Still open:** `YieldCurves/scripts/updateSpotYieldCurves.js` keeps its own copy of the market-quote parser and still reads both Treasury yields from the quote, so `Treasuries/YieldCurves.csv` and `Treasuries/BidAskSpreads.csv` state figures the app no longer shows. Two implementations of one parse is the standing defect underneath it.
+Closed in `12ff019`. One market-quote nominal parser now lives in `shared/src/fidelity-parse.js` and serves both the page and the acquisition job, beside the TIPS row parser they already shared, so the published stores and the page state one set of figures. The stores were republished on 2026-09-13 (§3.8).
 
 ---
 
@@ -89,6 +89,24 @@ The two lookups agreed on which row to take, because `RefCpiNsaSa.csv` is sorted
 The earlier `f57ef4a` retired this script’s duplicate SAO algorithm. Measured against the published file at the time, SA moved on none of 53 securities and SAO on 21, by up to 56 basis points, concentrated at the short end. Both corrections are now published.
 
 **Standing defect:** three duplicates of shared logic have now been found in `YieldCurves/scripts/`, each noticed only when its output visibly disagreed with the app — the SAO algorithm (`f57ef4a`), these SA factors (`72097c2`), and the market-quote parser in `updateSpotYieldCurves.js` (§3.6, still open). Finding them one at a time by their symptoms leaves the ones whose output nobody has compared. Proposed to the developer: sweep every script in that folder for logic that already exists in `shared/src/` and close the set.
+
+---
+
+## 3.8 The duplication sweep, and what it found
+
+Three duplicates of shared logic had been found one at a time, each noticed only when its output visibly disagreed with the page: the SAO algorithm (`f57ef4a`), the SA factors (`72097c2`, §3.7) and the market-quote parser (`12ff019`, §3.6). The developer directed a sweep of every app and acquisition job against everything `shared/src/` exports, on the grounds that finding them by symptom leaves the ones nobody has compared. Commits `12ff019`, `013d615`, `8bebdcb`, `27324bf`, `a0ef1a5`, about 180 lines net removed.
+
+**The sweep found a live defect that no symptom had surfaced.** `updateSaSaoYields.js` held its own bond-closure parse. The closure file states each date as a quoted string containing commas, `"Monday, January 19, 2026"`; the copy split each line on commas and kept the first piece, so every date parsed as the word Monday and failed. Its closure set held none of the 22 dates, and settlement skipped weekends only. On 11 of the 250 trading days in 2026 that settles a day early. Across the 53 quoted TIPS: ask yield median 0.04 bp and up to 4.00, SA yield median 0.08 bp and up to 4.37. `TIPS/YieldsSaSao.csv` is read by TipsLadderManager and FundHoldings, so both received it. The run on the day of the fix was byte-identical, because that day’s settlement date was not a closure date.
+
+**STRIPS are calculated, and the documentation was what was wrong.** `shared/src/bond-math.js#yieldFromPrice` builds no coupon cash flows at a coupon of zero, so a STRIP receives the semi-annual bond-equivalent yield of its price, and one maturing inside half a year receives Treasury’s bill investment-rate formula. Measured across 247 STRIPS, the calculated figure differs from the reported one by a median 0.05 bp, p90 0.09, max 3.31. The [S13](./DataStores.md#s13) note stating that no formula is applied described the acquisition job before `11cda8d` and never described the page; corrected in `12ff019`.
+
+**A second implementation was producing constants nothing checked.** The drift analysis script held its own copy of the curve fit, and that script is where the Credibility Factor constants in `shared/src/ref-cpi.js` come from. Its output after the change is byte-identical to what the copy produced, which confirms the published constants rather than assuming them.
+
+**Republished 2026-09-13** from the corrected code: [S13](./DataStores.md#s13), [S14](./DataStores.md#s14), [S15](./DataStores.md#s15) and [S10](./DataStores.md#s10). Against the 2026-09-11 quote file the ask yield on 650 market nominal securities moved a median 0.06 bp, p90 0.30, max 20.47; the bid-ask yield spread on 403 Treasuries up to 53.72 bp; breakeven inflation on 53 TIPS up to 1.25 bp. Every TIPS figure, every FedInvest row and the nearest-nominal match were unchanged to seven decimal places, and the fitted grid moved at most 0.01 bp.
+
+**Approved by the developer and under way:** the market TIPS settlement date defect recorded in 3.1 (the page derives it from the FedInvest date, the acquisition job from the quote file’s own; the acquisition job follows the spec), which unblocks the last duplicate copy of the TIPS security build; one convention for years-to-maturity in place of the three in use, the worst of which measures from the wall clock at run time rather than from the settlement date the prices are stated at; and one home for the nearest-nominal match that decides which nominal each published breakeven is stated against.
+
+**Still open:** `shared/src/fidelity-parse.js` now owns both row parsers for [S7](./DataStores.md#s7) and both yield calculations on the nominal side, and has no spec. It is the first shared module to need one, and the form it takes sets the pattern for the other nine.
 
 ---
 
