@@ -567,15 +567,15 @@ coverExcessCost_c = Future 30Y total cost × coverWeight_c
 ### Maturity SA Factor
 `Maturity_SA_Factor` = *The [SA Factor](#sa-factor) for the maturity date, the denominator of the [SA Price Factor](#sa-price-factor). A maturity date inside the published [Ref CPI](#ref-cpi) series takes that date’s exact value. A maturity date beyond it has no published factor: the same calendar month and day is taken from the most recent completed cycle, and its departure from 1.0 is scaled by the [Credibility Factor](#credibility-factor) — `1 + (S_maturity − 1) × w(h)`. The second case covers nearly every outstanding TIPS, since most mature beyond the published series. `shared/src/ref-cpi.js#maturitySaFactor`; specified in [1.0 Horizon-Dependent Maturity Factor](../YieldCurves/knowledge/3.2_Seasonal_Adjustments.md#horizon-dependent-maturity-factor).*
 
-*Measured: the factor for February 15, the maturity date of every 30-year TIPS, has a 30-year drift standard deviation of about 0.29% of price, against a current departure from 1.0 of −0.45%. The drift over the horizon the projection is used at is comparable to the whole adjustment being made, which is what the weight scales for ([1.1 Seasonal Factor Drift §4.1](../YieldCurves/knowledge/Seasonal_Factor_Drift.md#feb-15-dependency)).*
+*Measured: the factor for February 15, the maturity date of every 30-year TIPS, has a 30-year drift standard deviation of about 0.29% of price, against a current departure from 1.0 of −0.45%. The drift over the horizon the projection is used at is comparable to the whole adjustment being made, which is what the weight scales for ([Seasonal Factor Drift §4.1](../YieldCurves/knowledge/Seasonal_Factor_Drift.md#feb-15-dependency)).*
 
 <a id="seasonal-amplitude"></a>
 ### Seasonal Amplitude
-`Seasonal_Amplitude` = *`A`, the within-year spread of the [SA Factor](#sa-factor) across the twelve calendar months, as a standard deviation. Measured at 0.263% from frozen CPI vintages ([1.1 §3](../YieldCurves/knowledge/Seasonal_Factor_Drift.md)). The signal term of the [Credibility Factor](#credibility-factor).*
+`Seasonal_Amplitude` = *`A`, the within-year spread of the [SA Factor](#sa-factor) across the twelve calendar months, as a standard deviation. Measured at 0.263% from frozen CPI vintages ([Seasonal Factor Drift §3](../YieldCurves/knowledge/Seasonal_Factor_Drift.md)). The signal term of the [Credibility Factor](#credibility-factor).*
 
 <a id="seasonal-factor-drift"></a>
 ### Seasonal Factor Drift
-`Seasonal_Factor_Drift` = *`σ_drift(month, h)`, the RMS change in one calendar month’s [SA Factor](#sa-factor) over a horizon of `h` years, measured from CPI history 1947 onward ([1.1 §4](../YieldCurves/knowledge/Seasonal_Factor_Drift.md)). Held per calendar month, because the months do not drift at the same rate: December and the spring months drift fastest, and the long end of the TIPS curve is entirely February 15. The noise term of the [Credibility Factor](#credibility-factor). `shared/src/ref-cpi.js#seasonalDriftSigma`.*
+`Seasonal_Factor_Drift` = *`σ_drift(month, h)`, the RMS change in one calendar month’s [SA Factor](#sa-factor) over a horizon of `h` years, measured from CPI history 1947 onward ([Seasonal Factor Drift §4](../YieldCurves/knowledge/Seasonal_Factor_Drift.md)). Held per calendar month, because the months do not drift at the same rate: December and the spring months drift fastest, and the long end of the TIPS curve is entirely February 15. The noise term of the [Credibility Factor](#credibility-factor). `shared/src/ref-cpi.js#seasonalDriftSigma`.*
 
 <a id="credibility-factor"></a>
 ### Credibility Factor
