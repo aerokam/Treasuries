@@ -696,6 +696,13 @@ function getEtDateStr(date) {
   return str;
 }
 
+// getEtDateStr's 'M/D/YYYY' reformatted to the 'YYYY-MM-DD' keys parseHolidaySet (settlement.js)
+// builds saHolidaySet with — a bond-market holiday closure check for an ET-timestamped point.
+function isHolidayEt(date) {
+  const [m, d, y] = getEtDateStr(date).split('/');
+  return saHolidaySet.has(`${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`);
+}
+
 function makeEtMoment(year, month0, day, hour) {
   let d = new Date(Date.UTC(year, month0, day, hour, 0, 0));
   for (let i = 0; i < 2; i++) { const p = ET_FULL_FMT.formatToParts(d).reduce((a, pt) => ({ ...a, [pt.type]: pt.value }), {}); const diff = Date.UTC(year, month0, day, hour, 0, 0) - Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second); if (diff === 0) break; d = new Date(d.getTime() + diff); }
@@ -1420,8 +1427,13 @@ function updateCharts() {
     // day/time despite no trading having occurred). Left in, it would make the walk treat the
     // actual last trading day as "the previous day" and anchor closeP to a bar within that
     // same day's own session instead of walking back to the real previous trading day.
+    //
+    // Bond-market holidays get the same treatment (isHolidayEt, against saHolidaySet — same
+    // set the SA overlay already fetches, best-effort: whatever's loaded by the time this
+    // runs, same as every other saHolidaySet consumer). No live trading close exists on one
+    // either, so a bar dated one is the same kind of artifact a weekend bar is.
     let closeP = null;
-    const realData = calculationData ? calculationData.filter(p => !isWeekendEt(p.x)) : null;
+    const realData = calculationData ? calculationData.filter(p => !isWeekendEt(p.x) && !isHolidayEt(p.x)) : null;
     const lastReal = (realData && realData.length > 0) ? realData[realData.length - 1] : null;
     if (lastReal) {
       const latestDayET = getEtDateStr(lastReal.x);
