@@ -39,6 +39,9 @@ const FID_COMBINED_CSV = [
   'TIPS,"UNITED STATES TREAS NTS SER X-2026 0.12500% 04/15/2026",91282CCA7,0.125,semi-annually,2026-04-15,Yes,AA1/ --,-1.019,100.062/6000(100),124.011839,1.23935,100.132/6000(100),124.098594,-2.274,--,-2.274,--,--,"CP, IE"',
   'TIPS,"UNITED STATES TREAS NTS 0.12500% 07/15/2026 TIPS",912828S50,0.125,semi-annually,2026-07-15,Yes,AA1/ --,-3.842,101.231/6000(100),137.263162,1.35594,101.284/6000(100),137.335026,-4.011,--,-4.011,--,--,"CP, IE"',
   'TIPS,"UNITED STATES TREAS NTS SER AE-2026 0.12500% 10/15/2026",91282CDC2,0.125,semi-annually,2026-10-15,Yes,AA1/ --,-1.095,100.680/6000(100),119.751812,1.18943,100.738/6000(100),119.820799,-1.197,--,-1.197,--,--,"CP, IE"',
+  // Download-date footer, as the real export carries it: the quote settles T+1 from this date
+  // (2026-03-26), and both quoted sides are priced to that date.
+  'Date downloaded   03/25/2026 08:27 AM',
 ].join('\n');
 
 // ─── Setup helpers ────────────────────────────────────────────────────────────
@@ -234,6 +237,18 @@ test('Treasuries Spot label opens a help popup', async ({ page }) => {
   await loadTreasuries(page);
   await page.click('#nominalsControls a.col-help[data-col="spot-tsy"]');
   await expect(page.locator('#drill-modal')).toContainText('Zero-Coupon Yield Curve');
+});
+
+// ─── Market-quote nominal yields are calculated from price, not read from the quote ──
+// The fixture quotes this Bill at an ask yield of 3.810% on an ask price of 99.060. That
+// price, settling 2026-03-26 (T+1 from the file's download date) against a 2026-06-26
+// maturity, is 92 days of a 365-day year, so the Treasury investment rate it implies is
+// (100 / 99.060 - 1) x 365 / 92 = 3.765%. Reading the quoted yield would show 3.810%.
+test('market-quote nominal yield comes from the quoted price, not the quoted yield', async ({ page }) => {
+  await loadTreasuries(page);
+  const billRow = page.locator('#nominalsTable tbody tr', { hasText: '912797TB3' });
+  await expect(billRow).toContainText('3.765%');
+  await expect(billRow).not.toContainText('3.810%');
 });
 
 test('Treasuries: unchecking Bills/Notes/Bonds with Spot on does not error', async ({ page }) => {

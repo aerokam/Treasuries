@@ -69,11 +69,13 @@ Spec headers carry typed relations in reciprocal pairs: Specifies and Implemente
 
 ---
 
-## 3.6 Market-quote nominal yields are read, not calculated
+## 3.6 Market-quote nominal yields are calculated
 
-The one inconsistency left in Yield Curves. FedInvest nominals, FedInvest TIPS and market-quote TIPS all have their yield calculated from price; market-quote nominals read the quoted yield column. Measured difference over 650 securities: median 0.06 bp, p90 0.28, p99 3.28, max 20.47, with every large one within days of maturity.
+Done in the app. All four combinations of source and security type now have their yield calculated from price: `YieldCurves/src/app.js#parseFidelityNominals` prices both sides of each market-quote nominal Treasury at the settlement date of [3.1.6](../YieldCurves/knowledge/3.1_Load_And_Parse.md#determine-settlement-dates), and the quoted ask yield is read as a presence test only. Measured against the quoted ask yield over the 650 nominal securities in the 2026-09-11 quote file: median 0.06 bp, p90 0.30, p99 3.31, max 20.47. Four securities differ by more than 5 bp, three of them within three days of maturity and the fourth a Note 167 days from maturity.
 
-An attempt to calculate them in `processAndRenderNominals` rendered zero rows in the nominals table across most of the suite and took the run from 25 seconds to 4.8 minutes, which points at a loop rather than a thrown error. It was reverted rather than shipped. The unconfirmed suspicion is `marketSettleIso()`: before the change its result was only spread into an object, and afterwards it was passed to `localDate` and into the solver, so an unparsable broker date would newly matter.
+The earlier attempt that rendered zero rows and took the run from 25 seconds to 4.8 minutes was a null settlement date, not a loop. The inline market-quote fixtures carried no `Date downloaded` footer, so `marketSettleIso()` returned null and `yieldFromPrice` raised a `TypeError` in `daysBetween` instead of returning null; the catch in `processAndRenderNominals` swallowed it before the table was rendered, and the minutes were the resulting Playwright timeouts. `yieldFromPrice` now returns null for a missing or unparsable date, and the fixtures carry the footer the real store has.
+
+**Still open:** `YieldCurves/scripts/updateSpotYieldCurves.js` keeps its own copy of the market-quote parser and still reads both Treasury yields from the quote, so `Treasuries/YieldCurves.csv` and `Treasuries/BidAskSpreads.csv` state figures the app no longer shows. Two implementations of one parse is the standing defect underneath it.
 
 ---
 
