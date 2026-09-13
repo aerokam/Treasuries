@@ -163,20 +163,20 @@ R2 HEAD requests are deduplicated per status request — shared files are fetche
 `Dashboard/jobs.json` — local script registry (committed, no secrets):
 ```json
 [
-  { "id": "fidelity-download", "label": "Fidelity Download", "cmd": "...", "apps": ["yieldcurves"], "windowsTaskName": "Fidelity Download" },
+  { "id": "fidelity-download", "label": "Fidelity Download", "cmd": "...", "apps": ["yieldcurves"], "windowsTaskNames": ["FidelityQuotes"] },
   { "id": "fedinvest-download", "label": "FedInvest Download", "cmd": "...", "apps": ["yieldcurves"] },
   { "id": "upload-fidelity", "label": "Upload to R2", "cmd": "...", "apps": ["yieldcurves"] }
 ]
 ```
 
-`windowsTaskName` (optional) — if set, the server queries Windows Task Scheduler at status time to populate `nextRunAt`:
+`windowsTaskNames` (optional) — a list of Windows Task Scheduler task names. Where it is set, `Dashboard/server.js#getWindowsTaskNextRun` queries each one at status time to populate `nextRunAt`:
 ```
-schtasks /query /fo csv /nh /tn "<windowsTaskName>"
+schtasks /query /fo csv /nh /tn "<task name>"
 ```
-The "Next Run Time" field from the CSV output is parsed and returned as an ISO string (or `null` if the task is disabled or not found).
+The "Next Run Time" field of the CSV output is parsed as a date. A task that is not found, reports `N/A` or `Disabled`, or whose next run has already passed contributes nothing; the earliest of the remaining times is returned as an ISO string, and `null` when none remain.
 
-- Only jobs with `windowsTaskName` get a `nextRunAt` in the response; others omit the field.
-- The `schtasks` call is made per job entry; no deduplication needed (each task name is unique).
+- Only jobs carrying `windowsTaskNames` get a `nextRunAt` in the response; others omit the field.
+- One `schtasks` call is made per task name, with no deduplication.
 
 ---
 
