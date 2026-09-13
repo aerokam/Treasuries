@@ -1,4 +1,4 @@
-# 2.2 The SAO Residual — Empirical Analysis and Rationale
+# The SAO Residual — Empirical Analysis and Rationale
 
 **Evidence for:** [3.3 SAO](./3.3_SAO_Adjustment.md)
 

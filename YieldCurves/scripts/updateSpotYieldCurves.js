@@ -88,8 +88,8 @@ function parseFidelityNominalRows(text, tipsCusips) {
   return bonds;
 }
 
-// ─── TIPS row processing — mirrors src/app.js's buildProcessedTipsBonds.
-function buildProcessedTipsBonds(rawTipsData, refCpiData, priceMap, isBroker, brokerSettleStr) {
+// ─── TIPS row processing — mirrors src/app.js's buildTipsSecurities.
+function buildTipsSecurities(rawTipsData, refCpiData, priceMap, isBroker, brokerSettleStr) {
   return rawTipsData.map(bond => {
     const coupon = parseFloat(bond.coupon);
     let price = parseFloat(bond.price);
@@ -250,10 +250,10 @@ async function main() {
     + `(${fidNominalBondsAll.length - fidNominalBonds.length} STRIPS).`);
 
   // ── Processed bonds, per source ──────────────────────────────────────────────
-  const fedTipsBonds = buildProcessedTipsBonds(rawTipsData, refCpiData, priceMap, false, fedSettleStr);
-  const mktTipsBonds = buildProcessedTipsBonds(rawTipsData, refCpiData, priceMap, true, brokerSettleStr);
-  if (fedTipsBonds.length) { const s = calculateSAO(fedTipsBonds); fedTipsBonds.forEach((b, i) => b.saoYield = s[i]); }
-  if (mktTipsBonds.length) { const s = calculateSAO(mktTipsBonds); mktTipsBonds.forEach((b, i) => b.saoYield = s[i]); }
+  const fedTipsSecurities = buildTipsSecurities(rawTipsData, refCpiData, priceMap, false, fedSettleStr);
+  const mktTipsSecurities = buildTipsSecurities(rawTipsData, refCpiData, priceMap, true, brokerSettleStr);
+  if (fedTipsSecurities.length) { const s = calculateSAO(fedTipsSecurities); fedTipsSecurities.forEach((b, i) => b.saoYield = s[i]); }
+  if (mktTipsSecurities.length) { const s = calculateSAO(mktTipsSecurities); mktTipsSecurities.forEach((b, i) => b.saoYield = s[i]); }
 
   // FedInvest nominals: STRIPS aren't currently present in YieldsFromFedInvestPrices.csv
   // (verified empty at time of writing), but the same all/fit split is applied for symmetry
@@ -276,13 +276,13 @@ async function main() {
   const fits = {
     FedInvest: {
       nominal: spotCurveFit(fedNominalBonds, { priceOf: b => b.price, yieldOf: b => b.yield, minT: 0.25 }),
-      tips: spotCurveFit(fedTipsBonds, { priceOf: b => b.price, yieldOf: b => b.askYield }),
-      tips_sa: spotCurveFit(fedTipsBonds, { priceOf: b => b.price * b.saRatio, yieldOf: b => b.saYield }),
+      tips: spotCurveFit(fedTipsSecurities, { priceOf: b => b.price, yieldOf: b => b.askYield }),
+      tips_sa: spotCurveFit(fedTipsSecurities, { priceOf: b => b.price * b.saRatio, yieldOf: b => b.saYield }),
     },
     Market: {
       nominal: spotCurveFit(mktNominalBonds, { priceOf: b => b.price, yieldOf: b => b.yield, minT: 0.25 }),
-      tips: spotCurveFit(mktTipsBonds, { priceOf: b => b.price, yieldOf: b => b.askYield }),
-      tips_sa: spotCurveFit(mktTipsBonds, { priceOf: b => b.price * b.saRatio, yieldOf: b => b.saYield }),
+      tips: spotCurveFit(mktTipsSecurities, { priceOf: b => b.price, yieldOf: b => b.askYield }),
+      tips_sa: spotCurveFit(mktTipsSecurities, { priceOf: b => b.price * b.saRatio, yieldOf: b => b.saYield }),
     },
   };
   console.log(`Fitted spot curves — FedInvest: nominal=${!!fits.FedInvest.nominal} tips=${!!fits.FedInvest.tips} tips_sa=${!!fits.FedInvest.tips_sa}; `
@@ -302,12 +302,12 @@ async function main() {
     type: classifyByCusipRoot(b.cusip) || '', source: 'Market',
     ask_yield: b.yield, sa_yield: '', sao_yield: '', spot_yield: '', spot_sa_yield: '',
   });
-  for (const b of fedTipsBonds) evalRows.push({
+  for (const b of fedTipsSecurities) evalRows.push({
     term_years: termYears(b.maturity, fedSettleStr), maturity_date: b.maturity, cusip: b.cusip,
     type: 'TIPS', source: 'FedInvest',
     ask_yield: b.askYield, sa_yield: b.saYield, sao_yield: b.saoYield, spot_yield: '', spot_sa_yield: '',
   });
-  for (const b of mktTipsBonds) evalRows.push({
+  for (const b of mktTipsSecurities) evalRows.push({
     term_years: termYears(b.maturity, brokerSettleStr), maturity_date: b.maturity, cusip: b.cusip,
     type: 'TIPS', source: 'Market',
     ask_yield: b.askYield, sa_yield: b.saYield, sao_yield: b.saoYield, spot_yield: '', spot_sa_yield: '',
@@ -326,7 +326,7 @@ async function main() {
   // rather than verifying redundancy). Matched against STRIPS-excluded nominals, same as
   // before — a STRIP is not a sensible "nearest nominal" reference for a coupon TIPS. ───
   const beiRows = [];
-  for (const b of mktTipsBonds) {
+  for (const b of mktTipsSecurities) {
     const nom = findClosestNominal(mktNominalBonds, b.maturityDate);
     if (!nom) continue;
     beiRows.push({
@@ -343,7 +343,7 @@ async function main() {
   // STRIPS excluded, same as the BEI match above and unchanged from before — not in scope
   // for this task's STRIPS addition (see task report). ──────────────────────────────
   const spreadRows = [];
-  for (const b of mktTipsBonds) {
+  for (const b of mktTipsSecurities) {
     spreadRows.push({
       security_type: 'TIPS', cusip: b.cusip, maturity: b.maturity, coupon: b.coupon,
       ask_yield: b.askYield, bid_yield: b.bidYield, yield_spread_bps: b.yieldSpreadBps,
