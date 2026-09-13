@@ -1174,32 +1174,12 @@ async function fetchLive(symbol, range) {
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const json = await response.json();
     const priceBars = json?.data?.chartData?.priceBars || [];
-    // A `%`-suffixed close (every real bar's close is a bare numeric string) marks a
-    // synthetic trailing live-quote tick, not a real per-minute bar — see 1.0_Operation.md
-    // "TIPS latest"/"Treasuries latest" for the weekday form (mislabeled stale timestamp)
-    // and the weekend form (timestamp rolled forward to the current wall-clock day/time
-    // despite no trading having occurred). Its own timestamp is unreliable either way, so
-    // it's tagged here rather than silently trusted as a real dated bar downstream.
-    //
-    // The `%` marker is NOT permanent, though (confirmed 2026-09-13): once a newer tick
-    // supersedes it, CNBC reformats the previous tick's close to a bare numeric string
-    // identical to a real bar — so a weekend tick can "mature" into looking like a normal
-    // per-minute bar within a day. The gap-isolation check below catches that case: a bar
-    // separated from BOTH its neighbors by much more than the documented ~2.5h end-of-session
-    // break (17:05→19:30 ET) isn't part of any continuous session on either side and gets
-    // the same `synthetic` treatment, regardless of its close string's formatting.
-    const parsed = priceBars.map(bar => { let v = bar.close; const synthetic = typeof v === "string" && v.endsWith("%"); if (synthetic) v = v.slice(0, -1); return { x: parseSourceTime(bar.tradeTime), y: parseFloat(v), synthetic }; });
+    const parsed = priceBars.map(bar => { let v = bar.close; if (typeof v === "string" && v.endsWith("%")) v = v.slice(0, -1); return { x: parseSourceTime(bar.tradeTime), y: parseFloat(v) }; });
     // isNaN(p.x) coerces the Date via valueOf — catches an Invalid Date (e.g. a broken
     // Intl/timezone environment feeding parseSourceTime a value it can't converge on),
     // which a bare `p.x` truthiness check misses since a Date object is always truthy
     // even when its internal time value is NaN.
     const valid = parsed.filter(p => p.x && !isNaN(p.x) && !isNaN(p.y));
-    const ISOLATION_GAP_MS = 4 * 3600 * 1000;
-    valid.forEach((p, i) => {
-      const prevGap = i > 0 ? p.x - valid[i - 1].x : Infinity;
-      const nextGap = i < valid.length - 1 ? valid[i + 1].x - p.x : Infinity;
-      if (prevGap > ISOLATION_GAP_MS && nextGap > ISOLATION_GAP_MS) p.synthetic = true;
-    });
     if (valid.length < parsed.length) console.warn(`${symbol} ${range}: dropped ${parsed.length - valid.length} bar(s) with an invalid date — check Intl/timezone support in this browser environment`);
     return valid;
   } catch (err) {
@@ -1433,13 +1413,15 @@ function updateCharts() {
     // that reference is unreachable (chart feed frozen/stale) does it fall back to the quote
     // service's own previous_day_closing, so day change doesn't go blank during an outage.
     //
-    // The walk excludes `synthetic` points (see fetchLive) — a trailing live-quote tick can
-    // carry a timestamp dated the current wall-clock day even on a weekend with no trading,
-    // which would otherwise make the walk treat the actual last trading day as "the previous
-    // day" and anchor closeP to a bar within that same day's own session instead of walking
-    // back to the real previous trading day.
+    // The walk excludes weekend-dated points, same as the chart data itself already does
+    // (isWeekendEt, see fetchOne's 2D/10D filtering) — there's never a real trading close on
+    // a Saturday or Sunday, so any bar dated one is necessarily a CNBC feed artifact (a
+    // trailing live-quote tick can carry a timestamp rolled forward to the current wall-clock
+    // day/time despite no trading having occurred). Left in, it would make the walk treat the
+    // actual last trading day as "the previous day" and anchor closeP to a bar within that
+    // same day's own session instead of walking back to the real previous trading day.
     let closeP = null;
-    const realData = calculationData ? calculationData.filter(p => !p.synthetic) : null;
+    const realData = calculationData ? calculationData.filter(p => !isWeekendEt(p.x)) : null;
     const lastReal = (realData && realData.length > 0) ? realData[realData.length - 1] : null;
     if (lastReal) {
       const latestDayET = getEtDateStr(lastReal.x);
