@@ -1,5 +1,7 @@
 # UI Redesign Status Report - April 11, 2026
 
+*Status: Archived — the state of the redesign on 2026-04-11. The open items it lists were settled afterwards, and the names it proposes are not all in the code.*
+
 ## Progress Summary
 - **DARA Restoration:** Successfully returned the DARA input to the visible grid (Row 2).
 - **Row Architecture:** Standardized a 4-row structure for Rebalance and a consolidated 3-row structure for Build.

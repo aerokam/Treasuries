@@ -40,7 +40,7 @@ These came out of review and apply to every spec from here.
 ## 3.0 Open, awaiting the developer
 
 1. **Eight flow label fragments have no Data Dictionary entry**, reported by every run of the diagram build: bond trading days, picked security, quote file date, scales, source dates, spreads, tab and date selections, tab and mode. Some want a term defined, some want the label changed to one that exists.
-2. **Whether to wire `scripts/check-spec-code.cjs` into the pre-commit hook**, now that its 94 findings are triaged and the run is clean (§3.8). A gate blocks only a reference introduced after this point.
+2. **Whether to wire `scripts/check-spec-code.cjs` into the pre-commit hook**, now that its 94 findings are triaged and the run is clean (§3.10). A gate blocks only a reference introduced after this point.
 3. **`3.2_Seasonal_Adjustments.md` may be repurposed** as the Yield Curves spec, with seasonal adjustment demoted to a section. Proposed by a session that has since ended and never confirmed. The proposal predates the naming scheme in §2.0 and conflicts with it: a numbered spec takes the number of the process it specifies, and process numbers are frozen, so the file cannot become `1.0_Yield_Curves.md` while it specifies process 3.2. Repurposing it would mean giving Yield Curves a spec of its own at process 3 and leaving 3.2 as the seasonal adjustment spec.
 
 ---
@@ -124,6 +124,24 @@ Closed in `d0619ef`. The TIPS security set moved to `shared/src/tips-securities.
 
 ---
 
+## 3.10 The stale spec-to-code references are triaged
+
+The 94 findings `scripts/check-spec-code.cjs` reported are down to zero, across `bb7203d`, `baedc3d`, `c044f56`, `86e123e` and the commit carrying this section. Each was read against the source before the spec was changed, and they fell into four kinds.
+
+**Stale naming, 54 findings.** The code was renamed and the spec was not. The largest groups: the solved weight of the active lower bracket is `activeWeight`, where the specs carried a retired name with a redundant Lower in it, in both `2.0_TIPS_Ladders.md` and `3.0_TIPS_Ladder_Rebalancing.md`; the funded-year and excess quantities on a rebalance row are `fundedYearQtyBefore`, `fundedYearQtyAfter` and `fundedYearQtyDelta`, the `fy` abbreviation the root `CLAUDE.md` retired; a job entry in `Dashboard/jobs.json` carries `windowsTaskNames`, a list, not a single name. The two raw estimates in `3.0` have no field of their own and are now written subscripted, the form this document already uses for a quantity that exists only in a formula.
+
+**Absent by design, 32 findings across four specs.** Resolved by the status-line convention in §4.0.
+
+**External names, 3 findings.** `EADDRINUSE` is a Node.js error code and `launchPersistentContext` a Playwright API, so no repository file can hold either. The checker lists them one at a time, with their owner, rather than opening a category.
+
+**Prose the checker misread, 5 findings.** `knowledge/DFD_Worklist.md` named the stale identifiers as examples of the problem and illustrated the file-and-symbol form with a placeholder path; both now name live code instead.
+
+**One correction to what §3.0 asked.** `3.2_Multi_Account_Rebalancing.md` does not describe work that was never built. Its own header records that the layer was implemented and then removed on 2026-06-25, which is why the account allocation module it names is absent. No spec among the 94 findings was ahead of its code.
+
+**No spec was found naming something the code should have and does not.**
+
+---
+
 ## 4.0 Structural decisions already taken
 
 - **Data stores are not on the context diagram.** They sit inside process 0, so they are drawn where they are first shared.
@@ -135,6 +153,7 @@ Closed in `d0619ef`. The TIPS security set moved to `shared/src/tips-securities.
 - **Credibility Factor is the name for `w(h)`.** `w(h) = A² / (A² + σ_drift(h)²)` is the credibility factor of actuarial credibility theory, Bühlmann’s `Z` at one observation: the posterior mean weight for a prior centred on 1.0 with variance `A²` against an observation whose error variance is `σ_drift(h)²`. An earlier session named it Horizon Confidence Weight; the developer replaced that with the established term once the correspondence was shown to be exact rather than an analogy.
 - **"Fade" is out of the vocabulary, everywhere.** A weight that gets smaller does not fade. The horizon work was swept in `8ca7f69` and the SAO snap weight in `2b2aa86`, where the two exported constants became `SAO_BLEND_START_YRS` and `SAO_BLEND_END_YRS`. `scripts/check-vocabulary.js` carries the rule, exempting only a chart line drawn at reduced opacity, which literally fades.
 - **The long-end seasonal adjustment stands at about 3 bp**, and [Seasonal Factor Drift §8](../YieldCurves/knowledge/Seasonal_Factor_Drift.md) records why: about 63% of the seasonal variance is a permanent month effect, February is negative in every era, and the factor still autocorrelates about 0.50 at 30 years. Every alternative that follows a measurement lands within 0.15 bp of the method in use, so the formula did not change.
+- **A spec that describes absent code says so on a status line**, written for the reader as the first line under the title: `*Status: Archived — <why the code is gone, and where the live spec is>.*`, or `Unbuilt` for a spec written ahead of its code. `scripts/check-spec-code.cjs` reads that line, lists the spec at the end of its report and does not resolve its names, because naming what is absent is what those documents are for. Four specs carry it today, all Archived. It is the distinction that made the checker clean enough to gate on: without it a spec that is deliberately ahead of or behind the code is indistinguishable from one that has rotted.
 - **Level 1 is one process per app plus one acquisition process**, which explodes into the fifteen jobs. Portal menu groupings were considered and rejected: nearly every shared store is read across group boundaries, so grouping would have added a level without simplifying anything.
 
 ---

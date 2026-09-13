@@ -1,5 +1,5 @@
 # AMD Formula Analysis — Working Notes
-*Status: Historical analysis log (Rev 1–4). Superseded by **Revision 5 — Option C**, refined by **Revision 6** (cover Amount accounting + roll coupon) and **Revision 7** (2056 lower cover AMD flipped on), all shipped to `main`. Read Rev 7 then 6 then Rev 5 (bottom) first; Rev 1–4 are kept for the derivation history. Canonical spec is 2.0 §Future 30Y Cover AMD.*
+*Status: Archived — working notes, whose Rev 1–4 are superseded by **Revision 5 — Option C**, refined by **Revision 6** (cover Amount accounting + roll coupon) and **Revision 7** (2056 lower cover AMD flipped on), all shipped to `main`. Read Rev 7 then 6 then Rev 5 (bottom) first; Rev 1–4 are kept for the derivation history. Canonical spec is 2.0 §Future 30Y Cover AMD.*
 
 ---
 

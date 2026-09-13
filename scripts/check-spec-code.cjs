@@ -18,6 +18,9 @@
 //
 // Everything else in backticks is left alone: column headers, R2 keys, CSV
 // field names and formula symbols are data, not code references.
+//
+// A spec whose status line reads Archived or Unbuilt is listed at the end of the
+// report rather than resolved — see STATUS_RE below for the form and the reason.
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
@@ -59,10 +62,39 @@ const PATH_RE = /^[A-Za-z0-9_.\-]+(?:\/[A-Za-z0-9_.\-]+)+\.(?:js|mjs|cjs|ps1|cmd
 const FN_RE = /^[a-z_$][A-Za-z0-9_$]*$/;              // camelCase or _leading
 const CONST_RE = /^[A-Z][A-Z0-9_]{3,}$/;              // SCREAMING_SNAKE
 
+// Names owned by something outside the repository, which no repository file can be
+// expected to contain. Each is listed one at a time, with its owner, so that adding
+// one is a decision about that name rather than a category left open.
+const EXTERNAL = new Map([
+  ['EADDRINUSE', 'Node.js error code'],
+  ['launchPersistentContext', 'Playwright API'],
+]);
+
+// A spec whose status line reads Archived or Unbuilt describes code that is not in
+// the repository: Archived because it was built and then removed or superseded,
+// Unbuilt because it has not been written yet. Naming what is absent is what those
+// documents are for, so their code references are not resolved. The line is the
+// first thing under the H1 and is written for the reader, in the form
+//   *Status: Archived — the code was removed in <commit>; <where the live spec is>.*
+// The state word is what this reads; the clause after it is prose.
+const STATUS_RE = /^[\s*_]*Status:\s*\**\s*(Archived|Unbuilt)\b/i;
+function declaredStatus(text) {
+  const head = text.split(/\r?\n/).filter(l => l.trim()).slice(0, 3);
+  for (const line of head) {
+    const m = line.match(STATUS_RE);
+    if (m) return m[1].toLowerCase();
+  }
+  return null;
+}
+
 const findings = [];
+const exempt = [];
 for (const spec of specs) {
   const rel = path.relative(ROOT, spec).replace(/\\/g, '/');
-  const lines = fs.readFileSync(spec, 'utf8').split(/\r?\n/);
+  const raw = fs.readFileSync(spec, 'utf8');
+  const status = declaredStatus(raw);
+  if (status) { exempt.push({ rel, status }); continue; }
+  const lines = raw.split(/\r?\n/);
   let fenced = false;
   lines.forEach((line, i) => {
     if (/^\s*```/.test(line)) { fenced = !fenced; return; }
@@ -95,6 +127,7 @@ for (const spec of specs) {
         continue;
       }
       if (/_[a-z0-9]$/i.test(tok)) continue;   // piPerBond_i is a subscript, not a name
+      if (EXTERNAL.has(tok)) continue;
       const looksLikeCode = (FN_RE.test(tok) && /[a-z][A-Z]/.test(tok)) || CONST_RE.test(tok);
       if (looksLikeCode && !identifiers.has(tok)) {
         findings.push({ rel, line: i + 1, tok, why: 'name not found in any source file' });
@@ -122,10 +155,11 @@ for (const [file, text] of sourceText) {
 }
 
 if (!QUIET) {
+  const scanned = specs.length - exempt.length;
   if (findings.length === 0) {
-    console.log(`spec/code check: ${specs.length} specs scanned, nothing stale.`);
+    console.log(`spec/code check: ${scanned} specs scanned, nothing stale.`);
   } else {
-    console.log(`spec/code check: ${findings.length} stale reference(s) across ${specs.length} specs\n`);
+    console.log(`spec/code check: ${findings.length} stale reference(s) across ${scanned} specs\n`);
     const byFile = new Map();
     for (const f of findings) {
       if (!byFile.has(f.rel)) byFile.set(f.rel, []);
@@ -135,6 +169,12 @@ if (!QUIET) {
       console.log(rel);
       for (const g of group) console.log(`  ${String(g.line).padStart(5)}  ${g.tok}  — ${g.why}`);
       console.log('');
+    }
+  }
+  if (exempt.length) {
+    console.log(`Not resolved, by their own status line — ${exempt.length} spec(s):`);
+    for (const e of [...exempt].sort((a, b) => a.rel.localeCompare(b.rel))) {
+      console.log(`  ${e.status.padEnd(9)} ${e.rel}`);
     }
   }
 }

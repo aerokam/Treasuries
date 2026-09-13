@@ -1,5 +1,7 @@
 # UI Redesign Log - April 2026
 
+*Status: Archived — a record of the April 2026 redesign session. The layout it works toward shipped, and the names it proposes are not all in the code.*
+
 ## Objective
 Modernize the TipsLadderManager top card into a compact, 4-row layout where card width matches the data table width.
 
