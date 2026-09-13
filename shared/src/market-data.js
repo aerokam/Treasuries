@@ -32,17 +32,10 @@ export function nextBondTradingDay(isoDateStr, holidaySet) {
   return toIsoDate(nextBusinessDay(localDate(isoDateStr), holidaySet));
 }
 
-export function parseCsv(text) {
-  const lines = text.trim().split('\n').filter(l => l.trim());
-  if (lines.length < 2) return [];
-  const headers = lines[0].split(',').map(s => s.trim());
-  return lines.slice(1).map(line => {
-    const vals = line.split(',').map(s => s.trim());
-    const obj = {};
-    headers.forEach((h, i) => { obj[h] = vals[i] ?? ''; });
-    return obj;
-  });
-}
+// The CSV parse is defined once, in shared/src/csv.js (no-redundancy directive,
+// projects/CLAUDE.md §2a). Re-exported here so existing `from './market-data.js'` imports
+// resolve, the same way lookupRefCpi is.
+export { parseCsvRows as parseCsv };
 
 // Fetches RefCPI.csv, TipsRef.csv, YieldsSaSao.csv, and BondHolidaysSifma.csv from R2 --
 // shared by both fetchTipsData() (FedInvest) and fetchFidelityTipsData() (Fidelity) so the
@@ -67,12 +60,12 @@ async function fetchAuxTipsData() {
     if (holidayRes.ok) bondHolidays = parseHolidaySet(parseCsvRows(await holidayRes.text(), false));
   } catch (_) { /* unavailable -- T+1 falls back to weekend-skip only */ }
 
-  const refCpiRows = parseCsv(await refCpiRes.text()).map(r => ({
+  const refCpiRows = parseCsvRows(await refCpiRes.text()).map(r => ({
     date:   r.date,
     refCpi: parseFloat(r.refCpi),
   }));
 
-  const tipsRefRows = parseCsv(await tipsRefRes.text()).map(r => ({
+  const tipsRefRows = parseCsvRows(await tipsRefRes.text()).map(r => ({
     cusip:     r.cusip,
     maturity:  r.maturity,
     datedDate: r.datedDate,
@@ -86,7 +79,7 @@ async function fetchAuxTipsData() {
   // YieldsSaSao.csv: cusip,maturity,coupon,ask_yield,sa_yield,sao_yield -- produced by
   // YieldCurves/scripts/updateSaSaoYields.js. Only sa_yield is consumed (2.0 §Within-Year
   // Allocation Policy); ask_yield/sao_yield are parsed but unused here.
-  const saSaoRows = parseCsv(await saSaoRes.text()).map(r => ({
+  const saSaoRows = parseCsvRows(await saSaoRes.text()).map(r => ({
     cusip:    r.cusip,
     saYield:  parseFloat(r.sa_yield),
   }));
@@ -110,7 +103,7 @@ export async function fetchTipsData() {
   const yieldsText = await yieldsRes.text();
   const yieldsLines = yieldsText.trim().split('\n');
   const settlementDate = yieldsLines[0].trim();
-  const yieldsRows = parseCsv(yieldsLines.slice(1).join('\n'))
+  const yieldsRows = parseCsvRows(yieldsLines.slice(1).join('\n'))
     .filter(r => r.type === 'TIPS')
     .map(r => ({
       settlementDate,
