@@ -71,6 +71,13 @@ SA/SAO TIPS yields into their own spreadsheets. The upload in
 `YieldCurves/scripts/updateSaSaoYields.js` has been restored and the file is written
 to `TIPS/YieldsSaSao.csv` on every Fidelity broker-quote run. Do not remove it.
 
+**Superseded 2026-09-13:** the claim that no app reads it was true when written and is not
+true now. Three consumers read `TIPS/YieldsSaSao.csv`: TipsLadderManager takes `sa_yield`
+through `shared/src/market-data.js` for its within-year allocation policy, FundHoldings
+enriches TIPS fund holdings from it, and SeasonalAdjustments reads a committed snapshot of
+it rather than the object itself. It is both a public resource and an input to the suite.
+See [S10](./DataStores.md#s10).
+
 Separately, that run was logging `Exited with code 1` even on success: the script wrote
 its progress via `console.error`, and `run-fidelity.cmd`'s `2>&1` pipe makes PowerShell 5.1
 wrap any native stderr as a `NativeCommandError` and flip the exit code. Progress logging

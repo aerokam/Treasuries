@@ -226,7 +226,7 @@ This document provides the technical schemas and field-level specifications for 
 | `sa_yield` | Number | [SA Yield](./DATA_DICTIONARY.md#sa-yield). |
 | `sao_yield` | Number | [SAO Yield](./DATA_DICTIONARY.md#sao-yield). |
 
-**Consumer**: FundHoldings ([E7](./DATA_DICTIONARY.md#e7)/[E8](./DATA_DICTIONARY.md#e8) holdings enrichment) — cross-references by CUSIP to attach ask/SA/SAO yield to TIPS fund holdings.
+**Consumers**: TipsLadderManager — reads `sa_yield` via `shared/src/market-data.js` for the within-year allocation policy (`TipsLadderManager/knowledge/2.0_TIPS_Ladders.md`). FundHoldings ([E7](./DATA_DICTIONARY.md#e7)/[E8](./DATA_DICTIONARY.md#e8) holdings enrichment) — cross-references by CUSIP to attach ask/SA/SAO yield to TIPS fund holdings. SeasonalAdjustments — reads a snapshot committed to that app (`SeasonalAdjustments/data/YieldsSaSao.snapshot.csv`), not this object, so a re-publish does not reach it until the snapshot is retaken.
 
 **Live Data**: [View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/TIPS/YieldsSaSao.csv)
 
