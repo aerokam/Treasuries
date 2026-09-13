@@ -30,7 +30,7 @@ These came out of review and apply to every spec from here.
 - **Lead with what the process does.** Not with what a file is or is not. Name a store by its identifier, S1, never "the file".
 - **No metaphors and no anthropomorphism.** A process has an input and an output; it does not know, need, want or label. "Keyed on month/day" was rejected as a metaphor.
 - **Link rather than restate.** If another spec owns a rule, point at it.
-- **Every term in a spec, a diagram label or a domain identifier is defined in the Data Dictionary.** Loop counters and buffers are exempt; a name carrying a domain quantity is not. `inflationFactor` was renamed `indexRatio` for this reason.
+- **Every term in a spec, a diagram label or a domain identifier is defined in the Data Dictionary.** Loop counters and buffers are exempt; a name carrying a domain quantity is not. The identifier for [Index Ratio](./DATA_DICTIONARY.md#index-ratio) was renamed `indexRatio` for this reason.
 - **A synonym belongs on the term**, not in the store entry that happens to use it.
 - **Every lowest-level process links to a spec, and the spec should name the code it drives** — with a check that the naming still resolves, or it rots silently.
 - **Flow labels are compositions of defined terms**, each linking to its Data Dictionary entry. `scripts/build-dfd.cjs` reports fragments with no entry rather than linking them.
@@ -40,10 +40,8 @@ These came out of review and apply to every spec from here.
 ## 3.0 Open, awaiting the developer
 
 1. **Eight flow label fragments have no Data Dictionary entry**, reported by every run of the diagram build: bond trading days, picked security, quote file date, scales, source dates, spreads, tab and date selections, tab and mode. Some want a term defined, some want the label changed to one that exists.
-2. **93 stale spec-to-code references** across 62 specs, from `node scripts/check-spec-code.cjs`. Not wired into the pre-commit hook, because that many findings would block every commit before triage. Concentrations: `3.2_Multi_Account_Rebalancing.md` 27, `3.0_TIPS_Ladder_Rebalancing.md` 17, `AMD_FORMULA_ANALYSIS.md` 14, `2.0_TIPS_Ladders.md` 8. Verified genuine: specs say `activeLowerWeight` where the code has `activeFloorWeight`, `MAX_LAST_YEAR` where it has `maxLastYear`, `fyQtyBefore` where it has `fundedYearQtyBefore` — the last being the `fy` abbreviation the root `CLAUDE.md` retired.
-3. **A spec for unbuilt work needs to say so.** `3.2_Multi_Account_Rebalancing.md` describes a feature that does not exist: `src/account-allocation.js` is absent and 27 of its names resolve to nothing. Under specs-drive-code that is legitimate, but nothing distinguishes it from a spec that has rotted, and the checker will flag it forever.
-4. **Whether to gate on the checker** once those are triaged.
-5. **`3.2_Seasonal_Adjustments.md` may be repurposed** as the Yield Curves spec, with seasonal adjustment demoted to a section. Proposed by a session that has since ended and never confirmed. The proposal predates the naming scheme in §2.0 and conflicts with it: a numbered spec takes the number of the process it specifies, and process numbers are frozen, so the file cannot become `1.0_Yield_Curves.md` while it specifies process 3.2. Repurposing it would mean giving Yield Curves a spec of its own at process 3 and leaving 3.2 as the seasonal adjustment spec.
+2. **Whether to wire `scripts/check-spec-code.cjs` into the pre-commit hook**, now that its 94 findings are triaged and the run is clean (§3.8). A gate blocks only a reference introduced after this point.
+3. **`3.2_Seasonal_Adjustments.md` may be repurposed** as the Yield Curves spec, with seasonal adjustment demoted to a section. Proposed by a session that has since ended and never confirmed. The proposal predates the naming scheme in §2.0 and conflicts with it: a numbered spec takes the number of the process it specifies, and process numbers are frozen, so the file cannot become `1.0_Yield_Curves.md` while it specifies process 3.2. Repurposing it would mean giving Yield Curves a spec of its own at process 3 and leaving 3.2 as the seasonal adjustment spec.
 
 ---
 
@@ -64,7 +62,7 @@ Every process has a spec, every process spec names the functions that implement 
 
 Spec headers carry typed relations in reciprocal pairs: Specifies and Implemented by, Constrains and Constrained by, Source for and Derived from, Evidence for and Evidence, Explains and Explained in. A reference spec is reachable through them and is never the end of a drill.
 
-**A fourth checker exists**: `scripts/check-links.cjs` fails when a relative markdown link does not resolve. `check-spec-code.cjs` now also resolves `path/to/file.js#symbol` against both halves, and reads `// spec: <file>#<anchor>` tags in source back to the anchor they claim.
+**A fourth checker exists**: `scripts/check-links.cjs` fails when a relative markdown link does not resolve. `check-spec-code.cjs` now also resolves a reference written as file and symbol together, such as `YieldCurves/src/app.js#parseFedInvestPrices`, against both halves, and reads `// spec: <file>#<anchor>` tags in source back to the anchor they claim.
 
 ---
 
@@ -104,9 +102,25 @@ Three duplicates of shared logic had been found one at a time, each noticed only
 
 **Republished 2026-09-13** from the corrected code: [S13](./DataStores.md#s13), [S14](./DataStores.md#s14), [S15](./DataStores.md#s15) and [S10](./DataStores.md#s10). Against the 2026-09-11 quote file the ask yield on 650 market nominal securities moved a median 0.06 bp, p90 0.30, max 20.47; the bid-ask yield spread on 403 Treasuries up to 53.72 bp; breakeven inflation on 53 TIPS up to 1.25 bp. Every TIPS figure, every FedInvest row and the nearest-nominal match were unchanged to seven decimal places, and the fitted grid moved at most 0.01 bp.
 
-**Approved by the developer and under way:** the market TIPS settlement date defect recorded in 3.1 (the page derives it from the FedInvest date, the acquisition job from the quote file’s own; the acquisition job follows the spec), which unblocks the last duplicate copy of the TIPS security build; one convention for years-to-maturity in place of the three in use, the worst of which measures from the wall clock at run time rather than from the settlement date the prices are stated at; and one home for the nearest-nominal match that decides which nominal each published breakeven is stated against.
+The three items the developer approved out of this sweep are closed in §3.9.
 
 **Still open:** `shared/src/fidelity-parse.js` now owns both row parsers for [S7](./DataStores.md#s7) and both yield calculations on the nominal side, and has no spec. It is the first shared module to need one, and the form it takes sets the pattern for the other nine.
+
+---
+
+## 3.9 The last duplicates, and one term
+
+Closed in `d0619ef`. The TIPS security set moved to `shared/src/tips-securities.js#buildTipsSecurities` and the nearest-maturity nominal to `shared/src/breakeven.js#findClosestNominal`, each imported by the page and by `updateSpotYieldCurves.js` in place of a separate copy.
+
+**The market TIPS settlement date.** The two copies of the security set differed on one thing, the [Known Defect](../YieldCurves/knowledge/3.1_Load_And_Parse.md) 3.1 had recorded: the page derived the settlement date of a market-quote TIPS from [S1](./DataStores.md#s1)'s date, against the quote file's own date in [3.1.6](../YieldCurves/knowledge/3.1_Load_And_Parse.md#determine-settlement-dates), which the acquisition job already followed. The page follows it now and the note is gone. Both files carried 2026-09-11, so nothing moves in today's figures; the measurement was made by holding the quoted prices and moving the settlement date. One business day of divergence moves the SA yield of all 53 quoted TIPS by a median 0.08 bp, p90 0.52, p99 and max 4.37, the largest at the shortest maturity; three business days, a median 0.25 bp and a max of 14.06. Breakeven inflation is a nominal yield less that TIPS yield, so it moves one for one.
+
+**One term.** Three conventions had been in use: 365.25 always in the acquisition job, actual/actual below one year in `shared/src/bond-math.js#termYears`, and the clock at run time in `shared/src/spot-curve.js#spotCurveFit`. `termYears` is now the one measure, defined at [Term](./DATA_DICTIONARY.md#term). Below a year its denominator is the actual length of the year beginning at settlement, 365 or 366, which is the measure Treasury's own bill formula uses and the one that matters where the relative error is largest; from a year the denominator is 365.25, so a multi-year term does not move with the placement of a single leap day. Cash-flow horizons inside the pricing formula are counted in coupon periods, a different quantity from a term label, and are unchanged.
+
+**The run-time clock was the defect.** `spotCurveFit` measured each bond's term from the hour the fit ran rather than from the settlement date the prices are stated at, so the published grid's term labels shifted by about a day between runs over identical data. Against the 2026-09-11 files, the fitted curve read at the same term moves at most 0.021 bp and the SAO yield at most 0.025 bp; the grid's own terms move up to 2.58 days on the FedInvest curves and 0.46 days on the Market curves. In [S13](./DataStores.md#s13), 106 security rows change in the `Term (y)` column alone and 51 in the `SAO` column.
+
+**Four stores no longer match the code that writes them.** [S13](./DataStores.md#s13), [S14](./DataStores.md#s14) and [S15](./DataStores.md#s15) were republished from the previous code minutes before this, and `updateSaSaoYields.js` reads the same `calculateSAO`, so [S10](./DataStores.md#s10) is affected too: its `SAO` column moves on 24 of 53 rows, by at most 0.0249 bp. Republishing is the developer's call.
+
+**Found, not fixed:** where a TIPS is quoted with an ask price and no bid price, the yield spread is written as the negative of the ask yield rather than left empty, because `yieldFromPrice` returns null there and null passes the numeric test guarding the subtraction. Both copies carried it, so it is not a divergence, and no TIPS in the 2026-09-11 quote file is missing a bid price. Reported rather than changed, because fixing it moves a published column.
 
 ---
 
