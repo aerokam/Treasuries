@@ -38,7 +38,7 @@ both paths via `shared/src/bond-math.js::calculateMDuration`.
    Alternatively, extract a shared `gapParamsCore(gapYears, prelim, ...)` function
    that both orchestrators call.
 3. **Restore strict test assertion**: Once aligned, revert the tolerance in
-   `tests/run.js` back to `totalAbsQtyDelta === 0` and `costDeltaSum === 0`.
+   `TipsLadderManager/tests/run.js` back to `totalAbsQtyDelta === 0` and `costDeltaSum === 0`.
 
 ## Files Involved
 - `TipsLadderManager/src/build-lib.js` — `calcGapParams`
