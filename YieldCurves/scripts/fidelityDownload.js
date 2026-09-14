@@ -5,6 +5,8 @@ import os from 'os';
 import fs from 'fs/promises';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
+import { parseHolidaySet } from '../../shared/src/settlement.js';
+import { parseCsv } from '../../shared/src/csv.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, '../../.env') });
@@ -21,16 +23,7 @@ try {
   const holidayRes = await fetch('https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/misc/BondHolidaysSifma.csv');
   if (holidayRes.ok) {
     const holidayText = await holidayRes.text();
-    const holidays = new Set(
-      holidayText.trim().split('\n')
-        .map(line => {
-          const m = line.match(/"[^,]+,\s+(\w+ \d+, \d{4})"/);
-          if (!m) return null;
-          const d = new Date(m[1]);
-          return isNaN(d) ? null : d.toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
-        })
-        .filter(Boolean)
-    );
+    const holidays = parseHolidaySet(parseCsv(holidayText, false));
     if (holidays.has(todayET)) {
       console.log(`Skipping run: Bond market holiday (${todayET}).`);
       process.exit(0);
