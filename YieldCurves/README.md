@@ -15,7 +15,12 @@ To get started, visit the [Treasury Investors Portal](https://aerokam.github.io/
 For local development, execute `npx serve .` from the root directory of the `Treasuries` repository and navigate to `http://localhost:8080/YieldCurves/`. (Note: Root serving is required for shared components).
 
 ## Knowledge Base
-- **[1.0 Seasonal Adjustments](./knowledge/3.2_Seasonal_Adjustments.md)**: The core multiplicative transform logic.
-- **[2.0 SAO Adjustment](./knowledge/3.3_SAO_Adjustment.md)**: Smoothing of non-seasonal deviations, and the curve fit behind it.
-- **[2.1 SA Intuition](./knowledge/SA_Intuition.md)**: Conceptual intuition behind the SA ratio.
-- **[3.0 Visual Standards](./knowledge/Visual_Standards.md)**: Charting and UI conventions.
+- [3.1 Parse sources and calculate yields](./knowledge/3.1_Parse_Sources_And_Calculate_Yields.md)
+- [3.2 Adjust for seasonality](./knowledge/3.2_Adjust_For_Seasonality.md)
+- [3.3 Adjust for other effects](./knowledge/3.3_Adjust_For_Other_Effects.md)
+- [3.4 Fit spot yield curves](./knowledge/3.4_Fit_Spot_Yield_Curves.md)
+- [3.5 Calculate breakeven inflation](./knowledge/3.5_Calculate_Breakeven_Inflation.md)
+- [3.6 Calculate bid and ask spreads](./knowledge/3.6_Calculate_Bid_And_Ask_Spreads.md)
+- [3.7 Render charts and tables](./knowledge/3.7_Render_Charts_And_Tables.md)
+- [Visual Standards](./knowledge/Visual_Standards.md): the rules every chart and table obeys.
+- [SA Intuition](./knowledge/SA_Intuition.md): why a seasonal adjustment applies to TIPS.
