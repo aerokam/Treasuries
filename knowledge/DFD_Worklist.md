@@ -155,6 +155,42 @@ The developer set the rule in §2.0: a process name states the transformation, a
 
 ---
 
+## 3.12 The index ratio the market quotes state
+
+Measured, not yet built. The inflation factor in [S7](./DataStores.md#s7) is the [Index Ratio](./DATA_DICTIONARY.md#index-ratio) at the [Settlement Date](./DATA_DICTIONARY.md#settlement-date) one bond trading day after the [Download Date](./DATA_DICTIONARY.md#download-date), calculated from the retrieved [Ref CPI](./DATA_DICTIONARY.md#ref-cpi) and rounded once to nine decimal places. That calculation reproduces the quoted figure on all 53 TIPS in the 2026-09-14 quote file, and on all 53 in the 2026-06-25 quote file held in `YieldCurves/tests/fixtures/`. Treasury's rule matches none.
+
+**The convention.**
+
+- **Settlement date:** the download date plus one bond trading day, the date [3.1.6](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#determine-settlement-date) already determines: 2026-09-14 settles 2026-09-15, and 2026-06-25 settles 2026-06-26. Every other date tested, the download date included, matches no TIPS in either file.
+- **Ref CPI series:** [S3](./DataStores.md#s3), the retrieved series. The NSA column of [S4](./DataStores.md#s4) states the same Ref CPI on 2026-09-14 and 2026-09-15, so these files do not separate the two series; S3 is the one to use because it is authoritative.
+- **Dated date Ref CPI:** [S2](./DataStores.md#s2). The S3 figure on each dated date equals it on all 53 TIPS. S4 begins at 2019-04-01 and holds no figure for the 21 TIPS dated earlier.
+- **Rounding:** the ratio rounded half up to nine decimal places, in one step. Both Ref CPIs are stated to five decimal places already, so rounding them first changes nothing.
+
+**Measured on the 2026-09-14 quote file**, 53 TIPS, Ref CPI from S3, dated date Ref CPI from S2. Each count is the TIPS whose calculated figure equals the quoted one to nine decimal places.
+
+| Rounding of the ratio | Settlement 2026-09-15 | Largest difference | Settlement 2026-09-14, the download date | Largest difference |
+|---|---|---|---|---|
+| Round to 9 | 53 | 0 | 0 | 7.05 × 10⁻⁶ |
+| Ref CPIs rounded to 5 first, ratio rounded to 9 | 53 | 0 | 0 | 7.05 × 10⁻⁶ |
+| Round to 10, then to 9 | 51 | 1 × 10⁻⁹ | 0 | 7.05 × 10⁻⁶ |
+| Truncate to 9, with or without the epsilon adjustment | 27 | 1 × 10⁻⁹ | 0 | 7.05 × 10⁻⁶ |
+| Round to 8 | 6 | 5 × 10⁻⁹ | 0 | 7.05 × 10⁻⁶ |
+| Treasury's rule: truncate to 6, round to 5 | 0 | 4.99 × 10⁻⁶ | 0 | 9.69 × 10⁻⁶ |
+| Round to 6, truncate to 5 | 0 | 9.48 × 10⁻⁶ | 0 | 5.92 × 10⁻⁶ |
+
+The unrounded ratio lies within 0.5 × 10⁻⁹ of the quoted figure on all 53. Substituting the S4 NSA column for S3 gives the same counts, as does taking the dated date Ref CPI from S3 in place of S2. Each calculated ratio lies at least 0.0093 × 10⁻⁹ from a nine-decimal rounding boundary, more than 20,000 times the spacing of double-precision values at that magnitude, so no count depends on floating-point representation. Six TIPS are quoted to seven or eight decimal places because the file drops trailing zeros (`1.18271786` is 1.182717860), so the comparison is numeric and not on the text.
+
+**What the implementation must do.**
+
+1. Calculate the index ratio of each market-quote TIPS at the settlement date of 3.1.6, the one its yields already use, as the S3 Ref CPI on that date over the S2 dated date Ref CPI.
+2. Round the ratio once, half up, to nine decimal places. `shared/src/ref-cpi.js#indexRatio` applies Treasury's rule, which matches no TIPS, so it cannot be called as it stands. The nine-decimal rounding belongs in that module beside Treasury's rule, not in a second copy in the app. Which callers keep Treasury's rule is the developer's call.
+3. Hold the calculated ratio equal to the quoted one, to nine decimal places, in a test on a real quote file. The quoted figure is an independent derivation, so the test is a cross-check and not a duplicate.
+4. Change [3.1](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md) in the same commit: 3.1.7 takes the index ratio the quote states.
+
+**Open.** Both files were downloaded on a day followed by a bond trading day, a Monday and a Thursday, so neither separates one bond trading day from one calendar day, and neither settlement crosses a [Bond Holiday](./DATA_DICTIONARY.md#bond-holiday). A quote file downloaded on a Friday, or on the day before a bond holiday, settles the question. S7 is replaced three times a day, so that file has to be kept when it occurs.
+
+---
+
 ## 4.0 Structural decisions already taken
 
 - **Data stores are not on the context diagram.** They sit inside process 0, so they are drawn where they are first shared.
