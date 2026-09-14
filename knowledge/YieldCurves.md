@@ -1,70 +1,30 @@
-# YieldCurves (App Overview)
+# Yield Curves (App Overview)
 
-**YieldCurves** analyzes TIPS (Treasury Inflation-Protected Securities) real yields under two adjustments: seasonal, and other. It produces a fair-value curve by removing the predictable seasonal component of CPI and then the remaining non-seasonal deviations from a smooth curve.
-
----
-
-## 1.0 App Context (Level 1 DFD)
-
-```mermaid
-graph LR
-    %% Data Stores (S)
-    S1[("S1 YieldsFromFedInvestPrices.csv")]
-    S4[(S4 RefCpiNsaSa.csv)]
-    S7[(S7 FidelityQuotes)]
-
-    %% Processes (P)
-    P1((1.0 Seasonal Adjustment))
-    P2((2.0 SAO Other Adjustment))
-    P3((3.0 Interactive Charting))
-
-    %% User (E)
-    U[User / Investor]
-
-    %% Inbound Data
-    S1 --> P1
-    S4 --> P1
-    S7 --> P1
-    
-    %% Internal Flows
-    P1 --> P2
-    P2 --> P3
-    
-    %% User Interaction
-    U <-->|Zoom / Pan / Filters| P3
-
-    %% Links to Specs
-    click P1 "#/md/YieldCurves/knowledge/3.2_Adjust_For_Seasonality.md" "View SA Logic"
-    click P2 "#/md/YieldCurves/knowledge/3.3_Adjust_For_Other_Effects.md" "View SAO Logic"
-    click P3 "#/md/YieldCurves/knowledge/Visual_Standards.md" "View UI Specs"
-    click S1 "#/md/knowledge/DataStores.md#s1" "View Schema"
-    click S4 "#/md/knowledge/DataStores.md#s4" "View Schema"
-    click S7 "#/md/knowledge/DataStores.md#s7" "View Schema"
-```
+**Yield Curves** draws the Treasury and TIPS yield curves from two sources, the market quotes and the FedInvest prices, with every yield calculated from price. For TIPS it applies two adjustments. The seasonal adjustment removes the predictable seasonal component of CPI. The other adjustment blends each seasonally adjusted yield with a smooth curve fitted to all of them. The app also calculates breakeven inflation, and the bid and ask spreads of the market quotes.
 
 ---
 
-## 2.0 Core Processes
+## Data flow diagram
 
-### [3.2 Adjust for seasonality](../YieldCurves/knowledge/3.2_Adjust_For_Seasonality.md)
-Normalizes real yields by applying seasonal factors derived from BLS CPI-U (NSA vs SA) data.
-- **Goal**: Enable "fair" comparison of yields across different months of the year.
-- **Formula**: `SA Yield = Clean Price * (S_settle / S_maturity)`
+Yield Curves is process 3 on [Level 1](/knowledge/DFD_LEVEL1). Its [Level 2 diagram](/knowledge/DFD_LEVEL2_YIELDCURVES) shows the seven processes below, the five data stores that process 3.1 reads, and the flows between the processes, each defined in [Data Dictionary §6.0](./DATA_DICTIONARY.md#6.0-data-flows).
 
-### [3.3 Adjust for other effects](../YieldCurves/knowledge/3.3_Adjust_For_Other_Effects.md)
-Applies a backwards-anchored linear regression to smooth the front-end of the SA curve.
-- **Goal**: Remove idiosyncratic "wiggles" caused by liquidity or one-off shocks to specific CUSIPs.
-- **Method**: Blending the SA yield with a projected trend line.
+## Process specs
 
-### [Interactive Visualization](../YieldCurves/knowledge/Visual_Standards.md)
-A high-performance charting interface built with Chart.js and Hammer.js.
-- **Features**: Full X/Y zoom, vertical panning, and dataset visibility toggles.
-- **Visual Priority**: SAO > SA > Ask (Market).
+| Process | Spec | What it does |
+|---|---|---|
+| 3.1 | [Parse sources and calculate yields](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md) | Reads [S1](./DataStores.md#s1), [S4](./DataStores.md#s4), [S7](./DataStores.md#s7), [S12](./DataStores.md#s12) and the bond holidays, and calculates the [TIPS Yields](./DATA_DICTIONARY.md#tips-yields) and the [Treasury Yields](./DATA_DICTIONARY.md#treasury-yields) from price. |
+| 3.2 | [Adjust for seasonality](../YieldCurves/knowledge/3.2_Adjust_For_Seasonality.md) | Calculates the [SA Yield](./DATA_DICTIONARY.md#sa-yield) of each TIPS, the yield of its clean price multiplied by its [SA Price Factor](./DATA_DICTIONARY.md#sa-price-factor). |
+| 3.3 | [Adjust for other effects](../YieldCurves/knowledge/3.3_Adjust_For_Other_Effects.md) | Calculates the [SAO Yield](./DATA_DICTIONARY.md#sao-yield), `SAO = w × curve(maturity) + (1 − w) × SA`, where `curve` is a Nelson-Siegel-Svensson fit to the SA yields and `w` is the [SAO Blend Weight](./DATA_DICTIONARY.md#sao-blend-weight), which declines with maturity. |
+| 3.4 | [Fit spot yield curves](../YieldCurves/knowledge/3.4_Fit_Spot_Yield_Curves.md) | Fits [Spot Yield](./DATA_DICTIONARY.md#spot-yield) curves to the Treasury prices, the TIPS prices and the TIPS seasonally adjusted prices, and evaluates the published GSW curve. |
+| 3.5 | [Calculate breakeven inflation](../YieldCurves/knowledge/3.5_Calculate_Breakeven_Inflation.md) | Subtracts a TIPS yield from a nominal yield, per security and across terms. |
+| 3.6 | [Calculate bid and ask spreads](../YieldCurves/knowledge/3.6_Calculate_Bid_And_Ask_Spreads.md) | Subtracts the ask side from the bid side, in yield and in price, for each security quoted on both sides. |
+| 3.7 | [Render charts and tables](../YieldCurves/knowledge/3.7_Render_Charts_And_Tables.md) | Draws the view the user selects. |
 
----
+## Reference specs
 
-## 3.0 Foundational Logic (The Engine Room)
-
-- **[SA Intuition](../YieldCurves/knowledge/SA_Intuition.md)**: Conceptual guide to why seasonality matters for TIPS.
-- **[Canty Authority](../YieldCurves/knowledge/Canty.md)**: Technical reference for the mathematical foundations of SA/SAO (Canty, 2009).
-- **[Data Pipeline](./Data_Pipeline.md)**: Details on the GitHub Actions that update the R2 data stores.
+- [Visual Standards](../YieldCurves/knowledge/Visual_Standards.md): the rules every chart and table obeys.
+- [SA Intuition](../YieldCurves/knowledge/SA_Intuition.md): why a seasonal adjustment applies to TIPS.
+- [Canty (2009)](../YieldCurves/knowledge/Canty.md): the paper the seasonal adjustment is derived from.
+- [Seasonal Factor Drift](../YieldCurves/knowledge/Seasonal_Factor_Drift.md): the measurement behind the [Credibility Factor](./DATA_DICTIONARY.md#credibility-factor).
+- [SAO Residual Analysis](../YieldCurves/knowledge/SAO_Residual_Analysis.md): the evidence for the other adjustment.
+- [Data Pipeline](./Data_Pipeline.md): the scheduled jobs that write the data stores.
