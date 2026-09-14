@@ -89,7 +89,7 @@ let isUpdatingData = false;
 const yOverrideSyms = new Set();
 const panStartY = {}; // sym -> {min, max} at pan gesture start; cleared on pan end
 
-// Seasonal Adjustment (SA) — see YieldCurves/knowledge/3.2_Seasonal_Adjustments.md.
+// Seasonal Adjustment (SA) — see YieldCurves/knowledge/3.2_Adjust_For_Seasonality.md.
 // CNBC's TIPS symbols (e.g. US2YTIPS) are the bid yield of one specific, real TIPS —
 // CNBC's own quote page shows which one (e.g. US2YTIPS = the Jan 2028 0.50% TIPS).
 // So this is the exact same transform YieldCurves applies to actual TIPS: derive the

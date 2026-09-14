@@ -1,5 +1,5 @@
 // breakeven.js -- the nominal Treasury each per-security breakeven is stated against.
-// Spec: YieldCurves/knowledge/3.5_Breakeven_Inflation.md#breakeven-inflation.
+// Spec: YieldCurves/knowledge/3.5_Calculate_Breakeven_Inflation.md#breakeven-inflation.
 //
 // One implementation, imported by the YieldCurves page (YieldCurves/src/app.js) and by the
 // acquisition job that publishes S14 (YieldCurves/scripts/updateSpotYieldCurves.js), per the

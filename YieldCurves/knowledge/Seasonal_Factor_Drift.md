@@ -1,16 +1,16 @@
 # Seasonal Factor Drift — Why S_maturity Loses Meaning at Long Horizons
 
-**Evidence for:** [3.2 Seasonal Adjustments](./3.2_Seasonal_Adjustments.md)
+**Evidence for:** [3.2 Adjust for seasonality](./3.2_Adjust_For_Seasonality.md)
 
-**Status:** Research supporting the **S_maturity** input to the seasonal adjustment ([3.2 Seasonal Adjustments](3.2_Seasonal_Adjustments.md)). Same relation to 1.0 that [2.2 SAO Residual Analysis](SAO_Residual_Analysis.md) has to [2.0](3.3_SAO_Adjustment.md).
-**Dependencies:** [3.2 Seasonal Adjustments](3.2_Seasonal_Adjustments.md), [Canty](Canty.md), [DATA_DICTIONARY.md#sa-factor](../../knowledge/DATA_DICTIONARY.md#sa-factor), [DATA_DICTIONARY.md#sa-price-factor](../../knowledge/DATA_DICTIONARY.md#sa-price-factor), [DATA_DICTIONARY.md#cpi-sa](../../knowledge/DATA_DICTIONARY.md#cpi-sa).
+**Status:** Research supporting the **S_maturity** input to the seasonal adjustment ([3.2 Adjust for seasonality](3.2_Adjust_For_Seasonality.md)). Same relation to 1.0 that [SAO Residual Analysis](SAO_Residual_Analysis.md) has to [3.3](3.3_Adjust_For_Other_Effects.md).
+**Dependencies:** [3.2 Adjust for seasonality](3.2_Adjust_For_Seasonality.md), [Canty](Canty.md), [DATA_DICTIONARY.md#sa-factor](../../knowledge/DATA_DICTIONARY.md#sa-factor), [DATA_DICTIONARY.md#sa-price-factor](../../knowledge/DATA_DICTIONARY.md#sa-price-factor), [DATA_DICTIONARY.md#cpi-sa](../../knowledge/DATA_DICTIONARY.md#cpi-sa).
 **Data snapshot:** FRED `CPIAUCNS` (NSA, 1913–) and `CPIAUCSL` (SA, 1947–), monthly, overlap 1947-01 … 2026-07 (954 months). Live [S1](../../knowledge/DataStores.md#s1) and [S4](../../knowledge/DataStores.md#s4), settlement 2026-09-08, 53 TIPS.
 
 ---
 
 ## 1. The question
 
-The seasonal adjustment multiplies a TIPS clean price by `S_settle / S_maturity`, where `S_t = RefCPI_NSA(t) / RefCPI_SA(t)` is the seasonal factor for the calendar month and day of `t` ([1.0](3.2_Seasonal_Adjustments.md) Level 4). `S_settle` is a known recent daily value. `S_maturity` is not: the maturity date of a long TIPS lies beyond the published Ref CPI series, so `shared/src/ref-cpi.js#saFactorForDate` substitutes the most recent past occurrence of that month and day.
+The seasonal adjustment multiplies a TIPS clean price by `S_settle / S_maturity`, where `S_t = RefCPI_NSA(t) / RefCPI_SA(t)` is the seasonal factor for the calendar month and day of `t` ([3.2](3.2_Adjust_For_Seasonality.md) Level 4). `S_settle` is a known recent daily value. `S_maturity` is not: the maturity date of a long TIPS lies beyond the published Ref CPI series, so `shared/src/ref-cpi.js#saFactorForDate` substitutes the most recent past occurrence of that month and day.
 
 That substitution is Canty's simplifying assumption that the 12 monthly seasonal factors repeat unchanged every year ([Canty](Canty.md) §2, Appendix B; [DATA_DICTIONARY.md#sa-price-factor](../../knowledge/DATA_DICTIONARY.md#sa-price-factor)). This document measures how well the assumption holds as the maturity date moves further from the estimation window, and what the reported seasonal adjustment on long-dated TIPS actually rests on.
 
@@ -23,7 +23,7 @@ Two findings, one structural and one quantitative:
 
 ## 2. How BLS derives its seasonal factors
 
-[1.0 §How BLS Derives the Seasonal Factors](3.2_Seasonal_Adjustments.md#bls-seasonal-factor-estimation) gives the mechanics: X-13ARIMA-SEATS with moving seasonal filters spanning about 5 to 11 years, re-estimated annually with the prior five years revised, and projected factors published one year forward only. The consequence this document measures: BLS provides a factor for the recent past and one year ahead, and no basis for projecting one decades out, so the substitution `saFactorForDate` makes for a distant maturity date is an extrapolation of the current pattern whose error grows with horizon.
+[3.2 §How BLS Derives the Seasonal Factors](3.2_Adjust_For_Seasonality.md#bls-seasonal-factor-estimation) gives the mechanics: X-13ARIMA-SEATS with moving seasonal filters spanning about 5 to 11 years, re-estimated annually with the prior five years revised, and projected factors published one year forward only. The consequence this document measures: BLS provides a factor for the recent past and one year ahead, and no basis for projecting one decades out, so the substitution `saFactorForDate` makes for a distant maturity date is an extrapolation of the current pattern whose error grows with horizon.
 
 ---
 
@@ -86,7 +86,7 @@ Treat the current seasonal factor as a signal of [Seasonal Amplitude](../../know
 
 with `w(0) = 1` and `w → 0` as the drift band overtakes the amplitude. `A` and `sigma_drift(h)` are both measured above, so the weight has no free parameter.
 
-The app applies `w(h)` at every horizon with no floor, using the per-calendar-month `sigma_drift` (§4.1), and never scales `S_settle` ([1.0 §horizon-dependent-maturity-factor](3.2_Seasonal_Adjustments.md#horizon-dependent-maturity-factor)). `sigma_drift(h)` is a smooth, continuous function of horizon with no discontinuity at any candidate cutoff, so a floor would discard measured 1-to-5-year drift without a measurement to support the boundary. It is unnecessary in practice: `w` is about 0.91 at 1 year and 0.85 at 3, so the front-end adjustment is nearly unchanged, and the SAO fit ([2.0](3.3_SAO_Adjustment.md)) snaps the front end to a smooth curve at full weight, absorbing the small residual. The weighting has its effect beyond about 6 years, where SAO no longer smooths and where the maturity month is eventually always February.
+The app applies `w(h)` at every horizon with no floor, using the per-calendar-month `sigma_drift` (§4.1), and never scales `S_settle` ([3.2 §horizon-dependent-maturity-factor](3.2_Adjust_For_Seasonality.md#horizon-dependent-maturity-factor)). `sigma_drift(h)` is a smooth, continuous function of horizon with no discontinuity at any candidate cutoff, so a floor would discard measured 1-to-5-year drift without a measurement to support the boundary. It is unnecessary in practice: `w` is about 0.91 at 1 year and 0.85 at 3, so the front-end adjustment is nearly unchanged, and the SAO fit ([3.3](3.3_Adjust_For_Other_Effects.md)) snaps the front end to a smooth curve at full weight, absorbing the small residual. The weighting has its effect beyond about 6 years, where SAO no longer smooths and where the maturity month is eventually always February.
 
 Pooled over the five maturity dates, `A = 0.263%`:
 
@@ -142,7 +142,7 @@ Applying the weight (`shared/src/ref-cpi.js#maturitySaFactor`, per-calendar-mont
 
 ### 7.1 There is no market cross-section to check against at the long end
 
-At the front end the seasonal adjustment is large and its effect is verifiable: the raw April-to-July ask-yield spread inside 2027–2032 is about 24 bp, and the adjustment removes the maturity-month structure in it, leaving an April-low, October-high SA residual of about 6 bp peak-to-trough (consistent with [2.2](SAO_Residual_Analysis.md) §2). Through 2033–2039 a residual January-high, July-low pattern of about 4 bp remains in the raw yields; it is near the noise floor and cannot be separated from a 10-year issue-cohort effect. From 2040 onward every TIPS matures in February, so there is no maturity-month cross-section: the long-end adjustment cannot be corroborated or refuted against the market, and its size is set entirely by `S(Feb-15)`.
+At the front end the seasonal adjustment is large and its effect is verifiable: the raw April-to-July ask-yield spread inside 2027–2032 is about 24 bp, and the adjustment removes the maturity-month structure in it, leaving an April-low, October-high SA residual of about 6 bp peak-to-trough (consistent with [SAO Residual Analysis](SAO_Residual_Analysis.md) §2). Through 2033–2039 a residual January-high, July-low pattern of about 4 bp remains in the raw yields; it is near the noise floor and cannot be separated from a 10-year issue-cohort effect. From 2040 onward every TIPS matures in February, so there is no maturity-month cross-section: the long-end adjustment cannot be corroborated or refuted against the market, and its size is set entirely by `S(Feb-15)`.
 
 ---
 

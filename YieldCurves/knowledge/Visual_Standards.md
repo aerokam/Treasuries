@@ -1,6 +1,6 @@
 # Visual Standards and Interaction
 
-**Constrains:** [3.7 Render charts and tables](/knowledge/DFD_LEVEL3_YC_RENDER) and the seven processes it decomposes into, specified in [3.7 Rendering](./3.7_Rendering.md)  
+**Constrains:** [3.7 Render charts and tables](/knowledge/DFD_LEVEL3_YC_RENDER) and the seven processes it decomposes into, specified in [3.7 Render charts and tables](./3.7_Render_Charts_And_Tables.md)  
 **Implemented by:** `YieldCurves/src/app.js`, `shared/src/chart-time-axis.js`
 
 ## Overview

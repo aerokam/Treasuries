@@ -368,10 +368,10 @@ Chart.defaults.color = '#334155';
 
 // ── 3.1 Load and parse source data ─────────────────────────────────────────
 // One function per process of knowledge/DFD_LEVEL3_YC_LOAD, specified in
-// YieldCurves/knowledge/3.1_Load_And_Parse.md. Each parses and returns; applying
+// YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md. Each parses and returns; applying
 // the result to app state and to the controls is init()'s job, not theirs.
 
-// spec: 3.1_Load_And_Parse.md#parse-fedinvest-prices (3.1.1)
+// spec: 3.1_Parse_Sources_And_Calculate_Yields.md#parse-fedinvest-prices (3.1.1)
 // Row 1 is the settlement date, row 2 the header, rows 3 on the data.
 function parseFedInvestPrices(text) {
   const lines = text.split(/\r?\n/).filter(l => l.trim());
@@ -381,17 +381,17 @@ function parseFedInvestPrices(text) {
   return { tips: rows.filter(r => r.type === 'TIPS'), nominals: rows.filter(r => r.type !== 'TIPS'), settlementDate };
 }
 
-// spec: 3.1_Load_And_Parse.md#parse-ref-cpi-and-sa-factors (3.1.3)
+// spec: 3.1_Parse_Sources_And_Calculate_Yields.md#parse-ref-cpi-and-sa-factors (3.1.3)
 function parseRefCpiAndSaFactors(text) {
   return parseCsv(text);
 }
 
-// spec: 3.1_Load_And_Parse.md#parse-bond-holidays (3.1.4)
+// spec: 3.1_Parse_Sources_And_Calculate_Yields.md#parse-bond-holidays (3.1.4)
 function parseBondHolidays(text) {
   return parseHolidaySet(parseCsv(text, false));
 }
 
-// spec: 3.1_Load_And_Parse.md#parse-gsw-parameters (3.1.5)
+// spec: 3.1_Parse_Sources_And_Calculate_Yields.md#parse-gsw-parameters (3.1.5)
 // A missing or malformed file leaves the app without a published curve rather
 // than without a page, so both cases return null.
 async function parseGswParameters(res) {
@@ -399,7 +399,7 @@ async function parseGswParameters(res) {
   try { return await res.json(); } catch { return null; }
 }
 
-// spec: 3.1_Load_And_Parse.md#parse-market-quotes (3.1.2)
+// spec: 3.1_Parse_Sources_And_Calculate_Yields.md#parse-market-quotes (3.1.2)
 // A TIPS quote is kept only for a CUSIP the FedInvest file also carries, and
 // only when it has an ask price.
 function parseMarketQuotes(text, knownTips) {
@@ -524,7 +524,7 @@ async function init() {
 // SAO / spot-curve math (fitNSS, fitSpotNSS, spotCurveFit, spotCurveGrid, calculateSAO,
 // zToSA, and the SAO_* constants) lives in shared/src/spot-curve.js — single source of
 // truth for both this app and any pipeline script computing the same fitted curves.
-// See knowledge/3.3_SAO_Adjustment.md and 3.4_Spot_Yield_Curves.md.
+// See knowledge/3.3_Adjust_For_Other_Effects.md and 3.4_Fit_Spot_Yield_Curves.md.
 
 // years-to-maturity → current x-axis unit (calendar ms in Maturity mode, weeks in Term mode).
 function yearsToX(now) {
@@ -975,7 +975,7 @@ function renderNominalsChart(fedBonds, fidBonds, fedSpotBonds, fidSpotBonds) {
 
 // The TIPS yields for one source (FedInvest or Market) is built by
 // shared/src/tips-yields.js#tipsYieldsFromPrices — one implementation for this page and
-// for the acquisition job that publishes S13, S14 and S15 (3.1_Load_And_Parse.md §3.1.7).
+// for the acquisition job that publishes S13, S14 and S15 (3.1_Parse_Sources_And_Calculate_Yields.md §3.1.7).
 const tipsFor = (quotesByCusip, isBroker) =>
   tipsYieldsFromPrices(rawYieldsData, rawRefCpiData, quotesByCusip, isBroker, marketSettleIso());
 
@@ -1046,7 +1046,7 @@ function processAndRenderTips() {
 }
 
 // Table columns follow the chart's own series checkboxes (Ask/SA/SAO/Spot/Spot SA) rather
-// than a fixed set — see YieldCurves/knowledge/3.7_Rendering.md §2.4. Spot and Spot SA are
+// than a fixed set — see YieldCurves/knowledge/3.7_Render_Charts_And_Tables.md §3.7.4. Spot and Spot SA are
 // fitted curves, not a value tied to any one security, so they get their own rows (Term
 // only, evaluated at the curve's half-year grid plus its own longest-fitted endpoint —
 // spotCurveTermGrid, same fit the chart draws) interleaved by Term with the security rows.

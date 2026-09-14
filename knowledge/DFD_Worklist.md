@@ -19,7 +19,7 @@ State of the levelled data flow diagrams and the spec rewrite that goes with the
 
 **Two other generators.** `scripts/build-dd-index.cjs` regenerates the A-Z index at the top of the Data Dictionary, covering every anchor so a synonym leads to its term; run it after adding an entry. `scripts/check-spec-code.cjs` reports specs naming code that no longer exists.
 
-**Specs written to the current template**, all in `YieldCurves/knowledge/`: `3.1_Load_And_Parse.md`, `3.7_Rendering.md`, `3.5_Breakeven_Inflation.md` and `3.6_Bid_And_Ask_Spreads.md`.
+**Specs written to the current template**, all in `YieldCurves/knowledge/`: `3.1_Parse_Sources_And_Calculate_Yields.md`, `3.7_Render_Charts_And_Tables.md`, `3.5_Calculate_Breakeven_Inflation.md` and `3.6_Calculate_Bid_And_Ask_Spreads.md`.
 
 ---
 
@@ -41,7 +41,7 @@ These came out of review and apply to every spec from here.
 
 1. **Eight flow label fragments have no Data Dictionary entry**, reported by every run of the diagram build: bond trading days, picked security, quote file date, scales, source dates, spreads, tab and date selections, tab and mode. Some want a term defined, some want the label changed to one that exists.
 2. **Whether to wire `scripts/check-spec-code.cjs` into the pre-commit hook**, now that its 94 findings are triaged and the run is clean (§3.10). A gate blocks only a reference introduced after this point.
-3. **`3.2_Seasonal_Adjustments.md` may be repurposed** as the Yield Curves spec, with seasonal adjustment demoted to a section. Proposed by a session that has since ended and never confirmed. The proposal predates the naming scheme in §2.0 and conflicts with it: a numbered spec takes the number of the process it specifies, and process numbers are frozen, so the file cannot become `1.0_Yield_Curves.md` while it specifies process 3.2. Repurposing it would mean giving Yield Curves a spec of its own at process 3 and leaving 3.2 as the seasonal adjustment spec.
+3. **`3.2_Adjust_For_Seasonality.md` may be repurposed** as the Yield Curves spec, with seasonal adjustment demoted to a section. Proposed by a session that has since ended and never confirmed. The proposal predates the naming scheme in §2.0 and conflicts with it: a numbered spec takes the number of the process it specifies, and process numbers are frozen, so the file cannot become `1.0_Yield_Curves.md` while it specifies process 3.2. Repurposing it would mean giving Yield Curves a spec of its own at process 3 and leaving 3.2 as the seasonal adjustment spec.
 
 ---
 
@@ -51,13 +51,13 @@ Every process has a spec, every process spec names the functions that implement 
 
 | Spec | Process |
 |---|---|
-| `3.1_Load_And_Parse.md` | 3.1 and its seven children |
-| `3.2_Seasonal_Adjustments.md` | 3.2 |
-| `3.3_SAO_Adjustment.md` | 3.3 |
-| `3.4_Spot_Yield_Curves.md` | 3.4 |
-| `3.5_Breakeven_Inflation.md` | 3.5 |
-| `3.6_Bid_And_Ask_Spreads.md` | 3.6 |
-| `3.7_Rendering.md` | 3.7 and its seven children |
+| `3.1_Parse_Sources_And_Calculate_Yields.md` | 3.1 and its seven children |
+| `3.2_Adjust_For_Seasonality.md` | 3.2 |
+| `3.3_Adjust_For_Other_Effects.md` | 3.3 |
+| `3.4_Fit_Spot_Yield_Curves.md` | 3.4 |
+| `3.5_Calculate_Breakeven_Inflation.md` | 3.5 |
+| `3.6_Calculate_Bid_And_Ask_Spreads.md` | 3.6 |
+| `3.7_Render_Charts_And_Tables.md` | 3.7 and its seven children |
 | `Visual_Standards.md`, `Canty.md`, `SA_Intuition.md`, `SAO_Residual_Analysis.md`, `Seasonal_Factor_Drift.md`, both `FedInvest_*` | none: reference |
 
 Spec headers carry typed relations in reciprocal pairs: Specifies and Implemented by, Constrains and Constrained by, Source for and Derived from, Evidence for and Evidence, Explains and Explained in. A reference spec is reachable through them and is never the end of a drill.
@@ -68,7 +68,7 @@ Spec headers carry typed relations in reciprocal pairs: Specifies and Implemente
 
 ## 3.6 Market-quote nominal yields are calculated
 
-Done in the app. All four combinations of source and security type now have their yield calculated from price: `YieldCurves/src/app.js#parseFidelityNominals` prices both sides of each market-quote nominal Treasury at the settlement date of [3.1.6](../YieldCurves/knowledge/3.1_Load_And_Parse.md#determine-settlement-dates), and the quoted ask yield is read as a presence test only. Measured against the quoted ask yield over the 650 nominal securities in the 2026-09-11 quote file: median 0.06 bp, p90 0.30, p99 3.31, max 20.47. Four securities differ by more than 5 bp, three of them within three days of maturity and the fourth a Note 167 days from maturity.
+Done in the app. All four combinations of source and security type now have their yield calculated from price: `YieldCurves/src/app.js#parseFidelityNominals` prices both sides of each market-quote nominal Treasury at the settlement date of [3.1.6](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#determine-settlement-date), and the quoted ask yield is read as a presence test only. Measured against the quoted ask yield over the 650 nominal securities in the 2026-09-11 quote file: median 0.06 bp, p90 0.30, p99 3.31, max 20.47. Four securities differ by more than 5 bp, three of them within three days of maturity and the fourth a Note 167 days from maturity.
 
 The earlier attempt that rendered zero rows and took the run from 25 seconds to 4.8 minutes was a null settlement date, not a loop. The inline market-quote fixtures carried no `Date downloaded` footer, so `marketSettleIso()` returned null and `yieldFromPrice` raised a `TypeError` in `daysBetween` instead of returning null; the catch in `processAndRenderNominals` swallowed it before the table was rendered, and the minutes were the resulting Playwright timeouts. `yieldFromPrice` now returns null for a missing or unparsable date, and the fixtures carry the footer the real store has.
 
@@ -112,7 +112,7 @@ The three items the developer approved out of this sweep are closed in §3.9.
 
 Closed in `d0619ef`. The TIPS yields moved to `shared/src/tips-yields.js#tipsYieldsFromPrices` and the nearest-maturity nominal to `shared/src/breakeven.js#findClosestNominal`, each imported by the page and by `updateSpotYieldCurves.js` in place of a separate copy.
 
-**The market TIPS settlement date.** The two copies of the security set differed on one thing, the [Known Defect](../YieldCurves/knowledge/3.1_Load_And_Parse.md) 3.1 had recorded: the page derived the settlement date of a market-quote TIPS from [S1](./DataStores.md#s1)'s date, against the quote file's own date in [3.1.6](../YieldCurves/knowledge/3.1_Load_And_Parse.md#determine-settlement-dates), which the acquisition job already followed. The page follows it now and the note is gone. Both files carried 2026-09-11, so nothing moves in today's figures; the measurement was made by holding the quoted prices and moving the settlement date. One business day of divergence moves the SA yield of all 53 quoted TIPS by a median 0.08 bp, p90 0.52, p99 and max 4.37, the largest at the shortest maturity; three business days, a median 0.25 bp and a max of 14.06. Breakeven inflation is a nominal yield less that TIPS yield, so it moves one for one.
+**The market TIPS settlement date.** The two copies of the security set differed on one thing, the [Known Defect](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md) 3.1 had recorded: the page derived the settlement date of a market-quote TIPS from [S1](./DataStores.md#s1)'s date, against the quote file's own date in [3.1.6](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#determine-settlement-date), which the acquisition job already followed. The page follows it now and the note is gone. Both files carried 2026-09-11, so nothing moves in today's figures; the measurement was made by holding the quoted prices and moving the settlement date. One business day of divergence moves the SA yield of all 53 quoted TIPS by a median 0.08 bp, p90 0.52, p99 and max 4.37, the largest at the shortest maturity; three business days, a median 0.25 bp and a max of 14.06. Breakeven inflation is a nominal yield less that TIPS yield, so it moves one for one.
 
 **One term.** Three conventions had been in use: 365.25 always in the acquisition job, actual/actual below one year in `shared/src/bond-math.js#termYears`, and the clock at run time in `shared/src/spot-curve.js#spotCurveFit`. `termYears` is now the one measure, defined at [Term](./DATA_DICTIONARY.md#term). Below a year its denominator is the actual length of the year beginning at settlement, 365 or 366, which is the measure Treasury's own bill formula uses and the one that matters where the relative error is largest; from a year the denominator is 365.25, so a multi-year term does not move with the placement of a single leap day. Cash-flow horizons inside the pricing formula are counted in coupon periods, a different quantity from a term label, and are unchanged.
 

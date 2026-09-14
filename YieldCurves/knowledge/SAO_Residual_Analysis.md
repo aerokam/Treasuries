@@ -1,9 +1,9 @@
 # The SAO Residual — Empirical Analysis and Rationale
 
-**Evidence for:** [3.3 SAO](./3.3_SAO_Adjustment.md)
+**Evidence for:** [3.3 Adjust for other effects](./3.3_Adjust_For_Other_Effects.md)
 
-**Status:** Analysis supporting the **O (other)** step of [3.3 SAO](3.3_SAO_Adjustment.md).
-**Dependencies:** [3.2 Seasonal Adjustments](3.2_Seasonal_Adjustments.md), [3.3 SAO](3.3_SAO_Adjustment.md), [Canty](Canty.md).
+**Status:** Analysis supporting the **O (other)** step of [3.3 Adjust for other effects](3.3_Adjust_For_Other_Effects.md).
+**Dependencies:** [3.2 Adjust for seasonality](3.2_Adjust_For_Seasonality.md), [3.3 Adjust for other effects](3.3_Adjust_For_Other_Effects.md), [Canty](Canty.md).
 **Data snapshot:** FedInvest mid prices, settlement **2026-06-18**, region **2027–2031** maturities (the front end, where seasonality is material and the SA curve is otherwise flat at ~1.82–1.88%).
 
 ---
@@ -84,7 +84,7 @@ Apr and Oct maturities are both **5-yr-origin** TIPS, yet they carry **opposite-
 
 With coupon, index ratio, Canty's RAI/semiannual refinements, and original-term cohort all eliminated, and the residual being **coupon-independent, maturity-month-keyed, sign-consistent across years, and amortizing toward the long end**, the most consistent remaining explanation is:
 
-> **Imperfect deseasonalization.** Our daily SA factor series is constructed by 31 CFR App. B interpolation of monthly BLS CPI-SA — a *necessarily calculated* daily SA Ref CPI (there is no official one; see [1.0](3.2_Seasonal_Adjustments.md)). The institutional desks that actually price the curve use their own seasonal model. The mismatch between the two is, by construction, **keyed to the calendar month** and applied to the dominant principal cashflow — producing precisely a month-of-maturity residual that is largest where the seasonal correction itself is largest (the front end) and washes out as it amortizes over longer maturities.
+> **Imperfect deseasonalization.** Our daily SA factor series is constructed by 31 CFR App. B interpolation of monthly BLS CPI-SA — a *necessarily calculated* daily SA Ref CPI (there is no official one; see [3.2](3.2_Adjust_For_Seasonality.md)). The institutional desks that actually price the curve use their own seasonal model. The mismatch between the two is, by construction, **keyed to the calendar month** and applied to the dominant principal cashflow — producing precisely a month-of-maturity residual that is largest where the seasonal correction itself is largest (the front end) and washes out as it amortizes over longer maturities.
 
 This is consistent with Canty's own framing: his **outliers ($O_t$)** are *transient* shocks (gasoline since the last CPI release, VAT changes) — explicitly **not** persistent recurring month effects. So this residual is **not a Canty outlier**; it is a deseasonalization residual that the empirical "O" smoothing step mops up. The user's intuition — "it's puzzling that there would be consistent maturity-month factors *other than* the seasonal adjustment" — is correct, and the resolution is that it **is** the seasonal adjustment: specifically its calibration error, not a new factor.
 
@@ -96,9 +96,9 @@ We cannot fully exclude a small genuine month-specific supply/demand component, 
 
 The findings above (§3) do the decisive work: **no value-relevant factor explains the departures.** Coupon and index ratio — the only factors that would change fair value to a buy-and-hold holder — are immaterial. Everything else (the month-keyed deseasonalization residual of §2/§4, and any idiosyncratic per-bond richness such as the twice-confirmed Jan-2028 hump) is **relative-value noise**: a liquidity-driven cheapness just makes a bond "a better deal," not a different fair value, to a holder indifferent to liquidity.
 
-So the O step does **not** target seasonality specifically. It **smooths every non-value-relevant deviation to a fair-value curve**: `SAO_i = smoothCurve(maturity_i)` via **Nelson-Siegel-Svensson** (see [2.0](3.3_SAO_Adjustment.md)). The maturity-month structure documented here is then simply *what the deviations look like*, not the thing being targeted — NSS removes month-keyed and idiosyncratic wiggles alike.
+So the O step does **not** target seasonality specifically. It **smooths every non-value-relevant deviation to a fair-value curve**: `SAO_i = smoothCurve(maturity_i)` via **Nelson-Siegel-Svensson** (see [3.3](3.3_Adjust_For_Other_Effects.md)). The maturity-month structure documented here is then simply *what the deviations look like*, not the thing being targeted — NSS removes month-keyed and idiosyncratic wiggles alike.
 
-> **Note — inspired by, but not, Canty's outlier factor.** Canty's `O_t` is an *analytical, event-driven* adjustment for known inflation shocks not yet in the CPI; it is not a curve smoother (see [2.0](3.3_SAO_Adjustment.md) and [Canty.md](Canty.md) Eq 20–21). Lacking a way to identify specific outlier factors, we smooth instead. Our SAO is inspired by that analysis but is operationally a curve fit.
+> **Note — inspired by, but not, Canty's outlier factor.** Canty's `O_t` is an *analytical, event-driven* adjustment for known inflation shocks not yet in the CPI; it is not a curve smoother (see [3.3](3.3_Adjust_For_Other_Effects.md) and [Canty.md](Canty.md) Eq 20–21). Lacking a way to identify specific outlier factors, we smooth instead. Our SAO is inspired by that analysis but is operationally a curve fit.
 
 ### 5.1 Caveat — we may be smoothing away real expected-return differences
 This is an **assumption, not a certainty.** We do not actually know that an apparently-artificial high yield *is* artificial — it may genuinely deliver a higher return to whoever buys it. The SA step itself is really an adjustment to **expected nominal return**: it strips the *seasonally predictable* part so different maturity months compare fairly. By the same logic, we **suspect other factors also affect expected nominal return** but in ways that are **not seasonally predictable** and that we cannot model. If a smoothed-away deviation is one of those, we are hiding a genuinely better/worse deal, not removing noise. We accept that because, for the target holder, no value-relevant factor has been identified to justify keeping a point off the curve — but the uncertainty is real and is this approach's main known limitation.
@@ -109,7 +109,7 @@ This is an **assumption, not a certainty.** We do not actually know that an appa
 
 ## 6. Extension: does the residual persist at the long end?
 
-**§2–§5 above analyzed only the 2027–2031 front-end region.** [2.0](3.3_SAO_Adjustment.md) had generalized "smooth every deviation" to the whole curve on that basis alone — worth checking directly rather than assuming it extrapolates, since §2 already flagged the residual "amortizes with maturity."
+**§2–§5 above analyzed only the 2027–2031 front-end region.** [3.3](3.3_Adjust_For_Other_Effects.md) had generalized "smooth every deviation" to the whole curve on that basis alone — worth checking directly rather than assuming it extrapolates, since §2 already flagged the residual "amortizes with maturity."
 
 **Method:** fit the same full-curve NSS curve `calculateSAO()` uses, then measure `|SA − NSS|` grouped by maturity year across the entire available curve (2027–2056), settlement 2026-07-01.
 
@@ -129,7 +129,7 @@ Cross-checked with a maturity-agnostic **local-trend residual** (±0.6yr moving 
 
 **Reading:** the front-end decay from §2 (large at 2027, sub-1bp by 2031) is real and continues — by 2030 the deviation is already at noise level, and the **2032-04 point (-2.4 to -2.9bp) is the last one showing a real, sign-consistent departure**; **2032-07 onward is clean**. Beyond 2036 there's a data gap (2037–2039 gap years) and the visible large deviations at 2040–2041 are a full-curve NSS **fit** artifact (the single curve straining to span a sparse, lumpy long tail), not a deseasonalization residual — consistent with §3's finding that value-relevant/idiosyncratic structure, not seasonality, explains long-end departures.
 
-**Consequence:** smoothing should not apply uniformly to the whole curve. §5's `SAO_i = smoothCurve(maturity_i)` is refined in [2.0](3.3_SAO_Adjustment.md#smoothing-declines-with-maturity) to decline the snap-to-curve weight from 1 to 0 over `SAO_BLEND_START_YRS=5` → `SAO_BLEND_END_YRS=6` years-to-maturity, so points beyond ~6yr report their raw SA yield instead of being pulled onto a curve that was never shown to need correcting there.
+**Consequence:** smoothing should not apply uniformly to the whole curve. §5's `SAO_i = smoothCurve(maturity_i)` is refined in [3.3](3.3_Adjust_For_Other_Effects.md#smoothing-declines-with-maturity) to decline the snap-to-curve weight from 1 to 0 over `SAO_BLEND_START_YRS=5` → `SAO_BLEND_END_YRS=6` years-to-maturity, so points beyond ~6yr report their raw SA yield instead of being pulled onto a curve that was never shown to need correcting there.
 
 ## 7. Reproduction
 

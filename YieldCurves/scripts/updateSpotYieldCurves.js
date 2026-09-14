@@ -1,6 +1,6 @@
 // updateSpotYieldCurves.js — persists the values the YieldCurves app computes but never
 // writes to R2: evaluated spot (zero-coupon) yields, per-TIPS breakeven inflation, and
-// broker bid/ask spreads. See YieldCurves/knowledge/3.4_Spot_Yield_Curves.md.
+// broker bid/ask spreads. See YieldCurves/knowledge/3.4_Fit_Spot_Yield_Curves.md.
 //
 // Loads the same R2 inputs the browser app loads (YieldsFromFedInvestPrices.csv,
 // RefCpiNsaSa.csv, BondHolidaysSifma.csv, FidelityTreasuriesTips.csv) and reuses the same
@@ -42,8 +42,8 @@ const FIDELITY_URL = `${R2_BASE_URL}/Treasuries/FidelityTreasuriesTips.csv`;
 const DRY = process.argv.includes('--dry');
 
 // The TIPS yields, the nearest-maturity nominal pairing and the term measure are each
-// defined once in shared/src/ and imported above — see 3.1_Load_And_Parse.md §3.1.7,
-// 3.5_Breakeven_Inflation.md and DATA_DICTIONARY.md#term.
+// defined once in shared/src/ and imported above — see 3.1_Parse_Sources_And_Calculate_Yields.md §3.1.7,
+// 3.5_Calculate_Breakeven_Inflation.md and DATA_DICTIONARY.md#term.
 const termOf = (maturityStr, settlementStr) => termYears(localDate(settlementStr), localDate(maturityStr));
 
 const GRID_STEP_YRS = 0.5; // half-year grid — matches the chart's own spotCurveGrid convention.
@@ -136,7 +136,7 @@ async function main() {
   // Unfiltered: every nominal Treasury row, STRIPS included, for the per-security rows.
   // Both yields come from the quoted price at the market settlement date, calculated by the
   // same shared parser src/app.js uses, so the published figures and the ones the app shows
-  // are one method (3.1_Load_And_Parse.md#parse-market-quotes).
+  // are one method (3.1_Parse_Sources_And_Calculate_Yields.md#parse-market-quotes).
   const fidNominalBondsAll = parseFidelityNominalRows(fidText, {
     settleIso: brokerSettleStr,
     excludeCusips: tipsCusips,

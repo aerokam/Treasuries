@@ -34,8 +34,8 @@ graph LR
     U <-->|Zoom / Pan / Filters| P3
 
     %% Links to Specs
-    click P1 "#/md/YieldCurves/knowledge/3.2_Seasonal_Adjustments.md" "View SA Logic"
-    click P2 "#/md/YieldCurves/knowledge/3.3_SAO_Adjustment.md" "View SAO Logic"
+    click P1 "#/md/YieldCurves/knowledge/3.2_Adjust_For_Seasonality.md" "View SA Logic"
+    click P2 "#/md/YieldCurves/knowledge/3.3_Adjust_For_Other_Effects.md" "View SAO Logic"
     click P3 "#/md/YieldCurves/knowledge/Visual_Standards.md" "View UI Specs"
     click S1 "#/md/knowledge/DataStores.md#s1" "View Schema"
     click S4 "#/md/knowledge/DataStores.md#s4" "View Schema"
@@ -46,17 +46,17 @@ graph LR
 
 ## 2.0 Core Processes
 
-### [1.0 Seasonal Adjustment (SA)](../YieldCurves/knowledge/3.2_Seasonal_Adjustments.md)
+### [3.2 Adjust for seasonality](../YieldCurves/knowledge/3.2_Adjust_For_Seasonality.md)
 Normalizes real yields by applying seasonal factors derived from BLS CPI-U (NSA vs SA) data.
 - **Goal**: Enable "fair" comparison of yields across different months of the year.
 - **Formula**: `SA Yield = Clean Price * (S_settle / S_maturity)`
 
-### [2.0 SAO Other Adjustment](../YieldCurves/knowledge/3.3_SAO_Adjustment.md)
+### [3.3 Adjust for other effects](../YieldCurves/knowledge/3.3_Adjust_For_Other_Effects.md)
 Applies a backwards-anchored linear regression to smooth the front-end of the SA curve.
 - **Goal**: Remove idiosyncratic "wiggles" caused by liquidity or one-off shocks to specific CUSIPs.
 - **Method**: Blending the SA yield with a projected trend line.
 
-### [3.0 Interactive Visualization](../YieldCurves/knowledge/Visual_Standards.md)
+### [Interactive Visualization](../YieldCurves/knowledge/Visual_Standards.md)
 A high-performance charting interface built with Chart.js and Hammer.js.
 - **Features**: Full X/Y zoom, vertical panning, and dataset visibility toggles.
 - **Visual Priority**: SAO > SA > Ask (Market).

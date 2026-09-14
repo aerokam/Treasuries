@@ -1,5 +1,5 @@
 // updateSaSaoYields.js — writes TIPS/YieldsSaSao.csv: the ask, SA and SAO yield of every
-// TIPS quoted in the market-quote file. Spec: YieldCurves/knowledge/3.2_Seasonal_Adjustments.md,
+// TIPS quoted in the market-quote file. Spec: YieldCurves/knowledge/3.2_Adjust_For_Seasonality.md,
 // knowledge/DataStores.md#s10.
 //
 // Every parse and every calculation here comes from shared/src (no-redundancy directive,

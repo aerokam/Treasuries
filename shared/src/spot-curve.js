@@ -2,13 +2,13 @@
 // zero-coupon (spot) curve fit. Single source of truth for both: the YieldCurves browser
 // app (src/app.js) and any pipeline script that persists the same fitted curves import
 // this module rather than keeping their own copy.
-// See YieldCurves/knowledge/3.3_SAO_Adjustment.md and 3.4_Spot_Yield_Curves.md.
+// See YieldCurves/knowledge/3.3_Adjust_For_Other_Effects.md and 3.4_Fit_Spot_Yield_Curves.md.
 
 import { cashflowSchedule, termYears } from './bond-math.js';
 import { localDate } from './settlement.js';
 
 // SAO "O" step — a SMOOTH-CURVE FIT, not Canty's inflation-shock outlier factor.
-// See knowledge/3.3_SAO_Adjustment.md and SAO_Residual_Analysis.md.
+// See knowledge/3.3_Adjust_For_Other_Effects.md and SAO_Residual_Analysis.md.
 //
 // Canty's O_t (Eq 20–21) adjusts for *known, non-seasonal* inflation shocks not yet
 // in the CPI (VAT hike, a gasoline move since the last print) — determined analytically
@@ -226,7 +226,7 @@ export function spotCurveGrid(bonds, opts) {
 }
 
 // Snap each bond's SA yield to a smooth NSS fair-value curve, with the snap weight declining
-// to 0 over the blend band in years-to-maturity (see 3.3_SAO_Adjustment.md). Mutates each bond with _saoFit /
+// to 0 over the blend band in years-to-maturity (see 3.3_Adjust_For_Other_Effects.md). Mutates each bond with _saoFit /
 // _saoWeight / _saoDevBps / _saoMode diagnostics; returns the SAO yield array.
 export function calculateSAO(bonds) {
   const n = bonds.length;
@@ -243,7 +243,7 @@ export function calculateSAO(bonds) {
   // Below the shortest fitted maturity the global NSS form is unconstrained and its
   // extrapolation diverges (a near-maturity TIPS can swing hundreds of bps negative).
   // Hold the curve flat at its shortest-anchor value there instead of extrapolating
-  // (see 3.3_SAO_Adjustment.md §"The very short end").
+  // (see 3.3_Adjust_For_Other_Effects.md §"The very short end").
   const tMin = fitIdx.length ? Math.min(...fitIdx.map(i => yrs[i])) : 0;
 
   for (let i = 0; i < n; i++) {

@@ -1,6 +1,6 @@
 // fidelity-parse.js -- shared parser for Fidelity's combined Treasury+TIPS CSV export
 // (R2 key Treasuries/FidelityTreasuriesTips.csv). Spec: YieldCurves/knowledge/
-// 3.1_Load_And_Parse.md#parse-market-quotes (3.1.2), knowledge/DataStores.md#s7.
+// 3.1_Parse_Sources_And_Calculate_Yields.md#parse-market-quotes (3.1.2), knowledge/DataStores.md#s7.
 //
 // Field-shape helpers (cleanFidelityField, fidPriceField, fidParseMaturity, the download-date
 // pair) are source-format-only. The two row parsers below are the single canonical home for
@@ -86,7 +86,7 @@ export function parseFidelityTipsRows(text) {
 // Both yields are calculated from the quoted price at `settleIso`, rather than read from the
 // quote: the quoted price states more decimal places than the quoted yield, a yield is quoted
 // on the ask side only, and calculating both sides puts them on one convention so their
-// difference is the spread of 3.6_Bid_And_Ask_Spreads.md. The quoted ask yield is read only
+// difference is the spread of 3.6_Calculate_Bid_And_Ask_Spreads.md. The quoted ask yield is read only
 // as a presence test -- a row without one carries no live offer.
 //
 // A row is dropped when it has no CUSIP, no parseable maturity date, no quoted ask yield, a

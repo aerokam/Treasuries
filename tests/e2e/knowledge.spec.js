@@ -20,10 +20,10 @@ test.describe('Knowledge Map and Viewer', () => {
   test('reaches a process spec from a level-2 bubble', async ({ page }) => {
     await page.goto('/knowledge/DFD_LEVEL2_YIELDCURVES.html');
 
-    // 3.3 Adjust for other effects. Its bubble opens the spec named for it.
-    await page.locator('a.process[href*="3.3_SAO_Adjustment.md"]').first().click();
-    await expect(page).toHaveURL(/3\.3_SAO_Adjustment\.md/, { timeout: 10000 });
-    await expect(page.locator('h1')).toContainText('SAO');
+    // 3.3 Adjust for other effects. Its bubble opens the spec named for it, whose title is the process name.
+    await page.locator('a.process[href*="3.3_Adjust_For_Other_Effects.md"]').first().click();
+    await expect(page).toHaveURL(/3\.3_Adjust_For_Other_Effects\.md/, { timeout: 10000 });
+    await expect(page.locator('h1')).toContainText('3.3 Adjust for other effects');
   });
 
   test('reaches the parent spec from a diagram header', async ({ page }) => {
@@ -31,11 +31,11 @@ test.describe('Knowledge Map and Viewer', () => {
     await expect(page.locator('h1')).toContainText('3.1');
 
     await page.locator('a.spec-link').click();
-    await expect(page).toHaveURL(/3\.1_Load_And_Parse\.md/, { timeout: 10000 });
+    await expect(page).toHaveURL(/3\.1_Parse_Sources_And_Calculate_Yields\.md/, { timeout: 10000 });
   });
 
   test('a leaf process spec names the code that implements it', async ({ page }) => {
-    await page.goto('/knowledge/viewer.html#/md/YieldCurves/knowledge/3.1_Load_And_Parse.md');
+    await page.goto('/knowledge/viewer.html#/md/YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md');
     const body = page.locator('#content');
     await expect(body).toContainText('parseRefCpiAndSaFactors', { timeout: 15000 });
     await expect(body).toContainText('Specifies:');
@@ -78,7 +78,7 @@ test.describe('Knowledge Map and Viewer', () => {
   });
 
   test('renders LaTeX math via KaTeX, not raw source', async ({ page }) => {
-    await page.goto('/knowledge/viewer.html#/md/YieldCurves/knowledge/3.2_Seasonal_Adjustments.md');
+    await page.goto('/knowledge/viewer.html#/md/YieldCurves/knowledge/3.2_Adjust_For_Seasonality.md');
 
     const katex = page.locator('.katex').first();
     await expect(katex).toBeVisible({ timeout: 15000 });

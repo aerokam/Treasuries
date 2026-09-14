@@ -1,6 +1,6 @@
 # FedInvest Pricing Logic
 
-**Reference for:** [3.1 Load and Parse](./3.1_Load_And_Parse.md#parse-fedinvest-prices)
+**Reference for:** [3.1 Parse sources and calculate yields](./3.1_Parse_Sources_And_Calculate_Yields.md#parse-fedinvest-prices)
 
 ## Overview
 FedInvest (TreasuryDirect) provides daily price data for US Treasury securities. These prices are calculated from secondary-market dealer quotations surveyed by the Federal Reserve Bank of New York. For the authoritative methodology by which Treasury derives these prices, see [FedInvest Treasury Pricing Methodology](FedInvest_Treasury_Pricing_Methodology.md) (based on Treasury Fiscal Service Appendix 1).
