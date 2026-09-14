@@ -122,8 +122,8 @@ export async function fetchTipsData() {
 // via the shared yieldFromPrice(), not read from Fidelity's own quoted yield column -- verified
 // more accurate than Fidelity's own figure, see 3.1_Data_Pipeline.md). datedDateRefCpi comes from
 // TipsRef.csv (Fidelity's export doesn't carry it). Settlement is T+1 from Fidelity's download
-// date (real broker trade settlement), unlike FedInvest's T=0 (needed for its own price->yield
-// math) -- see 3.1_Data_Pipeline.md "Settlement Date Conventions".
+// date (real broker trade settlement), unlike FedInvest's T=0 (1.1_Download_FedInvest_Prices.md
+// #determine-settlement-date) -- see 3.1_Data_Pipeline.md "Settlement Date Conventions".
 // Returns the same shape as fetchTipsData(): { yieldsRows, refCpiRows, tipsRefRows, bondHolidays }
 // Throws on HTTP errors.
 //
