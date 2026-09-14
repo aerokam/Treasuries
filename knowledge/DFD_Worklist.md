@@ -33,15 +33,20 @@ These came out of review and apply to every spec from here.
 - **Every term in a spec, a diagram label or a domain identifier is defined in the Data Dictionary.** Loop counters and buffers are exempt; a name carrying a domain quantity is not. The identifier for [Index Ratio](./DATA_DICTIONARY.md#index-ratio) was renamed `indexRatio` for this reason.
 - **A synonym belongs on the term**, not in the store entry that happens to use it.
 - **Every lowest-level process links to a spec, and the spec should name the code it drives** — with a check that the naming still resolves, or it rots silently.
-- **A process is named by a verb phrase stating what it does.** A process consumes one or more structures and produces another, which may be the same data restructured or data with calculated values added. The name states that transformation. A spec that specifies a process takes the process name as its title and its file name.
+- **Below Level 1, a process is named by a verb phrase stating what it does, with no article.** A process consumes one or more structures and produces another, which may be the same data restructured or data with calculated values added. The name states that transformation. A spec that specifies a process takes the process name as its title and its file name. **At Level 1 an app is named as the portal names it.**
+- **A process spec opens with the whole transformation**: every structure read, every structure produced, and every rule that keeps, drops or changes a row on the way. An opening that names only the first step is incomplete.
+- **A data store is titled in its entry as the diagrams name it, with its identifier in parentheses**: Market quotes (S7). The file name and the R2 key are part of the entry, not its title.
 - **A data flow is named by one noun for the structure it holds**, defined in the Data Dictionary, in [§6.0](./DATA_DICTIONARY.md#6.0-data-flows) when it is a composition of other terms. Two structures passing between the same two processes are two flows. `scripts/build-dfd.cjs` fails on a label that lists more than one term and reports a label with no entry.
 - **An agent spawned for this work reports; the session that spawned it decides.** A found defect is fixed, not returned to the developer as a question.
 
 ---
 
-## 3.0 Open, awaiting the developer
+## 3.0 Open, for the next session
 
-None.
+1. **Calculate the index ratio.** 3.1.7 takes the [Index Ratio](./DATA_DICTIONARY.md#index-ratio) the market quote states. The developer wants it calculated, for both sources, equal to the quoted figure, which the broker states to 9 decimal places without Treasury’s rounding convention. §3.12 records the investigation into which calculation reproduces it.
+2. **Separate the SA yield from the TIPS yield in code.** `shared/src/tips-yields.js#tipsYieldsFromPrices` performs the work of both 3.1.7 and 3.2, so both specs name the same function and the separation exists only in the spec text. A function for each process makes the drill from each spec reach code that does that process’s work and nothing more.
+3. **Check every process spec’s opening against the code**, per §2.0: 3.2 to 3.7 and the sub-processes of 3.7. 3.1.1 and 3.1.2 are corrected; 3.1.2 had described only the separation of Treasury rows from TIPS rows.
+4. **Two stores drawn on the diagrams have no entry in DataStores**, so a click on either opens the top of that page: the bond holidays and the monthly CPI (§5.0).
 
 ---
 
@@ -147,11 +152,11 @@ The 94 findings `scripts/check-spec-code.cjs` reported are down to zero, across 
 The developer set the rule in §2.0: a process name states the transformation, and a flow name is the one structure the flow holds. Applying it changed the model as well as the labels, because several labels had been lists of the several structures a single line stood for.
 
 - **Process specs are named for their process.** The seven Yield Curves specs became `3.1_Parse_Sources_And_Calculate_Yields.md` to `3.7_Render_Charts_And_Tables.md` (`39b1393`, `b25a166`), with every reference rewritten and every link that cited a retired spec number corrected.
-- **3.1.8 Calculate the Treasury yields is new.** The Treasury yields had been specified inside the parse of 3.1.2 and inside rendering, and the FedInvest Treasury yield calculation existed in the page’s render step and again in the acquisition job. It is now `shared/src/treasury-yields.js`, calculated once at load. The bid-ask spread formulas, which had three copies, are now `shared/src/spreads.js` (`194dfcc`). Every figure from the new functions equals the old formula on the live stores: 403 FedInvest Treasury yields, 649 market Treasury spreads and 53 TIPS spreads.
-- **The model was corrected where the labels had hidden an error.** The GSW curve parameters were drawn going to 3.1.7, which does not use them; they go to 3.4. 3.1.6 determines one settlement date, the market quotes’. 3.1.7 takes the index ratio the quote states rather than calculating one.
+- **3.1.8 Calculate Treasury yields is new.** The Treasury yields had been specified inside the parse of 3.1.2 and inside rendering, and the FedInvest Treasury yield calculation existed in the page’s render step and again in the acquisition job. It is now `shared/src/treasury-yields.js`, calculated once at load. The bid-ask spread formulas, which had three copies, are now `shared/src/spreads.js` (`194dfcc`). Every figure from the new functions equals the old formula on the live stores: 403 FedInvest Treasury yields, 649 market Treasury spreads and 53 TIPS spreads.
+- **The model was corrected where the labels had hidden an error.** The GSW curve parameters were drawn going to 3.1.7, which does not use them, and no default view uses them at all: they are drawn only on an analysis view opened with `?gsw`, so they are off the diagrams. 3.1.6 determines one settlement date, the market quotes’. The spec had said 3.1.7 calculates the index ratio; it takes the one the quote states (§3.0 item 1).
 - **Every flow has one Data Dictionary name** (`a9ac724`): §6.1 the flows from external entities, §6.2 the flows at Levels 0 and 1, §6.3 the Yield Curves flows. Download Date and Bond Holiday are new primitives.
 - **The context diagram has fourteen entities.** The sources of S12 and S9, the Federal Reserve and Treasury’s tentative auction schedule, had no entity and no flow, so Level 1 did not balance against Level 0. They are E13 and E14. FiscalData’s two structures are two flows.
-- **Level 1 names each app by what it does**, with its portal name beneath it.
+- **Level 1 keeps the app names.** Verb phrases were tried there and reverted: an app is known by its portal name. Below Level 1 process names have no article, and each data store is titled in its entry as the diagrams name it.
 
 ---
 
