@@ -146,3 +146,25 @@ Order followed, since this one was live: copy to the new key; repoint the writer
 The two prefixes differ by one letter and sort next to each other in a bucket listing, and the plural one contains `intraday-raw/`, which gains a file per symbol per weekday. The stale dates under the singular prefix were therefore read as a broken scheduled job twice before the cause was found. It was never broken.
 
 Every live writer already used the plural prefix (`updateYieldsHistory.js`, `archiveIntraday.js`, `probeClose.js`, `probeLock.js`). The single remaining reference to the singular prefix was `fetchLegacySeries()` in `updateYieldsHistory.js`, a one-time migration seed that could no longer fire — it ran only for a symbol with no accumulated history, and every symbol has some. Removed with its call site.
+
+---
+
+## Correction (2026-09-14)
+
+The `console.error` → `console.log` workaround from the 2026-06-01 correction above only relocated
+one call site (`updateSaSaoYields.js`'s progress logging); it didn't remove the underlying cause,
+and the same class of bug recurred at a second site — `fidelityDownload.js`'s handled MFA fallback
+(`console.error('Automated MFA handling failed, falling back to manual wait...')` inside a caught
+`try`/`catch`, not a real failure). Every recent `FidelityQuotes` run hit this path and was logged
+as `Exited with code 1`, which made `run-fidelity.cmd` skip its chained `run-yield-curves.cmd` step
+even though the download and upload had succeeded.
+
+Fixed at the source instead of the call site: `run-fidelity.cmd` piped `node` through
+`powershell -Command "& node ... 2>&1 | Tee-Object ..."`, and PowerShell 5.1 wraps a native
+command's redirected stderr into `NativeCommandError` objects, which flips `powershell.exe`'s own
+exit code to 1 regardless of what `node` actually exited with. Replaced with plain cmd-level
+redirection (`node "%SCRIPT%" >> "%LOG%" 2>&1`, matching `run-yield-curves.cmd`'s existing
+pattern), which reports `node`'s real exit code. This removes the failure mode for every future
+`console.error` call in the chain, not just the two found so far — the 2026-06-01 workaround is no
+longer load-bearing but was left in place (moving progress logging to `console.log` is still correct
+practice; `console.error` is for real failures).
