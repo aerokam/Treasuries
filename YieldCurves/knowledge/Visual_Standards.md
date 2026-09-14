@@ -63,8 +63,10 @@ The legend and visual priority follow the logical flow of data:
 
 ### 3. Auto-Rescale on Filter Change
 Any checkbox that changes what data is displayed must trigger a Y-axis auto-fit (clear saved zoom, re-render from data bounds). This includes:
-- **Type filters** (Bills, Notes, Bonds, STRIPS): Y-axis and X-axis rescale to the remaining data.
+- **Security type filters** (Bills, Notes, Bonds, STRIPS): Y-axis and X-axis rescale to the remaining data.
 - **Clip Outliers**: Y-axis rescales applying or removing IQR-based clipping.
+
+**Curve type toggles** (Ask, Spot) do **not** rescale. Unlike a security type filter, a curve type does not change which securities are in the data set — it changes which representation of that data set is drawn (the per-security Ask points, or the fitted Spot curve), the same distinction TIPS draws between its own Ask/SA/SAO/Spot checkboxes. Toggling one rebuilds the chart and table, but the current view (X zoom/pan **and** Y scale) is preserved verbatim — the same behavior as a **source toggle** below.
 
 **Source toggles** (FedInvest, Market) do **not** rescale at all. Adding or removing a source rebuilds the chart, but the current view (X zoom/pan **and** Y scale) is preserved verbatim — the same behavior as showing/hiding a series (Ask, SA, SAO). A source toggle must never change the axis bounds. Mechanism: the source handlers snapshot the live scales into `savedZoom[tab]` before `processAndRender()`, so the rebuild restores them instead of auto-fitting.
 
@@ -77,11 +79,11 @@ Each tab (TIPS, Treasuries) maintains its own independent zoom state:
 - Zoom state is cleared (auto-fit) when any filter checkbox is toggled on the active tab.
 
 ### 5. Outlier Clipping (Treasuries only)
-The **Clip Outliers** toggle (default: on) clips the Y-axis floor to suppress near-maturity Bills/Notes with extreme negative YTM. A Bill or Note maturing in days and trading at a tiny premium can show yields like −5%, which collapses the visible yield range for all other data. Only the floor is clipped — no upper bound is applied.
+The **Clip Outliers** toggle (default: on) clips the Y-axis floor to suppress near-maturity Bills/Notes/STRIPS with extreme negative YTM. A Bill, Note or STRIP maturing in days and trading at a tiny premium can show yields like −5%, which collapses the visible yield range for all other data. Only the floor is clipped — no upper bound is applied. Clipping only ever trims the per-security Ask points — it never applies to the Spot curve, which is a smooth fit and not a candidate for a near-maturity outlier.
 
 **Algorithm (`iqrClipBounds`):**
-- Only activates when Bills or Notes series are visible — they are the source of near-maturity garbage; Bonds/STRIPS alone are not clipped.
-- IQR source: positive-yield Bills + Notes values only (filters out near-maturity values before computing Q1/Q3).
+- Only activates when Ask is checked and Bills, Notes or STRIPS are visible — they are the source of near-maturity garbage; Bonds alone are not clipped, and unchecking Ask removes the points it would clip.
+- IQR source: positive-yield Bills + Notes + STRIPS values only (filters out near-maturity values before computing Q1/Q3).
 - Fence = max(1.0 × IQR, 0.5%); floor = Q1 − fence.
 - Floor is applied to all visible Y values; ceiling = natural data max (unconstrained).
 - Data points below the floor are still plotted — only the axis scale is adjusted.

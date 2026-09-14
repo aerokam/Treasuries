@@ -612,7 +612,7 @@ coverExcessCost_c = Future 30Y total cost × coverWeight_c
 
 <a id="iqr-clip"></a>
 ### IQR Clip
-`IQR_Clip` = *Y-axis floor applied to the Treasuries chart tab to suppress near-maturity Bills/Notes with extreme negative YTM. Floor = Q1 − max(1.0 × IQR, 0.5%) computed from positive-yield Bills + Notes values only. Does not remove data points — only adjusts the visible axis scale. Upper bound unconstrained.*
+`IQR_Clip` = *Y-axis floor applied to the Treasuries chart tab to suppress near-maturity Bills/Notes/STRIPS with extreme negative YTM. Floor = Q1 − max(1.0 × IQR, 0.5%) computed from positive-yield Bills + Notes + STRIPS values only. Does not remove data points — only adjusts the visible axis scale. Upper bound unconstrained.*
 
 ---
 

@@ -251,7 +251,7 @@ test('market-quote nominal yield comes from the quoted price, not the quoted yie
   await expect(billRow).not.toContainText('3.810%');
 });
 
-test('Treasuries: unchecking Bills/Notes/Bonds with Spot on does not error', async ({ page }) => {
+test('Treasuries: unchecking Bills/Notes/Bonds with Spot on leaves only Spot curve rows', async ({ page }) => {
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
   await loadTreasuries(page);
@@ -259,9 +259,54 @@ test('Treasuries: unchecking Bills/Notes/Bonds with Spot on does not error', asy
   await page.locator('#filterBills').uncheck();
   await page.locator('#filterNotes').uncheck();
   await page.locator('#filterBonds').uncheck();
-  await expect(page.locator('#nominalsTable tbody tr')).toHaveCount(0);
-  // re-check restores the per-bond rows
+  // Security rows are gone, but Spot curve rows remain — the curve fits the full non-STRIP
+  // set regardless of which security types are checked (per 3.7.3 Draw Treasuries view).
+  const rows = page.locator('#nominalsTable tbody tr');
+  await expect(rows.first()).toContainText('Spot (');
+  await expect(page.locator('#nominalsTable tbody tr', { hasText: '912797TB3' })).toHaveCount(0);
+  // re-check restores the per-bond rows too
   await page.locator('#filterNotes').check();
-  await expect(page.locator('#nominalsTable tbody tr')).not.toHaveCount(0);
+  await expect(page.locator('#nominalsTable tbody tr', { hasText: '91282CBT7' })).toHaveCount(1);
   expect(errors).toEqual([]);
+});
+
+test('Treasuries Ask toggle: cannot be unchecked while Spot is also off', async ({ page }) => {
+  await loadTreasuries(page);
+  await expect(page.locator('#showTsyAsk')).toBeChecked();   // Ask is explicit and on by default
+  await expect(page.locator('#showTsySpot')).not.toBeChecked();
+  await page.locator('#showTsyAsk').click();
+  // Reverted — Spot was already off, so unchecking the last curve type is blocked.
+  await expect(page.locator('#showTsyAsk')).toBeChecked();
+});
+
+test('Treasuries Ask toggle: unchecking Ask removes the Ask column once Spot is on', async ({ page }) => {
+  await loadTreasuries(page);
+  await page.locator('#showTsySpot').check();
+  await page.locator('#showTsyAsk').uncheck();
+  await expect(page.locator('#showTsyAsk')).not.toBeChecked();
+  await expect(page.locator('#nominalsTable thead th', { hasText: 'Ask' })).toHaveCount(0);
+});
+
+test('Treasuries curve types: at least one of Ask/Spot must stay checked', async ({ page }) => {
+  await loadTreasuries(page);
+  await page.locator('#showTsySpot').check();
+  await page.locator('#showTsyAsk').uncheck();
+  await page.locator('#showTsySpot').click();
+  // The last one unchecked is reverted rather than leaving nothing shown.
+  await expect(page.locator('#showTsySpot')).toBeChecked();
+});
+
+test('Treasuries All/None only affect security types, not Ask/Spot', async ({ page }) => {
+  await loadTreasuries(page);
+  await page.locator('#nominalsShowNone').click();
+  await expect(page.locator('#filterBills')).not.toBeChecked();
+  await expect(page.locator('#filterNotes')).not.toBeChecked();
+  await expect(page.locator('#filterBonds')).not.toBeChecked();
+  await expect(page.locator('#filterStrips')).not.toBeChecked();
+  await expect(page.locator('#showTsyAsk')).toBeChecked();
+  await page.locator('#nominalsShowAll').click();
+  await expect(page.locator('#filterBills')).toBeChecked();
+  await expect(page.locator('#filterNotes')).toBeChecked();
+  await expect(page.locator('#filterBonds')).toBeChecked();
+  await expect(page.locator('#filterStrips')).toBeChecked();
 });

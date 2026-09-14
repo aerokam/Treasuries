@@ -244,6 +244,11 @@ const COL_HELP = {
 <p>It is a <strong>zero-coupon</strong> curve: the rate for a single payment at each horizon. The fit chooses the curve so that discounting every TIPS's own cash flows along it reproduces that bond's price. Because a bond's yield-to-maturity blends together many different-dated payments, two TIPS of the same maturity but different coupons have slightly different yields to maturity — the spot curve removes that coupon effect.</p>
 <p>Same curve family (Nelson-Siegel-Svensson) the Federal Reserve uses for its published TIPS curve. <strong>Spot</strong> is fitted to the <strong>quoted ask</strong> yields, so it tracks the Ask points.</p>`
   },
+  'ask-yield-tsy': {
+    title: 'Ask Yield',
+    html: `<p>Yield to maturity (YTM) calculated directly from the market price using standard Treasury bond math (semi-annual compounding).</p>
+<p>For broker quotes (solid lines), this is the yield from the <strong>Ask Price</strong>. For FedInvest data (dotted lines), the price is the <strong>midpoint of bid and ask</strong>, so the yield will be higher than a true market ask yield. This is especially evident for short-dated Bills.</p>`
+  },
   'spot-tsy': {
     title: 'Spot — Zero-Coupon Yield Curve',
     html: `<p>Bills, Notes and Bonds are one point per security. <strong>Spot</strong> is a single smooth curve fitted through the coupon Treasuries (Notes and Bonds), one line per price source (FedInvest dotted, Market solid).</p>
@@ -657,7 +662,7 @@ function processAndRenderNominals() {
       renderSpreadCharts(fidFiltered, 'treasuries');
       renderSpreadTable(fidFiltered, 'treasuries');
     } else {
-      renderNominalsTable(fedFiltered, fidFiltered);
+      renderNominalsTable(fedFiltered, fidFiltered, fedSpotInRange, fidSpotInRange);
       renderNominalsChart(fedFiltered, fidFiltered, fedSpotInRange, fidSpotInRange);
     }
 
@@ -679,7 +684,14 @@ function processAndRenderNominals() {
   }
 }
 
-function renderNominalsTable(fedBonds, fidBonds) {
+// Curve-type columns for the Treasuries table, gated by their own checkbox — same pattern as
+// TIPS_TABLE_SERIES. Ask is a per-security cell; Spot adds curve-only rows (see below).
+const NOMINALS_CURVE_COLS = [
+  { key: 'ask',  label: 'Ask',  help: 'ask-yield-tsy', checkboxId: 'showTsyAsk' },
+  { key: 'spot', label: 'Spot', help: 'spot-tsy',       checkboxId: 'showTsySpot' },
+];
+
+function renderNominalsTable(fedBonds, fidBonds, fedSpotBonds, fidSpotBonds) {
   const theadRow = document.querySelector('#nominalsTable thead tr');
   const tbody = document.getElementById('nominalsTableBody');
   const bothActive = fedBonds && fidBonds;
@@ -689,6 +701,13 @@ function renderNominalsTable(fedBonds, fidBonds) {
   const sortCls = col => nominalsSort.col === col ? ` class="sort-${nominalsSort.dir}"` : '';
   const makeCmp = getV => (a, b) => { const va = getV(a), vb = getV(b); return (va < vb ? -1 : va > vb ? 1 : 0) * (nominalsSort.dir === 'asc' ? 1 : -1); };
 
+  const curveCols = NOMINALS_CURVE_COLS.filter(c => document.getElementById(c.checkboxId).checked);
+  const spotColIdx = curveCols.findIndex(c => c.key === 'spot');
+  const curveHeaderHtml = curveCols.map(c => {
+    const sortAttr = (c.key === 'ask' && !bothActive) ? ` data-sort="yield"${sortCls('yield')}` : '';
+    return `<th${sortAttr}><a class="col-help" href="#" data-col="${c.help}">${c.label}${bothActive ? ' (Fed/Mkt)' : ''}</a></th>`;
+  }).join('');
+
   if (bothActive) {
     theadRow.innerHTML = `
       <th data-sort="maturity"${sortCls('maturity')}>Maturity</th>
@@ -696,8 +715,7 @@ function renderNominalsTable(fedBonds, fidBonds) {
       <th>Type</th>
       <th data-sort="coupon"${sortCls('coupon')}>Coupon</th>
       <th>Price (Fed/Mkt)</th>
-      <th>Yield (Fed/Mkt)</th>
-`;
+      ${curveHeaderHtml}`;
     const fedMap = new Map(fedBonds.map(b => [b.cusip, b]));
     const fidMap = new Map(fidBonds.map(b => [b.cusip, b]));
     const getV = b => nominalsSort.col === 'cusip' ? b.cusip : nominalsSort.col === 'coupon' ? b.coupon : b.maturityDate;
@@ -712,7 +730,7 @@ function renderNominalsTable(fedBonds, fidBonds) {
         <td>${shortType(b.type)}</td>
         <td>${((b.coupon || 0) * 100).toFixed(3)}%</td>
         <td>${isNaN(b.fedPrice) ? '—' : b.fedPrice.toFixed(3)} / ${isNaN(b.fidPrice) ? '—' : b.fidPrice.toFixed(3)}</td>
-        <td>${fmtYld(b.fedYield)} / ${fmtYld(b.fidYield)}</td>
+        ${curveCols.map(c => `<td>${c.key === 'ask' ? `${fmtYld(b.fedYield)} / ${fmtYld(b.fidYield)}` : '—'}</td>`).join('')}
       </tr>`).join('');
   } else {
     const bonds = fedBonds || fidBonds;
@@ -722,7 +740,7 @@ function renderNominalsTable(fedBonds, fidBonds) {
       <th>Type</th>
       <th data-sort="coupon"${sortCls('coupon')}>Coupon</th>
       <th data-sort="price"${sortCls('price')}>Price</th>
-      <th data-sort="yield"${sortCls('yield')}>Yield</th>`;
+      ${curveHeaderHtml}`;
     const getV = b => nominalsSort.col === 'maturity' ? b.maturityDate : nominalsSort.col === 'cusip' ? b.cusip : nominalsSort.col === 'coupon' ? b.coupon : nominalsSort.col === 'price' ? b.price : b.yield;
     const sorted = [...bonds].sort(makeCmp(getV));
     tbody.innerHTML = sorted.map(b => `
@@ -732,8 +750,32 @@ function renderNominalsTable(fedBonds, fidBonds) {
         <td>${shortType(b.type)}</td>
         <td>${(b.coupon * 100).toFixed(3)}%</td>
         <td>${isNaN(b.price) ? '—' : b.price.toFixed(3)}</td>
-        <td>${(b.yield * 100).toFixed(3)}%</td>
+        ${curveCols.map(c => `<td>${c.key === 'ask' ? fmtYld(b.yield) : '—'}</td>`).join('')}
       </tr>`).join('');
+  }
+
+  // Spot curve rows — the fitted zero-coupon Treasury curve (same fit the chart draws),
+  // appended after the security rows since a curve point has a Term but no CUSIP to sort by.
+  if (spotColIdx !== -1) {
+    const curveByTerm = new Map();   // term.toFixed(4) -> { term, fed, mkt }
+    const addCurve = (bonds, source) => {
+      const grid = bonds && spotCurveTermGrid(bonds, { priceOf: b => b.price, yieldOf: b => b.yield, minT: 0.25 });
+      if (!grid) return;
+      for (const { t, y } of grid) {
+        const tk = t.toFixed(4);
+        if (!curveByTerm.has(tk)) curveByTerm.set(tk, { term: t });
+        curveByTerm.get(tk)[source] = y;
+      }
+    };
+    addCurve(fedSpotBonds, 'fed');
+    addCurve(fidSpotBonds, 'mkt');
+    const fmt = v => v != null ? v.toFixed(3) + '%' : '—';
+    tbody.innerHTML += [...curveByTerm.values()].sort((a, b) => a.term - b.term).map(({ term, fed, mkt }) => {
+      const cells = curveCols.map((c, i) => i === spotColIdx
+        ? `<td>${bothActive ? `${fmt(fed)} / ${fmt(mkt)}` : fmt(fed ?? mkt)}</td>`
+        : '<td>—</td>');
+      return `<tr><td>Spot (${term.toFixed(1)}y)</td><td>—</td><td>—</td><td>—</td><td>—</td>${cells.join('')}</tr>`;
+    }).join('');
   }
 }
 
@@ -864,18 +906,20 @@ function renderNominalsChart(fedBonds, fidBonds, fedSpotBonds, fidSpotBonds) {
     };
   }
 
-  // The spot curve drives the initial y-scale only when it is actually shown (off by
-  // default). It is a smooth fit, so it is never treated as an outlier — Clip Outliers
-  // only trims the per-bond points.
+  // The Ask (bare-point) and Spot series each drive the initial y-scale only when their own
+  // curve-type checkbox is checked (Spot off by default). Spot is a smooth fit, so it is
+  // never treated as an outlier — Clip Outliers only trims the per-bond Ask points.
+  const askShown = document.getElementById('showTsyAsk').checked;
   const spotShown = document.getElementById('showTsySpot').checked;
-  const barePointY = activeSeries.filter(s => !s.curve).flatMap(s => s.data).map(d => d.y);
+  const barePointY = askShown ? activeSeries.filter(s => !s.curve).flatMap(s => s.data).map(d => d.y) : [];
   const curveY = spotShown ? activeSeries.filter(s => s.curve).flatMap(s => s.data).map(d => d.y) : [];
   let scaleY = barePointY.slice();
   if (nominalsClipOutliers && barePointY.length >= 4) {
-    // Use Bills/Notes yields for IQR (outliers live in short-dated issues; bonds widen IQR too much).
-    // Filter IQR source to positive yields only — near-maturity Bills/Notes can show extreme
-    // negative YTM (e.g. -5%) when trading at a tiny premium with days to expiry.
-    const nearMaturityY = activeSeries.filter(s => s.label.includes('Notes') || s.label.includes('Bills')).flatMap(s => s.data).map(d => d.y);
+    // Use Bills/Notes/STRIPS yields for IQR (outliers live in short-dated issues; bonds widen
+    // IQR too much). Filter IQR source to positive yields only — near-maturity Bills/Notes/
+    // STRIPS can show extreme negative YTM (e.g. -5%) when trading at a tiny premium with days
+    // to expiry.
+    const nearMaturityY = activeSeries.filter(s => s.label.includes('Notes') || s.label.includes('Bills') || s.label.includes('STRIPS')).flatMap(s => s.data).map(d => d.y);
     const nearMaturityYPos = nearMaturityY.filter(y => y > 0);
     if (nearMaturityYPos.length >= 4) {
       const bounds = iqrClipBounds(nearMaturityYPos);
@@ -913,7 +957,7 @@ function renderNominalsChart(fedBonds, fidBonds, fedSpotBonds, fidSpotBonds) {
         pointRadius: s.curve ? (s.markerR ?? 0) : s.r,
         pointHoverRadius: s.curve ? 5 : (s.r > 0 ? s.r + 2 : 3),
         tension: s.curve ? 0.3 : 0.1,
-        hidden: s.curve ? !document.getElementById('showTsySpot').checked : false
+        hidden: s.curve ? !document.getElementById('showTsySpot').checked : !document.getElementById('showTsyAsk').checked
       }))
     },
     options: {
@@ -1366,10 +1410,10 @@ function rescaleToVisible(chart) {
   if (allVisibleY.length === 0 && curveVisibleY.length === 0) return;
 
   if (nominalsClipOutliers && chartTab === 'treasuries' && allVisibleY.length >= 4) {
-    // Use Bills/Notes yields for IQR (outliers live in short-dated issues; bonds widen IQR too much)
+    // Use Bills/Notes/STRIPS yields for IQR (outliers live in short-dated issues; bonds widen IQR too much)
     const nearMaturityVisibleY = [];
     chart.data.datasets.forEach((dataset, i) => {
-      if (!chart.isDatasetVisible(i) || !(dataset.label.includes('Notes') || dataset.label.includes('Bills'))) return;
+      if (!chart.isDatasetVisible(i) || !(dataset.label.includes('Notes') || dataset.label.includes('Bills') || dataset.label.includes('STRIPS'))) return;
       dataset.data.forEach(p => { if (p.x >= xMin && p.x <= xMax) nearMaturityVisibleY.push(p.y); });
     });
     const nearMaturityVisibleYPos = nearMaturityVisibleY.filter(y => y > 0);
@@ -2095,10 +2139,11 @@ document.getElementById('beiShowNone').onclick = (e) => {
   });
 };
 
-// Nominals 'All/None' Links
+// Nominals 'All/None' Links — Security types only. Ask/Spot are curve types, not security
+// types: with only two of them and one always required, All/None would not make sense there.
 document.getElementById('nominalsShowAll').onclick = (e) => {
   e.preventDefault();
-  ['filterBills', 'filterNotes', 'filterBonds', 'showTsySpot'].forEach(id => {
+  ['filterBills', 'filterNotes', 'filterBonds', 'filterStrips'].forEach(id => {
     const el = document.getElementById(id);
     el.checked = true;
     el.dispatchEvent(new Event('change', { bubbles: true }));
@@ -2106,7 +2151,7 @@ document.getElementById('nominalsShowAll').onclick = (e) => {
 };
 document.getElementById('nominalsShowNone').onclick = (e) => {
   e.preventDefault();
-  ['filterBills', 'filterNotes', 'filterBonds', 'showTsySpot'].forEach(id => {
+  ['filterBills', 'filterNotes', 'filterBonds', 'filterStrips'].forEach(id => {
     const el = document.getElementById(id);
     el.checked = false;
     el.dispatchEvent(new Event('change', { bubbles: true }));
@@ -2199,14 +2244,18 @@ document.getElementById('nominalsTable').querySelector('thead').addEventListener
 });
 
 document.getElementById('nominalsControls').addEventListener('change', (e) => {
-  if (e.target.id === 'showTsySpot') {
-    if (chart && activeTab === 'treasuries') {
-      chart.data.datasets.forEach((ds, i) => {
-        if (ds.label.startsWith('Spot')) chart.setDatasetVisibility(i, e.target.checked);
-      });
-      chart.update('none');
-      rescaleToVisible(chart);
+  if (e.target.id === 'showTsyAsk' || e.target.id === 'showTsySpot') {
+    // At least one curve type must stay checked — with only two, unchecking the last one
+    // would leave nothing to show and All/None would not make sense for a pair like this.
+    const askEl = document.getElementById('showTsyAsk');
+    const spotEl = document.getElementById('showTsySpot');
+    if (!askEl.checked && !spotEl.checked) {
+      e.target.checked = true;
+      return;
     }
+    // A curve type is a series toggle, not a data filter — like a source toggle, it rebuilds
+    // the chart and table but preserves the current zoom/scale rather than auto-fitting.
+    processAndRenderNominals();
     return;
   }
   if (e.target.id === 'clipOutliers') {
