@@ -222,7 +222,7 @@ function level1() {
   const apps = [
     { key: 'lm', cat: 'workflow', name: ['Ladder', 'Manager'], spec: V('knowledge/TipsLadderManager.md'), reads: ['fedinv', 'tipsref', 'refcpi', 'sasao', 'hol'] },
     { key: 'tr', cat: 'reference', name: ['TIPS', 'Reference'], spec: V('TipsReference/knowledge/1.0_TIPS_Reference.md'), reads: ['tipsref', 'refcpi', 'sasao', 'hol'] },
-    { key: 'pr', cat: 'educational', name: ['Treasury', 'Primer'], spec: V('Primer/knowledge/1.0_Primer.md'), reads: ['tipsref', 'refcpi'] },
+    { key: 'pr', cat: 'educational', name: ['Treasury', 'Primer'], spec: V('Primer/knowledge/1.0_Primer.md'), reads: ['fedinv', 'tipsref', 'refcpi'] },
     { key: 'ce', cat: 'reference', name: ['CPI', 'Explorer'], spec: V('CpiExplorer/knowledge/1.0_Overview.md'), reads: ['refcpi', 'cpihist'] },
     { key: 'ym', cat: 'workflow', name: ['Yields', 'Monitor'], spec: V('knowledge/YieldsMonitor.md'), reads: ['tipsref', 'nsasa', 'hol', 'yhist'] },
     { key: 'yc', cat: 'workflow', name: ['Yield', 'Curves'], spec: 'DFD_LEVEL2_YIELDCURVES.html', reads: ['fedinv', 'nsasa', 'quotes', 'gsw', 'hol'] },
@@ -395,7 +395,7 @@ function level3YieldCurvesLoad() {
   ];
   const S = a => V(F31 + '#' + a);
   const procs = [
-    { id: '3.1.1', name: ['Parse FedInvest', 'prices'], href: S('parse-fedinvest-prices'), reads: ['fedinv'], out: { '3.1.7': ['TIPS prices'], '3.1.8': ['Treasury prices'] } },
+    { id: '3.1.1', name: ['Parse FedInvest', 'prices'], href: S('parse-fedinvest-prices'), reads: ['fedinv'], out: { '3.1.7': ['TIPS prices', 'settlement date'], '3.1.8': ['Treasury prices', 'settlement date'] } },
     { id: '3.1.2', name: ['Parse market', 'quotes'], href: S('parse-market-quotes'), reads: ['quotes'], out: { '3.1.6': ['download date'], '3.1.7': ['TIPS quotes'], '3.1.8': ['Treasury quotes'] } },
     { id: '3.1.3', name: ['Parse Ref CPI', 'and SA factors'], href: S('parse-ref-cpi-and-sa-factors'), reads: ['nsasa'], out: {} },
     { id: '3.1.4', name: ['Parse bond', 'holidays'], href: S('parse-bond-holidays'), reads: ['hol'], out: { '3.1.6': ['bond holidays'] } },
@@ -445,8 +445,8 @@ function level2Ingestion() {
   // Each job is a process; each writes the store named beside it. Sources are not
   // redrawn as entities here: their flows enter from the page edge, named by the data they hold.
   const jobs = [
-    { id: '1.1',  name: ['Download', 'FedInvest', 'prices'],        data: 'daily mid-market prices',    writes: ['fedinv'] },
-    { id: '1.2',  name: ['Download', 'market quotes'],              data: 'market quotes',              writes: ['quotes'] },
+    { id: '1.1',  name: ['Download', 'FedInvest', 'prices'],        data: 'daily mid-market prices', reads: ['tipsref', 'hol'], writes: ['fedinv'], href: 'DFD_LEVEL3_INGEST_FEDINVEST.html' },
+    { id: '1.2',  name: ['Download', 'market quotes'],              data: 'market quotes', reads: ['hol'],     writes: ['quotes'] },
     { id: '1.3',  name: ['Calculate', 'yield curve', 'data sets'],  data: null, reads: ['fedinv', 'quotes', 'nsasa', 'hol'], writes: ['yc', 'bei', 'spread'] },
     { id: '1.4',  name: ['Fetch auction', 'results'],               data: 'auction results',            writes: ['auctions'] },
     { id: '1.5',  name: ['Fetch tentative', 'auction', 'schedule'], data: 'tentative auction schedule', writes: ['tent'] },
@@ -497,16 +497,16 @@ function level2Ingestion() {
     });
   });
   order.forEach((k, i) => P.push(storeShape(SX, sy(i), SW, stores[k][1], stores[k][0])));
-  jobs.forEach((j, i) => P.push(procShape(JX, jy(i), JR, V('knowledge/Data_Pipeline.md'), j.id, j.name)));
+  jobs.forEach((j, i) => P.push(procShape(JX, jy(i), JR, j.href || V('knowledge/Data_Pipeline.md'), j.id, j.name)));
   P.push('</svg>');
 
   return page({
     title: 'Ingestion jobs — Level 2', h1: 'Level 2 &mdash; 1 Acquire and derive reference data', maxWidth: W,
     up: 'DFD_LEVEL1.html', upLabel: 'Level 1', svg: P.join(NL),
-    notes: ['  One process per scheduled job, and the store each writes. A job that reads a store as well as writing one calculates rather than retrieves.',
-      '  1.3, 1.10 and 1.11 read no external source: they calculate from what the retrieving jobs have stored. 1.14 reads both an external source and two stores.',
+    notes: ['  One process per scheduled job, and the store each writes.',
+      '  1.3, 1.10 and 1.11 read no external source: they calculate from what the retrieving jobs have stored. 1.1, 1.2 and 1.14 read both an external source and one or more stores.',
       '  Sources are not redrawn here. Their flows enter from the edge, named by the data they hold, and each source is drawn on the <a href="KNOWLEDGE_MAP.html">context diagram</a>.',
-      '  Every job drills to <a href="viewer.html#/md/knowledge/Data_Pipeline.md">Data Pipeline</a> for its schedule and script path. Per-job process specs do not exist yet.'].join(NL)
+      '  1.1 explodes at <a href="DFD_LEVEL3_INGEST_FEDINVEST.html">Level 3</a>. Every other job drills to <a href="viewer.html#/md/knowledge/Data_Pipeline.md">Data Pipeline</a> for its schedule and script path; its process spec is not yet written.'].join(NL)
   });
 }
 
@@ -573,10 +573,52 @@ function level3YieldCurvesRender() {
   });
 }
 
+// ── Level 3: 1.1 Download FedInvest prices ──────────────────────────────────
+function level3IngestFedInvest() {
+  const S = a => V('knowledge/1.1_Download_FedInvest_Prices.md' + (a ? '#' + a : ''));
+  const procs = [
+    { id: '1.1.1', name: ['Determine', 'settlement date'], href: S('determine-settlement-date'), out: { '1.1.3': ['settlement date'] } },
+    { id: '1.1.2', name: ['Select TIPS and', 'Treasury prices'], href: S('select-tips-and-treasury-prices'), out: { '1.1.3': ['TIPS prices', 'Treasury prices'] } },
+    { id: '1.1.3', name: ['Calculate', 'yields'], href: S('calculate-yields'), out: {} },
+  ];
+  const PR = 60, SW = 215, W = 1100, H = 660;
+  const px = { '1.1.1': 380, '1.1.2': 380, '1.1.3': 700 };
+  const py = { '1.1.1': 190, '1.1.2': 460, '1.1.3': 325 };
+  const OBS = procs.map(q => ({ x: px[q.id], y: py[q.id], r: PR }));
+  const LBL = [];
+  const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 3: 1.1 Download FedInvest prices, three processes from the FedInvest price list to S1.">`, marker()];
+  // The price list enters from the page edge at each process that reads it.
+  ['1.1.1', '1.1.2'].forEach(id => {
+    P.push(flow(8, py[id], px[id] - PR - 3, py[id], { obstacles: OBS.filter(o => o.y !== py[id]) }));
+    P.push(labelAt(12, py[id] - 12, 'daily mid-market prices'));
+  });
+  // Bond holidays above 1.1.1 and S2 below 1.1.2 are read; S1, right of 1.1.3, is written.
+  const hol = { x: px['1.1.1'] - SW / 2, y: 50 }, ref = { x: px['1.1.2'] - SW / 2, y: 610 }, s1 = { x: 860, y: py['1.1.3'] };
+  P.push(flow(px['1.1.1'], hol.y + 25, px['1.1.1'], py['1.1.1'] - PR - 3));
+  P.push(flow(px['1.1.2'], ref.y - 25, px['1.1.2'], py['1.1.2'] + PR + 3));
+  P.push(flow(px['1.1.3'] + PR + 3, s1.y, s1.x - 5, s1.y));
+  P.push(internalFlows(procs, px, py, PR, OBS, LBL));
+  P.push(storeShape(hol.x, hol.y, SW, DS(), 'Bond holidays'));
+  P.push(storeShape(ref.x, ref.y, SW, DS('s2'), 'TIPS reference data'));
+  P.push(storeShape(s1.x, s1.y, SW, DS('s1'), 'FedInvest prices'));
+  procs.forEach(p => P.push(procShape(px[p.id], py[p.id], PR, p.href, p.id, p.name)));
+  P.push('</svg>');
+
+  return page({
+    spec: S(), specLabel: '1.1 Download FedInvest prices',
+    title: '1.1 Download FedInvest prices — Level 3', h1: 'Level 3 &mdash; 1.1 Download FedInvest prices', maxWidth: W,
+    up: 'DFD_LEVEL2_INGESTION.html', upLabel: 'Level 2 — 1 Acquire and derive reference data', svg: P.join(NL),
+    notes: ['  Every process here drills to its own section of <a href="' + S() + '">1.1 Download FedInvest prices</a>.',
+      '  The flow entering from the edge is the FedInvest daily price list, drawn against its source on the <a href="KNOWLEDGE_MAP.html">context diagram</a>. 1.1.1 reads the date it states, and 1.1.2 reads its rows.',
+      '  On a Bond Holiday, or when the price list does not state prices for the run date, 1.1.1 produces no settlement date and S1 is not written.'].join(NL)
+  });
+}
+
 // ── emit ────────────────────────────────────────────────────────────────────
 const outputs = [
   ['knowledge/DFD_LEVEL1.html', level1()],
   ['knowledge/DFD_LEVEL2_INGESTION.html', level2Ingestion()],
+  ['knowledge/DFD_LEVEL3_INGEST_FEDINVEST.html', level3IngestFedInvest()],
   ['knowledge/DFD_LEVEL2_YIELDCURVES.html', level2YieldCurves()],
   ['knowledge/DFD_LEVEL3_YC_LOAD.html', level3YieldCurvesLoad()],
   ['knowledge/DFD_LEVEL3_YC_RENDER.html', level3YieldCurvesRender()],
