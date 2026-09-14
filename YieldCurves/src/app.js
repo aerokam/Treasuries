@@ -635,12 +635,16 @@ function processAndRenderNominals() {
       if (fidProcessed) fidProcessed = fidProcessed.filter(b => !isStrip(b.cusip));
     }
 
-    const allBonds = [...(fedProcessed || []), ...(fidProcessed || [])].sort((a, b) => a.maturityDate - b.maturityDate);
+    // Default range spans every security type, not just the ones currently checked — the
+    // range must not move as a side effect of toggling a type, or it silently starves the
+    // Spot fit below (Visual_Standards.md's Maturity Range note).
+    const universalBonds = [...(showFed ? rawNominalsData : []), ...(showFid ? fidelityNominalsData : [])]
+      .sort((a, b) => a.maturityDate - b.maturityDate);
     const startEl = document.getElementById('startMaturity');
     const endEl = document.getElementById('endMaturity');
-    if (!startEl.value && allBonds.length > 0) {
-      startEl.value = allBonds[0].maturity;
-      endEl.value = allBonds[allBonds.length - 1].maturity;
+    if (!startEl.value && universalBonds.length > 0) {
+      startEl.value = universalBonds[0].maturity;
+      endEl.value = universalBonds[universalBonds.length - 1].maturity;
     }
 
     const startDate = parseIsoInput(startEl.value) || new Date(0);
@@ -648,8 +652,14 @@ function processAndRenderNominals() {
     const inRange = b => b.maturityDate >= startDate && b.maturityDate <= endDate;
     const fedFiltered = fedProcessed ? fedProcessed.filter(inRange) : null;
     const fidFiltered = fidProcessed ? fidProcessed.filter(inRange) : null;
-    const fedSpotInRange = fedSpotSet ? fedSpotSet.filter(inRange) : null;
-    const fidSpotInRange = fidSpotSet ? fidSpotSet.filter(inRange) : null;
+
+    // The Spot fit itself always uses the full, un-ranged set (fedSpotSet/fidSpotSet) — the
+    // Maturity Range only crops what gets drawn/listed from the resulting curve, exactly like
+    // it crops the other security types' own points, via startTermY/endTermY below and via
+    // the chart's own axis domain.
+    const refSettle = localDate(fedSpotSet?.[0]?.settlementDate || fidSpotSet?.[0]?.settlementDate);
+    const startTermY = refSettle ? termYears(refSettle, startDate) : -Infinity;
+    const endTermY = refSettle ? termYears(refSettle, endDate) : Infinity;
 
     if (fidFiltered) {
       fidFiltered.forEach(b => {
@@ -662,8 +672,8 @@ function processAndRenderNominals() {
       renderSpreadCharts(fidFiltered, 'treasuries');
       renderSpreadTable(fidFiltered, 'treasuries');
     } else {
-      renderNominalsTable(fedFiltered, fidFiltered, fedSpotInRange, fidSpotInRange);
-      renderNominalsChart(fedFiltered, fidFiltered, fedSpotInRange, fidSpotInRange);
+      renderNominalsTable(fedFiltered, fidFiltered, fedSpotSet, fidSpotSet, startTermY, endTermY);
+      renderNominalsChart(fedFiltered, fidFiltered, fedSpotSet, fidSpotSet);
     }
 
     const treaFedSettle = rawNominalsData?.[0]?.settlementDate;
@@ -684,14 +694,7 @@ function processAndRenderNominals() {
   }
 }
 
-// Curve-type columns for the Treasuries table, gated by their own checkbox — same pattern as
-// TIPS_TABLE_SERIES. Ask is a per-security cell; Spot adds curve-only rows (see below).
-const NOMINALS_CURVE_COLS = [
-  { key: 'ask',  label: 'Ask',  help: 'ask-yield-tsy', checkboxId: 'showTsyAsk' },
-  { key: 'spot', label: 'Spot', help: 'spot-tsy',       checkboxId: 'showTsySpot' },
-];
-
-function renderNominalsTable(fedBonds, fidBonds, fedSpotBonds, fidSpotBonds) {
+function renderNominalsTable(fedBonds, fidBonds, fedSpotBonds, fidSpotBonds, startTermY, endTermY) {
   const theadRow = document.querySelector('#nominalsTable thead tr');
   const tbody = document.getElementById('nominalsTableBody');
   const bothActive = fedBonds && fidBonds;
@@ -701,7 +704,13 @@ function renderNominalsTable(fedBonds, fidBonds, fedSpotBonds, fidSpotBonds) {
   const sortCls = col => nominalsSort.col === col ? ` class="sort-${nominalsSort.dir}"` : '';
   const makeCmp = getV => (a, b) => { const va = getV(a), vb = getV(b); return (va < vb ? -1 : va > vb ? 1 : 0) * (nominalsSort.dir === 'asc' ? 1 : -1); };
 
-  const curveCols = NOMINALS_CURVE_COLS.filter(c => document.getElementById(c.checkboxId).checked);
+  // Ask is implied by any security type being checked, exactly like the chart — it is not a
+  // choice of its own. Spot is its own checkbox, independent of which security types are on.
+  const askShown = ['filterBills', 'filterNotes', 'filterBonds', 'filterStrips'].some(id => document.getElementById(id).checked);
+  const spotShown = document.getElementById('showTsySpot').checked;
+  const curveCols = [];
+  if (askShown) curveCols.push({ key: 'ask', label: 'Ask', help: 'ask-yield-tsy' });
+  if (spotShown) curveCols.push({ key: 'spot', label: 'Spot', help: 'spot-tsy' });
   const spotColIdx = curveCols.findIndex(c => c.key === 'spot');
   const curveHeaderHtml = curveCols.map(c => {
     const sortAttr = (c.key === 'ask' && !bothActive) ? ` data-sort="yield"${sortCls('yield')}` : '';
@@ -756,12 +765,17 @@ function renderNominalsTable(fedBonds, fidBonds, fedSpotBonds, fidSpotBonds) {
 
   // Spot curve rows — the fitted zero-coupon Treasury curve (same fit the chart draws),
   // appended after the security rows since a curve point has a Term but no CUSIP to sort by.
+  // The fit itself always uses the full fedSpotBonds/fidSpotBonds (never range-restricted —
+  // Spot is independent of the Maturity Range the same way it is independent of the security
+  // type checkboxes); the Range only crops which resulting terms are listed here, the same
+  // way it crops the other security types' own rows.
   if (spotColIdx !== -1) {
     const curveByTerm = new Map();   // term.toFixed(4) -> { term, fed, mkt }
     const addCurve = (bonds, source) => {
       const grid = bonds && spotCurveTermGrid(bonds, { priceOf: b => b.price, yieldOf: b => b.yield, minT: 0.25 });
       if (!grid) return;
       for (const { t, y } of grid) {
+        if (t < startTermY || t > endTermY) continue;
         const tk = t.toFixed(4);
         if (!curveByTerm.has(tk)) curveByTerm.set(tk, { term: t });
         curveByTerm.get(tk)[source] = y;
@@ -906,12 +920,11 @@ function renderNominalsChart(fedBonds, fidBonds, fedSpotBonds, fidSpotBonds) {
     };
   }
 
-  // The Ask (bare-point) and Spot series each drive the initial y-scale only when their own
-  // curve-type checkbox is checked (Spot off by default). Spot is a smooth fit, so it is
-  // never treated as an outlier — Clip Outliers only trims the per-bond Ask points.
-  const askShown = document.getElementById('showTsyAsk').checked;
+  // The spot curve drives the initial y-scale only when it is actually shown (off by
+  // default). It is a smooth fit, so it is never treated as an outlier — Clip Outliers
+  // only trims the per-bond points.
   const spotShown = document.getElementById('showTsySpot').checked;
-  const barePointY = askShown ? activeSeries.filter(s => !s.curve).flatMap(s => s.data).map(d => d.y) : [];
+  const barePointY = activeSeries.filter(s => !s.curve).flatMap(s => s.data).map(d => d.y);
   const curveY = spotShown ? activeSeries.filter(s => s.curve).flatMap(s => s.data).map(d => d.y) : [];
   let scaleY = barePointY.slice();
   if (nominalsClipOutliers && barePointY.length >= 4) {
@@ -957,7 +970,7 @@ function renderNominalsChart(fedBonds, fidBonds, fedSpotBonds, fidSpotBonds) {
         pointRadius: s.curve ? (s.markerR ?? 0) : s.r,
         pointHoverRadius: s.curve ? 5 : (s.r > 0 ? s.r + 2 : 3),
         tension: s.curve ? 0.3 : 0.1,
-        hidden: s.curve ? !document.getElementById('showTsySpot').checked : !document.getElementById('showTsyAsk').checked
+        hidden: s.curve ? !document.getElementById('showTsySpot').checked : false
       }))
     },
     options: {
@@ -2139,11 +2152,12 @@ document.getElementById('beiShowNone').onclick = (e) => {
   });
 };
 
-// Nominals 'All/None' Links — Security types only. Ask/Spot are curve types, not security
-// types: with only two of them and one always required, All/None would not make sense there.
+// Nominals 'All/None' Links — Spot is treated as a fifth security type here: Ask has no
+// checkbox of its own (it is implied by any of the other four), so Spot is the only other
+// thing All/None has to cover.
 document.getElementById('nominalsShowAll').onclick = (e) => {
   e.preventDefault();
-  ['filterBills', 'filterNotes', 'filterBonds', 'filterStrips'].forEach(id => {
+  ['filterBills', 'filterNotes', 'filterBonds', 'filterStrips', 'showTsySpot'].forEach(id => {
     const el = document.getElementById(id);
     el.checked = true;
     el.dispatchEvent(new Event('change', { bubbles: true }));
@@ -2151,7 +2165,7 @@ document.getElementById('nominalsShowAll').onclick = (e) => {
 };
 document.getElementById('nominalsShowNone').onclick = (e) => {
   e.preventDefault();
-  ['filterBills', 'filterNotes', 'filterBonds', 'filterStrips'].forEach(id => {
+  ['filterBills', 'filterNotes', 'filterBonds', 'filterStrips', 'showTsySpot'].forEach(id => {
     const el = document.getElementById(id);
     el.checked = false;
     el.dispatchEvent(new Event('change', { bubbles: true }));
@@ -2244,22 +2258,16 @@ document.getElementById('nominalsTable').querySelector('thead').addEventListener
 });
 
 document.getElementById('nominalsControls').addEventListener('change', (e) => {
-  if (e.target.id === 'showTsyAsk' || e.target.id === 'showTsySpot') {
-    // At least one curve type must stay checked — with only two, unchecking the last one
-    // would leave nothing to show and All/None would not make sense for a pair like this.
-    const askEl = document.getElementById('showTsyAsk');
-    const spotEl = document.getElementById('showTsySpot');
-    if (!askEl.checked && !spotEl.checked) {
-      e.target.checked = true;
-      return;
-    }
-    // A curve type is a series toggle, not a data filter — like a source toggle, it rebuilds
-    // the chart and table but preserves the current zoom/scale rather than auto-fitting.
+  if (e.target.id === 'clipOutliers') {
+    nominalsClipOutliers = e.target.checked;
+    savedZoom['treasuries'] = null;
     processAndRenderNominals();
     return;
   }
-  if (e.target.id === 'clipOutliers') {
-    nominalsClipOutliers = e.target.checked;
+  // Spot is a security type for charting purposes — same auto-rescale treatment as
+  // Bills/Notes/Bonds/STRIPS below, and it never resets the Maturity Range (the range is
+  // set once from every security type, not from whichever ones happen to be checked).
+  if (e.target.id === 'showTsySpot') {
     savedZoom['treasuries'] = null;
     processAndRenderNominals();
     return;
@@ -2267,8 +2275,6 @@ document.getElementById('nominalsControls').addEventListener('change', (e) => {
   if (e.target.id === 'filterStrips') {
     nominalsShowStrips = e.target.checked;
     savedZoom['treasuries'] = null;
-    document.getElementById('startMaturity').value = '';
-    document.getElementById('endMaturity').value = '';
     processAndRenderNominals();
     return;
   }
@@ -2277,8 +2283,6 @@ document.getElementById('nominalsControls').addEventListener('change', (e) => {
   if (e.target.checked) nominalsTypeFilters.add(type);
   else nominalsTypeFilters.delete(type);
   savedZoom['treasuries'] = null;
-  document.getElementById('startMaturity').value = '';
-  document.getElementById('endMaturity').value = '';
   processAndRenderNominals();
 });
 

@@ -270,43 +270,59 @@ test('Treasuries: unchecking Bills/Notes/Bonds with Spot on leaves only Spot cur
   expect(errors).toEqual([]);
 });
 
-test('Treasuries Ask toggle: cannot be unchecked while Spot is also off', async ({ page }) => {
+test('Treasuries Ask column: implied by any security type, gone when none are checked', async ({ page }) => {
   await loadTreasuries(page);
-  await expect(page.locator('#showTsyAsk')).toBeChecked();   // Ask is explicit and on by default
-  await expect(page.locator('#showTsySpot')).not.toBeChecked();
-  await page.locator('#showTsyAsk').click();
-  // Reverted — Spot was already off, so unchecking the last curve type is blocked.
-  await expect(page.locator('#showTsyAsk')).toBeChecked();
-});
-
-test('Treasuries Ask toggle: unchecking Ask removes the Ask column once Spot is on', async ({ page }) => {
-  await loadTreasuries(page);
-  await page.locator('#showTsySpot').check();
-  await page.locator('#showTsyAsk').uncheck();
-  await expect(page.locator('#showTsyAsk')).not.toBeChecked();
+  await expect(page.locator('#nominalsTable thead th', { hasText: 'Ask' })).toHaveCount(1);
+  await page.locator('#filterBills').uncheck();
+  await page.locator('#filterNotes').uncheck();
+  await page.locator('#filterBonds').uncheck();
+  // Ask has no checkbox of its own — with every security type off, there is nothing left
+  // for it to imply, so the column disappears too.
   await expect(page.locator('#nominalsTable thead th', { hasText: 'Ask' })).toHaveCount(0);
+  await page.locator('#filterBonds').check();
+  await expect(page.locator('#nominalsTable thead th', { hasText: 'Ask' })).toHaveCount(1);
 });
 
-test('Treasuries curve types: at least one of Ask/Spot must stay checked', async ({ page }) => {
+test('Treasuries All/None covers Spot too, since Ask has no checkbox of its own', async ({ page }) => {
   await loadTreasuries(page);
   await page.locator('#showTsySpot').check();
-  await page.locator('#showTsyAsk').uncheck();
-  await page.locator('#showTsySpot').click();
-  // The last one unchecked is reverted rather than leaving nothing shown.
-  await expect(page.locator('#showTsySpot')).toBeChecked();
-});
-
-test('Treasuries All/None only affect security types, not Ask/Spot', async ({ page }) => {
-  await loadTreasuries(page);
   await page.locator('#nominalsShowNone').click();
   await expect(page.locator('#filterBills')).not.toBeChecked();
   await expect(page.locator('#filterNotes')).not.toBeChecked();
   await expect(page.locator('#filterBonds')).not.toBeChecked();
   await expect(page.locator('#filterStrips')).not.toBeChecked();
-  await expect(page.locator('#showTsyAsk')).toBeChecked();
+  await expect(page.locator('#showTsySpot')).not.toBeChecked();
   await page.locator('#nominalsShowAll').click();
   await expect(page.locator('#filterBills')).toBeChecked();
   await expect(page.locator('#filterNotes')).toBeChecked();
   await expect(page.locator('#filterBonds')).toBeChecked();
   await expect(page.locator('#filterStrips')).toBeChecked();
+  await expect(page.locator('#showTsySpot')).toBeChecked();
+});
+
+// ─── Spot is independent of security type AND of the Maturity Range ─────────────────────
+
+test('Treasuries Maturity Range is not reset by toggling a security type', async ({ page }) => {
+  await loadTreasuries(page);
+  const startBefore = await page.locator('#startMaturity').inputValue();
+  const endBefore = await page.locator('#endMaturity').inputValue();
+  await page.locator('#filterBonds').uncheck();
+  await page.locator('#filterBonds').check();
+  await expect(page.locator('#startMaturity')).toHaveValue(startBefore);
+  await expect(page.locator('#endMaturity')).toHaveValue(endBefore);
+});
+
+test('Treasuries Spot fit spans the full nominal set regardless of which security types are checked', async ({ page }) => {
+  await loadTreasuries(page);
+  await page.locator('#showTsySpot').check();
+  await page.locator('#filterBills').uncheck();
+  await page.locator('#filterNotes').uncheck();
+  await page.locator('#filterStrips').uncheck();
+  // Only Bonds is left checked, but the Spot curve still fits the whole non-STRIP set — its
+  // first term should come from the Bill's short maturity, not from the Bonds' 10y+ range.
+  const firstCurveRow = page.locator('#nominalsTable tbody tr', { hasText: 'Spot (' }).first();
+  await expect(firstCurveRow).toBeVisible();
+  const termText = await firstCurveRow.locator('td').first().innerText();
+  const term = parseFloat(termText.match(/\(([\d.]+)y\)/)[1]);
+  expect(term).toBeLessThan(2);
 });

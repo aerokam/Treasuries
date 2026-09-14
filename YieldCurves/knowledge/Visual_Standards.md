@@ -63,14 +63,19 @@ The legend and visual priority follow the logical flow of data:
 
 ### 3. Auto-Rescale on Filter Change
 Any checkbox that changes what data is displayed must trigger a Y-axis auto-fit (clear saved zoom, re-render from data bounds). This includes:
-- **Security type filters** (Bills, Notes, Bonds, STRIPS): Y-axis and X-axis rescale to the remaining data.
+- **Security type filters** (Bills, Notes, Bonds, STRIPS, and Spot — Spot is a fifth security type for this purpose, not a distinct kind of control): Y-axis and X-axis rescale to the remaining data.
 - **Clip Outliers**: Y-axis rescales applying or removing IQR-based clipping.
 
-**Curve type toggles** (Ask, Spot) do **not** rescale. Unlike a security type filter, a curve type does not change which securities are in the data set — it changes which representation of that data set is drawn (the per-security Ask points, or the fitted Spot curve), the same distinction TIPS draws between its own Ask/SA/SAO/Spot checkboxes. Toggling one rebuilds the chart and table, but the current view (X zoom/pan **and** Y scale) is preserved verbatim — the same behavior as a **source toggle** below.
+There is no separate "Ask" checkbox. Ask is implied by any of Bills/Notes/Bonds/STRIPS being checked — it is each of those types' own point series, not a representation chosen independently of them. The Ask/SA/SAO/Spot/Spot SA checkboxes on the TIPS tab are a genuinely different case: those are several representations of the same TIPS security, so choosing among them independently of a security-type filter makes sense there. Treasuries has only one representation per security type (its own quoted yield), so Ask is not a choice of its own.
 
 **Source toggles** (FedInvest, Market) do **not** rescale at all. Adding or removing a source rebuilds the chart, but the current view (X zoom/pan **and** Y scale) is preserved verbatim — the same behavior as showing/hiding a series (Ask, SA, SAO). A source toggle must never change the axis bounds. Mechanism: the source handlers snapshot the live scales into `savedZoom[tab]` before `processAndRender()`, so the rebuild restores them instead of auto-fitting.
 
 Zoom is also NOT cleared by: date range filter changes, table sort, or legend series hide/show (legend toggles call `rescaleToVisible` directly — a refit to visible data that is visually a no-op when the remaining series share the same range).
+
+### 3a. Maturity Range vs. Spot (Treasuries)
+The Maturity Range fields (start/end date) default to the full span of every security type available, not just whichever types are currently checked, and toggling a security type or Spot never resets them. A range once set — by that default or typed by hand — persists across checkbox changes; it is a display window the user controls, not a byproduct of which types happen to be on.
+
+The Spot curve fit itself (the NSS parameters, i.e. its shape) always uses the complete non-STRIP nominal set, regardless of the Maturity Range and regardless of which security types are checked — narrowing the Range must not narrow the bond set the curve is fit to, or the fit quietly changes shape as an unintended side effect of an unrelated display choice. The Range still crops which part of that fixed curve is drawn or listed, the same as it crops every other security type's own points — a zoom, not a refit.
 
 ### 4. Per-Tab Zoom State
 Each tab (TIPS, Treasuries) maintains its own independent zoom state:
@@ -82,7 +87,7 @@ Each tab (TIPS, Treasuries) maintains its own independent zoom state:
 The **Clip Outliers** toggle (default: on) clips the Y-axis floor to suppress near-maturity Bills/Notes/STRIPS with extreme negative YTM. A Bill, Note or STRIP maturing in days and trading at a tiny premium can show yields like −5%, which collapses the visible yield range for all other data. Only the floor is clipped — no upper bound is applied. Clipping only ever trims the per-security Ask points — it never applies to the Spot curve, which is a smooth fit and not a candidate for a near-maturity outlier.
 
 **Algorithm (`iqrClipBounds`):**
-- Only activates when Ask is checked and Bills, Notes or STRIPS are visible — they are the source of near-maturity garbage; Bonds alone are not clipped, and unchecking Ask removes the points it would clip.
+- Only activates when Bills, Notes or STRIPS are visible — they are the source of near-maturity garbage; Bonds alone are not clipped.
 - IQR source: positive-yield Bills + Notes + STRIPS values only (filters out near-maturity values before computing Q1/Q3).
 - Fence = max(1.0 × IQR, 0.5%); floor = Q1 − fence.
 - Floor is applied to all visible Y values; ceiling = natural data max (unconstrained).
