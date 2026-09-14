@@ -15,8 +15,9 @@
 //        defaults to ./YieldsFromFedInvestPrices-<date>.csv
 
 import { writeFileSync } from 'fs';
-import { yieldFromPrice } from '../shared/src/bond-math.js';
-import { localDate } from '../shared/src/settlement.js';
+import {
+  parseFedInvestPriceRows, parseTipsRefMap, selectPricedSecurity, yieldForSecurity, serializeS1,
+} from '../shared/src/fedinvest-prices.js';
 
 const FEDINVEST = 'https://www.treasurydirect.gov/GA-FI/FedInvest';
 const R2 = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev';
@@ -92,12 +93,7 @@ async function main() {
 
   const refRes = await fetch(`${R2}/TIPS/TipsRef.csv`);
   if (!refRes.ok) throw new Error(`TipsRef.csv: HTTP ${refRes.status}`);
-  const refMap = new Map((await refRes.text()).trim().split('\n').slice(1)
-    .filter(l => l.trim())
-    .map(line => {
-      const [cusip, maturity, datedDate, coupon, datedDateRefCpi] = line.split(',');
-      return [cusip, { maturity, coupon: parseFloat(coupon), datedDateRefCpi: parseFloat(datedDateRefCpi) }];
-    }));
+  const refMap = parseTipsRefMap(await refRes.text());
 
   const got = await fetchPricesForDate(iso);
   if (got === null) { console.error(`No FedInvest prices for ${iso} (weekend, holiday, or not yet published).`); process.exit(1); }
@@ -113,23 +109,22 @@ async function main() {
     process.exit(1);
   }
 
-  // Same merge rules as getYieldsFedInvest.js: price = buy || sell || eod, TIPS metadata from
-  // TipsRef.csv, yield computed via the shared yieldFromPrice at that day's settlement.
+  // 1.1.2/1.1.3 for TIPS alone, via shared/src/fedinvest-prices.js — the same selection
+  // and yield rules getYieldsFedInvest.js applies to the daily job.
+  const priceRows = parseFedInvestPriceRows(raw).filter(r => r.type === 'TIPS');
   const rows = [];
   const missing = [];
-  for (const line of raw.trim().split('\n')) {
-    if (!/^[A-Z0-9]{9},/.test(line)) continue;
-    const c = line.split(',').map(s => s.trim());
-    if (c[1] !== 'TIPS') continue;
-    const ref = refMap.get(c[0]);
-    if (!ref) { missing.push(c[0]); continue; }
-    const price = parseFloat(c[5]) || parseFloat(c[6]) || parseFloat(c[7]) || null;
-    const yld = price ? yieldFromPrice(price, ref.coupon, localDate(iso), localDate(ref.maturity)) : null;
-    rows.push(['TIPS', c[0], ref.maturity, ref.coupon, ref.datedDateRefCpi, price ?? '', yld ?? ''].join(','));
+  for (const row of priceRows) {
+    const security = selectPricedSecurity(row, refMap);
+    if (!security) { missing.push(row.cusip); continue; }
+    const yld = yieldForSecurity(security, iso);
+    rows.push({ ...security, yield: yld });
   }
   if (!rows.length) throw new Error('No TIPS rows produced');
 
-  writeFileSync(out, [iso, 'type,cusip,maturity,coupon,datedDateCpi,price,yield', ...rows].join('\n') + '\n');
+  // Unformatted yield (unlike getYieldsFedInvest.js's toFixed(8)) — see
+  // shared/src/fedinvest-prices.js#serializeS1.
+  writeFileSync(out, serializeS1(iso, rows));
   console.error(`${iso}: ${rows.length} TIPS → ${out}`);
   if (missing.length) console.error(`  skipped (no TipsRef metadata): ${missing.join(', ')}`);
 }

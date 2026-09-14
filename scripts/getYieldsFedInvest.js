@@ -2,9 +2,12 @@
 import { existsSync, readFileSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { yieldFromPrice as _yieldFromPrice } from '../shared/src/bond-math.js';
-import { localDate, parseHolidaySet } from '../shared/src/settlement.js';
+import { parseHolidaySet } from '../shared/src/settlement.js';
 import { parseCsv } from '../shared/src/csv.js';
+import {
+  FEDINVEST_TYPES, parseFedInvestPriceRows, parseTipsRefMap,
+  selectPricedSecurity, yieldForSecurity, serializeS1,
+} from '../shared/src/fedinvest-prices.js';
 const _envPath = resolve(dirname(fileURLToPath(import.meta.url)), '../.env');
 if (existsSync(_envPath)) {
   readFileSync(_envPath, 'utf8').split('\n').forEach(line => {
@@ -23,8 +26,6 @@ if (existsSync(_envPath)) {
 // yet. Skips cleanly (exit 0, no retry) on bond market holidays.
 
 const FEDINVEST_URL = 'https://www.treasurydirect.gov/GA-FI/FedInvest/todaySecurityPriceDetail';
-
-const INCLUDE_TYPES = new Set(['TIPS', 'MARKET BASED BILL', 'MARKET BASED NOTE', 'MARKET BASED BOND']);
 
 async function uploadToR2(key, body) {
   const { S3Client, PutObjectCommand } = await import('@aws-sdk/client-s3');
@@ -53,12 +54,6 @@ async function uploadToR2(key, body) {
 // Today's date in ET (handles EDT/EST automatically)
 function todayET() {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' }); // YYYY-MM-DD
-}
-
-// FedInvest maturity dates are MM/DD/YYYY → convert to YYYY-MM-DD
-function parseFedInvestDate(str) {
-  const [m, d, y] = str.split('/').map(Number);
-  return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
 
 // ─── FedInvest price fetch ────────────────────────────────────────────────────
@@ -119,34 +114,38 @@ async function fetchPrices() {
   }
   const settleDateStr = `${y}-${String(months[mon] + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 
-  const rows = text.trim().split('\n')
-    .filter(l => /^[A-Z0-9]{9},/.test(l))   // CUSIP data rows only
-    .map(line => {
-      const c = line.split(',').map(s => s.trim());
-      return {
-        cusip:    c[0],
-        type:     c[1],
-        coupon:   parseFloat(c[2]),
-        maturity: c[3],
-        buy:  parseFloat(c[5]) || 0,
-        sell: parseFloat(c[6]) || 0,
-        eod:  parseFloat(c[7]) || 0,
-      };
-    })
-    .filter(r => INCLUDE_TYPES.has(r.type));
+  const rows = parseFedInvestPriceRows(text).filter(r => FEDINVEST_TYPES.has(r.type));
 
   return { rows, settleDateStr };
 }
 
-// ─── Yield from price ─────────────────────────────────────────────────────────
-// Thin wrapper over shared/src/bond-math.js's yieldFromPrice (single source of
-// truth — see knowledge/Bond_Basics.md §Treasury Bill Yield, knowledge/TIPS_Basics.md
-// §Yield Calculation Conventions): always frequency=2 for coupon-bearing securities;
-// zero-coupon bills use Treasury's own investment-rate/CEY convention. Date args
-// here are strings (YYYY-MM-DD or FedInvest's MM/DD/YYYY-derived form); bond-math.js
-// takes Date objects.
-function yieldFromPrice(cleanPrice, coupon, settleDateStr, maturityStr) {
-  return _yieldFromPrice(cleanPrice, coupon, localDate(settleDateStr), localDate(maturityStr));
+// spec: 1.1_Download_FedInvest_Prices.md#determine-settlement-date
+// 1.1.1: produces S1's settlement date from E1's `Prices For:` line (T+0 — see the spec for
+// why this is T+0 rather than T+1), gated by the bond-holiday check and the
+// date-is-not-today check. Returns { settleDateStr, priceRows } on success, or null when
+// this run has nothing to write and should exit cleanly with no retry (bond holiday, or the
+// page has no `Prices For:` line yet — weekend or before FedInvest posts). Sets
+// process.exitCode = 1 (no throw) so the caller's retry-on-failure task scheduling
+// (Data_Pipeline.md §2.0) picks the run back up later when the page still shows a stale date.
+async function determineSettlementDate(today, holidaySet) {
+  if (holidaySet.has(today)) {
+    console.error(`Bond market holiday (${today}) — no FedInvest prices today.`);
+    return null;
+  }
+
+  const priceResult = await fetchPrices();
+  if (priceResult === null) return null; // no "Prices For:" line yet — clean exit
+  const { rows: priceRows, settleDateStr } = priceResult;
+  if (priceRows.length === 0) throw new Error('No price data found from FedInvest');
+  console.error(`Settlement date: ${settleDateStr}`);
+
+  if (settleDateStr !== today) {
+    console.error(`FedInvest still showing ${settleDateStr} (today is ${today} ET) — not ready yet.`);
+    process.exitCode = 1;
+    return null;
+  }
+
+  return { settleDateStr, priceRows };
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
@@ -154,88 +153,37 @@ async function main() {
   const R2_BASE = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev';
   const R2_BASE_URL = `${R2_BASE}/TIPS`;
 
-  // Check bond market holidays — skip cleanly on non-trading days
+  // Bond market holidays — proceeds unchecked (as before) if the fetch itself fails.
   const today = todayET();
   const holidayRes = await fetch(`${R2_BASE}/misc/BondHolidaysSifma.csv`);
-  if (holidayRes.ok) {
-    const holidayText = await holidayRes.text();
-    const holidays = parseHolidaySet(parseCsv(holidayText, false));
-    if (holidays.has(today)) {
-      console.error(`Bond market holiday (${today}) — no FedInvest prices today.`);
-      return;
-    }
-  }
+  const holidays = holidayRes.ok
+    ? parseHolidaySet(parseCsv(await holidayRes.text(), false))
+    : new Set();
 
-  // Read TipsRef.csv for TIPS dated-date CPI / coupon / maturity metadata
+  // Read TipsRef.csv (S2) for TIPS dated-date CPI / coupon / maturity metadata
   console.error('Fetching TipsRef.csv from R2...');
   const refRes = await fetch(`${R2_BASE_URL}/TipsRef.csv`);
   if (!refRes.ok) throw new Error(`Failed to fetch TipsRef.csv from R2: ${refRes.status}`);
-  const refText = await refRes.text();
-  const refRows = refText
-    .trim().split('\n').slice(1)               // skip header
-    .filter(l => l.trim())
-    .map(line => {
-      const [cusip, maturity, datedDate, coupon, datedDateRefCpi, term] = line.split(',');
-      return { cusip, maturity, datedDate, coupon: parseFloat(coupon), datedDateRefCpi: parseFloat(datedDateRefCpi), term };
-    });
+  const refMap = parseTipsRefMap(await refRes.text());
 
-  const refMap = new Map(refRows.map(r => [r.cusip, r]));
-
-  // Fetch FedInvest prices (today's latest available)
+  // Fetch FedInvest prices (today's latest available) and determine the settlement date
   console.error('Fetching prices from FedInvest...');
-  const priceResult = await fetchPrices();
-  if (priceResult === null) return; // weekend/holiday — clean exit
-  const { rows: priceRows, settleDateStr } = priceResult;
-  if (priceRows.length === 0) throw new Error('No price data found from FedInvest');
-  console.error(`Settlement date: ${settleDateStr}`);
+  const settlement = await determineSettlementDate(today, holidays);
+  if (settlement === null) return; // holiday / not yet published / stale — clean exit or retry
+  const { settleDateStr, priceRows } = settlement;
 
-  // Guard: if FedInvest hasn't updated yet (still showing yesterday), exit non-zero so
-  // the scheduled task's retry-on-failure setting (see setup-windows-tasks.ps1) tries
-  // again later instead of silently leaving yesterday's data live.
-  if (settleDateStr !== today) {
-    console.error(`FedInvest still showing ${settleDateStr} (today is ${today} ET) — not ready yet.`);
-    process.exitCode = 1;
-    return;
-  }
-
-  // Merge prices with metadata and calculate yields
+  // Select TIPS and Treasury prices, and calculate yields
   const rows = [];
-  for (const p of priceRows) {
-    const price = p.buy || p.sell || p.eod || null;
-    let maturity, coupon, datedDateCpi;
-
-    if (p.type === 'TIPS') {
-      const ref = refMap.get(p.cusip);
-      if (!ref) continue; // no TipsRef metadata — skip
-      maturity = ref.maturity;
-      coupon = ref.coupon;
-      datedDateCpi = ref.datedDateRefCpi;
-    } else {
-      maturity = parseFedInvestDate(p.maturity);
-      coupon = p.coupon;
-      datedDateCpi = '';
-    }
-
-    const yld = price ? yieldFromPrice(price, coupon, settleDateStr, maturity) : null;
-
-    rows.push({
-      type:         p.type,
-      cusip:        p.cusip,
-      maturity,
-      coupon,
-      datedDateCpi,
-      price:        price ?? '',
-      yield:        yld != null ? yld.toFixed(8) : '',
-    });
+  for (const row of priceRows) {
+    const security = selectPricedSecurity(row, refMap);
+    if (!security) continue; // TIPS with no S2 metadata — dropped
+    const yld = yieldForSecurity(security, settleDateStr);
+    rows.push({ ...security, yield: yld });
   }
 
   // Write standardized and legacy keys to R2
-  const header = 'type,cusip,maturity,coupon,datedDateCpi,price,yield';
-  const lines = rows.map(r =>
-    `${r.type},${r.cusip},${r.maturity},${r.coupon},${r.datedDateCpi},${r.price},${r.yield}`
-  );
-  const content = [settleDateStr, header, ...lines].join('\n') + '\n';
-  
+  const content = serializeS1(settleDateStr, rows, (y) => (y != null ? y.toFixed(8) : ''));
+
   await uploadToR2('Treasuries/YieldsFromFedInvestPrices.csv', content);
 
   const typeCounts = rows.reduce((acc, r) => { acc[r.type] = (acc[r.type] || 0) + 1; return acc; }, {});
