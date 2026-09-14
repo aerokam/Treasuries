@@ -4,7 +4,8 @@ This document provides the technical schemas and field-level specifications for 
 
 ---
 
-## <a id="s1"></a>S1: YieldsFromFedInvestPrices.csv
+## <a id="s1"></a>FedInvest prices (S1)
+**File**: `YieldsFromFedInvestPrices.csv`
 **Description**: Daily Treasury settlement prices and derived Yield-to-Maturity (YTM).
 **Update Frequency**: Weekdays ~1:05 PM ET.
 
@@ -23,7 +24,7 @@ This document provides the technical schemas and field-level specifications for 
 
 ---
 
-## <a id="s2"></a>S2: TipsRef.csv
+## <a id="s2"></a>TIPS reference data (S2)
 **Description**: Immutable TIPS metadata fetched from FiscalData.
 **Update Frequency**: Weekly (or on-demand for new auctions).
 **R2 Key**: `TIPS/TipsRef.csv` (written by `scripts/fetchTipsRef.js`). The old `Treasuries/TipsRef.csv` key was consolidated away (see `R2_Cleanup.md`) but the stale object was never deleted from R2 — it is frozen at 2026-07-13 and must not be read.
@@ -41,7 +42,8 @@ This document provides the technical schemas and field-level specifications for 
 
 ---
 
-## <a id="s3"></a>S3: RefCPI.csv
+## <a id="s3"></a>Ref CPI (S3)
+**File**: `RefCPI.csv`
 **Description**: Daily interpolated Reference CPI for index ratio calculations.
 **Update Frequency**: Monthly (on BLS release).
 
@@ -54,7 +56,7 @@ This document provides the technical schemas and field-level specifications for 
 
 ---
 
-## <a id="s4"></a>S4: RefCpiNsaSa.csv
+## <a id="s4"></a>Ref CPI NSA and SA (S4)
 **Description**: Daily interpolated Reference CPI (NSA and SA) derived from monthly BLS CPI-U data via 31 CFR §356 App. B interpolation. SA daily Ref CPI is a calculated sole source (no official daily SA series).
 **Update Frequency**: Monthly (on BLS release).
 **R2 Key**: `TIPS/RefCpiNsaSa.csv`
@@ -72,7 +74,8 @@ This document provides the technical schemas and field-level specifications for 
 
 ---
 
-## <a id="s5"></a>S5: Auctions.csv
+## <a id="s5"></a>Auction results (S5)
+**File**: `Auctions.csv`
 **Description**: Historical Treasury auction results since 1980.
 **Update Frequency**: Weekdays.
 
@@ -82,7 +85,8 @@ This document provides the technical schemas and field-level specifications for 
 
 ---
 
-## <a id="s6"></a>S6: yields-history/
+## <a id="s6"></a>Yield history (S6)
+**File**: `yields-history/`
 **Description**: Single consolidated JSON, nested by symbol (US10Y, US30Y, … — all 14).
 **Update Frequency**: Weekdays (end-of-day snapshots) via `updateYieldsHistory.js`.
 
@@ -96,7 +100,7 @@ This document provides the technical schemas and field-level specifications for 
 
 ---
 
-## <a id="s13"></a>S13: YieldCurves.csv
+## <a id="s13"></a>Yield curves (S13)
 **Description**: General-purpose, spreadsheet-ready yields — evaluated yields for every priced Treasury (Bill/Note/Bond/STRIPS) and TIPS security, plus the fitted nominal, TIPS-quoted and TIPS-SA zero-coupon (spot) yield curves evaluated on a term grid (unlike [S12](#s12), which stores unevaluated Svensson parameters). Renamed from `SpotYieldCurves.csv` (2026-09-07): the file is a general yields resource, not spot-curves-only — it also carries every quoted security's own Ask/SA/SAO yield. Superseded the parameters-only `SpotYieldCurves.json` (retired 2026-09-07): six coefficients aren't usable in a spreadsheet, so this file stores actual yields instead. One row per **actual security** (`CUSIP`/`Maturity`/`Type` populated; `Ask`/`SA`/`SAO` populated where they exist) or one row per **fitted grid point** (`CUSIP` = `Spot`, `Maturity` blank, `Type` = `Treasury`/`TIPS`/`BEI`; `Spot`/`Spot SA` populated per Type — see below).
 **Update Frequency**: Chained, not independently scheduled — re-run whenever either of its actual inputs changes: after `FidelityQuotes` (3x daily on weekdays, via `run-fidelity.cmd`) and after `YieldsFromFedInvestPrices` (1x daily on weekdays, via `run-fedinvest.cmd`), each chaining into `YieldCurves/scripts/run-yield-curves.cmd` on success. See [Data_Pipeline.md](./Data_Pipeline.md).
 **R2 Key**: `Treasuries/YieldCurves.csv`
@@ -124,7 +128,7 @@ This document provides the technical schemas and field-level specifications for 
 
 ---
 
-## <a id="s14"></a>S14: BreakevenInflation.csv
+## <a id="s14"></a>Breakeven inflation (S14)
 **Description**: Per-TIPS breakeven inflation — the Ask/SA/SAO yield for each TIPS against the yield of its nearest-maturity nominal Treasury, `Market` (broker quotey) source only. Matches the YieldCurves BEI tab's per-bond table, which the app computes but does not persist.
 **Update Frequency**: `Market`-only data, so it changes only when `FidelityQuotes` refreshes (3x daily on weekdays); written by the same chained `updateSpotYieldCurves.js` run as [S13](#s13) (also chained from `YieldsFromFedInvestPrices`, which this file doesn't depend on — see [Data_Pipeline.md](./Data_Pipeline.md)).
 **R2 Key**: `Treasuries/BreakevenInflation.csv`
@@ -148,7 +152,7 @@ This document provides the technical schemas and field-level specifications for 
 
 ---
 
-## <a id="s15"></a>S15: BidAskSpreads.csv
+## <a id="s15"></a>Bid and ask spreads (S15)
 **Description**: Per-security broker bid/ask yield and price spread, TIPS and nominal Treasuries combined in one file (`security_type` discriminates, same pattern as [S7](#s7)'s `Product` column). `Market` (broker quotey) source only — FedInvest carries a single mid-market price, not a separate bid and ask.
 **Update Frequency**: `Market`-only data, so it changes only when `FidelityQuotes` refreshes (3x daily on weekdays); written by the same chained `updateSpotYieldCurves.js` run as [S13](#s13) (also chained from `YieldsFromFedInvestPrices`, which this file doesn't depend on — see [Data_Pipeline.md](./Data_Pipeline.md)).
 **R2 Key**: `Treasuries/BidAskSpreads.csv`
@@ -170,7 +174,8 @@ This document provides the technical schemas and field-level specifications for 
 
 ---
 
-## <a id="s7"></a>S7: FidelityTreasuriesTips.csv
+## <a id="s7"></a>Market quotes (S7)
+**File**: `FidelityTreasuriesTips.csv`
 **Description**: Combined broker market quotes from Fidelity — Treasury and TIPS rows in one file, distinguished by the `Product` column (`Treasury` / `TIPS`).
 **Update Frequency**: 3× Daily (Local Windows Task).
 
@@ -180,7 +185,7 @@ This document provides the technical schemas and field-level specifications for 
 
 ---
 
-## <a id="s8"></a>S8: CPI_history.csv
+## <a id="s8"></a>CPI history (S8)
 **Description**: Full monthly BLS CPI-U history (NSA and SA) from January 1913 to present.
 **Update Frequency**: Monthly (on BLS release).
 **R2 Key**: `bls/CPI_history.csv`
@@ -199,7 +204,7 @@ This document provides the technical schemas and field-level specifications for 
 
 ---
 
-## <a id="s9"></a>S9: Tentative-Auction-Schedule.xml
+## <a id="s9"></a>Tentative auction schedule (S9)
 **Description**: Copy of the Treasury's Tentative Auction Schedule, used to identify TIPS auctions that the FiscalData upcoming-auctions feed doesn't flag.
 **Update Frequency**: Local Windows Task `TreasuryAuctions-TentativeSchedule`. Treasury revises this schedule at its Quarterly Refunding press conference (first Wednesday of Feb/May/Aug/Nov), with the document itself updated ~1–3 weeks later, so the task runs daily for 21 days after each of the next 2 quarterly-refunding dates, plus a monthly safety-net check the rest of the year. A companion task, `TreasuryAuctions-TentativeSchedule-Refresh`, re-runs `scripts/setup-tentative-schedule-task.ps1` quarterly to roll the trigger window forward — no manual maintenance needed.
 **R2 Key**: `Treasuries/Tentative-Auction-Schedule.xml`
@@ -212,7 +217,7 @@ This document provides the technical schemas and field-level specifications for 
 
 ---
 
-## <a id="s10"></a>S10: YieldsSaSao.csv
+## <a id="s10"></a>SA and SAO yields (S10)
 **Description**: TIPS ask/SA/SAO yields derived from the market quotes in [S7](#s7).
 **Update Frequency**: Triggered by the `FidelityQuotes` task (3× daily on weekdays), via `updateSaSaoYields.js`.
 **R2 Key**: `TIPS/YieldsSaSao.csv`
@@ -232,7 +237,7 @@ This document provides the technical schemas and field-level specifications for 
 
 ---
 
-## <a id="s11"></a>S11: FundHoldings/Holdings-&lt;TICKER&gt;(-Enriched).csv
+## <a id="s11"></a>Fund holdings (S11)
 **Description**: Treasury and TIPS fund holdings by CUSIP, one raw and one enriched CSV per fund ticker (VBIL, VTIP, VTP, RBIL, LTPZ, SCHP, XHLF, ICPI). The enriched file adds ask/SA/SAO yield, term, and duration, computed the same way for every fund from [S10](#s10) and [S7](#s7) rather than taken from each provider’s own reported analytics.
 **Update Frequency**: Daily, Local Windows Task `FundHoldings`, via `FundHoldings/updateAllHoldings.js` then `FundHoldings/enrichHoldings.js`.
 **R2 Key**: `FundHoldings/` (its own top-level prefix, since a fund’s holdings mix TIPS and nominal rows and so belong under neither `TIPS/` nor `Treasuries/`)
@@ -247,7 +252,7 @@ This document provides the technical schemas and field-level specifications for 
 
 ---
 
-## <a id="s12"></a>S12: GswTipsCurve.json
+## <a id="s12"></a>GSW curve parameters (S12)
 **Description**: The latest published row of the Federal Reserve's Gürkaynak-Sack-Wright fitted TIPS (real) yield curve (FEDS 2008-05), scraped from `feds200805_1.html`. Just the six Svensson parameters and the observation date — the app evaluates the curve itself. Used only as a reference overlay against YieldCurves' own spot fit.
 **Update Frequency**: `GswTipsCurve` task, daily 7:15am PT, via `YieldCurves/scripts/updateGswTipsCurve.js`. The source itself updates weekly (Tuesdays, covering through the prior Friday); the daily poll just picks up new or revised rows promptly.
 **R2 Key**: `TIPS/GswTipsCurve.json`
@@ -258,6 +263,6 @@ This document provides the technical schemas and field-level specifications for 
 | `beta0`–`beta3` | Number | Svensson level / slope / two curvature coefficients (percent). |
 | `tau1`, `tau2` | Number | Svensson decay parameters (years). |
 
-**Consumer**: YieldCurves (TIPS tab) — evaluates the Svensson zero-yield formula from these parameters to draw the "GSW zero" reference line.
+**Consumer**: YieldCurves (TIPS tab) — evaluates the Svensson zero-yield formula from these parameters to draw the "GSW zero" reference line, on the analysis view opened with `?gsw` only. No view of the app uses it otherwise.
 
 **Live Data**: [View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/TIPS/GswTipsCurve.json)

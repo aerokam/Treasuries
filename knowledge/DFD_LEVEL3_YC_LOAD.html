@@ -180,7 +180,6 @@
   <path class="flow" d="M 250.0 300.0 Q 297.0 292.5 344.0 300.0" marker-end="url(#a1)"/>
   <path class="flow" d="M 250.0 450.0 Q 297.0 442.5 344.0 450.0" marker-end="url(#a1)"/>
   <path class="flow" d="M 250.0 600.0 Q 297.0 592.5 344.0 600.0" marker-end="url(#a1)"/>
-  <path class="flow" d="M 250.0 750.0 Q 297.0 742.5 344.0 750.0" marker-end="url(#a1)"/>
   <path class="flow" d="M 453.5 166.7 Q 649.3 195.2 826.5 283.3" marker-end="url(#a1)"/>
   <text class="flow-label" x="765" y="240" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#tips-prices"><tspan class="lk">TIPS prices</tspan></a></text>
   <path class="flow" d="M 443.5 185.3 Q 665.5 313.6 836.5 504.7" marker-end="url(#a1)"/>
@@ -205,8 +204,6 @@
   <text class="flow-label" x="1324" y="412" text-anchor="end"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#sa-factor"><tspan class="lk">SA factors</tspan></a>  →  3.2</text>
   <path class="flow" d="M 936.0 540.0 Q 1132.0 508.6 1328.0 540.0" marker-end="url(#a1)"/>
   <text class="flow-label" x="1324" y="532" text-anchor="end"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#treasury-yields"><tspan class="lk">Treasury yields</tspan></a>  →  3.4 to 3.7</text>
-  <path class="flow" d="M 455.8 754.8 Q 897.9 722.6 1328.0 830.0" marker-end="url(#a1)"/>
-  <text class="flow-label" x="1324" y="822" text-anchor="end"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#gsw-curve-parameters"><tspan class="lk">GSW curve parameters</tspan></a>  →  3.4</text>
   <a class="store" href="viewer.html#/md/knowledge/DataStores.md#s1">
     <rect x="40" y="130" width="205" height="40" fill="transparent" stroke="none"/>
     <line x1="40" y1="130" x2="245" y2="130"/>
@@ -230,12 +227,6 @@
     <line x1="40" y1="580" x2="245" y2="580"/>
     <line x1="40" y1="620" x2="245" y2="620"/>
     <text class="s-name" x="142.5" y="605">Bond holidays</text>
-  </a>
-  <a class="store" href="viewer.html#/md/knowledge/DataStores.md#s12">
-    <rect x="40" y="730" width="205" height="40" fill="transparent" stroke="none"/>
-    <line x1="40" y1="730" x2="245" y2="730"/>
-    <line x1="40" y1="770" x2="245" y2="770"/>
-    <text class="s-name" x="142.5" y="755">GSW curve parameters</text>
   </a>
   <a class="process" href="viewer.html#/md/YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#parse-fedinvest-prices">
     <circle cx="400" cy="150" r="56"/>
@@ -261,38 +252,32 @@
     <text class="p-name" x="400" y="601">Parse bond</text>
     <text class="p-name" x="400" y="617">holidays</text>
   </a>
-  <a class="process" href="viewer.html#/md/YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#parse-gsw-parameters">
-    <circle cx="400" cy="750" r="56"/>
-    <text class="p-id" x="400" y="730">3.1.5</text>
-    <text class="p-name" x="400" y="751">Parse GSW</text>
-    <text class="p-name" x="400" y="767">parameters</text>
-  </a>
   <a class="process" href="viewer.html#/md/YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#determine-settlement-date">
     <circle cx="640" cy="680" r="56"/>
-    <text class="p-id" x="640" y="652">3.1.6</text>
-    <text class="p-name" x="640" y="673">Determine the</text>
-    <text class="p-name" x="640" y="689">settlement</text>
-    <text class="p-name" x="640" y="705">date</text>
+    <text class="p-id" x="640" y="660">3.1.6</text>
+    <text class="p-name" x="640" y="681">Determine</text>
+    <text class="p-name" x="640" y="697">settlement date</text>
   </a>
   <a class="process" href="viewer.html#/md/YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#calculate-tips-yields">
     <circle cx="880" cy="300" r="56"/>
     <text class="p-id" x="880" y="280">3.1.7</text>
-    <text class="p-name" x="880" y="301">Calculate the</text>
+    <text class="p-name" x="880" y="301">Calculate</text>
     <text class="p-name" x="880" y="317">TIPS yields</text>
   </a>
   <a class="process" href="viewer.html#/md/YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#calculate-treasury-yields">
     <circle cx="880" cy="540" r="56"/>
     <text class="p-id" x="880" y="520">3.1.8</text>
-    <text class="p-name" x="880" y="541">Calculate the</text>
+    <text class="p-name" x="880" y="541">Calculate</text>
     <text class="p-name" x="880" y="557">Treasury yields</text>
   </a>
 </svg>
 </div>
 
 <p class="notes">
-  One process per source parsed, then 3.1.6, 3.1.7 and 3.1.8, which calculate from what the parses produce. The five flows leaving on the right are the outputs of 3.1 at Level 2.
+  One process per source parsed, then 3.1.6, 3.1.7 and 3.1.8, which calculate from what the parses produce. The four flows leaving on the right are the outputs of 3.1 at Level 2.
   Every process here drills to its own section of <a href="viewer.html#/md/YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md">3.1 Parse sources and calculate yields</a>.
-  3.1.3 and 3.1.5 produce nothing another process here uses: their outputs leave 3.1 directly, for 3.2 and 3.4.
+  3.1.3 produces nothing another process here uses: its output leaves 3.1 directly, for 3.2.
+  3.1.5 Parse GSW parameters is specified but not drawn. Its output is drawn only on an analysis view opened with ?gsw, and no view of the app uses it otherwise.
 </p>
 
 </body>

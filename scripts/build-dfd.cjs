@@ -5,10 +5,10 @@
 // Level 0 (knowledge/KNOWLEDGE_MAP.html) is hand-written and not generated here.
 // Everything else is, so a diagram is never hand-edited out of step with its model.
 //
-// Naming: a process is named by a verb phrase stating what it does. A data flow is
-// named by one noun for the structure it holds, defined in knowledge/DATA_DICTIONARY.md
-// §6.0 or as a term there. Two structures passing between the same two processes are
-// two flows, drawn and named separately.
+// Naming: below Level 1 a process is named by a verb phrase stating what it does, with no
+// article; at Level 1 an app is named as the portal names it. A data flow is named by one
+// noun for the structure it holds, defined in knowledge/DATA_DICTIONARY.md §6.0 or as a
+// term there. Two structures passing between the same two processes are two flows.
 const fs = require('fs');
 const path = require('path');
 
@@ -218,18 +218,18 @@ function level1() {
     { id: 'bei', name: 'Breakeven inflation', href: DS('s14') },
     { id: 'spread', name: 'Bid and ask spreads', href: DS('s15') },
   ];
-  // Each app is named by what it does; its portal name is written beneath it.
+  // Each app is named as the portal names it.
   const apps = [
-    { key: 'lm', cat: 'workflow', does: ['Build and', 'rebalance', 'TIPS ladders'], app: 'Ladder Manager', spec: V('knowledge/TipsLadderManager.md'), reads: ['fedinv', 'tipsref', 'refcpi', 'sasao', 'hol'] },
-    { key: 'tr', cat: 'reference', does: ['List TIPS', 'reference data'], app: 'TIPS Reference', spec: V('TipsReference/knowledge/1.0_TIPS_Reference.md'), reads: ['tipsref', 'refcpi', 'sasao', 'hol'] },
-    { key: 'pr', cat: 'educational', does: ['Explain', 'Treasury', 'securities'], app: 'Treasury Primer', spec: V('Primer/knowledge/1.0_Primer.md'), reads: ['tipsref', 'refcpi'] },
-    { key: 'ce', cat: 'reference', does: ['Calculate', 'CPI changes'], app: 'CPI Explorer', spec: V('CpiExplorer/knowledge/1.0_Overview.md'), reads: ['refcpi', 'cpihist'] },
-    { key: 'ym', cat: 'workflow', does: ['Chart live and', 'historical', 'yields'], app: 'Yields Monitor', spec: V('knowledge/YieldsMonitor.md'), reads: ['tipsref', 'nsasa', 'hol', 'yhist'] },
-    { key: 'yc', cat: 'workflow', does: ['Chart yield', 'curves'], app: 'Yield Curves', spec: 'DFD_LEVEL2_YIELDCURVES.html', reads: ['fedinv', 'nsasa', 'quotes', 'gsw', 'hol'] },
-    { key: 'sa', cat: 'educational', does: ['Explain', 'seasonal', 'adjustment'], app: 'Seasonal Adjustments', spec: V('SeasonalAdjustments/knowledge/1.0_SeasonalAdjustments_Explorer.md'), reads: ['nsasa', 'hol'] },
-    { key: 'fh', cat: 'reference', does: ['List fund', 'holdings'], app: 'Fund Holdings', spec: V('FundHoldings/knowledge/1.0_FundHoldings.md'), reads: ['funds'] },
-    { key: 'ta', cat: 'reference', does: ['List auction', 'results'], app: 'Treasury Auctions', spec: V('knowledge/TreasuryAuctions.md'), reads: ['auctions', 'tent'] },
-    { key: 'tx', cat: 'reference', does: ['Explain', 'Treasury', 'taxation'], app: 'Taxation of Treasuries', spec: V('TaxationOfTreasuries/docs/TaxationOfTreasuries_Foundation.md'), reads: [] },
+    { key: 'lm', cat: 'workflow', name: ['Ladder', 'Manager'], spec: V('knowledge/TipsLadderManager.md'), reads: ['fedinv', 'tipsref', 'refcpi', 'sasao', 'hol'] },
+    { key: 'tr', cat: 'reference', name: ['TIPS', 'Reference'], spec: V('TipsReference/knowledge/1.0_TIPS_Reference.md'), reads: ['tipsref', 'refcpi', 'sasao', 'hol'] },
+    { key: 'pr', cat: 'educational', name: ['Treasury', 'Primer'], spec: V('Primer/knowledge/1.0_Primer.md'), reads: ['tipsref', 'refcpi'] },
+    { key: 'ce', cat: 'reference', name: ['CPI', 'Explorer'], spec: V('CpiExplorer/knowledge/1.0_Overview.md'), reads: ['refcpi', 'cpihist'] },
+    { key: 'ym', cat: 'workflow', name: ['Yields', 'Monitor'], spec: V('knowledge/YieldsMonitor.md'), reads: ['tipsref', 'nsasa', 'hol', 'yhist'] },
+    { key: 'yc', cat: 'workflow', name: ['Yield', 'Curves'], spec: 'DFD_LEVEL2_YIELDCURVES.html', reads: ['fedinv', 'nsasa', 'quotes', 'gsw', 'hol'] },
+    { key: 'sa', cat: 'educational', name: ['Seasonal', 'Adjustments'], spec: V('SeasonalAdjustments/knowledge/1.0_SeasonalAdjustments_Explorer.md'), reads: ['nsasa', 'hol'] },
+    { key: 'fh', cat: 'reference', name: ['Fund', 'Holdings'], spec: V('FundHoldings/knowledge/1.0_FundHoldings.md'), reads: ['funds'] },
+    { key: 'ta', cat: 'reference', name: ['Treasury', 'Auctions'], spec: V('knowledge/TreasuryAuctions.md'), reads: ['auctions', 'tent'] },
+    { key: 'tx', cat: 'reference', name: ['Taxation of', 'Treasuries'], spec: V('TaxationOfTreasuries/docs/TaxationOfTreasuries_Foundation.md'), reads: [] },
   ];
   barycentre(stores, apps);
   // The column reproduces the portal index: the same three sections in the same
@@ -312,14 +312,13 @@ function level1() {
   P.push(`    <text class="s-name" x="${store.x + store.w / 2}" y="${store.y + 16}" style="opacity:0.7">${stores.length} files</text>`);
   P.push('  </a>');
 
-  apps.forEach((a, j) => P.push(procShape(AX, ay(j), AR, a.spec, String(a.n), a.does, a.app)));
+  apps.forEach((a, j) => P.push(procShape(AX, ay(j), AR, a.spec, String(a.n), a.name)));
   P.push('</svg>');
 
   return page({
     title: 'Treasury Investors Portal — Level 1', h1: 'Level 1', maxWidth: W,
     up: 'KNOWLEDGE_MAP.html', upLabel: 'Context Diagram', svg: P.join(NL),
-    notes: ['  Each app is named by what it does, with its portal name beneath it.',
-      '  Process 1 writes every store drawn here. No app writes one: the apps read, and the scheduled jobs inside process 1 do all the writing.',
+    notes: ['  Process 1 writes every store drawn here. No app writes one: the apps read, and the scheduled jobs inside process 1 do all the writing.',
       '  Process 1 explodes at Level 2 into those jobs, one per store it writes.',
       '  The stores are drawn as one shape. Level 1 answers which app reads what rather than which file, and the shape opens the full list.',
       '  Three of those files are read by no app: YieldCurves.csv, BreakevenInflation.csv and BidAskSpreads.csv. They are written for the user to pull into a spreadsheet, so their flow goes to the user rather than to a process.',
@@ -336,11 +335,10 @@ function level2YieldCurves() {
     { id: 'quotes', name: 'Market quotes', href: DS('s7') },
     { id: 'nsasa', name: 'Ref CPI NSA and SA', href: DS('s4') },
     { id: 'hol', name: 'Bond holidays', href: DS() },
-    { id: 'gsw', name: 'GSW curve parameters', href: DS('s12') },
   ];
   const procs = [
-    { id: '3.1', name: ['Parse sources', 'and calculate', 'yields'], href: 'DFD_LEVEL3_YC_LOAD.html', reads: ['fedinv', 'quotes', 'nsasa', 'hol', 'gsw'],
-      out: { '3.2': ['TIPS yields', 'SA factors'], '3.4': ['Treasury yields', 'GSW curve parameters'], '3.5': ['Treasury yields'],
+    { id: '3.1', name: ['Parse sources', 'and calculate', 'yields'], href: 'DFD_LEVEL3_YC_LOAD.html', reads: ['fedinv', 'quotes', 'nsasa', 'hol'],
+      out: { '3.2': ['TIPS yields', 'SA factors'], '3.4': ['Treasury yields'], '3.5': ['Treasury yields'],
              '3.6': ['TIPS yields', 'Treasury yields'], '3.7': ['Treasury yields', 'download date'] } },
     { id: '3.2', name: ['Adjust for', 'seasonality'], href: V(K + '3.2_Adjust_For_Seasonality.md'), reads: [],
       out: { '3.3': ['SA yields'], '3.4': ['SA yields'] } },
@@ -359,7 +357,7 @@ function level2YieldCurves() {
   const H = 1000, W = 1360;
   const OBS = procs.map(q => ({ x: px[q.id], y: py[q.id], r: PR }));
   const LBL = [];
-  const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 2 for Yield Curves: seven processes reading five data stores. No process writes a data store.">`, marker()];
+  const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 2 for Yield Curves: seven processes reading four data stores. No process writes a data store.">`, marker()];
   const sIdx = Object.fromEntries(stores.map((s, i) => [s.id, i]));
   procs.forEach(p => p.reads.forEach(id => {
     const y = sy(sIdx[id]), [x2, y2] = toCircle(SX + SW + 5, y, px[p.id], py[p.id], PR);
@@ -383,7 +381,7 @@ function level2YieldCurves() {
       '  The spot yield curves, breakeven inflation and bid and ask spreads are available from R2 all the same: Level 1 process 1 executes the same calculations as a scheduled job and writes <a href="viewer.html#/md/knowledge/DataStores.md#s13">S13</a>, S14 and S15. Each calculation is defined once, in shared/src/, and imported by both.',
       '  3.1 is the only process that reads a store; the others take their input from each other. It explodes at <a href="DFD_LEVEL3_YC_LOAD.html">Level 3</a>.',
       '  Each flow is named by the one structure it holds, defined in <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#6.0-data-flows">Data Dictionary &sect;6.0</a>. Two structures passing between the same two processes are drawn as two flows.',
-      '  The GSW curve parameters are the Federal Reserve&rsquo;s own published fit, evaluated as a reference curve rather than fitted here.'].join(NL)
+      '  The page also reads the GSW curve parameters, for a reference curve drawn only on an analysis view opened with ?gsw. No view of the app uses them otherwise, so they are not drawn here.'].join(NL)
   });
 }
 
@@ -394,7 +392,6 @@ function level3YieldCurvesLoad() {
     { id: 'quotes', name: 'Market quotes', href: DS('s7') },
     { id: 'nsasa', name: 'Ref CPI NSA and SA', href: DS('s4') },
     { id: 'hol', name: 'Bond holidays', href: DS() },
-    { id: 'gsw', name: 'GSW curve parameters', href: DS('s12') },
   ];
   const S = a => V(F31 + '#' + a);
   const procs = [
@@ -402,15 +399,14 @@ function level3YieldCurvesLoad() {
     { id: '3.1.2', name: ['Parse market', 'quotes'], href: S('parse-market-quotes'), reads: ['quotes'], out: { '3.1.6': ['download date'], '3.1.7': ['TIPS quotes'], '3.1.8': ['Treasury quotes'] } },
     { id: '3.1.3', name: ['Parse Ref CPI', 'and SA factors'], href: S('parse-ref-cpi-and-sa-factors'), reads: ['nsasa'], out: {} },
     { id: '3.1.4', name: ['Parse bond', 'holidays'], href: S('parse-bond-holidays'), reads: ['hol'], out: { '3.1.6': ['bond holidays'] } },
-    { id: '3.1.5', name: ['Parse GSW', 'parameters'], href: S('parse-gsw-parameters'), reads: ['gsw'], out: {} },
-    { id: '3.1.6', name: ['Determine the', 'settlement', 'date'], href: S('determine-settlement-date'), reads: [], out: { '3.1.7': ['settlement date'], '3.1.8': ['settlement date'] } },
-    { id: '3.1.7', name: ['Calculate the', 'TIPS yields'], href: S('calculate-tips-yields'), reads: [], out: {} },
-    { id: '3.1.8', name: ['Calculate the', 'Treasury yields'], href: S('calculate-treasury-yields'), reads: [], out: {} },
+    { id: '3.1.6', name: ['Determine', 'settlement date'], href: S('determine-settlement-date'), reads: [], out: { '3.1.7': ['settlement date'], '3.1.8': ['settlement date'] } },
+    { id: '3.1.7', name: ['Calculate', 'TIPS yields'], href: S('calculate-tips-yields'), reads: [], out: {} },
+    { id: '3.1.8', name: ['Calculate', 'Treasury yields'], href: S('calculate-treasury-yields'), reads: [], out: {} },
   ];
   const SX = 40, SW = 205, PR = 56, W = 1340, H = 900;
   const sy = i => 150 + i * 150;
-  const px = { '3.1.1': 400, '3.1.2': 400, '3.1.3': 400, '3.1.4': 400, '3.1.5': 400, '3.1.6': 640, '3.1.7': 880, '3.1.8': 880 };
-  const py = { '3.1.1': 150, '3.1.2': 300, '3.1.3': 450, '3.1.4': 600, '3.1.5': 750, '3.1.6': 680, '3.1.7': 300, '3.1.8': 540 };
+  const px = { '3.1.1': 400, '3.1.2': 400, '3.1.3': 400, '3.1.4': 400, '3.1.6': 640, '3.1.7': 880, '3.1.8': 880 };
+  const py = { '3.1.1': 150, '3.1.2': 300, '3.1.3': 450, '3.1.4': 600, '3.1.6': 680, '3.1.7': 300, '3.1.8': 540 };
   const OBS = procs.map(q => ({ x: px[q.id], y: py[q.id], r: PR }));
   const LBL = [];
   const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 3: Yield Curves 3.1, one process per source parsed and three that calculate from what the parses produce.">`, marker()];
@@ -422,7 +418,7 @@ function level3YieldCurvesLoad() {
   P.push(internalFlows(procs, px, py, PR, OBS, LBL));
   // The outputs of 3.1 at Level 2, each leaving the process that produces it.
   [['3.1.2', 110, 'download date  →  3.7'], ['3.1.7', 300, 'TIPS yields  →  3.2 and 3.6'], ['3.1.3', 420, 'SA factors  →  3.2'],
-   ['3.1.8', 540, 'Treasury yields  →  3.4 to 3.7'], ['3.1.5', 830, 'GSW curve parameters  →  3.4']].forEach(([id, y, lab]) => {
+   ['3.1.8', 540, 'Treasury yields  →  3.4 to 3.7']].forEach(([id, y, lab]) => {
     const [x1, y1] = fromCircle(px[id], py[id], PR, W - 12, y);
     const others = OBS.filter(o => !(o.x === px[id] && o.y === py[id]));
     P.push(flow(x1, y1, W - 12, y, { obstacles: others }));
@@ -436,9 +432,10 @@ function level3YieldCurvesLoad() {
     spec: V(F31), specLabel: '3.1 Parse sources and calculate yields',
     title: 'Yield Curves 3.1 — Level 3', h1: 'Level 3 &mdash; Yield Curves 3.1 Parse sources and calculate yields', maxWidth: W,
     up: 'DFD_LEVEL2_YIELDCURVES.html', upLabel: 'Level 2 — Yield Curves', svg: P.join(NL),
-    notes: ['  One process per source parsed, then 3.1.6, 3.1.7 and 3.1.8, which calculate from what the parses produce. The five flows leaving on the right are the outputs of 3.1 at Level 2.',
+    notes: ['  One process per source parsed, then 3.1.6, 3.1.7 and 3.1.8, which calculate from what the parses produce. The four flows leaving on the right are the outputs of 3.1 at Level 2.',
       '  Every process here drills to its own section of <a href="viewer.html#/md/' + F31 + '">3.1 Parse sources and calculate yields</a>.',
-      '  3.1.3 and 3.1.5 produce nothing another process here uses: their outputs leave 3.1 directly, for 3.2 and 3.4.'].join(NL)
+      '  3.1.3 produces nothing another process here uses: its output leaves 3.1 directly, for 3.2.',
+      '  3.1.5 Parse GSW parameters is specified but not drawn. Its output is drawn only on an analysis view opened with ?gsw, and no view of the app uses it otherwise.'].join(NL)
   });
 }
 
@@ -519,15 +516,15 @@ function level3YieldCurvesRender() {
   const S = K + '3.7_Render_Charts_And_Tables.md';
   const views = ['3.7.3', '3.7.4', '3.7.5', '3.7.6'];
   const procs = [
-    { id: '3.7.1', name: ['Select the', 'view'], a: 'select-view',
+    { id: '3.7.1', name: ['Select', 'view'], a: 'select-view',
       out: { '3.7.2': ['view selections'], ...Object.fromEntries(views.map(v => [v, ['']])) } },
-    { id: '3.7.2', name: ['Build the', 'axis scales'], a: 'build-scales',
+    { id: '3.7.2', name: ['Build', 'axis scales'], a: 'build-scales',
       out: Object.fromEntries(views.map((v, k) => [v, [k ? '' : 'axis scales']])) },
-    { id: '3.7.3', name: ['Draw the', 'Treasuries', 'view'], a: 'draw-treasuries', out: {} },
-    { id: '3.7.4', name: ['Draw the', 'TIPS view'], a: 'draw-tips', out: { '3.7.7': ['drill request'] } },
-    { id: '3.7.5', name: ['Draw the', 'breakeven', 'view'], a: 'draw-breakeven', out: {} },
-    { id: '3.7.6', name: ['Draw the', 'spread view'], a: 'draw-spreads', out: {} },
-    { id: '3.7.7', name: ['Answer a', 'drill request'], a: 'answer-a-drill', out: {} },
+    { id: '3.7.3', name: ['Draw', 'Treasuries view'], a: 'draw-treasuries', out: {} },
+    { id: '3.7.4', name: ['Draw', 'TIPS view'], a: 'draw-tips', out: { '3.7.7': ['drill request'] } },
+    { id: '3.7.5', name: ['Draw', 'breakeven view'], a: 'draw-breakeven', out: {} },
+    { id: '3.7.6', name: ['Draw', 'spread view'], a: 'draw-spreads', out: {} },
+    { id: '3.7.7', name: ['Answer', 'drill request'], a: 'answer-a-drill', out: {} },
   ];
   const PR = 56, UX = 870, UW = 145, W = 1030, H = 980;
   const px = { '3.7.1': 300, '3.7.2': 300, '3.7.3': 640, '3.7.4': 640, '3.7.5': 640, '3.7.6': 640, '3.7.7': 380 };
