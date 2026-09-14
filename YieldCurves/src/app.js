@@ -2,6 +2,8 @@
 import { yieldFromPrice, cashflowSchedule, termYears } from '../../shared/src/bond-math.js';
 import { saFactorForDate, maturitySaFactor } from '../../shared/src/ref-cpi.js';
 import { tipsYieldsFromPrices } from '../../shared/src/tips-yields.js';
+import { treasuryYieldsFromPrices } from '../../shared/src/treasury-yields.js';
+import { yieldSpreadBps, priceSpreadPct } from '../../shared/src/spreads.js';
 import { findClosestNominal } from '../../shared/src/breakeven.js';
 import {
   SAO_NOISE_YRS, SAO_BLEND_START_YRS, SAO_BLEND_END_YRS,
@@ -441,7 +443,7 @@ async function init() {
     console.log("Parsing CSVs...");
     const fedInvest = parseFedInvestPrices(yieldsText);
     rawYieldsData = fedInvest.tips;
-    rawNominalsData = fedInvest.nominals;
+    rawNominalsData = treasuryYieldsFromPrices(fedInvest.nominals);
     rawRefCpiData = parseRefCpiAndSaFactors(refCpiText);
     
     console.log(`Parsed ${rawYieldsData.length} yield rows and ${rawRefCpiData.length} RefCPI rows.`);
@@ -599,20 +601,12 @@ function processAndRenderNominals() {
   try {
     // FedInvest rows settle on the price date itself (T=0); market quotes settle T+1.
     const mktSettle = marketSettleIso();
-    const mapFedRow = r => {
-      const price = parseFloat(r.price);
-      const coupon = parseFloat(r.coupon);
-      const maturityDate = localDate(r.maturity);
-      const yld = yieldFromPrice(price, coupon, localDate(r.settlementDate), maturityDate);
-      if (yld === null || isNaN(yld)) return null;
-      return { ...r, coupon, price, yield: yld, maturityDate };
-    };
 
     let fedProcessed = null;
     if (showFed) {
       if (!rawNominalsData || rawNominalsData.length === 0) { statusEl.textContent = 'No FedInvest data available.'; return; }
       fedProcessed = rawNominalsData.filter(r => nominalsTypeFilters.has(r.type) || (nominalsShowStrips && isStrip(r.cusip)))
-        .map(mapFedRow).filter(Boolean).sort((a, b) => a.maturityDate - b.maturityDate);
+        .sort((a, b) => a.maturityDate - b.maturityDate);
     }
 
     let fidProcessed = null;
@@ -624,7 +618,7 @@ function processAndRenderNominals() {
     // checkboxes (those pick which per-bond series are drawn, not what the curve is
     // fitted to). Bills are already zero-coupon, so they anchor the short end.
     let fedSpotSet = showFed
-      ? rawNominalsData.filter(r => !isStrip(r.cusip)).map(mapFedRow).filter(Boolean)
+      ? rawNominalsData.filter(r => !isStrip(r.cusip))
       : null;
     let fidSpotSet = showFid
       ? fidelityNominalsData.filter(b => !isStrip(b.cusip) && b.type !== 'MARKET BASED STRIP')
@@ -654,8 +648,8 @@ function processAndRenderNominals() {
 
     if (fidFiltered) {
       fidFiltered.forEach(b => {
-        b.yieldSpreadBps = (!isNaN(b.bidYield) && !isNaN(b.yield)) ? (b.bidYield - b.yield) * 10000 : NaN;
-        b.priceSpreadPct = (!isNaN(b.bidPrice) && !isNaN(b.price) && b.price > 0) ? (b.price - b.bidPrice) / b.price * 100 : NaN;
+        b.yieldSpreadBps = yieldSpreadBps(b.yield, b.bidYield);
+        b.priceSpreadPct = priceSpreadPct(b.price, b.bidPrice);
       });
     }
 

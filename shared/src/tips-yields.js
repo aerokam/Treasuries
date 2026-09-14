@@ -11,6 +11,7 @@
 import { yieldFromPrice } from './bond-math.js';
 import { saFactorForDate, maturitySaFactor } from './ref-cpi.js';
 import { localDate } from './settlement.js';
+import { yieldSpreadBps, priceSpreadPct } from './spreads.js';
 
 // tipsRows        S1's TIPS rows, each carrying cusip, coupon, maturity, price and the
 //                 settlementDate of the file it came from
@@ -55,23 +56,21 @@ export function tipsYieldsFromPrices(tipsRows, refCpiRows, quotesByCusip, isBrok
     if (askYield == null || isNaN(askYield) || saYield == null || isNaN(saYield)) return null;
 
     let bidPrice = NaN, bidYield = NaN, adjAskPrice = NaN, adjBidPrice = NaN;
-    let indexRatio = NaN, yieldSpreadBps = NaN, priceSpreadPct = NaN;
+    let indexRatio = NaN, yieldSpread = NaN, priceSpread = NaN;
     if (isBroker && quote) {
       bidPrice = quote.bidPrice;
       adjAskPrice = quote.adjAskPrice;
       adjBidPrice = quote.adjBidPrice;
       indexRatio = quote.indexRatio;
-      // Null where there is no bid price to price from. Left as null it would pass the
-      // numeric test below and publish the spread as the negative of the ask yield.
+      // Null where there is no bid price to calculate from; NaN is what the tables show as empty.
       bidYield = yieldFromPrice(bidPrice, coupon, settleDate, matureDate) ?? NaN;
-      if (!isNaN(bidYield) && !isNaN(askYield)) yieldSpreadBps = (bidYield - askYield) * 10000;
-      if (!isNaN(adjAskPrice) && !isNaN(adjBidPrice) && adjAskPrice > 0)
-        priceSpreadPct = (adjAskPrice - adjBidPrice) / adjAskPrice * 100;
+      yieldSpread = yieldSpreadBps(askYield, bidYield);
+      priceSpread = priceSpreadPct(adjAskPrice, adjBidPrice);
     }
 
     return {
       ...bond, coupon, price, saRatio, askYield, saYield, bidPrice, bidYield,
-      adjAskPrice, adjBidPrice, indexRatio, yieldSpreadBps, priceSpreadPct,
+      adjAskPrice, adjBidPrice, indexRatio, yieldSpreadBps: yieldSpread, priceSpreadPct: priceSpread,
       maturityDate: matureDate, settlementDate: settleDateStr, isBroker,
     };
   }).filter(Boolean).sort((a, b) => a.maturityDate - b.maturityDate);

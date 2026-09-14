@@ -19,8 +19,10 @@
 // Run: node YieldCurves/scripts/updateSpotYieldCurves.js  [--dry]
 
 import { uploadToR2 } from './r2.js';
-import { yieldFromPrice, termYears } from '../../shared/src/bond-math.js';
+import { termYears } from '../../shared/src/bond-math.js';
 import { tipsYieldsFromPrices } from '../../shared/src/tips-yields.js';
+import { treasuryYieldsFromPrices } from '../../shared/src/treasury-yields.js';
+import { yieldSpreadBps, priceSpreadPct } from '../../shared/src/spreads.js';
 import { findClosestNominal } from '../../shared/src/breakeven.js';
 import { parseCsv } from '../../shared/src/csv.js';
 import { localDate, toIsoDate, nextBusinessDay, parseHolidaySet } from '../../shared/src/settlement.js';
@@ -157,13 +159,7 @@ async function main() {
   // FedInvest nominals: STRIPS aren't currently present in YieldsFromFedInvestPrices.csv
   // (verified empty at time of writing), but the same all/fit split is applied for symmetry
   // and in case that ever changes — classifyByCusipRoot tags STRIPS Type correctly either way.
-  const fedNominalBondsAll = rawNominalsData.map(r => {
-    const coupon = parseFloat(r.coupon), price = parseFloat(r.price);
-    const maturityDate = localDate(r.maturity);
-    const yld = yieldFromPrice(price, coupon, localDate(r.settlementDate), maturityDate);
-    if (yld == null || isNaN(yld)) return null;
-    return { ...r, coupon, price, yield: yld, maturityDate };
-  }).filter(Boolean);
+  const fedNominalBondsAll = treasuryYieldsFromPrices(rawNominalsData);
   const fedNominalBonds = fedNominalBondsAll.filter(b => !isStrip(b.cusip));
   // The parser already stamps each quote with the market settlement date it was priced at.
   const mktNominalBondsAll = fidNominalBondsAll;
@@ -251,12 +247,10 @@ async function main() {
     });
   }
   for (const b of mktNominalBonds) {
-    const yieldSpreadBps = (!isNaN(b.bidYield) && !isNaN(b.yield)) ? (b.bidYield - b.yield) * 10000 : NaN;
-    const priceSpreadPct = (!isNaN(b.bidPrice) && !isNaN(b.price) && b.price > 0) ? (b.price - b.bidPrice) / b.price * 100 : NaN;
     spreadRows.push({
       security_type: 'Treasury', cusip: b.cusip, maturity: b.maturity, coupon: b.coupon,
-      ask_yield: b.yield, bid_yield: b.bidYield, yield_spread_bps: yieldSpreadBps,
-      ask_price: b.price, bid_price: b.bidPrice, price_spread_pct: priceSpreadPct,
+      ask_yield: b.yield, bid_yield: b.bidYield, yield_spread_bps: yieldSpreadBps(b.yield, b.bidYield),
+      ask_price: b.price, bid_price: b.bidPrice, price_spread_pct: priceSpreadPct(b.price, b.bidPrice),
     });
   }
   console.log(`Computed bid/ask spreads for ${spreadRows.length} securities.`);
