@@ -160,17 +160,19 @@ async function main() {
     ? parseHolidaySet(parseCsv(await holidayRes.text(), false))
     : new Set();
 
+  // Fetch FedInvest prices (today's latest available) and determine the settlement date.
+  // Runs before S2 is read, so a holiday, a missing "Prices For:" line or a stale date all
+  // end the run without ever touching S2 (1.1.1's no-retry cases stay no-retry).
+  console.error('Fetching prices from FedInvest...');
+  const settlement = await determineSettlementDate(today, holidays);
+  if (settlement === null) return; // holiday / not yet published / stale — clean exit or retry
+  const { settleDateStr, priceRows } = settlement;
+
   // Read TipsRef.csv (S2) for TIPS dated-date CPI / coupon / maturity metadata
   console.error('Fetching TipsRef.csv from R2...');
   const refRes = await fetch(`${R2_BASE_URL}/TipsRef.csv`);
   if (!refRes.ok) throw new Error(`Failed to fetch TipsRef.csv from R2: ${refRes.status}`);
   const refMap = parseTipsRefMap(await refRes.text());
-
-  // Fetch FedInvest prices (today's latest available) and determine the settlement date
-  console.error('Fetching prices from FedInvest...');
-  const settlement = await determineSettlementDate(today, holidays);
-  if (settlement === null) return; // holiday / not yet published / stale — clean exit or retry
-  const { settleDateStr, priceRows } = settlement;
 
   // Select TIPS and Treasury prices, and calculate yields
   const rows = [];
