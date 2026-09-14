@@ -47,6 +47,10 @@ These came out of review and apply to every spec from here.
 2. **Separate the SA yield from the TIPS yield in code.** `shared/src/tips-yields.js#tipsYieldsFromPrices` performs the work of both 3.1.7 and 3.2, so both specs name the same function and the separation exists only in the spec text. A function for each process makes the drill from each spec reach code that does that process’s work and nothing more.
 3. **Check every process spec’s opening against the code**, per §2.0: 3.2 to 3.7 and the sub-processes of 3.7. 3.1.1 and 3.1.2 are corrected; 3.1.2 had described only the separation of Treasury rows from TIPS rows.
 4. **Two stores drawn on the diagrams have no entry in DataStores**, so a click on either opens the top of that page: the bond holidays and the monthly CPI (§5.0).
+5. **Trace the second path, E6 → 1.2 → S7 → 3.1.2**, the way §3.13 traced the first. 1.2 downloads the E6 export and removes the `="…"` wrappers around its field values before writing S7, one transformation, so it needs a process spec and no Level 3. Its detailed download steps are in the gitignored `Data_Pipeline_Local.md`.
+6. **Apply the §3.13 guidelines to every other E entry, S entry and job** once both paths are clean.
+7. **TipsLadderManager's dormant FedInvest source looks Ref CPI up one bond trading day after the settlement date**, while [3.0 §Ref CPI Date](../TipsLadderManager/knowledge/3.0_TIPS_Ladder_Rebalancing.md) states the settlement date in both modes. The rule was written only in the Data Dictionary's Settlement Date entry, which does not own it, and §3.13 removed it. 3.0 is the foundation, so either the code or 3.0 changes: the developer's call.
+8. **3.1.1 still writes the settlement date onto every row in code.** The specs now make it one flow (§3.13), but `YieldCurves/src/app.js#parseFedInvestPrices` copies it onto each row, and `shared/src/tips-yields.js#tipsYieldsFromPrices` and `shared/src/treasury-yields.js#treasuryYieldsFromPrices` read it from there. Deferred while another session is editing `app.js`.
 
 ---
 
@@ -193,6 +197,30 @@ The unrounded ratio lies within 0.5 × 10⁻⁹ of the quoted figure on all 53. 
 4. Change [3.1](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md) in the same commit: 3.1.7 takes the index ratio the quote states.
 
 **Open.** Both files were downloaded on a day followed by a bond trading day, a Monday and a Thursday, so neither separates one bond trading day from one calendar day, and neither settlement crosses a [Bond Holiday](./DATA_DICTIONARY.md#bond-holiday). A quote file downloaded on a Friday, or on the day before a bond holiday, settles the question. S7 is replaced three times a day, so that file has to be kept when it occurs.
+
+---
+
+## 3.13 One path traced end to end: E1 → 1.1 → S1 → 3.1
+
+The developer set the method: trace one path from its external entity to the process that consumes it, specify each transformation once at the process that performs it, and clean that path before applying what it shows to the others. Commits `294a42d` and `fe7e7a7`.
+
+**What the path had wrong.**
+
+- The T+0 settlement rule for FedInvest was written in six places with three different reasons. The reason given most often, a match to the source's own published yields, names nothing the job reads, because 1.1 reads prices only. The rule now lives in [1.1.1](./1.1_Download_FedInvest_Prices.md#determine-settlement-date) with its basis, a spreadsheet comparison the developer made against broker quotes settling T+1, and every other document links there.
+- E1 described one price, and a midpoint claim that `FedInvest_Pricing_Logic.md` had withdrawn as unsourced. The page states a `Prices For:` date and three prices. E1 now states the page's own contents and says nothing about settlement, which is assigned in 1.1.1.
+- S1 was described twice, in the Data Dictionary and in DataStores, and both disagreed with the file: the date listed as a column, column names, type values, coupon units, and every yield called real. Its composition is now in the Data Dictionary alone, in the file's own header names.
+- The TIPS Prices and Treasury Prices flows held the settlement date on every row, where the market-quote side has it as one flow. It is one flow on both sides now.
+- Level 2 drew 1.1 and 1.2 reading no store: 1.1 reads S2 and the bond holidays, and 1.2 reads the bond holidays. Level 1 did not record Treasury Primer reading S1.
+- 1.1 had no spec. [1.1 Download FedInvest prices](./1.1_Download_FedInvest_Prices.md) and its Level 3 specify 1.1.1 Determine settlement date, 1.1.2 Select TIPS and Treasury prices, and 1.1.3 Calculate yields. Every flow on it was already a Data Dictionary term, so no term was added.
+- Two statements that the FedInvest path exists to match tipsladder.com were removed. The developer confirmed no portal app depends on tipsladder.com beyond naming conventions.
+
+**Guidelines, to apply to the other paths.**
+
+- A source's own contents are stated once, in its E entry, in the source's own labels.
+- A store's composition is stated once, in the Data Dictionary, in the file's own header names, including a line that is not a row. Its DataStores entry holds the R2 key, writer, schedule and readers, and links to the composition.
+- A rule is stated in the spec of the process that applies it, and every other document links there.
+- A value that occurs once per file is one flow, not a field on every row.
+- A diagram draws exactly the stores the code reads.
 
 ---
 
