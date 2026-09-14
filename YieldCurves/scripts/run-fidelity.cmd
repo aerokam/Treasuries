@@ -11,7 +11,7 @@ if not exist "C:\Users\aerok\projects\Treasuries\YieldCurves\logs" (
 
 echo [%DATE% %TIME%] Starting
 echo [%DATE% %TIME%] Starting >> "%LOG%"
-powershell -NoProfile -Command "& %NODE% '%SCRIPT%' 2>&1 | Tee-Object -FilePath '%LOG%' -Append"
+%NODE% "%SCRIPT%" >> "%LOG%" 2>&1
 set EXIT_CODE=%ERRORLEVEL%
 echo [%DATE% %TIME%] Exited with code %EXIT_CODE%
 echo [%DATE% %TIME%] Exited with code %EXIT_CODE% >> "%LOG%"
