@@ -68,6 +68,8 @@ const CONST_RE = /^[A-Z][A-Z0-9_]{3,}$/;              // SCREAMING_SNAKE
 const EXTERNAL = new Map([
   ['EADDRINUSE', 'Node.js error code'],
   ['launchPersistentContext', 'Playwright API'],
+  ['RATE', 'FedInvest price table column (E1)'],
+  ['SELL', 'FedInvest price table column (E1)'],
 ]);
 
 // A spec whose status line reads Archived or Unbuilt describes code that is not in

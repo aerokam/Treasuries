@@ -13,7 +13,7 @@ Follow these steps to verify that the navigation, rendering, and drill-down feat
 - [ ] **Spec Index**: Click **Data Stores**.
     - *Expected*: Opens the detailed `DataStores.md` spec in the viewer.
 - [ ] **Source Drilling**: Click **FedInvest** in the map.
-    - *Expected*: Opens `DATA_DICTIONARY.md` at the E1 schema section. Verify the note about mid-market pricing and inferred T=0.
+    - *Expected*: Opens `DATA_DICTIONARY.md` at the E1 schema section, which states the `Prices For:` date and the eight columns of the price table.
 - [ ] **Process Drilling**: Click the **0 Treasury Investors Portal** circle.
     - *Expected*: Opens `Portal.md` in the viewer. (Replaced by the Level 1 diagram once it is drawn.)
 

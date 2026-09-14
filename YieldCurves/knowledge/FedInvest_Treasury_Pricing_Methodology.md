@@ -118,7 +118,7 @@ Determined by the Secretary of the Treasury, taking into consideration the curre
 
 ## Connection to Portal Ingestion
 
-The FedInvest daily price list publishes three prices per security: **Buy**, **Sell**, and **End of Day**. The Treasury portal's ingestion script (`scripts/getYieldsFedInvest.js`) takes the Buy price, falling back to Sell, then End of Day, and calculates yields from it. This pricing methodology describes the market-based foundation for those published prices.
+The FedInvest daily price list publishes three prices per security: **Buy**, **Sell**, and **End of Day**. Which one the portal takes is specified in [1.1.2 Select TIPS and Treasury prices](../../knowledge/1.1_Download_FedInvest_Prices.md#select-tips-and-treasury-prices). This pricing methodology describes the market-based foundation for those published prices.
 
 ---
 

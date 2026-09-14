@@ -75,8 +75,8 @@
 ## 1.0 External Entities (E)
 *External sources providing data to the system. Click these in the Context Diagram to see their data structures.*
 
-- <a id="e1"></a>**E1: FedInvest** = `CUSIP + Security_Type + Maturity_Date + Rate + Price`
-  *US Treasury price source. Price represents the **midpoint of market bid and ask prices** (mid-market reference). Because it is a midpoint, it is consistently lower than commercial market Ask prices, resulting in calculated FedInvest yields that are slightly higher than broker Ask yields. This is particularly noticeable for short-dated Bills. Note: FedInvest does not specify a settlement date; our system infers T=0 (Price Date = Settlement Date) based on empirical yield matching. We calculate the Yield (YTM) based on this price.*
+- <a id="e1"></a>**E1: FedInvest** = `Prices_For + { CUSIP + SECURITY_TYPE + RATE + MATURITY_DATE + CALL_DATE + BUY + SELL + END_OF_DAY }`
+  *TreasuryDirect’s daily price list for marketable Treasury securities, one row per security. The page states the date its prices are for on a `Prices For:` line, and its price table has the eight columns above, named as the page names them. Prices are published for the current business day and, on a separate page, for a past date. The three prices, and how Treasury derives them, are described in [FedInvest Pricing Logic](../YieldCurves/knowledge/FedInvest_Pricing_Logic.md).*
 - <a id="e2"></a>**E2: TreasuryDirect SecIndex** = `CUSIP + Index_Date + Ref_CPI`
   *Authority for daily interpolated RefCPI. Provides values for every day of the month.*
 - <a id="e3"></a>**E3: FiscalData API** = `CUSIP + Auction_Date + Security_Type + High_Yield + Bid_to_Cover + ...`
@@ -110,8 +110,19 @@
 ## 2.0 Data Stores (S)
 *Internal R2 data files. Schemas are normalized from External Entities.*
 
-- <a id="s1"></a>**FedInvest prices (S1)**, `YieldsFromFedInvestPrices.csv` = `Settlement_Date + { @CUSIP + Type + Maturity + Coupon + DatedDateCPI + Price + Yield }`
-  *Primary R2 key for daily FedInvest prices and yields. Legacy alias: `YieldsDerivedFromFedInvestPrices.csv`, `Yields.csv`.*
+- <a id="s1"></a>**FedInvest prices (S1)**, `YieldsFromFedInvestPrices.csv` = `Settlement_Date + { type + @cusip + maturity + coupon + ( datedDateCpi ) + price + yield }`
+  *The first line holds the [Settlement Date](#settlement-date) alone, the second line is the header, and each line after it is one security: the [TIPS Prices](#tips-prices) and the [Treasury Prices](#treasury-prices), each with its yield. Written by [1.1 Download FedInvest prices](./1.1_Download_FedInvest_Prices.md).*
+
+  | Column | Defined term |
+  |---|---|
+  | `type` | security type, as [E1](#e1) states it: `TIPS`, `MARKET BASED BILL`, `MARKET BASED NOTE` or `MARKET BASED BOND` |
+  | `cusip` | [CUSIP](#cusip) |
+  | `maturity` | [Maturity Date](#maturity-date), `YYYY-MM-DD` |
+  | `coupon` | [Coupon Rate](#coupon-rate), as a decimal |
+  | `datedDateCpi` | dated date [Ref CPI](#ref-cpi), TIPS only |
+  | `price` | [Clean Price](#clean-price) |
+  | `yield` | [Yield](#yield) at the settlement date, as a decimal: real for a TIPS, nominal for every other security |
+
 - <a id="s2"></a>**TIPS reference data (S2)**, `TipsRef.csv` = `{ @CUSIP + Maturity + DatedDate + Coupon + DatedDateRefCpi + Term }`
 - <a id="s3"></a>**Ref CPI (S3)**, `RefCPI.csv` = `{ @Date + Ref_CPI }` *— authoritative retrieved NSA Ref CPI (TreasuryDirect). Consumed by all apps.*
 - <a id="s4"></a>**Ref CPI NSA and SA (S4)**, `RefCpiNsaSa.csv` = `{ @Date + CPI_NSA + CPI_SA + SA_Factor }` *— calculated (App. B daily interpolation), built for the SA pipeline: `CPI_NSA` and `CPI_SA` interpolated daily so `SA_Factor = CPI_NSA / CPI_SA`. The daily SA series has no official or retrieved equivalent — this is its **sole source**.*
@@ -193,7 +204,12 @@
 
 <a id="settlement-date"></a>
 ### Settlement Date
-`Settlement_Date` = *The date on which a bond trade is settled. Standard system logic: [ Trade_Date + 1 Bond Trading Day (T+1) | Manual_Override ]. T+1 excludes weekends and US bond market holidays (source: BondHolidaysSifma.csv). Exception: For FedInvest price ingestion, yield calculations use T=0 (Price Date = Settlement Date) to match FedInvest reported yields empirically. However, the default Ref CPI date is still set to T+1 bond trading day of the FedInvest price date, to match broker convention (where the Ref CPI used is that of the actual settlement date).*
+`Settlement_Date` = *The date on which a bond trade is settled. Standard system logic: [ Trade_Date + 1 Bond Trading Day (T+1) | Manual_Override ]. T+1 excludes weekends and US bond market holidays (source: BondHolidaysSifma.csv).*
+
+*Each source’s settlement date is determined once, by the process that assigns it:*
+
+- *Market quotes ([S7](#s7)): the [Download Date](#download-date) plus one bond trading day (T+1), in [3.1.6 Determine settlement date](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#determine-settlement-date).*
+- *FedInvest prices ([S1](#s1)): the date FedInvest states its prices are for (T+0), in [1.1.1 Determine settlement date](./1.1_Download_FedInvest_Prices.md#determine-settlement-date), where the basis for T+0 is recorded.*
 
 <a id="download-date"></a>
 ### Download Date
@@ -320,7 +336,7 @@ For nominal Treasuries, 31 CFR §356.2 applies: *"Dated date means the date from
 <a id="ref-cpi"></a>
 ### Ref CPI
 `Ref_CPI` = *Daily interpolated Consumer Price Index (CPI-U NSA) value used for TIPS calculations. Authority: 31 CFR § 356 Appendix B.* One value per **specific calendar day** (not "nearest" — see lookup rule below).
-- **Dated:** `Ref_CPI_dated` — Reference CPI on the TIPS [Dated Date](#dated-date) (constant for the bond's lifetime). Carried as `DatedDateCPI` in [S1](#s1) and `DatedDateRefCpi` in [S2](#s2). **Dated date Ref CPI** is the term, matching the Treasury FiscalData field it is sourced from (`ref_cpi_on_dated_date`). *Base CPI* was the earlier name and is retired.
+- **Dated:** `Ref_CPI_dated` — Reference CPI on the TIPS [Dated Date](#dated-date) (constant for the bond's lifetime). Carried as `datedDateCpi` in [S1](#s1) and `DatedDateRefCpi` in [S2](#s2). **Dated date Ref CPI** is the term, matching the Treasury FiscalData field it is sourced from (`ref_cpi_on_dated_date`). *Base CPI* was the earlier name and is retired.
 - **Settle:** `Ref_CPI_settle` — Reference CPI on the Settlement Date
 
 **Ref is short for Reference**, everywhere in these apps and in Treasury’s own field names. *Ref CPI* and *Reference CPI* are the same term, as are *dated date Ref CPI* and *dated date reference CPI*; the short form is the one to write.
@@ -675,10 +691,10 @@ Some values are true only until Treasury issues more TIPS. Left inline as approx
 
 ### 6.3 Yield Curves
 
-- <a id="tips-prices"></a>**TIPS Prices** = `{ @CUSIP + Coupon_Rate + Maturity_Date + Clean_Price + Settlement_Date }`
-  *The TIPS in [S1](#s1), each with the one settlement date the file states. From 3.1.1 to 3.1.7.*
-- <a id="treasury-prices"></a>**Treasury Prices** = `{ @CUSIP + Security_Type + Coupon_Rate + Maturity_Date + Clean_Price + Settlement_Date }`
-  *The nominal Treasuries in [S1](#s1). The price is mid-market ([E1](#e1)). From 3.1.1 to 3.1.8.*
+- <a id="tips-prices"></a>**TIPS Prices** = `{ @CUSIP + Coupon_Rate + Maturity_Date + Clean_Price + Ref_CPI_dated }`
+  *Each TIPS in [E1](#e1) that [S2](#s2) also holds, with one [Clean Price](#clean-price) from E1 and the coupon rate, maturity date and dated date [Ref CPI](#ref-cpi) from S2. From 1.1.2 to 1.1.3, held in [S1](#s1), and from 3.1.1 to 3.1.7. The [Settlement Date](#settlement-date) of the prices is a separate flow.*
+- <a id="treasury-prices"></a>**Treasury Prices** = `{ @CUSIP + Security_Type + Coupon_Rate + Maturity_Date + Clean_Price }`
+  *Each market-based bill, note and bond in [E1](#e1), with one [Clean Price](#clean-price). From 1.1.2 to 1.1.3, held in [S1](#s1), and from 3.1.1 to 3.1.8. The [Settlement Date](#settlement-date) of the prices is a separate flow.*
 - <a id="tips-quotes"></a>**TIPS Quotes** = `{ @CUSIP + Coupon_Rate + Maturity_Date + Ask_Clean_Price + ( Bid_Clean_Price ) + Index_Ratio }`
   *The TIPS in [S7](#s7), each with its [ask and bid](#ask) clean prices and the [Index Ratio](#index-ratio) the quote states. From 3.1.2 to 3.1.7.*
 - <a id="treasury-quotes"></a>**Treasury Quotes** = `{ @CUSIP + Security_Type + Coupon_Rate + Maturity_Date + Ask_Clean_Price + ( Bid_Clean_Price ) }`

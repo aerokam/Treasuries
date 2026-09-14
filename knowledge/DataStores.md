@@ -6,19 +6,11 @@ This document provides the technical schemas and field-level specifications for 
 
 ## <a id="s1"></a>FedInvest prices (S1)
 **File**: `YieldsFromFedInvestPrices.csv`
-**Description**: Daily Treasury settlement prices and derived Yield-to-Maturity (YTM).
-**Update Frequency**: Weekdays ~1:05 PM ET.
-
-| Field | Type | Description |
-|---|---|---|
-| `Settlement_Date` | Date | The date used for yield calculations. Inferred as T=0 (Price Date) for FedInvest. |
-| `CUSIP` | String | 9-character security identifier. |
-| `Type` | String | Security type (Bill, Note, Bond, TIPS). |
-| `Maturity` | Date | The maturity date of the security. |
-| `Coupon` | Number | The annual coupon rate (e.g., 0.125). |
-| `DatedDateCPI` | Number | For TIPS: The Ref CPI on the bond's dated date. |
-| `Price` | Number | The raw price provided by the source. |
-| `Yield` | Number | The computed real YTM (Excel YIELD convention). |
+**R2 Key**: `Treasuries/YieldsFromFedInvestPrices.csv`
+**Description**: The [Settlement Date](./DATA_DICTIONARY.md#settlement-date) of the day's FedInvest prices, then each TIPS and each market-based bill, note and bond with one clean price and the yield of that price. Composition: [Data Dictionary S1](./DATA_DICTIONARY.md#s1).
+**Written by**: [1.1 Download FedInvest prices](./1.1_Download_FedInvest_Prices.md).
+**Update Frequency**: Weekdays ~1:05 PM ET ([Data Pipeline](./Data_Pipeline.md)).
+**Read by**: YieldCurves ([3.1.1](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#parse-fedinvest-prices)), the yield curves job (process 1.3), Treasury Primer, and TipsLadderManager and TipsReference when the FedInvest source is selected ([3.1 Data Pipeline §4.0](../TipsLadderManager/knowledge/3.1_Data_Pipeline.md)).
 
 **Live Data**: [View Preview (Toggles Table)](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/YieldsFromFedInvestPrices.csv)
 
