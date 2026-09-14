@@ -635,16 +635,16 @@ function processAndRenderNominals() {
       if (fidProcessed) fidProcessed = fidProcessed.filter(b => !isStrip(b.cusip));
     }
 
-    // Default range spans every security type, not just the ones currently checked — the
-    // range must not move as a side effect of toggling a type, or it silently starves the
-    // Spot fit below (Visual_Standards.md's Maturity Range note).
-    const universalBonds = [...(showFed ? rawNominalsData : []), ...(showFid ? fidelityNominalsData : [])]
-      .sort((a, b) => a.maturityDate - b.maturityDate);
+    // Initial default: the range spans whatever is checked by default (Bills/Notes/Bonds).
+    // Checking something new later expands the range to fit it (see expandRangeToInclude in
+    // the change handler below) — it never shrinks on its own; only unchecking something, or
+    // typing a narrower range by hand, reduces what's shown.
+    const allBonds = [...(fedProcessed || []), ...(fidProcessed || [])].sort((a, b) => a.maturityDate - b.maturityDate);
     const startEl = document.getElementById('startMaturity');
     const endEl = document.getElementById('endMaturity');
-    if (!startEl.value && universalBonds.length > 0) {
-      startEl.value = universalBonds[0].maturity;
-      endEl.value = universalBonds[universalBonds.length - 1].maturity;
+    if (!startEl.value && allBonds.length > 0) {
+      startEl.value = allBonds[0].maturity;
+      endEl.value = allBonds[allBonds.length - 1].maturity;
     }
 
     const startDate = parseIsoInput(startEl.value) || new Date(0);
@@ -827,16 +827,20 @@ function renderNominalsChart(fedBonds, fidBonds, fedSpotBonds, fidSpotBonds) {
   }
 
   // Zero-coupon (spot) curve, per source — fitted in price space to every non-STRIP
-  // nominal (Bills, Notes and Bonds), independent of the Bills/Notes/Bonds checkboxes.
+  // nominal (Bills, Notes and Bonds), independent of the Bills/Notes/Bonds checkboxes. Only
+  // built at all when Spot is checked — an unchecked series must not appear in the dataset
+  // array, or Chart.js's legend shows it struck through instead of simply omitting it.
   // Its own colour, distinct from the per-bond lines.
   const yToX = yearsToX(now);
-  const bothSpot = fedSpotBonds && fedSpotBonds.length && fidSpotBonds && fidSpotBonds.length;
-  const nomCurveSrc = [];
-  if (fedSpotBonds && fedSpotBonds.length) nomCurveSrc.push({ bonds: fedSpotBonds, sfx: bothSpot ? ' (FedInvest)' : '', color: '#0f172a' });
-  if (fidSpotBonds && fidSpotBonds.length) nomCurveSrc.push({ bonds: fidSpotBonds, sfx: bothSpot ? ' (Market)' : '',    color: '#b45309' });
-  for (const { bonds, sfx, color } of nomCurveSrc) {
-    const grid = spotCurveGrid(bonds, { priceOf: b => b.price, yieldOf: b => b.yield, yToX, minT: 0.25 });
-    if (grid) seriesDef.push({ label: `Spot${sfx}`, data: grid, color, w: 2.5, dash: [], curve: true, r: 0, markerR: 2 });
+  if (document.getElementById('showTsySpot').checked) {
+    const bothSpot = fedSpotBonds && fedSpotBonds.length && fidSpotBonds && fidSpotBonds.length;
+    const nomCurveSrc = [];
+    if (fedSpotBonds && fedSpotBonds.length) nomCurveSrc.push({ bonds: fedSpotBonds, sfx: bothSpot ? ' (FedInvest)' : '', color: '#0f172a' });
+    if (fidSpotBonds && fidSpotBonds.length) nomCurveSrc.push({ bonds: fidSpotBonds, sfx: bothSpot ? ' (Market)' : '',    color: '#b45309' });
+    for (const { bonds, sfx, color } of nomCurveSrc) {
+      const grid = spotCurveGrid(bonds, { priceOf: b => b.price, yieldOf: b => b.yield, yToX, minT: 0.25 });
+      if (grid) seriesDef.push({ label: `Spot${sfx}`, data: grid, color, w: 2.5, dash: [], curve: true, r: 0, markerR: 2 });
+    }
   }
 
   // Filter series with no data points
@@ -920,19 +924,18 @@ function renderNominalsChart(fedBonds, fidBonds, fedSpotBonds, fidSpotBonds) {
     };
   }
 
-  // The spot curve drives the initial y-scale only when it is actually shown (off by
-  // default). It is a smooth fit, so it is never treated as an outlier — Clip Outliers
-  // only trims the per-bond points.
-  const spotShown = document.getElementById('showTsySpot').checked;
+  // The spot curve is a smooth fit, so it is never treated as an outlier — Clip Outliers
+  // only trims the per-bond points. (Its series only exists at all when Spot is checked.)
   const barePointY = activeSeries.filter(s => !s.curve).flatMap(s => s.data).map(d => d.y);
-  const curveY = spotShown ? activeSeries.filter(s => s.curve).flatMap(s => s.data).map(d => d.y) : [];
+  const curveY = activeSeries.filter(s => s.curve).flatMap(s => s.data).map(d => d.y);
   let scaleY = barePointY.slice();
   if (nominalsClipOutliers && barePointY.length >= 4) {
-    // Use Bills/Notes/STRIPS yields for IQR (outliers live in short-dated issues; bonds widen
-    // IQR too much). Filter IQR source to positive yields only — near-maturity Bills/Notes/
-    // STRIPS can show extreme negative YTM (e.g. -5%) when trading at a tiny premium with days
-    // to expiry.
-    const nearMaturityY = activeSeries.filter(s => s.label.includes('Notes') || s.label.includes('Bills') || s.label.includes('STRIPS')).flatMap(s => s.data).map(d => d.y);
+    // Use Bills/Notes yields for IQR (outliers live in short-dated issues; Bonds and STRIPS
+    // both widen IQR too much — STRIPS carry a coupon-date sawtooth of their own, not just
+    // near-maturity noise, so lumping them into this fence clips real variation). Filter IQR
+    // source to positive yields only — near-maturity Bills/Notes can show extreme negative
+    // YTM (e.g. -5%) when trading at a tiny premium with days to expiry.
+    const nearMaturityY = activeSeries.filter(s => s.label.includes('Notes') || s.label.includes('Bills')).flatMap(s => s.data).map(d => d.y);
     const nearMaturityYPos = nearMaturityY.filter(y => y > 0);
     if (nearMaturityYPos.length >= 4) {
       const bounds = iqrClipBounds(nearMaturityYPos);
@@ -970,7 +973,7 @@ function renderNominalsChart(fedBonds, fidBonds, fedSpotBonds, fidSpotBonds) {
         pointRadius: s.curve ? (s.markerR ?? 0) : s.r,
         pointHoverRadius: s.curve ? 5 : (s.r > 0 ? s.r + 2 : 3),
         tension: s.curve ? 0.3 : 0.1,
-        hidden: s.curve ? !document.getElementById('showTsySpot').checked : false
+        hidden: false
       }))
     },
     options: {
@@ -1423,10 +1426,11 @@ function rescaleToVisible(chart) {
   if (allVisibleY.length === 0 && curveVisibleY.length === 0) return;
 
   if (nominalsClipOutliers && chartTab === 'treasuries' && allVisibleY.length >= 4) {
-    // Use Bills/Notes/STRIPS yields for IQR (outliers live in short-dated issues; bonds widen IQR too much)
+    // Use Bills/Notes yields for IQR (outliers live in short-dated issues; Bonds and STRIPS
+    // both widen IQR too much)
     const nearMaturityVisibleY = [];
     chart.data.datasets.forEach((dataset, i) => {
-      if (!chart.isDatasetVisible(i) || !(dataset.label.includes('Notes') || dataset.label.includes('Bills') || dataset.label.includes('STRIPS'))) return;
+      if (!chart.isDatasetVisible(i) || !(dataset.label.includes('Notes') || dataset.label.includes('Bills'))) return;
       dataset.data.forEach(p => { if (p.x >= xMin && p.x <= xMax) nearMaturityVisibleY.push(p.y); });
     });
     const nearMaturityVisibleYPos = nearMaturityVisibleY.filter(y => y > 0);
@@ -2257,6 +2261,22 @@ document.getElementById('nominalsTable').querySelector('thead').addEventListener
   processAndRenderNominals();
 });
 
+// Grows the Maturity Range fields to include a just-checked selection's own maturities —
+// never shrinks. Checking a security type or Spot can only widen what's visible; narrowing
+// it back down is the range fields' job (typed by hand), not a side effect of unchecking
+// something (Visual_Standards.md §3a).
+function expandRangeToInclude(bonds) {
+  if (!bonds || bonds.length === 0) return;
+  const startEl = document.getElementById('startMaturity');
+  const endEl = document.getElementById('endMaturity');
+  const minB = bonds.reduce((a, b) => a.maturityDate <= b.maturityDate ? a : b);
+  const maxB = bonds.reduce((a, b) => a.maturityDate >= b.maturityDate ? a : b);
+  const curStart = parseIsoInput(startEl.value);
+  const curEnd = parseIsoInput(endEl.value);
+  if (!curStart || minB.maturityDate < curStart) startEl.value = minB.maturity;
+  if (!curEnd || maxB.maturityDate > curEnd) endEl.value = maxB.maturity;
+}
+
 document.getElementById('nominalsControls').addEventListener('change', (e) => {
   if (e.target.id === 'clipOutliers') {
     nominalsClipOutliers = e.target.checked;
@@ -2265,23 +2285,36 @@ document.getElementById('nominalsControls').addEventListener('change', (e) => {
     return;
   }
   // Spot is a security type for charting purposes — same auto-rescale treatment as
-  // Bills/Notes/Bonds/STRIPS below, and it never resets the Maturity Range (the range is
-  // set once from every security type, not from whichever ones happen to be checked).
+  // Bills/Notes/Bonds/STRIPS below. Checking it can widen the range (its fit spans the full
+  // non-STRIP set); unchecking it never narrows the range back down.
   if (e.target.id === 'showTsySpot') {
+    if (e.target.checked) {
+      expandRangeToInclude(rawNominalsData);
+      expandRangeToInclude(fidelityNominalsData);
+    }
     savedZoom['treasuries'] = null;
     processAndRenderNominals();
     return;
   }
   if (e.target.id === 'filterStrips') {
     nominalsShowStrips = e.target.checked;
+    if (e.target.checked) {
+      expandRangeToInclude(rawNominalsData?.filter(r => isStrip(r.cusip)));
+      expandRangeToInclude(fidelityNominalsData?.filter(r => isStrip(r.cusip)));
+    }
     savedZoom['treasuries'] = null;
     processAndRenderNominals();
     return;
   }
   const type = typeCheckboxMap[e.target.id];
   if (!type) return;
-  if (e.target.checked) nominalsTypeFilters.add(type);
-  else nominalsTypeFilters.delete(type);
+  if (e.target.checked) {
+    nominalsTypeFilters.add(type);
+    expandRangeToInclude(rawNominalsData?.filter(r => r.type === type));
+    expandRangeToInclude(fidelityNominalsData?.filter(r => r.type === type));
+  } else {
+    nominalsTypeFilters.delete(type);
+  }
   savedZoom['treasuries'] = null;
   processAndRenderNominals();
 });

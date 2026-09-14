@@ -300,9 +300,9 @@ test('Treasuries All/None covers Spot too, since Ask has no checkbox of its own'
   await expect(page.locator('#showTsySpot')).toBeChecked();
 });
 
-// ─── Spot is independent of security type AND of the Maturity Range ─────────────────────
+// ─── Maturity Range expands to fit a newly-checked selection, but never shrinks ──────────
 
-test('Treasuries Maturity Range is not reset by toggling a security type', async ({ page }) => {
+test('Treasuries Maturity Range is unchanged by unchecking then re-checking a type already within it', async ({ page }) => {
   await loadTreasuries(page);
   const startBefore = await page.locator('#startMaturity').inputValue();
   const endBefore = await page.locator('#endMaturity').inputValue();
@@ -310,6 +310,21 @@ test('Treasuries Maturity Range is not reset by toggling a security type', async
   await page.locator('#filterBonds').check();
   await expect(page.locator('#startMaturity')).toHaveValue(startBefore);
   await expect(page.locator('#endMaturity')).toHaveValue(endBefore);
+});
+
+test('Treasuries: checking a type expands a manually narrowed Maturity Range to fit it', async ({ page }) => {
+  await loadTreasuries(page);
+  await page.evaluate(() => {
+    const el = document.getElementById('endMaturity');
+    el.value = '2030-01-01';
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await page.locator('#filterBonds').uncheck();
+  await page.locator('#filterBonds').check();
+  // Bonds' own maturities (2036, 2056 in the fixture) no longer fit inside the narrowed
+  // range — re-checking Bonds must widen the range back out to include them.
+  const endAfter = await page.locator('#endMaturity').inputValue();
+  expect(new Date(endAfter).getFullYear()).toBeGreaterThanOrEqual(2056);
 });
 
 test('Treasuries Spot fit spans the full nominal set regardless of which security types are checked', async ({ page }) => {
@@ -325,4 +340,18 @@ test('Treasuries Spot fit spans the full nominal set regardless of which securit
   const termText = await firstCurveRow.locator('td').first().innerText();
   const term = parseFloat(termText.match(/\(([\d.]+)y\)/)[1]);
   expect(term).toBeLessThan(2);
+});
+
+// ─── Spot dataset is fully absent from the chart when unchecked, not merely hidden ───────
+
+test('Treasuries: unchecked Spot has no chart dataset at all (no struck-through legend entry)', async ({ page }) => {
+  await loadTreasuries(page);
+  await expect(page.locator('#showTsySpot')).not.toBeChecked();
+  const hasSpotBefore = await page.evaluate(() =>
+    Object.values(Chart.instances).some(c => c.data.datasets.some(ds => ds.label.startsWith('Spot'))));
+  expect(hasSpotBefore).toBe(false);
+  await page.locator('#showTsySpot').check();
+  const hasSpotAfter = await page.evaluate(() =>
+    Object.values(Chart.instances).some(c => c.data.datasets.some(ds => ds.label.startsWith('Spot'))));
+  expect(hasSpotAfter).toBe(true);
 });

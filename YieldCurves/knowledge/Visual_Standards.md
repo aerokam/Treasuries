@@ -73,7 +73,7 @@ There is no separate "Ask" checkbox. Ask is implied by any of Bills/Notes/Bonds/
 Zoom is also NOT cleared by: date range filter changes, table sort, or legend series hide/show (legend toggles call `rescaleToVisible` directly — a refit to visible data that is visually a no-op when the remaining series share the same range).
 
 ### 3a. Maturity Range vs. Spot (Treasuries)
-The Maturity Range fields (start/end date) default to the full span of every security type available, not just whichever types are currently checked, and toggling a security type or Spot never resets them. A range once set — by that default or typed by hand — persists across checkbox changes; it is a display window the user controls, not a byproduct of which types happen to be on.
+The Maturity Range fields (start/end date) default to the span of whatever is checked by default (Bills, Notes, Bonds). Checking an additional security type or Spot **expands** the range as needed to include that selection's own maturities — the same way checking Bonds already reaches out to the long end. Unchecking something never shrinks the range back down, and neither does anything else (sort, Clip Outliers, a source toggle); only typing a narrower range by hand does. So a manually narrowed range stays narrow until a newly-checked selection needs more room than it currently allows, at which point it widens just enough to fit that selection.
 
 The Spot curve fit itself (the NSS parameters, i.e. its shape) always uses the complete non-STRIP nominal set, regardless of the Maturity Range and regardless of which security types are checked — narrowing the Range must not narrow the bond set the curve is fit to, or the fit quietly changes shape as an unintended side effect of an unrelated display choice. The Range still crops which part of that fixed curve is drawn or listed, the same as it crops every other security type's own points — a zoom, not a refit.
 
@@ -84,11 +84,11 @@ Each tab (TIPS, Treasuries) maintains its own independent zoom state:
 - Zoom state is cleared (auto-fit) when any filter checkbox is toggled on the active tab.
 
 ### 5. Outlier Clipping (Treasuries only)
-The **Clip Outliers** toggle (default: on) clips the Y-axis floor to suppress near-maturity Bills/Notes/STRIPS with extreme negative YTM. A Bill, Note or STRIP maturing in days and trading at a tiny premium can show yields like −5%, which collapses the visible yield range for all other data. Only the floor is clipped — no upper bound is applied. Clipping only ever trims the per-security Ask points — it never applies to the Spot curve, which is a smooth fit and not a candidate for a near-maturity outlier.
+The **Clip Outliers** toggle (default: on) clips the Y-axis floor to suppress near-maturity Bills/Notes with extreme negative YTM. A Bill or Note maturing in days and trading at a tiny premium can show yields like −5%, which collapses the visible yield range for all other data. Only the floor is clipped — no upper bound is applied. Clipping only ever trims the per-security Ask points — it never applies to the Spot curve, which is a smooth fit and not a candidate for a near-maturity outlier.
 
 **Algorithm (`iqrClipBounds`):**
-- Only activates when Bills, Notes or STRIPS are visible — they are the source of near-maturity garbage; Bonds alone are not clipped.
-- IQR source: positive-yield Bills + Notes + STRIPS values only (filters out near-maturity values before computing Q1/Q3).
+- Only activates when Bills or Notes are visible — they are the source of near-maturity garbage. Bonds are excluded because their natural yield range is too wide for this fence; STRIPS are excluded for the same reason — a coupon-date sawtooth of their own, not just near-maturity noise, so lumping them into this fence clips real variation rather than an outlier.
+- IQR source: positive-yield Bills + Notes values only (filters out near-maturity values before computing Q1/Q3).
 - Fence = max(1.0 × IQR, 0.5%); floor = Q1 − fence.
 - Floor is applied to all visible Y values; ceiling = natural data max (unconstrained).
 - Data points below the floor are still plotted — only the axis scale is adjusted.
