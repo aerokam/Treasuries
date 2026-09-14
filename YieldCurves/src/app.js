@@ -2261,20 +2261,28 @@ document.getElementById('nominalsTable').querySelector('thead').addEventListener
   processAndRenderNominals();
 });
 
-// Grows the Maturity Range fields to include a just-checked selection's own maturities —
-// never shrinks. Checking a security type or Spot can only widen what's visible; narrowing
-// it back down is the range fields' job (typed by hand), not a side effect of unchecking
-// something (Visual_Standards.md §3a).
-function expandRangeToInclude(bonds) {
-  if (!bonds || bonds.length === 0) return;
+// Recomputes the Maturity Range fields to the union of every currently checked selection's
+// own maturities (security types and Spot) — this is what "checking a type" means for the
+// range: it changes to match the current set of selections, growing or shrinking as needed,
+// the same way checking Bonds already reached out to the long end before Spot existed as a
+// checkbox. A manually typed range still works between checkbox changes, but the next one
+// recomputes over it (Visual_Standards.md §3a).
+function recomputeRangeFromChecked() {
   const startEl = document.getElementById('startMaturity');
   const endEl = document.getElementById('endMaturity');
-  const minB = bonds.reduce((a, b) => a.maturityDate <= b.maturityDate ? a : b);
-  const maxB = bonds.reduce((a, b) => a.maturityDate >= b.maturityDate ? a : b);
-  const curStart = parseIsoInput(startEl.value);
-  const curEnd = parseIsoInput(endEl.value);
-  if (!curStart || minB.maturityDate < curStart) startEl.value = minB.maturity;
-  if (!curEnd || maxB.maturityDate > curEnd) endEl.value = maxB.maturity;
+  const typeMatches = r => nominalsTypeFilters.has(r.type) || (nominalsShowStrips && isStrip(r.cusip));
+  const candidates = [];
+  if (rawNominalsData) candidates.push(...rawNominalsData.filter(typeMatches));
+  if (fidelityNominalsData) candidates.push(...fidelityNominalsData.filter(typeMatches));
+  if (document.getElementById('showTsySpot').checked) {
+    if (rawNominalsData) candidates.push(...rawNominalsData.filter(r => !isStrip(r.cusip)));
+    if (fidelityNominalsData) candidates.push(...fidelityNominalsData.filter(r => !isStrip(r.cusip) && r.type !== 'MARKET BASED STRIP'));
+  }
+  if (candidates.length === 0) { startEl.value = ''; endEl.value = ''; return; }
+  const minB = candidates.reduce((a, b) => a.maturityDate <= b.maturityDate ? a : b);
+  const maxB = candidates.reduce((a, b) => a.maturityDate >= b.maturityDate ? a : b);
+  startEl.value = minB.maturity;
+  endEl.value = maxB.maturity;
 }
 
 document.getElementById('nominalsControls').addEventListener('change', (e) => {
@@ -2284,37 +2292,26 @@ document.getElementById('nominalsControls').addEventListener('change', (e) => {
     processAndRenderNominals();
     return;
   }
-  // Spot is a security type for charting purposes — same auto-rescale treatment as
-  // Bills/Notes/Bonds/STRIPS below. Checking it can widen the range (its fit spans the full
-  // non-STRIP set); unchecking it never narrows the range back down.
+  // Spot is a security type for charting purposes — same range recompute and auto-rescale
+  // treatment as Bills/Notes/Bonds/STRIPS below.
   if (e.target.id === 'showTsySpot') {
-    if (e.target.checked) {
-      expandRangeToInclude(rawNominalsData);
-      expandRangeToInclude(fidelityNominalsData);
-    }
+    recomputeRangeFromChecked();
     savedZoom['treasuries'] = null;
     processAndRenderNominals();
     return;
   }
   if (e.target.id === 'filterStrips') {
     nominalsShowStrips = e.target.checked;
-    if (e.target.checked) {
-      expandRangeToInclude(rawNominalsData?.filter(r => isStrip(r.cusip)));
-      expandRangeToInclude(fidelityNominalsData?.filter(r => isStrip(r.cusip)));
-    }
+    recomputeRangeFromChecked();
     savedZoom['treasuries'] = null;
     processAndRenderNominals();
     return;
   }
   const type = typeCheckboxMap[e.target.id];
   if (!type) return;
-  if (e.target.checked) {
-    nominalsTypeFilters.add(type);
-    expandRangeToInclude(rawNominalsData?.filter(r => r.type === type));
-    expandRangeToInclude(fidelityNominalsData?.filter(r => r.type === type));
-  } else {
-    nominalsTypeFilters.delete(type);
-  }
+  if (e.target.checked) nominalsTypeFilters.add(type);
+  else nominalsTypeFilters.delete(type);
+  recomputeRangeFromChecked();
   savedZoom['treasuries'] = null;
   processAndRenderNominals();
 });

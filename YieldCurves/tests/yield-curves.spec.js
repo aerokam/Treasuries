@@ -300,31 +300,52 @@ test('Treasuries All/None covers Spot too, since Ask has no checkbox of its own'
   await expect(page.locator('#showTsySpot')).toBeChecked();
 });
 
-// ─── Maturity Range expands to fit a newly-checked selection, but never shrinks ──────────
+// ─── Maturity Range recomputes to match whatever is currently checked ────────────────────
 
-test('Treasuries Maturity Range is unchanged by unchecking then re-checking a type already within it', async ({ page }) => {
+test('Treasuries: checking Bills after None sets the range to match Bills, not the old range', async ({ page }) => {
   await loadTreasuries(page);
-  const startBefore = await page.locator('#startMaturity').inputValue();
-  const endBefore = await page.locator('#endMaturity').inputValue();
+  await page.locator('#nominalsShowNone').click();
+  await page.locator('#filterBills').check();
+  const end = await page.locator('#endMaturity').inputValue();
+  // The fixture's only Bill matures 2026-06-26 — the range must shrink to match it, not
+  // stay at whatever wide span (out to the 2056 Bond) was showing before None was clicked.
+  expect(new Date(end).getFullYear()).toBeLessThan(2030);
+});
+
+test('Treasuries: checking Spot alongside Bills-only expands the range to the full curve', async ({ page }) => {
+  await loadTreasuries(page);
+  await page.locator('#nominalsShowNone').click();
+  await page.locator('#filterBills').check();
+  const endBillsOnly = await page.locator('#endMaturity').inputValue();
+  await page.locator('#showTsySpot').check();
+  const endWithSpot = await page.locator('#endMaturity').inputValue();
+  expect(new Date(endWithSpot).getTime()).toBeGreaterThan(new Date(endBillsOnly).getTime());
+});
+
+test('Treasuries: unchecking Bonds narrows the range back down to what remains checked', async ({ page }) => {
+  await loadTreasuries(page);
+  const endBefore = await page.locator('#endMaturity').inputValue();   // Bills+Notes+Bonds
   await page.locator('#filterBonds').uncheck();
+  const endAfter = await page.locator('#endMaturity').inputValue();    // Bills+Notes only
+  expect(new Date(endAfter).getTime()).toBeLessThan(new Date(endBefore).getTime());
   await page.locator('#filterBonds').check();
-  await expect(page.locator('#startMaturity')).toHaveValue(startBefore);
   await expect(page.locator('#endMaturity')).toHaveValue(endBefore);
 });
 
-test('Treasuries: checking a type expands a manually narrowed Maturity Range to fit it', async ({ page }) => {
+test('Treasuries: a manually typed range holds until the next checkbox change', async ({ page }) => {
   await loadTreasuries(page);
+  const before = await page.locator('#nominalsTable tbody tr').count();
   await page.evaluate(() => {
     const el = document.getElementById('endMaturity');
-    el.value = '2030-01-01';
+    el.value = '2027-01-01';
     el.dispatchEvent(new Event('change', { bubbles: true }));
   });
+  const narrowed = await page.locator('#nominalsTable tbody tr').count();
+  expect(narrowed).toBeLessThan(before);
+  // The next checkbox change recomputes the range and drops the manual value.
   await page.locator('#filterBonds').uncheck();
   await page.locator('#filterBonds').check();
-  // Bonds' own maturities (2036, 2056 in the fixture) no longer fit inside the narrowed
-  // range — re-checking Bonds must widen the range back out to include them.
-  const endAfter = await page.locator('#endMaturity').inputValue();
-  expect(new Date(endAfter).getFullYear()).toBeGreaterThanOrEqual(2056);
+  await expect(page.locator('#endMaturity')).not.toHaveValue('2027-01-01');
 });
 
 test('Treasuries Spot fit spans the full nominal set regardless of which security types are checked', async ({ page }) => {
