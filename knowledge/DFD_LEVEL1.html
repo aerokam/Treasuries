@@ -142,6 +142,9 @@
     padding: 5px 12px;
   }
   .index-group a:hover { border-color: var(--accent); color: #ffffff; }
+  .flow-label a { cursor: pointer; }
+  tspan.lk { fill: #a8b2e0; text-decoration: underline; text-decoration-style: dotted; }
+  .flow-label a:hover tspan.lk { fill: #ffffff; }
 </style>
 <style>
   .cat-band { fill-opacity: 0.13; stroke-opacity: 0.55; stroke-width: 1.5; }
@@ -151,12 +154,13 @@
   .store .s-name { fill: #a8e6a8; font-size: 13px; }
   a.store { cursor: pointer; text-decoration: none; }
   .process .p-name { font-size: 12.5px; }
+  .process .p-app { fill: #c8d0ea; font-size: 12px; font-style: italic; text-anchor: middle; }
   .flow-label { font-size: 12px; }
   .flow-label a { cursor: pointer; }
   tspan.lk { fill: #a8b2e0; text-decoration: underline; text-decoration-style: dotted; }
   .flow-label a:hover tspan.lk { fill: #ffffff; }
   .nav-header .spec-link { margin-left: auto; }
-  .diagram { max-width: 1265px; }
+  .diagram { max-width: 1285px; }
 </style>
 </head>
 <body>
@@ -169,141 +173,157 @@
 <h1>Level 1</h1>
 
 <div class="diagram">
-<svg viewBox="0 0 1265 1500" role="img" aria-label="Level 1: one acquisition process, the R2 data stores as one shape, ten app processes and the user.">
+<svg viewBox="0 0 1285 1818" role="img" aria-label="Level 1: one acquisition process, the R2 data stores as one shape, ten app processes and the user.">
   <defs><marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#55558c"/></marker></defs>
-  <rect class="cat-band" x="812" y="94" width="176" height="374" rx="10" fill="#5a6e5a" stroke="#5a6e5a"/>
+  <rect class="cat-band" x="800" y="94" width="200" height="486" rx="10" fill="#5a6e5a" stroke="#5a6e5a"/>
   <text class="cat-label" x="900" y="114" text-anchor="middle" fill="#5a6e5a">Daily Workflow</text>
-  <rect class="cat-band" x="812" y="448" width="176" height="610" rx="10" fill="#2474a6" stroke="#2474a6"/>
-  <text class="cat-label" x="900" y="468" text-anchor="middle" fill="#2474a6">Reference</text>
-  <rect class="cat-band" x="812" y="1038" width="176" height="256" rx="10" fill="#6c4ab8" stroke="#6c4ab8"/>
-  <text class="cat-label" x="900" y="1058" text-anchor="middle" fill="#6c4ab8">Educational</text>
-  <path class="flow" d="M 8.0 701.0 Q 63.5 692.1 119.0 701.0" marker-end="url(#a1)"/>
-  <text class="flow-label" x="10" y="689">external source data</text>
-  <path class="flow" d="M 281.0 691.0 Q 353.0 679.5 425.0 691.0" marker-end="url(#a1)"/>
-  <path class="flow" d="M 425.0 711.0 Q 353.0 722.5 281.0 711.0" marker-end="url(#a1)"/>
-  <text class="flow-label" x="354" y="679" text-anchor="middle">reference data</text>
-  <path class="flow" d="M 665 701 L 750 701"/>
-  <path class="flow" d="M 750.0 701.0 Q 692.2 421.9 887.5 214.3" marker-end="url(#a1)"/>
-  <path class="flow" d="M 750.0 701.0 Q 758.0 494.6 884.3 331.2" marker-end="url(#a1)"/>
-  <path class="flow" d="M 750.0 701.0 Q 794.3 563.7 879.2 447.0" marker-end="url(#a1)"/>
-  <path class="flow" d="M 750.0 701.0 Q 798.8 620.4 870.3 559.1" marker-end="url(#a1)"/>
-  <path class="flow" d="M 750.0 701.0 Q 800.2 671.3 857.2 658.8" marker-end="url(#a1)"/>
-  <path class="flow" d="M 750.0 701.0 Q 807.0 713.5 857.2 743.2" marker-end="url(#a1)"/>
-  <path class="flow" d="M 750.0 701.0 Q 821.5 762.3 870.3 842.9" marker-end="url(#a1)"/>
-  <path class="flow" d="M 750.0 701.0 Q 794.3 838.3 879.2 955.0" marker-end="url(#a1)"/>
-  <path class="flow" d="M 750.0 701.0 Q 758.0 907.4 884.3 1070.8" marker-end="url(#a1)"/>
-  <path class="flow" d="M 750.0 701.0 Q 692.2 980.1 887.5 1187.7" marker-end="url(#a1)"/>
-  <text class="flow-label" x="705" y="689" text-anchor="middle">app inputs</text>
-  <path class="flow" d="M 949.0 161.0 Q 1017.0 150.1 1085.0 161.0" marker-end="url(#a1)"/>
-  <path class="flow" d="M 1085.0 179.0 Q 1017.0 189.9 949.0 179.0" marker-end="url(#a1)"/>
-  <path class="flow" d="M 949.0 279.0 Q 1017.0 268.1 1085.0 279.0" marker-end="url(#a1)"/>
-  <path class="flow" d="M 1085.0 297.0 Q 1017.0 307.9 949.0 297.0" marker-end="url(#a1)"/>
-  <path class="flow" d="M 949.0 397.0 Q 1017.0 386.1 1085.0 397.0" marker-end="url(#a1)"/>
-  <path class="flow" d="M 1085.0 415.0 Q 1017.0 425.9 949.0 415.0" marker-end="url(#a1)"/>
-  <path class="flow" d="M 949.0 515.0 Q 1017.0 504.1 1085.0 515.0" marker-end="url(#a1)"/>
-  <path class="flow" d="M 1085.0 533.0 Q 1017.0 543.9 949.0 533.0" marker-end="url(#a1)"/>
-  <path class="flow" d="M 949.0 633.0 Q 1017.0 622.1 1085.0 633.0" marker-end="url(#a1)"/>
-  <path class="flow" d="M 1085.0 651.0 Q 1017.0 661.9 949.0 651.0" marker-end="url(#a1)"/>
-  <path class="flow" d="M 949.0 751.0 Q 1017.0 740.1 1085.0 751.0" marker-end="url(#a1)"/>
-  <path class="flow" d="M 1085.0 769.0 Q 1017.0 779.9 949.0 769.0" marker-end="url(#a1)"/>
-  <path class="flow" d="M 949.0 869.0 Q 1017.0 858.1 1085.0 869.0" marker-end="url(#a1)"/>
-  <path class="flow" d="M 1085.0 887.0 Q 1017.0 897.9 949.0 887.0" marker-end="url(#a1)"/>
-  <path class="flow" d="M 949.0 987.0 Q 1017.0 976.1 1085.0 987.0" marker-end="url(#a1)"/>
-  <path class="flow" d="M 1085.0 1005.0 Q 1017.0 1015.9 949.0 1005.0" marker-end="url(#a1)"/>
-  <path class="flow" d="M 949.0 1105.0 Q 1017.0 1094.1 1085.0 1105.0" marker-end="url(#a1)"/>
-  <path class="flow" d="M 1085.0 1123.0 Q 1017.0 1133.9 949.0 1123.0" marker-end="url(#a1)"/>
-  <path class="flow" d="M 949.0 1223.0 Q 1017.0 1212.1 1085.0 1223.0" marker-end="url(#a1)"/>
-  <path class="flow" d="M 1085.0 1241.0 Q 1017.0 1251.9 949.0 1241.0" marker-end="url(#a1)"/>
-  <text class="flow-label" x="1018" y="136" text-anchor="middle">to the user</text>
-  <text class="flow-label" x="1018" y="214" text-anchor="middle">from the user</text>
-  <path class="flow" d="M 545.0 754.0 Q 588.5 1257.2 1085.0 1350.0" marker-end="url(#a1)"/>
-  <text class="flow-label" x="575" y="795">downloaded data sets</text>
-  <g class="entity"><rect x="1090" y="70" width="145" height="1360" rx="3"/><text class="e-name" x="1162.5" y="750">User</text></g>
+  <rect class="cat-band" x="800" y="588" width="200" height="786" rx="10" fill="#2474a6" stroke="#2474a6"/>
+  <text class="cat-label" x="900" y="608" text-anchor="middle" fill="#2474a6">Reference</text>
+  <rect class="cat-band" x="800" y="1382" width="200" height="336" rx="10" fill="#6c4ab8" stroke="#6c4ab8"/>
+  <text class="cat-label" x="900" y="1402" text-anchor="middle" fill="#6c4ab8">Educational</text>
+  <path class="flow" d="M 8.0 909.0 Q 63.5 900.1 119.0 909.0" marker-end="url(#a1)"/>
+  <text class="flow-label" x="10" y="897"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#source-data"><tspan class="lk">source data</tspan></a></text>
+  <path class="flow" d="M 281.0 899.0 Q 353.0 887.5 425.0 899.0" marker-end="url(#a1)"/>
+  <path class="flow" d="M 425.0 919.0 Q 353.0 930.5 281.0 919.0" marker-end="url(#a1)"/>
+  <text class="flow-label" x="354" y="887" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#reference-data"><tspan class="lk">reference data</tspan></a></text>
+  <path class="flow" d="M 665 909 L 750 909"/>
+  <path class="flow" d="M 750.0 909.0 Q 568.0 526.5 887.7 248.7" marker-end="url(#a1)"/>
+  <path class="flow" d="M 750.0 909.0 Q 684.5 618.5 884.7 398.0" marker-end="url(#a1)"/>
+  <path class="flow" d="M 750.0 909.0 Q 785.9 717.4 879.8 546.5" marker-end="url(#a1)"/>
+  <path class="flow" d="M 750.0 909.0 Q 794.4 812.1 866.7 733.9" marker-end="url(#a1)"/>
+  <path class="flow" d="M 750.0 909.0 Q 794.3 877.2 846.3 860.8" marker-end="url(#a1)"/>
+  <path class="flow" d="M 750.0 909.0 Q 802.0 925.4 846.3 957.2" marker-end="url(#a1)"/>
+  <path class="flow" d="M 750.0 909.0 Q 822.4 987.2 866.7 1084.1" marker-end="url(#a1)"/>
+  <path class="flow" d="M 750.0 909.0 Q 762.8 1089.1 877.7 1228.3" marker-end="url(#a1)"/>
+  <path class="flow" d="M 750.0 909.0 Q 735.6 1186.0 884.7 1420.0" marker-end="url(#a1)"/>
+  <path class="flow" d="M 750.0 909.0 Q 568.0 1291.5 887.7 1569.3" marker-end="url(#a1)"/>
+  <text class="flow-label" x="705" y="897" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#reference-data"><tspan class="lk">reference data</tspan></a></text>
+  <path class="flow" d="M 963.0 181.0 Q 1034.0 169.6 1105.0 181.0" marker-end="url(#a1)"/>
+  <path class="flow" d="M 1105.0 199.0 Q 1034.0 210.4 963.0 199.0" marker-end="url(#a1)"/>
+  <path class="flow" d="M 963.0 331.0 Q 1034.0 319.6 1105.0 331.0" marker-end="url(#a1)"/>
+  <path class="flow" d="M 1105.0 349.0 Q 1034.0 360.4 963.0 349.0" marker-end="url(#a1)"/>
+  <path class="flow" d="M 963.0 481.0 Q 1034.0 469.6 1105.0 481.0" marker-end="url(#a1)"/>
+  <path class="flow" d="M 1105.0 499.0 Q 1034.0 510.4 963.0 499.0" marker-end="url(#a1)"/>
+  <path class="flow" d="M 963.0 675.0 Q 1034.0 663.6 1105.0 675.0" marker-end="url(#a1)"/>
+  <path class="flow" d="M 1105.0 693.0 Q 1034.0 704.4 963.0 693.0" marker-end="url(#a1)"/>
+  <path class="flow" d="M 963.0 825.0 Q 1034.0 813.6 1105.0 825.0" marker-end="url(#a1)"/>
+  <path class="flow" d="M 1105.0 843.0 Q 1034.0 854.4 963.0 843.0" marker-end="url(#a1)"/>
+  <path class="flow" d="M 963.0 975.0 Q 1034.0 963.6 1105.0 975.0" marker-end="url(#a1)"/>
+  <path class="flow" d="M 1105.0 993.0 Q 1034.0 1004.4 963.0 993.0" marker-end="url(#a1)"/>
+  <path class="flow" d="M 963.0 1125.0 Q 1034.0 1113.6 1105.0 1125.0" marker-end="url(#a1)"/>
+  <path class="flow" d="M 1105.0 1143.0 Q 1034.0 1154.4 963.0 1143.0" marker-end="url(#a1)"/>
+  <path class="flow" d="M 963.0 1275.0 Q 1034.0 1263.6 1105.0 1275.0" marker-end="url(#a1)"/>
+  <path class="flow" d="M 1105.0 1293.0 Q 1034.0 1304.4 963.0 1293.0" marker-end="url(#a1)"/>
+  <path class="flow" d="M 963.0 1469.0 Q 1034.0 1457.6 1105.0 1469.0" marker-end="url(#a1)"/>
+  <path class="flow" d="M 1105.0 1487.0 Q 1034.0 1498.4 963.0 1487.0" marker-end="url(#a1)"/>
+  <path class="flow" d="M 963.0 1619.0 Q 1034.0 1607.6 1105.0 1619.0" marker-end="url(#a1)"/>
+  <path class="flow" d="M 1105.0 1637.0 Q 1034.0 1648.4 963.0 1637.0" marker-end="url(#a1)"/>
+  <text class="flow-label" x="1035" y="156" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#app-outputs"><tspan class="lk">app outputs</tspan></a></text>
+  <text class="flow-label" x="1035" y="234" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#app-inputs"><tspan class="lk">app inputs</tspan></a></text>
+  <path class="flow" d="M 545 962 L 545 1768 L 1105 1768" marker-end="url(#a1)"/>
+  <text class="flow-label" x="557" y="1759"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#downloaded-data-sets"><tspan class="lk">downloaded data sets</tspan></a></text>
+  <g class="entity"><rect x="1110" y="70" width="145" height="1718" rx="3"/><text class="e-name" x="1182.5" y="929">User</text></g>
   <a class="process" href="DFD_LEVEL2_INGESTION.html">
-    <circle cx="200" cy="701" r="78"/>
-    <text class="p-id" x="200" y="673">1</text>
-    <text class="p-name" x="200" y="694">Acquire and</text>
-    <text class="p-name" x="200" y="710">derive</text>
-    <text class="p-name" x="200" y="726">reference data</text>
+    <circle cx="200" cy="909" r="78"/>
+    <text class="p-id" x="200" y="881">1</text>
+    <text class="p-name" x="200" y="902">Acquire and</text>
+    <text class="p-name" x="200" y="918">derive</text>
+    <text class="p-name" x="200" y="934">reference data</text>
   </a>
   <a class="store" href="viewer.html#/md/knowledge/DataStores.md">
-    <rect x="430" y="653" width="230" height="96" fill="transparent" stroke="none"/>
-    <line x1="430" y1="653" x2="660" y2="653"/>
-    <line x1="430" y1="749" x2="660" y2="749"/>
-    <text class="s-name" x="545" y="693">R2 data stores</text>
-    <text class="s-name" x="545" y="717" style="opacity:0.7">17 files</text>
+    <rect x="430" y="861" width="230" height="96" fill="transparent" stroke="none"/>
+    <line x1="430" y1="861" x2="660" y2="861"/>
+    <line x1="430" y1="957" x2="660" y2="957"/>
+    <text class="s-name" x="545" y="901">R2 data stores</text>
+    <text class="s-name" x="545" y="925" style="opacity:0.7">17 files</text>
   </a>
   <a class="process" href="viewer.html#/md/knowledge/YieldsMonitor.md">
-    <circle cx="900" cy="170" r="46"/>
-    <text class="p-id" x="900" y="150">2</text>
-    <text class="p-name" x="900" y="171">Yields</text>
-    <text class="p-name" x="900" y="187">Monitor</text>
+    <circle cx="900" cy="190" r="60"/>
+    <text class="p-id" x="900" y="162">2</text>
+    <text class="p-name" x="900" y="183">Chart live and</text>
+    <text class="p-name" x="900" y="199">historical</text>
+    <text class="p-name" x="900" y="215">yields</text>
+    <text class="p-app" x="900" y="267">Yields Monitor</text>
   </a>
   <a class="process" href="DFD_LEVEL2_YIELDCURVES.html">
-    <circle cx="900" cy="288" r="46"/>
-    <text class="p-id" x="900" y="268">3</text>
-    <text class="p-name" x="900" y="289">Yield</text>
-    <text class="p-name" x="900" y="305">Curves</text>
+    <circle cx="900" cy="340" r="60"/>
+    <text class="p-id" x="900" y="320">3</text>
+    <text class="p-name" x="900" y="341">Chart yield</text>
+    <text class="p-name" x="900" y="357">curves</text>
+    <text class="p-app" x="900" y="417">Yield Curves</text>
   </a>
   <a class="process" href="viewer.html#/md/knowledge/TipsLadderManager.md">
-    <circle cx="900" cy="406" r="46"/>
-    <text class="p-id" x="900" y="386">4</text>
-    <text class="p-name" x="900" y="407">Ladder</text>
-    <text class="p-name" x="900" y="423">Manager</text>
+    <circle cx="900" cy="490" r="60"/>
+    <text class="p-id" x="900" y="462">4</text>
+    <text class="p-name" x="900" y="483">Build and</text>
+    <text class="p-name" x="900" y="499">rebalance</text>
+    <text class="p-name" x="900" y="515">TIPS ladders</text>
+    <text class="p-app" x="900" y="567">Ladder Manager</text>
   </a>
   <a class="process" href="viewer.html#/md/knowledge/TreasuryAuctions.md">
-    <circle cx="900" cy="524" r="46"/>
-    <text class="p-id" x="900" y="504">5</text>
-    <text class="p-name" x="900" y="525">Treasury</text>
-    <text class="p-name" x="900" y="541">Auctions</text>
+    <circle cx="900" cy="684" r="60"/>
+    <text class="p-id" x="900" y="664">5</text>
+    <text class="p-name" x="900" y="685">List auction</text>
+    <text class="p-name" x="900" y="701">results</text>
+    <text class="p-app" x="900" y="761">Treasury Auctions</text>
   </a>
   <a class="process" href="viewer.html#/md/TipsReference/knowledge/1.0_TIPS_Reference.md">
-    <circle cx="900" cy="642" r="46"/>
-    <text class="p-id" x="900" y="622">6</text>
-    <text class="p-name" x="900" y="643">TIPS</text>
-    <text class="p-name" x="900" y="659">Reference</text>
+    <circle cx="900" cy="834" r="60"/>
+    <text class="p-id" x="900" y="814">6</text>
+    <text class="p-name" x="900" y="835">List TIPS</text>
+    <text class="p-name" x="900" y="851">reference data</text>
+    <text class="p-app" x="900" y="911">TIPS Reference</text>
   </a>
   <a class="process" href="viewer.html#/md/CpiExplorer/knowledge/1.0_Overview.md">
-    <circle cx="900" cy="760" r="46"/>
-    <text class="p-id" x="900" y="740">7</text>
-    <text class="p-name" x="900" y="761">CPI</text>
-    <text class="p-name" x="900" y="777">Explorer</text>
+    <circle cx="900" cy="984" r="60"/>
+    <text class="p-id" x="900" y="964">7</text>
+    <text class="p-name" x="900" y="985">Calculate</text>
+    <text class="p-name" x="900" y="1001">CPI changes</text>
+    <text class="p-app" x="900" y="1061">CPI Explorer</text>
   </a>
   <a class="process" href="viewer.html#/md/TaxationOfTreasuries/docs/TaxationOfTreasuries_Foundation.md">
-    <circle cx="900" cy="878" r="46"/>
-    <text class="p-id" x="900" y="858">8</text>
-    <text class="p-name" x="900" y="879">Taxation of</text>
-    <text class="p-name" x="900" y="895">Treasuries</text>
+    <circle cx="900" cy="1134" r="60"/>
+    <text class="p-id" x="900" y="1106">8</text>
+    <text class="p-name" x="900" y="1127">Explain</text>
+    <text class="p-name" x="900" y="1143">Treasury</text>
+    <text class="p-name" x="900" y="1159">taxation</text>
+    <text class="p-app" x="900" y="1211">Taxation of Treasuries</text>
   </a>
   <a class="process" href="viewer.html#/md/FundHoldings/knowledge/1.0_FundHoldings.md">
-    <circle cx="900" cy="996" r="46"/>
-    <text class="p-id" x="900" y="976">9</text>
-    <text class="p-name" x="900" y="997">Fund</text>
-    <text class="p-name" x="900" y="1013">Holdings</text>
+    <circle cx="900" cy="1284" r="60"/>
+    <text class="p-id" x="900" y="1264">9</text>
+    <text class="p-name" x="900" y="1285">List fund</text>
+    <text class="p-name" x="900" y="1301">holdings</text>
+    <text class="p-app" x="900" y="1361">Fund Holdings</text>
   </a>
   <a class="process" href="viewer.html#/md/Primer/knowledge/1.0_Primer.md">
-    <circle cx="900" cy="1114" r="46"/>
-    <text class="p-id" x="900" y="1094">10</text>
-    <text class="p-name" x="900" y="1115">Treasury</text>
-    <text class="p-name" x="900" y="1131">Primer</text>
+    <circle cx="900" cy="1478" r="60"/>
+    <text class="p-id" x="900" y="1450">10</text>
+    <text class="p-name" x="900" y="1471">Explain</text>
+    <text class="p-name" x="900" y="1487">Treasury</text>
+    <text class="p-name" x="900" y="1503">securities</text>
+    <text class="p-app" x="900" y="1555">Treasury Primer</text>
   </a>
   <a class="process" href="viewer.html#/md/SeasonalAdjustments/knowledge/1.0_SeasonalAdjustments_Explorer.md">
-    <circle cx="900" cy="1232" r="46"/>
-    <text class="p-id" x="900" y="1212">11</text>
-    <text class="p-name" x="900" y="1233">Seasonal</text>
-    <text class="p-name" x="900" y="1249">Adjustments</text>
+    <circle cx="900" cy="1628" r="60"/>
+    <text class="p-id" x="900" y="1600">11</text>
+    <text class="p-name" x="900" y="1621">Explain</text>
+    <text class="p-name" x="900" y="1637">seasonal</text>
+    <text class="p-name" x="900" y="1653">adjustment</text>
+    <text class="p-app" x="900" y="1705">Seasonal Adjustments</text>
   </a>
 </svg>
 </div>
 
 <p class="notes">
+  Each app is named by what it does, with its portal name beneath it.
   Process 1 writes every store drawn here. No app writes one: the apps read, and the scheduled jobs inside process 1 do all the writing.
   Process 1 explodes at Level 2 into those jobs, one per store it writes.
   The stores are drawn as one shape. Level 1 answers which app reads what rather than which file, and the shape opens the full list.
   Three of those files are read by no app: YieldCurves.csv, BreakevenInflation.csv and BidAskSpreads.csv. They are written for the user to pull into a spreadsheet, so their flow goes to the user rather than to a process.
-  External entities are not redrawn at this level; their twelve flows are shown against each entity on the <a href="KNOWLEDGE_MAP.html">context diagram</a> and enter here as one flow.
+  External entities are not redrawn at this level. Their fourteen flows are drawn against each entity on the <a href="KNOWLEDGE_MAP.html">context diagram</a> and enter here as one flow.
   The app column reproduces the portal index: the same three sections in the same order, and the same apps in the same order inside each.
-  Every app carries the same pair of flows to the user, labelled once at the top. The user is drawn once, as a tall shape, so no flow to it crosses another.
+  Every app has the same pair of flows with the user, labelled once at the top. The user is drawn once, as a tall shape, so no flow to it crosses another.
 </p>
 
 </body>

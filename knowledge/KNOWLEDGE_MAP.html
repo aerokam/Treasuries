@@ -142,6 +142,9 @@
     padding: 5px 12px;
   }
   .index-group a:hover { border-color: var(--accent); color: #ffffff; }
+  .flow-label a { cursor: pointer; }
+  tspan.lk { fill: #a8b2e0; text-decoration: underline; text-decoration-style: dotted; }
+  .flow-label a:hover tspan.lk { fill: #ffffff; }
 </style>
 </head>
 <body>
@@ -153,7 +156,7 @@
 <h1>Context Diagram</h1>
 
 <div class="diagram">
-<svg viewBox="0 0 1400 760" role="img" aria-label="Context diagram: twelve external data sources and the user exchange data flows with the Treasury Investors Portal.">
+<svg viewBox="0 0 1400 880" role="img" aria-label="Context diagram: fourteen external data sources and the user exchange data flows with the Treasury Investors Portal.">
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M 0 0 L 10 5 L 0 10 z" fill="#55558c"/>
@@ -162,21 +165,24 @@
 
   <!-- Legend -->
   <g class="legend">
-    <rect class="sw" x="40" y="42" width="28" height="15" rx="2"/>
-    <text x="78" y="54">external entity</text>
-    <circle class="sw" cx="54" cy="80" r="9"/>
-    <text x="78" y="85">process</text>
+    <rect class="sw" x="1150" y="42" width="28" height="15" rx="2"/>
+    <text x="1188" y="54" text-anchor="start">external entity</text>
+    <circle class="sw" cx="1164" cy="80" r="9"/>
+    <text x="1188" y="85" text-anchor="start">process</text>
   </g>
 
-  <!-- Flows: external entities E1-E6 into the process -->
-  <line class="flow" x1="260" y1="210" x2="616.6" y2="404.5" marker-end="url(#arrow)"/>
-  <line class="flow" x1="260" y1="306" x2="609.7" y2="420.5" marker-end="url(#arrow)"/>
-  <line class="flow" x1="260" y1="402" x2="605.6" y2="439.7" marker-end="url(#arrow)"/>
-  <line class="flow" x1="260" y1="498" x2="605.6" y2="460.3" marker-end="url(#arrow)"/>
-  <line class="flow" x1="260" y1="594" x2="609.7" y2="479.5" marker-end="url(#arrow)"/>
-  <line class="flow" x1="260" y1="690" x2="616.6" y2="495.5" marker-end="url(#arrow)"/>
+  <!-- Flows: the data sources into the process -->
+  <line class="flow" x1="290" y1="114" x2="626.5" y2="389.8" marker-end="url(#arrow)"/>
+  <line class="flow" x1="290" y1="210" x2="618.0" y2="402.0" marker-end="url(#arrow)"/>
+  <line class="flow" x1="290" y1="295" x2="611.1" y2="416.4" marker-end="url(#arrow)"/>
+  <line class="flow" x1="290" y1="317" x2="609.6" y2="420.7" marker-end="url(#arrow)"/>
+  <line class="flow" x1="290" y1="402" x2="605.6" y2="439.0" marker-end="url(#arrow)"/>
+  <line class="flow" x1="290" y1="498" x2="605.6" y2="461.0" marker-end="url(#arrow)"/>
+  <line class="flow" x1="290" y1="594" x2="610.4" y2="481.5" marker-end="url(#arrow)"/>
+  <line class="flow" x1="290" y1="690" x2="618.0" y2="498.0" marker-end="url(#arrow)"/>
+  <line class="flow" x1="290" y1="786" x2="626.5" y2="510.2" marker-end="url(#arrow)"/>
 
-  <!-- Flows: fund providers E7-E12 carry one flow -->
+  <!-- Flows: fund providers E7-E12 share one flow -->
   <line class="flow" x1="1140" y1="210" x2="1010" y2="450"/>
   <line class="flow" x1="1140" y1="306" x2="1010" y2="450"/>
   <line class="flow" x1="1140" y1="402" x2="1010" y2="450"/>
@@ -191,43 +197,54 @@
   <line class="flow" x1="775" y1="358" x2="775" y2="84" marker-end="url(#arrow)"/>
 
   <!-- Flow labels -->
-  <text class="flow-label" x="290" y="218.4" transform="rotate(28.6, 290, 226.4)">daily mid-market prices</text>
-  <text class="flow-label" x="290" y="307.8" transform="rotate(18.1, 290, 315.8)">daily Ref CPI</text>
-  <text class="flow-label" x="290" y="397.3" transform="rotate(6.2, 290, 405.3)">auction results, TIPS metadata</text>
-  <text class="flow-label" x="290" y="486.7" transform="rotate(-6.2, 290, 494.7)">monthly CPI-U, NSA and SA</text>
-  <text class="flow-label" x="290" y="576.2" transform="rotate(-18.1, 290, 584.2)">market yields</text>
-  <text class="flow-label" x="290" y="665.6" transform="rotate(-28.6, 290, 673.6)">bid and ask quotes</text>
+  <text class="flow-label" x="318" y="128.9" transform="rotate(39.3, 318, 136.9)"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#daily-mid-market-prices"><tspan class="lk">daily mid-market prices</tspan></a></text>
+  <text class="flow-label" x="318" y="218.4" transform="rotate(30.3, 318, 226.4)"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#daily-ref-cpi"><tspan class="lk">daily Ref CPI</tspan></a></text>
+  <text class="flow-label" x="318" y="297.6" transform="rotate(20.7, 318, 305.6)"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#auction-results"><tspan class="lk">auction results</tspan></a></text>
+  <text class="flow-label" x="318" y="318.1" transform="rotate(18.0, 318, 326.1)"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#tips-reference-data"><tspan class="lk">TIPS reference data</tspan></a></text>
+  <text class="flow-label" x="318" y="397.3" transform="rotate(6.7, 318, 405.3)"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#monthly-cpi-u"><tspan class="lk">monthly CPI-U</tspan></a></text>
+  <text class="flow-label" x="318" y="486.7" transform="rotate(-6.7, 318, 494.7)"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#market-yields"><tspan class="lk">market yields</tspan></a></text>
+  <text class="flow-label" x="318" y="576.2" transform="rotate(-19.4, 318, 584.2)"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#market-quotes"><tspan class="lk">market quotes</tspan></a></text>
+  <text class="flow-label" x="318" y="665.6" transform="rotate(-30.3, 318, 673.6)"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#gsw-curve-parameters"><tspan class="lk">GSW curve parameters</tspan></a></text>
+  <text class="flow-label" x="318" y="755.1" transform="rotate(-39.3, 318, 763.1)"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#tentative-auction-schedule"><tspan class="lk">tentative auction schedule</tspan></a></text>
 
-  <text class="flow-label" x="902" y="438" text-anchor="middle">fund holdings</text>
+  <text class="flow-label" x="902" y="438" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#fund-holdings"><tspan class="lk">fund holdings</tspan></a></text>
 
-  <text class="flow-label" x="663" y="196" text-anchor="end">app inputs</text>
-  <text class="flow-label" x="737" y="196">app outputs</text>
-  <text class="flow-label" x="787" y="196">downloaded data sets</text>
+  <text class="flow-label" x="663" y="196" text-anchor="end"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#app-inputs"><tspan class="lk">app inputs</tspan></a></text>
+  <text class="flow-label" x="737" y="196"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#app-outputs"><tspan class="lk">app outputs</tspan></a></text>
+  <text class="flow-label" x="787" y="300"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#downloaded-data-sets"><tspan class="lk">downloaded data sets</tspan></a></text>
 
-  <!-- External entities: data sources E1-E6 -->
+  <!-- External entities: the data sources -->
   <a class="entity" href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#e1">
-    <rect x="30" y="184" width="230" height="52" rx="3"/>
-    <text class="e-name" x="145" y="216">FedInvest</text>
+    <rect x="30" y="88" width="260" height="52" rx="3"/>
+    <text class="e-name" x="160" y="120">FedInvest</text>
   </a>
   <a class="entity" href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#e2">
-    <rect x="30" y="280" width="230" height="52" rx="3"/>
-    <text class="e-name" x="145" y="312">TreasuryDirect SecIndex</text>
+    <rect x="30" y="184" width="260" height="52" rx="3"/>
+    <text class="e-name" x="160" y="216">TreasuryDirect SecIndex</text>
   </a>
   <a class="entity" href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#e3">
-    <rect x="30" y="376" width="230" height="52" rx="3"/>
-    <text class="e-name" x="145" y="408">FiscalData API</text>
+    <rect x="30" y="280" width="260" height="52" rx="3"/>
+    <text class="e-name" x="160" y="312">FiscalData API</text>
   </a>
   <a class="entity" href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#e4">
-    <rect x="30" y="472" width="230" height="52" rx="3"/>
-    <text class="e-name" x="145" y="504">BLS Public API</text>
+    <rect x="30" y="376" width="260" height="52" rx="3"/>
+    <text class="e-name" x="160" y="408">BLS Public API</text>
   </a>
   <a class="entity" href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#e5">
-    <rect x="30" y="568" width="230" height="52" rx="3"/>
-    <text class="e-name" x="145" y="600">CNBC GraphQL</text>
+    <rect x="30" y="472" width="260" height="52" rx="3"/>
+    <text class="e-name" x="160" y="504">CNBC GraphQL</text>
   </a>
   <a class="entity" href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#e6">
-    <rect x="30" y="664" width="230" height="52" rx="3"/>
-    <text class="e-name" x="145" y="696">Fidelity Fixed Income</text>
+    <rect x="30" y="568" width="260" height="52" rx="3"/>
+    <text class="e-name" x="160" y="600">Fidelity Fixed Income</text>
+  </a>
+  <a class="entity" href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#e13">
+    <rect x="30" y="664" width="260" height="52" rx="3"/>
+    <text class="e-name" x="160" y="696">Federal Reserve FEDS 2008-05</text>
+  </a>
+  <a class="entity" href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#e14">
+    <rect x="30" y="760" width="260" height="52" rx="3"/>
+    <text class="e-name" x="160" y="792">Treasury Tentative Auction Schedule</text>
   </a>
 
   <!-- External entities: fund providers E7-E12 -->
@@ -277,11 +294,12 @@
   Process 0 is the whole system. Its data stores are inside it, so they are drawn where they are first shared rather than here.
   Each of the six fund providers supplies fund holdings together with that fund’s expense ratio and 30-Day SEC yield.
   Click any shape to reach its spec: an external entity opens its field-level composition in the <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md">Data Dictionary</a>.
+  Each flow is named by the one structure it holds. Click a flow name for its definition in <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#6.0-data-flows">Data Dictionary &sect;6.0</a>. FiscalData supplies two structures, so it has two flows.
 </p>
 
 <div class="index">
   <h2>Spec Index</h2>
-  <p>Level 1 will explode process 0 into one process per app, with the data stores each one reads. Until it is drawn, the specs are linked directly here.</p>
+  <p>Every spec, grouped as the portal groups the apps. Drilling from process 0 reaches the same specs through <a href="DFD_LEVEL1.html">Level 1</a>.</p>
 
   <div class="index-group">
     <span class="g-label">Daily Workflow</span>
@@ -320,7 +338,18 @@
     <a href="viewer.html#/md/TipsLadderManager/knowledge/1.0_Bond_Ladders.md">1.0 Bond Ladders</a>
     <a href="viewer.html#/md/TipsLadderManager/knowledge/2.0_TIPS_Ladders.md">2.0 TIPS Ladders</a>
     <a href="viewer.html#/md/TipsLadderManager/knowledge/3.0_TIPS_Ladder_Rebalancing.md">3.0 Rebalancing</a>
+  </div>
+
+  <div class="index-group">
+    <span class="g-label">Yield Curves Specs</span>
+    <a href="viewer.html#/md/YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md">3.1 Parse sources and calculate yields</a>
     <a href="viewer.html#/md/YieldCurves/knowledge/3.2_Adjust_For_Seasonality.md">3.2 Adjust for seasonality</a>
+    <a href="viewer.html#/md/YieldCurves/knowledge/3.3_Adjust_For_Other_Effects.md">3.3 Adjust for other effects</a>
+    <a href="viewer.html#/md/YieldCurves/knowledge/3.4_Fit_Spot_Yield_Curves.md">3.4 Fit spot yield curves</a>
+    <a href="viewer.html#/md/YieldCurves/knowledge/3.5_Calculate_Breakeven_Inflation.md">3.5 Calculate breakeven inflation</a>
+    <a href="viewer.html#/md/YieldCurves/knowledge/3.6_Calculate_Bid_And_Ask_Spreads.md">3.6 Calculate bid and ask spreads</a>
+    <a href="viewer.html#/md/YieldCurves/knowledge/3.7_Render_Charts_And_Tables.md">3.7 Render charts and tables</a>
+    <a href="viewer.html#/md/YieldCurves/knowledge/Visual_Standards.md">Visual Standards</a>
   </div>
 
   <div class="index-group">
