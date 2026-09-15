@@ -405,14 +405,13 @@ async function parseGswParameters(res) {
 }
 
 // spec: 3.1_Parse_Sources_And_Calculate_Yields.md#parse-market-quotes (3.1.2)
-// A TIPS quote is kept only for a CUSIP the FedInvest file also carries, and
-// only when it has an ask price.
-function parseMarketQuotes(text, knownTips) {
+// Every TIPS row the export itself carries (parseFidelityTipsRows already limits these to the
+// export's own Product = TIPS rows) is kept, provided it has an ask price.
+function parseMarketQuotes(text) {
   const { bonds, downloadDate } = parseFidelityNominals(text, marketSettleIso(parseFidelityDownloadDate(text)));
   const tipsPrices = new Map();
   parseFidelityTipsRows(text).forEach(r => {
     if (isNaN(r.askPrice)) return;
-    if (!knownTips || !knownTips.some(y => y.cusip === r.cusip)) return;
     tipsPrices.set(r.cusip, r);
   });
   return { nominals: bonds, nominalsDate: downloadDate, tipsPrices, tipsDate: parseFidelityDownloadDate(text) };
@@ -458,7 +457,7 @@ async function init() {
 
     if (fidRes.ok) {
       const fidText = await fidRes.text();
-      const quotes = parseMarketQuotes(fidText, rawYieldsData);
+      const quotes = parseMarketQuotes(fidText);
 
       // Nominals (Treasuries)
       const bonds = quotes.nominals;
