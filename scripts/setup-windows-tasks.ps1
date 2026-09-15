@@ -179,6 +179,17 @@ Register-NodeTask "YieldsHistory" `
     @(New-ScheduledTaskTrigger -Weekly -DaysOfWeek $Weekdays -At "2:00pm") `
     "YieldsMonitor/scripts/updateYieldsHistory.js"
 
+# CheckCnbcRollover  -  Weekdays 2:30pm PT (after YieldsHistory's 2:00pm daily-close snapshot,
+# which supplies the archived quoted-yield history it cross-checks against)
+# Compares each TIPS symbol's live CNBC bond identity to CNBC_ROLLOVER_LOG's last entry; on a
+# mismatch, bisects the flip date same-day via FedInvest T+0 cross-check and auto-commits +
+# pushes the pinned entry. See YieldsMonitor/knowledge/2.4_Seasonal_Adjustment.md#automated-
+# rollover-check. Developer-facing background maintenance only, no UI surface.
+Register-NodeTask "CheckCnbcRollover" `
+    "Check each TIPS symbol's live CNBC bond identity against CNBC_ROLLOVER_LOG; auto-pin, test, commit and push a new rollover entry on mismatch" `
+    @(New-ScheduledTaskTrigger -Weekly -DaysOfWeek $Weekdays -At "2:30pm") `
+    "YieldsMonitor/scripts/checkCnbcRollover.js"
+
 # IntradayArchive  -  Weekdays 2:05pm PT [ET: 5:05pm] (5 min after cash close)
 # Audit archive: captures raw 1D + 5D feeds per symbol so any past close window can be
 # inspected offline. Separate from YieldsHistory (daily-close baseline).
