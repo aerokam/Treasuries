@@ -232,6 +232,17 @@ Register-CmdTask "FidelityQuotes" `
     ) `
     "$ProjectDir\YieldCurves\scripts\run-fidelity.cmd"
 
+# FidelityQuotesCatchup  -  2 min after logon
+# Safety net for FidelityQuotes: if every run above was missed today (PC off or
+# restarting through them), this runs the download once as soon as the user logs back
+# on. No-ops when today's data is already on R2 (see fidelityCatchupIfStale.js).
+$catchupTrigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
+$catchupTrigger.Delay = 'PT2M'
+Register-CmdTask "FidelityQuotesCatchup" `
+    "Logon safety net: run the Fidelity download once if today's data is still missing from R2" `
+    @($catchupTrigger) `
+    "$ProjectDir\YieldCurves\scripts\run-fidelity-catchup.cmd"
+
 # Yield Curves fit (S13/S14/S15) is NOT independently scheduled — it has no standalone
 # trigger. It runs chained from inside run-fidelity.cmd (called by FidelityQuotes, above)
 # and inside run-fedinvest.cmd (called by YieldsFromFedInvestPrices, above), each on
