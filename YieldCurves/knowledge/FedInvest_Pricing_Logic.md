@@ -10,11 +10,11 @@ The FedInvest daily price list has three price columns per security: **Buy**, **
 
 Per Treasury Fiscal Service Appendix 1:
 - **Purchase prices** (FedInvest "Buy") are the average of prevailing dealer bid and asked prices on the specified security, as reported by the Federal Reserve Bank of New York (survey taken 11:15–11:45 a.m. ET each business day).
-- **Redemption prices** (early sales) are the prevailing dealer bid price on the security.
+- **Redemption prices** (FedInvest "Sell", early sales) are the prevailing dealer bid price on the security.
 
 ### Key implications
 1. **Dealer-based, not retail-actionable**: FedInvest prices derive from secondary-market dealer quotations; broker ask-side quotes reflect retail execution prices, which differ.
-2. **Empirical offset**: In practice the FedInvest yield curve typically sits slightly above the broker ask-yield curve. This is an observed pattern, not a documented pricing rule.
+2. **Higher yield than the broker ask**: the Buy price is the midpoint of the dealer bid and ask, below the ask price a broker quotes, so the yield calculated from it is generally higher than the broker ask yield.
 3. **Bill sensitivity**: The discrepancy is most pronounced for short-dated Treasury Bills, where small price differences produce large annualized yield deltas.
 
 ## Usage in Treasury Investors Portal
