@@ -4,11 +4,21 @@
 // of the day. No-ops when today's data is already on R2, so a normal logon after a successful
 // scheduled run doesn't trigger a redundant broker login.
 import { execFileSync } from 'child_process';
+import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const LOG = path.join(__dirname, '..', 'logs', 'fidelity.log');
 const CSV_URL = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/FidelityTreasuriesTips.csv';
+
+// Log directly to the file rather than via inherited stdio: run-fidelity.cmd (invoked
+// below) opens the same fidelity.log for its own append redirection, and two processes
+// holding that file open via cmd.exe's `>>` at once causes a sharing-violation error that
+// silently skips the download while still exiting 0.
+function log(line) {
+  fs.appendFileSync(LOG, `${line}\n`);
+}
 
 const res = await fetch(CSV_URL);
 if (!res.ok) throw new Error('FidelityTreasuriesTips.csv: HTTP ' + res.status);
@@ -23,9 +33,9 @@ const now = new Date();
 const todayLocal = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
 if (downloadedDate === todayLocal) {
-  console.log(`[fidelityCatchupIfStale] Already downloaded today (${downloadedDate}) -- skipping logon catch-up.`);
+  log(`[fidelityCatchupIfStale] Already downloaded today (${downloadedDate}) -- skipping logon catch-up.`);
   process.exit(0);
 }
 
-console.log(`[fidelityCatchupIfStale] Last download is ${downloadedDate}, today is ${todayLocal} -- running logon catch-up.`);
+log(`[fidelityCatchupIfStale] Last download is ${downloadedDate}, today is ${todayLocal} -- running logon catch-up.`);
 execFileSync('cmd.exe', ['/c', path.join(__dirname, 'run-fidelity.cmd')], { stdio: 'inherit' });
