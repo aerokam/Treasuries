@@ -446,7 +446,7 @@ function level2Ingestion() {
   // redrawn as entities here: their flows enter from the page edge, named by the data they hold.
   const jobs = [
     { id: '1.1',  name: ['Download', 'FedInvest', 'prices'],        data: 'daily mid-market prices', reads: ['tipsref', 'hol'], writes: ['fedinv'], href: 'DFD_LEVEL3_INGEST_FEDINVEST.html' },
-    { id: '1.2',  name: ['Download', 'market quotes'],              data: 'market quotes', reads: ['hol'],     writes: ['quotes'] },
+    { id: '1.2',  name: ['Download', 'market quotes'],              data: 'market quotes', reads: ['hol'],     writes: ['quotes'], href: V('knowledge/1.2_Download_Market_Quotes.md') },
     { id: '1.3',  name: ['Calculate', 'yield curve', 'data sets'],  data: null, reads: ['fedinv', 'quotes', 'nsasa', 'hol'], writes: ['yc', 'bei', 'spread'] },
     { id: '1.4',  name: ['Fetch auction', 'results'],               data: 'auction results',            writes: ['auctions'] },
     { id: '1.5',  name: ['Fetch tentative', 'auction', 'schedule'], data: 'tentative auction schedule', writes: ['tent'] },

@@ -47,7 +47,7 @@ These came out of review and apply to every spec from here.
 2. **Separate the SA yield from the TIPS yield in code.** `shared/src/tips-yields.js#tipsYieldsFromPrices` performs the work of both 3.1.7 and 3.2, so both specs name the same function and the separation exists only in the spec text. A function for each process makes the drill from each spec reach code that does that process’s work and nothing more.
 3. **Check every process spec’s opening against the code**, per §2.0: 3.2 to 3.7 and the sub-processes of 3.7. 3.1.1 and 3.1.2 are corrected; 3.1.2 had described only the separation of Treasury rows from TIPS rows.
 4. **Closed.** Two stores drawn on the diagrams had no entry in DataStores, so a click on either opened the top of that page: the bond holidays and the monthly CPI. Now [Bond holidays (S16)](./DataStores.md#s16) and [Monthly CPI (S17)](./DataStores.md#s17) (§5.0).
-5. **Trace the second path, E6 → 1.2 → Market quotes (S7) → 3.1.2**, the way §3.13 traced the first. 1.2 downloads the E6 export and removes the `="…"` wrappers around its field values before writing Market quotes (S7), one transformation, so it needs a process spec and no Level 3. Its detailed download steps are in the gitignored `Data_Pipeline_Local.md`.
+5. **Closed.** The second path, E6 → 1.2 → Market quotes (S7) → 3.1.2, is traced end to end (§3.14).
 6. **Apply the §3.13 guidelines to every other E entry, S entry and job** once both paths are clean. Check each process name against the whole of what the process does in the same pass: 1.14 Collect fund holdings also calculates yields and duration ([Fund holdings (S11)](./DataStores.md#s11)).
 7. **Low priority: TipsLadderManager's dormant FedInvest source looks Ref CPI up one bond trading day after the date FedInvest states its prices are for**, while [3.0 §Ref CPI Date](../TipsLadderManager/knowledge/3.0_TIPS_Ladder_Rebalancing.md) states the settlement date in both modes. For market quotes the Ref CPI is the settlement date's, because the yields are stated at that date. The developer treats FedInvest as a secondary source and is considering dropping it. Dropping it also removes the second source Yield Curves draws and publishes in [Yield curves (S13)](./DataStores.md#s13), and the past-date prices TipsLadderManager's year-over-year test is built from ([3.1 Data Pipeline §4.0](../TipsLadderManager/knowledge/3.1_Data_Pipeline.md)).
 8. **The code writes a source's settlement date onto every row.** The specs make it one flow per source (§3.13), but `YieldCurves/src/app.js#parseFedInvestPrices` copies it onto each row, and `shared/src/tips-yields.js#tipsYieldsFromPrices` and `shared/src/treasury-yields.js#treasuryYieldsFromPrices` read it from there. The developer asked why, and to keep the copy only if there is a reason. The agent sent to find out whether any function receives rows with different settlement dates in one call was stopped by a usage limit on 2026-09-14 before it reported, and has to be rerun. Any change waits until another session has finished in `app.js`.
@@ -223,6 +223,21 @@ The developer set the method: trace one path from its external entity to the pro
 - A rule is stated in the spec of the process that applies it, and every other document links there.
 - A value that occurs once per file is one flow, not a field on every row.
 - A diagram draws exactly the stores the code reads.
+
+---
+
+## 3.14 The second path traced end to end: E6 → 1.2 → S7 → 3.1.2
+
+Closed, applying the §3.13 method and guidelines to the second of the two paths §3.0 item 6 needs clean first.
+
+**What the path had wrong.**
+
+- [Fidelity Fixed Income (E6)](./DATA_DICTIONARY.md#e6) listed a composition ([`Product + CUSIP + Maturity + Coupon + Price_Bid + Price_Ask + …`]) that matched neither the export's real header nor [Market quotes (S7)](./DataStores.md#s7)'s own composition, which had already been corrected to the export's real header names and was the more accurate of the two. E6 now states the same header S7 does — the two have to agree, since 1.2 passes every row through unchanged.
+- [Market quotes (S7)](./DataStores.md#s7)'s own DataStores.md entry (as against its Data Dictionary composition, already accurate) still carried a four-year-stale field list (`Product, CUSIP, Maturity, Coupon, Ask_Price, Bid_Price, Ask_Yield, Bid_Yield`) that named none of the export's real columns. Per the §3.13 guideline, a store's composition is stated once, in the Data Dictionary; the DataStores entry now links there instead of restating it, and carries the R2 key, writer, schedule and readers, the same shape S1's entry took in §3.13.
+- 1.2 had no spec. [1.2 Download market quotes](./1.2_Download_Market_Quotes.md) specifies it as one transformation — E6's rows, unchanged, except that every `="value"` Excel literal-string wrapper is stripped — with no Level 3, since there is nothing here to decompose.
+- The browser automation, sign-in and MFA steps that obtain E6 stay in the gitignored `knowledge/Data_Pipeline_Local.md`, per its own note. The public spec links there and states nothing about how the download happens, only what it reads and writes.
+
+Level 2 already drew 1.2 reading the bond holidays, to skip the run on a closed day, the same as 1.1 — unlike 1.1's original state in §3.13, this diagram was already correct. No mismatch was found in the data itself, only in what the specs said about it: 1.2 has always passed E6's rows through unchanged, and the DD's own composition for S7 (as against its DataStores.md entry) was already right.
 
 ---
 

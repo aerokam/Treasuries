@@ -168,12 +168,12 @@ This document provides the technical schemas and field-level specifications for 
 
 ## <a id="s7"></a>Market quotes (S7)
 **File**: `FidelityTreasuriesTips.csv`
-**Description**: Combined broker market quotes from Fidelity — Treasury and TIPS rows in one file, distinguished by the `Product` column (`Treasury` / `TIPS`).
-**Update Frequency**: 3× Daily (Local Windows Task).
+**Description**: [Fidelity Fixed Income (E6)](./DATA_DICTIONARY.md#e6)'s own rows, unchanged except for one transformation: every `="value"` Excel literal-string wrapper the export applies to a field is stripped to `value`. Combined Treasury + TIPS bid/ask quotes (replaces the old separate `FidelityTips.csv`/`FidelityTreasuries.csv` pair as of ~2026-06-23). Composition: [Data Dictionary S7](./DATA_DICTIONARY.md#s7).
+**Written by**: [1.2 Download market quotes](./1.2_Download_Market_Quotes.md).
+**Update Frequency**: `FidelityQuotes` task, three weekday trigger windows — 5:05 AM PT, 9:35 AM PT, 2:05 PM PT ([Data Pipeline](./Data_Pipeline.md)).
+**Read by**: YieldCurves ([3.1.2](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#parse-market-quotes)), the yield curves job (process 1.3), the SA and SAO yields job (process 1.11), the fund holdings job (process 1.14), and TipsLadderManager and TipsReference when the Market source is selected ([3.1 Data Pipeline §4.0](../TipsLadderManager/knowledge/3.1_Data_Pipeline.md)).
 
-**Fields**: `Product`, `CUSIP`, `Maturity`, `Coupon`, `Ask_Price`, `Bid_Price`, `Ask_Yield`, `Bid_Yield`.
-
-**Live Sample**: [View FidelityTreasuriesTips.csv](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/FidelityTreasuriesTips.csv)
+**Live Data**: [View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/FidelityTreasuriesTips.csv)
 
 ---
 

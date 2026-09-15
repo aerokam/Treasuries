@@ -1,3 +1,4 @@
+// spec: 1.2_Download_Market_Quotes.md
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
@@ -29,7 +30,7 @@ for (const { name, r2Key } of FILES) {
   const content = raw.replace(/="([^"]+)"/g, '$1');
   const downloadDate = extractDownloadDate(content);
 
-  console.log(`Uploading ${name} (downloaded ${downloadDate}) â†’ ${r2Key}`);
+  console.log(`Uploading ${name} (downloaded ${downloadDate}) → ${r2Key}`);
   await uploadToR2(r2Key, content);
   uploaded++;
   }
