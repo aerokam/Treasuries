@@ -212,8 +212,8 @@ function level1() {
     { id: 'sasao', name: 'SA and SAO yields', href: DS('s10') },
     { id: 'funds', name: 'Fund holdings', href: DS('s11') },
     { id: 'gsw', name: 'GSW curve parameters', href: DS('s12') },
-    { id: 'hol', name: 'Bond holidays', href: DS() },
-    { id: 'blscpi', name: 'Monthly CPI', href: DS() },
+    { id: 'hol', name: 'Bond holidays', href: DS('s16') },
+    { id: 'blscpi', name: 'Monthly CPI', href: DS('s17') },
     { id: 'spot', name: 'Yield curves', href: DS('s13') },
     { id: 'bei', name: 'Breakeven inflation', href: DS('s14') },
     { id: 'spread', name: 'Bid and ask spreads', href: DS('s15') },
@@ -334,7 +334,7 @@ function level2YieldCurves() {
     { id: 'fedinv', name: 'FedInvest prices', href: DS('s1') },
     { id: 'quotes', name: 'Market quotes', href: DS('s7') },
     { id: 'nsasa', name: 'Ref CPI NSA and SA', href: DS('s4') },
-    { id: 'hol', name: 'Bond holidays', href: DS() },
+    { id: 'hol', name: 'Bond holidays', href: DS('s16') },
   ];
   const procs = [
     { id: '3.1', name: ['Parse sources', 'and calculate', 'yields'], href: 'DFD_LEVEL3_YC_LOAD.html', reads: ['fedinv', 'quotes', 'nsasa', 'hol'],
@@ -391,7 +391,7 @@ function level3YieldCurvesLoad() {
     { id: 'fedinv', name: 'FedInvest prices', href: DS('s1') },
     { id: 'quotes', name: 'Market quotes', href: DS('s7') },
     { id: 'nsasa', name: 'Ref CPI NSA and SA', href: DS('s4') },
-    { id: 'hol', name: 'Bond holidays', href: DS() },
+    { id: 'hol', name: 'Bond holidays', href: DS('s16') },
   ];
   const S = a => V(F31 + '#' + a);
   const procs = [
@@ -469,8 +469,8 @@ function level2Ingestion() {
     tent: ['Tentative auction schedule', DS('s9')], sasao: ['SA and SAO yields', DS('s10')],
     funds: ['Fund holdings', DS('s11')], gsw: ['GSW curve parameters', DS('s12')],
     yc: ['Yield curves', DS('s13')], bei: ['Breakeven inflation', DS('s14')],
-    spread: ['Bid and ask spreads', DS('s15')], hol: ['Bond holidays', DS()],
-    blscpi: ['Monthly CPI', DS()], intraday: ['Intraday yields', DS('s6')],
+    spread: ['Bid and ask spreads', DS('s15')], hol: ['Bond holidays', DS('s16')],
+    blscpi: ['Monthly CPI', DS('s17')], intraday: ['Intraday yields', DS('s6')],
   };
   const order = ['fedinv','quotes','yc','bei','spread','auctions','tent','tipsref','yhist','intraday','blscpi','nsasa','sasao','cpihist','refcpi','funds','gsw','hol'];
   const JX = 470, JR = 54, SX = 730, SW = 235;
@@ -598,7 +598,7 @@ function level3IngestFedInvest() {
   P.push(flow(px['1.1.2'], ref.y - 25, px['1.1.2'], py['1.1.2'] + PR + 3));
   P.push(flow(px['1.1.3'] + PR + 3, s1.y, s1.x - 5, s1.y));
   P.push(internalFlows(procs, px, py, PR, OBS, LBL));
-  P.push(storeShape(hol.x, hol.y, SW, DS(), 'Bond holidays'));
+  P.push(storeShape(hol.x, hol.y, SW, DS('s16'), 'Bond holidays'));
   P.push(storeShape(ref.x, ref.y, SW, DS('s2'), 'TIPS reference data'));
   P.push(storeShape(s1.x, s1.y, SW, DS('s1'), 'FedInvest prices'));
   procs.forEach(p => P.push(procShape(px[p.id], py[p.id], PR, p.href, p.id, p.name)));

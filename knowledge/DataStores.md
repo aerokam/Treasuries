@@ -257,4 +257,37 @@ This document provides the technical schemas and field-level specifications for 
 
 **Consumer**: YieldCurves (TIPS tab) — evaluates the Svensson zero-yield formula from these parameters to draw the "GSW zero" reference line, on the analysis view opened with `?gsw` only. No view of the app uses it otherwise.
 
+---
+
+## <a id="s16"></a>Bond holidays (S16)
+**Description**: SIFMA's published US bond-market holiday schedule, filtered to the eleven base US market holidays plus New Year's Day, one row per holiday per year. Backs the [Bond Holiday](./DATA_DICTIONARY.md#bond-holiday) term: a weekday listed here is not a bond trading day, so T+1 settlement passes over it.
+**Update Frequency**: Run manually, `node BondHolidays/updateHolidaysSifma.js` (the `bond-holidays-update` Dashboard job) — not on the automatic scheduler, since a year's holiday schedule changes rarely once published.
+**R2 Key**: `misc/BondHolidaysSifma.csv`
+
+| Field | Type | Description |
+|---|---|---|
+| *(unnamed)* | String | The holiday date, quoted, in the source's own long form (e.g. `"Monday, January 19, 2026"`). |
+| *(unnamed)* | String | The holiday name (e.g. `Martin Luther King Day`). |
+
+**Sort order**: Ascending by date.
+
+**Read by**: five apps — YieldCurves, SeasonalAdjustments, TipsLadderManager, YieldsMonitor, and the FedInvest acquisition job (`scripts/getYieldsFedInvest.js`) — through the shared `shared/src/settlement.js` and `shared/src/market-data.js` modules, so settlement-date logic reads one holiday calendar everywhere.
+
+---
+
+## <a id="s17"></a>Monthly CPI (S17)
+**Description**: BLS's monthly CPI-U NSA and SA series (`CUUR0000SA0`/`CUSR0000SA0`), 2019 to present — the [Monthly CPI-U](./DATA_DICTIONARY.md#monthly-cpi-u) flow at rest. Same fields as [CPI history (S8)](#s8), but 2019-present only: S8 serves the full 1913-present display series, and the App. B daily interpolation that reads this store only needs to bracket the dates it is interpolating between.
+**Update Frequency**: Chained, not independently scheduled — `YieldCurves/scripts/fetchCpiBls.js` runs as the first step of `YieldCurves/scripts/updateRefCpi.js`, at the SA Factor Update schedule (daily 6:35am ET, [Data_Pipeline.md](./Data_Pipeline.md)), and its output feeds the App. B interpolation that produces [Ref CPI NSA and SA (S4)](#s4) in the same run.
+**R2 Key**: `bls/CPI.csv`
+
+| Field | Type | Description |
+|---|---|---|
+| `Year` | String | 4-digit year (e.g., `"2026"`) |
+| `Period` | String | BLS period code (e.g., `"M01"` = January) |
+| `PeriodName` | String | Full month name (e.g., `"January"`) |
+| `NSA` | Number | CPI-U Not Seasonally Adjusted ([BLS Public API (E4)](./DATA_DICTIONARY.md#e4) series `CUUR0000SA0`) |
+| `SA` | Number | CPI-U Seasonally Adjusted ([BLS Public API (E4)](./DATA_DICTIONARY.md#e4) series `CUSR0000SA0`) |
+
+**Sort order**: Descending by Year, then Period (newest row first).
+
 **Live Data**: [View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/TIPS/GswTipsCurve.json)
