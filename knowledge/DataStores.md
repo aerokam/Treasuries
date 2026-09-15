@@ -1,13 +1,13 @@
 # System Data Stores (S)
 
-This document provides the technical schemas and field-level specifications for all internal data files stored in the Cloudflare R2 bucket.
+This document provides the operational details for every data store: R2 key, writer, schedule and readers. Each entry's heading links to that store's field-by-field composition, defined once in the Data Dictionary — the composition is not restated here.
 
 ---
 
-## <a id="s1"></a>FedInvest prices (S1)
+## <a id="s1"></a>[FedInvest prices (S1)](./DATA_DICTIONARY.md#s1)
 **File**: `YieldsFromFedInvestPrices.csv`
 **R2 Key**: `Treasuries/YieldsFromFedInvestPrices.csv`
-**Description**: The [Settlement Date](./DATA_DICTIONARY.md#settlement-date) of the day's FedInvest prices, then each TIPS and each market-based bill, note and bond with one clean price and the yield of that price. Composition: [Data Dictionary S1](./DATA_DICTIONARY.md#s1).
+**Description**: The [Settlement Date](./DATA_DICTIONARY.md#settlement-date) of the day's FedInvest prices, then each TIPS and each market-based bill, note and bond with one clean price and the yield of that price.
 **Written by**: [1.1 Download FedInvest prices](./1.1_Download_FedInvest_Prices.md).
 **Update Frequency**: Weekdays ~1:05 PM ET ([Data Pipeline](./Data_Pipeline.md)).
 **Read by**: YieldCurves ([3.1.1](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#parse-fedinvest-prices)), the yield curves job (process 1.3), Treasury Primer, and TipsLadderManager and TipsReference when the FedInvest source is selected ([3.1 Data Pipeline §4.0](../TipsLadderManager/knowledge/3.1_Data_Pipeline.md)).
@@ -166,9 +166,9 @@ This document provides the technical schemas and field-level specifications for 
 
 ---
 
-## <a id="s7"></a>Market quotes (S7)
+## <a id="s7"></a>[Market quotes (S7)](./DATA_DICTIONARY.md#s7)
 **File**: `FidelityTreasuriesTips.csv`
-**Description**: [Fidelity Fixed Income (E6)](./DATA_DICTIONARY.md#e6)'s own rows, unchanged except for one transformation: every `="value"` Excel literal-string wrapper the export applies to a field is stripped to `value`. Combined Treasury + TIPS bid/ask quotes (replaces the old separate `FidelityTips.csv`/`FidelityTreasuries.csv` pair as of ~2026-06-23). Composition: [Data Dictionary S7](./DATA_DICTIONARY.md#s7).
+**Description**: [Fidelity Fixed Income (E6)](./DATA_DICTIONARY.md#e6)'s own rows, unchanged except for one transformation: every `="value"` Excel literal-string wrapper the export applies to a field is stripped to `value`. Combined Treasury + TIPS bid/ask quotes (replaces the old separate `FidelityTips.csv`/`FidelityTreasuries.csv` pair as of ~2026-06-23).
 **Written by**: [1.2 Download market quotes](./1.2_Download_Market_Quotes.md).
 **Update Frequency**: `FidelityQuotes` task, three weekday trigger windows — 5:05 AM PT, 9:35 AM PT, 2:05 PM PT ([Data Pipeline](./Data_Pipeline.md)).
 **Read by**: YieldCurves ([3.1.2](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#parse-market-quotes)), the yield curves job (process 1.3), the SA and SAO yields job (process 1.11), the fund holdings job (process 1.14), and TipsLadderManager and TipsReference when the Market source is selected ([3.1 Data Pipeline §4.0](../TipsLadderManager/knowledge/3.1_Data_Pipeline.md)).
@@ -259,35 +259,22 @@ This document provides the technical schemas and field-level specifications for 
 
 ---
 
-## <a id="s16"></a>Bond holidays (S16)
+## <a id="s16"></a>[Bond holidays (S16)](./DATA_DICTIONARY.md#s16)
 **Description**: SIFMA's published US bond-market holiday schedule, filtered to the eleven base US market holidays plus New Year's Day, one row per holiday per year. Backs the [Bond Holiday](./DATA_DICTIONARY.md#bond-holiday) term: a weekday listed here is not a bond trading day, so T+1 settlement passes over it.
-**Update Frequency**: Run manually, `node BondHolidays/updateHolidaysSifma.js` (the `bond-holidays-update` Dashboard job) — not on the automatic scheduler, since a year's holiday schedule changes rarely once published.
+**Written by**: `node BondHolidays/updateHolidaysSifma.js` (the `bond-holidays-update` Dashboard job).
+**Update Frequency**: Run manually, not on the automatic scheduler — a year's holiday schedule changes rarely once published.
 **R2 Key**: `misc/BondHolidaysSifma.csv`
-
-| Field | Type | Description |
-|---|---|---|
-| *(unnamed)* | String | The holiday date, quoted, in the source's own long form (e.g. `"Monday, January 19, 2026"`). |
-| *(unnamed)* | String | The holiday name (e.g. `Martin Luther King Day`). |
-
-**Sort order**: Ascending by date.
-
 **Read by**: five apps — YieldCurves, SeasonalAdjustments, TipsLadderManager, YieldsMonitor, and the FedInvest acquisition job (`scripts/getYieldsFedInvest.js`) — through the shared `shared/src/settlement.js` and `shared/src/market-data.js` modules, so settlement-date logic reads one holiday calendar everywhere.
+
+**Live Data**: [View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/misc/BondHolidaysSifma.csv)
 
 ---
 
-## <a id="s17"></a>Monthly CPI (S17)
-**Description**: BLS's monthly CPI-U NSA and SA series (`CUUR0000SA0`/`CUSR0000SA0`), 2019 to present — the [Monthly CPI-U](./DATA_DICTIONARY.md#monthly-cpi-u) flow at rest. Same fields as [CPI history (S8)](#s8), but 2019-present only: S8 serves the full 1913-present display series, and the App. B daily interpolation that reads this store only needs to bracket the dates it is interpolating between.
-**Update Frequency**: Chained, not independently scheduled — `YieldCurves/scripts/fetchCpiBls.js` runs as the first step of `YieldCurves/scripts/updateRefCpi.js`, at the SA Factor Update schedule (daily 6:35am ET, [Data_Pipeline.md](./Data_Pipeline.md)), and its output feeds the App. B interpolation that produces [Ref CPI NSA and SA (S4)](#s4) in the same run.
+## <a id="s17"></a>[Monthly CPI (S17)](./DATA_DICTIONARY.md#s17)
+**Description**: BLS's monthly CPI-U NSA and SA series (`CUUR0000SA0`/`CUSR0000SA0`), 2019 to present, fetched separately from [CPI history (S8)](#s8) (same series, 1913 to present) so that the daily App. B interpolation that produces [Ref CPI NSA and SA (S4)](#s4) does not depend on S8's own refresh, which runs only on BLS release dates.
+**Written by**: `YieldCurves/scripts/fetchCpiBls.js`, the first step of `YieldCurves/scripts/updateRefCpi.js`.
+**Update Frequency**: Daily 6:35am ET, unconditionally, as the first step of the SA Factor Update chain ([Data_Pipeline.md](./Data_Pipeline.md)) — a plain daily trigger, not the release-date-aware scheme S8's own task uses, so it re-fetches from BLS on days the underlying monthly value has not changed. Flagged for a fix: [DFD_Worklist.md §3.0 item 11](./DFD_Worklist.md).
 **R2 Key**: `bls/CPI.csv`
+**Read by**: `YieldCurves/scripts/calcRefCpi.js`, in the same chained run, to produce [Ref CPI NSA and SA (S4)](#s4).
 
-| Field | Type | Description |
-|---|---|---|
-| `Year` | String | 4-digit year (e.g., `"2026"`) |
-| `Period` | String | BLS period code (e.g., `"M01"` = January) |
-| `PeriodName` | String | Full month name (e.g., `"January"`) |
-| `NSA` | Number | CPI-U Not Seasonally Adjusted ([BLS Public API (E4)](./DATA_DICTIONARY.md#e4) series `CUUR0000SA0`) |
-| `SA` | Number | CPI-U Seasonally Adjusted ([BLS Public API (E4)](./DATA_DICTIONARY.md#e4) series `CUSR0000SA0`) |
-
-**Sort order**: Descending by Year, then Period (newest row first).
-
-**Live Data**: [View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/TIPS/GswTipsCurve.json)
+**Live Data**: [View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/bls/CPI.csv)
