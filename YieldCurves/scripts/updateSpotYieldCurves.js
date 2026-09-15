@@ -130,7 +130,7 @@ async function main() {
   const tipsCusips = new Set(rawTipsData.map(r => r.cusip));
   const priceMap = new Map();
   for (const r of parseFidelityTipsRows(fidText)) {
-    if (isNaN(r.askPrice) || !tipsCusips.has(r.cusip)) continue;
+    if (isNaN(r.askPrice)) continue;
     priceMap.set(r.cusip, r);
   }
   // Unfiltered: every nominal Treasury row, STRIPS included, for the per-security rows.

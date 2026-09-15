@@ -29,15 +29,16 @@ import { yieldSpreadBps, priceSpreadPct } from './spreads.js';
 //
 // Returns the securities in maturity order.
 export function tipsYieldsFromPrices(tipsRows, refCpiRows, quotesByCusip, isBroker, marketSettleIso) {
-  return tipsRows.map(bond => {
+  const source = isBroker ? Array.from(quotesByCusip ? quotesByCusip.values() : []) : tipsRows;
+  return source.map(row => {
+    const bond = isBroker ? { cusip: row.cusip, coupon: row.coupon, maturity: row.maturity } : row;
     const coupon = parseFloat(bond.coupon);
     let price = parseFloat(bond.price);
     let settleDateStr = bond.settlementDate;
     let quote = null;
 
     if (isBroker) {
-      if (!quotesByCusip || !quotesByCusip.has(bond.cusip)) return null;
-      quote = quotesByCusip.get(bond.cusip);
+      quote = row;
       if (isNaN(quote.askPrice)) return null;
       price = quote.askPrice;
       settleDateStr = marketSettleIso;
