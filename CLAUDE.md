@@ -100,10 +100,17 @@ small pieces as it goes.
 - **Two full `npm run test:e2e` runs against the 8080 server at once interfere** and report
   failures that are not real. Check `ListAgents` before starting one. The pre-push hook already
   runs the suites for a push, so a routine push needs no separate run.
-- **Pushing is the developer's explicit call, every time, and it means only the commits from the
-  session being asked** — not everything else waiting on `main`. `main` usually carries unpushed
-  work from several sessions at once, so "push" is scoped to the session unless the developer says
-  otherwise.
+- **A bug fix or other low-risk commit pushes itself, immediately after commit, once it passes
+  the repo's automated gates** (`npm test`, `npm run test:e2e`, `.githooks/pre-push`) — no waiting
+  for the developer's review first. This exists because a session can hit its own usage limit at
+  any point with no way to know that in advance, and a fix stuck in a dead session's uncommitted
+  or unpushed state is a real loss (it happened twice in one day, 2026-09-15). The rule: if what's
+  committed is verifiably better than what's live, ship it — don't hold it hostage to a review step
+  that might never happen. This does **not** extend to a new feature, a spec change, a UI redesign,
+  or anything else where the judgment call is more than "does it pass the gates" — those still wait
+  for the developer's go-ahead before pushing.
+  - Push means only the commits from the session doing the pushing, same scoping as below — not
+    everything else waiting on `main`.
   - If nothing else is unpushed, this is a plain push: `git push origin main`.
   - If other sessions' unpushed commits are mixed in, separate the session's own commits first and
     push just those — §Shipping less than all of `main` below. More steps, not harder; never push
