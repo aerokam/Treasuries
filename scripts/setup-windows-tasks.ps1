@@ -77,7 +77,10 @@ function Register-DataTask {
         $settingsArgs.RestartCount    = $RestartCount
     }
     $settings  = New-ScheduledTaskSettingsSet @settingsArgs
-    $principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive -RunLevel Limited
+    # S4U (not Interactive): runs whether the user is logged on or not, without storing a
+    # password. Registering with S4U requires the elevated re-run above (Interactive alone
+    # doesn't).
+    $principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType S4U -RunLevel Limited
     $task      = New-ScheduledTask -Action $action -Trigger $Triggers -Settings $settings -Principal $principal -Description $Description
     Register-ScheduledTask -TaskName $Name -InputObject $task | Out-Null
     Write-Host "  [OK] $Name"
