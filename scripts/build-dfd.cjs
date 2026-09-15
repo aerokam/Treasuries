@@ -378,7 +378,7 @@ function level2YieldCurves() {
     up: 'DFD_LEVEL1.html', upLabel: 'Level 1',
     spec: V('YieldCurves/README.md'), specLabel: 'Yield Curves specs', svg: P.join(NL),
     notes: ['  <b>No process here writes a data store.</b> Every flow ends at 3.7 and is gone when the page closes.',
-      '  The spot yield curves, breakeven inflation and bid and ask spreads are available from R2 all the same: Level 1 process 1 executes the same calculations as a scheduled job and writes <a href="viewer.html#/md/knowledge/DataStores.md#s13">S13</a>, S14 and S15. Each calculation is defined once, in shared/src/, and imported by both.',
+      '  The spot yield curves, breakeven inflation and bid and ask spreads are available from R2 all the same: Level 1 process 1 executes the same calculations as a scheduled job and writes <a href="viewer.html#/md/knowledge/DataStores.md#s13">Yield curves (S13)</a>, Breakeven inflation (S14) and Bid and ask spreads (S15). Each calculation is defined once, in shared/src/, and imported by both.',
       '  3.1 is the only process that reads a store; the others take their input from each other. It explodes at <a href="DFD_LEVEL3_YC_LOAD.html">Level 3</a>.',
       '  Each flow is named by the one structure it holds, defined in <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#6.0-data-flows">Data Dictionary &sect;6.0</a>. Two structures passing between the same two processes are drawn as two flows.',
       '  The page also reads the GSW curve parameters, for a reference curve drawn only on an analysis view opened with ?gsw. No view of the app uses them otherwise, so they are not drawn here.'].join(NL)
@@ -586,13 +586,13 @@ function level3IngestFedInvest() {
   const py = { '1.1.1': 190, '1.1.2': 460, '1.1.3': 325 };
   const OBS = procs.map(q => ({ x: px[q.id], y: py[q.id], r: PR }));
   const LBL = [];
-  const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 3: 1.1 Download FedInvest prices, three processes from the FedInvest price list to S1.">`, marker()];
+  const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 3: 1.1 Download FedInvest prices, three processes from the FedInvest price list to FedInvest prices (S1).">`, marker()];
   // The price list enters from the page edge at each process that reads it.
   ['1.1.1', '1.1.2'].forEach(id => {
     P.push(flow(8, py[id], px[id] - PR - 3, py[id], { obstacles: OBS.filter(o => o.y !== py[id]) }));
     P.push(labelAt(12, py[id] - 12, 'daily mid-market prices'));
   });
-  // Bond holidays above 1.1.1 and S2 below 1.1.2 are read; S1, right of 1.1.3, is written.
+  // Bond holidays above 1.1.1 and TIPS reference data (S2) below 1.1.2 are read; FedInvest prices (S1), right of 1.1.3, is written.
   const hol = { x: px['1.1.1'] - SW / 2, y: 50 }, ref = { x: px['1.1.2'] - SW / 2, y: 610 }, s1 = { x: 860, y: py['1.1.3'] };
   P.push(flow(px['1.1.1'], hol.y + 25, px['1.1.1'], py['1.1.1'] - PR - 3));
   P.push(flow(px['1.1.2'], ref.y - 25, px['1.1.2'], py['1.1.2'] + PR + 3));
@@ -610,7 +610,7 @@ function level3IngestFedInvest() {
     up: 'DFD_LEVEL2_INGESTION.html', upLabel: 'Level 2 — 1 Acquire and derive reference data', svg: P.join(NL),
     notes: ['  Every process here drills to its own section of <a href="' + S() + '">1.1 Download FedInvest prices</a>.',
       '  The flow entering from the edge is the FedInvest daily price list, drawn against its source on the <a href="KNOWLEDGE_MAP.html">context diagram</a>. 1.1.1 reads the date it states, and 1.1.2 reads its rows.',
-      '  On a Bond Holiday, or when the price list does not state prices for the run date, 1.1.1 produces no settlement date and S1 is not written.'].join(NL)
+      '  On a Bond Holiday, or when the price list does not state prices for the run date, 1.1.1 produces no settlement date and FedInvest prices (S1) is not written.'].join(NL)
   });
 }
 

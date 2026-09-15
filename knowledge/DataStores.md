@@ -93,7 +93,7 @@ This document provides the technical schemas and field-level specifications for 
 ---
 
 ## <a id="s13"></a>Yield curves (S13)
-**Description**: General-purpose, spreadsheet-ready yields — evaluated yields for every priced Treasury (Bill/Note/Bond/STRIPS) and TIPS security, plus the fitted nominal, TIPS-quoted and TIPS-SA zero-coupon (spot) yield curves evaluated on a term grid (unlike [S12](#s12), which stores unevaluated Svensson parameters). Renamed from `SpotYieldCurves.csv` (2026-09-07): the file is a general yields resource, not spot-curves-only — it also carries every quoted security's own Ask/SA/SAO yield. Superseded the parameters-only `SpotYieldCurves.json` (retired 2026-09-07): six coefficients aren't usable in a spreadsheet, so this file stores actual yields instead. One row per **actual security** (`CUSIP`/`Maturity`/`Type` populated; `Ask`/`SA`/`SAO` populated where they exist) or one row per **fitted grid point** (`CUSIP` = `Spot`, `Maturity` blank, `Type` = `Treasury`/`TIPS`/`BEI`; `Spot`/`Spot SA` populated per Type — see below).
+**Description**: General-purpose, spreadsheet-ready yields — evaluated yields for every priced Treasury (Bill/Note/Bond/STRIPS) and TIPS security, plus the fitted nominal, TIPS-quoted and TIPS-SA zero-coupon (spot) yield curves evaluated on a term grid (unlike [GSW curve parameters (S12)](#s12), which stores unevaluated Svensson parameters). Renamed from `SpotYieldCurves.csv` (2026-09-07): the file is a general yields resource, not spot-curves-only — it also carries every quoted security's own Ask/SA/SAO yield. Superseded the parameters-only `SpotYieldCurves.json` (retired 2026-09-07): six coefficients aren't usable in a spreadsheet, so this file stores actual yields instead. One row per **actual security** (`CUSIP`/`Maturity`/`Type` populated; `Ask`/`SA`/`SAO` populated where they exist) or one row per **fitted grid point** (`CUSIP` = `Spot`, `Maturity` blank, `Type` = `Treasury`/`TIPS`/`BEI`; `Spot`/`Spot SA` populated per Type — see below).
 **Update Frequency**: Chained, not independently scheduled — re-run whenever either of its actual inputs changes: after `FidelityQuotes` (3x daily on weekdays, via `run-fidelity.cmd`) and after `YieldsFromFedInvestPrices` (1x daily on weekdays, via `run-fedinvest.cmd`), each chaining into `YieldCurves/scripts/run-yield-curves.cmd` on success. See [Data_Pipeline.md](./Data_Pipeline.md).
 **R2 Key**: `Treasuries/YieldCurves.csv`
 
@@ -103,18 +103,18 @@ This document provides the technical schemas and field-level specifications for 
 | `Maturity` | Date | Maturity date. Blank on a fitted grid row. |
 | `CUSIP` | String | 9-character security identifier on a security row. `Spot` on a fitted grid row, so a grid row reads consistently with a security row rather than leaving the field blank. |
 | `Type` | String | Security row: `Bill`, `Note`, `Bond`, `STRIPS`, or `TIPS` ([Treasury CUSIP Reference](./Treasury_CUSIP_Reference.md)). Grid row: `Treasury` (fitted nominal spot), `TIPS` (fitted TIPS quoted + SA spot), or `BEI` (nominal spot minus TIPS spot) — three rows per term per source. |
-| `Source` | String | `FedInvest` or `Market`, same distinction as [S10](#s10)/[S14](#s14)/[S15](#s15). |
+| `Source` | String | `FedInvest` or `Market`, same distinction as [SA and SAO yields (S10)](#s10)/[Breakeven inflation (S14)](#s14)/[Bid and ask spreads (S15)](#s15). |
 | `Ask` | Number | Ask yield-to-maturity (decimal), calculated from the row's own quoted price at its source's settlement date — every security and both sources, per [3.1 Parse sources and calculate yields](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md) §Scope. FedInvest carries a single mid-market price ([E1](./DATA_DICTIONARY.md#e1)), not a true ask, so this column holds the yield of that mid-market price on FedInvest-source rows. |
 | `SA` | Number | [SA Yield](./DATA_DICTIONARY.md#sa-yield) (decimal). TIPS security rows only. |
 | `SAO` | Number | [SAO Yield](./DATA_DICTIONARY.md#sao-yield) (decimal). TIPS security rows only. |
 | `Spot` | Number | Grid rows only, semi-annual bond-equivalent decimal (converted from the module's continuously-compounded `z(t)` so it sits on the same basis as `Ask`). Type `Treasury`: fitted nominal Treasury zero-coupon yield at `Term (y)`. Type `TIPS`: fitted TIPS zero-coupon yield to the **quoted** (non-SA) ask prices. Type `BEI`: nominal spot minus TIPS quoted spot. |
 | `Spot SA` | Number | Grid rows only. Type `TIPS`: fitted TIPS zero-coupon yield to seasonally adjusted prices. Type `BEI`: nominal spot minus TIPS SA spot, per [3.4 Fit spot yield curves](../YieldCurves/knowledge/3.4_Fit_Spot_Yield_Curves.md#spot-bei). Blank on Type `Treasury` (no SA concept for a nominal). |
 
-**STRIPS**: `Product = Treasury` in [S7](#s7)/[E6](#e6) also covers STRIPS (zero-coupon, identified by CUSIP root, e.g. `912803`/`912820`/`912821`/`912833`/`912834` — [Treasury CUSIP Reference](./Treasury_CUSIP_Reference.md)), a fact neither S7 nor E6 states explicitly today (both describe `Product` as Treasury-or-TIPS with no mention that STRIPS rows sit inside the Treasury rows — flagged as a documentation gap, not yet fixed). STRIPS are Market-source only (not present in FedInvest data as of 2026-09). They are excluded from the nominal spot-curve fit's input universe, same as every other STRIP-fitting exclusion in this pipeline, but included as their own `Type = STRIPS` security rows. `Ask` is calculated from the quoted price, as it is for every other row in the file. `shared/src/bond-math.js#yieldFromPrice` builds no coupon cash flows at a coupon of zero, so what a STRIP gets is the semi-annual bond-equivalent zero-coupon yield of its price, and a STRIP maturing inside half a year gets Treasury's own bill investment-rate formula. Against the 2026-09-11 quote file the calculated figure differs from the reported one by a median 0.05 bp across 247 STRIPS (p90 0.09, max 3.31).
+**STRIPS**: `Product = Treasury` in [Market quotes (S7)](#s7)/[E6](#e6) also covers STRIPS (zero-coupon, identified by CUSIP root, e.g. `912803`/`912820`/`912821`/`912833`/`912834` — [Treasury CUSIP Reference](./Treasury_CUSIP_Reference.md)), a fact neither Market quotes (S7) nor E6 states explicitly today (both describe `Product` as Treasury-or-TIPS with no mention that STRIPS rows sit inside the Treasury rows — flagged as a documentation gap, not yet fixed). STRIPS are Market-source only (not present in FedInvest data as of 2026-09). They are excluded from the nominal spot-curve fit's input universe, same as every other STRIP-fitting exclusion in this pipeline, but included as their own `Type = STRIPS` security rows. `Ask` is calculated from the quoted price, as it is for every other row in the file. `shared/src/bond-math.js#yieldFromPrice` builds no coupon cash flows at a coupon of zero, so what a STRIP gets is the semi-annual bond-equivalent zero-coupon yield of its price, and a STRIP maturing inside half a year gets Treasury's own bill investment-rate formula. Against the 2026-09-11 quote file the calculated figure differs from the reported one by a median 0.05 bp across 247 STRIPS (p90 0.09, max 3.31).
 
 **Term grid**: half-year steps (0.5, 1.0, 1.5, …), matching the chart's own `spotCurveGrid` convention and including every whole year in range (a whole-year term is itself a half-year multiple, so no separate annual pass is needed). Spans the union of the nominal, TIPS-quoted and TIPS-SA fits' valid ranges per `Source`, rather than clipping to their intersection — a term outside one curve's valid range simply leaves that curve's cell(s) blank rather than dropping the whole row. A cell is also left blank if its fit's sanity check fails at that term (see `shared/src/spot-curve.js#spotCurveFit`).
 
-**Logic**: Loads the same R2 inputs the YieldCurves app loads (S1, S4, S7, `misc/BondHolidaysSifma.csv`) and runs every step through the module `YieldCurves/src/app.js` imports for it, so the app and this pipeline cannot drift apart: `shared/src/fidelity-parse.js#parseFidelityNominalRows` for the S7 nominal Treasury rows, `shared/src/tips-yields.js#tipsYieldsFromPrices` for the TIPS yields, `shared/src/treasury-yields.js#treasuryYieldsFromPrices` for the S1 nominal Treasury yields, `shared/src/spreads.js` for the [S15](#s15) spreads, `shared/src/spot-curve.js#spotCurveFit` for the fits, `shared/src/breakeven.js#findClosestNominal` for the nominal each [S14](#s14) row is stated against, and `shared/src/bond-math.js#termYears` for `Term (y)`. The script evaluates the fit objects' own `z(t)`/`sane()` on the term grid rather than refitting.
+**Logic**: Loads the same R2 inputs the YieldCurves app loads ([FedInvest prices (S1)](#s1), [Ref CPI NSA and SA (S4)](#s4), [Market quotes (S7)](#s7), `misc/BondHolidaysSifma.csv`) and runs every step through the module `YieldCurves/src/app.js` imports for it, so the app and this pipeline cannot drift apart: `shared/src/fidelity-parse.js#parseFidelityNominalRows` for the Market quotes (S7) nominal Treasury rows, `shared/src/tips-yields.js#tipsYieldsFromPrices` for the TIPS yields, `shared/src/treasury-yields.js#treasuryYieldsFromPrices` for the FedInvest prices (S1) nominal Treasury yields, `shared/src/spreads.js` for the [Bid and ask spreads (S15)](#s15) spreads, `shared/src/spot-curve.js#spotCurveFit` for the fits, `shared/src/breakeven.js#findClosestNominal` for the nominal each [Breakeven inflation (S14)](#s14) row is stated against, and `shared/src/bond-math.js#termYears` for `Term (y)`. The script evaluates the fit objects' own `z(t)`/`sane()` on the term grid rather than refitting.
 
 **Live Data**: [View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/YieldCurves.csv)
 
@@ -122,7 +122,7 @@ This document provides the technical schemas and field-level specifications for 
 
 ## <a id="s14"></a>Breakeven inflation (S14)
 **Description**: Per-TIPS breakeven inflation — the Ask/SA/SAO yield for each TIPS against the yield of its nearest-maturity nominal Treasury, `Market` (broker quotey) source only. Matches the YieldCurves BEI tab's per-bond table, which the app computes but does not persist.
-**Update Frequency**: `Market`-only data, so it changes only when `FidelityQuotes` refreshes (3x daily on weekdays); written by the same chained `updateSpotYieldCurves.js` run as [S13](#s13) (also chained from `YieldsFromFedInvestPrices`, which this file doesn't depend on — see [Data_Pipeline.md](./Data_Pipeline.md)).
+**Update Frequency**: `Market`-only data, so it changes only when `FidelityQuotes` refreshes (3x daily on weekdays); written by the same chained `updateSpotYieldCurves.js` run as [Yield curves (S13)](#s13) (also chained from `YieldsFromFedInvestPrices`, which this file doesn't depend on — see [Data_Pipeline.md](./Data_Pipeline.md)).
 **R2 Key**: `Treasuries/BreakevenInflation.csv`
 
 | Field | Type | Description |
@@ -145,8 +145,8 @@ This document provides the technical schemas and field-level specifications for 
 ---
 
 ## <a id="s15"></a>Bid and ask spreads (S15)
-**Description**: Per-security broker bid/ask yield and price spread, TIPS and nominal Treasuries combined in one file (`security_type` discriminates, same pattern as [S7](#s7)'s `Product` column). `Market` (broker quotey) source only — FedInvest carries a single mid-market price, not a separate bid and ask.
-**Update Frequency**: `Market`-only data, so it changes only when `FidelityQuotes` refreshes (3x daily on weekdays); written by the same chained `updateSpotYieldCurves.js` run as [S13](#s13) (also chained from `YieldsFromFedInvestPrices`, which this file doesn't depend on — see [Data_Pipeline.md](./Data_Pipeline.md)).
+**Description**: Per-security broker bid/ask yield and price spread, TIPS and nominal Treasuries combined in one file (`security_type` discriminates, same pattern as [Market quotes (S7)](#s7)'s `Product` column). `Market` (broker quotey) source only — FedInvest carries a single mid-market price, not a separate bid and ask.
+**Update Frequency**: `Market`-only data, so it changes only when `FidelityQuotes` refreshes (3x daily on weekdays); written by the same chained `updateSpotYieldCurves.js` run as [Yield curves (S13)](#s13) (also chained from `YieldsFromFedInvestPrices`, which this file doesn't depend on — see [Data_Pipeline.md](./Data_Pipeline.md)).
 **R2 Key**: `Treasuries/BidAskSpreads.csv`
 
 | Field | Type | Description |
@@ -158,8 +158,8 @@ This document provides the technical schemas and field-level specifications for 
 | `ask_yield` | Number | Ask yield-to-maturity (decimal). |
 | `bid_yield` | Number | Bid yield-to-maturity (decimal). |
 | `yield_spread_bps` | Number | `(bid_yield − ask_yield) × 10000`. |
-| `ask_price` | Number | Ask price (TIPS: raw clean price, matching S7). |
-| `bid_price` | Number | Bid price (TIPS: raw clean price, matching S7). |
+| `ask_price` | Number | Ask price (TIPS: raw clean price, matching Market quotes (S7)). |
+| `bid_price` | Number | Bid price (TIPS: raw clean price, matching Market quotes (S7)). |
 | `price_spread_pct` | Number | TIPS: `(adjusted_ask − adjusted_bid) / adjusted_ask × 100` (actual dollar cost). Treasury: `(ask − bid) / ask × 100`. |
 
 **Live Data**: [View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/BidAskSpreads.csv)
@@ -210,7 +210,7 @@ This document provides the technical schemas and field-level specifications for 
 ---
 
 ## <a id="s10"></a>SA and SAO yields (S10)
-**Description**: TIPS ask/SA/SAO yields derived from the market quotes in [S7](#s7).
+**Description**: TIPS ask/SA/SAO yields derived from [Market quotes (S7)](#s7).
 **Update Frequency**: Triggered by the `FidelityQuotes` task (3× daily on weekdays), via `updateSaSaoYields.js`.
 **R2 Key**: `TIPS/YieldsSaSao.csv`
 
@@ -230,7 +230,7 @@ This document provides the technical schemas and field-level specifications for 
 ---
 
 ## <a id="s11"></a>Fund holdings (S11)
-**Description**: Treasury and TIPS fund holdings by CUSIP, one raw and one enriched CSV per fund ticker (VBIL, VTIP, VTP, RBIL, LTPZ, SCHP, XHLF, ICPI). The enriched file adds ask/SA/SAO yield, term, and duration, computed the same way for every fund from [S10](#s10) and [S7](#s7) rather than taken from each provider’s own reported analytics.
+**Description**: Treasury and TIPS fund holdings by CUSIP, one raw and one enriched CSV per fund ticker (VBIL, VTIP, VTP, RBIL, LTPZ, SCHP, XHLF, ICPI). The enriched file adds ask/SA/SAO yield, term, and duration, computed the same way for every fund from [SA and SAO yields (S10)](#s10) and [Market quotes (S7)](#s7) rather than taken from each provider’s own reported analytics.
 **Update Frequency**: Daily, Local Windows Task `FundHoldings`, via `FundHoldings/updateAllHoldings.js` then `FundHoldings/enrichHoldings.js`.
 **R2 Key**: `FundHoldings/` (its own top-level prefix, since a fund’s holdings mix TIPS and nominal rows and so belong under neither `TIPS/` nor `Treasuries/`)
 

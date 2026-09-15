@@ -291,7 +291,7 @@
 
 <p class="notes">
   <b>No process here writes a data store.</b> Every flow ends at 3.7 and is gone when the page closes.
-  The spot yield curves, breakeven inflation and bid and ask spreads are available from R2 all the same: Level 1 process 1 executes the same calculations as a scheduled job and writes <a href="viewer.html#/md/knowledge/DataStores.md#s13">S13</a>, S14 and S15. Each calculation is defined once, in shared/src/, and imported by both.
+  The spot yield curves, breakeven inflation and bid and ask spreads are available from R2 all the same: Level 1 process 1 executes the same calculations as a scheduled job and writes <a href="viewer.html#/md/knowledge/DataStores.md#s13">Yield curves (S13)</a>, Breakeven inflation (S14) and Bid and ask spreads (S15). Each calculation is defined once, in shared/src/, and imported by both.
   3.1 is the only process that reads a store; the others take their input from each other. It explodes at <a href="DFD_LEVEL3_YC_LOAD.html">Level 3</a>.
   Each flow is named by the one structure it holds, defined in <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#6.0-data-flows">Data Dictionary &sect;6.0</a>. Two structures passing between the same two processes are drawn as two flows.
   The page also reads the GSW curve parameters, for a reference curve drawn only on an analysis view opened with ?gsw. No view of the app uses them otherwise, so they are not drawn here.
