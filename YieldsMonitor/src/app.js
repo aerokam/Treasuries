@@ -193,6 +193,7 @@ const SA_ROLLOVER_LOG = {
     { from: '2025-07-10', maturity: '2026-04-15' }, // corrected from 2025-07-14 — re-bisected under sell-primary price
     { from: '2025-08-01', maturity: '2026-07-15' }, // corrected from 2025-08-04 — re-bisected under sell-primary price
     { from: '2026-02-10', maturity: '2027-01-15' },
+    { from: '2026-09-01', maturity: '2027-07-15' }, // cross-checked: bisected between 2026-08-31 (still prior cohort, diffs 3-7bp) and 2026-09-01 (new cohort, diffs ~0.5bp)
   ],
   US2YTIPS: [
     // FALLBACK-DERIVED (2014-04-01 .. 2024-02-29) — same method as US1YTIPS above, target
@@ -242,6 +243,7 @@ const SA_ROLLOVER_LOG = {
     { from: '2025-07-10', maturity: '2027-04-15' },
     { from: '2025-08-01', maturity: '2027-07-15' },
     { from: '2026-02-10', maturity: '2028-01-15' },
+    { from: '2026-09-01', maturity: '2028-07-15' }, // cross-checked: same rollover event as US1YTIPS above — bisected between 2026-08-31 (still prior cohort, diffs 5-7bp) and 2026-09-01 (new cohort, diffs ~0.6-2.8bp)
   ],
   // US5YTIPS: the empirical cross-check is unresolvable here too (candidate 5-Year cohorts'
   // yields sit too close together to disambiguate, same as US10YTIPS below), so the issue-date
