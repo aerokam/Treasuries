@@ -36,31 +36,32 @@ export function lookupRefCpi(rows, dateStr) {
 // "Interpolation calculations are truncated to six decimal places, then
 // rounded to five decimal places — so Ref CPI and Index Ratio are always
 // expressed to five decimal places." Applied at both computation points below.
+// IEEE754 doubles can represent an exact n-decimal value as e.g.
+// 1.1500349999999999 instead of 1.150035, which silently truncates/rounds
+// one digit low. Nudge by an epsilon before a trunc/round step so an exact
+// boundary value lands on its true value.
+//
+// The nudge must be RELATIVE (proportional to the scaled magnitude), not a
+// fixed absolute amount: a fixed 1e-9 nudge is ~4 ulps at index-ratio
+// magnitude (~1e6 after scaling) but ~0.01 ulps at Ref CPI magnitude
+// (~3e8 after scaling) -- a no-op there. That silently mis-rounded 28 real
+// dates in the published RefCPI.csv series (e.g. 2019-08-02: true value
+// 256.093645 -> must round up to 256.09365, absolute-nudge version gave
+// 256.09364). At 1e-12 relative this is ~4500 ulps at any magnitude this
+// function is used at -- far above representation noise, far below one
+// unit in the 6th/5th decimal place (or the 9th, for indexRatioNineDecimal
+// below). Verified against TreasuryDirect's published Ref CPI series: 0
+// mismatches (was 28) -- see shared/tests/ref-cpi.test.js.
+//
+// Note: nudging by sign(x)*epsilon shifts negative half-way values from
+// round-half-up to round-half-away-from-zero (a real but unrequested
+// semantic change vs. plain Math.round). Moot in practice -- Ref CPI and
+// Index Ratio are always positive -- but be aware if this function is ever
+// reused for a signed quantity.
+function nudge(v) { return v === 0 ? v : v + Math.sign(v) * Math.max(1e-9, Math.abs(v) * 1e-12); }
+
 function truncateThenRound(x, truncDp = 6, roundDp = 5) {
   if (x == null) return x;
-  // IEEE754 doubles can represent an exact n-decimal value as e.g.
-  // 1.1500349999999999 instead of 1.150035, which silently truncates/rounds
-  // one digit low. Nudge by an epsilon before each trunc/round step so an
-  // exact boundary value lands on its true value.
-  //
-  // The nudge must be RELATIVE (proportional to the scaled magnitude), not a
-  // fixed absolute amount: a fixed 1e-9 nudge is ~4 ulps at index-ratio
-  // magnitude (~1e6 after scaling) but ~0.01 ulps at Ref CPI magnitude
-  // (~3e8 after scaling) -- a no-op there. That silently mis-rounded 28 real
-  // dates in the published RefCPI.csv series (e.g. 2019-08-02: true value
-  // 256.093645 -> must round up to 256.09365, absolute-nudge version gave
-  // 256.09364). At 1e-12 relative this is ~4500 ulps at any magnitude this
-  // function is used at -- far above representation noise, far below one
-  // unit in the 6th/5th decimal place. Verified against TreasuryDirect's
-  // published Ref CPI series: 0 mismatches (was 28) -- see
-  // shared/tests/ref-cpi.test.js.
-  //
-  // Note: nudging by sign(x)*epsilon shifts negative half-way values from
-  // round-half-up to round-half-away-from-zero (a real but unrequested
-  // semantic change vs. plain Math.round). Moot in practice -- Ref CPI and
-  // Index Ratio are always positive -- but be aware if this function is ever
-  // reused for a signed quantity.
-  const nudge = v => v === 0 ? v : v + Math.sign(v) * Math.max(1e-9, Math.abs(v) * 1e-12);
   const truncFactor = 10 ** truncDp;
   const truncated = Math.trunc(nudge(x * truncFactor)) / truncFactor;
   const roundFactor = 10 ** roundDp;
@@ -110,6 +111,20 @@ export function indexRatio(refCpi, datedDateRefCpi) {
   return (refCpi != null && datedDateRefCpi) ? truncateThenRound(refCpi / datedDateRefCpi) : null;
 }
 
+// Ref CPI(settlement) / Ref CPI(dated date), rounded once, half up, to nine
+// decimal places -- the convention a market quote's own stated Index Ratio
+// follows (knowledge/DFD_Worklist.md §3.12), not Treasury's truncate-6-
+// round-5 rule above, which matches no real quote tested. This is for
+// reproducing/cross-checking a broker's stated Index Ratio; a figure that
+// states Treasury's own value (e.g. an acquisition Index Ratio for tax
+// purposes) keeps indexRatio() above.
+export function indexRatioNineDecimal(refCpi, datedDateRefCpi) {
+  if (refCpi == null || datedDateRefCpi == null || isNaN(refCpi) || isNaN(datedDateRefCpi) || !datedDateRefCpi) return null;
+  const ratio = refCpi / datedDateRefCpi;
+  const factor = 1e9;
+  return Math.round(nudge(ratio * factor)) / factor;
+}
+
 // ─── SA Factor lookup (RefCpiNsaSa.csv rows) ─────────────────────────────────
 // `rows` = TIPS/RefCpiNsaSa.csv parsed via shared/src/csv.js (any order):
 //   [{ "Ref CPI Date": 'YYYY-MM-DD', "SA Factor": '1.00343', ... }, ...]
@@ -133,6 +148,18 @@ export function saFactorForDate(rows, dateStr) {
     if (!best || d > best['Ref CPI Date']) best = r;
   }
   return best ? parseFloat(best['SA Factor']) : null;
+}
+
+// Exact-date NSA Ref CPI from the same S4 rows saFactorForDate() reads
+// (RefCpiNsaSa.csv). Used as the settlement-date Ref CPI for
+// indexRatioNineDecimal() above: S4's "Ref CPI NSA" column states the same
+// value as the authoritative retrieved series (S3, RefCPI.csv) on every date
+// tested (knowledge/DFD_Worklist.md §3.12), so a caller that already loads S4
+// for the SA factors needs no separate S3 fetch. Returns null when dateStr
+// has no row (S4 starts 2019-04-01) -- there is no "snap" to a nearby date.
+export function refCpiNsaForDate(rows, dateStr) {
+  const row = rows.find(r => r['Ref CPI Date'] === dateStr);
+  return row ? parseFloat(row['Ref CPI NSA']) : null;
 }
 
 // ─── Credibility factor for a projected maturity SA factor ──────────────────

@@ -37,6 +37,24 @@ export function nextBondTradingDay(isoDateStr, holidaySet) {
 // resolve, the same way lookupRefCpi is.
 export { parseCsvRows as parseCsv };
 
+// Parses TIPS reference data (S2, TIPS/TipsRef.csv), FiscalData's immutable per-CUSIP
+// metadata -- knowledge/DataStores.md#s2. One implementation, used by fetchAuxTipsData()
+// below and by any other caller that needs S2 without the RefCPI/YieldsSaSao fetches that
+// function bundles with it (projects/CLAUDE.md §2a).
+// Returns: [{ cusip, maturity, datedDate, coupon, datedDateRefCpi, term }]
+export function parseTipsRefRows(text) {
+  return parseCsvRows(text).map(r => ({
+    cusip:     r.cusip,
+    maturity:  r.maturity,
+    datedDate: r.datedDate,
+    coupon:    parseFloat(r.coupon),
+    // `baseCpi` is the pre-rename header; read both while R2 still carries files written
+    // before the rename (DD S2, "dated date Ref CPI").
+    datedDateRefCpi: parseFloat(r.datedDateRefCpi ?? r.baseCpi),
+    term:      r.term,
+  }));
+}
+
 // Fetches RefCPI.csv, TipsRef.csv, YieldsSaSao.csv, and BondHolidaysSifma.csv from R2 --
 // shared by both fetchTipsData() (FedInvest) and fetchFidelityTipsData() (Fidelity) so the
 // parsing isn't duplicated between the two sources (projects/CLAUDE.md §2a).
@@ -65,16 +83,7 @@ async function fetchAuxTipsData() {
     refCpi: parseFloat(r.refCpi),
   }));
 
-  const tipsRefRows = parseCsvRows(await tipsRefRes.text()).map(r => ({
-    cusip:     r.cusip,
-    maturity:  r.maturity,
-    datedDate: r.datedDate,
-    coupon:    parseFloat(r.coupon),
-    // `baseCpi` is the pre-rename header; read both while R2 still carries files written
-    // before the rename (DD S2, "dated date Ref CPI").
-    datedDateRefCpi:   parseFloat(r.datedDateRefCpi ?? r.baseCpi),
-    term:      r.term,
-  }));
+  const tipsRefRows = parseTipsRefRows(await tipsRefRes.text());
 
   // YieldsSaSao.csv: cusip,maturity,coupon,ask_yield,sa_yield,sao_yield -- produced by
   // YieldCurves/scripts/updateSaSaoYields.js. Only sa_yield is consumed (2.0 §Within-Year
