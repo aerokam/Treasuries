@@ -42,6 +42,11 @@
   table.main { border-collapse: collapse; width: 100%; background: #fff; font-size: 13px; }
   table.main th { background: #1e293b; color: #fff; padding: 8px 12px; text-align: right; font-weight: 600; white-space: nowrap; position: sticky; top: 0; z-index: 10; }
   table.main th:first-child, table.main th:nth-child(2) { text-align: left; }
+  table.main th[data-sort] { cursor: pointer; user-select: none; }
+  table.main th[data-sort]:hover { background: #334155; }
+  table.main th.sort-asc::after { content: ' \2191'; }
+  table.main th.sort-desc::after { content: ' \2193'; }
+  table.main th[data-tip] { text-decoration: underline dotted rgba(255,255,255,0.5); text-underline-offset: 3px; }
   table.main td { padding: 6px 12px; border-bottom: 1px solid #eee; white-space: nowrap; font-variant-numeric: tabular-nums; }
   table.main td:not(:first-child):not(:nth-child(2)) { text-align: right; }
   table.main tr:hover td { background: #fffde7; }
@@ -63,6 +68,14 @@
   .col-help:hover { color: #1a56db; text-decoration-color: #1a56db; }
   .drillable { cursor: pointer; text-decoration: underline dotted #94a3b8; }
   .drillable:hover { background: #fef9c3 !important; }
+
+  /* ── Column header hover explainer ── */
+  #col-tooltip { position: fixed; z-index: 500; max-width: 380px; background: #1e293b; color: #f1f5f9;
+    font-size: 12px; line-height: 1.5; padding: 10px 12px; border-radius: 6px; box-shadow: 0 4px 18px rgba(0,0,0,.3);
+    display: none; pointer-events: none; }
+  #col-tooltip b { color: #fff; }
+  #col-tooltip p { margin: 0 0 8px; }
+  #col-tooltip p:last-child { margin-bottom: 0; }
 
   #info-strip { font-size: 13px; color: #1e293b; margin-bottom: 8px; }
   
@@ -209,11 +222,11 @@
           <table class="main" id="saTable">
             <thead>
               <tr>
-                <th><a class="col-help" href="#" data-col="maturity">Maturity</a></th>
-                <th><a class="col-help" href="#" data-col="term">Term</a></th>
-                <th><a class="col-help" href="#" data-col="ask-yield">Ask</a></th>
-                <th><a class="col-help" href="#" data-col="sa-yield">SA</a></th>
-                <th><a class="col-help" href="#" data-col="sao-yield">SAO</a></th>
+                <th data-sort="maturity" data-tip="maturity" class="sort-asc">Maturity</th>
+                <th data-sort="term" data-tip="term">Term</th>
+                <th data-sort="ask" data-tip="ask-yield">Ask</th>
+                <th data-sort="sa" data-tip="sa-yield">SA</th>
+                <th data-sort="sao" data-tip="sao-yield">SAO</th>
               </tr>
             </thead>
             <tbody id="tableBody">
@@ -260,6 +273,8 @@
       </div>
     </div>
   </div>
+
+  <div id="col-tooltip"></div>
 
   <footer>
     <span>A free contribution to the <a href="https://www.bogleheads.org/" style="color: #64748b; text-decoration: none; border-bottom: 1px dotted #cbd5e1;">Bogleheads</a> community.</span>
