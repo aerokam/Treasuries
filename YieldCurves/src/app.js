@@ -16,6 +16,7 @@ import { initDatePicker } from '../../shared/src/date-picker.js';
 import { calendarTimeAxis } from '../../shared/src/chart-time-axis.js';
 import { isStrip } from '../../shared/src/treasury-cusip.js';
 import { parseFidelityDownloadDate, fidelityDownloadDateIso, parseFidelityTipsRows, parseFidelityNominalRows } from '../../shared/src/fidelity-parse.js';
+import { parseTipsRefRows } from '../../shared/src/market-data.js';
 
 console.log("YieldCurves app.js loading...");
 
@@ -25,6 +26,7 @@ const REF_CPI_CSV_URL = `${R2_BASE_URL}/TIPS/RefCpiNsaSa.csv`;
 const HOLIDAYS_CSV_URL = `${R2_BASE_URL}/misc/BondHolidaysSifma.csv`;
 const FIDELITY_URL = `${R2_BASE_URL}/Treasuries/FidelityTreasuriesTips.csv`;
 const GSW_TIPS_CURVE_URL = `${R2_BASE_URL}/TIPS/GswTipsCurve.json`;   // { date, beta0..beta3, tau1, tau2 } — updateGswTipsCurve.js
+const TIPS_REF_CSV_URL = `${R2_BASE_URL}/TIPS/TipsRef.csv`;   // S2 -- dated date Ref CPI per CUSIP, for the market-quote Index Ratio (3.1.7)
 
 // The GSW reference line is an analysis aid, not an end-user feature — the published curve
 // is only weekly (Tuesdays, through the prior Friday) so it goes stale fast. Hidden unless
@@ -65,6 +67,7 @@ function iqrClipBounds(source, minFence = 0.5) {
 let rawYieldsData = null;
 let rawNominalsData = null;
 let rawRefCpiData = null;
+let tipsRefByCusip = null;   // S2 (TipsRef.csv) rows by CUSIP, for the market-quote Index Ratio
 let holidaySet = new Set();
 let brokerPrices = null;
 let brokerDownloadDate = null;    // download date string from Fidelity TIPS CSV footer
@@ -424,12 +427,13 @@ async function init() {
   
   try {
     console.log("Fetching market data...");
-    const [yieldsRes, refCpiRes, holidayRes, fidRes, gswRes] = await Promise.all([
+    const [yieldsRes, refCpiRes, holidayRes, fidRes, gswRes, tipsRefRes] = await Promise.all([
       fetch(YIELDS_CSV_URL, { cache: 'no-cache' }).then(r => { console.log("Yields fetched"); return r; }).catch(e => ({ ok: false, error: e })),
       fetch(REF_CPI_CSV_URL, { cache: 'no-cache' }).then(r => { console.log("RefCPI fetched"); return r; }).catch(e => ({ ok: false, error: e })),
       fetch(HOLIDAYS_CSV_URL, { cache: 'no-cache' }).then(r => { console.log("Holidays fetched"); return r; }).catch(e => ({ ok: false, error: e })),
       fetch(FIDELITY_URL, { cache: 'no-cache' }).then(r => { console.log("Fidelity fetched"); return r; }).catch(e => ({ ok: false, error: e })),
       fetch(GSW_TIPS_CURVE_URL, { cache: 'no-cache' }).then(r => { console.log("GSW curve fetched"); return r; }).catch(e => ({ ok: false, error: e })),
+      fetch(TIPS_REF_CSV_URL, { cache: 'no-cache' }).then(r => { console.log("TipsRef fetched"); return r; }).catch(e => ({ ok: false, error: e })),
     ]);
 
     gswTipsCurve = await parseGswParameters(gswRes);
@@ -444,6 +448,16 @@ async function init() {
       refCpiRes.text(),
       holidayRes.text(),
     ]);
+
+    // S2 (TipsRef.csv): dated date Ref CPI per CUSIP for the market-quote Index Ratio (3.1.7).
+    // A missing/failed fetch leaves market-quote TIPS without an Index Ratio rather than
+    // without a page -- the same tolerance the GSW curve fetch gets above.
+    if (tipsRefRes.ok) {
+      const tipsRefRows = parseTipsRefRows(await tipsRefRes.text());
+      tipsRefByCusip = new Map(tipsRefRows.map(r => [r.cusip, r]));
+    } else {
+      console.warn('TipsRef.csv not available on R2 -- market-quote Index Ratio will be blank');
+    }
 
     console.log("Parsing CSVs...");
     const fedInvest = parseFedInvestPrices(yieldsText);
@@ -1038,7 +1052,7 @@ function renderNominalsChart(fedBonds, fidBonds, fedSpotBonds, fidSpotBonds) {
 // shared/src/tips-yields.js#tipsYieldsFromPrices — one implementation for this page and
 // for the acquisition job that publishes S13, S14 and S15 (3.1_Parse_Sources_And_Calculate_Yields.md §3.1.7).
 const tipsFor = (quotesByCusip, isBroker) =>
-  tipsYieldsFromPrices(rawYieldsData, rawRefCpiData, quotesByCusip, isBroker, marketSettleIso());
+  tipsYieldsFromPrices(rawYieldsData, rawRefCpiData, quotesByCusip, isBroker, marketSettleIso(), tipsRefByCusip);
 
 function processAndRenderTips() {
   const statusEl = document.getElementById('status');
