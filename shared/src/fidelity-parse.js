@@ -83,16 +83,18 @@ export function parseFidelityTipsRows(text) {
 // so they are returned alongside Bills, Notes and Bonds, each row tagged with the type its
 // CUSIP root gives. A caller fitting a coupon-bond curve filters them out itself.
 //
-// Both yields are calculated from the quoted price at `settleIso`, rather than read from the
-// quote: the quoted price states more decimal places than the quoted yield, a yield is quoted
-// on the ask side only, and calculating both sides puts them on one convention so their
-// difference is the spread of 3.6_Calculate_Bid_And_Ask_Spreads.md. The quoted ask yield is read only
-// as a presence test -- a row without one carries no live offer.
+// Both yields are calculated from the quoted price at `settleIso`, never read from the quote's
+// own ask yield or its unlabeled "Yield" column (the implied bid yield): the price gives a more
+// accurate yield than either quoted value, and calculating both sides puts them on one
+// convention, which is what makes their difference the spread of
+// 3.6_Calculate_Bid_And_Ask_Spreads.md. A row with an ask price but no bid price keeps its ask
+// yield; it has no bid yield and so no spread.
 //
-// A row is dropped when it has no CUSIP, no parseable maturity date, no quoted ask yield, a
-// CUSIP root the Treasury CUSIP reference does not recognise, a CUSIP listed in
-// `excludeCusips`, a description naming it as TIPS, or an ask yield that cannot be calculated
-// (for want of an ask price, or for a maturity on or before the settlement date).
+// A row is dropped when it has no CUSIP, no parseable maturity date, a CUSIP root the Treasury
+// CUSIP reference does not recognise, a CUSIP listed in `excludeCusips`, a description naming it
+// as TIPS, or an ask yield that cannot be calculated (for want of an ask price, or for a maturity
+// on or before the settlement date). Fidelity's own quoted ask yield is not checked for
+// presence -- only whether a yield can be calculated from the ask price.
 //
 // Options:
 //   settleIso      the settlement date the quoted prices are stated at, 'YYYY-MM-DD'
@@ -128,9 +130,6 @@ export function parseFidelityNominalRows(text, { settleIso = null, excludeCusips
     if (!maturity) continue;
     const maturityDate = localDate(maturity);
     if (!maturityDate) continue;
-
-    const quotedAskYield = parseFloat(cleanFidelityField(n['ask yield to maturity'])) / 100;
-    if (isNaN(quotedAskYield)) continue;
 
     const coupon = parseFloat(cleanFidelityField(n['coupon'])) / 100 || 0;
     const price = parseFloat(fidPriceField(n['price ask'] || n['ask price/quantity (min)'])) || NaN;
