@@ -88,6 +88,7 @@ const CUSIP_TYPE_TO_MARKET_BASED = { Bill: 'MARKET BASED BILL', Note: 'MARKET BA
 let activeTab = 'tips';
 let nominalsTypeFilters = new Set(['MARKET BASED BILL', 'MARKET BASED NOTE', 'MARKET BASED BOND']);
 let nominalsSort = { col: 'maturity', dir: 'asc' };
+let tipsSort = { col: 'maturity', dir: 'asc' };
 let xAxisMode = 'maturity';
 window._currentBonds = [];
 // Last-rendered TIPS yield-mode bond sets, so the series checkboxes (which restyle the
@@ -714,7 +715,7 @@ function renderNominalsTable(fedBonds, fidBonds, fedSpotBonds, fidSpotBonds, sta
   const spotColIdx = curveCols.findIndex(c => c.key === 'spot');
   const curveHeaderHtml = curveCols.map(c => {
     const sortAttr = (c.key === 'ask' && !bothActive) ? ` data-sort="yield"${sortCls('yield')}` : '';
-    return `<th${sortAttr}><a class="col-help" href="#" data-col="${c.help}">${c.label}${bothActive ? ' (Fed/Mkt)' : ''}</a></th>`;
+    return `<th${sortAttr} data-tip="${c.help}">${c.label}${bothActive ? ' (Fed/Mkt)' : ''}</th>`;
   }).join('');
 
   if (bothActive) {
@@ -1130,20 +1131,23 @@ function renderTable(fedBonds, brokerBonds) {
 
   const shown = { ask: 'showTipsAsk', sa: 'showTipsSa', sao: 'showTipsSao', spot: 'showTipsSpot', spotSa: 'showTipsSpotSa' };
   const cols = TIPS_TABLE_SERIES.filter(s => document.getElementById(shown[s.key]).checked);
+  const sortCls = col => tipsSort.col === col ? ` class="sort-${tipsSort.dir}"` : '';
 
   thead.innerHTML = `
-    <th><a class="col-help" href="#" data-col="maturity">Maturity</a></th>
-    <th><a class="col-help" href="#" data-col="term">Term</a></th>
-    ${cols.map(c => `<th><a class="col-help" href="#" data-col="${c.help}">${c.label}${both ? ' (Fed/Mkt)' : ''}</a></th>`).join('')}`;
+    <th data-sort="maturity" data-tip="maturity"${sortCls('maturity')}>Maturity</th>
+    <th data-sort="term" data-tip="term"${sortCls('term')}>Term</th>
+    ${cols.map(c => `<th data-sort="${c.key}" data-tip="${c.help}"${sortCls(c.key)}>${c.label}${both ? ' (Fed/Mkt)' : ''}</th>`).join('')}`;
 
-  // Security rows — one per CUSIP, Ask/SA/SAO cells where that security has them.
+  // Security rows — one per CUSIP, Ask/SA/SAO cells where that security has them. Each cell
+  // carries a numeric `val` (Fed's own yield, falling back to Market) alongside its display
+  // html, so a column can be sorted even where it shows two source values at once.
   const fedMap = fedBonds ? new Map(fedBonds.map(b => [b.cusip, b])) : new Map();
   const brokerMap = brokerBonds ? new Map(brokerBonds.map(b => [b.cusip, b])) : new Map();
   const rows = [...new Set([...fedMap.keys(), ...brokerMap.keys()])].map(cusip => {
     const f = fedMap.get(cusip), b = brokerMap.get(cusip);
     const ref = f || b;
     const cells = cols.map(c => c.yieldKey
-      ? { html: both ? `${fmtY(f?.[c.yieldKey])} / ${fmtY(b?.[c.yieldKey])}` : fmtY(ref[c.yieldKey]), drill: c.drill, cusip }
+      ? { html: both ? `${fmtY(f?.[c.yieldKey])} / ${fmtY(b?.[c.yieldKey])}` : fmtY(ref[c.yieldKey]), val: f?.[c.yieldKey] ?? b?.[c.yieldKey], drill: c.drill, cusip }
       : { html: '—' });
     return { term: termOf(ref), maturityHtml: fmtMMM(ref.maturity), cells };
   });
@@ -1172,12 +1176,24 @@ function renderTable(fedBonds, brokerBonds) {
       if (c.key !== 'spot' && c.key !== 'spotSa') return { html: '—' };
       const fedV = vals[`${c.key}_fed`], mktV = vals[`${c.key}_mkt`];
       const fmt = v => v != null ? v.toFixed(3) + '%' : '—';
-      return { html: both ? `${fmt(fedV)} / ${fmt(mktV)}` : fmt(fedV ?? mktV) };
+      return { html: both ? `${fmt(fedV)} / ${fmt(mktV)}` : fmt(fedV ?? mktV), val: fedV ?? mktV };
     });
     rows.push({ term, maturityHtml: '—', cells });
   }
 
-  rows.sort((a, b) => a.term - b.term);
+  // Maturity and Term share the same chronological order, so both sort on term. A value
+  // column sorts on its own cells' `val`; rows without one (e.g. a security row under Spot)
+  // sort to the end regardless of direction, same as an empty cell in the other tables.
+  const colIdx = cols.findIndex(c => c.key === tipsSort.col);
+  const getV = r => (tipsSort.col === 'maturity' || tipsSort.col === 'term') ? r.term : r.cells[colIdx]?.val;
+  const dirMul = tipsSort.dir === 'asc' ? 1 : -1;
+  rows.sort((a, b) => {
+    const va = getV(a), vb = getV(b);
+    if (va == null && vb == null) return a.term - b.term;
+    if (va == null) return 1;
+    if (vb == null) return -1;
+    return (va < vb ? -1 : va > vb ? 1 : 0) * dirMul;
+  });
   tbody.innerHTML = rows.map(r => `
     <tr>
       <td>${r.maturityHtml}</td>
@@ -2236,6 +2252,45 @@ document.addEventListener('click', (e) => {
     e.preventDefault();
     _showColHelp(link.dataset.col);
   }
+});
+
+document.getElementById('saTable').querySelector('thead').addEventListener('click', (e) => {
+  const th = e.target.closest('th[data-sort]');
+  if (!th) return;
+  const col = th.dataset.sort;
+  if (tipsSort.col === col) {
+    tipsSort.dir = tipsSort.dir === 'asc' ? 'desc' : 'asc';
+  } else {
+    tipsSort.col = col;
+    tipsSort.dir = (col === 'maturity' || col === 'term') ? 'asc' : 'desc';
+  }
+  renderTable(tipsTableFed, tipsTableBroker);
+});
+
+// Column header hover explainer. A header click now sorts, so hover is the only way to reach
+// the COL_HELP entries (TipsLadderManager's data-tip-html/#bracket-tooltip mechanism, applied
+// here directly against COL_HELP rather than an encoded attribute).
+const colTip = document.getElementById('col-tooltip');
+function _showColTip(th) {
+  const entry = COL_HELP[th.dataset.tip];
+  if (!entry) return;
+  colTip.innerHTML = `<b>${entry.title}</b>${entry.html}`;
+  colTip.style.display = 'block';
+  const r = th.getBoundingClientRect();
+  const maxLeft = window.innerWidth - colTip.offsetWidth - 12;
+  colTip.style.left = Math.max(8, Math.min(r.left, maxLeft)) + 'px';
+  colTip.style.top = (r.bottom + 6) + 'px';
+}
+function _hideColTip() { colTip.style.display = 'none'; }
+[document.getElementById('saTable'), document.getElementById('nominalsTable')].forEach(tbl => {
+  tbl.querySelector('thead').addEventListener('mouseover', e => {
+    const th = e.target.closest('th[data-tip]');
+    if (th) _showColTip(th);
+  });
+  tbl.querySelector('thead').addEventListener('mouseout', e => {
+    const th = e.target.closest('th[data-tip]');
+    if (th && !th.contains(e.relatedTarget)) _hideColTip();
+  });
 });
 
 document.getElementById('tab-bar').addEventListener('click', (e) => {
