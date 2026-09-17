@@ -146,7 +146,7 @@
   *Per-TIPS [breakeven inflation](#sa-yield): the Ask/SA/SAO yield for each TIPS against the yield of its nearest-maturity nominal Treasury, `Market` source only (BEI needs the nominal and TIPS yields quoted the same way — [3.4 Fit spot yield curves](../YieldCurves/knowledge/3.4_Fit_Spot_Yield_Curves.md)). Written by `YieldCurves/scripts/updateSpotYieldCurves.js`. R2 key: `Treasuries/BreakevenInflation.csv`.*
 
 - <a id="s15"></a>**Bid and ask spreads (S15)**, `BidAskSpreads.csv` = `{ @security_type + @cusip + maturity + coupon + ask_yield + bid_yield + yield_spread_bps + ask_price + bid_price + price_spread_pct }`
-  *Per-security broker bid/ask yield and price spread, TIPS and nominal Treasuries combined (`security_type` = `TIPS` or `Treasury`, same discrimination as [Market quotes (S7)](#s7)'s `Product` column), `Market` source only (FedInvest carries a single mid-market price, not a separate bid and ask). Written by `YieldCurves/scripts/updateSpotYieldCurves.js`. R2 key: `Treasuries/BidAskSpreads.csv`.*
+  *Per-security broker bid/ask yield and price spread, TIPS and nominal Treasuries combined (`security_type` = `TIPS` or `Treasury`, same discrimination as [Market quotes (S7)](#s7)'s `Product` column), `Market` source only (FedInvest carries a single price, not a separate bid and ask). Written by `YieldCurves/scripts/updateSpotYieldCurves.js`. R2 key: `Treasuries/BidAskSpreads.csv`.*
 - <a id="s16"></a>**Bond holidays (S16)**, `BondHolidaysSifma.csv` = `{ Date + Holiday_Name }` *— SIFMA's US bond-market holiday schedule, filtered to the eleven base US market holidays plus New Year's Day. Backs the [Bond Holiday](#bond-holiday) term. R2 key: `misc/BondHolidaysSifma.csv`.*
 - <a id="s17"></a>**Monthly CPI (S17)**, `CPI.csv` = `{ @Year + @Period + PeriodName + NSA + SA }` *— the same BLS series as [CPI history (S8)](#s8), 2019 to present, fetched separately so the daily App. B interpolation that produces [Ref CPI NSA and SA (S4)](#s4) does not depend on S8's own release-date-triggered refresh. R2 key: `bls/CPI.csv`.*
 
@@ -195,7 +195,7 @@
 <a id="price"></a>
 <a id="clean-price"></a>
 ### Price
-`Price` = *Market value expressed as percentage of par (e.g., 102.5 = 102.5% of par). By convention, "price" means the clean price — excluding accrued interest and (for TIPS) before inflation adjustment — unless dirty price is named explicitly. Canty (2009) formal notation for the clean price: CP.*
+`Price` = *Market value expressed as percentage of par (e.g., 102.5 = 102.5% of par), before inflation adjustment. By convention, "price" means this clean price — excluding accrued interest — unless dirty price is named explicitly, though dirty price (clean price plus accrued interest) is rarely invoked for a TIPS in practice, since the accrued interest on a TIPS is itself inflation-adjusted. Canty (2009) formal notation for the clean price: CP. Canty's own "dirty price" (DP) is a different quantity from that market-convention sense, unrelated to accrued interest: `DP = CP × Index Ratio`, what this codebase calls [Adjusted ask price / Adjusted bid price](#s7) for a TIPS.*
 
 <a id="accrued-interest-nominal"></a>
 ### Accrued Interest (Nominal)
