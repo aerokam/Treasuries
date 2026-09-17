@@ -276,6 +276,7 @@ test('Treasuries Ask column: implied by any security type, gone when none are ch
   await page.locator('#filterBills').uncheck();
   await page.locator('#filterNotes').uncheck();
   await page.locator('#filterBonds').uncheck();
+  await page.locator('#filterUnclassified').uncheck();
   // Ask has no checkbox of its own — with every security type off, there is nothing left
   // for it to imply, so the column disappears too.
   await expect(page.locator('#nominalsTable thead th', { hasText: 'Ask' })).toHaveCount(0);
