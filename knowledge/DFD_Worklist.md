@@ -89,6 +89,8 @@ The earlier attempt that rendered zero rows and took the run from 25 seconds to 
 
 Closed in `12ff019`. One market-quote nominal parser now lives in `shared/src/fidelity-parse.js` and serves both the page and the acquisition job, beside the TIPS row parser they already shared, so the published stores and the page state one set of figures. The stores were republished on 2026-09-13 (§3.8).
 
+**Superseded, 2026-09-17.** The "read as a presence test only" line above is no longer true: that gate was removed (`94018af`) — Fidelity's own quoted ask yield is no longer checked at all, a row is dropped only when a yield can't be calculated from its ask price. See §3.0 item 3 and item 13's audit.
+
 ---
 
 ## 3.7 The SA factors in the published store are the canonical ones
