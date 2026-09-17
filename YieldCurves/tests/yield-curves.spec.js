@@ -72,6 +72,31 @@ async function loadTreasuries(page) {
   await expect(page.locator('#chkFidelity')).not.toBeDisabled({ timeout: 5000 });
 }
 
+// Same as FID_COMBINED_CSV, but the Bill's CUSIP root is one shared/src/treasury-cusip.js
+// does not recognise -- proves the Unclassified checkbox actually appears/hides based on
+// real data, not just that the code compiles (shared/src/fidelity-parse.js#parseFidelityNominalRows).
+const FID_WITH_UNCLASSIFIED_CSV = FID_COMBINED_CSV.replace(/912797TB3/g, '999999TB3');
+
+test('Unclassified checkbox: hidden with no unrecognized CUSIP, appears when one occurs', async ({ page }) => {
+  await page.route('**/Treasuries/YieldsFromFedInvestPrices.csv', r => r.fulfill({ status: 200, contentType: 'text/csv', body: FED_YIELDS_CSV }));
+  await page.route('**/TIPS/RefCpiNsaSa.csv',                      r => r.fulfill({ status: 200, contentType: 'text/csv', body: REF_CPI_CSV }));
+  await page.route('**/misc/BondHolidaysSifma.csv',                       r => r.fulfill({ status: 200, contentType: 'text/csv', body: HOLIDAYS_CSV }));
+  await page.route('**/TIPS/GswTipsCurve.json', r => r.fulfill({ status: 404, body: '' }));
+  await page.route('**/Treasuries/FidelityTreasuriesTips.csv',            r => r.fulfill({ status: 200, contentType: 'text/csv', body: FID_WITH_UNCLASSIFIED_CSV }));
+  await page.goto('./');
+  await expect(page.locator('#saTable tbody tr')).toHaveCount(3, { timeout: 10000 });
+  await page.click('[data-tab="treasuries"]');
+  await expect(page.locator('#nominalsTable tbody tr')).toHaveCount(5, { timeout: 10000 });
+
+  await expect(page.locator('#filterUnclassifiedRow')).toBeVisible();
+  await expect(page.locator('#filterUnclassified')).toBeChecked();
+  await expect(page.locator('#nominalsTable tbody tr', { hasText: '999999TB3' })).toContainText('Unclassified');
+
+  // Unchecking it removes just that one row, same as any other type checkbox.
+  await page.locator('#filterUnclassified').uncheck();
+  await expect(page.locator('#nominalsTable tbody tr', { hasText: '999999TB3' })).toHaveCount(0);
+});
+
 function spreadBtn(page) { return page.locator('.tab-btn[data-mode="spread"]'); }
 function yieldBtn(page)  { return page.locator('.tab-btn[data-mode="yield"]'); }
 
@@ -273,10 +298,13 @@ test('Treasuries: unchecking Bills/Notes/Bonds with Spot on leaves only Spot cur
 test('Treasuries Ask column: implied by any security type, gone when none are checked', async ({ page }) => {
   await loadTreasuries(page);
   await expect(page.locator('#nominalsTable thead th', { hasText: 'Ask' })).toHaveCount(1);
+  // Unclassified stays hidden for this fixture (no unrecognized CUSIP root in it), so it
+  // can't be unchecked here and doesn't need to be — Bills/Notes/Bonds off is already every
+  // visible, relevant type off.
+  await expect(page.locator('#filterUnclassifiedRow')).toBeHidden();
   await page.locator('#filterBills').uncheck();
   await page.locator('#filterNotes').uncheck();
   await page.locator('#filterBonds').uncheck();
-  await page.locator('#filterUnclassified').uncheck();
   // Ask has no checkbox of its own — with every security type off, there is nothing left
   // for it to imply, so the column disappears too.
   await expect(page.locator('#nominalsTable thead th', { hasText: 'Ask' })).toHaveCount(0);

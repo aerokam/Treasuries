@@ -75,10 +75,11 @@ let fidelityNominalsData = null;  // processed bond objects from Fidelity CSV
 let fidelityNominalsDate = null;  // download date string extracted from CSV footer
 let gswTipsCurve = null;          // { date, beta0..beta3, tau1, tau2 } — GSW fitted TIPS curve, R2 (weekly)
 let nominalsShowStrips = false;
-// Unclassified defaults to shown (unlike STRIPS' opt-in default) -- it exists so an
-// unrecognized CUSIP root in shared/src/treasury-cusip.js can't go unnoticed; hiding it by
-// default would defeat that purpose. See shared/src/fidelity-parse.js#parseFidelityNominalRows.
-let nominalsShowUnclassified = true;
+// Starts false/hidden -- the checkbox and this flag only turn on together, at load, when an
+// unrecognized CUSIP root actually occurs (see the fidelityNominalsData assignment in init()).
+// It exists so that can't go unnoticed; a permanent checkbox nobody ever needs would be worse,
+// not better, at that job (easy to become blind to). See shared/src/fidelity-parse.js#parseFidelityNominalRows.
+let nominalsShowUnclassified = false;
 let nominalsClipOutliers = true;
 let beiClipOutliers = true;
 let chart = null;
@@ -490,6 +491,17 @@ async function init() {
         chkFid.disabled = false;
         chkFid.checked = true;
         console.log(`Loaded ${bonds.length} Fidelity Treasuries (${quotes.nominalsDate})`);
+        // The Unclassified checkbox only exists to surface a CUSIP root shared/src/
+        // treasury-cusip.js doesn't recognise -- shown, and checked, only when one actually
+        // occurs (see shared/src/fidelity-parse.js#parseFidelityNominalRows). Setting the flag
+        // and the checkbox together, only in this branch, keeps them consistent: no world
+        // where the checkbox is hidden but still counts as "on" for the Ask-column/range logic.
+        const hasUnclassified = bonds.some(b => b.type === 'MARKET BASED UNCLASSIFIED');
+        if (hasUnclassified) {
+          nominalsShowUnclassified = true;
+          document.getElementById('filterUnclassified').checked = true;
+          document.getElementById('filterUnclassifiedRow').style.display = 'flex';
+        }
         updateModeToggle();
       }
 
@@ -2207,9 +2219,13 @@ document.getElementById('beiShowNone').onclick = (e) => {
 // Nominals 'All/None' Links — Spot is treated as a fifth security type here: Ask has no
 // checkbox of its own (it is implied by any of the other four), so Spot is the only other
 // thing All/None has to cover.
+// filterUnclassified is skipped when its row is hidden (no unrecognized CUSIP occurred) --
+// touching a checkbox nobody can see, and that carries no matching data either way, would
+// only reintroduce the "hidden but counted as on" inconsistency the load-time wiring avoids.
 document.getElementById('nominalsShowAll').onclick = (e) => {
   e.preventDefault();
   ['filterBills', 'filterNotes', 'filterBonds', 'filterStrips', 'filterUnclassified', 'showTsySpot'].forEach(id => {
+    if (id === 'filterUnclassified' && document.getElementById('filterUnclassifiedRow').style.display === 'none') return;
     const el = document.getElementById(id);
     el.checked = true;
     el.dispatchEvent(new Event('change', { bubbles: true }));
@@ -2218,6 +2234,7 @@ document.getElementById('nominalsShowAll').onclick = (e) => {
 document.getElementById('nominalsShowNone').onclick = (e) => {
   e.preventDefault();
   ['filterBills', 'filterNotes', 'filterBonds', 'filterStrips', 'filterUnclassified', 'showTsySpot'].forEach(id => {
+    if (id === 'filterUnclassified' && document.getElementById('filterUnclassifiedRow').style.display === 'none') return;
     const el = document.getElementById(id);
     el.checked = false;
     el.dispatchEvent(new Event('change', { bubbles: true }));

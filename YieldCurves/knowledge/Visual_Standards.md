@@ -63,7 +63,7 @@ The legend and visual priority follow the logical flow of data:
 
 ### 3. Auto-Rescale on Filter Change
 Any checkbox that changes what data is displayed must trigger a Y-axis auto-fit (clear saved zoom, re-render from data bounds). This includes:
-- **Security type filters** (Bills, Notes, Bonds, STRIPS, Unclassified, and Spot — Spot is a sixth security type for this purpose, not a distinct kind of control): Y-axis and X-axis rescale to the remaining data.
+- **Security type filters** (Bills, Notes, Bonds, STRIPS, Spot, and Unclassified when it's present — Spot is a security type for this purpose, not a distinct kind of control; Unclassified's checkbox exists only while an unrecognized CUSIP root does, see [3.7](./3.7_Render_Charts_And_Tables.md)): Y-axis and X-axis rescale to the remaining data.
 - **Clip Outliers**: Y-axis rescales applying or removing IQR-based clipping.
 
 There is no separate "Ask" checkbox. Ask is implied by any of Bills/Notes/Bonds/STRIPS/Unclassified being checked — it is each of those types' own point series, not a representation chosen independently of them. The Ask/SA/SAO/Spot/Spot SA checkboxes on the TIPS tab are a genuinely different case: those are several representations of the same TIPS security, so choosing among them independently of a security-type filter makes sense there. Treasuries has only one representation per security type (its own quoted yield), so Ask is not a choice of its own.
