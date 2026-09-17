@@ -146,13 +146,16 @@ async function main() {
     settleIso: brokerSettleStr,
     onUnknownCusip: cusip => console.warn(`  Unrecognized CUSIP root, skipping: ${cusip}`),
   });
-  // Filtered: STRIPS excluded, for the coupon-bond price-space curve fit only — a STRIP's
-  // price/yield relationship is already a pure zero-coupon discount, but the *nominal fit*
-  // is a coupon-bond price-space fit (cashflowSchedule) and STRIPS aren't part of its
-  // fitting universe here, same as S1's fitting inputs (knowledge/DataStores.md#s13).
-  const fidNominalBonds = fidNominalBondsAll.filter(b => !isStrip(b.cusip));
+  // Filtered: STRIPS and Unclassified excluded, for the coupon-bond price-space curve fit
+  // only — a STRIP's price/yield relationship is already a pure zero-coupon discount, but the
+  // *nominal fit* is a coupon-bond price-space fit (cashflowSchedule) and STRIPS aren't part of
+  // its fitting universe here, same as S1's fitting inputs (knowledge/DataStores.md#s13).
+  // Unclassified gets the same treatment: its cash-flow structure is unknown (that's what the
+  // tag means), so it can't be fit as a plain coupon bond either.
+  const fidNominalBonds = fidNominalBondsAll.filter(b => !isStrip(b.cusip) && b.cusipType !== 'Unclassified');
   console.log(`Market: ${priceMap.size} TIPS quotes, ${fidNominalBondsAll.length} nominal quotes `
-    + `(${fidNominalBondsAll.length - fidNominalBonds.length} STRIPS).`);
+    + `(${fidNominalBondsAll.filter(b => isStrip(b.cusip)).length} STRIPS, `
+    + `${fidNominalBondsAll.filter(b => b.cusipType === 'Unclassified').length} Unclassified).`);
 
   // ── Processed bonds, per source ──────────────────────────────────────────────
   const fedTips = tipsYieldsFromPrices(rawTipsData, refCpiData, priceMap, false, brokerSettleStr, tipsRefByCusip);
