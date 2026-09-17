@@ -136,9 +136,8 @@ async function main() {
   // Both yields come from the quoted price at the market settlement date, calculated by the
   // same shared parser src/app.js uses, so the published figures and the ones the app shows
   // are one method (3.1_Parse_Sources_And_Calculate_Yields.md#parse-market-quotes).
-  // parseFidelityNominalRows already drops TIPS rows on its own -- the Product column in the
-  // new export format, and a description naming TIPS in the older one -- so this script adds
-  // no FedInvest cross-reference to gate on.
+  // parseFidelityNominalRows already drops TIPS rows on its own via the Product column, so
+  // this script adds no FedInvest cross-reference to gate on.
   const fidNominalBondsAll = parseFidelityNominalRows(fidText, {
     settleIso: brokerSettleStr,
     onUnknownCusip: cusip => console.warn(`  Unrecognized CUSIP root, skipping: ${cusip}`),
