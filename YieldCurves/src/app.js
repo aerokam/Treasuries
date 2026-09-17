@@ -599,10 +599,9 @@ function switchTab(tab) {
 // Works with text from file upload or R2 fetch. The row parse and both yield calculations
 // live in shared/src/fidelity-parse.js#parseFidelityNominalRows, which the acquisition script
 // that writes S13/S15 imports too, so neither can move onto a different method (§2a).
-// parseFidelityNominalRows already drops TIPS rows on its own -- the Product column in the
-// new export format, and a description naming TIPS in the older one -- so this app adds no
-// FedInvest cross-reference to gate on. What stays here is the S1 type vocabulary the rest
-// of the app filters on.
+// parseFidelityNominalRows already drops TIPS rows on its own via the Product column, so this
+// app adds no FedInvest cross-reference to gate on. What stays here is the S1 type vocabulary
+// the rest of the app filters on.
 function parseFidelityNominals(text, settleIso = null) {
   const bonds = parseFidelityNominalRows(text, {
     settleIso,

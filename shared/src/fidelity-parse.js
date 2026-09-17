@@ -91,22 +91,24 @@ export function parseFidelityTipsRows(text) {
 // yield; it has no bid yield and so no spread.
 //
 // A row is dropped when it has no CUSIP, no parseable maturity date, a CUSIP root the Treasury
-// CUSIP reference does not recognise, a CUSIP listed in `excludeCusips`, a description naming it
-// as TIPS, or an ask yield that cannot be calculated (for want of an ask price, or for a maturity
-// on or before the settlement date). Fidelity's own quoted ask yield is not checked for
-// presence -- only whether a yield can be calculated from the ask price.
+// CUSIP reference does not recognise, or an ask yield that cannot be calculated (for want of an
+// ask price, or for a maturity on or before the settlement date). Fidelity's own quoted ask
+// yield is not checked for presence -- only whether a yield can be calculated from the ask
+// price. TIPS/Treasury discrimination is the `Product` column alone -- every row this function
+// sees has already had `Product = TIPS` rows removed, so nothing here re-checks a row's
+// description for the word "TIPS": that word appears in some TIPS descriptions and not others
+// (real data checked, 2026-09-17), so it was never a reliable signal, and `Product` already
+// settles the question before this function runs.
 //
 // Options:
 //   settleIso      the settlement date the quoted prices are stated at, 'YYYY-MM-DD'
-//   excludeCusips  CUSIPs another source already knows to be TIPS, which the older export
-//                  format does not mark in its Product column
 //   onUnknownCusip called with a CUSIP whose root is unrecognised, in place of dropping it
 //                  silently
 //
 // Returns: [{ cusip, cusipType ('Bill'|'Note'|'Bond'|'STRIPS'), coupon, price, bidPrice,
 //   yield (calculated ask), bidYield (calculated, NaN where no bid price), maturity (ISO),
 //   maturityDate (Date), settlementDate (ISO) }]
-export function parseFidelityNominalRows(text, { settleIso = null, excludeCusips = new Set(), onUnknownCusip = null } = {}) {
+export function parseFidelityNominalRows(text, { settleIso = null, onUnknownCusip = null } = {}) {
   const settleDate = localDate(settleIso);
   const rows = parseCsv(text);
   const bonds = [];
@@ -119,9 +121,7 @@ export function parseFidelityNominalRows(text, { settleIso = null, excludeCusips
     if ((n['product'] || '').toLowerCase() === 'tips') continue;
 
     const cusip = cleanFidelityField(n['cusip'] || n['cusip|state']);
-    const desc = (n['description'] || '').toUpperCase();
     if (!cusip || seen.has(cusip)) continue;
-    if (excludeCusips.has(cusip) || /\bTIPS\b/.test(desc)) continue;
 
     const cusipType = classifyByCusipRoot(cusip);
     if (!cusipType) { if (onUnknownCusip) onUnknownCusip(cusip); continue; }
