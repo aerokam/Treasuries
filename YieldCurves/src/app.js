@@ -612,7 +612,7 @@ function switchTab(tab) {
 function parseFidelityNominals(text, settleIso = null) {
   const bonds = parseFidelityNominalRows(text, {
     settleIso,
-    onUnknownCusip: cusip => console.warn(`Unrecognized CUSIP root, skipping: ${cusip}`),
+    onUnknownCusip: cusip => console.warn(`Unrecognized CUSIP root, tagged Unclassified: ${cusip}`),
   }).map(b => ({ ...b, type: CUSIP_TYPE_TO_MARKET_BASED[b.cusipType] }));
   return { bonds, downloadDate: parseFidelityDownloadDate(text) };
 }

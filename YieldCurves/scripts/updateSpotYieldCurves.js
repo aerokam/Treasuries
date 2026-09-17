@@ -144,7 +144,7 @@ async function main() {
   // this script adds no FedInvest cross-reference to gate on.
   const fidNominalBondsAll = parseFidelityNominalRows(fidText, {
     settleIso: brokerSettleStr,
-    onUnknownCusip: cusip => console.warn(`  Unrecognized CUSIP root, skipping: ${cusip}`),
+    onUnknownCusip: cusip => console.warn(`  Unrecognized CUSIP root, tagged Unclassified: ${cusip}`),
   });
   // Filtered: STRIPS and Unclassified excluded, for the coupon-bond price-space curve fit
   // only — a STRIP's price/yield relationship is already a pure zero-coupon discount, but the
