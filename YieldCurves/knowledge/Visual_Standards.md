@@ -63,10 +63,10 @@ The legend and visual priority follow the logical flow of data:
 
 ### 3. Auto-Rescale on Filter Change
 Any checkbox that changes what data is displayed must trigger a Y-axis auto-fit (clear saved zoom, re-render from data bounds). This includes:
-- **Security type filters** (Bills, Notes, Bonds, STRIPS, and Spot — Spot is a fifth security type for this purpose, not a distinct kind of control): Y-axis and X-axis rescale to the remaining data.
+- **Security type filters** (Bills, Notes, Bonds, STRIPS, Unclassified, and Spot — Spot is a sixth security type for this purpose, not a distinct kind of control): Y-axis and X-axis rescale to the remaining data.
 - **Clip Outliers**: Y-axis rescales applying or removing IQR-based clipping.
 
-There is no separate "Ask" checkbox. Ask is implied by any of Bills/Notes/Bonds/STRIPS being checked — it is each of those types' own point series, not a representation chosen independently of them. The Ask/SA/SAO/Spot/Spot SA checkboxes on the TIPS tab are a genuinely different case: those are several representations of the same TIPS security, so choosing among them independently of a security-type filter makes sense there. Treasuries has only one representation per security type (its own quoted yield), so Ask is not a choice of its own.
+There is no separate "Ask" checkbox. Ask is implied by any of Bills/Notes/Bonds/STRIPS/Unclassified being checked — it is each of those types' own point series, not a representation chosen independently of them. The Ask/SA/SAO/Spot/Spot SA checkboxes on the TIPS tab are a genuinely different case: those are several representations of the same TIPS security, so choosing among them independently of a security-type filter makes sense there. Treasuries has only one representation per security type (its own quoted yield), so Ask is not a choice of its own.
 
 **Source toggles** (FedInvest, Market) do **not** rescale at all. Adding or removing a source rebuilds the chart, but the current view (X zoom/pan **and** Y scale) is preserved verbatim — the same behavior as showing/hiding a series (Ask, SA, SAO). A source toggle must never change the axis bounds. Mechanism: the source handlers snapshot the live scales into `savedZoom[tab]` before `processAndRender()`, so the rebuild restores them instead of auto-fitting.
 
@@ -75,7 +75,7 @@ Zoom is also NOT cleared by: date range filter changes, table sort, or legend se
 ### 3a. Maturity Range vs. Spot (Treasuries)
 The Maturity Range fields (start/end date) recompute to the union of every currently checked selection's own maturities (security types and Spot) whenever one of them is checked or unchecked — checking Spot alongside Bills widens the range out to the full curve, the same way checking Bonds already reaches out to the long end; unchecking something narrows it back to whatever remains checked. Nothing else touches the range (sort, Clip Outliers, a source toggle) — the fields also accept a value typed by hand, which stands until the next checkbox change recomputes over it.
 
-The Spot curve fit itself (the NSS parameters, i.e. its shape) always uses the complete non-STRIP nominal set, regardless of the Maturity Range and regardless of which security types are checked — narrowing the Range must not narrow the bond set the curve is fit to, or the fit quietly changes shape as an unintended side effect of an unrelated display choice. The Range still crops which part of that fixed curve is drawn or listed, the same as it crops every other security type's own points — a zoom, not a refit.
+The Spot curve fit itself (the NSS parameters, i.e. its shape) always uses the complete Bill/Note/Bond set — STRIPS and Unclassified excluded — regardless of the Maturity Range and regardless of which security types are checked — narrowing the Range must not narrow the bond set the curve is fit to, or the fit quietly changes shape as an unintended side effect of an unrelated display choice. The Range still crops which part of that fixed curve is drawn or listed, the same as it crops every other security type's own points — a zoom, not a refit.
 
 ### 4. Per-Tab Zoom State
 Each tab (TIPS, Treasuries) maintains its own independent zoom state:
