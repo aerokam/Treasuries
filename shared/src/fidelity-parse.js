@@ -90,24 +90,25 @@ export function parseFidelityTipsRows(text) {
 // 3.6_Calculate_Bid_And_Ask_Spreads.md. A row with an ask price but no bid price keeps its ask
 // yield; it has no bid yield and so no spread.
 //
-// A row is dropped when it has no CUSIP, no parseable maturity date, a CUSIP root the Treasury
-// CUSIP reference does not recognise, or an ask yield that cannot be calculated (for want of an
-// ask price, or for a maturity on or before the settlement date). Fidelity's own quoted ask
-// yield is not checked for presence -- only whether a yield can be calculated from the ask
-// price. TIPS/Treasury discrimination is the `Product` column alone -- every row this function
-// sees has already had `Product = TIPS` rows removed, so nothing here re-checks a row's
-// description for the word "TIPS": that word appears in some TIPS descriptions and not others
-// (real data checked, 2026-09-17), so it was never a reliable signal, and `Product` already
-// settles the question before this function runs.
+// A row is dropped when it has no CUSIP, no parseable maturity date, or an ask yield that cannot
+// be calculated (for want of an ask price, or for a maturity on or before the settlement date).
+// Fidelity's own quoted ask yield is not checked for presence -- only whether a yield can be
+// calculated from the ask price. TIPS/Treasury discrimination is the `Product` column alone --
+// every row this function sees has already had `Product = TIPS` rows removed, so nothing here
+// re-checks a row's description for the word "TIPS": that word appears in some TIPS descriptions
+// and not others (real data checked, 2026-09-17), so it was never a reliable signal, and
+// `Product` already settles the question before this function runs. A row whose CUSIP root the
+// Treasury CUSIP reference does not recognise is kept, tagged `cusipType: 'Unclassified'`, rather
+// than dropped -- see `onUnknownCusip` below.
 //
 // Options:
 //   settleIso      the settlement date the quoted prices are stated at, 'YYYY-MM-DD'
-//   onUnknownCusip called with a CUSIP whose root is unrecognised, in place of dropping it
-//                  silently
+//   onUnknownCusip called with a CUSIP whose root is unrecognised (the row is still kept as
+//                  'Unclassified' -- this is a log hook, not a drop signal)
 //
-// Returns: [{ cusip, cusipType ('Bill'|'Note'|'Bond'|'STRIPS'), coupon, price, bidPrice,
-//   yield (calculated ask), bidYield (calculated, NaN where no bid price), maturity (ISO),
-//   maturityDate (Date), settlementDate (ISO) }]
+// Returns: [{ cusip, cusipType ('Bill'|'Note'|'Bond'|'STRIPS'|'Unclassified'), coupon, price,
+//   bidPrice, yield (calculated ask), bidYield (calculated, NaN where no bid price),
+//   maturity (ISO), maturityDate (Date), settlementDate (ISO) }]
 export function parseFidelityNominalRows(text, { settleIso = null, onUnknownCusip = null } = {}) {
   const settleDate = localDate(settleIso);
   const rows = parseCsv(text);
@@ -123,8 +124,11 @@ export function parseFidelityNominalRows(text, { settleIso = null, onUnknownCusi
     const cusip = cleanFidelityField(n['cusip'] || n['cusip|state']);
     if (!cusip || seen.has(cusip)) continue;
 
-    const cusipType = classifyByCusipRoot(cusip);
-    if (!cusipType) { if (onUnknownCusip) onUnknownCusip(cusip); continue; }
+    let cusipType = classifyByCusipRoot(cusip);
+    if (!cusipType) {
+      if (onUnknownCusip) onUnknownCusip(cusip);
+      cusipType = 'Unclassified';
+    }
 
     const maturity = fidParseMaturity(cleanFidelityField(n['maturity date']));
     if (!maturity) continue;
