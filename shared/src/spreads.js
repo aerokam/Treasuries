@@ -16,7 +16,7 @@ export function yieldSpreadBps(askYield, bidYield) {
 }
 
 // Price spread, as a percentage of the ask price: the ask price less the bid price, over the
-// ask price. A TIPS is passed its adjusted prices, a nominal Treasury its clean prices.
+// ask price. A TIPS is passed its adjusted prices, a nominal Treasury its prices.
 export function priceSpreadPct(askPrice, bidPrice) {
   return Number.isFinite(askPrice) && Number.isFinite(bidPrice) && askPrice > 0
     ? (askPrice - bidPrice) / askPrice * 100

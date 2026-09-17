@@ -61,7 +61,7 @@ This environment has restricted script execution. Follow these rules for ALL ter
 ### Yields (Seasonal Adjustments) Logic
 - **Data Source**: Data is pulled from the R2 bucket (FedInvest prices/RefCPI).
 - **Yield Formulas**: 
-  - `SA Yield = Clean Price * (S_settle / S_maturity)`
+  - `SA Yield = Price * (S_settle / S_maturity)`
   - `SAO Yield = Backwards-anchored trend fitting (right-to-left) using linear regression on a sliding window.`
 - **Broker CSVs**: Use T+1 settlement and first-row-per-CUSIP for Ask prices.
 - **UI/Charts**: Uses Chart.js + Hammer.js + chartjs-plugin-zoom.

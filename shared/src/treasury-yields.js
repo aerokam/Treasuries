@@ -1,6 +1,6 @@
 // treasury-yields.js -- calculates the Treasury yields of
 // YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#calculate-treasury-yields (3.1.8)
-// for the nominal Treasuries of S1: each yield from the row's clean price at the settlement
+// for the nominal Treasuries of S1: each yield from the row's price at the settlement
 // date the file states. The nominal Treasuries quoted in S7 are calculated in
 // fidelity-parse.js#parseFidelityNominalRows, in the same pass as their parse.
 //

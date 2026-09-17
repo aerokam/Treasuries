@@ -10,7 +10,7 @@
 
 ## 1. The question
 
-The seasonal adjustment multiplies a TIPS clean price by `S_settle / S_maturity`, where `S_t = RefCPI_NSA(t) / RefCPI_SA(t)` is the seasonal factor for the calendar month and day of `t` ([3.2](3.2_Adjust_For_Seasonality.md) Level 4). `S_settle` is a known recent daily value. `S_maturity` is not: the maturity date of a long TIPS lies beyond the published Ref CPI series, so `shared/src/ref-cpi.js#saFactorForDate` substitutes the most recent past occurrence of that month and day.
+The seasonal adjustment multiplies a TIPS price by `S_settle / S_maturity`, where `S_t = RefCPI_NSA(t) / RefCPI_SA(t)` is the seasonal factor for the calendar month and day of `t` ([3.2](3.2_Adjust_For_Seasonality.md) Level 4). `S_settle` is a known recent daily value. `S_maturity` is not: the maturity date of a long TIPS lies beyond the published Ref CPI series, so `shared/src/ref-cpi.js#saFactorForDate` substitutes the most recent past occurrence of that month and day.
 
 That substitution is Canty's simplifying assumption that the 12 monthly seasonal factors repeat unchanged every year ([Canty](Canty.md) §2, Appendix B; [DATA_DICTIONARY.md#sa-price-factor](../../knowledge/DATA_DICTIONARY.md#sa-price-factor)). This document measures how well the assumption holds as the maturity date moves further from the estimation window, and what the reported seasonal adjustment on long-dated TIPS actually rests on.
 

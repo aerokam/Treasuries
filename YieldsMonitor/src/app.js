@@ -94,7 +94,7 @@ const panStartY = {}; // sym -> {min, max} at pan gesture start; cleared on pan 
 // CNBC's TIPS symbols (e.g. US2YTIPS) are the bid yield of one specific, real TIPS —
 // CNBC's own quote page shows which one (e.g. US2YTIPS = the Jan 2028 0.50% TIPS).
 // So this is the exact same transform YieldCurves applies to actual TIPS: derive the
-// clean price from the quoted yield via standard bond math using the bond's REAL
+// price from the quoted yield via standard bond math using the bond's actual
 // coupon and maturity date, apply the Price -> SA Price -> SA Yield ratio, and derive
 // the SA yield back from the adjusted price.
 // The seasonal effect amortizes with maturity (see YieldCurves/knowledge/

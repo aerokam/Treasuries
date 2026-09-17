@@ -43,11 +43,24 @@ Two deliberate omissions, recorded in the file itself:
 - **Repo-wide sweeps**: `3-bracket` → Multi-bracket; `synthetic gap` → synthetic TIPS;
   `bracket/cover` → the two terms named separately; `leg` → the yield it names; `print` → value,
   release, quote or bar depending on sense; `stamped` → timestamped; `tenor` → term; possessives on
-  security types; the retired *base CPI* → dated date Ref CPI.
+  security types; the retired *base CPI* → dated date Ref CPI; **Clean Price** → **Price** (2026-09-17,
+  developer's own rule: "price" is the standard term everywhere — Treasury, brokers — clean is
+  already implied by convention).
 - **DD entries added or changed**: Same-Year Excess Interest renamed **Same-Maturity Excess
   Interest** (old anchor kept as an alias); **Accrued Market Discount (AMD)** and **Pre-Ladder
   Interest (PLI)** added, both previously used with no entry; a note that **Ref is short for
-  Reference**.
+  Reference**; **Price** and **Clean Price** merged into one entry (`#clean-price` kept as an alias
+  anchor) — the two were duplicate definitions of the same quantity, "Price" already meaning "market
+  value as % of par" and "Clean Price" adding only the accrued-interest/inflation-adjustment
+  exclusion, which is now folded into "Price" 's own definition as the stated convention.
+- **"Clean" is kept, not dropped, anywhere it is contrasted with "dirty price"** in the same
+  passage — `Bond_Basics.md`'s clean/dirty explanation, `3.4_Fit_Spot_Yield_Curves.md`'s
+  curve-fit-matches-the-dirty-price passage, `shared/src/bond-math.js` (which computes both in the
+  same function), and `TipsLadderManager/knowledge/2.0_TIPS_Ladders.md`'s cost-vs-accrued-interest
+  aside. Also kept wherever the passage is explaining SA material in Canty's own terms/notation
+  (`3.2_Adjust_For_Seasonality.md`, `Canty.md`, the SA educational app, the DD's SACP/FACP entries)
+  — Canty's formal notation is CP for clean price specifically, and those entries are stating his
+  equations, not describing the app's own general vocabulary.
 - **Canty.md** was reconciled against the paper PDF. Content checks out: the Appendix B factors match
   Table B exactly, the three figure attributions are right, and the §1b blockquote matches verbatim.
   Nine phrasings were ours and appear nowhere in the paper, including *stub*, and are gone.

@@ -15,7 +15,7 @@
 
 **B** &nbsp; [bei](#breakeven-inflation) *(see Breakeven Inflation (BEI))* &middot; [bid](#ask) *(see Ask / Bid)* &middot; [Bid and Ask Spreads](#bid-and-ask-spreads) &middot; [Bid and ask spreads (S15)](#s15) &middot; [BlackRock iShares fund-document API (E12)](#e12) &middot; [BLS Public API (E4)](#e4) &middot; [Bond Holiday](#bond-holiday) &middot; [Bond holidays (S16)](#s16) &middot; [Bond Ladder](#bond-ladder) &middot; [BondBloxx product-page holdings table (E11)](#e11) &middot; [bracket maturity](#bracket-year-tips) *(see Bracket Year TIPS)* &middot; [Bracket Weight](#bracket-weight) &middot; [Bracket Year](#bracket-year) &middot; [Bracket Year TIPS](#bracket-year-tips) &middot; [Breakeven Inflation (BEI)](#breakeven-inflation) &middot; [Breakeven inflation (S14)](#s14)
 
-**C** &nbsp; [Cash Flow Calendar](#cash-flow-calendar) &middot; [Charts and Tables](#charts-and-tables) &middot; [Clean Price](#clean-price) &middot; [CNBC GraphQL (E5)](#e5) &middot; [Cost per TIPS](#cost-per-tips) &middot; [Coupon Rate](#coupon-rate) &middot; [Cover Excess](#cover-excess) &middot; [cover maturity](#cover-year-tips) *(see Cover Year TIPS)* &middot; [Cover Weight](#cover-weight) &middot; [Cover Year](#cover-year) &middot; [Cover Year TIPS](#cover-year-tips) &middot; [CPI CAGR](#cpi-cagr) &middot; [CPI Change (Month-over-Month)](#cpi-change-mom) &middot; [CPI Change (Point-to-Point)](#cpi-change-p2p) &middot; [CPI Change (Year-over-Year)](#cpi-change-yoy) &middot; [CPI history (S8)](#s8) &middot; [CPI-U NSA](#cpi-nsa) &middot; [CPI-U SA](#cpi-sa) &middot; [Credibility Factor](#credibility-factor) &middot; [CUSIP](#cusip)
+**C** &nbsp; [Cash Flow Calendar](#cash-flow-calendar) &middot; [Charts and Tables](#charts-and-tables) &middot; [clean price](#price) *(see Price)* &middot; [CNBC GraphQL (E5)](#e5) &middot; [Cost per TIPS](#cost-per-tips) &middot; [Coupon Rate](#coupon-rate) &middot; [Cover Excess](#cover-excess) &middot; [cover maturity](#cover-year-tips) *(see Cover Year TIPS)* &middot; [Cover Weight](#cover-weight) &middot; [Cover Year](#cover-year) &middot; [Cover Year TIPS](#cover-year-tips) &middot; [CPI CAGR](#cpi-cagr) &middot; [CPI Change (Month-over-Month)](#cpi-change-mom) &middot; [CPI Change (Point-to-Point)](#cpi-change-p2p) &middot; [CPI Change (Year-over-Year)](#cpi-change-yoy) &middot; [CPI history (S8)](#s8) &middot; [CPI-U NSA](#cpi-nsa) &middot; [CPI-U SA](#cpi-sa) &middot; [Credibility Factor](#credibility-factor) &middot; [CUSIP](#cusip)
 
 **D** &nbsp; [DAA](#daa) &middot; [Daily Mid-Market Prices](#daily-mid-market-prices) &middot; [Daily Ref CPI](#daily-ref-cpi) &middot; [DARA](#dara) &middot; [Dated Date](#dated-date) &middot; [Download Date](#download-date) &middot; [Downloaded Data Sets](#downloaded-data-sets) &middot; [Drill Popup](#drill-popup) &middot; [Drill Request](#drill-request) &middot; [Duration Matching](#duration-matching)
 
@@ -120,7 +120,7 @@
   | `maturity` | [Maturity Date](#maturity-date), `YYYY-MM-DD` |
   | `coupon` | [Coupon Rate](#coupon-rate), as a decimal |
   | `datedDateCpi` | dated date [Ref CPI](#ref-cpi), TIPS only |
-  | `price` | [Clean Price](#clean-price) |
+  | `price` | [Price](#price) |
   | `yield` | [Yield](#yield) at the settlement date, as a decimal: real for a TIPS, nominal for every other security |
 
 - <a id="s2"></a>**TIPS reference data (S2)**, `TipsRef.csv` = `{ @CUSIP + Maturity + DatedDate + Coupon + DatedDateRefCpi + Term }`
@@ -152,7 +152,7 @@
 
 - <a id="s7"></a>**Market quotes (S7)**, `FidelityTreasuriesTips.csv` — Combined Treasury + TIPS bid/ask quotes (replaces the old separate `FidelityTips.csv`/`FidelityTreasuries.csv` pair as of ~2026-06-23). Local drop path: `~/Downloads/FidelityTreasuriesTips.csv` (gitignored, re-downloaded fresh each run). R2 key: `Treasuries/FidelityTreasuriesTips.csv`.
   CSV columns (exact header names): `Product, Description, Cusip, State, Coupon, Frequency, Maturity date, Call protected, Call date, Moody's rating, S&P rating, Yield, Bid price/Quantity (min), Adjusted bid price, Inflation factor, Ask price/Quantity (min), Adjusted ask price, Ask yield to worst, Ask yield to sink, Ask yield to maturity, 3rd party price, Depth of book, Attributes`
-  *`Product` = `Treasury` or `TIPS`; parsers filter on this column before further processing (Treasury rows lack `Inflation factor`/`Adjusted bid price`/`Adjusted ask price`; both row types carry `Yield`, which doubles as the bid yield column — there is no separate "Yield Bid" header in the combined export). Parser normalises headers to lowercase. Key fields used: `cusip`, `coupon`, `ask price/quantity (min)` (ask clean real price), `bid price/quantity (min)` (bid clean real price), `adjusted bid price`/`adjusted ask price` (TIPS only), `inflation factor` (TIPS only), `ask yield to maturity` (ask yield, percentage form), `yield` (bid yield, percentage form). In the Yield Curves app, both yields are computed from the quoted prices via `yieldFromPrice` for TIPS and Treasuries alike, so that the two sides of a quote share one method ([3.1.2](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#parse-market-quotes), [3.1.7](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#calculate-tips-yields)); `ask yield to maturity` is read as a presence test only. `YieldCurves/scripts/updateSpotYieldCurves.js` calculates all four yields the same way, with the same shared functions. Price spread uses adjusted prices for TIPS (actual dollar cost) and raw prices for Treasuries: `yield_spread_bps = (yield_bid − ask_ytm) × 10000`; `price_spread_pct = (price_ask − price_bid) / price_ask × 100`. Footer line `Date downloaded MM/DD/YYYY HH:MM AM/PM` supplies the download timestamp.*
+  *`Product` = `Treasury` or `TIPS`; parsers filter on this column before further processing (Treasury rows lack `Inflation factor`/`Adjusted bid price`/`Adjusted ask price`; both row types carry `Yield`, which doubles as the bid yield column — there is no separate "Yield Bid" header in the combined export). Parser normalises headers to lowercase. Key fields used: `cusip`, `coupon`, `ask price/quantity (min)` (ask price, unadjusted), `bid price/quantity (min)` (bid price, unadjusted), `adjusted bid price`/`adjusted ask price` (TIPS only), `inflation factor` (TIPS only), `ask yield to maturity` (ask yield, percentage form), `yield` (bid yield, percentage form). In the Yield Curves app, both yields are always calculated from the quoted price for TIPS and Treasuries alike, never read from `ask yield to maturity` or `yield` — the two sides of a quote share one method, and the calculated figure is more accurate than either quoted one ([3.1.2](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#parse-market-quotes), [3.1.7](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#calculate-tips-yields), [3.1.8](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#calculate-treasury-yields)). `YieldCurves/scripts/updateSpotYieldCurves.js` calculates all four yields the same way, with the same shared functions. Price spread uses adjusted prices for TIPS (actual dollar cost) and raw prices for Treasuries: `yield_spread_bps = (yield_bid − ask_ytm) × 10000`; `price_spread_pct = (price_ask − price_bid) / price_ask × 100`. Footer line `Date downloaded MM/DD/YYYY HH:MM AM/PM` supplies the download timestamp.*
 
   **Column names.** The export uses its source's column names, not this dictionary's. Each one carries a defined term, and where a column name is a broker's own name for a quantity rather than a header, the synonym is recorded on that term:
 
@@ -161,9 +161,9 @@
   | `Cusip` | [CUSIP](#cusip) |
   | `Coupon` | [Coupon Rate](#coupon-rate) |
   | `Maturity date` | [Maturity Date](#maturity-date) |
-  | `Ask price/Quantity (min)` | [Clean Price](#clean-price), ask side |
-  | `Bid price/Quantity (min)` | [Clean Price](#clean-price), bid side |
-  | `Adjusted ask price` / `Adjusted bid price` | Clean Price × [Index Ratio](#index-ratio), TIPS only |
+  | `Ask price/Quantity (min)` | [Price](#price), ask side |
+  | `Bid price/Quantity (min)` | [Price](#price), bid side |
+  | `Adjusted ask price` / `Adjusted bid price` | Price × [Index Ratio](#index-ratio), TIPS only |
   | `Inflation factor` | [Index Ratio](#index-ratio), TIPS only — the synonym is recorded there |
   | `Ask yield to maturity` | [Yield](#yield), [ask](#ask) side |
   | `Yield` | [Yield](#yield), [bid](#bid) side |
@@ -193,12 +193,9 @@
 `Par_Value_Nominal` = *Current principal value of a nominal Treasury. Equals Face Value at all times. For inflation-adjusted principal see [Par Value (Adjusted)](#par-value-adjusted).*
 
 <a id="price"></a>
-### Price
-`Price` = *Market value expressed as percentage of par (e.g., 102.5 = 102.5% of par)*
-
 <a id="clean-price"></a>
-### Clean Price
-`Clean_Price` = *Quoted market price excluding accrued interest and (for TIPS) before inflation adjustment. Canty (2009) formal notation: CP.*
+### Price
+`Price` = *Market value expressed as percentage of par (e.g., 102.5 = 102.5% of par). By convention, "price" means the clean price — excluding accrued interest and (for TIPS) before inflation adjustment — unless dirty price is named explicitly. Canty (2009) formal notation for the clean price: CP.*
 
 <a id="accrued-interest-nominal"></a>
 ### Accrued Interest (Nominal)
@@ -693,18 +690,18 @@ Some values are true only until Treasury issues more TIPS. Left inline as approx
 
 ### 6.3 Yield Curves
 
-- <a id="tips-prices"></a>**TIPS Prices** = `{ @CUSIP + Coupon_Rate + Maturity_Date + Clean_Price + Ref_CPI_dated }`
-  *Each TIPS in [FedInvest (E1)](#e1) that [TIPS reference data (S2)](#s2) also holds, with one [Clean Price](#clean-price) from E1 and the coupon rate, maturity date and dated date [Ref CPI](#ref-cpi) from TIPS reference data (S2). From 1.1.2 to 1.1.3, held in [FedInvest prices (S1)](#s1), and from 3.1.1 to 3.1.7. The [Settlement Date](#settlement-date) of the prices is a separate flow.*
-- <a id="treasury-prices"></a>**Treasury Prices** = `{ @CUSIP + Security_Type + Coupon_Rate + Maturity_Date + Clean_Price }`
-  *Each market-based bill, note and bond in [FedInvest (E1)](#e1), with one [Clean Price](#clean-price). From 1.1.2 to 1.1.3, held in [FedInvest prices (S1)](#s1), and from 3.1.1 to 3.1.8. The [Settlement Date](#settlement-date) of the prices is a separate flow.*
-- <a id="tips-quotes"></a>**TIPS Quotes** = `{ @CUSIP + Coupon_Rate + Maturity_Date + Ask_Clean_Price + ( Bid_Clean_Price ) + Index_Ratio }`
-  *The TIPS in [Market quotes (S7)](#s7), each with its [ask and bid](#ask) clean prices and the [Index Ratio](#index-ratio) the quote states. From 3.1.2 to 3.1.7.*
-- <a id="treasury-quotes"></a>**Treasury Quotes** = `{ @CUSIP + Security_Type + Coupon_Rate + Maturity_Date + Ask_Clean_Price + ( Bid_Clean_Price ) }`
+- <a id="tips-prices"></a>**TIPS Prices** = `{ @CUSIP + Coupon_Rate + Maturity_Date + Price + Ref_CPI_dated }`
+  *Each TIPS in [FedInvest (E1)](#e1) that [TIPS reference data (S2)](#s2) also holds, with one [Price](#price) from E1 and the coupon rate, maturity date and dated date [Ref CPI](#ref-cpi) from TIPS reference data (S2). From 1.1.2 to 1.1.3, held in [FedInvest prices (S1)](#s1), and from 3.1.1 to 3.1.7. The [Settlement Date](#settlement-date) of the prices is a separate flow.*
+- <a id="treasury-prices"></a>**Treasury Prices** = `{ @CUSIP + Security_Type + Coupon_Rate + Maturity_Date + Price }`
+  *Each market-based bill, note and bond in [FedInvest (E1)](#e1), with one [Price](#price). From 1.1.2 to 1.1.3, held in [FedInvest prices (S1)](#s1), and from 3.1.1 to 3.1.8. The [Settlement Date](#settlement-date) of the prices is a separate flow.*
+- <a id="tips-quotes"></a>**TIPS Quotes** = `{ @CUSIP + Coupon_Rate + Maturity_Date + Ask_Price + ( Bid_Price ) + Index_Ratio }`
+  *The TIPS in [Market quotes (S7)](#s7), each with its [ask and bid](#ask) prices. Its Index Ratio is calculated, not the one the quote states ([3.1.7](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#calculate-tips-yields)). From 3.1.2 to 3.1.7.*
+- <a id="treasury-quotes"></a>**Treasury Quotes** = `{ @CUSIP + Security_Type + Coupon_Rate + Maturity_Date + Ask_Price + ( Bid_Price ) }`
   *The nominal Treasuries in [Market quotes (S7)](#s7), STRIPS included. From 3.1.2 to 3.1.8.*
 - <a id="tips-yields"></a>**TIPS Yields** = `{ [ TIPS_Prices | TIPS_Quotes ] + Ask_Yield + ( Bid_Yield ) }`
   *Each TIPS with the [yield](#yield) calculated from its price at its settlement date. A quoted TIPS also has the yield of its bid price. From 3.1.7 to 3.2 and 3.6.*
 - <a id="treasury-yields"></a>**Treasury Yields** = `{ [ Treasury_Prices | Treasury_Quotes ] + Ask_Yield + ( Bid_Yield ) }`
-  *Each nominal Treasury with the [yield](#yield) calculated from its price at its settlement date. A quoted Treasury also has the yield of its bid price; for a Treasury from [FedInvest prices (S1)](#s1) the ask yield is the yield of the mid-market price. From 3.1.8 to 3.4, 3.5, 3.6 and 3.7.*
+  *Each nominal Treasury with the [yield](#yield) calculated from its price at its settlement date. A quoted Treasury also has the yield of its bid price; a Treasury from [FedInvest prices (S1)](#s1) has one yield only, from the price [1.1.2](./1.1_Download_FedInvest_Prices.md#select-tips-and-treasury-prices) selects, not a true ask or a true bid. From 3.1.8 to 3.4, 3.5, 3.6 and 3.7.*
 - <a id="sa-yields"></a>**SA Yields** = `{ TIPS_Yields + SA_Price_Factor + SA_Yield }`
   *Each TIPS with its [SA Price Factor](#sa-price-factor) and [SA Yield](#sa-yield). From 3.2 to 3.3 and 3.4.*
 - <a id="sao-yields"></a>**SAO Yields** = `{ SA_Yields + SAO_Yield }`

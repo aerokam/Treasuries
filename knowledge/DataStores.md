@@ -7,7 +7,7 @@ This document provides the operational details for every data store: R2 key, wri
 ## <a id="s1"></a>[FedInvest prices (S1)](./DATA_DICTIONARY.md#s1)
 **File**: `YieldsFromFedInvestPrices.csv`
 **R2 Key**: `Treasuries/YieldsFromFedInvestPrices.csv`
-**Description**: The [Settlement Date](./DATA_DICTIONARY.md#settlement-date) of the day's FedInvest prices, then each TIPS and each market-based bill, note and bond with one clean price and the yield of that price.
+**Description**: The [Settlement Date](./DATA_DICTIONARY.md#settlement-date) of the day's FedInvest prices, then each TIPS and each market-based bill, note and bond with one price and the yield of that price.
 **Written by**: [1.1 Download FedInvest prices](./1.1_Download_FedInvest_Prices.md).
 **Update Frequency**: Weekdays ~1:05 PM ET ([Data Pipeline](./Data_Pipeline.md)).
 **Read by**: YieldCurves ([3.1.1](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#parse-fedinvest-prices)), the yield curves job (process 1.3), Treasury Primer, and TipsLadderManager and TipsReference when the FedInvest source is selected ([3.1 Data Pipeline §4.0](../TipsLadderManager/knowledge/3.1_Data_Pipeline.md)).
@@ -158,8 +158,8 @@ This document provides the operational details for every data store: R2 key, wri
 | `ask_yield` | Number | Ask yield-to-maturity (decimal). |
 | `bid_yield` | Number | Bid yield-to-maturity (decimal). |
 | `yield_spread_bps` | Number | `(bid_yield − ask_yield) × 10000`. |
-| `ask_price` | Number | Ask price (TIPS: raw clean price, matching Market quotes (S7)). |
-| `bid_price` | Number | Bid price (TIPS: raw clean price, matching Market quotes (S7)). |
+| `ask_price` | Number | Ask price (TIPS: raw price, unadjusted, matching Market quotes (S7)). |
+| `bid_price` | Number | Bid price (TIPS: raw price, unadjusted, matching Market quotes (S7)). |
 | `price_spread_pct` | Number | TIPS: `(adjusted_ask − adjusted_bid) / adjusted_ask × 100` (actual dollar cost). Treasury: `(ask − bid) / ask × 100`. |
 
 **Live Data**: [View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/BidAskSpreads.csv)

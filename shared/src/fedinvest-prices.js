@@ -88,7 +88,7 @@ export function selectPricedSecurity(row, tipsRefMap) {
 }
 
 // spec: 1.1_Download_FedInvest_Prices.md#calculate-yields
-// Yield of a selected security's Clean Price at settleDateStr (a YYYY-MM-DD string), via
+// Yield of a selected security's Price at settleDateStr (a YYYY-MM-DD string), via
 // shared/src/bond-math.js#yieldFromPrice. Null for a security with no price.
 export function yieldForSecurity(security, settleDateStr) {
   if (!security.price) return null;
