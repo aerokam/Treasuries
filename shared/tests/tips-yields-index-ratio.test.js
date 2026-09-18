@@ -12,7 +12,7 @@ import path from 'path';
 import { parseFidelityTipsRows } from '../src/fidelity-parse.js';
 import { parseTipsRefRows } from '../src/market-data.js';
 import { parseCsv } from '../src/csv.js';
-import { tipsYieldsFromPrices } from '../src/tips-yields.js';
+import { tipsIndexRatios } from '../src/ref-cpi.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
@@ -42,18 +42,17 @@ function main() {
   const tipsRefRows = parseTipsRefRows(readFileSync(TIPS_REF, 'utf8'));
   const tipsRefByCusip = new Map(tipsRefRows.map(r => [r.cusip, r]));
 
-  const results = tipsYieldsFromPrices([], refCpiRows, quotesByCusip, true, MARKET_SETTLE_ISO, tipsRefByCusip);
-  ok(results.length === 53, `expected all 53 quoted TIPS to be priced (got ${results.length})`);
+  const indexRatioByCusip = tipsIndexRatios([], refCpiRows, quotesByCusip, true, MARKET_SETTLE_ISO, tipsRefByCusip);
+  ok(indexRatioByCusip.size === 53, `expected all 53 quoted TIPS to have a calculated Index Ratio (got ${indexRatioByCusip.size})`);
 
   let compared = 0, maxDiff = 0, maxDiffCusip = '';
-  for (const r of results) {
-    const quoted = quotesByCusip.get(r.cusip)?.indexRatio;
+  for (const [cusip, calculated] of indexRatioByCusip) {
+    const quoted = quotesByCusip.get(cusip)?.indexRatio;
     if (quoted == null || isNaN(quoted)) continue;
     compared++;
-    ok(!isNaN(r.indexRatio), `${r.cusip}: calculated Index Ratio is NaN`);
-    const diff = Math.abs(r.indexRatio - quoted);
-    if (diff > maxDiff) { maxDiff = diff; maxDiffCusip = r.cusip; }
-    ok(diff < 5e-10, `${r.cusip}: calculated ${r.indexRatio} vs quoted ${quoted} (diff ${diff.toExponential(3)})`);
+    const diff = Math.abs(calculated - quoted);
+    if (diff > maxDiff) { maxDiff = diff; maxDiffCusip = cusip; }
+    ok(diff < 5e-10, `${cusip}: calculated ${calculated} vs quoted ${quoted} (diff ${diff.toExponential(3)})`);
   }
   ok(compared === 53, `expected to compare all 53 TIPS (compared ${compared})`);
   console.log(`Compared ${compared} TIPS; max |calculated - quoted| = ${maxDiff.toExponential(3)} (${maxDiffCusip || 'n/a'})`);

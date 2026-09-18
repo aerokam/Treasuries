@@ -1,6 +1,6 @@
 // Yield Curves — Frontend Logic
 import { yieldFromPrice, cashflowSchedule, termYears } from '../../shared/src/bond-math.js';
-import { saFactorForDate, maturitySaFactor } from '../../shared/src/ref-cpi.js';
+import { saFactorForDate, maturitySaFactor, tipsIndexRatios } from '../../shared/src/ref-cpi.js';
 import { tipsYieldsFromPrices } from '../../shared/src/tips-yields.js';
 import { treasuryYieldsFromPrices } from '../../shared/src/treasury-yields.js';
 import { yieldSpreadBps, priceSpreadPct } from '../../shared/src/spreads.js';
@@ -1080,8 +1080,15 @@ function renderNominalsChart(fedBonds, fidBonds, fedSpotBonds, fidSpotBonds) {
 // The TIPS yields for one source (FedInvest or Market) is built by
 // shared/src/tips-yields.js#tipsYieldsFromPrices — one implementation for this page and
 // for the acquisition job that publishes S13, S14 and S15 (3.1_Parse_Sources_And_Calculate_Yields.md §3.1.7).
-const tipsFor = (quotesByCusip, isBroker) =>
-  tipsYieldsFromPrices(rawYieldsData, rawRefCpiData, quotesByCusip, isBroker, marketSettleIso(), tipsRefByCusip);
+// Index Ratio is a separate calculation (ref-cpi.js#tipsIndexRatios) attached onto the result
+// afterward for whichever rows the market-quote TIPS table renders -- it has no dependency on
+// yield or Price and tipsYieldsFromPrices does not calculate it.
+const tipsFor = (quotesByCusip, isBroker) => {
+  const bonds = tipsYieldsFromPrices(rawYieldsData, rawRefCpiData, quotesByCusip, isBroker, marketSettleIso());
+  const indexRatioByCusip = tipsIndexRatios(rawYieldsData, rawRefCpiData, quotesByCusip, isBroker, marketSettleIso(), tipsRefByCusip);
+  bonds.forEach(b => { b.indexRatio = indexRatioByCusip.get(b.cusip) ?? NaN; });
+  return bonds;
+};
 
 function processAndRenderTips() {
   const statusEl = document.getElementById('status');

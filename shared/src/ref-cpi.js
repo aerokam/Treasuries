@@ -111,18 +111,55 @@ export function indexRatio(refCpi, datedDateRefCpi) {
   return (refCpi != null && datedDateRefCpi) ? truncateThenRound(refCpi / datedDateRefCpi) : null;
 }
 
-// Ref CPI(settlement) / Ref CPI(dated date), rounded once, half up, to nine
-// decimal places -- the convention a market quote's own stated Index Ratio
-// follows (knowledge/DFD_Worklist.md §3.12), not Treasury's truncate-6-
-// round-5 rule above, which matches no real quote tested. This is for
-// reproducing/cross-checking a broker's stated Index Ratio; a figure that
-// states Treasury's own value (e.g. an acquisition Index Ratio for tax
-// purposes) keeps indexRatio() above.
+// Ref CPI(settlement) / Ref CPI(dated date), rounded once, half up, to nine decimal
+// places -- reproduces a real broker's displayed Index Ratio to that many places, on
+// every TIPS in every quote file tested (knowledge/DFD_Worklist.md §3.12). This is not
+// evidence of a stated broker rounding rule -- it is only known to match at 9 decimal
+// places, consistent with a broker computing at full precision and displaying 9 places.
+// Not Treasury's own truncate-6-round-5 rule (indexRatio() above), which is scoped to
+// Treasury's own auction and settlement mechanics and does not apply to a broker's
+// tax-lot accrual math -- see TaxationOfTreasuries/docs/TIPS_OID_Tax_Reference.md, which
+// shows the Treasury-rounded ratio understating a real 1099-B by three cents where the
+// full-precision ratio reproduces it exactly.
 export function indexRatioNineDecimal(refCpi, datedDateRefCpi) {
   if (refCpi == null || datedDateRefCpi == null || isNaN(refCpi) || isNaN(datedDateRefCpi) || !datedDateRefCpi) return null;
   const ratio = refCpi / datedDateRefCpi;
   const factor = 1e9;
   return Math.round(nudge(ratio * factor)) / factor;
+}
+
+// Index Ratio of every TIPS in a source, keyed by CUSIP -- independent of, and not
+// consumed by, TIPS yield calculation (tips-yields.js#tipsYieldsFromPrices). This does
+// not belong inside that function: Index Ratio does not use Price and is not a yield.
+// The only current consumer is the market-quote TIPS table YieldCurves/src/app.js
+// renders; nothing downstream of that reads it, and it is not published to any store.
+//
+// tipsRows        S1's TIPS rows, each carrying cusip and datedDateCpi
+// refCpiRows      S4, parsed
+// quotesByCusip   S7's TIPS quotes by CUSIP, or null when the quoted source isn't shown
+// isBroker        true for a market quote, false for FedInvest
+// marketSettleIso the settlement date the market quotes are stated at, 'YYYY-MM-DD'.
+//                 Ignored when isBroker is false, where each row's own settlementDate is used.
+// tipsRefByCusip  S2 (TIPS/TipsRef.csv) rows by CUSIP, giving a market-quote TIPS its
+//                 dated date Ref CPI -- S7 doesn't carry it. Ignored when isBroker is false.
+//
+// Returns a Map<cusip, indexRatio>. A TIPS with no settlement date, or whose Ref CPI at
+// either date is unavailable, is left out of the map rather than mapped to NaN.
+export function tipsIndexRatios(tipsRows, refCpiRows, quotesByCusip, isBroker, marketSettleIso, tipsRefByCusip = null) {
+  const source = isBroker ? Array.from(quotesByCusip ? quotesByCusip.values() : []) : tipsRows;
+  const result = new Map();
+  for (const row of source) {
+    const cusip = row.cusip;
+    const settleDateStr = isBroker ? marketSettleIso : row.settlementDate;
+    if (!cusip || !settleDateStr) continue;
+    const settleRefCpi = refCpiNsaForDate(refCpiRows, settleDateStr);
+    const datedDateRefCpi = isBroker
+      ? (tipsRefByCusip ? tipsRefByCusip.get(cusip)?.datedDateRefCpi ?? null : null)
+      : (row.datedDateCpi != null && row.datedDateCpi !== '' ? parseFloat(row.datedDateCpi) : null);
+    const ratio = indexRatioNineDecimal(settleRefCpi, datedDateRefCpi);
+    if (ratio != null) result.set(cusip, ratio);
+  }
+  return result;
 }
 
 // ─── SA Factor lookup (RefCpiNsaSa.csv rows) ─────────────────────────────────

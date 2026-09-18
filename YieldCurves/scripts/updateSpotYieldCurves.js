@@ -31,7 +31,6 @@ import {
   parseFidelityDownloadDate, fidelityDownloadDateIso,
   parseFidelityTipsRows, parseFidelityNominalRows,
 } from '../../shared/src/fidelity-parse.js';
-import { parseTipsRefRows } from '../../shared/src/market-data.js';
 import { spotCurveFit, calculateSAO, zToSA, unionGridTerms } from '../../shared/src/spot-curve.js';
 
 const R2_BASE_URL = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev';
@@ -39,7 +38,6 @@ const YIELDS_CSV_URL = `${R2_BASE_URL}/Treasuries/YieldsFromFedInvestPrices.csv`
 const REF_CPI_CSV_URL = `${R2_BASE_URL}/TIPS/RefCpiNsaSa.csv`;
 const HOLIDAYS_CSV_URL = `${R2_BASE_URL}/misc/BondHolidaysSifma.csv`;
 const FIDELITY_URL = `${R2_BASE_URL}/Treasuries/FidelityTreasuriesTips.csv`;
-const TIPS_REF_CSV_URL = `${R2_BASE_URL}/TIPS/TipsRef.csv`;   // S2 -- dated date Ref CPI per CUSIP, for the market-quote Index Ratio (3.1.7)
 
 const DRY = process.argv.includes('--dry');
 
@@ -103,16 +101,14 @@ function buildGridRows(fits, source) {
 async function main() {
   console.log(`Starting Spot Yield Curves update at ${new Date().toISOString()}`);
 
-  const [yieldsText, refCpiText, holidayText, fidRes, tipsRefText] = await Promise.all([
+  const [yieldsText, refCpiText, holidayText, fidRes] = await Promise.all([
     fetch(YIELDS_CSV_URL, { cache: 'no-cache' }).then(r => { if (!r.ok) throw new Error(`Yields fetch failed: ${r.status}`); return r.text(); }),
     fetch(REF_CPI_CSV_URL, { cache: 'no-cache' }).then(r => { if (!r.ok) throw new Error(`RefCPI fetch failed: ${r.status}`); return r.text(); }),
     fetch(HOLIDAYS_CSV_URL, { cache: 'no-cache' }).then(r => { if (!r.ok) throw new Error(`Holidays fetch failed: ${r.status}`); return r.text(); }),
     fetch(FIDELITY_URL, { cache: 'no-cache' }),
-    fetch(TIPS_REF_CSV_URL, { cache: 'no-cache' }).then(r => { if (!r.ok) throw new Error(`TipsRef fetch failed: ${r.status}`); return r.text(); }),
   ]);
   if (!fidRes.ok) throw new Error(`Fidelity fetch failed: ${fidRes.status}`);
   const fidText = await fidRes.text();
-  const tipsRefByCusip = new Map(parseTipsRefRows(tipsRefText).map(r => [r.cusip, r]));
 
   // YieldsFromFedInvestPrices.csv: row 1 = settlement date, row 2 = header, rows 3+ = data.
   const yieldsLines = yieldsText.split(/\r?\n/).filter(l => l.trim());
@@ -158,8 +154,8 @@ async function main() {
     + `${fidNominalBondsAll.filter(b => b.cusipType === 'Unclassified').length} Unclassified).`);
 
   // ── Processed bonds, per source ──────────────────────────────────────────────
-  const fedTips = tipsYieldsFromPrices(rawTipsData, refCpiData, priceMap, false, brokerSettleStr, tipsRefByCusip);
-  const mktTips = tipsYieldsFromPrices(rawTipsData, refCpiData, priceMap, true, brokerSettleStr, tipsRefByCusip);
+  const fedTips = tipsYieldsFromPrices(rawTipsData, refCpiData, priceMap, false, brokerSettleStr);
+  const mktTips = tipsYieldsFromPrices(rawTipsData, refCpiData, priceMap, true, brokerSettleStr);
   if (fedTips.length) { const s = calculateSAO(fedTips); fedTips.forEach((b, i) => b.saoYield = s[i]); }
   if (mktTips.length) { const s = calculateSAO(mktTips); mktTips.forEach((b, i) => b.saoYield = s[i]); }
 
