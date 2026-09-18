@@ -107,6 +107,9 @@ function scaleSchwabPos(cols) {
   };
 }
 
+// Account header row: a single quoted field, "Name ...DIGITS" (Schwab quotes this line too).
+const ACCOUNT_HEADER_RE = /^"([^"]*\.\.\.\d+)"$/;
+
 function sanitizeSchwab(text) {
   const lines = text.split('\n');
   const outLines = [lines[0]]; // date/time header
@@ -117,9 +120,9 @@ function sanitizeSchwab(text) {
   for (let i = 1; i < lines.length; i++) {
     const trimmed = lines[i].trim();
     if (!trimmed) continue;
-    if (!trimmed.startsWith('"')) {
-      // Account header: "Name ...DIGITS"
-      current = { rawName: trimmed.split(' ...')[0], positions: [] };
+    const headerMatch = trimmed.match(ACCOUNT_HEADER_RE);
+    if (headerMatch) {
+      current = { rawName: headerMatch[1].split(' ...')[0], positions: [] };
       sections.push(current);
     } else if (current && trimmed !== SCHWAB_COL_HEADER && !trimmed.startsWith('"Symbol"')) {
       const cols = parseQuotedRow(trimmed);
