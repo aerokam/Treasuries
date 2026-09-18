@@ -94,7 +94,7 @@ const savedDateRange = { tips: null, treasuries: null, bei: null };
 // no FedInvest counterpart (FedInvest states its own type directly, see fedinvest-prices.js) --
 // the string below is this app's own, for a CUSIP root shared/src/treasury-cusip.js does not
 // recognise.
-const CUSIP_TYPE_TO_MARKET_BASED = { Bill: 'MARKET BASED BILL', Note: 'MARKET BASED NOTE', Bond: 'MARKET BASED BOND', STRIPS: 'MARKET BASED STRIP', Unclassified: 'MARKET BASED UNCLASSIFIED' };
+const CUSIP_TYPE_TO_MARKET_BASED = { Bill: 'MARKET BASED BILL', Note: 'MARKET BASED NOTE', Bond: 'MARKET BASED BOND', STRIPS: 'MARKET BASED STRIPS', Unclassified: 'MARKET BASED UNCLASSIFIED' };
 
 let activeTab = 'tips';
 let nominalsTypeFilters = new Set(['MARKET BASED BILL', 'MARKET BASED NOTE', 'MARKET BASED BOND']);
@@ -661,7 +661,7 @@ function processAndRenderNominals() {
       ? rawNominalsData.filter(r => !isStrip(r.cusip) && r.type !== 'MARKET BASED UNCLASSIFIED')
       : null;
     let fidSpotSet = showFid
-      ? fidelityNominalsData.filter(b => !isStrip(b.cusip) && b.type !== 'MARKET BASED STRIP' && b.type !== 'MARKET BASED UNCLASSIFIED')
+      ? fidelityNominalsData.filter(b => !isStrip(b.cusip) && b.type !== 'MARKET BASED STRIPS' && b.type !== 'MARKET BASED UNCLASSIFIED')
       : null;
 
     // Filter STRIPS unless user opts in (already handled by the initial filter above for performance, but we keep the fidProcessed part consistent)
@@ -739,7 +739,7 @@ function renderNominalsTable(fedBonds, fidBonds, fedSpotBonds, fidSpotBonds, sta
   const theadRow = document.querySelector('#nominalsTable thead tr');
   const tbody = document.getElementById('nominalsTableBody');
   const bothActive = fedBonds && fidBonds;
-  const shortType = t => t === 'MARKET BASED BILL' ? 'Bill' : t === 'MARKET BASED NOTE' ? 'Note' : t === 'MARKET BASED BOND' ? 'Bond' : t === 'MARKET BASED UNCLASSIFIED' ? 'Unclassified' : 'STRIP';
+  const shortType = t => t === 'MARKET BASED BILL' ? 'Bill' : t === 'MARKET BASED NOTE' ? 'Note' : t === 'MARKET BASED BOND' ? 'Bond' : t === 'MARKET BASED UNCLASSIFIED' ? 'Unclassified' : 'STRIPS';
   const fmtMat = s => isoToMDY(s);
   const fmtYld = y => (y != null && !isNaN(y)) ? (y * 100).toFixed(3) + '%' : '—';
   const sortCls = col => nominalsSort.col === col ? ` class="sort-${nominalsSort.dir}"` : '';
@@ -869,7 +869,7 @@ function renderNominalsChart(fedBonds, fidBonds, fedSpotBonds, fidSpotBonds) {
     );
   }
 
-  // Zero-coupon (spot) curve, per source — fitted in price space to every non-STRIP,
+  // Zero-coupon (spot) curve, per source — fitted in price space to every non-STRIPS,
   // non-Unclassified nominal (Bills, Notes and Bonds), independent of the Bills/Notes/Bonds
   // checkboxes. Only
   // built at all when Spot is checked — an unchecked series must not appear in the dataset
@@ -1550,7 +1550,7 @@ function processAndRenderBei() {
     const smoothed = calculateSAO(tips);
     tips.forEach((b, i) => { b.saoYield = smoothed[i]; });
 
-    const nominalCandidates = fidelityNominalsData.filter(b => b.type !== 'MARKET BASED STRIP' && b.type !== 'MARKET BASED UNCLASSIFIED');
+    const nominalCandidates = fidelityNominalsData.filter(b => b.type !== 'MARKET BASED STRIPS' && b.type !== 'MARKET BASED UNCLASSIFIED');
     if (nominalCandidates.length === 0) {
       statusEl.textContent = 'No market nominal data available for BEI.';
       if (chart) { chart.destroy(); chart = null; }
@@ -2079,7 +2079,7 @@ function renderSpreadCharts(bonds, tab) {
       { type: 'MARKET BASED BILL',  label: 'Bills',  yc: '#0ea5e9', pc: '#38bdf8', r: 1.25 },
       { type: 'MARKET BASED NOTE',  label: 'Notes',  yc: '#1a56db', pc: '#60a5fa', r: 1.25 },
       { type: 'MARKET BASED BOND',  label: 'Bonds',  yc: '#7c3aed', pc: '#a78bfa', r: 1.25 },
-      { type: 'MARKET BASED STRIP', label: 'STRIPS', yc: '#64748b', pc: '#94a3b8', r: 1   },
+      { type: 'MARKET BASED STRIPS', label: 'STRIPS', yc: '#64748b', pc: '#94a3b8', r: 1   },
       { type: 'MARKET BASED UNCLASSIFIED', label: 'Unclassified', yc: '#b45309', pc: '#eab308', r: 1 },
     ];
     for (const { type, label, yc, pc, r } of types) {
@@ -2136,7 +2136,7 @@ function renderSpreadTable(bonds, tab) {
   } else {
     const tbody = document.getElementById('nominalsTableBody');
     const thead = document.querySelector('#nominalsTable thead tr');
-    const shortType = t => t === 'MARKET BASED BILL' ? 'Bill' : t === 'MARKET BASED NOTE' ? 'Note' : t === 'MARKET BASED BOND' ? 'Bond' : t === 'MARKET BASED UNCLASSIFIED' ? 'Unclassified' : 'STRIP';
+    const shortType = t => t === 'MARKET BASED BILL' ? 'Bill' : t === 'MARKET BASED NOTE' ? 'Note' : t === 'MARKET BASED BOND' ? 'Bond' : t === 'MARKET BASED UNCLASSIFIED' ? 'Unclassified' : 'STRIPS';
     thead.innerHTML = `
       <th>Maturity</th><th>CUSIP</th><th>Type</th><th>Coupon</th>
       <th>Bid Price</th><th>Ask Price</th><th>Price Spread %</th>
@@ -2387,7 +2387,7 @@ function recomputeRangeFromChecked() {
   if (fidelityNominalsData) candidates.push(...fidelityNominalsData.filter(typeMatches));
   if (document.getElementById('showTsySpot').checked) {
     if (rawNominalsData) candidates.push(...rawNominalsData.filter(r => !isStrip(r.cusip) && r.type !== 'MARKET BASED UNCLASSIFIED'));
-    if (fidelityNominalsData) candidates.push(...fidelityNominalsData.filter(r => !isStrip(r.cusip) && r.type !== 'MARKET BASED STRIP' && r.type !== 'MARKET BASED UNCLASSIFIED'));
+    if (fidelityNominalsData) candidates.push(...fidelityNominalsData.filter(r => !isStrip(r.cusip) && r.type !== 'MARKET BASED STRIPS' && r.type !== 'MARKET BASED UNCLASSIFIED'));
   }
   if (candidates.length === 0) { startEl.value = ''; endEl.value = ''; return; }
   const minB = candidates.reduce((a, b) => a.maturityDate <= b.maturityDate ? a : b);
