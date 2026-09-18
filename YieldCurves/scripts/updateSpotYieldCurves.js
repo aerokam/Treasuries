@@ -143,7 +143,7 @@ async function main() {
     onUnknownCusip: cusip => console.warn(`  Unrecognized CUSIP root, tagged Unclassified: ${cusip}`),
   });
   // Filtered: STRIPS and Unclassified excluded, for the coupon-bond price-space curve fit
-  // only — a STRIP's price/yield relationship is already a pure zero-coupon discount, but the
+  // only — the price/yield relationship of a STRIPS is already a pure zero-coupon discount, but the
   // *nominal fit* is a coupon-bond price-space fit (cashflowSchedule) and STRIPS aren't part of
   // its fitting universe here, same as S1's fitting inputs (knowledge/DataStores.md#s13).
   // Unclassified gets the same treatment: its cash-flow structure is unknown (that's what the
@@ -223,7 +223,7 @@ async function main() {
   // nominal (spot BEI itself is not persisted here — it is fully re-derivable from the
   // Treasury/TIPS grid rows above, so storing it separately would be redundant duplication
   // rather than verifying redundancy). Matched against STRIPS-excluded nominals, same as
-  // before — a STRIP is not a sensible "nearest nominal" reference for a coupon TIPS. ───
+  // before — a STRIPS is not a sensible "nearest nominal" reference for a coupon TIPS. ───
   const beiRows = [];
   for (const b of mktTips) {
     const nom = findClosestNominal(mktNominalBonds, b.maturityDate);

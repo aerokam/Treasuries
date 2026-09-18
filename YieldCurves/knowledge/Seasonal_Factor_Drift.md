@@ -10,7 +10,7 @@
 
 ## 1. The question
 
-The seasonal adjustment multiplies a TIPS price by `S_settle / S_maturity`, where `S_t = RefCPI_NSA(t) / RefCPI_SA(t)` is the seasonal factor for the calendar month and day of `t` ([3.2](3.2_Adjust_For_Seasonality.md) Level 4). `S_settle` is a known recent daily value. `S_maturity` is not: the maturity date of a long TIPS lies beyond the published Ref CPI series, so `shared/src/ref-cpi.js#saFactorForDate` substitutes the most recent past occurrence of that month and day.
+The seasonal adjustment multiplies a TIPS price by `S_settle / S_maturity`, where `S_t = RefCPI_NSA(t) / RefCPI_SA(t)` is the seasonal factor for the calendar month and day of `t` ([3.2 §The Transformation](3.2_Adjust_For_Seasonality.md#the-transformation)). `S_settle` is a known recent daily value. `S_maturity` is not: the maturity date of a long TIPS lies beyond the published Ref CPI series, so `shared/src/ref-cpi.js#saFactorForDate` substitutes the most recent past occurrence of that month and day.
 
 That substitution is Canty's simplifying assumption that the 12 monthly seasonal factors repeat unchanged every year ([Canty](Canty.md) §2, Appendix B; [DATA_DICTIONARY.md#sa-price-factor](../../knowledge/DATA_DICTIONARY.md#sa-price-factor)). This document measures how well the assumption holds as the maturity date moves further from the estimation window, and what the reported seasonal adjustment on long-dated TIPS actually rests on.
 
@@ -23,7 +23,15 @@ Two findings, one structural and one quantitative:
 
 ## 2. How BLS derives its seasonal factors
 
-[3.2 §How BLS Derives the Seasonal Factors](3.2_Adjust_For_Seasonality.md#bls-seasonal-factor-estimation) gives the mechanics: X-13ARIMA-SEATS with moving seasonal filters spanning about 5 to 11 years, re-estimated annually with the prior five years revised, and projected factors published one year forward only. The consequence this document measures: BLS provides a factor for the recent past and one year ahead, and no basis for projecting one decades out, so the substitution `saFactorForDate` makes for a distant maturity date is an extrapolation of the current pattern whose error grows with horizon.
+The seasonal factor series is not a fixed property of the calendar. BLS re-estimates it every year from a moving window of recent data, with a method that treats seasonality as something that evolves.
+
+- **Method.** CPI-U seasonal adjustment uses X-13ARIMA-SEATS (X-12-ARIMA before 2018, X-11 before that). It divides the series by a centred moving average to isolate the seasonal-plus-irregular component, then smooths that component across years, separately for each calendar month, to extract the seasonal factor. An ARIMA model extends the series at both ends so the moving averages reach the most recent months.
+- **Moving seasonal filters.** The smoothing applied to each month's values is a moving average spanning a few years: a 3×3 filter covers about 5 years, 3×5 about 7 years, 3×9 about 11 years. BLS selects the filter per series. A year outside the window contributes nothing to the current factor.
+- **Annual re-estimation.** With the January release each February, BLS re-runs seasonal adjustment for every series and revises the prior five years of seasonally adjusted data. Older data is frozen at whatever factors were current when it left the window.
+- **Projected factors.** BLS publishes seasonal factors for the coming year only, from the asymmetric end filters and the ARIMA extension, and applies them to incoming months until the next annual re-estimation.
+- **Aggregation.** The all-items index is seasonally adjusted by summing roughly 70 separately adjusted component indexes; a component that fails BLS's seasonality test enters the aggregate unadjusted.
+
+The consequence this document measures: BLS provides a factor for the recent past and one year ahead, and no basis for projecting one decades out, so the substitution `saFactorForDate` makes for a distant maturity date is an extrapolation of the current pattern whose error grows with horizon.
 
 ---
 
