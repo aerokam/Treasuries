@@ -1,11 +1,11 @@
-"Positions for All-Accounts as of 02:05 PM ET, 09/18/2026"
+"Positions for All-Accounts as of 02:24 PM ET, 09/18/2026"
 
 
 Acct1 ...001
 "Symbol","Description","Qty (Quantity)","Price","Mkt Val (Market Value)","Gain $ (Gain/Loss $)","Gain % (Gain/Loss %)","Asset Type",
-"VBR","VANGUARD MORNINGSTAR SMALL-CAP VALUE ETF","57","237.73","$13550.61","$0.00","0%","ETFs & Closed End Funds",
-"VEU","VANGUARD FTSE ALL-WORLD EX-US INDEX FUND ETF SHARES","316","83.73","$26441.93","$0.00","0%","ETFs & Closed End Funds",
-"VV","VANGUARD MORNINGSTAR LARGE-CAP ETF","60","351.396","$21013.48","$0.00","0%","ETFs & Closed End Funds",
+"VBR","VANGUARD MORNINGSTAR SMALL-CAP VALUE ETF","57","237.765","$13552.61","$0.00","0%","ETFs & Closed End Funds",
+"VEU","VANGUARD FTSE ALL-WORLD EX-US INDEX FUND ETF SHARES","316","83.735","$26443.51","$0.00","0%","ETFs & Closed End Funds",
+"VV","VANGUARD MORNINGSTAR LARGE-CAP ETF","60","351.6034","$21025.88","$0.00","0%","ETFs & Closed End Funds",
 "912797SK4","US TREASURY BILL26U S T BILL DUE 10/29/26","6,000","99.5655","$5973.93","$0.00","0%","Fixed Income",
 "912797SU2","US TREASURY BILL26U S T BILL DUE 11/27/26","3,000","99.2368","$2977.10","$0.00","0%","Fixed Income",
 "912797TC1","US TREASURY BILL26U S T BILL DUE 12/24/26","0","98.9263","$0.00","$0.00","0%","Fixed Income",
@@ -19,25 +19,25 @@ Acct1 ...001
 "SNSXX","SCHWAB US TREASURY MONEY INVESTOR","185.96","1.00","$185.96","$0.00","0%","Cash and Money Market",
 "SNSXX","SCHWAB US TREASURY MONEY INVESTOR","2.645","1.00","$2.65","$0.00","0%","Cash and Money Market",
 "Cash & Cash Investments","--","--","--","$0.00","--","--","Cash and Money Market",
-"Positions Total","","--","--","$114612.18","--","--","--",
+"Positions Total","","--","--","$114628.16","--","--","--",
 
 
 Acct2 ...002
 "Symbol","Description","Qty (Quantity)","Price","Mkt Val (Market Value)","Gain $ (Gain/Loss $)","Gain % (Gain/Loss %)","Asset Type",
-"VB","VANGUARD MORNINGSTAR SMALL-CAP ETF","278","289.15","$80325.87","$0.00","0%","ETFs & Closed End Funds",
-"VBR","VANGUARD MORNINGSTAR SMALL-CAP VALUE ETF","481","237.73","$114253.04","$0.00","0%","ETFs & Closed End Funds",
+"VB","VANGUARD MORNINGSTAR SMALL-CAP ETF","278","289.205","$80341.15","$0.00","0%","ETFs & Closed End Funds",
+"VBR","VANGUARD MORNINGSTAR SMALL-CAP VALUE ETF","481","237.765","$114269.86","$0.00","0%","ETFs & Closed End Funds",
 "VEA","VANGUARD FTSE DEVELOPED MARKETS INDEX FUND ETF SHARES","77","71.265","$5487.41","$0.00","0%","ETFs & Closed End Funds",
-"VGK","VANGUARD FTSE EUROPE ETF","138","88.165","$12166.77","$0.00","0%","ETFs & Closed End Funds",
-"VPL","VANGUARD FTSE PACIFIC INDEX FUND ETF SHARES","75","115.615","$8694.25","$0.00","0%","ETFs & Closed End Funds",
-"VSS","VANGUARD FTSE ALL-WORLD EX-US SMALL-CAP INDEX FUND ETF SHARES","49","157.305","$7676.48","$0.00","0%","ETFs & Closed End Funds",
-"VTI","VANGUARD MORNINGSTAR TOTAL STOCK MARKET ETF","130.008","374.675","$48710.90","$0.00","0%","ETFs & Closed End Funds",
-"VWO","VANGUARD FTSE EMERGING MARKETS INDEX FUND ETF SHARES","455","59.8936","$27275.55","$0.00","0%","ETFs & Closed End Funds",
+"VGK","VANGUARD FTSE EUROPE ETF","138","88.155","$12165.39","$0.00","0%","ETFs & Closed End Funds",
+"VPL","VANGUARD FTSE PACIFIC INDEX FUND ETF SHARES","75","115.68","$8699.14","$0.00","0%","ETFs & Closed End Funds",
+"VSS","VANGUARD FTSE ALL-WORLD EX-US SMALL-CAP INDEX FUND ETF SHARES","49","157.30","$7676.24","$0.00","0%","ETFs & Closed End Funds",
+"VTI","VANGUARD MORNINGSTAR TOTAL STOCK MARKET ETF","130.008","374.8884","$48738.64","$0.00","0%","ETFs & Closed End Funds",
+"VWO","VANGUARD FTSE EMERGING MARKETS INDEX FUND ETF SHARES","455","59.9001","$27278.51","$0.00","0%","ETFs & Closed End Funds",
 "VXUS","VANGUARD TOTAL INTERNATIONAL STOCK INDEX FUND ETF SHARES","972","85.725","$83307.56","$0.00","0%","ETFs & Closed End Funds",
-"VYM","VANGUARD HIGH DIVIDEND YIELD INDEX FUND ETF SHARES","354","159.0705","$56374.59","$0.00","0%","ETFs & Closed End Funds",
+"VYM","VANGUARD HIGH DIVIDEND YIELD INDEX FUND ETF SHARES","354","159.1976","$56419.63","$0.00","0%","ETFs & Closed End Funds",
 "FSKAX","FIDELITY TOTAL MARKET INDEX","417.805","210.29","$87860.26","$0.00","0%","Mutual Fund",
 "FSPSX","FIDELITY INTERNATIONAL INDEX","715.399","68.35","$48897.49","$0.00","0%","Mutual Fund",
 "Cash & Cash Investments","--","--","--","$0.00","--","--","Cash and Money Market",
-"Positions Total","","--","--","$581030.15","--","--","--",
+"Positions Total","","--","--","$581141.27","--","--","--",
 
 
 Acct3 ...003
@@ -77,9 +77,9 @@ Acct4 ...004
 
 Acct5 IRA ...005
 "Symbol","Description","Qty (Quantity)","Price","Mkt Val (Market Value)","Gain $ (Gain/Loss $)","Gain % (Gain/Loss %)","Asset Type",
-"VCIT","VANGUARD INTERMEDIATE-TERM CORPORATE BOND INDEX FUN","162.1222","79.675","$12917.09","$0.00","0%","ETFs & Closed End Funds",
-"VTI","VANGUARD MORNINGSTAR TOTAL STOCK MARKET ETF","130","374.675","$48857.62","$0.00","0%","ETFs & Closed End Funds",
-"VWO","VANGUARD FTSE EMERGING MARKETS INDEX FUND ETF SHARES","124","59.8936","$7402.85","$0.00","0%","ETFs & Closed End Funds",
+"VCIT","VANGUARD INTERMEDIATE-TERM CORPORATE BOND INDEX FUN","162.1222","79.6599","$12914.64","$0.00","0%","ETFs & Closed End Funds",
+"VTI","VANGUARD MORNINGSTAR TOTAL STOCK MARKET ETF","130","374.8884","$48885.45","$0.00","0%","ETFs & Closed End Funds",
+"VWO","VANGUARD FTSE EMERGING MARKETS INDEX FUND ETF SHARES","124","59.9001","$7403.65","$0.00","0%","ETFs & Closed End Funds",
 "VXUS","VANGUARD TOTAL INTERNATIONAL STOCK INDEX FUND ETF SHARES","71","85.725","$6086.48","$0.00","0%","ETFs & Closed End Funds",
 "912810QF8","UST INFL IDX 2.125%02/40INFL INDEX DUE 02/15/40","21,000","92.3477","$19393.02","$0.00","0%","Fixed Income",
 "912810QP6","UST INFL IDX 2.125%02/41INFL INDEX DUE 02/15/41","6,000","91.5078","$5490.47","$0.00","0%","Fixed Income",
@@ -106,12 +106,12 @@ Acct5 IRA ...005
 "91282CPU9","UST INFL IDX 1.875%01/36INFL INDEX DUE 01/15/36","9,000","93.8242","$8444.18","$0.00","0%","Fixed Income",
 "SWVXX","SCHWAB PRIME ADVANTAGE MONEY INVESTOR","218.84","1.00","$218.84","$0.00","0%","Cash and Money Market",
 "Cash & Cash Investments","--","--","--","$0.00","--","--","Cash and Money Market",
-"Positions Total","","--","--","$195444.28","--","--","--",
+"Positions Total","","--","--","$195470.47","--","--","--",
 
 
 Acct6 Roth IRA ...006
 "Symbol","Description","Qty (Quantity)","Price","Mkt Val (Market Value)","Gain $ (Gain/Loss $)","Gain % (Gain/Loss %)","Asset Type",
-"EEM","ISHARES MSCI EMERGING MARKETS ETF","31.2134","66.84","$2086.30","$0.00","0%","ETFs & Closed End Funds",
+"EEM","ISHARES MSCI EMERGING MARKETS ETF","31.2134","66.85","$2086.62","$0.00","0%","ETFs & Closed End Funds",
 "912797SU2","US TREASURY BILL26U S T BILL DUE 11/27/26","6,000","99.2368","$5954.21","$0.00","0%","Fixed Income",
 "912797TC1","US TREASURY BILL26U S T BILL DUE 12/24/26","28,000","98.9263","$27699.36","$0.00","0%","Fixed Income",
 "912797UL9","US TREASURY BILL26U S T BILL DUE 10/22/26","9,000","99.6402","$8967.62","$0.00","0%","Fixed Income",
@@ -125,7 +125,7 @@ Acct6 Roth IRA ...006
 "91282CFR7","UST INFL IDX 1.625%10/27INFL INDEX DUE 10/15/27","10,000","99.3906","$9939.06","$0.00","0%","Fixed Income",
 "SWVXX","SCHWAB PRIME ADVANTAGE MONEY INVESTOR","15.20","1.00","$15.20","$0.00","0%","Cash and Money Market",
 "Cash & Cash Investments","--","--","--","$0.00","--","--","Cash and Money Market",
-"Positions Total","","--","--","$112053.13","--","--","--",
+"Positions Total","","--","--","$112053.45","--","--","--",
 
 
 Acct7 IRA ...007
@@ -155,7 +155,7 @@ Acct8 ...008
 
 Acct9 ...009
 "Symbol","Description","Qty (Quantity)","Price","Mkt Val (Market Value)","Gain $ (Gain/Loss $)","Gain % (Gain/Loss %)","Asset Type",
-"META","META PLATFORMS INC CLASS A","6.633","671.895","$4456.55","$0.00","0%","Equity",
+"META","META PLATFORMS INC CLASS A","6.633","670.91","$4450.01","$0.00","0%","Equity",
 "9128282L3","UST INFL IDX 0.375%07/27INFL INDEX DUE 07/15/27","1,000","98.6797","$986.80","$0.00","0%","Fixed Income",
 "9128283R9","UST INFL IDX 0.5%01/28INFL INDEX DUE 01/15/28","2,000","97.3867","$1947.73","$0.00","0%","Fixed Income",
 "9128285W6","UST INFL IDX 0.875%01/29INFL INDEX DUE 01/15/29","2,000","96.5234","$1930.47","$0.00","0%","Fixed Income",
@@ -170,17 +170,17 @@ Acct9 ...009
 "91282CHP9","UST INFL IDX 1.375%07/33INFL INDEX DUE 07/15/33","2,000","93.3125","$1866.25","$0.00","0%","Fixed Income",
 "SWVXX","SCHWAB PRIME ADVANTAGE MONEY INVESTOR","3690.96","1.00","$3690.96","$0.00","0%","Cash and Money Market",
 "Cash & Cash Investments","--","--","--","$0.00","--","--","Cash and Money Market",
-"Positions Total","","--","--","$28858.80","--","--","--",
+"Positions Total","","--","--","$28852.26","--","--","--",
 
 
 Acct10 Roth IRA ...010
 "Symbol","Description","Qty (Quantity)","Price","Mkt Val (Market Value)","Gain $ (Gain/Loss $)","Gain % (Gain/Loss %)","Asset Type",
-"BRK/B","BERKSHIRE HATHAWAY CLASS B","30","509.5222","$15285.67","$0.00","0%","Equity",
-"CNI","CANADIAN NATL RY CO F","70","119.28","$8301.89","$0.00","0%","Equity",
-"CSX","CSX CORP","99.2082","47.26","$4688.58","$0.00","0%","Equity",
-"FRVO","FERVO ENERGY CO CLASS CLASS A","20","16.7468","$334.94","$0.00","0%","Equity",
-"SPCX","SPACE EX TECH SPACEX CLASS A","12","151.7552","$1821.06","$0.00","0%","Equity",
-"VTI","VANGUARD MORNINGSTAR TOTAL STOCK MARKET ETF","11.7231","374.675","$4392.37","$0.00","0%","ETFs & Closed End Funds",
+"BRK/B","BERKSHIRE HATHAWAY CLASS B","30","511.34","$15340.20","$0.00","0%","Equity",
+"CNI","CANADIAN NATL RY CO F","70","119.232","$8298.55","$0.00","0%","Equity",
+"CSX","CSX CORP","99.2082","47.295","$4692.05","$0.00","0%","Equity",
+"FRVO","FERVO ENERGY CO CLASS CLASS A","20","16.87","$337.40","$0.00","0%","Equity",
+"SPCX","SPACE EX TECH SPACEX CLASS A","12","151.18","$1814.16","$0.00","0%","Equity",
+"VTI","VANGUARD MORNINGSTAR TOTAL STOCK MARKET ETF","11.7231","374.8884","$4394.87","$0.00","0%","ETFs & Closed End Funds",
 "VXUS","VANGUARD TOTAL INTERNATIONAL STOCK INDEX FUND ETF SHARES","22.7128","85.725","$1947.05","$0.00","0%","ETFs & Closed End Funds",
 "912797VA2","US TREASURY BILL26U S T BILL DUE 12/03/26","1,000","99.1703","$991.70","$0.00","0%","Fixed Income",
 "912810QF8","UST INFL IDX 2.125%02/40INFL INDEX DUE 02/15/40","1,000","92.3477","$923.48","$0.00","0%","Fixed Income",
@@ -191,7 +191,7 @@ Acct10 Roth IRA ...010
 "91282CPU9","UST INFL IDX 1.875%01/36INFL INDEX DUE 01/15/36","9,000","93.8242","$8444.18","$0.00","0%","Fixed Income",
 "SWVXX","SCHWAB PRIME ADVANTAGE MONEY INVESTOR","107.71","1.00","$107.71","$0.00","0%","Cash and Money Market",
 "Cash & Cash Investments","--","--","--","$0.00","--","--","Cash and Money Market",
-"Positions Total","","--","--","$59372.92","--","--","--",
+"Positions Total","","--","--","$59425.65","--","--","--",
 
 
 Acct11 Roth IRA ...011
@@ -218,7 +218,7 @@ Acct12 IRA ...012
 "912810RR1","UST INFL IDX 1%02/46INFL INDEX DUE 02/15/46","20,000","70.1758","$14035.16","$0.00","0%","Fixed Income",
 "912810RW0","UST INFL IDX 0.875%02/47INFL INDEX DUE 02/15/47","20,000","67.043","$13408.60","$0.00","0%","Fixed Income",
 "912810SB5","UST INFL IDX 1%02/48INFL INDEX DUE 02/15/48","14,000","67.7227","$9481.18","$0.00","0%","Fixed Income",
-"912810SG4","UST INFL IDX 1%02/49INFL INDEX DUE 02/15/49","9,000","66.7344","$6006.10","$0.00","0%","Fixed Income",
+"912810SG4","UST INFL IDX 1%02/49INFL INDEX DUE 02/15/49","11,000","66.7344","$7340.78","$0.00","0%","Fixed Income",
 "912810SM1","UST INFL IDX 0.25%02/50INFL INDEX DUE 02/15/50","15,000","53.1523","$7972.85","$0.00","0%","Fixed Income",
 "912810SV1","UST INFL IDX 0.125%02/51INFL INDEX DUE 02/15/51","11,000","49.6289","$5459.18","$0.00","0%","Fixed Income",
 "912810TE8","UST INFL IDX 0.125%02/52INFL INDEX DUE 02/15/52","4,000","48.3672","$1934.69","$0.00","0%","Fixed Income",
@@ -233,7 +233,7 @@ Acct12 IRA ...012
 "912828Y38","UST INFL IDX 0.75%07/28INFL INDEX DUE 07/15/28","1,000","97.3789","$973.79","$0.00","0%","Fixed Income",
 "912828Z37","UST INFL IDX 0.125%01/30INFL INDEX DUE 01/15/30","1,000","92.7695","$927.70","$0.00","0%","Fixed Income",
 "912828ZZ6","UST INFL IDX 0.125%07/30INFL INDEX DUE 07/15/30","9,000","92.0586","$8285.27","$0.00","0%","Fixed Income",
-"91282CBF7","UST INFL IDX 0.125%01/31INFL INDEX DUE 01/15/31","2,000","90.7227","$1814.45","$0.00","0%","Fixed Income",
+"91282CBF7","UST INFL IDX 0.125%01/31INFL INDEX DUE 01/15/31","1,000","90.7227","$907.23","$0.00","0%","Fixed Income",
 "91282CCM1","UST INFL IDX 0.125%07/31INFL INDEX DUE 07/15/31","9,000","89.9766","$8097.89","$0.00","0%","Fixed Income",
 "91282CDC2","UST INFL IDX 0.125%10/26INFL INDEX DUE 10/15/26","12,000","99.8242","$11978.90","$0.00","0%","Fixed Income",
 "91282CDX6","UST INFL IDX 0.125%01/32INFL INDEX DUE 01/15/32","5,000","88.5547","$4427.73","$0.00","0%","Fixed Income",
@@ -250,4 +250,4 @@ Acct12 IRA ...012
 "91282CPU9","UST INFL IDX 1.875%01/36INFL INDEX DUE 01/15/36","23,000","93.8242","$21579.57","$0.00","0%","Fixed Income",
 "SWVXX","SCHWAB PRIME ADVANTAGE MONEY INVESTOR","1.03","1.00","$1.03","$0.00","0%","Cash and Money Market",
 "Cash & Cash Investments","--","--","--","$0.00","--","--","Cash and Money Market",
-"Positions Total","","--","--","$304769.42","--","--","--",
+"Positions Total","","--","--","$305196.88","--","--","--",
