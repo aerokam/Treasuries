@@ -10,7 +10,7 @@ All data enters the system from these external entities. Click the **Drill-down 
 
 | ID | Source | Data Provided | Method | Drill-down Schema |
 |---|---|---|---|---|
-| **E1** | **FedInvest** | Daily mid-market reference prices | Automated Scrape | [E1 Schema](./DATA_DICTIONARY.md#e1) |
+| **E1** | **FedInvest** | Daily price list (Buy, Sell, End of Day) | Automated Scrape | [E1 Schema](./DATA_DICTIONARY.md#e1) |
 | **E2** | **TreasuryDirect** | Daily interpolated RefCPI | REST API | [E2 Schema](./DATA_DICTIONARY.md#e2) |
 | **E3** | **FiscalData** | Auction results & TIPS metadata | REST API | [E3 Schema](./DATA_DICTIONARY.md#e3) |
 | **E4** | **BLS API** | Monthly CPI-U (NSA/SA) factors | REST API | [E4 Schema](./DATA_DICTIONARY.md#e4) |

@@ -53,7 +53,7 @@ const DD = 'viewer.html#/md/knowledge/DATA_DICTIONARY.md#';
 const TERMS = {
   'source data': 'source-data', 'reference data': 'reference-data', 'app inputs': 'app-inputs',
   'app outputs': 'app-outputs', 'downloaded data sets': 'downloaded-data-sets',
-  'daily mid-market prices': 'daily-mid-market-prices', 'daily Ref CPI': 'daily-ref-cpi',
+  'FedInvest daily price list': 'fedinvest-daily-price-list', 'daily Ref CPI': 'daily-ref-cpi',
   'auction results': 'auction-results', 'TIPS reference data': 'tips-reference-data',
   'monthly CPI-U': 'monthly-cpi-u', 'market yields': 'market-yields', 'market quotes': 'market-quotes',
   'fund holdings': 'fund-holdings', 'GSW curve parameters': 'gsw-curve-parameters',
@@ -445,7 +445,7 @@ function level2Ingestion() {
   // Each job is a process; each writes the store named beside it. Sources are not
   // redrawn as entities here: their flows enter from the page edge, named by the data they hold.
   const jobs = [
-    { id: '1.1',  name: ['Download', 'FedInvest', 'prices'],        data: 'daily mid-market prices', reads: ['tipsref', 'hol'], writes: ['fedinv'], href: 'DFD_LEVEL3_INGEST_FEDINVEST.html' },
+    { id: '1.1',  name: ['Download', 'FedInvest', 'prices'],        data: 'FedInvest daily price list', reads: ['tipsref', 'hol'], writes: ['fedinv'], href: 'DFD_LEVEL3_INGEST_FEDINVEST.html' },
     { id: '1.2',  name: ['Download', 'market quotes'],              data: 'market quotes', reads: ['hol'],     writes: ['quotes'], href: V('knowledge/1.2_Download_Market_Quotes.md') },
     { id: '1.3',  name: ['Calculate', 'yield curve', 'data sets'],  data: null, reads: ['fedinv', 'quotes', 'nsasa', 'hol'], writes: ['yc', 'bei', 'spread'] },
     { id: '1.4',  name: ['Fetch auction', 'results'],               data: 'auction results',            writes: ['auctions'] },
@@ -590,7 +590,7 @@ function level3IngestFedInvest() {
   // The price list enters from the page edge at each process that reads it.
   ['1.1.1', '1.1.2'].forEach(id => {
     P.push(flow(8, py[id], px[id] - PR - 3, py[id], { obstacles: OBS.filter(o => o.y !== py[id]) }));
-    P.push(labelAt(12, py[id] - 12, 'daily mid-market prices'));
+    P.push(labelAt(12, py[id] - 12, 'FedInvest daily price list'));
   });
   // Bond holidays above 1.1.1 and TIPS reference data (S2) below 1.1.2 are read; FedInvest prices (S1), right of 1.1.3, is written.
   const hol = { x: px['1.1.1'] - SW / 2, y: 50 }, ref = { x: px['1.1.2'] - SW / 2, y: 610 }, s1 = { x: 860, y: py['1.1.3'] };

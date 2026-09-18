@@ -17,11 +17,11 @@
 
 **C** &nbsp; [Cash Flow Calendar](#cash-flow-calendar) &middot; [Charts and Tables](#charts-and-tables) &middot; [clean price](#price) *(see Price)* &middot; [CNBC GraphQL (E5)](#e5) &middot; [Cost per TIPS](#cost-per-tips) &middot; [Coupon Rate](#coupon-rate) &middot; [Cover Excess](#cover-excess) &middot; [cover maturity](#cover-year-tips) *(see Cover Year TIPS)* &middot; [Cover Weight](#cover-weight) &middot; [Cover Year](#cover-year) &middot; [Cover Year TIPS](#cover-year-tips) &middot; [CPI CAGR](#cpi-cagr) &middot; [CPI Change (Month-over-Month)](#cpi-change-mom) &middot; [CPI Change (Point-to-Point)](#cpi-change-p2p) &middot; [CPI Change (Year-over-Year)](#cpi-change-yoy) &middot; [CPI history (S8)](#s8) &middot; [CPI-U NSA](#cpi-nsa) &middot; [CPI-U SA](#cpi-sa) &middot; [Credibility Factor](#credibility-factor) &middot; [CUSIP](#cusip)
 
-**D** &nbsp; [DAA](#daa) &middot; [Daily Mid-Market Prices](#daily-mid-market-prices) &middot; [Daily Ref CPI](#daily-ref-cpi) &middot; [DARA](#dara) &middot; [Dated Date](#dated-date) &middot; [Download Date](#download-date) &middot; [Downloaded Data Sets](#downloaded-data-sets) &middot; [Drill Popup](#drill-popup) &middot; [Drill Request](#drill-request) &middot; [Duration Matching](#duration-matching)
+**D** &nbsp; [DAA](#daa) &middot; [Daily Ref CPI](#daily-ref-cpi) &middot; [DARA](#dara) &middot; [Dated Date](#dated-date) &middot; [Download Date](#download-date) &middot; [Downloaded Data Sets](#downloaded-data-sets) &middot; [Drill Popup](#drill-popup) &middot; [Drill Request](#drill-request) &middot; [Duration Matching](#duration-matching)
 
 **E** &nbsp; [Excess TIPS](#excess-tips)
 
-**F** &nbsp; [Face Value](#face-value) &middot; [FACP](#facp) &middot; [Federal Reserve FEDS 2008-05 (E13)](#e13) &middot; [FedInvest (E1)](#e1) &middot; [FedInvest prices (S1)](#s1) &middot; [Fidelity Fixed Income (E6)](#e6) &middot; [FiscalData API (E3)](#e3) &middot; [fminvest.com API (E8)](#e8) &middot; [Forward Rate](#forward-rate) &middot; [Fund Holdings](#fund-holdings) &middot; [Fund holdings (S11)](#s11) &middot; [Funded Year](#funded-year) &middot; [Funded Year TIPS](#funded-year-tips)
+**F** &nbsp; [Face Value](#face-value) &middot; [FACP](#facp) &middot; [Federal Reserve FEDS 2008-05 (E13)](#e13) &middot; [FedInvest (E1)](#e1) &middot; [FedInvest Daily Price List](#fedinvest-daily-price-list) &middot; [FedInvest prices (S1)](#s1) &middot; [Fidelity Fixed Income (E6)](#e6) &middot; [FiscalData API (E3)](#e3) &middot; [fminvest.com API (E8)](#e8) &middot; [Forward Rate](#forward-rate) &middot; [Fund Holdings](#fund-holdings) &middot; [Fund holdings (S11)](#s11) &middot; [Funded Year](#funded-year) &middot; [Funded Year TIPS](#funded-year-tips)
 
 **G** &nbsp; [Gap Years](#gap-years) &middot; [GSW Curve Parameters](#gsw-curve-parameters) &middot; [GSW curve parameters (S12)](#s12)
 
@@ -666,7 +666,8 @@ Some values are true only until Treasury issues more TIPS. Left inline as approx
 
 ### 6.1 From external entities
 
-- <a id="daily-mid-market-prices"></a>**Daily Mid-Market Prices** = [FedInvest (E1)](#e1)
+- <a id="fedinvest-daily-price-list"></a>**FedInvest Daily Price List** = [FedInvest (E1)](#e1)
+  *Every price [FedInvest (E1)](#e1) publishes for a security — Buy, Sell and End of Day alike. Only the Buy price is a midpoint of dealer bid and ask; [Select TIPS and Treasury prices (1.1.2)](./1.1_Download_FedInvest_Prices.md#select-tips-and-treasury-prices) is what reduces this to the one [Price](#price) downstream processes use. Renamed from "Daily Mid-Market Prices" (2026-09-18): that name asserted of the whole flow what is only true of the Buy price.*
 - <a id="daily-ref-cpi"></a>**Daily Ref CPI** = [TreasuryDirect SecIndex (E2)](#e2)
 - <a id="auction-results"></a>**Auction Results** = *the auction records of* [FiscalData API (E3)](#e3)
 - <a id="tips-reference-data"></a>**TIPS Reference Data** = *the TIPS security records of* [FiscalData API (E3)](#e3)
