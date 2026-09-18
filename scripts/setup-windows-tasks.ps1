@@ -120,8 +120,8 @@ $legacy = @(
     'SnapYieldHistory', 'YieldHistorySnap',
     # SA Factor variants
     'SaFactorUpdate',
-    # Ref CPI variants (now chained from inside CpiHistory's wrapper, not its own task)
-    'RefCPI', 'RefCpi', 'RefCpiRefresh',
+    # Ref CPI variants (superseded by the canonical 'RefCpi' task registered below)
+    'RefCPI', 'RefCpiRefresh',
     # CPI History variants
     'FetchCpiHistory', 'CpiHistoryRefresh',
     # Fidelity variants
@@ -321,28 +321,35 @@ foreach ($year in @($now.Year, $now.Year + 1)) {
 }
 
 if ($futureDates.Count -gt 0) {
-    # 8:35am ET [PT: 5:35am]
+    # CpiHistory  -  8:35am ET [PT: 5:35am]
     $cpiTriggers = $futureDates | ForEach-Object {
         New-ScheduledTaskTrigger -Once -At ($_.Date.AddHours(5).AddMinutes(35))
     }
-
-    # RefCpi (TIPS/RefCPI.csv) is chained from inside run-cpi-history.cmd, run right after
-    # the BLS fetch succeeds, rather than given its own same-time trigger. RefCpi pulls from
-    # TreasuryDirect, a separate source that lags BLS's 8:30am ET print by an unknown amount;
-    # chaining runs it as soon as our own fetch confirms release day instead of guessing a
-    # fixed clock offset (the old fixed 11am PT trigger was confirmed too conservative).
-    # Retry every 30 min, up to 12x (6h), if the Ref CPI chain step reports TreasuryDirect
-    # hasn't caught up yet (non-zero exit from run-ref-cpi.cmd's freshness check).
     Register-CmdTask "CpiHistory" `
-        "Fetch full CPI-U history from BLS on release dates, upload bls/CPI_history.csv; then chain-run Ref CPI fetch (TIPS/RefCPI.csv), retrying if TreasuryDirect hasn't caught up yet" `
+        "Fetch full CPI-U history from BLS on release dates, upload bls/CPI_history.csv" `
         $cpiTriggers `
-        "$ProjectDir\scripts\run-cpi-history.cmd" `
+        "$ProjectDir\scripts\run-cpi-history.cmd"
+
+    # RefCpi (TIPS/RefCPI.csv)  -  9:30am ET [PT: 6:30am], same release dates as CpiHistory.
+    # Ref CPI pulls from TreasuryDirect, a source separate from BLS that lags the 8:30am ET
+    # BLS print by an unknown amount; this used to chain off CpiHistory's own trigger, but a
+    # non-zero exit from a chained step didn't reliably restart the wrapping task, so
+    # RefCpi has run on its own trigger since 2026-09-18. 9:30am ET gives TreasuryDirect an
+    # hour to catch up on its own clock. Retry every 30 min, up to 12x (6h), if
+    # run-ref-cpi.cmd's freshness check reports TreasuryDirect still hasn't caught up.
+    $refCpiTriggers = $futureDates | ForEach-Object {
+        New-ScheduledTaskTrigger -Once -At ($_.Date.AddHours(6).AddMinutes(30))
+    }
+    Register-CmdTask "RefCpi" `
+        "Fetch daily interpolated Ref CPI from TreasuryDirect on BLS release dates, upload TIPS/RefCPI.csv, retrying if TreasuryDirect hasn't caught up yet" `
+        $refCpiTriggers `
+        "$ProjectDir\scripts\run-ref-cpi.cmd" `
         -RestartInterval (New-TimeSpan -Minutes 30) -RestartCount 12
 
     $nextDate = ($futureDates | Sort-Object | Select-Object -First 1).ToString('yyyy-MM-dd')
     Write-Host "  Registered $($futureDates.Count) CPI date triggers (next: $nextDate)"
 } else {
-    Write-Warning "  No future CPI dates found  -  CpiHistory NOT registered."
+    Write-Warning "  No future CPI dates found  -  CpiHistory/RefCpi NOT registered."
 }
 
 # ---------------------------------------------------------------------------
