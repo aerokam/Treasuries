@@ -1,7 +1,8 @@
 @echo off
 REM scripts/run-ref-cpi.cmd
 REM Fetches daily interpolated Ref CPI from TreasuryDirect and writes to TIPS/RefCPI.csv in R2.
-REM Triggered by Task Scheduler only on BLS CPI release dates (scripts/setup-windows-tasks.ps1).
+REM Triggered by its own Task Scheduler task (RefCpi) at 9:30am ET on BLS CPI release dates
+REM (scripts/setup-windows-tasks.ps1) — independent of the CpiHistory task's own trigger.
 
 set REPO=C:\Users\aerok\projects\Treasuries
 set LOG=%REPO%\logs\ref-cpi.log
