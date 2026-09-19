@@ -174,18 +174,18 @@
 <h1>Level 2 &mdash; Yields Monitor</h1>
 
 <div class="diagram">
-<svg viewBox="0 0 1360 900" role="img" aria-label="Level 2 for Yields Monitor: seven processes reading five data stores and two external entities directly. No process writes a data store.">
+<svg viewBox="0 0 1360 950" role="img" aria-label="Level 2 for Yields Monitor: seven processes reading five data stores and one external entity directly. No process writes a data store.">
   <defs><marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#55558c"/></marker></defs>
   <path class="flow" d="M 260.0 170.0 Q 323.2 215.8 369.0 279.0" marker-end="url(#a1)"/>
   <path class="flow" d="M 260.0 315.0 Q 306.3 309.2 352.0 318.1" marker-end="url(#a1)"/>
-  <path class="flow" d="M 260.0 460.0 Q 482.9 426.1 583.1 224.2" marker-end="url(#a1)"/>
-  <path class="flow" d="M 260.0 605.0 Q 408.1 692.2 576.0 728.8" marker-end="url(#a1)"/>
+  <path class="flow" d="M 260.0 605.0 Q 455.4 445.7 591.4 233.3" marker-end="url(#a1)"/>
   <path class="flow" d="M 260.0 750.0 Q 416.0 725.0 572.0 750.0" marker-end="url(#a1)"/>
-  <path class="flow" d="M 260.0 460.0 Q 518.8 463.9 584.4 714.2" marker-end="url(#a1)"/>
-  <path class="flow" d="M 8.0 242.5 Q 183.7 248.0 349.0 308.0" marker-end="url(#a1)"/>
-  <text class="flow-label" x="12" y="233"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#market-yields"><tspan class="lk">market yields</tspan></a></text>
-  <path class="flow" d="M 8.0 532.5 Q 183.1 534.0 349.0 590.0" marker-end="url(#a1)"/>
-  <text class="flow-label" x="12" y="523"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#live-quotes"><tspan class="lk">live quotes</tspan></a></text>
+  <path class="flow" d="M 260.0 895.0 Q 408.1 807.8 576.0 771.2" marker-end="url(#a1)"/>
+  <path class="flow" d="M 260.0 605.0 Q 408.1 692.2 576.0 728.8" marker-end="url(#a1)"/>
+  <path class="flow" d="M 260.0 446.0 Q 305.7 393.2 365.6 357.3" marker-end="url(#a1)"/>
+  <text class="flow-label" x="267" y="438"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#market-yields"><tspan class="lk">market yields</tspan></a></text>
+  <path class="flow" d="M 260.0 474.0 Q 318.5 505.9 364.1 554.5" marker-end="url(#a1)"/>
+  <text class="flow-label" x="267" y="494"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#live-quotes"><tspan class="lk">live quotes</tspan></a></text>
   <path class="flow" d="M 459.9 290.5 Q 514.3 245.4 580.1 219.5" marker-end="url(#a1)"/>
   <text class="flow-label" x="552" y="256" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#yield-series"><tspan class="lk">yield series</tspan></a></text>
   <path class="flow" d="M 436.4 371.6 Q 546.1 521.6 603.6 698.4" marker-end="url(#a1)"/>
@@ -216,7 +216,7 @@
   <text class="flow-label" x="1049" y="176" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#charts-and-tables"><tspan class="lk">charts and tables</tspan></a></text>
   <path class="flow" d="M 1185.0 320.0 Q 829.6 387.1 471.0 340.0" marker-end="url(#a1)"/>
   <text class="flow-label" x="829" y="360" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#view-selections"><tspan class="lk">view selections</tspan></a></text>
-  <g class="entity"><rect x="1190" y="100" width="145" height="720" rx="3"/><text class="e-name" x="1262.5" y="450">User</text></g>
+  <g class="entity"><rect x="1190" y="100" width="145" height="770" rx="3"/><text class="e-name" x="1262.5" y="475">User</text></g>
   <a class="store" href="viewer.html#/md/knowledge/DataStores.md#s6">
     <rect x="40" y="150" width="215" height="40" fill="transparent" stroke="none"/>
     <line x1="40" y1="150" x2="255" y2="150"/>
@@ -229,23 +229,27 @@
     <line x1="40" y1="335" x2="255" y2="335"/>
     <text class="s-name" x="147.5" y="320">Intraday archive</text>
   </a>
-  <a class="store" href="viewer.html#/md/knowledge/DataStores.md#s16">
-    <rect x="40" y="440" width="215" height="40" fill="transparent" stroke="none"/>
-    <line x1="40" y1="440" x2="255" y2="440"/>
-    <line x1="40" y1="480" x2="255" y2="480"/>
-    <text class="s-name" x="147.5" y="465">Bond holidays</text>
+  <a class="entity" href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#e5">
+    <rect x="40" y="434" width="215" height="52" rx="3"/>
+    <text class="e-name" x="147.5" y="465">CNBC</text>
   </a>
-  <a class="store" href="viewer.html#/md/knowledge/DataStores.md#s2">
+  <a class="store" href="viewer.html#/md/knowledge/DataStores.md#s16">
     <rect x="40" y="585" width="215" height="40" fill="transparent" stroke="none"/>
     <line x1="40" y1="585" x2="255" y2="585"/>
     <line x1="40" y1="625" x2="255" y2="625"/>
-    <text class="s-name" x="147.5" y="610">TIPS reference data</text>
+    <text class="s-name" x="147.5" y="610">Bond holidays</text>
   </a>
-  <a class="store" href="viewer.html#/md/knowledge/DataStores.md#s4">
+  <a class="store" href="viewer.html#/md/knowledge/DataStores.md#s2">
     <rect x="40" y="730" width="215" height="40" fill="transparent" stroke="none"/>
     <line x1="40" y1="730" x2="255" y2="730"/>
     <line x1="40" y1="770" x2="255" y2="770"/>
-    <text class="s-name" x="147.5" y="755">Ref CPI NSA and SA</text>
+    <text class="s-name" x="147.5" y="755">TIPS reference data</text>
+  </a>
+  <a class="store" href="viewer.html#/md/knowledge/DataStores.md#s4">
+    <rect x="40" y="875" width="215" height="40" fill="transparent" stroke="none"/>
+    <line x1="40" y1="875" x2="255" y2="875"/>
+    <line x1="40" y1="915" x2="255" y2="915"/>
+    <text class="s-name" x="147.5" y="900">Ref CPI NSA and SA</text>
   </a>
   <a class="process" href="DFD_LEVEL3_YM_ASSEMBLE.html">
     <circle cx="410" cy="320" r="58"/>
@@ -296,8 +300,8 @@
 
 <p class="notes">
   <b>No process here writes a data store.</b> Every flow ends at 2.5, 2.6 or 2.7 and is gone when the page closes.
-  2.1 is the only process that reads a store for its main feed; it also reads <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#market-yields">market yields</a> directly from <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#e5">CNBC GraphQL (E5)</a>, live — no acquisition job stores this app's own working copy. It explodes at <a href="DFD_LEVEL3_YM_ASSEMBLE.html">Level 3</a>.
-  2.2 reads <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#live-quotes">live quotes</a> directly from <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#e15">CNBC Quote Service (E15)</a>, the same way — the second and only other place this portal reads an external entity outside process 1.
+  <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#e5">CNBC (E5)</a> is drawn as a box, in the store column, since this is the one place a Level 2 diagram in this portal shows an app reading an entity directly, live — no acquisition job stands between it and the app (see <a href="viewer.html#/md/knowledge/DFD_Worklist.md">DFD_Worklist.md</a> §4.0). Its two flows are independently named: <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#market-yields">market yields</a>, its chart-bar feed, to 2.1; <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#live-quotes">live quotes</a>, its quote service, to 2.2.
+  2.1 explodes at <a href="DFD_LEVEL3_YM_ASSEMBLE.html">Level 3</a>.
   2.3 and 2.4 each read <a href="viewer.html#/md/knowledge/DataStores.md#s16">Bond holidays (S16)</a> directly, to exclude a weekend or holiday bar from their own calculation, rather than through 2.1.
   Each flow is named by the one structure it holds, defined in <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#6.0-data-flows">Data Dictionary &sect;6.4</a>.
 </p>

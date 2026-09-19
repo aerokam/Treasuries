@@ -3,7 +3,7 @@
 ## Data Sources
 
 ### Historical Auction Results (`Auctions.csv`)
-- **Source:** FiscalData API — `api.fiscaldata.treasury.gov/services/api/fiscal_service/v1/accounting/od/auctions_query`
+- **Source:** FiscalData — `api.fiscaldata.treasury.gov/services/api/fiscal_service/v1/accounting/od/auctions_query`
 - **Script:** `scripts/getAuctions.js` (repo root scripts/)
 - **R2 key:** `Treasuries/Auctions.csv`
 - **Public URL:** `https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/Auctions.csv`

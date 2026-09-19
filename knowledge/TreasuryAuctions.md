@@ -11,7 +11,7 @@ graph LR
     %% Data Stores (S)
     S5[(S5 Auctions.csv)]
     S9[(S9 Tentative-Auction-Schedule.xml)]
-    E3[E3 FiscalData API]
+    E3[E3 FiscalData]
     E4[E4 Treasury XML]
 
     %% Processes (P)
@@ -48,7 +48,7 @@ graph LR
 ## 2.0 Core Processes
 
 ### [1.0 Auction Search](../TreasuryAuctions/knowledge/Data_Pipeline.md)
-Retrieves auction results from both the local `Auctions.csv` database and the live FiscalData API.
+Retrieves auction results from both the local `Auctions.csv` database and live from FiscalData.
 - **Goal**: Enable exploration of historical auction performance (e.g., high yields, bid-to-cover ratios).
 - **Sources**: FiscalData (accounting/od/auctions_query).
 
@@ -61,5 +61,5 @@ Augments the live `upcoming_auctions` feed with accurate TIPS identification.
 
 ## 3.0 Foundational Logic (The Engine Room)
 
-- **[Auctions Query Reference](./AuctionsQuery_Reference.md)**: Technical guide to the FiscalData API fields and query logic.
+- **[Auctions Query Reference](./AuctionsQuery_Reference.md)**: Technical guide to FiscalData's query fields and logic.
 - **[Data Pipeline](./Data_Pipeline.md)**: Details on the local **Auction Refresh** job that maintains the historical database.

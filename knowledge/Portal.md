@@ -62,16 +62,16 @@ All definitions are canonical in the [Data Dictionary](./DATA_DICTIONARY.md#1.0-
 |----|--------|-------------|
 | [E1](./DATA_DICTIONARY.md#e1) | FedInvest | A1, A2 |
 | [E2](./DATA_DICTIONARY.md#e2) | TreasuryDirect SecIndex | A1, A5 |
-| [E3](./DATA_DICTIONARY.md#e3) | FiscalData API | A4 |
-| [E4](./DATA_DICTIONARY.md#e4) | BLS Public API | A2 (SA), A5 (CPI history) |
-| [E5](./DATA_DICTIONARY.md#e5) | CNBC GraphQL | A3 |
+| [E3](./DATA_DICTIONARY.md#e3) | FiscalData | A4 |
+| [E4](./DATA_DICTIONARY.md#e4) | BLS | A2 (SA), A5 (CPI history) |
+| [E5](./DATA_DICTIONARY.md#e5) | CNBC | A3 |
 | [E6](./DATA_DICTIONARY.md#e6) | Fidelity Fixed Income | A2 |
-| [E7](./DATA_DICTIONARY.md#e7) | Vanguard Advisors API | A9 |
-| [E8](./DATA_DICTIONARY.md#e8) | fminvest.com API | A9 |
-| [E9](./DATA_DICTIONARY.md#e9) | PIMCO fund-detail API | A9 |
+| [E7](./DATA_DICTIONARY.md#e7) | Vanguard Advisors | A9 |
+| [E8](./DATA_DICTIONARY.md#e8) | fminvest.com | A9 |
+| [E9](./DATA_DICTIONARY.md#e9) | PIMCO | A9 |
 | [E10](./DATA_DICTIONARY.md#e10) | Schwab Asset Management holdings export | A9 |
 | [E11](./DATA_DICTIONARY.md#e11) | BondBloxx product-page holdings table | A9 |
-| [E12](./DATA_DICTIONARY.md#e12) | BlackRock iShares fund-document API | A9 |
+| [E12](./DATA_DICTIONARY.md#e12) | BlackRock iShares | A9 |
 
 ---
 

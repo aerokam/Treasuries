@@ -41,9 +41,9 @@ The following symbols are currently supported and grouped by security type:
 
 ## CNBC API
 
-**2D, 10D ranges**: Use CNBC GraphQL with mapped `timeRange` (1D, 5D).
+**2D, 10D ranges**: Use CNBC's chart-bar feed with mapped `timeRange` (1D, 5D).
 
-**1Y, 2Y, 3Y ranges**: CNBC GraphQL with `6M` `timeRange` — the same feed is refetched fresh for all three UI ranges and filtered client-side to the selected cutoff. This is deliberate (matches CNBC's own daily window, no drift), not a CORS fallback.
+**1Y, 2Y, 3Y ranges**: CNBC's chart-bar feed with `6M` `timeRange` — the same feed is refetched fresh for all three UI ranges and filtered client-side to the selected cutoff. This is deliberate (matches CNBC's own daily window, no drift), not a CORS fallback.
 
 **5D latest yields**: All ranges (except 10D) append CNBC 5D data for current market context.
 

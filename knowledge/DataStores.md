@@ -95,10 +95,10 @@ This document provides the operational details for every data store: R2 key, wri
 ## <a id="s18"></a>[Intraday archive (S18)](./DATA_DICTIONARY.md#s18)
 **File**: `intraday-raw/{symbol}/{YYYYMMDD}.json`
 **R2 Key**: `Treasuries/yields-history/intraday-raw/{symbol}/{YYYYMMDD}.json`
-**Description**: One immutable daily snapshot per symbol of the raw feeds [CNBC GraphQL (E5)](./DATA_DICTIONARY.md#e5) served that day.
+**Description**: One immutable daily snapshot per symbol of the raw feeds [CNBC (E5)](./DATA_DICTIONARY.md#e5) served that day.
 **Written by**: `YieldsMonitor/scripts/archiveIntraday.js` (job 1.8).
 **Update Frequency**: Weekdays 17:05 ET ([Data Pipeline](./Data_Pipeline.md)).
-**Read by**: Yields Monitor ([2.1 Assemble range data](../YieldsMonitor/knowledge/2.1_Assemble_Range_Data.md)), as the fallback when E5 itself returns nothing for a symbol.
+**Read by**: Yields Monitor ([2.1 Assemble range data](../YieldsMonitor/knowledge/2.1_Assemble_Range_Data.md)), as the fallback when [CNBC (E5)](./DATA_DICTIONARY.md#e5)'s chart-bar feed itself returns nothing for a symbol.
 
 ---
 
@@ -197,8 +197,8 @@ This document provides the operational details for every data store: R2 key, wri
 | `Year` | String | 4-digit year (e.g., `"1913"`) |
 | `Period` | String | BLS period code (e.g., `"M01"` = January) |
 | `PeriodName` | String | Full month name (e.g., `"January"`) |
-| `NSA` | Number | CPI-U Not Seasonally Adjusted ([BLS Public API (E4)](./DATA_DICTIONARY.md#e4) series `CUUR0000SA0`) |
-| `SA` | Number | CPI-U Seasonally Adjusted ([BLS Public API (E4)](./DATA_DICTIONARY.md#e4) series `CUSR0000SA0`). Blank for periods before January 1947. |
+| `NSA` | Number | CPI-U Not Seasonally Adjusted ([BLS (E4)](./DATA_DICTIONARY.md#e4) series `CUUR0000SA0`) |
+| `SA` | Number | CPI-U Seasonally Adjusted ([BLS (E4)](./DATA_DICTIONARY.md#e4) series `CUSR0000SA0`). Blank for periods before January 1947. |
 
 **Sort order**: Ascending by Year, then Period (oldest row first).
 
@@ -233,7 +233,7 @@ This document provides the operational details for every data store: R2 key, wri
 | `sa_yield` | Number | [SA Yield](./DATA_DICTIONARY.md#sa-yield). |
 | `sao_yield` | Number | [SAO Yield](./DATA_DICTIONARY.md#sao-yield). |
 
-**Consumers**: TipsLadderManager — reads `sa_yield` via `shared/src/market-data.js` for the within-year allocation policy (`TipsLadderManager/knowledge/2.0_TIPS_Ladders.md`). FundHoldings ([Vanguard Advisors API (E7)](./DATA_DICTIONARY.md#e7)/[fminvest.com API (E8)](./DATA_DICTIONARY.md#e8) holdings enrichment) — cross-references by CUSIP to attach ask/SA/SAO yield to TIPS fund holdings. SeasonalAdjustments — reads a snapshot committed to that app (`SeasonalAdjustments/data/YieldsSaSao.snapshot.csv`), not this object, so a re-publish does not reach it until the snapshot is retaken.
+**Consumers**: TipsLadderManager — reads `sa_yield` via `shared/src/market-data.js` for the within-year allocation policy (`TipsLadderManager/knowledge/2.0_TIPS_Ladders.md`). FundHoldings ([Vanguard Advisors (E7)](./DATA_DICTIONARY.md#e7)/[fminvest.com (E8)](./DATA_DICTIONARY.md#e8) holdings enrichment) — cross-references by CUSIP to attach ask/SA/SAO yield to TIPS fund holdings. SeasonalAdjustments — reads a snapshot committed to that app (`SeasonalAdjustments/data/YieldsSaSao.snapshot.csv`), not this object, so a re-publish does not reach it until the snapshot is retaken.
 
 **Live Data**: [View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/TIPS/YieldsSaSao.csv)
 
@@ -244,11 +244,11 @@ This document provides the operational details for every data store: R2 key, wri
 **Update Frequency**: Daily, Local Windows Task `FundHoldings`, via `FundHoldings/updateAllHoldings.js` then `FundHoldings/enrichHoldings.js`.
 **R2 Key**: `FundHoldings/` (its own top-level prefix, since a fund’s holdings mix TIPS and nominal rows and so belong under neither `TIPS/` nor `Treasuries/`)
 
-**CSV columns** (exact header names): `CUSIP, Holding Name, Ticker, Category, Quantity, Coupon, % of Fund, Market Value, Maturity Date, ISIN, SEDOL, As of` — and, in the `-Enriched` file only, `Ask Yield, SA Yield, SAO Yield, Term, Duration`. These are the file’s own headers; the [Vanguard Advisors API (E7)](./DATA_DICTIONARY.md#e7)–[BlackRock iShares fund-document API (E12)](./DATA_DICTIONARY.md#e12) entries name the same fields in the Data Dictionary’s normalized form.
+**CSV columns** (exact header names): `CUSIP, Holding Name, Ticker, Category, Quantity, Coupon, % of Fund, Market Value, Maturity Date, ISIN, SEDOL, As of` — and, in the `-Enriched` file only, `Ask Yield, SA Yield, SAO Yield, Term, Duration`. These are the file’s own headers; the [Vanguard Advisors (E7)](./DATA_DICTIONARY.md#e7)–[BlackRock iShares (E12)](./DATA_DICTIONARY.md#e12) entries name the same fields in the Data Dictionary’s normalized form.
 
 **Companion file**: `FundHoldings/FundMeta.json` = `{ @Ticker: { fundName, portId | etfId | cusip | portfolioId, expenseRatio, secYield } }`. `expenseRatio` and `secYield` are percent-scale numbers (`0.09` for 0.09%), each the provider’s own reported figure rather than an independently computed one.
 
-**Sources**: [Vanguard Advisors API (E7)](./DATA_DICTIONARY.md#e7) Vanguard, [fminvest.com API (E8)](./DATA_DICTIONARY.md#e8) fminvest.com, [PIMCO fund-detail API (E9)](./DATA_DICTIONARY.md#e9) PIMCO, [Schwab Asset Management holdings export (E10)](./DATA_DICTIONARY.md#e10) Schwab, [BondBloxx product-page holdings table (E11)](./DATA_DICTIONARY.md#e11) BondBloxx, [BlackRock iShares fund-document API (E12)](./DATA_DICTIONARY.md#e12) BlackRock iShares. Per-fund detail: [FundHoldings 1.0](../FundHoldings/knowledge/1.0_FundHoldings.md).
+**Sources**: [Vanguard Advisors (E7)](./DATA_DICTIONARY.md#e7) Vanguard, [fminvest.com (E8)](./DATA_DICTIONARY.md#e8) fminvest.com, [PIMCO (E9)](./DATA_DICTIONARY.md#e9) PIMCO, [Schwab Asset Management holdings export (E10)](./DATA_DICTIONARY.md#e10) Schwab, [BondBloxx product-page holdings table (E11)](./DATA_DICTIONARY.md#e11) BondBloxx, [BlackRock iShares (E12)](./DATA_DICTIONARY.md#e12) BlackRock iShares. Per-fund detail: [FundHoldings 1.0](../FundHoldings/knowledge/1.0_FundHoldings.md).
 
 **Live Data**: [View FundMeta.json](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/FundHoldings/FundMeta.json)
 

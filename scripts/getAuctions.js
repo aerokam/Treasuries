@@ -99,7 +99,7 @@ function unionHeaders(h1, h2) {
 }
 
 // ── FiscalData fetch ──────────────────────────────────────────────────────────
-const PAGE_SIZE = 10000; // FiscalData API max is 10000; larger values return HTTP 400
+const PAGE_SIZE = 10000; // FiscalData's max is 10000; larger values return HTTP 400
 
 async function fetchAuctions(sinceDate) {
   // No &fields= param → returns all available columns

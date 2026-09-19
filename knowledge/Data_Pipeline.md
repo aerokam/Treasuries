@@ -13,7 +13,7 @@ All data enters the system from these external entities. Click the **Drill-down 
 | **E1** | **FedInvest** | Daily price list (Buy, Sell, End of Day) | Automated Scrape | [E1 Schema](./DATA_DICTIONARY.md#e1) |
 | **E2** | **TreasuryDirect** | Daily interpolated RefCPI | REST API | [E2 Schema](./DATA_DICTIONARY.md#e2) |
 | **E3** | **FiscalData** | Auction results & TIPS metadata | REST API | [E3 Schema](./DATA_DICTIONARY.md#e3) |
-| **E4** | **BLS API** | Monthly CPI-U (NSA/SA) factors | REST API | [E4 Schema](./DATA_DICTIONARY.md#e4) |
+| **E4** | **BLS** | Monthly CPI-U (NSA/SA) factors | REST API | [E4 Schema](./DATA_DICTIONARY.md#e4) |
 | **E5** | **CNBC** | Real-time market yields | GraphQL | [E5 Schema](./DATA_DICTIONARY.md#e5) |
 | **E6** | **Fidelity** | Broker ask/bid quotes | Automated Download | [E6 Schema](./DATA_DICTIONARY.md#e6) |
 | **E7** | **Vanguard Advisors** | Fund holdings, expense ratio, 30-Day SEC yield | REST API | [E7 Schema](./DATA_DICTIONARY.md#e7) |

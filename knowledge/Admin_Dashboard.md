@@ -83,7 +83,7 @@ Each app has a set of named pipelines. The server's `APP_CONFIGS` is the authori
 | Daily yields-history snapshots | `yields-history/history.json` *(consolidated, all 14)* | Update Yields History | History charts — 14 symbols |
 | Live Treasury yields | *(none — live browser fetch)* | — | Live yield display + intraday charts |
 
-Note: YieldsMonitor does **not** read `YieldsFromFedInvestPrices.csv`. Its only R2 dependency is the single consolidated `yields-history/history.json` (nested by symbol, all 14). Live data comes from CNBC GraphQL fetched directly in the browser.
+Note: YieldsMonitor does **not** read `YieldsFromFedInvestPrices.csv`. Its only R2 dependency is the single consolidated `yields-history/history.json` (nested by symbol, all 14). Live data comes from CNBC, fetched directly in the browser.
 
 ### TipsLadderManager
 

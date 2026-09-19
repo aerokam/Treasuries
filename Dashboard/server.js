@@ -114,7 +114,7 @@ const APP_CONFIGS = [
         r2Key: null,
         localJobIds: [],
         stalenessHours: null,
-        liveNote: 'Browser fetches CNBC GraphQL directly on page load — no job to run',
+        liveNote: 'Browser fetches CNBC directly on page load — no job to run',
       },
       {
         id: 'feed-inspector',
@@ -181,7 +181,7 @@ const APP_CONFIGS = [
         r2Key: null,
         localJobIds: [],
         stalenessHours: null,
-        liveNote: 'Live fetch from FiscalData API on page load — no job to run',
+        liveNote: 'Live fetch from FiscalData on page load — no job to run',
       },
     ],
   },

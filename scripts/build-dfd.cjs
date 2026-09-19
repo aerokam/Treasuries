@@ -126,6 +126,16 @@ const fromCircle = (cx, cy, r, x2, y2) => { const dx = x2 - cx, dy = y2 - cy, L 
 
 const marker = () => `  <defs><marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#55558c"/></marker></defs>`;
 
+// An external entity, drawn as a box at whichever level the process reading it is
+// decomposed into the specific jobs or processes that actually do the reading —
+// see DFD_Worklist.md §4.0. Multi-line name, centered on its own y.
+function entityShape(x, y, w, h, href, lines) {
+  const top = y - h / 2;
+  return [`  <a class="entity" href="${href}">`,
+    `    <rect x="${x}" y="${top}" width="${w}" height="${h}" rx="3"/>`,
+    ...lines.map((ln, k) => `    <text class="e-name" x="${x + w / 2}" y="${top + h / 2 + (k - (lines.length - 1) / 2) * 16 + 5}">${esc(ln)}</text>`),
+    `  </a>`].join(NL);
+}
 function storeShape(x, y, w, href, name) {
   return [`  <a class="store" href="${href}">`,
     `    <rect x="${x}" y="${y - 20}" width="${w}" height="40" fill="transparent" stroke="none"/>`,
@@ -458,6 +468,7 @@ function level2YieldsMonitor() {
   const stores = [
     { id: 'yhist', name: 'Yield history', href: DS('s6') },
     { id: 'ia', name: 'Intraday archive', href: DS('s18') },
+    { id: 'cnbc', entity: true, name: ['CNBC'], href: DD + 'e5' },
     { id: 'hol', name: 'Bond holidays', href: DS('s16') },
     { id: 'tipsref', name: 'TIPS reference data', href: DS('s2') },
     { id: 'nsasa', name: 'Ref CPI NSA and SA', href: DS('s4') },
@@ -475,28 +486,30 @@ function level2YieldsMonitor() {
     { id: '2.6', name: ['Render yield', 'curve', 'snapshots'], href: V(KYM + '2.6_Render_Yield_Curve_Snapshots.md'), reads: [], out: {} },
     { id: '2.7', name: ['Render', 'breakeven', 'inflation'], href: V(KYM + '2.7_Render_Breakeven_Inflation.md'), reads: [], out: {} },
   ];
-  const SX = 40, SW = 215, PR = 58, UX = 1190, UW = 145;
+  const SX = 40, SW = 215, EH = 52, PR = 58, UX = 1190, UW = 145;
   const sy = i => 170 + i * 145;
   const px = { '2.1': 410, '2.2': 410, '2.3': 630, '2.4': 630, '2.5': 850, '2.6': 850, '2.7': 850 };
   const py = { '2.1': 320, '2.2': 590, '2.3': 190, '2.4': 750, '2.5': 190, '2.6': 470, '2.7': 750 };
-  const H = 900, W = 1360;
+  const H = 950, W = 1360;
   const OBS = procs.map(q => ({ x: px[q.id], y: py[q.id], r: PR }));
   const LBL = [];
-  const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 2 for Yields Monitor: seven processes reading five data stores and two external entities directly. No process writes a data store.">`, marker()];
+  const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 2 for Yields Monitor: seven processes reading five data stores and one external entity directly. No process writes a data store.">`, marker()];
   const sIdx = Object.fromEntries(stores.map((s, i) => [s.id, i]));
   procs.forEach(p => p.reads.forEach(id => {
     const y = sy(sIdx[id]), [x2, y2] = toCircle(SX + SW + 5, y, px[p.id], py[p.id], PR);
     P.push(flow(SX + SW + 5, y, x2, y2, { obstacles: OBS }));
   }));
-  // The two entities Yields Monitor reads directly, live, enter from the page edge —
-  // the same convention every other diagram uses for a source, not redrawn as a box.
-  // Entering between two store rows, rather than beside one, keeps the label clear of it.
-  const mktY = (sy(sIdx.yhist) + sy(sIdx.ia)) / 2;
-  P.push(flow(8, mktY, px['2.1'] - PR - 3, py['2.1'] - 12, { obstacles: OBS.filter(o => !(o.x === px['2.1'] && o.y === py['2.1'])) }));
-  P.push(labelAt(12, mktY - 10, 'market yields'));
-  const lqY = (sy(sIdx.hol) + sy(sIdx.tipsref)) / 2;
-  P.push(flow(8, lqY, px['2.2'] - PR - 3, py['2.2'], { obstacles: OBS.filter(o => !(o.x === px['2.2'] && o.y === py['2.2'])) }));
-  P.push(labelAt(12, lqY - 10, 'live quotes'));
+  // CNBC is drawn as a box, in the same column as the stores, rather than an unlabelled
+  // edge-flow — the one entity this app reads live, feeding two processes with two
+  // independently named flows. See DFD_Worklist.md §4.0.
+  const cnbcY = sy(sIdx.cnbc);
+  const mY = cnbcY - 14, lY = cnbcY + 14;
+  const [m2, m3] = toCircle(SX + SW + 5, mY, px['2.1'], py['2.1'], PR);
+  P.push(flow(SX + SW + 5, mY, m2, m3, { obstacles: OBS.filter(o => !(o.x === px['2.1'] && o.y === py['2.1'])) }));
+  P.push(labelAt(SX + SW + 12, mY - 8, 'market yields'));
+  const [l2, l3] = toCircle(SX + SW + 5, lY, px['2.2'], py['2.2'], PR);
+  P.push(flow(SX + SW + 5, lY, l2, l3, { obstacles: OBS.filter(o => !(o.x === px['2.2'] && o.y === py['2.2'])) }));
+  P.push(labelAt(SX + SW + 12, lY + 20, 'live quotes'));
   P.push(internalFlows(procs, px, py, PR, OBS, LBL));
   ['2.5', '2.6', '2.7'].forEach(id => {
     P.push(flow(px[id] + PR + 3, py[id], UX - 5, py[id], { obstacles: OBS.filter(o => !(o.x === px[id] && o.y === py[id])) }));
@@ -505,7 +518,7 @@ function level2YieldsMonitor() {
   P.push(flow(UX - 5, py['2.1'], px['2.1'] + PR + 3, py['2.1'] + 20, { obstacles: OBS.filter(o => !(o.x === px['2.1'] && o.y === py['2.1'])) }));
   P.push(labelAt((px['2.1'] + PR + UX) / 2, py['2.1'] + 40, 'view selections', 'middle'));
   P.push(`  <g class="entity"><rect x="${UX}" y="100" width="${UW}" height="${H - 180}" rx="3"/><text class="e-name" x="${UX + UW / 2}" y="${H / 2}">User</text></g>`);
-  stores.forEach((s, i) => P.push(storeShape(SX, sy(i), SW, s.href, s.name)));
+  stores.forEach((s, i) => P.push(s.entity ? entityShape(SX, sy(i), SW, EH, s.href, s.name) : storeShape(SX, sy(i), SW, s.href, s.name)));
   procs.forEach(p => P.push(procShape(px[p.id], py[p.id], PR, p.href, p.id, p.name)));
   P.push('</svg>');
 
@@ -514,8 +527,8 @@ function level2YieldsMonitor() {
     up: 'DFD_LEVEL1.html', upLabel: 'Level 1',
     spec: V('YieldsMonitor/README.md'), specLabel: 'Yields Monitor specs', svg: P.join(NL),
     notes: ['  <b>No process here writes a data store.</b> Every flow ends at 2.5, 2.6 or 2.7 and is gone when the page closes.',
-      '  2.1 is the only process that reads a store for its main feed; it also reads <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#market-yields">market yields</a> directly from <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#e5">CNBC GraphQL (E5)</a>, live — no acquisition job stores this app\'s own working copy. It explodes at <a href="DFD_LEVEL3_YM_ASSEMBLE.html">Level 3</a>.',
-      '  2.2 reads <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#live-quotes">live quotes</a> directly from <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#e15">CNBC Quote Service (E15)</a>, the same way — the second and only other place this portal reads an external entity outside process 1.',
+      '  <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#e5">CNBC (E5)</a> is drawn as a box, in the store column, since this is the one place a Level 2 diagram in this portal shows an app reading an entity directly, live — no acquisition job stands between it and the app (see <a href="viewer.html#/md/knowledge/DFD_Worklist.md">DFD_Worklist.md</a> §4.0). Its two flows are independently named: <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#market-yields">market yields</a>, its chart-bar feed, to 2.1; <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#live-quotes">live quotes</a>, its quote service, to 2.2.',
+      '  2.1 explodes at <a href="DFD_LEVEL3_YM_ASSEMBLE.html">Level 3</a>.',
       '  2.3 and 2.4 each read <a href="viewer.html#/md/knowledge/DataStores.md#s16">Bond holidays (S16)</a> directly, to exclude a weekend or holiday bar from their own calculation, rather than through 2.1.',
       '  Each flow is named by the one structure it holds, defined in <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#6.0-data-flows">Data Dictionary &sect;6.4</a>.'].join(NL)
   });
@@ -564,14 +577,27 @@ function level3YieldsMonitorAssemble() {
     up: 'DFD_LEVEL2_YIELDSMONITOR.html', upLabel: 'Level 2 — Yields Monitor', svg: P.join(NL),
     notes: ['  One process per family of UI ranges — 2D/10D, 1Y/2Y/3Y, 10Y/ALL and Custom — each independent: only one is active at a time, so nothing here combines their output.',
       '  Every process here drills to its own section of <a href="' + S() + '">2.1 Assemble range data</a>.',
-      '  Every process also reads <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#market-yields">market yields</a> live, from <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#e5">CNBC GraphQL (E5)</a>, for its own primary feed or its own live tip — only <a href="viewer.html#/md/knowledge/DataStores.md#s18">Intraday archive (S18)</a> and <a href="viewer.html#/md/knowledge/DataStores.md#s6">Yield history (S6)</a> are the fallbacks drawn on the left.'].join(NL)
+      '  Every process also reads <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#market-yields">market yields</a> live, from <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#e5">CNBC (E5)</a>\'s chart-bar feed, for its own primary feed or its own live tip — only <a href="viewer.html#/md/knowledge/DataStores.md#s18">Intraday archive (S18)</a> and <a href="viewer.html#/md/knowledge/DataStores.md#s6">Yield history (S6)</a> are the fallbacks drawn on the left.'].join(NL)
   });
 }
 
 // ── Level 2: process 1, the ingestion jobs ──────────────────────────────────
 function level2Ingestion() {
-  // Each job is a process; each writes the store named beside it. Sources are not
-  // redrawn as entities here: their flows enter from the page edge, named by the data they hold.
+  // Each job is a process; each writes the store named beside it. Unlike Level 1, an
+  // external entity IS drawn here — the fan-out this diagram would need to show every
+  // entity is bounded (one box per source, some feeding two jobs), not the every-app
+  // fan-out that rules entities out at Level 1. See DFD_Worklist.md §4.0.
+  const entities = [
+    { name: ['FedInvest'], href: DD + 'e1', jobs: ['1.1'] },
+    { name: ['TreasuryDirect', 'SecIndex'], href: DD + 'e2', jobs: ['1.13'] },
+    { name: ['FiscalData'], href: DD + 'e3', jobs: ['1.4', '1.6'] },
+    { name: ['BLS'], href: DD + 'e4', jobs: ['1.9', '1.12'] },
+    { name: ['CNBC'], href: DD + 'e5', jobs: ['1.7', '1.8'] },
+    { name: ['Fidelity', 'Fixed Income'], href: DD + 'e6', jobs: ['1.2'] },
+    { name: ['Fund providers', '(E7-E12)'], href: DD + 'fund-holdings', jobs: ['1.14'] },
+    { name: ['Federal Reserve', 'FEDS 2008-05'], href: DD + 'e13', jobs: ['1.15'] },
+    { name: ['Treasury Tentative', 'Auction Schedule'], href: DD + 'e14', jobs: ['1.5'] },
+  ];
   const jobs = [
     { id: '1.1',  name: ['Download', 'FedInvest', 'prices'],        data: 'FedInvest daily price list', reads: ['tipsref', 'hol'], writes: ['fedinv'], href: 'DFD_LEVEL3_INGEST_FEDINVEST.html' },
     { id: '1.2',  name: ['Download', 'market quotes'],              data: 'market quotes', reads: ['hol'],     writes: ['quotes'], href: V('knowledge/1.2_Download_Market_Quotes.md') },
@@ -602,19 +628,36 @@ function level2Ingestion() {
   };
   const order = ['fedinv','quotes','yc','bei','spread','auctions','tent','tipsref','yhist','ia','blscpi','nsasa','sasao','cpihist','refcpi','funds','gsw','hol'];
   const JX = 470, JR = 54, SX = 730, SW = 235;
+  const EX = 20, EW = 190, EH = 52;
   const jy = i => 90 + i * 116;
   const sy = i => 80 + i * 97;
   const H = Math.max(jy(jobs.length - 1), sy(order.length - 1)) + 110, W = 1010;
+  const jobIdx = Object.fromEntries(jobs.map((j, i) => [j.id, i]));
+  entities.forEach(e => { e.y = e.jobs.reduce((s, jid) => s + jy(jobIdx[jid]), 0) / e.jobs.length; });
+  // An entity feeding two jobs sits at their midpoint, which can land exactly on a
+  // single-job entity sitting between them (FiscalData's two jobs bracket Treasury
+  // Tentative Auction Schedule's one). Sorting by that midpoint and enforcing a
+  // minimum gap keeps every box legible without losing the "near its own jobs" placement.
+  entities.sort((a, b) => a.y - b.y);
+  const MIN_ENTITY_GAP = EH + 24;
+  for (let i = 1; i < entities.length; i++) {
+    if (entities[i].y - entities[i - 1].y < MIN_ENTITY_GAP) entities[i].y = entities[i - 1].y + MIN_ENTITY_GAP;
+  }
   const OBS = jobs.map((j, i) => ({ x: JX, y: jy(i), r: JR }));
   const sIdx = Object.fromEntries(order.map((k, i) => [k, i]));
 
-  const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 2 for process 1: the ingestion jobs and the data stores each one writes.">`, marker()];
+  const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 2 for process 1: the ingestion jobs, the external entity each one reads, and the data store each one writes.">`, marker()];
+  entities.forEach(e => {
+    e.jobs.forEach(jid => {
+      const ji = jobIdx[jid], y = jy(ji), j = jobs[ji];
+      const y1 = e.y + (e.jobs.length > 1 ? (e.jobs.indexOf(jid) - (e.jobs.length - 1) / 2) * 16 : 0);
+      const [x2, y2] = toCircle(EX + EW, y1, JX, y, JR);
+      P.push(flow(EX + EW, y1, x2, y2, { obstacles: OBS.filter(o => o.y !== y) }));
+      P.push(labelAt(EX + EW + 8, y1 - 8, j.data));
+    });
+  });
   jobs.forEach((j, i) => {
     const y = jy(i);
-    if (j.data) {
-      P.push(flow(8, y, JX - JR - 3, y, { obstacles: OBS.filter(o => o.y !== y) }));
-      P.push(labelAt(12, y - 12, j.data));
-    }
     (j.reads || []).forEach(k => {
       const from = toCircle(SX + SW + 5, sy(sIdx[k]), JX, y, JR);
       P.push(flow(SX - 5, sy(sIdx[k]), from[0], from[1], { obstacles: OBS.filter(o => o.y !== y) }));
@@ -624,6 +667,7 @@ function level2Ingestion() {
       P.push(flow(s[0], s[1], SX - 5, sy(sIdx[k]), { obstacles: OBS.filter(o => o.y !== y) }));
     });
   });
+  entities.forEach(e => P.push(entityShape(EX, e.y, EW, EH, e.href, e.name)));
   order.forEach((k, i) => P.push(storeShape(SX, sy(i), SW, stores[k][1], stores[k][0])));
   jobs.forEach((j, i) => P.push(procShape(JX, jy(i), JR, j.href || V('knowledge/Data_Pipeline.md'), j.id, j.name)));
   P.push('</svg>');
@@ -631,9 +675,10 @@ function level2Ingestion() {
   return page({
     title: 'Ingestion jobs — Level 2', h1: 'Level 2 &mdash; 1 Acquire and derive reference data', maxWidth: W,
     up: 'DFD_LEVEL1.html', upLabel: 'Level 1', svg: P.join(NL),
-    notes: ['  One process per scheduled job, and the store each writes.',
+    notes: ['  One process per scheduled job: the external entity it reads (if any), and the store it writes.',
       '  1.3, 1.10 and 1.11 read no external source: they calculate from what the retrieving jobs have stored. 1.1, 1.2 and 1.14 read both an external source and one or more stores.',
-      '  Sources are not redrawn here. Their flows enter from the edge, named by the data they hold, and each source is drawn on the <a href="KNOWLEDGE_MAP.html">context diagram</a>.',
+      '  An entity feeding two jobs (FiscalData, BLS, CNBC) is drawn once, with a separately labelled flow to each — the same source, not two sources. FiscalData\'s two flows here match its two flows in the Data Dictionary; BLS\'s and CNBC\'s two jobs each read the same flow independently.',
+      '  E7 through E12 are drawn as one box: the six fund-holdings providers, each with its own entry in the <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md">Data Dictionary</a>, are otherwise identical in shape from this diagram\'s point of view — one job reads all six.',
       '  1.1 explodes at <a href="DFD_LEVEL3_INGEST_FEDINVEST.html">Level 3</a>. Every other job drills to <a href="viewer.html#/md/knowledge/Data_Pipeline.md">Data Pipeline</a> for its schedule and script path; its process spec is not yet written.'].join(NL)
   });
 }
