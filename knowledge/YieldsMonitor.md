@@ -1,70 +1,28 @@
-# YieldsMonitor (App Overview)
+# Yields Monitor (App Overview)
 
-**YieldsMonitor** is a real-time and historical visualization tool for U.S. Treasury yields (Nominal and TIPS). It provides high-resolution intraday tracking and long-term trend analysis, focusing on consistency and market-state awareness.
-
----
-
-## 1.0 App Context (Level 1 DFD)
-
-```mermaid
-graph LR
-    %% Data Stores (S)
-    S6[(S6 yields-history/)]
-    E5[E5 CNBC GraphQL]
-
-    %% Processes (P)
-    P1((1.0 Data Blending))
-    P2((2.0 Yield Change Logic))
-    P3((3.0 Interactive Charts))
-
-    %% User (E)
-    U[User / Investor]
-
-    %% Inbound Data
-    S6 --> P1
-    E5 -->|Live Tip| P1
-    
-    %% Internal Flows
-    P1 --> P2
-    P2 --> P3
-    
-    %% User Interaction
-    U <-->|Symbol Select / Time Range| P3
-
-    %% Links to Specs
-    click P1 "#/md/YieldsMonitor/knowledge/1.0_Operation.md#data-blending-the-live-tip" "View Blending Logic"
-    click P2 "#/md/YieldsMonitor/knowledge/1.0_Operation.md#20-yield-change-logic" "View Change Logic"
-    click P3 "#/md/YieldsMonitor/knowledge/1.0_Operation.md#30-interactive-visualization" "View UI Specs"
-    click S6 "#/md/knowledge/DataStores.md#s6" "View Schema"
-```
-
+**Yields Monitor** tracks Treasury and TIPS yields intraday and historically, for whichever maturities the user selects. Every range reads a different combination of a live CNBC feed and a stored baseline; the app calculates each symbol's day-over-day change and, for TIPS, a Seasonally Adjusted yield, and renders three views: individual time-series charts, a yield curve snapshot, and breakeven inflation.
 
 ---
 
-## 2.0 Core Processes
+## Data flow diagram
 
-### [1.0 Data Blending](../YieldsMonitor/knowledge/1.0_Operation.md#data-architecture)
-For 10Y, ALL, and Custom ranges: blend R2 historical baseline with latest intraday yields from CNBC for current market context. (1Y/2Y/3Y instead reread a CNBC feed fresh each load — no R2 involved; see linked spec.)
-- **Goal**: Ensure "Latest Yield" and "Day Change" always reflect current trading, not stale historical closes.
-- **Method**: 10Y/ALL/Custom fetch R2 historical baseline (daily 3PM closes, refreshed by updateYieldsHistory.js), then append latest intraday yields from CNBC 5D feed.
+Yields Monitor is process 2 on [Level 1](/knowledge/DFD_LEVEL1). Its [Level 2 diagram](/knowledge/DFD_LEVEL2_YIELDSMONITOR) shows the seven processes below, the five data stores and two external entities it reads, and the flows between the processes, each defined in [Data Dictionary §6.4](./DATA_DICTIONARY.md#6.4-yields-monitor).
 
-### [2.0 Yield Change Logic](../YieldsMonitor/knowledge/1.0_Operation.md#yield-change-calculation)
-Calculates the difference between the latest yield and the previous market close (17:00 ET).
-- **Goal**: Provide a consistent "Day Change" metric across all views.
-- **Timezone**: All logic is anchored to `America/New_York` wall-clock time.
-- **Reference point**: The last bar at exactly **17:00 ET** on the previous trading day. This is the official end-of-trading-day close.
-- **Deviation from CNBC**: CNBC's displayed yield change uses an earlier reference (their `previous_day_closing` field from the Tradeweb quote service), which appears to reflect a **mid-afternoon settlement quote** (~3:00 PM ET) rather than the 5 PM close. On 2026-04-08 for US1Y, our 17:00 close = 3.693% vs. CNBC's reference = 3.685% — a 0.008% discrepancy. This is expected and intentional.
+## Process specs
 
-### [3.0 Interactive Visualization](../YieldsMonitor/knowledge/1.0_Operation.md#uiux-standards)
-Intraday and historical charts featuring market-state annotations.
-- **Features**: After-hours and weekend shading, Y-axis auto-rescaling, comparative yield curve overlays, and **custom date range** selection.
-- **Custom Date Range**: A dedicated sidebar control lets users input a specific start and end date. Time Series charts filter to that window; Yield Curve and Breakeven Inflation snapshot curves automatically reflect the custom start/end dates.
-- **Precision**: Yields are tracked to 3 decimal places for granular movement analysis.
+| Process | Spec | What it does |
+|---|---|---|
+| 2.1 | [Assemble range data](../YieldsMonitor/knowledge/2.1_Assemble_Range_Data.md) | Builds each symbol's [Yield Series](./DATA_DICTIONARY.md#yield-series) for the active range, from [Yield history (S6)](./DataStores.md#s6), [Intraday archive (S18)](./DataStores.md#s18) and CNBC's live feed, in whichever combination the range calls for. |
+| 2.2 | [Read live quotes](../YieldsMonitor/knowledge/2.2_Read_Live_Quotes.md) | Reads every symbol's live Yield and prior close from CNBC's quote service, and today's real bond behind each Seasonally Adjusted TIPS symbol. |
+| 2.3 | [Calculate day change](../YieldsMonitor/knowledge/2.3_Calculate_Day_Change.md) | Calculates the [Day Change](./DATA_DICTIONARY.md#day-change): the current Yield less the prior trading day's 17:05 ET close. |
+| 2.4 | [Adjust for seasonality](../YieldsMonitor/knowledge/2.4_Adjust_For_Seasonality.md) | Carries each TIPS symbol's Yield Series through the same Price → SA Price → SA Yield transform Yield Curves applies to an actual TIPS. |
+| 2.5 | [Render time series](../YieldsMonitor/knowledge/2.5_Render_Time_Series.md) | Draws one chart per checked symbol, and the sidebar readings for every symbol. |
+| 2.6 | [Render yield curve snapshots](../YieldsMonitor/knowledge/2.6_Render_Yield_Curve_Snapshots.md) | Draws the TIPS and Nominal curves at the start and end of the active range. |
+| 2.7 | [Render breakeven inflation](../YieldsMonitor/knowledge/2.7_Render_Breakeven_Inflation.md) | Draws the breakeven curve, nominal Yield less TIPS Yield, at five maturity pairs. |
 
----
+## Reference specs
 
-## 3.0 Foundational Logic (The Engine Room)
-
-- **[Operation Manual (1.0)](../YieldsMonitor/knowledge/1.0_Operation.md)**: Details on timezone handling, shading, and CNBC API range mappings.
-- **[API Mapping](../YieldsMonitor/knowledge/API_Mapping.md)**: Required CNBC `timeRange` parameter mappings for all UI ranges.
-- **[Data Pipeline](./Data_Pipeline.md)**: Automation scripts only (not app). No local fallbacks in app code.
+- [Visual Standards](../YieldsMonitor/knowledge/Visual_Standards.md): the pan, zoom and rescale rules every chart obeys.
+- [API Mapping](../YieldsMonitor/knowledge/API_Mapping.md): the CNBC endpoints and `timeRange` parameters each UI range maps to.
+- [Close Price Investigation](../YieldsMonitor/knowledge/Close_Price_Investigation.md): the evidence behind the 17:05 ET session close and CNBC's own ~3 PM daily-close basis.
+- [Data Pipeline](./Data_Pipeline.md): the scheduled jobs that write the data stores.

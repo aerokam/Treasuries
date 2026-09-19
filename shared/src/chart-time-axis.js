@@ -3,7 +3,7 @@ const MONTH_MS = 30.44 * DAY_MS;
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 // Returns the Chart.js time unit appropriate for the given visible span.
-// Thresholds match the tick label format rules in YieldsMonitor/knowledge/2.1_Time_Series.md:
+// Thresholds match the tick label format rules in YieldsMonitor/knowledge/2.5_Render_Time_Series.md:
 //   < 3 days  → 'hour'  (intraday, 2D range)
 //   < 90 days → 'day'   (MMM D labels)
 //   ≤ 548 days → 'month' (~18 months; MMM YYYY labels)

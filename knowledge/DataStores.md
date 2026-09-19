@@ -92,6 +92,16 @@ This document provides the operational details for every data store: R2 key, wri
 
 ---
 
+## <a id="s18"></a>[Intraday archive (S18)](./DATA_DICTIONARY.md#s18)
+**File**: `intraday-raw/{symbol}/{YYYYMMDD}.json`
+**R2 Key**: `Treasuries/yields-history/intraday-raw/{symbol}/{YYYYMMDD}.json`
+**Description**: One immutable daily snapshot per symbol of the raw feeds [CNBC GraphQL (E5)](./DATA_DICTIONARY.md#e5) served that day.
+**Written by**: `YieldsMonitor/scripts/archiveIntraday.js` (job 1.8).
+**Update Frequency**: Weekdays 17:05 ET ([Data Pipeline](./Data_Pipeline.md)).
+**Read by**: Yields Monitor ([2.1 Assemble range data](../YieldsMonitor/knowledge/2.1_Assemble_Range_Data.md)), as the fallback when E5 itself returns nothing for a symbol.
+
+---
+
 ## <a id="s13"></a>Yield curves (S13)
 **Description**: General-purpose, spreadsheet-ready yields — evaluated yields for every priced Treasury (Bill/Note/Bond/STRIPS/Unclassified) and TIPS security, plus the fitted nominal, TIPS-quoted and TIPS-SA zero-coupon (spot) yield curves evaluated on a term grid (unlike [GSW curve parameters (S12)](#s12), which stores unevaluated Svensson parameters). Renamed from `SpotYieldCurves.csv` (2026-09-07): the file is a general yields resource, not spot-curves-only — it also carries every quoted security's own Ask/SA/SAO yield. Superseded the parameters-only `SpotYieldCurves.json` (retired 2026-09-07): six coefficients aren't usable in a spreadsheet, so this file stores actual yields instead. One row per **actual security** (`CUSIP`/`Maturity`/`Type` populated; `Ask`/`SA`/`SAO` populated where they exist) or one row per **fitted grid point** (`CUSIP` = `Spot`, `Maturity` blank, `Type` = `Treasury`/`TIPS`/`BEI`; `Spot`/`Spot SA` populated per Type — see below).
 **Update Frequency**: Chained, not independently scheduled — re-run whenever either of its actual inputs changes: after `FidelityQuotes` (3x daily on weekdays, via `run-fidelity.cmd`) and after `YieldsFromFedInvestPrices` (1x daily on weekdays, via `run-fedinvest.cmd`), each chaining into `YieldCurves/scripts/run-yield-curves.cmd` on success. See [Data_Pipeline.md](./Data_Pipeline.md).

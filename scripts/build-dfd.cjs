@@ -66,6 +66,8 @@ const TERMS = {
   'download date': 'download-date', 'bond holidays': 'bond-holiday',
   'view selections': 'view-selections', 'axis scales': 'axis-scales', 'drill request': 'drill-request',
   'charts and tables': 'charts-and-tables', 'drill popup': 'drill-popup',
+  'live quotes': 'live-quotes', 'yield series': 'yield-series', 'day change': 'day-change',
+  'SA yield series': 'sa-yield-series',
 };
 const unlinked = new Set();
 function labelMarkup(text) {
@@ -214,6 +216,7 @@ function level1() {
     { id: 'gsw', name: 'GSW curve parameters', href: DS('s12') },
     { id: 'hol', name: 'Bond holidays', href: DS('s16') },
     { id: 'blscpi', name: 'Monthly CPI', href: DS('s17') },
+    { id: 'ia', name: 'Intraday archive', href: DS('s18') },
     { id: 'spot', name: 'Yield curves', href: DS('s13') },
     { id: 'bei', name: 'Breakeven inflation', href: DS('s14') },
     { id: 'spread', name: 'Bid and ask spreads', href: DS('s15') },
@@ -224,7 +227,7 @@ function level1() {
     { key: 'tr', cat: 'reference', name: ['TIPS', 'Reference'], spec: V('TipsReference/knowledge/1.0_TIPS_Reference.md'), reads: ['tipsref', 'refcpi', 'sasao', 'hol'] },
     { key: 'pr', cat: 'educational', name: ['Treasury', 'Primer'], spec: V('Primer/knowledge/1.0_Primer.md'), reads: ['fedinv', 'tipsref', 'refcpi'] },
     { key: 'ce', cat: 'reference', name: ['CPI', 'Explorer'], spec: V('CpiExplorer/knowledge/1.0_Overview.md'), reads: ['refcpi', 'cpihist'] },
-    { key: 'ym', cat: 'workflow', name: ['Yields', 'Monitor'], spec: V('knowledge/YieldsMonitor.md'), reads: ['tipsref', 'nsasa', 'hol', 'yhist'] },
+    { key: 'ym', cat: 'workflow', name: ['Yields', 'Monitor'], spec: 'DFD_LEVEL2_YIELDSMONITOR.html', reads: ['tipsref', 'nsasa', 'hol', 'yhist', 'ia'] },
     { key: 'yc', cat: 'workflow', name: ['Yield', 'Curves'], spec: 'DFD_LEVEL2_YIELDCURVES.html', reads: ['fedinv', 'nsasa', 'quotes', 'gsw', 'hol'] },
     { key: 'sa', cat: 'educational', name: ['Seasonal', 'Adjustments'], spec: V('SeasonalAdjustments/knowledge/1.0_SeasonalAdjustments_Explorer.md'), reads: ['nsasa', 'hol'] },
     { key: 'fh', cat: 'reference', name: ['Fund', 'Holdings'], spec: V('FundHoldings/knowledge/1.0_FundHoldings.md'), reads: ['funds'] },
@@ -285,6 +288,15 @@ function level1() {
     P.push(flow(JX, mid, x2, y2, { obstacles: OBS }));
   });
   P.push(labelAt((SX + SW + JX) / 2, mid - 12, 'reference data', 'middle'));
+
+  // Yields Monitor is the one app that also reads two external entities directly, live,
+  // rather than only a store process 1 has written — no acquisition job stores either feed.
+  const ymJ = apps.findIndex(a => a.key === 'ym'), ymY = ay(ymJ);
+  const ymL = toCircle(AX - 70, 15, AX, ymY, AR), ymR = toCircle(AX + 70, 15, AX, ymY, AR);
+  P.push(flow(AX - 70, 15, ymL[0], ymL[1], { obstacles: OBS }));
+  P.push(labelAt(AX - 70, 40, 'market yields', 'middle'));
+  P.push(flow(AX + 70, 15, ymR[0], ymR[1], { obstacles: OBS }));
+  P.push(labelAt(AX + 70, 64, 'live quotes', 'middle'));
 
   apps.forEach((a, j) => {
     const y = ay(j);
@@ -440,6 +452,122 @@ function level3YieldCurvesLoad() {
 }
 
 
+// ── Level 2: Yields Monitor ─────────────────────────────────────────────────
+const KYM = 'YieldsMonitor/knowledge/';
+function level2YieldsMonitor() {
+  const stores = [
+    { id: 'yhist', name: 'Yield history', href: DS('s6') },
+    { id: 'ia', name: 'Intraday archive', href: DS('s18') },
+    { id: 'hol', name: 'Bond holidays', href: DS('s16') },
+    { id: 'tipsref', name: 'TIPS reference data', href: DS('s2') },
+    { id: 'nsasa', name: 'Ref CPI NSA and SA', href: DS('s4') },
+  ];
+  const procs = [
+    { id: '2.1', name: ['Assemble', 'range data'], href: 'DFD_LEVEL3_YM_ASSEMBLE.html', reads: ['yhist', 'ia'],
+      out: { '2.3': ['yield series'], '2.4': ['yield series'], '2.5': ['yield series'], '2.6': ['yield series'], '2.7': ['yield series'] } },
+    { id: '2.2', name: ['Read live', 'quotes'], href: V(KYM + '2.2_Read_Live_Quotes.md'), reads: [],
+      out: { '2.3': ['live quotes'], '2.4': ['live quotes'], '2.5': ['live quotes'] } },
+    { id: '2.3', name: ['Calculate', 'day change'], href: V(KYM + '2.3_Calculate_Day_Change.md'), reads: ['hol'],
+      out: { '2.5': ['day change'] } },
+    { id: '2.4', name: ['Adjust for', 'seasonality'], href: V(KYM + '2.4_Adjust_For_Seasonality.md'), reads: ['tipsref', 'nsasa', 'hol'],
+      out: { '2.5': ['SA yield series'], '2.6': ['SA yield series'], '2.7': ['SA yield series'] } },
+    { id: '2.5', name: ['Render time', 'series'], href: V(KYM + '2.5_Render_Time_Series.md'), reads: [], out: {} },
+    { id: '2.6', name: ['Render yield', 'curve', 'snapshots'], href: V(KYM + '2.6_Render_Yield_Curve_Snapshots.md'), reads: [], out: {} },
+    { id: '2.7', name: ['Render', 'breakeven', 'inflation'], href: V(KYM + '2.7_Render_Breakeven_Inflation.md'), reads: [], out: {} },
+  ];
+  const SX = 40, SW = 215, PR = 58, UX = 1190, UW = 145;
+  const sy = i => 170 + i * 145;
+  const px = { '2.1': 410, '2.2': 410, '2.3': 630, '2.4': 630, '2.5': 850, '2.6': 850, '2.7': 850 };
+  const py = { '2.1': 320, '2.2': 590, '2.3': 190, '2.4': 750, '2.5': 190, '2.6': 470, '2.7': 750 };
+  const H = 900, W = 1360;
+  const OBS = procs.map(q => ({ x: px[q.id], y: py[q.id], r: PR }));
+  const LBL = [];
+  const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 2 for Yields Monitor: seven processes reading five data stores and two external entities directly. No process writes a data store.">`, marker()];
+  const sIdx = Object.fromEntries(stores.map((s, i) => [s.id, i]));
+  procs.forEach(p => p.reads.forEach(id => {
+    const y = sy(sIdx[id]), [x2, y2] = toCircle(SX + SW + 5, y, px[p.id], py[p.id], PR);
+    P.push(flow(SX + SW + 5, y, x2, y2, { obstacles: OBS }));
+  }));
+  // The two entities Yields Monitor reads directly, live, enter from the page edge —
+  // the same convention every other diagram uses for a source, not redrawn as a box.
+  // Entering between two store rows, rather than beside one, keeps the label clear of it.
+  const mktY = (sy(sIdx.yhist) + sy(sIdx.ia)) / 2;
+  P.push(flow(8, mktY, px['2.1'] - PR - 3, py['2.1'] - 12, { obstacles: OBS.filter(o => !(o.x === px['2.1'] && o.y === py['2.1'])) }));
+  P.push(labelAt(12, mktY - 10, 'market yields'));
+  const lqY = (sy(sIdx.hol) + sy(sIdx.tipsref)) / 2;
+  P.push(flow(8, lqY, px['2.2'] - PR - 3, py['2.2'], { obstacles: OBS.filter(o => !(o.x === px['2.2'] && o.y === py['2.2'])) }));
+  P.push(labelAt(12, lqY - 10, 'live quotes'));
+  P.push(internalFlows(procs, px, py, PR, OBS, LBL));
+  ['2.5', '2.6', '2.7'].forEach(id => {
+    P.push(flow(px[id] + PR + 3, py[id], UX - 5, py[id], { obstacles: OBS.filter(o => !(o.x === px[id] && o.y === py[id])) }));
+  });
+  P.push(labelAt((px['2.5'] + PR + UX) / 2, py['2.5'] - 14, 'charts and tables', 'middle'));
+  P.push(flow(UX - 5, py['2.1'], px['2.1'] + PR + 3, py['2.1'] + 20, { obstacles: OBS.filter(o => !(o.x === px['2.1'] && o.y === py['2.1'])) }));
+  P.push(labelAt((px['2.1'] + PR + UX) / 2, py['2.1'] + 40, 'view selections', 'middle'));
+  P.push(`  <g class="entity"><rect x="${UX}" y="100" width="${UW}" height="${H - 180}" rx="3"/><text class="e-name" x="${UX + UW / 2}" y="${H / 2}">User</text></g>`);
+  stores.forEach((s, i) => P.push(storeShape(SX, sy(i), SW, s.href, s.name)));
+  procs.forEach(p => P.push(procShape(px[p.id], py[p.id], PR, p.href, p.id, p.name)));
+  P.push('</svg>');
+
+  return page({
+    title: 'Yields Monitor — Level 2', h1: 'Level 2 &mdash; Yields Monitor', maxWidth: W,
+    up: 'DFD_LEVEL1.html', upLabel: 'Level 1',
+    spec: V('YieldsMonitor/README.md'), specLabel: 'Yields Monitor specs', svg: P.join(NL),
+    notes: ['  <b>No process here writes a data store.</b> Every flow ends at 2.5, 2.6 or 2.7 and is gone when the page closes.',
+      '  2.1 is the only process that reads a store for its main feed; it also reads <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#market-yields">market yields</a> directly from <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#e5">CNBC GraphQL (E5)</a>, live — no acquisition job stores this app\'s own working copy. It explodes at <a href="DFD_LEVEL3_YM_ASSEMBLE.html">Level 3</a>.',
+      '  2.2 reads <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#live-quotes">live quotes</a> directly from <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#e15">CNBC Quote Service (E15)</a>, the same way — the second and only other place this portal reads an external entity outside process 1.',
+      '  2.3 and 2.4 each read <a href="viewer.html#/md/knowledge/DataStores.md#s16">Bond holidays (S16)</a> directly, to exclude a weekend or holiday bar from their own calculation, rather than through 2.1.',
+      '  Each flow is named by the one structure it holds, defined in <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#6.0-data-flows">Data Dictionary &sect;6.4</a>.'].join(NL)
+  });
+}
+
+// ── Level 3: Yields Monitor 2.1 ─────────────────────────────────────────────
+function level3YieldsMonitorAssemble() {
+  const stores = [
+    { id: 'yhist', name: 'Yield history', href: DS('s6') },
+    { id: 'ia', name: 'Intraday archive', href: DS('s18') },
+  ];
+  const S = a => V(KYM + '2.1_Assemble_Range_Data.md' + (a ? '#' + a : ''));
+  const procs = [
+    { id: '2.1.1', name: ['Assemble', '2D/10D', 'range data'], href: S('assemble-2d-10d-range-data'), reads: ['ia'], out: {} },
+    { id: '2.1.2', name: ['Assemble', '1Y/2Y/3Y', 'range data'], href: S('assemble-1y-2y-3y-range-data'), reads: ['yhist'], out: {} },
+    { id: '2.1.3', name: ['Assemble', '10Y/ALL', 'range data'], href: S('assemble-10y-all-range-data'), reads: ['yhist'], out: {} },
+    { id: '2.1.4', name: ['Assemble', 'Custom', 'range data'], href: S('assemble-custom-range-data'), reads: ['yhist'], out: {} },
+  ];
+  const SX = 40, SW = 205, PR = 60, W = 1150, H = 780;
+  const sy = i => 220 + i * 340;
+  const px = { '2.1.1': 420, '2.1.2': 420, '2.1.3': 420, '2.1.4': 420 };
+  const py = { '2.1.1': 110, '2.1.2': 320, '2.1.3': 530, '2.1.4': 700 };
+  const OBS = procs.map(q => ({ x: px[q.id], y: py[q.id], r: PR }));
+  const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 3: Yields Monitor 2.1, one process per family of UI ranges.">`, marker()];
+  const sIdx = Object.fromEntries(stores.map((s, i) => [s.id, i]));
+  procs.forEach(p => p.reads.forEach(id => {
+    const y = sy(sIdx[id]), [x2, y2] = toCircle(SX + SW + 5, y, px[p.id], py[p.id], PR);
+    P.push(flow(SX + SW + 5, y, x2, y2, { obstacles: OBS.filter(o => !(o.x === px[p.id] && o.y === py[p.id])) }));
+  }));
+  // Every process here also reads market yields live; each emits a yield series that
+  // leaves 2.1 directly, for every other Yields Monitor process (see Level 2).
+  procs.forEach(p => {
+    P.push(flow(8, py[p.id] - 14, px[p.id] - PR - 3, py[p.id] - 14, { obstacles: OBS.filter(o => !(o.x === px[p.id] && o.y === py[p.id])) }));
+    P.push(labelAt(12, py[p.id] - 26, 'market yields'));
+    const [x1, y1] = fromCircle(px[p.id], py[p.id], PR, W - 12, py[p.id]);
+    P.push(flow(x1, y1, W - 12, py[p.id], { obstacles: OBS.filter(o => !(o.x === px[p.id] && o.y === py[p.id])) }));
+    P.push(labelAt(W - 16, py[p.id] - 8, 'yield series', 'end'));
+  });
+  stores.forEach((s, i) => P.push(storeShape(SX, sy(i), SW, s.href, s.name)));
+  procs.forEach(p => P.push(procShape(px[p.id], py[p.id], PR, p.href, p.id, p.name)));
+  P.push('</svg>');
+
+  return page({
+    spec: V(KYM + '2.1_Assemble_Range_Data.md'), specLabel: '2.1 Assemble range data',
+    title: 'Yields Monitor 2.1 — Level 3', h1: 'Level 3 &mdash; Yields Monitor 2.1 Assemble range data', maxWidth: W,
+    up: 'DFD_LEVEL2_YIELDSMONITOR.html', upLabel: 'Level 2 — Yields Monitor', svg: P.join(NL),
+    notes: ['  One process per family of UI ranges — 2D/10D, 1Y/2Y/3Y, 10Y/ALL and Custom — each independent: only one is active at a time, so nothing here combines their output.',
+      '  Every process here drills to its own section of <a href="' + S() + '">2.1 Assemble range data</a>.',
+      '  Every process also reads <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#market-yields">market yields</a> live, from <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#e5">CNBC GraphQL (E5)</a>, for its own primary feed or its own live tip — only <a href="viewer.html#/md/knowledge/DataStores.md#s18">Intraday archive (S18)</a> and <a href="viewer.html#/md/knowledge/DataStores.md#s6">Yield history (S6)</a> are the fallbacks drawn on the left.'].join(NL)
+  });
+}
+
 // ── Level 2: process 1, the ingestion jobs ──────────────────────────────────
 function level2Ingestion() {
   // Each job is a process; each writes the store named beside it. Sources are not
@@ -452,7 +580,7 @@ function level2Ingestion() {
     { id: '1.5',  name: ['Fetch tentative', 'auction', 'schedule'], data: 'tentative auction schedule', writes: ['tent'] },
     { id: '1.6',  name: ['Fetch TIPS', 'reference data'],           data: 'TIPS reference data',        writes: ['tipsref'] },
     { id: '1.7',  name: ['Update yield', 'history'],                data: 'market yields',              writes: ['yhist'] },
-    { id: '1.8',  name: ['Archive', 'intraday yields'],             data: 'market yields',              writes: ['intraday'] },
+    { id: '1.8',  name: ['Archive', 'intraday yields'],             data: 'market yields',              writes: ['ia'] },
     { id: '1.9',  name: ['Fetch monthly', 'CPI'],                   data: 'monthly CPI-U',              writes: ['blscpi'] },
     { id: '1.10', name: ['Interpolate', 'daily Ref CPI', 'NSA and SA'], data: null, reads: ['blscpi'], writes: ['nsasa'] },
     { id: '1.11', name: ['Calculate SA', 'and SAO yields'],         data: null, reads: ['quotes', 'refcpi', 'hol'], writes: ['sasao'] },
@@ -470,9 +598,9 @@ function level2Ingestion() {
     funds: ['Fund holdings', DS('s11')], gsw: ['GSW curve parameters', DS('s12')],
     yc: ['Yield curves', DS('s13')], bei: ['Breakeven inflation', DS('s14')],
     spread: ['Bid and ask spreads', DS('s15')], hol: ['Bond holidays', DS('s16')],
-    blscpi: ['Monthly CPI', DS('s17')], intraday: ['Intraday yields', DS('s6')],
+    blscpi: ['Monthly CPI', DS('s17')], ia: ['Intraday archive', DS('s18')],
   };
-  const order = ['fedinv','quotes','yc','bei','spread','auctions','tent','tipsref','yhist','intraday','blscpi','nsasa','sasao','cpihist','refcpi','funds','gsw','hol'];
+  const order = ['fedinv','quotes','yc','bei','spread','auctions','tent','tipsref','yhist','ia','blscpi','nsasa','sasao','cpihist','refcpi','funds','gsw','hol'];
   const JX = 470, JR = 54, SX = 730, SW = 235;
   const jy = i => 90 + i * 116;
   const sy = i => 80 + i * 97;
@@ -622,6 +750,8 @@ const outputs = [
   ['knowledge/DFD_LEVEL2_YIELDCURVES.html', level2YieldCurves()],
   ['knowledge/DFD_LEVEL3_YC_LOAD.html', level3YieldCurvesLoad()],
   ['knowledge/DFD_LEVEL3_YC_RENDER.html', level3YieldCurvesRender()],
+  ['knowledge/DFD_LEVEL2_YIELDSMONITOR.html', level2YieldsMonitor()],
+  ['knowledge/DFD_LEVEL3_YM_ASSEMBLE.html', level3YieldsMonitorAssemble()],
 ];
 if (unlinked.size) {
   console.log(String.fromCharCode(10) + "flow labels with no Data Dictionary entry:");

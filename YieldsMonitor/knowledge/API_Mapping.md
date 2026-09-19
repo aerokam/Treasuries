@@ -1,6 +1,6 @@
 # Treasury Yields Monitor - API Mapping
 
-**Disclaimer:** For personal and educational use only. Data retrieved from public chart services. [Yields](../../knowledge/DATA_DICTIONARY.md#yield) represent market mid-prices and may vary by provider.
+**Disclaimer:** For personal and educational use only. Data retrieved from public chart services. [Yields](../../knowledge/DATA_DICTIONARY.md#yield) track the bid side of the market, not a mid-price, and may vary by provider — see [Close Price Investigation §4](./Close_Price_Investigation.md).
 
 ## Public Data Alternatives
 While this tool uses high-resolution (intraday) and real-time data feeds, official daily closing rates can be sourced from:

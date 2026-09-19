@@ -40,6 +40,22 @@ These came out of review and apply to every spec from here.
 - **An agent spawned for this work reports; the session that spawned it decides.** A found defect is fixed, not returned to the developer as a question.
 - **Market quotes are the primary source; FedInvest is secondary and could be dropped entirely.** A process spec whose behavior genuinely differs between the two is split into a Market-quotes section (first), a FedInvest section, and a Common section for what both share. Dropping FedInvest later then means deleting its section — and folding Common into the market section, if anything remains — with no other spec change. A process with no real difference between sources is not split.
 
+**The rules above govern the diagrams and the naming. These govern the prose inside a process spec**, settled the same way, against Yield Curves 3.1-3.7, through several rejected drafts:
+
+- **No step numbers.** Nested bullet indentation states a for-each loop or an if/then branch: a bullet per action, an indented bullet under it for a per-source variant or a condition. A number appears only where a step must be referenced by position, and even then the thing is named rather than numbered.
+- **A Data Dictionary term links every time it appears** in a passage, not only its first occurrence in the document.
+- **A process cross-reference is `[Process Name (n.n)](link)`** — the process's full name as the link text, its number in parentheses — never a bare number, and never a number linked with the name floating unlinked beside it.
+- **Two processes that compute a shared mechanic the same way never point at each other for it**; each states the mechanic directly, inline. This is the one exception to "link rather than restate": it governs a calculation's own steps, not a data-flow or store fact, which still links.
+- **No self-referential aside stating what a fact is not**, when no reader-visible claim ever asserted it. A spec states the current fact once, plainly, and never narrates a former version of itself.
+- **Narrative prose is for genuine rationale only** — why a process exists, why a design choice was made, a caveat about a limitation. A calculation's own steps always take the nested for-each/if-then form, however short the passage.
+- **A passage with no code behind it does not belong in a process spec.** Test: does the code implement this? If not, delete it — after checking whether another spec depends on a fact the passage carries, which is moved rather than lost.
+- **Every claim is verified against the implementing code before it is written or left standing**, including a claim already sitting in the spec from an earlier pass.
+- **A wrong claim found once is searched for across the whole repository in the same pass and fixed everywhere it occurs** — a code comment and a formally-named Data Dictionary term or diagram label included. A wrong fact can live in a name, not only a sentence.
+- **No possessive on a security-type noun** (`TIPS's`, `Note's`, `Bond's`) — reworded around, not reshuffled into the same violation. `scripts/check-vocabulary.js` enforces this on staged content only; a check against an unstaged file can pass falsely.
+- **Every change is verified mechanically before it is done**: `check-links.cjs`, `check-spec-code.cjs` and `check-vocabulary.js` for a doc change; `npm test` and the app's own end-to-end suite for anything touching runtime code.
+- **A defect found while reformatting is fixed or explicitly escalated, never silently noted and left.**
+- **This applies to every section alike.** A flat status list, a dated verification log, a short two-paragraph description are exactly as in scope as a large multi-branch calculation.
+
 ---
 
 ## 3.0 Open, for the next session
@@ -67,6 +83,7 @@ These came out of review and apply to every spec from here.
 20. **Closed.** `3.7 Render charts and tables`' framing understated that part of its work is already shared: `shared/src/chart-keys.js` (keyboard/wheel pan-zoom for Chart.js) and `shared/src/chart-time-axis.js` (time-axis unit selection) are imported by `CpiExplorer`, `YieldCurves` and `YieldsMonitor` alike. The bulk of the work — building the datasets, the DOM, the table HTML — is still separate code in each app's own `app.js`, not a shared module, so 3.7 isn't wrong to be a YieldCurves-numbered process, only was incomplete in not naming the shared pieces it already draws on. Fixed: `chart-keys.js` added to 3.7.2's Implemented-by, with a one-line note it's shared rather than reimplemented.
 21. **Closed.** `3.2 Adjust for seasonality` mixed a real process spec with pure tutorial content that has no code behind it — the "Explaining Seasonality" Level 1-4 walkthrough and "How BLS Derives the Seasonal Factors." Deleted per the developer's test (does the code implement this? if not, it doesn't belong in a process spec) and his explicit call that the SeasonalAdjustments app's own in-progress explanation already supersedes it — nothing worth preserving. The BLS-methodology paragraphs were a genuine dependency, not just tutorial noise (`Seasonal_Factor_Drift.md` linked into 3.2 for those facts to support its own measurement), so they were moved into `Seasonal_Factor_Drift.md` §2 rather than lost. 3.2 dropped from 120 to 84 lines; only code-backed content remains.
 22. **Closed.** "Daily Mid-Market Prices" — a formally-named Data Dictionary flow (`FedInvest (E1)` → the whole raw daily download), rendered on three real diagrams — baked in the same "FedInvest = mid-market" overstatement already found and fixed in prose several times this session: FedInvest actually publishes three prices (Buy, Sell, End of Day) and only Buy is a midpoint of dealer bid and ask. Renamed to "FedInvest Daily Price List"; DD entry, anchor, `1.1_Download_FedInvest_Prices.md`, `Data_Pipeline.md`, `Visual_Standards.md` and `3.4`'s own Verification section all updated; three diagrams regenerated via `build-dfd.cjs`, `KNOWLEDGE_MAP.html` (the one hand-written diagram) fixed manually.
+23. **Closed.** The spec-prose rules worked out against Yield Curves 3.1-3.7 were written into §2.0 alongside the diagram-format rules already there, so the next app starts from a documented template instead of re-deriving it by trial and error. See §3.15 for what came of applying it to Yields Monitor.
 
 ---
 
@@ -254,6 +271,41 @@ Closed, applying the §3.13 method and guidelines to the second of the two paths
 - The browser automation, sign-in and MFA steps that obtain E6 stay in the gitignored `knowledge/Data_Pipeline_Local.md`, per its own note. The public spec links there and states nothing about how the download happens, only what it reads and writes.
 
 Level 2 already drew 1.2 reading the bond holidays, to skip the run on a closed day, the same as 1.1 — unlike 1.1's original state in §3.13, this diagram was already correct. No mismatch was found in the data itself, only in what the specs said about it: 1.2 has always passed E6's rows through unchanged, and the DD's own composition for S7 (as against its DataStores.md entry) was already right.
+
+---
+
+## 3.15 Yields Monitor is done, following the template
+
+The template §2.0 documents (item 23) was applied to Yields Monitor, process 2 — its diagrams and its specs, both rebuilt from scratch rather than reformatted, since its prior state (`knowledge/YieldsMonitor.md`, a hand-drawn Mermaid diagram mixed with prose) predated the levelled-diagram convention entirely and was discarded per the developer's own instruction.
+
+**Numbering.** Yields Monitor's specs had drifted from the convention Yield Curves set: `1.0_Operation.md` and `2.1`-`2.4` did not match process 2's own Level 1 number. Every spec is renumbered 2.1-2.7 to match, one file per process:
+
+| Spec | Process | Superseded |
+|---|---|---|
+| `2.1_Assemble_Range_Data.md` | 2.1 (and its four Level 3 children) | most of `1.0_Operation.md` |
+| `2.2_Read_Live_Quotes.md` | 2.2 | part of `1.0_Operation.md` |
+| `2.3_Calculate_Day_Change.md` | 2.3 | `1.0_Operation.md`'s Yield Change Calculation; part of the old `2.1_Time_Series.md` |
+| `2.4_Adjust_For_Seasonality.md` | 2.4 | `2.4_Seasonal_Adjustment.md` (renamed, restructured, pinned-dates table kept byte-for-byte for `checkCnbcRollover.js` to keep appending to) |
+| `2.5_Render_Time_Series.md` | 2.5 | the old `2.1_Time_Series.md`; the rest of `1.0_Operation.md` |
+| `2.6_Render_Yield_Curve_Snapshots.md` | 2.6 | the old `2.2_Yield_Curves.md` |
+| `2.7_Render_Breakeven_Inflation.md` | 2.7 | the old `2.3_Breakeven_Inflation.md` |
+| `Visual_Standards.md` | none: reference | the old `1.0_Operation.md`'s Shared Interaction & Navigation section |
+
+`API_Mapping.md` and `Close_Price_Investigation.md` stay as reference specs, cross-references corrected to the new files. `knowledge/YieldsMonitor.md` (the app-overview landing page, a different, still-live convention shared with `knowledge/YieldCurves.md`) was rewritten to the same table-of-processes format, rather than left deleted.
+
+**The model gained a process, an entity and a store that did not exist anywhere in the portal before.** Yields Monitor is the one app that reads two external entities live, at runtime, rather than only a store process 1 has written — no acquisition job stands between it and CNBC:
+
+- [CNBC Quote Service (E15)](./DATA_DICTIONARY.md#e15) — the batched REST quote endpoint `quote.cnbc.com/quote-html-webservice/restQuote/...`, distinct from [CNBC GraphQL (E5)](./DATA_DICTIONARY.md#e5)'s chart-bar feed. It had no entity at all before this pass, despite the app depending on it for its sidebar reading, its day-change fallback and its Seasonally Adjusted bond identity.
+- [Intraday archive (S18)](./DataStores.md#s18) — the daily raw-feed snapshots at `Treasuries/yields-history/intraday-raw/`, read directly by the app as the last-resort fallback for 2D/10D. It existed in the code and in a stale `intraday` alias pointing at S6's own anchor in `scripts/build-dfd.cjs`'s job 1.8, but had no Data Dictionary entry, no DataStores.md entry, and no S number of its own until now.
+- Level 1 gained two new flows entering an app directly rather than process 1 — `market yields` and `live quotes` — the first time any app-level circle on that diagram reads an external entity rather than only the shared store trunk.
+
+**Two stale claims fixed along the way, per the standing verify-and-sweep rule.** [CNBC GraphQL (E5)](./DATA_DICTIONARY.md#e5)'s own Data Dictionary entry stated a composition (`Symbol + Timestamp + Price + Change + Yield`) that matches neither `buildUrl`/`fetchLive`'s actual GraphQL shape (`Symbol + TimeRange + { TradeTime + Close }`) nor Close Price Investigation's own finding that the feed tracks the bid side, not mid-price — corrected, and the API_Mapping.md disclaimer's matching "market mid-prices" claim fixed alongside it. Separately, [§6.2's Source Data](./DATA_DICTIONARY.md#source-data) flow still named the flow "Daily_Mid_Market_Prices" a full worklist item (22) after it was renamed "FedInvest Daily Price List" everywhere else — missed because §6.2 composes flows by their old identifier string rather than linking to them, so the rename didn't touch it. Fixed, and re-scoped: [Live Quotes](./DATA_DICTIONARY.md#live-quotes) (E15) is explicitly excluded from Source Data, since no acquisition job reads it — Yields Monitor is the exception, not process 1.
+
+**Two production dependencies confirmed intact.** `YieldsMonitor/scripts/checkCnbcRollover.js` is a live daily scheduled job that programmatically appends rows to `2.4`'s own pinned-dates table (`insertSpecRow`, matched by the literal `| \`SYMBOL\` | ` row prefix) and commits and pushes the result unattended — the table was carried into the renamed file with its row format untouched, and the script's two path constants were updated to match. `shared/src/chart-time-axis.js#getXTimeUnit`'s own thresholds are cross-referenced from a code comment to the tick-format rules now in `2.5`; the comment was updated, and while at it, a real discrepancy between that code comment and the actual label callback in `app.js` was caught: the label format never drops to a bare year, at any span — it is `MMM YYYY` at every tier from 90 days up, `time.unit` only ever changing which tick density Chart.js targets. The old `2.1_Time_Series.md`'s tick-format table had claimed a bare-year example ("2025") for its longest tier that the code has never produced; `2.5` states the corrected behavior.
+
+**Data_Pipeline.md's own schedule table was missing three of Yields Monitor's four Windows tasks** (`IntradayArchive`, `CloseProbe`, `LockProbe`) and the newer `CheckCnbcRollover` task entirely, discovered while tracing where `2.1`'s Intraday archive fallback and `2.4`'s automated rollover check are actually scheduled. All four added, the two purely diagnostic ones (`CloseProbe`, `LockProbe`) marked as such since they write no store any process reads.
+
+Mechanically verified: `node scripts/build-dfd.cjs` (no unlinked-term warnings), `node scripts/build-dd-index.cjs`, the new Level 2 and Level 3 diagrams checked visually in-browser for label collisions before being considered final.
 
 ---
 

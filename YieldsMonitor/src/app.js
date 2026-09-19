@@ -67,7 +67,7 @@ const rangeData = {};
 // diverge in freshness (e.g. a CNBC outage affecting only TIPS symbols, observed 2026-08-22),
 // and a single combined "Latest data" reading would either overclaim freshness for the group
 // that's actually current or (if pinned to the stalest group) needlessly undersell the one
-// that isn't. See knowledge/1.0_Operation.md.
+// that isn't. See knowledge/2.2_Read_Live_Quotes.md.
 let latestDataTimeTips = null;
 let latestDataTimeNominal = null;
 // sym -> { yield, time, prevClose } from the live CNBC quote service (quote.cnbc.com),
@@ -455,7 +455,7 @@ async function fetchWithTimeout(url, options = {}, timeout = 8000) {
 // Single consolidated, symbol-nested history file: { "US10Y": [{x,y}, ...], ... }
 const R2_HISTORY_URL = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/yields-history/history.json';
 
-// Daily raw-feed snapshots (see knowledge/1.0_Operation.md's R2-stores table), written
+// Daily raw-feed snapshots (see knowledge/DataStores.md#s18), written
 // weekdays at 17:05 ET by archiveIntraday.js — the last-resort fallback for 2D/10D when
 // CNBC's live feed itself returns nothing.
 const INTRADAY_ARCHIVE_BASE = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/yields-history/intraday-raw';
@@ -957,7 +957,7 @@ function rescaleYToVisible(chart, sym) {
 }
 
 // A symbol's chart-bar feed can freeze or fall back to an archived day during a CNBC outage
-// while its live quote keeps updating (see knowledge/1.0_Operation.md) — this detects that
+// while its live quote keeps updating (see knowledge/2.5_Render_Time_Series.md) — this detects that
 // divergence so 2D/10D charts can visually bridge the gap instead of looking complete when
 // they aren't. 30 min tolerates the feed's normal per-bar cadence/lag without false-flagging.
 const STALE_GAP_MS = 30 * 60 * 1000;
@@ -1122,8 +1122,8 @@ function updateCharts() {
     if (currentY == null) return;
 
     // Day change prefers the app's own documented 17:05 ET session-close reference (walked
-    // back through the chart-bar feed — see knowledge/1.0_Operation.md "Yield Change
-    // Calculation"), deliberately distinct from CNBC's own previous_day_closing. Only when
+    // back through the chart-bar feed — see knowledge/2.3_Calculate_Day_Change.md),
+    // deliberately distinct from CNBC's own previous_day_closing. Only when
     // that reference is unreachable (chart feed frozen/stale) does it fall back to the quote
     // service's own previous_day_closing, so day change doesn't go blank during an outage.
     //
@@ -1218,7 +1218,7 @@ function valueOnDate(sym, dateStr, pickLast) {
 
 function updateYieldCurves() {
   // The displayed Start/End dates are decided once, from the 10Y TIPS — the one reliable
-  // feed. The 5Y TIPS feed is too sparse to drive dates (see knowledge/1.0_Operation.md).
+  // feed. The 5Y TIPS feed is too sparse to drive dates (see knowledge/2.1_Assemble_Range_Data.md).
   // Start = the chosen start date (or, for preset ranges, the first 10Y-TIPS trading day in
   // range); End = the chosen end date. fetchOne already clamps the 10Y-TIPS series to the
   // active window, so its first/last points ARE those dates (and snap past non-trading days).
@@ -1240,7 +1240,7 @@ function updateYieldCurves() {
 
   // SA overlay data, per SA-eligible symbol, for the active range — reused by both the TIPS
   // curve (direct SA yield) and the BEI curve (Nominal - SA yield). Same "overlay, don't
-  // replace" convention as the Time Series SA line (see 2.4_Seasonal_Adjustment.md).
+  // replace" convention as the Time Series SA line (see 2.4_Adjust_For_Seasonality.md).
   const saSeriesBySym = {};
   if (showSaYield) SA_SYMBOLS.forEach(sym => { saSeriesBySym[sym] = computeSaSeries(sym, rangeData[sym]); });
 

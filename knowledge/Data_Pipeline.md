@@ -38,7 +38,11 @@ These jobs run on the host machine via Windows Task Scheduler.
 | **Fidelity Quotes** | 3× Daily | *(Windows Task)* | `FidelityTreasuriesTips.csv` (combined Treasury + TIPS) |
 | **TreasuryAuctions** | Weekdays 8:35/10:05am PT | `scripts/getAuctions.js` | `Auctions.csv` |
 | **TIPS Ref Refresh** | Mondays 7am PT | `scripts/fetchTipsRef.js` | `TipsRef.csv` |
-| **Update Yields History** | Weekdays 2:00pm PT | `YieldsMonitor/scripts/updateYieldsHistory.js` | `yields-history/history.json` |
+| **Update Yields History** | Weekdays 2:00pm PT | `YieldsMonitor/scripts/updateYieldsHistory.js` | `yields-history/history.json` ([S6](./DataStores.md#s6)) |
+| **Archive Intraday Yields** | Weekdays 2:05pm PT | `YieldsMonitor/scripts/archiveIntraday.js` | `yields-history/intraday-raw/{symbol}/{date}.json` ([S18](./DataStores.md#s18)) |
+| **Close Probe** | Weekdays 2:05pm PT, +15min ×1h | `YieldsMonitor/scripts/probeClose.js` | `yields-history/close-probe/{symbol}.csv` — diagnostic only, not read by the app; see [Close Price Investigation](../YieldsMonitor/knowledge/Close_Price_Investigation.md) |
+| **Lock Probe** | Hourly, 2:00pm–5:00am PT | `YieldsMonitor/scripts/probeLock.js` | `yields-history/lock-probe/lock-probe.csv` — diagnostic only, not read by the app; see [Close Price Investigation §7](../YieldsMonitor/knowledge/Close_Price_Investigation.md#7-investigation-tooling-all-read-only--additive) |
+| **Check CNBC Rollover** | Daily | `YieldsMonitor/scripts/checkCnbcRollover.js` | Commits and pushes `YieldsMonitor/src/cnbc-rollover-log.js` and the pinned-dates table in [2.4 Adjust for seasonality](../YieldsMonitor/knowledge/2.4_Adjust_For_Seasonality.md) — a code/spec commit, not an R2 write |
 | **SA Factor Update** | Daily 6:35am | `YieldCurves/scripts/updateRefCpi.js` | `RefCpiNsaSa.csv` |
 | **FundHoldings** | Daily 6:40am PT | `FundHoldings/updateAllHoldings.js`, then `FundHoldings/enrichHoldings.js` | `FundHoldings/Holdings-<TICKER>(-Enriched).csv` and `FundHoldings/FundMeta.json` ([S11](./DataStores.md#s11)) |
 | **GSW TIPS Curve** | Daily 7:15am PT | `YieldCurves/scripts/updateGswTipsCurve.js` | `TIPS/GswTipsCurve.json` (GSW Svensson params — [S12](./DataStores.md#s12)) |

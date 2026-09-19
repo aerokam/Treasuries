@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Yields Monitor — Level 2</title>
+<style>
+  :root {
+    --bg: #0d0d1a;
+    --border: #2a2a4a;
+    --text: #c0c8e0;
+    --accent: #7070cc;
+    --entity: #1a1a2e;
+    --process: #1a2a4e;
+    --store: #1a2e1a;
+    --flow: #55558c;
+    --flow-text: #8b93b8;
+    --font: 'Segoe UI', system-ui, sans-serif;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    margin: 0;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+  }
+
+  .nav-header {
+    width: 100%;
+    max-width: 1200px;
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 50px;
+    padding: 25px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 30px;
+  }
+  .nav-header a {
+    color: var(--accent);
+    text-decoration: none;
+    font-size: 1.2rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .nav-header a:hover { color: #aaaaff; text-decoration: underline; }
+  .nav-header a.portal-link { font-size: 11px; font-weight: 700; color: #475569; background: #e2e8f0; border: 1px solid #cbd5e1; border-radius: 4px; padding: 2px 10px; text-decoration: none; letter-spacing: 0.02em; text-transform: none; }
+  .nav-header a.portal-link:hover { background: #1e293b; color: #ffffff; border-color: #1e293b; text-decoration: none; }
+
+  h1 {
+    font-size: 1.5rem;
+    font-weight: 300;
+    letter-spacing: 2px;
+    color: var(--accent);
+    margin: 0 0 25px;
+    text-align: center;
+  }
+
+  .diagram { width: 100%; max-width: 1400px; }
+  .diagram svg { width: 100%; height: auto; display: block; }
+
+  /* Shapes */
+  .entity rect {
+    fill: var(--entity);
+    stroke: var(--border);
+    stroke-width: 1;
+  }
+  .entity:hover rect { stroke: var(--accent); }
+  .entity .e-name { fill: #c8d0ea; font-size: 13.5px; }
+  .entity:hover .e-name { fill: #ffffff; }
+
+  .process circle {
+    fill: var(--process);
+    stroke: var(--accent);
+    stroke-width: 2;
+  }
+  .process:hover circle { stroke: #aaaaff; filter: drop-shadow(0 0 12px rgba(112,112,204,0.6)); }
+  .process .p-id { fill: #8fa0d8; font-size: 12px; letter-spacing: 1px; }
+  .process .p-name { fill: #eef0ff; font-size: 15px; font-weight: 600; }
+
+
+  a.entity, a.process { cursor: pointer; text-decoration: none; }
+  a text, g.entity text { text-anchor: middle; font-family: var(--font); }
+
+  /* Flows */
+  .flow { stroke: var(--flow); stroke-width: 1.6; fill: none; }
+  .flow-label {
+    fill: var(--flow-text);
+    font-size: 13px;
+    font-family: var(--font);
+    stroke: var(--bg);
+    stroke-width: 5;
+    paint-order: stroke;
+    stroke-linejoin: round;
+  }
+
+  .legend text { fill: #6f78a0; font-size: 12px; font-family: var(--font); }
+  .legend rect.sw { fill: var(--entity); stroke: var(--border); }
+  .legend circle.sw { fill: var(--process); stroke: var(--accent); stroke-width: 1.5; }
+
+  .notes {
+    max-width: 900px;
+    margin-top: 30px;
+    font-size: 0.8rem;
+    color: #7a83aa;
+    line-height: 1.7;
+    text-align: center;
+  }
+  .notes a { color: var(--accent); }
+
+  .index {
+    max-width: 980px;
+    margin: 45px 0 20px;
+    border-top: 1px solid var(--border);
+    padding-top: 25px;
+  }
+  .index h2 {
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #666699;
+    margin: 0 0 6px;
+    text-align: center;
+  }
+  .index p { font-size: 0.8rem; color: #7a83aa; text-align: center; margin: 0 0 20px; line-height: 1.6; }
+  .index-group { margin-bottom: 14px; display: flex; flex-wrap: wrap; gap: 10px; align-items: baseline; justify-content: center; }
+  .index-group .g-label { font-size: 0.7rem; letter-spacing: 1.5px; text-transform: uppercase; color: #666699; font-weight: 700; width: 100%; text-align: center; }
+  .index-group a {
+    color: var(--text);
+    text-decoration: none;
+    font-size: 0.85rem;
+    border: 1px solid var(--border);
+    background: var(--entity);
+    border-radius: 4px;
+    padding: 5px 12px;
+  }
+  .index-group a:hover { border-color: var(--accent); color: #ffffff; }
+  .flow-label a { cursor: pointer; }
+  tspan.lk { fill: #a8b2e0; text-decoration: underline; text-decoration-style: dotted; }
+  .flow-label a:hover tspan.lk { fill: #ffffff; }
+</style>
+<style>
+  .cat-band { fill-opacity: 0.13; stroke-opacity: 0.55; stroke-width: 1.5; }
+  .cat-label { font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.85; }
+  .store line { stroke: #4a8a4a; stroke-width: 2; }
+  .store:hover line { stroke: #7ada7a; }
+  .store .s-name { fill: #a8e6a8; font-size: 13px; }
+  a.store { cursor: pointer; text-decoration: none; }
+  .process .p-name { font-size: 12.5px; }
+  .process .p-app { fill: #c8d0ea; font-size: 12px; font-style: italic; text-anchor: middle; }
+  .flow-label { font-size: 12px; }
+  .flow-label a { cursor: pointer; }
+  tspan.lk { fill: #a8b2e0; text-decoration: underline; text-decoration-style: dotted; }
+  .flow-label a:hover tspan.lk { fill: #ffffff; }
+  .nav-header .spec-link { margin-left: auto; }
+  .diagram { max-width: 1360px; }
+</style>
+</head>
+<body>
+
+<div class="nav-header">
+  <a href="../" class="portal-link">&#8592; Portal</a>
+  <a href="DFD_LEVEL1.html">&#8593; Level 1</a>
+  <a href="viewer.html#/md/YieldsMonitor/README.md" class="spec-link">&#9776; Yields Monitor specs</a>
+</div>
+
+<h1>Level 2 &mdash; Yields Monitor</h1>
+
+<div class="diagram">
+<svg viewBox="0 0 1360 900" role="img" aria-label="Level 2 for Yields Monitor: seven processes reading five data stores and two external entities directly. No process writes a data store.">
+  <defs><marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#55558c"/></marker></defs>
+  <path class="flow" d="M 260.0 170.0 Q 323.2 215.8 369.0 279.0" marker-end="url(#a1)"/>
+  <path class="flow" d="M 260.0 315.0 Q 306.3 309.2 352.0 318.1" marker-end="url(#a1)"/>
+  <path class="flow" d="M 260.0 460.0 Q 482.9 426.1 583.1 224.2" marker-end="url(#a1)"/>
+  <path class="flow" d="M 260.0 605.0 Q 408.1 692.2 576.0 728.8" marker-end="url(#a1)"/>
+  <path class="flow" d="M 260.0 750.0 Q 416.0 725.0 572.0 750.0" marker-end="url(#a1)"/>
+  <path class="flow" d="M 260.0 460.0 Q 518.8 463.9 584.4 714.2" marker-end="url(#a1)"/>
+  <path class="flow" d="M 8.0 242.5 Q 183.7 248.0 349.0 308.0" marker-end="url(#a1)"/>
+  <text class="flow-label" x="12" y="233"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#market-yields"><tspan class="lk">market yields</tspan></a></text>
+  <path class="flow" d="M 8.0 532.5 Q 183.1 534.0 349.0 590.0" marker-end="url(#a1)"/>
+  <text class="flow-label" x="12" y="523"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#live-quotes"><tspan class="lk">live quotes</tspan></a></text>
+  <path class="flow" d="M 459.9 290.5 Q 514.3 245.4 580.1 219.5" marker-end="url(#a1)"/>
+  <text class="flow-label" x="552" y="256" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#yield-series"><tspan class="lk">yield series</tspan></a></text>
+  <path class="flow" d="M 436.4 371.6 Q 546.1 521.6 603.6 698.4" marker-end="url(#a1)"/>
+  <text class="flow-label" x="591" y="628" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#yield-series"><tspan class="lk">yield series</tspan></a></text>
+  <path class="flow" d="M 465.6 303.6 Q 637.8 281.3 794.4 206.4" marker-end="url(#a1)"/>
+  <text class="flow-label" x="734" y="218" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#yield-series"><tspan class="lk">yield series</tspan></a></text>
+  <path class="flow" d="M 464.9 338.7 Q 639.0 368.6 795.1 451.3" marker-end="url(#a1)"/>
+  <text class="flow-label" x="742" y="410" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#yield-series"><tspan class="lk">yield series</tspan></a></text>
+  <path class="flow" d="M 451.5 360.5 Q 657.9 506.4 808.5 709.5" marker-end="url(#a1)"/>
+  <text class="flow-label" x="760" y="627" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#yield-series"><tspan class="lk">yield series</tspan></a></text>
+  <path class="flow" d="M 438.0 539.2 Q 496.1 376.9 602.0 240.8" marker-end="url(#a1)"/>
+  <text class="flow-label" x="556" y="282" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#live-quotes"><tspan class="lk">live quotes</tspan></a></text>
+  <path class="flow" d="M 456.9 624.1 Q 527.3 659.9 583.1 715.9" marker-end="url(#a1)"/>
+  <text class="flow-label" x="569" y="684" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#live-quotes"><tspan class="lk">live quotes</tspan></a></text>
+  <path class="flow" d="M 452.9 551.0 Q 604.2 361.7 807.1 229.0" marker-end="url(#a1)"/>
+  <text class="flow-label" x="728" y="267" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#live-quotes"><tspan class="lk">live quotes</tspan></a></text>
+  <path class="flow" d="M 688.0 190.0 Q 740.0 181.7 792.0 190.0" marker-end="url(#a1)"/>
+  <text class="flow-label" x="757" y="172" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#day-change"><tspan class="lk">day change</tspan></a></text>
+  <path class="flow" d="M 651.2 696.0 Q 703.8 455.8 828.8 244.0" marker-end="url(#a1)"/>
+  <text class="flow-label" x="776" y="314" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#sa-yield-series"><tspan class="lk">SA yield series</tspan></a></text>
+  <path class="flow" d="M 665.8 704.4 Q 724.9 598.1 814.2 515.6" marker-end="url(#a1)"/>
+  <text class="flow-label" x="792" y="565" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#sa-yield-series"><tspan class="lk">SA yield series</tspan></a></text>
+  <path class="flow" d="M 688.0 750.0 Q 740.0 741.7 792.0 750.0" marker-end="url(#a1)"/>
+  <text class="flow-label" x="740" y="732" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#sa-yield-series"><tspan class="lk">SA yield series</tspan></a></text>
+  <path class="flow" d="M 911.0 190.0 Q 1048.0 168.1 1185.0 190.0" marker-end="url(#a1)"/>
+  <path class="flow" d="M 911.0 470.0 Q 1048.0 448.1 1185.0 470.0" marker-end="url(#a1)"/>
+  <path class="flow" d="M 911.0 750.0 Q 1048.0 728.1 1185.0 750.0" marker-end="url(#a1)"/>
+  <text class="flow-label" x="1049" y="176" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#charts-and-tables"><tspan class="lk">charts and tables</tspan></a></text>
+  <path class="flow" d="M 1185.0 320.0 Q 829.6 387.1 471.0 340.0" marker-end="url(#a1)"/>
+  <text class="flow-label" x="829" y="360" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#view-selections"><tspan class="lk">view selections</tspan></a></text>
+  <g class="entity"><rect x="1190" y="100" width="145" height="720" rx="3"/><text class="e-name" x="1262.5" y="450">User</text></g>
+  <a class="store" href="viewer.html#/md/knowledge/DataStores.md#s6">
+    <rect x="40" y="150" width="215" height="40" fill="transparent" stroke="none"/>
+    <line x1="40" y1="150" x2="255" y2="150"/>
+    <line x1="40" y1="190" x2="255" y2="190"/>
+    <text class="s-name" x="147.5" y="175">Yield history</text>
+  </a>
+  <a class="store" href="viewer.html#/md/knowledge/DataStores.md#s18">
+    <rect x="40" y="295" width="215" height="40" fill="transparent" stroke="none"/>
+    <line x1="40" y1="295" x2="255" y2="295"/>
+    <line x1="40" y1="335" x2="255" y2="335"/>
+    <text class="s-name" x="147.5" y="320">Intraday archive</text>
+  </a>
+  <a class="store" href="viewer.html#/md/knowledge/DataStores.md#s16">
+    <rect x="40" y="440" width="215" height="40" fill="transparent" stroke="none"/>
+    <line x1="40" y1="440" x2="255" y2="440"/>
+    <line x1="40" y1="480" x2="255" y2="480"/>
+    <text class="s-name" x="147.5" y="465">Bond holidays</text>
+  </a>
+  <a class="store" href="viewer.html#/md/knowledge/DataStores.md#s2">
+    <rect x="40" y="585" width="215" height="40" fill="transparent" stroke="none"/>
+    <line x1="40" y1="585" x2="255" y2="585"/>
+    <line x1="40" y1="625" x2="255" y2="625"/>
+    <text class="s-name" x="147.5" y="610">TIPS reference data</text>
+  </a>
+  <a class="store" href="viewer.html#/md/knowledge/DataStores.md#s4">
+    <rect x="40" y="730" width="215" height="40" fill="transparent" stroke="none"/>
+    <line x1="40" y1="730" x2="255" y2="730"/>
+    <line x1="40" y1="770" x2="255" y2="770"/>
+    <text class="s-name" x="147.5" y="755">Ref CPI NSA and SA</text>
+  </a>
+  <a class="process" href="DFD_LEVEL3_YM_ASSEMBLE.html">
+    <circle cx="410" cy="320" r="58"/>
+    <text class="p-id" x="410" y="300">2.1</text>
+    <text class="p-name" x="410" y="321">Assemble</text>
+    <text class="p-name" x="410" y="337">range data</text>
+  </a>
+  <a class="process" href="viewer.html#/md/YieldsMonitor/knowledge/2.2_Read_Live_Quotes.md">
+    <circle cx="410" cy="590" r="58"/>
+    <text class="p-id" x="410" y="570">2.2</text>
+    <text class="p-name" x="410" y="591">Read live</text>
+    <text class="p-name" x="410" y="607">quotes</text>
+  </a>
+  <a class="process" href="viewer.html#/md/YieldsMonitor/knowledge/2.3_Calculate_Day_Change.md">
+    <circle cx="630" cy="190" r="58"/>
+    <text class="p-id" x="630" y="170">2.3</text>
+    <text class="p-name" x="630" y="191">Calculate</text>
+    <text class="p-name" x="630" y="207">day change</text>
+  </a>
+  <a class="process" href="viewer.html#/md/YieldsMonitor/knowledge/2.4_Adjust_For_Seasonality.md">
+    <circle cx="630" cy="750" r="58"/>
+    <text class="p-id" x="630" y="730">2.4</text>
+    <text class="p-name" x="630" y="751">Adjust for</text>
+    <text class="p-name" x="630" y="767">seasonality</text>
+  </a>
+  <a class="process" href="viewer.html#/md/YieldsMonitor/knowledge/2.5_Render_Time_Series.md">
+    <circle cx="850" cy="190" r="58"/>
+    <text class="p-id" x="850" y="170">2.5</text>
+    <text class="p-name" x="850" y="191">Render time</text>
+    <text class="p-name" x="850" y="207">series</text>
+  </a>
+  <a class="process" href="viewer.html#/md/YieldsMonitor/knowledge/2.6_Render_Yield_Curve_Snapshots.md">
+    <circle cx="850" cy="470" r="58"/>
+    <text class="p-id" x="850" y="442">2.6</text>
+    <text class="p-name" x="850" y="463">Render yield</text>
+    <text class="p-name" x="850" y="479">curve</text>
+    <text class="p-name" x="850" y="495">snapshots</text>
+  </a>
+  <a class="process" href="viewer.html#/md/YieldsMonitor/knowledge/2.7_Render_Breakeven_Inflation.md">
+    <circle cx="850" cy="750" r="58"/>
+    <text class="p-id" x="850" y="722">2.7</text>
+    <text class="p-name" x="850" y="743">Render</text>
+    <text class="p-name" x="850" y="759">breakeven</text>
+    <text class="p-name" x="850" y="775">inflation</text>
+  </a>
+</svg>
+</div>
+
+<p class="notes">
+  <b>No process here writes a data store.</b> Every flow ends at 2.5, 2.6 or 2.7 and is gone when the page closes.
+  2.1 is the only process that reads a store for its main feed; it also reads <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#market-yields">market yields</a> directly from <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#e5">CNBC GraphQL (E5)</a>, live — no acquisition job stores this app's own working copy. It explodes at <a href="DFD_LEVEL3_YM_ASSEMBLE.html">Level 3</a>.
+  2.2 reads <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#live-quotes">live quotes</a> directly from <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#e15">CNBC Quote Service (E15)</a>, the same way — the second and only other place this portal reads an external entity outside process 1.
+  2.3 and 2.4 each read <a href="viewer.html#/md/knowledge/DataStores.md#s16">Bond holidays (S16)</a> directly, to exclude a weekend or holiday bar from their own calculation, rather than through 2.1.
+  Each flow is named by the one structure it holds, defined in <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#6.0-data-flows">Data Dictionary &sect;6.4</a>.
+</p>
+
+</body>
+</html>

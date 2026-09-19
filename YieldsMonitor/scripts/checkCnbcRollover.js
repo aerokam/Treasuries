@@ -1,7 +1,7 @@
 // checkCnbcRollover.js — daily background check: does CNBC_ROLLOVER_LOG's last entry for each
 // TIPS symbol still match the bond CNBC is actually quoting live? If not, the log has gone
 // stale — exactly what happened 2026-09-01..2026-09-15 for US1YTIPS/US2YTIPS (see
-// YieldsMonitor/knowledge/2.4_Seasonal_Adjustment.md#automated-rollover-check) — and every SA
+// YieldsMonitor/knowledge/2.4_Adjust_For_Seasonality.md#automated-rollover-check) — and every SA
 // calculation since the missed rollover has been using the wrong bond's coupon/maturity.
 //
 // On a mismatch, resolves the flip date the same day it's noticed rather than waiting for more
@@ -32,15 +32,15 @@ import { fetchPricesForDate } from '../../scripts/getFedInvestPricesForDate.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.join(__dirname, '../..');
 const LOG_MODULE_PATH = path.join(REPO_ROOT, 'YieldsMonitor/src/cnbc-rollover-log.js');
-const SPEC_MD_PATH = path.join(REPO_ROOT, 'YieldsMonitor/knowledge/2.4_Seasonal_Adjustment.md');
+const SPEC_MD_PATH = path.join(REPO_ROOT, 'YieldsMonitor/knowledge/2.4_Adjust_For_Seasonality.md');
 const REL_LOG_MODULE = 'YieldsMonitor/src/cnbc-rollover-log.js';
-const REL_SPEC_MD = 'YieldsMonitor/knowledge/2.4_Seasonal_Adjustment.md';
+const REL_SPEC_MD = 'YieldsMonitor/knowledge/2.4_Adjust_For_Seasonality.md';
 
 const R2 = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev';
 const CNBC_QUOTE_URL = 'https://quote.cnbc.com/quote-html-webservice/restQuote/symbolType/symbol';
 const SYMBOLS = ['US1YTIPS', 'US2YTIPS', 'US5YTIPS', 'US10YTIPS', 'US30YTIPS'];
 // Comfortably covers the "several weeks" worst-case post-checkpoint lag documented in
-// 2.4_Seasonal_Adjustment.md — wide enough to find the boundary without scanning forever.
+// 2.4_Adjust_For_Seasonality.md — wide enough to find the boundary without scanning forever.
 const LOOKBACK_DAYS = 75;
 // A candidate's implied yield must land within this many bp of CNBC's actual quoted yield, AND
 // beat the other candidate by at least MARGIN_BP, to count as a clean fit for that day — not
@@ -60,7 +60,7 @@ function log(msg) {
 
 // CNBC's batched quote endpoint occasionally drops one symbol from an otherwise-successful
 // response (observed in testing — not a documented behavior, just flaky in practice, same
-// underlying feed as US5YTIPS's known unreliability in 1.0_Operation.md). A missing symbol
+// underlying feed as US5YTIPS's known unreliability in 2.1_Assemble_Range_Data.md). A missing symbol
 // self-heals on the next daily run either way, but retrying once avoids losing a whole day to
 // a transient glitch.
 async function fetchLiveQuotesOnce() {
@@ -136,7 +136,7 @@ function isoDaysAgo(n) {
 }
 
 // Classifies one trading day's fit: which candidate's FedInvest-implied yield (T+0 settlement,
-// sell-primary price — see 2.4_Seasonal_Adjustment.md's "Price selection") matches CNBC's own
+// sell-primary price — see 2.4_Adjust_For_Seasonality.md's "The CNBC rollover log") matches CNBC's own
 // archived quoted yield for that day.
 async function classifyDay(iso, oldCandidate, newCandidate, actualYield) {
   const got = await fetchPricesForDate(iso).catch(() => null);
