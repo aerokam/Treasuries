@@ -18,8 +18,11 @@ This document provides the operational details for every data store: R2 key, wri
 
 ## <a id="s2"></a>TIPS reference data (S2)
 **Description**: Immutable TIPS metadata fetched from FiscalData.
+**Written by**: [1.6 Fetch TIPS reference data](./1.6_Fetch_TIPS_Reference_Data.md).
 **Update Frequency**: Weekly (or on-demand for new auctions).
-**R2 Key**: `TIPS/TipsRef.csv` (written by `scripts/fetchTipsRef.js`). The old `Treasuries/TipsRef.csv` key was consolidated away (see `R2_Cleanup.md`) but the stale object was never deleted from R2 — it is frozen at 2026-07-13 and must not be read.
+**R2 Key**: `TIPS/TipsRef.csv`.
+
+The old `Treasuries/TipsRef.csv` key was consolidated away (see `R2_Cleanup.md`) but the stale object was never deleted from R2 — it is frozen at 2026-07-13 and must not be read.
 
 | Field | Type | Description |
 |---|---|---|
@@ -73,8 +76,11 @@ This document provides the operational details for every data store: R2 key, wri
 
 ## <a id="s5"></a>Auction results (S5)
 **File**: `Auctions.csv`
+**R2 Key**: `Treasuries/Auctions.csv`
 **Description**: Historical Treasury auction results since 1980.
+**Written by**: [1.4 Fetch auction results](./1.4_Fetch_Auction_Results.md).
 **Update Frequency**: Weekdays.
+**Read by**: TreasuryAuctions.
 
 **Key Fields**: `CUSIP`, `Auction_Date`, `Security_Type`, `High_Yield`, `Bid_to_Cover`.
 
@@ -213,6 +219,7 @@ This document provides the operational details for every data store: R2 key, wri
 
 ## <a id="s9"></a>Tentative auction schedule (S9)
 **Description**: Copy of the Treasury's Tentative Auction Schedule, used to identify TIPS auctions that the FiscalData upcoming-auctions feed doesn't flag.
+**Written by**: [1.5 Fetch tentative auction schedule](./1.5_Fetch_Tentative_Auction_Schedule.md).
 **Update Frequency**: Local Windows Task `TreasuryAuctions-TentativeSchedule`. Treasury revises this schedule at its Quarterly Refunding press conference (first Wednesday of Feb/May/Aug/Nov), with the document itself updated ~1–3 weeks later, so the task runs daily for 21 days after each of the next 2 quarterly-refunding dates, plus a monthly safety-net check the rest of the year. A companion task, `TreasuryAuctions-TentativeSchedule-Refresh`, re-runs `scripts/setup-tentative-schedule-task.ps1` quarterly to roll the trigger window forward — no manual maintenance needed.
 **R2 Key**: `Treasuries/Tentative-Auction-Schedule.xml`
 
