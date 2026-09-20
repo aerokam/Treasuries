@@ -126,23 +126,30 @@ const fromCircle = (cx, cy, r, x2, y2) => { const dx = x2 - cx, dy = y2 - cy, L 
 
 // Orthogonal H-V-H routing for a dense many-to-many region between two columns — a
 // curve there has no way to avoid crossing whatever sits between its two endpoints, and
-// is hard to trace by eye once several of them cross the same intervening column. Each
-// edge gets its own vertical lane within the gap, assigned by interval coloring so two
-// edges whose vertical spans overlap land in different lanes; a lane is reused once its
-// last edge's span has cleared.
-function laneAssign(edges, x0, x1, numLanes) {
-  const sorted = edges.slice().sort((a, b) => Math.min(a.y1, a.y2) - Math.min(b.y1, b.y2));
-  const laneEnd = new Array(numLanes).fill(-Infinity);
-  for (const e of sorted) {
-    const lo = Math.min(e.y1, e.y2) - 14, hi = Math.max(e.y1, e.y2) + 14;
-    let lane = laneEnd.findIndex(end => end < lo);
-    if (lane < 0) lane = laneEnd.indexOf(Math.min(...laneEnd));
-    laneEnd[lane] = hi;
-    e.turnX = x0 + (lane + 1) * (x1 - x0) / (numLanes + 1);
+// is hard to trace by eye once several of them cross the same intervening column, or once
+// several unrelated edges share a lane and a viewer can no longer tell which vertical
+// belongs to which horizontal. Every line here gets its own lane, never shared with a
+// different line — the only line that fans to more than one horizontal is a genuine
+// single flow with several consumers (routeLines' 'trunk' kind), drawn as one vertical
+// with a branch at each real consumer's row and nowhere else, so a vertical crossing an
+// unrelated row without a branch there is unambiguously just passing through, not
+// terminating. Shortest-span lines get the innermost lane (closest to the column), so a
+// short local hop's own stub never has to reach out through a lane a long-spanning line
+// or trunk owns.
+function routeLines(lines, x0, x1) {
+  lines.sort((a, b) => a.span - b.span);
+  lines.forEach((ln, i) => { ln.laneX = x0 + (i + 1) * (x1 - x0) / (lines.length + 1); });
+}
+function drawLine(P, ln) {
+  if (ln.kind === 'trunk') {
+    const ys = [ln.rootY, ...ln.branches.map(b => b.y)];
+    P.push(`  <path class="flow" d="M ${ln.rootX.toFixed(1)} ${ln.rootY.toFixed(1)} H ${ln.laneX.toFixed(1)}"/>`);
+    P.push(`  <path class="flow" d="M ${ln.laneX.toFixed(1)} ${Math.min(...ys).toFixed(1)} V ${Math.max(...ys).toFixed(1)}"/>`);
+    ln.branches.forEach(b => P.push(`  <path class="flow" d="M ${ln.laneX.toFixed(1)} ${b.y.toFixed(1)} H ${b.x.toFixed(1)}" marker-end="url(#a1)"/>`));
+  } else {
+    P.push(`  <path class="flow" d="M ${ln.x1.toFixed(1)} ${ln.y1.toFixed(1)} H ${ln.laneX.toFixed(1)} V ${ln.y2.toFixed(1)} H ${ln.x2.toFixed(1)}" marker-end="url(#a1)"/>`);
   }
 }
-const elbow = (x1, y1, x2, y2, turnX) =>
-  `  <path class="flow" d="M ${x1.toFixed(1)} ${y1.toFixed(1)} H ${turnX.toFixed(1)} V ${y2.toFixed(1)} H ${x2.toFixed(1)}" marker-end="url(#a1)"/>`;
 
 const marker = () => `  <defs><marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#55558c"/></marker></defs>`;
 
@@ -684,33 +691,59 @@ function level2Ingestion() {
   const sIdx = Object.fromEntries(order.map((k, i) => [k, i]));
 
   const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 2 for process 1: the ingestion jobs, the external entity each one reads, and the data store each one writes.">`, marker()];
-  // Every flow here is drawn horizontal-out, vertical, horizontal-in — never a curve —
-  // so a line crossing the store or entity column stays a straight run through the gap
-  // between columns rather than a bow that can sweep behind a box. Each edge gets its
-  // own lane (see laneAssign) so two flows whose vertical runs overlap don't share a line.
+  // Every flow here is drawn horizontal-out, vertical, horizontal-in — never a curve — so
+  // a line crossing the store or entity column stays a straight run through the gap
+  // between columns rather than a bow that can sweep behind a box. A source read or fed
+  // to more than one consumer (a store read by several jobs, or one named flow reaching
+  // several jobs from the same entity) is one trunk line with a branch at each real
+  // consumer, never several independent lines that happen to share a lane — see
+  // routeLines/drawLine.
   const EGAP0 = EX + EW + 4, EGAP1 = JX - JR - 4;
-  const eEdges = [];
+  const entLines = [];
   entities.forEach(e => {
-    e.jobs.forEach(jid => {
-      const y2 = jy(jobIdx[jid]);
-      const y1 = e.y + (e.jobs.length > 1 ? (e.jobs.indexOf(jid) - (e.jobs.length - 1) / 2) * 16 : 0);
-      eEdges.push({ y1, y2, data: jobs[jobIdx[jid]].data });
+    const groups = {};
+    e.jobs.forEach(jid => (groups[jobs[jobIdx[jid]].data] ||= []).push(jid));
+    const labels = Object.keys(groups);
+    labels.forEach((label, gi) => {
+      const jids = groups[label];
+      const rootY = e.y + (labels.length > 1 ? (gi - (labels.length - 1) / 2) * 16 : 0);
+      if (jids.length === 1) {
+        const y2 = jy(jobIdx[jids[0]]);
+        entLines.push({ kind: 'simple', x1: EGAP0, y1: rootY, x2: EGAP1, y2, span: Math.abs(rootY - y2), label, labelAt: [EGAP0 + 8, rootY - 8] });
+      } else {
+        const branches = jids.map(jid => ({ y: jy(jobIdx[jid]), x: EGAP1 }));
+        const ys = [rootY, ...branches.map(b => b.y)];
+        entLines.push({ kind: 'trunk', rootX: EGAP0, rootY, branches, span: Math.max(...ys) - Math.min(...ys), label, labelAt: [EGAP0 + 8, rootY - 8] });
+      }
     });
   });
-  laneAssign(eEdges, EGAP0 + 8, EGAP1 - 8, entities.length);
-  eEdges.forEach(e => {
-    P.push(elbow(EGAP0, e.y1, EGAP1, e.y2, e.turnX));
-    P.push(labelAt(EGAP0 + 8, e.y1 - 8, e.data));
-  });
+  routeLines(entLines, EGAP0 + 8, EGAP1 - 8);
+  entLines.forEach(ln => { drawLine(P, ln); P.push(labelAt(...ln.labelAt, ln.label)); });
+
   const SGAP0 = JX + JR + 4, SGAP1 = SX - 4;
-  const sEdges = [];
+  const readsByStore = {};
+  jobs.forEach((j, i) => (j.reads || []).forEach(k => (readsByStore[k] ||= []).push(i)));
+  const storeLines = [];
+  Object.entries(readsByStore).forEach(([k, jobIdxs]) => {
+    const rootY = sy(sIdx[k]);
+    if (jobIdxs.length === 1) {
+      const y2 = jy(jobIdxs[0]);
+      storeLines.push({ kind: 'simple', x1: SGAP1, y1: rootY, x2: SGAP0, y2, span: Math.abs(rootY - y2) });
+    } else {
+      const branches = jobIdxs.map(i => ({ y: jy(i), x: SGAP0 }));
+      const ys = [rootY, ...branches.map(b => b.y)];
+      storeLines.push({ kind: 'trunk', rootX: SGAP1, rootY, branches, span: Math.max(...ys) - Math.min(...ys) });
+    }
+  });
   jobs.forEach((j, i) => {
     const y = jy(i);
-    (j.reads || []).forEach(k => sEdges.push({ y1: sy(sIdx[k]), y2: y, from: SGAP1, to: SGAP0 }));
-    (j.writes || []).forEach(k => sEdges.push({ y1: y, y2: sy(sIdx[k]), from: SGAP0, to: SGAP1 }));
+    (j.writes || []).forEach(k => {
+      const y2 = sy(sIdx[k]);
+      storeLines.push({ kind: 'simple', x1: SGAP0, y1: y, x2: SGAP1, y2, span: Math.abs(y - y2) });
+    });
   });
-  laneAssign(sEdges, SGAP0 + 8, SGAP1 - 8, 16);
-  sEdges.forEach(e => P.push(elbow(e.from, e.y1, e.to, e.y2, e.turnX)));
+  routeLines(storeLines, SGAP0 + 8, SGAP1 - 8);
+  storeLines.forEach(ln => drawLine(P, ln));
   entities.forEach(e => P.push(entityShape(EX, e.y, EW, EH, e.href, e.name)));
   order.forEach((k, i) => P.push(storeShape(SX, sy(i), SW, stores[k][1], stores[k][0])));
   jobs.forEach((j, i) => P.push(procShape(JX, jy(i), JR, j.href || V('knowledge/Data_Pipeline.md'), j.id, j.name)));
