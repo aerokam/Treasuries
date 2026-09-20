@@ -124,6 +124,26 @@ function flowSet(x1, y1, x2, y2, labels, opts = {}) {
 const toCircle = (x1, y1, cx, cy, r) => { const dx = cx - x1, dy = cy - y1, L = Math.hypot(dx, dy) || 1; return [cx - r * dx / L, cy - r * dy / L]; };
 const fromCircle = (cx, cy, r, x2, y2) => { const dx = x2 - cx, dy = y2 - cy, L = Math.hypot(dx, dy) || 1; return [cx + r * dx / L, cy + r * dy / L]; };
 
+// Orthogonal H-V-H routing for a dense many-to-many region between two columns — a
+// curve there has no way to avoid crossing whatever sits between its two endpoints, and
+// is hard to trace by eye once several of them cross the same intervening column. Each
+// edge gets its own vertical lane within the gap, assigned by interval coloring so two
+// edges whose vertical spans overlap land in different lanes; a lane is reused once its
+// last edge's span has cleared.
+function laneAssign(edges, x0, x1, numLanes) {
+  const sorted = edges.slice().sort((a, b) => Math.min(a.y1, a.y2) - Math.min(b.y1, b.y2));
+  const laneEnd = new Array(numLanes).fill(-Infinity);
+  for (const e of sorted) {
+    const lo = Math.min(e.y1, e.y2) - 14, hi = Math.max(e.y1, e.y2) + 14;
+    let lane = laneEnd.findIndex(end => end < lo);
+    if (lane < 0) lane = laneEnd.indexOf(Math.min(...laneEnd));
+    laneEnd[lane] = hi;
+    e.turnX = x0 + (lane + 1) * (x1 - x0) / (numLanes + 1);
+  }
+}
+const elbow = (x1, y1, x2, y2, turnX) =>
+  `  <path class="flow" d="M ${x1.toFixed(1)} ${y1.toFixed(1)} H ${turnX.toFixed(1)} V ${y2.toFixed(1)} H ${x2.toFixed(1)}" marker-end="url(#a1)"/>`;
+
 const marker = () => `  <defs><marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#55558c"/></marker></defs>`;
 
 // An entity or store box names its identifier in parentheses, the same form the
@@ -635,13 +655,22 @@ function level2Ingestion() {
     spread: ['Bid and ask spreads', DS('s15')], hol: ['Bond holidays', DS('s16')],
     blscpi: ['Monthly CPI', DS('s17')], ia: ['Intraday archive', DS('s18')],
   };
-  const order = ['fedinv','quotes','yc','bei','spread','auctions','tent','tipsref','yhist','ia','blscpi','nsasa','sasao','cpihist','refcpi','funds','gsw','hol'];
-  const JX = 470, JR = 54, SX = 730, SW = 235;
+  const JX = 470, JR = 54, SX = 760, SW = 235;
   const EX = 20, EW = 190, EH = 52;
   const jy = i => 90 + i * 116;
-  const sy = i => 80 + i * 97;
-  const H = Math.max(jy(jobs.length - 1), sy(order.length - 1)) + 110, W = 1010;
   const jobIdx = Object.fromEntries(jobs.map((j, i) => [j.id, i]));
+  // Stores are ordered by the mean row index of every job that reads or writes them, the
+  // same barycentre principle level1() uses — a store touched only by one job sits level
+  // with it; one touched by several sits near their middle, which is what keeps the H-V-H
+  // lanes below short rather than spanning the whole column.
+  const touches = {};
+  jobs.forEach((j, i) => [...(j.reads || []), ...(j.writes || [])].forEach(k => (touches[k] ||= []).push(i)));
+  const order = Object.keys(stores).sort((a, b) => {
+    const mean = arr => arr.reduce((s, v) => s + v, 0) / arr.length;
+    return mean(touches[a]) - mean(touches[b]);
+  });
+  const sy = i => 80 + i * 97;
+  const H = Math.max(jy(jobs.length - 1), sy(order.length - 1)) + 110, W = 1040;
   entities.forEach(e => { e.y = e.jobs.reduce((s, jid) => s + jy(jobIdx[jid]), 0) / e.jobs.length; });
   // An entity feeding two jobs sits at their midpoint, which can land exactly on a
   // single-job entity sitting between them (FiscalData's two jobs bracket Treasury
@@ -652,30 +681,36 @@ function level2Ingestion() {
   for (let i = 1; i < entities.length; i++) {
     if (entities[i].y - entities[i - 1].y < MIN_ENTITY_GAP) entities[i].y = entities[i - 1].y + MIN_ENTITY_GAP;
   }
-  const OBS = jobs.map((j, i) => ({ x: JX, y: jy(i), r: JR }));
   const sIdx = Object.fromEntries(order.map((k, i) => [k, i]));
 
   const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 2 for process 1: the ingestion jobs, the external entity each one reads, and the data store each one writes.">`, marker()];
+  // Every flow here is drawn horizontal-out, vertical, horizontal-in — never a curve —
+  // so a line crossing the store or entity column stays a straight run through the gap
+  // between columns rather than a bow that can sweep behind a box. Each edge gets its
+  // own lane (see laneAssign) so two flows whose vertical runs overlap don't share a line.
+  const EGAP0 = EX + EW + 4, EGAP1 = JX - JR - 4;
+  const eEdges = [];
   entities.forEach(e => {
     e.jobs.forEach(jid => {
-      const ji = jobIdx[jid], y = jy(ji), j = jobs[ji];
+      const y2 = jy(jobIdx[jid]);
       const y1 = e.y + (e.jobs.length > 1 ? (e.jobs.indexOf(jid) - (e.jobs.length - 1) / 2) * 16 : 0);
-      const [x2, y2] = toCircle(EX + EW, y1, JX, y, JR);
-      P.push(flow(EX + EW, y1, x2, y2, { obstacles: OBS.filter(o => o.y !== y) }));
-      P.push(labelAt(EX + EW + 8, y1 - 8, j.data));
+      eEdges.push({ y1, y2, data: jobs[jobIdx[jid]].data });
     });
   });
+  laneAssign(eEdges, EGAP0 + 8, EGAP1 - 8, entities.length);
+  eEdges.forEach(e => {
+    P.push(elbow(EGAP0, e.y1, EGAP1, e.y2, e.turnX));
+    P.push(labelAt(EGAP0 + 8, e.y1 - 8, e.data));
+  });
+  const SGAP0 = JX + JR + 4, SGAP1 = SX - 4;
+  const sEdges = [];
   jobs.forEach((j, i) => {
     const y = jy(i);
-    (j.reads || []).forEach(k => {
-      const from = toCircle(SX + SW + 5, sy(sIdx[k]), JX, y, JR);
-      P.push(flow(SX - 5, sy(sIdx[k]), from[0], from[1], { obstacles: OBS.filter(o => o.y !== y) }));
-    });
-    (j.writes || []).forEach(k => {
-      const s = fromCircle(JX, y, JR, SX, sy(sIdx[k]));
-      P.push(flow(s[0], s[1], SX - 5, sy(sIdx[k]), { obstacles: OBS.filter(o => o.y !== y) }));
-    });
+    (j.reads || []).forEach(k => sEdges.push({ y1: sy(sIdx[k]), y2: y, from: SGAP1, to: SGAP0 }));
+    (j.writes || []).forEach(k => sEdges.push({ y1: y, y2: sy(sIdx[k]), from: SGAP0, to: SGAP1 }));
   });
+  laneAssign(sEdges, SGAP0 + 8, SGAP1 - 8, 16);
+  sEdges.forEach(e => P.push(elbow(e.from, e.y1, e.to, e.y2, e.turnX)));
   entities.forEach(e => P.push(entityShape(EX, e.y, EW, EH, e.href, e.name)));
   order.forEach((k, i) => P.push(storeShape(SX, sy(i), SW, stores[k][1], stores[k][0])));
   jobs.forEach((j, i) => P.push(procShape(JX, jy(i), JR, j.href || V('knowledge/Data_Pipeline.md'), j.id, j.name)));
