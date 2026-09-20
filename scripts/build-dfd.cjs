@@ -621,7 +621,7 @@ function level2Ingestion() {
     { id: '1.11', name: ['Calculate SA', 'and SAO yields'],         data: null, reads: ['quotes', 'refcpi', 'hol'], writes: ['sasao'] },
     { id: '1.12', name: ['Fetch CPI', 'history'],                   data: 'monthly CPI-U',              writes: ['cpihist'] },
     { id: '1.13', name: ['Fetch daily', 'Ref CPI'],                 data: 'daily Ref CPI',              writes: ['refcpi'] },
-    { id: '1.14', name: ['Collect fund', 'holdings'],               data: 'fund holdings', reads: ['quotes', 'sasao'], writes: ['funds'] },
+    { id: '1.14', name: ['Fetch and', 'process fund', 'holdings'],  data: 'fund holdings', reads: ['quotes', 'sasao'], writes: ['funds'] },
     { id: '1.15', name: ['Fetch GSW', 'curve parameters'],          data: 'GSW curve parameters',       writes: ['gsw'] },
   ];
   const stores = {
