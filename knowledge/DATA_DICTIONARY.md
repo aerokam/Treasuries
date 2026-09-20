@@ -127,7 +127,7 @@
   | `yield` | [Yield](#yield) at the settlement date, as a decimal: real for a TIPS, nominal for every other security |
 
 - <a id="s2"></a>**TIPS reference data (S2)**, `TipsRef.csv` = `{ @CUSIP + Maturity + DatedDate + Coupon + DatedDateRefCpi + Term }`
-- <a id="s3"></a>**Ref CPI (S3)**, `RefCPI.csv` = `{ @Date + Ref_CPI }` *— authoritative retrieved NSA Ref CPI (TreasuryDirect). Consumed by all apps.*
+- <a id="s3"></a>**Ref CPI (S3)**, `RefCPI.csv` = `{ @Date + Ref_CPI }` *— authoritative retrieved NSA Ref CPI (TreasuryDirect), 1997-01-15 (the first TIPS ever issued) to present. Consumed by all apps. See [DataStores.md](./DataStores.md#s3) for how the full range is assembled and kept current.*
 - <a id="s4"></a>**Ref CPI NSA and SA (S4)**, `RefCpiNsaSa.csv` = `{ @Date + CPI_NSA + CPI_SA + SA_Factor }` *— calculated (App. B daily interpolation), built for the SA pipeline: `CPI_NSA` and `CPI_SA` interpolated daily so `SA_Factor = CPI_NSA / CPI_SA`. The daily SA series has no official or retrieved equivalent — this is its **sole source**.*
 - <a id="s5"></a>**Auction results (S5)**, `Auctions.csv` = `{ @CUSIP + @Auction_Date + Security_Type + High_Yield + Bid_to_Cover + Primary_Dealer_Accepted + ... }`
 - <a id="s6"></a>**Yield history (S6)**, `YieldHistory` = `{ @Symbol + { [ Timestamp + Yield_Value ] } }`

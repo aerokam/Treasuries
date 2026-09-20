@@ -36,13 +36,18 @@ This document provides the operational details for every data store: R2 key, wri
 
 ## <a id="s3"></a>Ref CPI (S3)
 **File**: `RefCPI.csv`
-**Description**: Daily interpolated Reference CPI for index ratio calculations.
-**Update Frequency**: Monthly (on BLS release).
+**Description**: Daily Reference CPI, retrieved from TreasuryDirect SecIndex (E2), 1997-01-15 (the first TIPS ever issued) to present. Ref CPI is market-wide — identical across every outstanding CUSIP on a given date — so the file is one continuous series regardless of which CUSIP's SecIndex query produced each row.
+**Written by**: `scripts/fetchRefCpi.js`.
+- `--build`: one-shot historical bootstrap, never scheduled. Merges two CUSIPs whose SecIndex windows together cover the full range with no gap: `9128272M3` (the first TIPS issued, matured 2007-01-15, still queryable) and `912810FD5` (matures 2028-04-15). Run by hand only if the file ever needs to be rebuilt from scratch.
+- `--append`: what the scheduled task actually runs. Picks the currently-outstanding TIPS with the latest maturity date (from [TIPS reference data (S2)](#s2)) fresh each run — no hardcoded CUSIP to swap out as one matures — fetches its SecIndex series, and merges any new dates into the existing file.
+**Update Frequency**: Monthly (on BLS release, `run-ref-cpi.cmd` → `fetchRefCpi.js --append`).
 
 | Field | Type | Description |
 |---|---|---|
 | `Date` | Date | The specific date for the RefCPI value. |
-| `RefCPI` | Number | The daily interpolated CPI-U value. |
+| `RefCPI` | Number | Reference CPI, truncate-6/round-5 per 31 CFR §356 App. B §I.B.3. |
+
+**Sort order**: Ascending by date.
 
 **Live Data**: [View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/TIPS/RefCPI.csv)
 
