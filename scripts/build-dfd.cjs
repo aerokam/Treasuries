@@ -126,14 +126,23 @@ const fromCircle = (cx, cy, r, x2, y2) => { const dx = x2 - cx, dy = y2 - cy, L 
 
 const marker = () => `  <defs><marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#55558c"/></marker></defs>`;
 
+// An entity or store box names its identifier in parentheses, the same form the
+// prose everywhere else uses (FedInvest (E1), Market quotes (S7)) — derived from
+// the href's own trailing anchor so every call site gets it with no data change.
+function idSuffix(href) {
+  const m = /#([es])(\d+)$/.exec(href);
+  return m ? ` (${m[1].toUpperCase()}${m[2]})` : '';
+}
 // An external entity, drawn as a box at whichever level the process reading it is
 // decomposed into the specific jobs or processes that actually do the reading —
 // see DFD_Worklist.md §4.0. Multi-line name, centered on its own y.
 function entityShape(x, y, w, h, href, lines) {
   const top = y - h / 2;
+  const suf = idSuffix(href);
+  const shown = suf ? [...lines.slice(0, -1), lines[lines.length - 1] + suf] : lines;
   return [`  <a class="entity" href="${href}">`,
     `    <rect x="${x}" y="${top}" width="${w}" height="${h}" rx="3"/>`,
-    ...lines.map((ln, k) => `    <text class="e-name" x="${x + w / 2}" y="${top + h / 2 + (k - (lines.length - 1) / 2) * 16 + 5}">${esc(ln)}</text>`),
+    ...shown.map((ln, k) => `    <text class="e-name" x="${x + w / 2}" y="${top + h / 2 + (k - (shown.length - 1) / 2) * 16 + 5}">${esc(ln)}</text>`),
     `  </a>`].join(NL);
 }
 function storeShape(x, y, w, href, name) {
@@ -141,7 +150,7 @@ function storeShape(x, y, w, href, name) {
     `    <rect x="${x}" y="${y - 20}" width="${w}" height="40" fill="transparent" stroke="none"/>`,
     `    <line x1="${x}" y1="${y - 20}" x2="${x + w}" y2="${y - 20}"/>`,
     `    <line x1="${x}" y1="${y + 20}" x2="${x + w}" y2="${y + 20}"/>`,
-    `    <text class="s-name" x="${x + w / 2}" y="${y + 5}">${esc(name)}</text>`, `  </a>`].join(NL);
+    `    <text class="s-name" x="${x + w / 2}" y="${y + 5}">${esc(name + idSuffix(href))}</text>`, `  </a>`].join(NL);
 }
 // caption, when given, is written beneath the circle: the portal name of an app.
 function procShape(cx, cy, r, href, id, lines, caption) {
