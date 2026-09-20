@@ -126,7 +126,7 @@ function updateUpLink(contentEl) {
     if (!target) { upLink.style.display = 'none'; return; }
     const href = target.getAttribute('href');
     const levelMatch = href.match(/DFD_LEVEL(\d)/);
-    upLink.textContent = levelMatch ? `↑ Level ${levelMatch[1]} diagram` : '↑ Diagram';
+    upLink.textContent = levelMatch ? `↑ Up to Level ${levelMatch[1]} DFD` : '↑ Up to DFD';
     upLink.setAttribute('href', href);
     upLink.style.display = '';
 }
