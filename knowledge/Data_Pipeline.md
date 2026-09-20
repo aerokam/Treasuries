@@ -35,7 +35,7 @@ These jobs run on the host machine via Windows Task Scheduler.
 | Task Name | Schedule | Script | Primary Output |
 |---|---|---|---|
 | **FedInvest Download** | Weekdays 1:05pm ET, retries every 10 min up to 2h if not yet posted | `scripts/getYieldsFedInvest.js` (via `YieldCurves/scripts/run-fedinvest.cmd`) | `YieldsFromFedInvestPrices.csv` |
-| **Fidelity Quotes** | 3× Daily | *(Windows Task)* | `FidelityTreasuriesTips.csv` (combined Treasury + TIPS) |
+| **Fidelity Quotes** | 3× Daily | *(Windows Task)* → `fidelityDownload.js` → `uploadFidelityDownload.js`, which chains `updateSaSaoYields.js` on a successful upload | `FidelityTreasuriesTips.csv` ([S7](./DataStores.md#s7), combined Treasury + TIPS), then `TIPS/YieldsSaSao.csv` ([S10](./DataStores.md#s10)) |
 | **TreasuryAuctions** | Weekdays 8:35/10:05am PT | `scripts/getAuctions.js` | `Auctions.csv` |
 | **TIPS Ref Refresh** | Mondays 7am PT | `scripts/fetchTipsRef.js` | `TipsRef.csv` |
 | **Update Yields History** | Weekdays 2:00pm PT | `YieldsMonitor/scripts/updateYieldsHistory.js` | `yields-history/history.json` ([S6](./DataStores.md#s6)) |
@@ -43,7 +43,7 @@ These jobs run on the host machine via Windows Task Scheduler.
 | **Close Probe** | Weekdays 2:05pm PT, +15min ×1h | `YieldsMonitor/scripts/probeClose.js` | `yields-history/close-probe/{symbol}.csv` — diagnostic only, not read by the app; see [Close Price Investigation](../YieldsMonitor/knowledge/Close_Price_Investigation.md) |
 | **Lock Probe** | Hourly, 2:00pm–5:00am PT | `YieldsMonitor/scripts/probeLock.js` | `yields-history/lock-probe/lock-probe.csv` — diagnostic only, not read by the app; see [Close Price Investigation §7](../YieldsMonitor/knowledge/Close_Price_Investigation.md#7-investigation-tooling-all-read-only--additive) |
 | **Check CNBC Rollover** | Daily | `YieldsMonitor/scripts/checkCnbcRollover.js` | Commits and pushes `YieldsMonitor/src/cnbc-rollover-log.js` and the pinned-dates table in [2.4 Adjust for seasonality](../YieldsMonitor/knowledge/2.4_Adjust_For_Seasonality.md) — a code/spec commit, not an R2 write |
-| **SA Factor Update** | Daily 6:35am | `YieldCurves/scripts/updateRefCpi.js` | `RefCpiNsaSa.csv` |
+| **SA Factor Update** | Daily 6:35am | `YieldCurves/scripts/updateRefCpi.js`, which chains `fetchCpiBls.js` → `calcRefCpi.js` → `updateSaSaoYields.js` unconditionally | `bls/CPI.csv` ([S17](./DataStores.md#s17)), `RefCpiNsaSa.csv` ([S4](./DataStores.md#s4)), then `TIPS/YieldsSaSao.csv` ([S10](./DataStores.md#s10)) again |
 | **FundHoldings** | Daily 6:40am PT | `FundHoldings/updateAllHoldings.js`, then `FundHoldings/enrichHoldings.js` | `FundHoldings/Holdings-<TICKER>(-Enriched).csv` and `FundHoldings/FundMeta.json` ([S11](./DataStores.md#s11)) |
 | **GSW TIPS Curve** | Daily 7:15am PT | `YieldCurves/scripts/updateGswTipsCurve.js` | `TIPS/GswTipsCurve.json` (GSW Svensson params — [S12](./DataStores.md#s12)) |
 | **Yield Curves** | Chained after BOTH inputs it depends on: `FidelityQuotes` (3x daily on weekdays, via `run-fidelity.cmd`) and `YieldsFromFedInvestPrices` (1x daily on weekdays, via `run-fedinvest.cmd`), each calling `run-yield-curves.cmd` on success. No standalone trigger. | `YieldCurves/scripts/updateSpotYieldCurves.js` (via `YieldCurves/scripts/run-yield-curves.cmd`) | `Treasuries/YieldCurves.csv` ([S13](./DataStores.md#s13)), `Treasuries/BreakevenInflation.csv` ([S14](./DataStores.md#s14)), `Treasuries/BidAskSpreads.csv` ([S15](./DataStores.md#s15)) |

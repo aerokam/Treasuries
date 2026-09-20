@@ -653,12 +653,12 @@ function level2Ingestion() {
     { id: '1.6',  name: ['Fetch TIPS', 'reference data'],           data: 'TIPS reference data',        writes: ['tipsref'], href: V('knowledge/1.6_Fetch_TIPS_Reference_Data.md') },
     { id: '1.7',  name: ['Update yield', 'history'],                data: 'market yields',              writes: ['yhist'], href: V('knowledge/1.7_Update_Yield_History.md') },
     { id: '1.8',  name: ['Archive', 'intraday yields'],             data: 'market yields',              writes: ['ia'], href: V('knowledge/1.8_Archive_Intraday_Yields.md') },
-    { id: '1.9',  name: ['Fetch monthly', 'CPI'],                   data: 'monthly CPI-U',              writes: ['blscpi'] },
-    { id: '1.10', name: ['Interpolate', 'daily Ref CPI', 'NSA and SA'], data: null, reads: ['blscpi'], writes: ['nsasa'] },
-    { id: '1.11', name: ['Calculate SA', 'and SAO yields'],         data: null, reads: ['quotes', 'refcpi', 'hol'], writes: ['sasao'] },
-    { id: '1.12', name: ['Fetch CPI', 'history'],                   data: 'monthly CPI-U',              writes: ['cpihist'] },
-    { id: '1.13', name: ['Fetch daily', 'Ref CPI'],                 data: 'daily Ref CPI',              writes: ['refcpi'] },
-    { id: '1.14', name: ['Enrich fund', 'holdings'],                data: 'fund holdings', reads: ['quotes', 'sasao'], writes: ['funds'] },
+    { id: '1.9',  name: ['Fetch monthly', 'CPI'],                   data: 'monthly CPI-U',              writes: ['blscpi'], href: V('knowledge/1.9_Fetch_Monthly_CPI.md') },
+    { id: '1.10', name: ['Interpolate', 'daily Ref CPI', 'NSA and SA'], data: null, reads: ['blscpi'], writes: ['nsasa'], href: V('knowledge/1.10_Interpolate_Daily_Ref_CPI_NSA_And_SA.md') },
+    { id: '1.11', name: ['Calculate SA', 'and SAO yields'],         data: null, reads: ['quotes', 'nsasa', 'hol'], writes: ['sasao'], href: V('knowledge/1.11_Calculate_SA_And_SAO_Yields.md') },
+    { id: '1.12', name: ['Fetch CPI', 'history'],                   data: 'monthly CPI-U',              writes: ['cpihist'], href: V('knowledge/1.12_Fetch_CPI_History.md') },
+    { id: '1.13', name: ['Fetch daily', 'Ref CPI'],                 data: 'daily Ref CPI',              writes: ['refcpi'], href: V('knowledge/1.13_Fetch_Daily_Ref_CPI.md') },
+    { id: '1.14', name: ['Enrich fund', 'holdings'],                data: 'fund holdings', reads: ['quotes', 'sasao'], writes: ['funds'], href: V('knowledge/1.14_Enrich_Fund_Holdings.md') },
     { id: '1.15', name: ['Fetch GSW', 'curve parameters'],          data: 'GSW curve parameters',       writes: ['gsw'] },
   ];
   const stores = {

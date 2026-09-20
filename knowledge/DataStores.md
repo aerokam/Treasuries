@@ -40,7 +40,7 @@ The old `Treasuries/TipsRef.csv` key was consolidated away (see `R2_Cleanup.md`)
 ## <a id="s3"></a>Ref CPI (S3)
 **File**: `RefCPI.csv`
 **Description**: Daily Reference CPI, retrieved from TreasuryDirect SecIndex (E2), 1997-01-15 (the first TIPS ever issued) to present. Ref CPI is market-wide — identical across every outstanding CUSIP on a given date — so the file is one continuous series regardless of which CUSIP's SecIndex query produced each row.
-**Written by**: `scripts/fetchRefCpi.js`.
+**Written by**: [1.13 Fetch daily Ref CPI](./1.13_Fetch_Daily_Ref_CPI.md) (`scripts/fetchRefCpi.js --append`).
 - `--build`: one-shot historical bootstrap, never scheduled. Merges two CUSIPs whose SecIndex windows together cover the full range with no gap: `9128272M3` (the first TIPS issued, matured 2007-01-15, still queryable) and `912810FD5` (matures 2028-04-15). Run by hand only if the file ever needs to be rebuilt from scratch.
 - `--append`: what the scheduled task actually runs. Picks the currently-outstanding TIPS with the latest maturity date (from [TIPS reference data (S2)](#s2)) fresh each run — no hardcoded CUSIP to swap out as one matures — fetches its SecIndex series, and merges any new dates into the existing file.
 **Update Frequency**: Monthly (on BLS release, `run-ref-cpi.cmd` → `fetchRefCpi.js --append`).
@@ -58,8 +58,10 @@ The old `Treasuries/TipsRef.csv` key was consolidated away (see `R2_Cleanup.md`)
 
 ## <a id="s4"></a>Ref CPI NSA and SA (S4)
 **Description**: Daily interpolated Reference CPI (NSA and SA) derived from monthly BLS CPI-U data via 31 CFR §356 App. B interpolation. SA daily Ref CPI is a calculated sole source (no official daily SA series).
-**Update Frequency**: Monthly (on BLS release).
+**Written by**: [1.10 Interpolate daily Ref CPI NSA and SA](./1.10_Interpolate_Daily_Ref_CPI_NSA_And_SA.md).
+**Update Frequency**: Daily 6:35am ET, unconditionally, as the second step of the SA Factor Update chain ([Data_Pipeline.md](./Data_Pipeline.md)) — not on BLS's own monthly release cadence, since [Monthly CPI (S17)](#s17) it derives from is fetched on the same daily, unconditional schedule.
 **R2 Key**: `TIPS/RefCpiNsaSa.csv`
+**Read by**: YieldCurves ([3.1](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md)), Yields Monitor ([2.4](../YieldsMonitor/knowledge/2.4_Adjust_For_Seasonality.md)), and [Calculate SA and SAO yields (1.11)](./1.11_Calculate_SA_And_SAO_Yields.md).
 
 | Field | Type | Description |
 |---|---|---|
@@ -201,8 +203,10 @@ The old `Treasuries/TipsRef.csv` key was consolidated away (see `R2_Cleanup.md`)
 
 ## <a id="s8"></a>CPI history (S8)
 **Description**: Full monthly BLS CPI-U history (NSA and SA) from January 1913 to present.
+**Written by**: [1.12 Fetch CPI history](./1.12_Fetch_CPI_History.md).
 **Update Frequency**: Monthly (on BLS release).
 **R2 Key**: `bls/CPI_history.csv`
+**Read by**: CPI Explorer.
 
 | Field | Type | Description |
 |---|---|---|
@@ -234,7 +238,7 @@ The old `Treasuries/TipsRef.csv` key was consolidated away (see `R2_Cleanup.md`)
 
 ## <a id="s10"></a>SA and SAO yields (S10)
 **Description**: TIPS ask/SA/SAO yields derived from [Market quotes (S7)](#s7).
-**Update Frequency**: Triggered by the `FidelityQuotes` task (3× daily on weekdays), via `updateSaSaoYields.js`.
+**Written by**: [1.11 Calculate SA and SAO yields](./1.11_Calculate_SA_And_SAO_Yields.md), on two independent triggers: three times a day whenever [Market quotes (S7)](#s7) is refreshed (`uploadFidelityDownload.js`, chained from the `FidelityQuotes` task), and once more daily as the last step of the SA Factor Update chain, after [1.10](./1.10_Interpolate_Daily_Ref_CPI_NSA_And_SA.md) ([Data_Pipeline.md](./Data_Pipeline.md)).
 **R2 Key**: `TIPS/YieldsSaSao.csv`
 
 | Field | Type | Description |
@@ -254,6 +258,7 @@ The old `Treasuries/TipsRef.csv` key was consolidated away (see `R2_Cleanup.md`)
 
 ## <a id="s11"></a>Fund holdings (S11)
 **Description**: Treasury and TIPS fund holdings by CUSIP, one raw and one enriched CSV per fund ticker (VBIL, VTIP, VTP, RBIL, LTPZ, SCHP, XHLF, ICPI). The enriched file adds ask/SA/SAO yield, term, and duration, computed the same way for every fund from [SA and SAO yields (S10)](#s10) and [Market quotes (S7)](#s7) rather than taken from each provider’s own reported analytics.
+**Written by**: [1.14 Enrich fund holdings](./1.14_Enrich_Fund_Holdings.md).
 **Update Frequency**: Daily, Local Windows Task `FundHoldings`, via `FundHoldings/updateAllHoldings.js` then `FundHoldings/enrichHoldings.js`.
 **R2 Key**: `FundHoldings/` (its own top-level prefix, since a fund’s holdings mix TIPS and nominal rows and so belong under neither `TIPS/` nor `Treasuries/`)
 
@@ -295,7 +300,7 @@ The old `Treasuries/TipsRef.csv` key was consolidated away (see `R2_Cleanup.md`)
 
 ## <a id="s17"></a>[Monthly CPI (S17)](./DATA_DICTIONARY.md#s17)
 **Description**: BLS's monthly CPI-U NSA and SA series (`CUUR0000SA0`/`CUSR0000SA0`), 2019 to present, fetched separately from [CPI history (S8)](#s8) (same series, 1913 to present) so that the daily App. B interpolation that produces [Ref CPI NSA and SA (S4)](#s4) does not depend on S8's own refresh, which runs only on BLS release dates.
-**Written by**: `YieldCurves/scripts/fetchCpiBls.js`, the first step of `YieldCurves/scripts/updateRefCpi.js`.
+**Written by**: [1.9 Fetch monthly CPI](./1.9_Fetch_Monthly_CPI.md), the first step of `YieldCurves/scripts/updateRefCpi.js`.
 **Update Frequency**: Daily 6:35am ET, unconditionally, as the first step of the SA Factor Update chain ([Data_Pipeline.md](./Data_Pipeline.md)) — a plain daily trigger, not the release-date-aware scheme S8's own task uses, so it re-fetches from BLS on days the underlying monthly value has not changed. Flagged for a fix: [DFD_Worklist.md §3.0 item 11](./DFD_Worklist.md).
 **R2 Key**: `bls/CPI.csv`
 **Read by**: `YieldCurves/scripts/calcRefCpi.js`, in the same chained run, to produce [Ref CPI NSA and SA (S4)](#s4).
