@@ -7,7 +7,7 @@
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#0d0d1a;color:#c0c8e0;font-family:'Segoe UI',sans-serif;font-size:20px;line-height:1.7;padding:40px 60px;max-width:1200px;margin:0 auto}
-nav{margin-bottom:40px;display:flex;justify-content:space-between;align-items:center}
+nav{margin-bottom:40px;display:flex;align-items:center}
 nav a{color:#5577cc;text-decoration:none;font-size:20px;letter-spacing:.5px;font-weight:600}
 nav a:hover{color:#aabbff}
 #content { opacity: 0; transition: opacity 0.3s; }
@@ -51,7 +51,8 @@ li{margin:.4em 0}
 <body>
 <nav>
   <a href="KNOWLEDGE_MAP.html" style="font-size: 20px">← KNOWLEDGE MAP</a>
-  <span id="file-path" style="font-size: 12px; color: #555577; font-family: monospace;"></span>
+  <a id="up-link" href="#" style="font-size: 20px; margin-left: auto; display: none"></a>
+  <span id="file-path" style="font-size: 12px; color: #555577; font-family: monospace; margin-left: 20px"></span>
 </nav>
 <main id="content">Loading...</main>
 
@@ -108,6 +109,26 @@ function renderMath(el) {
         ],
         throwOnError: false,
     });
+}
+
+// A process spec's own "Specifies:" line already names the diagram it belongs to --
+// surface that as a real "up" link in the nav bar, since the only other way back to it
+// was the browser's own back button. Hidden on a reference doc, which has no such line.
+function updateUpLink(contentEl) {
+    const upLink = document.getElementById('up-link');
+    const strongs = contentEl.querySelectorAll('p > strong');
+    let target = null;
+    for (const s of strongs) {
+        if (s.textContent.trim() !== 'Specifies:') continue;
+        target = s.parentElement.querySelector('a');
+        break;
+    }
+    if (!target) { upLink.style.display = 'none'; return; }
+    const href = target.getAttribute('href');
+    const levelMatch = href.match(/DFD_LEVEL(\d)/);
+    upLink.textContent = levelMatch ? `↑ Level ${levelMatch[1]} diagram` : '↑ Diagram';
+    upLink.setAttribute('href', href);
+    upLink.style.display = '';
 }
 
 async function loadMarkdown() {
@@ -173,7 +194,8 @@ async function loadMarkdown() {
         contentEl.innerHTML = restoreMath(marked.parse(markdown, { renderer }), mathStore);
         renderMath(contentEl);
         contentEl.classList.add('loaded');
-        
+        updateUpLink(contentEl);
+
         // Clean persistent Mermaid junk
         document.querySelectorAll('.mermaidTooltip, .mermaid-tooltip').forEach(t => t.remove());
 
