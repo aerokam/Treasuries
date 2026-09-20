@@ -12,7 +12,7 @@ nav a{color:#5577cc;text-decoration:none;font-size:20px;letter-spacing:.5px;font
 nav a:hover{color:#aabbff}
 #content { opacity: 0; transition: opacity 0.3s; }
 #content.loaded { opacity: 1; }
-h1,h2,h3,h4{color:#9090ee;margin:1.8em 0 .6em;font-weight:600}
+h1,h2,h3,h4{color:#9090ee;margin:1.8rem 0 .6rem;font-weight:600}
 h1{font-size:2.8em;border-bottom:3px solid #1e1e3a;padding-bottom:.4em}
 h2{font-size:2.2em}
 h3{font-size:1.6em;color:#7788cc}
@@ -237,6 +237,11 @@ document.addEventListener('click', async (e) => {
         } catch (err) { previewDiv.innerHTML = `<p style="color:red">Error: ${err.message}</p>`; }
         return;
     }
+
+    // 2.5 Absolute path to a non-markdown resource (a generated DFD diagram's .html,
+    // linked without its extension so it also works as a bare filesystem path) — a real
+    // page navigation, not a /md/ viewer route. Only a .md target belongs in the viewer.
+    if (hrefAttr.startsWith('/') && !hrefAttr.split(/[?#]/)[0].toLowerCase().endsWith('.md')) return;
 
     // 3. Same-page anchor (not a cross-file /md/ path)
     if (hrefAttr.startsWith('#') && !hrefAttr.startsWith('#/md/')) {
