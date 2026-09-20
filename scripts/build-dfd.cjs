@@ -677,7 +677,8 @@ function level2Ingestion() {
     return mean(touches[a]) - mean(touches[b]);
   });
   const sy = i => 80 + i * 97;
-  const H = Math.max(jy(jobs.length - 1), sy(order.length - 1)) + 110, W = 1040;
+  const RGAP0 = SX + SW + 8, RGAP1 = RGAP0 + 150;
+  const H = Math.max(jy(jobs.length - 1), sy(order.length - 1)) + 110, W = RGAP1 + 30;
   entities.forEach(e => { e.y = e.jobs.reduce((s, jid) => s + jy(jobIdx[jid]), 0) / e.jobs.length; });
   // An entity feeding two jobs sits at their midpoint, which can land exactly on a
   // single-job entity sitting between them (FiscalData's two jobs bracket Treasury
@@ -720,30 +721,43 @@ function level2Ingestion() {
   routeLines(entLines, EGAP0 + 8, EGAP1 - 8);
   entLines.forEach(ln => { drawLine(P, ln); P.push(labelAt(...ln.labelAt, ln.label)); });
 
+  // A write (job produces, store receives) stays in the corridor between the two columns,
+  // entering the store's left side, same as every store-adjacent flow elsewhere.
   const SGAP0 = JX + JR + 4, SGAP1 = SX - 4;
-  const readsByStore = {};
-  jobs.forEach((j, i) => (j.reads || []).forEach(k => (readsByStore[k] ||= []).push(i)));
-  const storeLines = [];
-  Object.entries(readsByStore).forEach(([k, jobIdxs]) => {
-    const rootY = sy(sIdx[k]);
-    if (jobIdxs.length === 1) {
-      const y2 = jy(jobIdxs[0]);
-      storeLines.push({ kind: 'simple', x1: SGAP1, y1: rootY, x2: SGAP0, y2, span: Math.abs(rootY - y2) });
-    } else {
-      const branches = jobIdxs.map(i => ({ y: jy(i), x: SGAP0 }));
-      const ys = [rootY, ...branches.map(b => b.y)];
-      storeLines.push({ kind: 'trunk', rootX: SGAP1, rootY, branches, span: Math.max(...ys) - Math.min(...ys) });
-    }
-  });
+  const writeLines = [];
   jobs.forEach((j, i) => {
     const y = jy(i);
     (j.writes || []).forEach(k => {
       const y2 = sy(sIdx[k]);
-      storeLines.push({ kind: 'simple', x1: SGAP0, y1: y, x2: SGAP1, y2, span: Math.abs(y - y2) });
+      writeLines.push({ kind: 'simple', x1: SGAP0, y1: y, x2: SGAP1, y2, span: Math.abs(y - y2) });
     });
   });
-  routeLines(storeLines, SGAP0 + 8, SGAP1 - 8);
-  storeLines.forEach(ln => drawLine(P, ln));
+  routeLines(writeLines, SGAP0 + 8, SGAP1 - 8);
+  writeLines.forEach(ln => drawLine(P, ln));
+
+  // A read (store produces, job receives) exits the store's right side instead, into a
+  // lane that never touches the job/store corridor at all, then travels the whole way
+  // left at the reading job's own row — the developer's own routing: right, then up or
+  // down, then left between the stores, then into the job. This keeps every read fully
+  // clear of the write corridor rather than merging the two kinds of flow into one lane
+  // pool, and the leftward run crosses the store column in the gap between two stores'
+  // rows, never through a store's own label.
+  const readsByStore = {};
+  jobs.forEach((j, i) => (j.reads || []).forEach(k => (readsByStore[k] ||= []).push(i)));
+  const readLines = [];
+  Object.entries(readsByStore).forEach(([k, jobIdxs]) => {
+    const rootY = sy(sIdx[k]);
+    if (jobIdxs.length === 1) {
+      const y2 = jy(jobIdxs[0]);
+      readLines.push({ kind: 'simple', x1: RGAP0, y1: rootY, x2: SGAP0, y2, span: Math.abs(rootY - y2) });
+    } else {
+      const branches = jobIdxs.map(i => ({ y: jy(i), x: SGAP0 }));
+      const ys = [rootY, ...branches.map(b => b.y)];
+      readLines.push({ kind: 'trunk', rootX: RGAP0, rootY, branches, span: Math.max(...ys) - Math.min(...ys) });
+    }
+  });
+  routeLines(readLines, RGAP0 + 8, RGAP1 - 8);
+  readLines.forEach(ln => drawLine(P, ln));
   entities.forEach(e => P.push(entityShape(EX, e.y, EW, EH, e.href, e.name)));
   order.forEach((k, i) => P.push(storeShape(SX, sy(i), SW, stores[k][1], stores[k][0])));
   jobs.forEach((j, i) => P.push(procShape(JX, jy(i), JR, j.href || V('knowledge/Data_Pipeline.md'), j.id, j.name)));
