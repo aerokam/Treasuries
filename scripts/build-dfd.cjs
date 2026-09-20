@@ -145,7 +145,17 @@ function drawLine(P, ln) {
     const ys = [ln.rootY, ...ln.branches.map(b => b.y)];
     P.push(`  <path class="flow" d="M ${ln.rootX.toFixed(1)} ${ln.rootY.toFixed(1)} H ${ln.laneX.toFixed(1)}"/>`);
     P.push(`  <path class="flow" d="M ${ln.laneX.toFixed(1)} ${Math.min(...ys).toFixed(1)} V ${Math.max(...ys).toFixed(1)}"/>`);
-    ln.branches.forEach(b => P.push(`  <path class="flow" d="M ${ln.laneX.toFixed(1)} ${b.y.toFixed(1)} H ${b.x.toFixed(1)}" marker-end="url(#a1)"/>`));
+    ln.branches.forEach(b => {
+      // A branch whose row would otherwise cross a store's own box (see safeY, above)
+      // jogs, in its own lane, from the safe crossing height down to its true row —
+      // still one continuous line, just with one more bend, never a second flow merging in.
+      if (b.laneX !== undefined) {
+        P.push(`  <path class="flow" d="M ${ln.laneX.toFixed(1)} ${b.y.toFixed(1)} H ${b.laneX.toFixed(1)}"/>`);
+        P.push(`  <path class="flow" d="M ${b.laneX.toFixed(1)} ${b.y.toFixed(1)} V ${b.trueY.toFixed(1)} H ${b.x.toFixed(1)}" marker-end="url(#a1)"/>`);
+      } else {
+        P.push(`  <path class="flow" d="M ${ln.laneX.toFixed(1)} ${b.y.toFixed(1)} H ${b.x.toFixed(1)}" marker-end="url(#a1)"/>`);
+      }
+    });
   } else {
     P.push(`  <path class="flow" d="M ${ln.x1.toFixed(1)} ${ln.y1.toFixed(1)} H ${ln.laneX.toFixed(1)} V ${ln.y2.toFixed(1)} H ${ln.x2.toFixed(1)}" marker-end="url(#a1)"/>`);
   }
@@ -721,14 +731,23 @@ function level2Ingestion() {
   routeLines(entLines, EGAP0 + 8, EGAP1 - 8);
   entLines.forEach(ln => { drawLine(P, ln); P.push(labelAt(...ln.labelAt, ln.label)); });
 
+  // A job with several of its own store-side connections (some reads, some writes) never
+  // has them all touch its circle at the identical point — each gets its own small offset
+  // around the job's true row, same principle as a multi-flow entity above.
+  const SGAP0 = JX + JR + 4, SGAP1 = SX - 4;
+  const jobTouchY = jobs.map((j, i) => {
+    const keys = [...(j.reads || []).map(k => 'r:' + k), ...(j.writes || []).map(k => 'w:' + k)];
+    const n = keys.length, y = jy(i), out = {};
+    keys.forEach((key, k) => { out[key] = n > 1 ? y + (k - (n - 1) / 2) * 14 : y; });
+    return out;
+  });
+
   // A write (job produces, store receives) stays in the corridor between the two columns,
   // entering the store's left side, same as every store-adjacent flow elsewhere.
-  const SGAP0 = JX + JR + 4, SGAP1 = SX - 4;
   const writeLines = [];
   jobs.forEach((j, i) => {
-    const y = jy(i);
     (j.writes || []).forEach(k => {
-      const y2 = sy(sIdx[k]);
+      const y = jobTouchY[i]['w:' + k], y2 = sy(sIdx[k]);
       writeLines.push({ kind: 'simple', x1: SGAP0, y1: y, x2: SGAP1, y2, span: Math.abs(y - y2) });
     });
   });
@@ -736,27 +755,32 @@ function level2Ingestion() {
   writeLines.forEach(ln => drawLine(P, ln));
 
   // A read (store produces, job receives) exits the store's right side instead, into a
-  // lane that never touches the job/store corridor at all, then travels the whole way
-  // left at the reading job's own row — the developer's own routing: right, then up or
-  // down, then left between the stores, then into the job. This keeps every read fully
-  // clear of the write corridor rather than merging the two kinds of flow into one lane
-  // pool, and the leftward run crosses the store column in the gap between two stores'
-  // rows, never through a store's own label.
+  // lane that never touches the job/store corridor at all, then travels up or down and the
+  // whole way left at the reading job's own row — the developer's own routing. That
+  // leftward run has to cross the entire store column, though, and a store can sit close
+  // enough to a job's own row that the run would pass straight through its box; safeY()
+  // nudges the crossing height just clear of any store it would otherwise cross, and the
+  // one job whose row that lands on gets one extra short jog — vertical, then a last short
+  // horizontal — back down to its true row, in its own small lane so two jogs never merge.
+  const storeYs = order.map((_, i) => sy(i));
+  const safeY = y => { for (const s of storeYs) if (Math.abs(y - s) < 24) return y < s ? s - 24 : s + 24; return y; };
+  const JOG0 = SGAP0 + 4, JOG1 = SGAP0 + 70;
   const readsByStore = {};
   jobs.forEach((j, i) => (j.reads || []).forEach(k => (readsByStore[k] ||= []).push(i)));
-  const readLines = [];
+  const readLines = [], jogs = [];
   Object.entries(readsByStore).forEach(([k, jobIdxs]) => {
     const rootY = sy(sIdx[k]);
-    if (jobIdxs.length === 1) {
-      const y2 = jy(jobIdxs[0]);
-      readLines.push({ kind: 'simple', x1: RGAP0, y1: rootY, x2: SGAP0, y2, span: Math.abs(rootY - y2) });
-    } else {
-      const branches = jobIdxs.map(i => ({ y: jy(i), x: SGAP0 }));
-      const ys = [rootY, ...branches.map(b => b.y)];
-      readLines.push({ kind: 'trunk', rootX: RGAP0, rootY, branches, span: Math.max(...ys) - Math.min(...ys) });
-    }
+    const branches = jobIdxs.map(i => {
+      const y = jobTouchY[i]['r:' + k], cross = safeY(y);
+      const b = { y: cross, x: SGAP0, trueY: y };
+      if (cross !== y) { b.span = Math.abs(y - cross); jogs.push(b); }
+      return b;
+    });
+    const ys = [rootY, ...branches.map(b => b.y)];
+    readLines.push({ kind: 'trunk', rootX: RGAP0, rootY, branches, span: Math.max(...ys) - Math.min(...ys) });
   });
   routeLines(readLines, RGAP0 + 8, RGAP1 - 8);
+  routeLines(jogs, JOG0, JOG1);
   readLines.forEach(ln => drawLine(P, ln));
   entities.forEach(e => P.push(entityShape(EX, e.y, EW, EH, e.href, e.name)));
   order.forEach((k, i) => P.push(storeShape(SX, sy(i), SW, stores[k][1], stores[k][0])));
