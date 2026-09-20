@@ -608,7 +608,7 @@ function level2Ingestion() {
     { name: ['Treasury Tentative', 'Auction Schedule'], href: DD + 'e14', jobs: ['1.5'] },
   ];
   const jobs = [
-    { id: '1.1',  name: ['Download', 'FedInvest', 'prices'],        data: 'FedInvest daily price list', reads: ['tipsref', 'hol'], writes: ['fedinv'], href: 'DFD_LEVEL3_INGEST_FEDINVEST.html' },
+    { id: '1.1',  name: ['Download', 'FedInvest prices', 'and calculate', 'yields'], data: 'FedInvest daily price list', reads: ['tipsref', 'hol'], writes: ['fedinv'], href: 'DFD_LEVEL3_INGEST_FEDINVEST.html' },
     { id: '1.2',  name: ['Download', 'market quotes'],              data: 'market quotes', reads: ['hol'],     writes: ['quotes'], href: V('knowledge/1.2_Download_Market_Quotes.md') },
     { id: '1.3',  name: ['Calculate', 'yield curve', 'data sets'],  data: null, reads: ['fedinv', 'quotes', 'nsasa', 'hol'], writes: ['yc', 'bei', 'spread'] },
     { id: '1.4',  name: ['Fetch auction', 'results'],               data: 'auction results',            writes: ['auctions'] },
@@ -755,12 +755,12 @@ function level3YieldCurvesRender() {
   });
 }
 
-// ── Level 3: 1.1 Download FedInvest prices ──────────────────────────────────
+// ── Level 3: 1.1 Download FedInvest prices and calculate yields ────────────
 function level3IngestFedInvest() {
   const S = a => V('knowledge/1.1_Download_FedInvest_Prices.md' + (a ? '#' + a : ''));
   const procs = [
     { id: '1.1.1', name: ['Determine', 'settlement date'], href: S('determine-settlement-date'), out: { '1.1.3': ['settlement date'] } },
-    { id: '1.1.2', name: ['Select TIPS and', 'Treasury prices'], href: S('select-tips-and-treasury-prices'), out: { '1.1.3': ['TIPS prices', 'Treasury prices'] } },
+    { id: '1.1.2', name: ['Select prices', 'and add TIPS', 'reference data'], href: S('select-prices-and-add-tips-reference-data'), out: { '1.1.3': ['TIPS prices', 'Treasury prices'] } },
     { id: '1.1.3', name: ['Calculate', 'yields'], href: S('calculate-yields'), out: {} },
   ];
   const PR = 60, SW = 215, W = 1100, H = 660;
@@ -768,7 +768,7 @@ function level3IngestFedInvest() {
   const py = { '1.1.1': 190, '1.1.2': 460, '1.1.3': 325 };
   const OBS = procs.map(q => ({ x: px[q.id], y: py[q.id], r: PR }));
   const LBL = [];
-  const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 3: 1.1 Download FedInvest prices, three processes from the FedInvest price list to FedInvest prices (S1).">`, marker()];
+  const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 3: 1.1 Download FedInvest prices and calculate yields, three processes from the FedInvest price list to FedInvest prices (S1).">`, marker()];
   // The price list enters from the page edge at each process that reads it.
   ['1.1.1', '1.1.2'].forEach(id => {
     P.push(flow(8, py[id], px[id] - PR - 3, py[id], { obstacles: OBS.filter(o => o.y !== py[id]) }));
@@ -787,10 +787,10 @@ function level3IngestFedInvest() {
   P.push('</svg>');
 
   return page({
-    spec: S(), specLabel: '1.1 Download FedInvest prices',
-    title: '1.1 Download FedInvest prices — Level 3', h1: 'Level 3 &mdash; 1.1 Download FedInvest prices', maxWidth: W,
+    spec: S(), specLabel: '1.1 Download FedInvest prices and calculate yields',
+    title: '1.1 Download FedInvest prices and calculate yields — Level 3', h1: 'Level 3 &mdash; 1.1 Download FedInvest prices and calculate yields', maxWidth: W,
     up: 'DFD_LEVEL2_INGESTION.html', upLabel: 'Level 2 — 1 Acquire and derive reference data', svg: P.join(NL),
-    notes: ['  Every process here drills to its own section of <a href="' + S() + '">1.1 Download FedInvest prices</a>.',
+    notes: ['  Every process here drills to its own section of <a href="' + S() + '">1.1 Download FedInvest prices and calculate yields</a>.',
       '  The flow entering from the edge is the FedInvest daily price list, drawn against its source on the <a href="KNOWLEDGE_MAP.html">context diagram</a>. 1.1.1 reads the date it states, and 1.1.2 reads its rows.',
       '  On a Bond Holiday, or when the price list does not state prices for the run date, 1.1.1 produces no settlement date and FedInvest prices (S1) is not written.'].join(NL)
   });

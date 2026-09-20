@@ -4,7 +4,7 @@
 // Added when scripts/getYieldsFedInvest.js and scripts/getFedInvestPricesForDate.js's separate
 // copies of the 1.1.2/1.1.3 merge rules were consolidated onto this module (projects/CLAUDE.md
 // §2a no-redundancy directive). Pins the selection rules knowledge/1.1_Download_FedInvest_Prices.md
-// #select-tips-and-treasury-prices states: the BUY/SELL/END OF DAY price fallback, an FRN dropped
+// #select-prices-and-add-tips-reference-data states: the BUY/SELL/END OF DAY price fallback, an FRN dropped
 // by the type filter, and a TIPS S2 does not hold dropped rather than written with no metadata.
 
 import {

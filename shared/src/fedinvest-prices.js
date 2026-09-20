@@ -19,7 +19,7 @@ import { parseCsv } from './csv.js';
 // as the historical tool does with TIPS alone).
 export const FEDINVEST_TYPES = new Set(['TIPS', 'MARKET BASED BILL', 'MARKET BASED NOTE', 'MARKET BASED BOND']);
 
-// spec: 1.1_Download_FedInvest_Prices.md#select-tips-and-treasury-prices
+// spec: 1.1_Download_FedInvest_Prices.md#select-prices-and-add-tips-reference-data
 // Parses E1's CSV price-table rows (CUSIP,SECURITY TYPE,RATE,MATURITY DATE,CALL DATE,BUY,
 // SELL,END OF DAY,...) into one object per CUSIP data row. `maturity` is left as E1 states
 // it (MM/DD/YYYY); `coupon`/`buy`/`sell`/`eod` are parsed floats, each falling through to 0
@@ -41,7 +41,7 @@ export function parseFedInvestPriceRows(text) {
     });
 }
 
-// spec: 1.1_Download_FedInvest_Prices.md#select-tips-and-treasury-prices
+// spec: 1.1_Download_FedInvest_Prices.md#select-prices-and-add-tips-reference-data
 // The BUY price, the SELL price where BUY is empty or zero, the END OF DAY price where
 // both are. Null when a row has none of the three.
 export function selectPrice(row) {
@@ -54,7 +54,7 @@ export function parseFedInvestDate(str) {
   return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
 
-// spec: 1.1_Download_FedInvest_Prices.md#select-tips-and-treasury-prices
+// spec: 1.1_Download_FedInvest_Prices.md#select-prices-and-add-tips-reference-data
 // Parses S2 (TipsRef.csv, header cusip,maturity,datedDate,coupon,datedDateRefCpi,term) into
 // a Map keyed by CUSIP, via shared/src/csv.js#parseCsv.
 export function parseTipsRefMap(text) {
@@ -65,7 +65,7 @@ export function parseTipsRefMap(text) {
   }]));
 }
 
-// spec: 1.1_Download_FedInvest_Prices.md#select-tips-and-treasury-prices
+// spec: 1.1_Download_FedInvest_Prices.md#select-prices-and-add-tips-reference-data
 // Merges one parsed E1 row with S2's TIPS metadata (or E1's own RATE/MATURITY DATE for a
 // non-TIPS security), applying the BUY/SELL/END OF DAY price selection. Returns null for a
 // TIPS that S2 does not hold — that row is dropped, not included in the TIPS Prices output.

@@ -174,7 +174,7 @@ async function main() {
   if (!refRes.ok) throw new Error(`Failed to fetch TipsRef.csv from R2: ${refRes.status}`);
   const refMap = parseTipsRefMap(await refRes.text());
 
-  // Select TIPS and Treasury prices, and calculate yields
+  // Select prices and add TIPS reference data (1.1.2), then calculate yields (1.1.3)
   const rows = [];
   for (const row of priceRows) {
     const security = selectPricedSecurity(row, refMap);

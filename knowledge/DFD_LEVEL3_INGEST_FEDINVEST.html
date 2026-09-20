@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>1.1 Download FedInvest prices — Level 3</title>
+<title>1.1 Download FedInvest prices and calculate yields — Level 3</title>
 <style>
   :root {
     --bg: #0d0d1a;
@@ -168,13 +168,13 @@
 <div class="nav-header">
   <a href="../" class="portal-link">&#8592; Portal</a>
   <a href="DFD_LEVEL2_INGESTION.html">&#8593; Level 2 — 1 Acquire and derive reference data</a>
-  <a href="viewer.html#/md/knowledge/1.1_Download_FedInvest_Prices.md" class="spec-link">&#9776; 1.1 Download FedInvest prices</a>
+  <a href="viewer.html#/md/knowledge/1.1_Download_FedInvest_Prices.md" class="spec-link">&#9776; 1.1 Download FedInvest prices and calculate yields</a>
 </div>
 
-<h1>Level 3 &mdash; 1.1 Download FedInvest prices</h1>
+<h1>Level 3 &mdash; 1.1 Download FedInvest prices and calculate yields</h1>
 
 <div class="diagram">
-<svg viewBox="0 0 1100 660" role="img" aria-label="Level 3: 1.1 Download FedInvest prices, three processes from the FedInvest price list to FedInvest prices (S1).">
+<svg viewBox="0 0 1100 660" role="img" aria-label="Level 3: 1.1 Download FedInvest prices and calculate yields, three processes from the FedInvest price list to FedInvest prices (S1).">
   <defs><marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#55558c"/></marker></defs>
   <path class="flow" d="M 8.0 190.0 Q 162.5 165.3 317.0 190.0" marker-end="url(#a1)"/>
   <text class="flow-label" x="12" y="178"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#fedinvest-daily-price-list"><tspan class="lk">FedInvest daily price list</tspan></a></text>
@@ -213,11 +213,12 @@
     <text class="p-name" x="380" y="191">Determine</text>
     <text class="p-name" x="380" y="207">settlement date</text>
   </a>
-  <a class="process" href="viewer.html#/md/knowledge/1.1_Download_FedInvest_Prices.md#select-tips-and-treasury-prices">
+  <a class="process" href="viewer.html#/md/knowledge/1.1_Download_FedInvest_Prices.md#select-prices-and-add-tips-reference-data">
     <circle cx="380" cy="460" r="60"/>
-    <text class="p-id" x="380" y="440">1.1.2</text>
-    <text class="p-name" x="380" y="461">Select TIPS and</text>
-    <text class="p-name" x="380" y="477">Treasury prices</text>
+    <text class="p-id" x="380" y="432">1.1.2</text>
+    <text class="p-name" x="380" y="453">Select prices</text>
+    <text class="p-name" x="380" y="469">and add TIPS</text>
+    <text class="p-name" x="380" y="485">reference data</text>
   </a>
   <a class="process" href="viewer.html#/md/knowledge/1.1_Download_FedInvest_Prices.md#calculate-yields">
     <circle cx="700" cy="325" r="60"/>
@@ -229,7 +230,7 @@
 </div>
 
 <p class="notes">
-  Every process here drills to its own section of <a href="viewer.html#/md/knowledge/1.1_Download_FedInvest_Prices.md">1.1 Download FedInvest prices</a>.
+  Every process here drills to its own section of <a href="viewer.html#/md/knowledge/1.1_Download_FedInvest_Prices.md">1.1 Download FedInvest prices and calculate yields</a>.
   The flow entering from the edge is the FedInvest daily price list, drawn against its source on the <a href="KNOWLEDGE_MAP.html">context diagram</a>. 1.1.1 reads the date it states, and 1.1.2 reads its rows.
   On a Bond Holiday, or when the price list does not state prices for the run date, 1.1.1 produces no settlement date and FedInvest prices (S1) is not written.
 </p>

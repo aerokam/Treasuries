@@ -118,7 +118,7 @@ Determined by the Secretary of the Treasury, taking into consideration the curre
 
 ## Connection to Portal Ingestion
 
-The FedInvest daily price list publishes three prices per security: **Buy**, **Sell**, and **End of Day**. Which one the portal takes is specified in [1.1.2 Select TIPS and Treasury prices](../../knowledge/1.1_Download_FedInvest_Prices.md#select-tips-and-treasury-prices). This pricing methodology describes the market-based foundation for those published prices.
+The FedInvest daily price list publishes three prices per security: **Buy**, **Sell**, and **End of Day**. Which one the portal takes is specified in [Select prices and add TIPS reference data (1.1.2)](../../knowledge/1.1_Download_FedInvest_Prices.md#select-prices-and-add-tips-reference-data). This pricing methodology describes the market-based foundation for those published prices.
 
 ---
 

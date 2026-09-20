@@ -40,7 +40,7 @@ When X-axis mode is **Term**, the axis shows time-to-maturity instead of calenda
 
 ### 3. Data Flow Order (Legend)
 The legend and visual priority follow the logical flow of data:
-1.  **Ask / Mid (Circle)**: The raw, unadjusted market quote. For FedInvest, this is the Price [Select TIPS and Treasury prices (1.1.2)](../../knowledge/1.1_Download_FedInvest_Prices.md#select-tips-and-treasury-prices) selects — the Buy price when present (a midpoint of dealer bid and ask), else Sell (the dealer bid alone) or End of Day; for broker data, it is the **Ask Price**. (Bottom-most Z-index).
+1.  **Ask / Mid (Circle)**: The raw, unadjusted market quote. For FedInvest, this is the Price [Select prices and add TIPS reference data (1.1.2)](../../knowledge/1.1_Download_FedInvest_Prices.md#select-prices-and-add-tips-reference-data) selects — the Buy price when present (a midpoint of dealer bid and ask), else Sell (the dealer bid alone) or End of Day; for broker data, it is the **Ask Price**. (Bottom-most Z-index).
     - **Note**: Because Buy is present for nearly every FedInvest security, a FedInvest yield is usually higher than the broker ask yield for the same security. This is expected behavior and is most prominent on the short end (Bills).
 2.  **Seasonally Adjusted (SA) (Circle)**: The primary math transform. (Middle Z-index).
 3.  **SA with other adjustment (SAO) (Circle)**: The final empirical trend. (Top-most Z-index).
