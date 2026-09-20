@@ -117,6 +117,7 @@ The old `Treasuries/TipsRef.csv` key was consolidated away (see `R2_Cleanup.md`)
 ---
 
 ## <a id="s13"></a>Yield curves (S13)
+**Written by**: [1.3 Calculate yield curve data sets](./1.3_Calculate_Yield_Curve_Data_Sets.md).
 **Description**: General-purpose, spreadsheet-ready yields — evaluated yields for every priced Treasury (Bill/Note/Bond/STRIPS/Unclassified) and TIPS security, plus the fitted nominal, TIPS-quoted and TIPS-SA zero-coupon (spot) yield curves evaluated on a term grid (unlike [GSW curve parameters (S12)](#s12), which stores unevaluated Svensson parameters). Renamed from `SpotYieldCurves.csv` (2026-09-07): the file is a general yields resource, not spot-curves-only — it also carries every quoted security's own Ask/SA/SAO yield. Superseded the parameters-only `SpotYieldCurves.json` (retired 2026-09-07): six coefficients aren't usable in a spreadsheet, so this file stores actual yields instead. One row per **actual security** (`CUSIP`/`Maturity`/`Type` populated; `Ask`/`SA`/`SAO` populated where they exist) or one row per **fitted grid point** (`CUSIP` = `Spot`, `Maturity` blank, `Type` = `Treasury`/`TIPS`/`BEI`; `Spot`/`Spot SA` populated per Type — see below).
 **Update Frequency**: Chained, not independently scheduled — re-run whenever either of its actual inputs changes: after `FidelityQuotes` (3x daily on weekdays, via `run-fidelity.cmd`) and after `YieldsFromFedInvestPrices` (1x daily on weekdays, via `run-fedinvest.cmd`), each chaining into `YieldCurves/scripts/run-yield-curves.cmd` on success. See [Data_Pipeline.md](./Data_Pipeline.md).
 **R2 Key**: `Treasuries/YieldCurves.csv`
@@ -145,6 +146,7 @@ The old `Treasuries/TipsRef.csv` key was consolidated away (see `R2_Cleanup.md`)
 ---
 
 ## <a id="s14"></a>Breakeven inflation (S14)
+**Written by**: [1.3 Calculate yield curve data sets](./1.3_Calculate_Yield_Curve_Data_Sets.md).
 **Description**: Per-TIPS breakeven inflation — the Ask/SA/SAO yield for each TIPS against the yield of its nearest-maturity nominal Treasury, `Market` (broker quotey) source only. Matches the YieldCurves BEI tab's per-bond table, which the app computes but does not persist.
 **Update Frequency**: `Market`-only data, so it changes only when `FidelityQuotes` refreshes (3x daily on weekdays); written by the same chained `updateSpotYieldCurves.js` run as [Yield curves (S13)](#s13) (also chained from `YieldsFromFedInvestPrices`, which this file doesn't depend on — see [Data_Pipeline.md](./Data_Pipeline.md)).
 **R2 Key**: `Treasuries/BreakevenInflation.csv`
@@ -169,6 +171,7 @@ The old `Treasuries/TipsRef.csv` key was consolidated away (see `R2_Cleanup.md`)
 ---
 
 ## <a id="s15"></a>Bid and ask spreads (S15)
+**Written by**: [1.3 Calculate yield curve data sets](./1.3_Calculate_Yield_Curve_Data_Sets.md).
 **Description**: Per-security broker bid/ask yield and price spread, TIPS and nominal Treasuries combined in one file (`security_type` discriminates, same pattern as [Market quotes (S7)](#s7)'s `Product` column). `Market` (broker quotey) source only — FedInvest carries a single price, not a separate bid and ask.
 **Update Frequency**: `Market`-only data, so it changes only when `FidelityQuotes` refreshes (3x daily on weekdays); written by the same chained `updateSpotYieldCurves.js` run as [Yield curves (S13)](#s13) (also chained from `YieldsFromFedInvestPrices`, which this file doesn't depend on — see [Data_Pipeline.md](./Data_Pipeline.md)).
 **R2 Key**: `Treasuries/BidAskSpreads.csv`
@@ -274,6 +277,7 @@ The old `Treasuries/TipsRef.csv` key was consolidated away (see `R2_Cleanup.md`)
 
 ## <a id="s12"></a>GSW curve parameters (S12)
 **Description**: The latest published row of the Federal Reserve's Gürkaynak-Sack-Wright fitted TIPS (real) yield curve (FEDS 2008-05), scraped from `feds200805_1.html`. Just the six Svensson parameters and the observation date — the app evaluates the curve itself. Used only as a reference overlay against YieldCurves' own spot fit.
+**Written by**: [1.15 Fetch GSW curve parameters](./1.15_Fetch_GSW_Curve_Parameters.md).
 **Update Frequency**: `GswTipsCurve` task, daily 7:15am PT, via `YieldCurves/scripts/updateGswTipsCurve.js`. The source itself updates weekly (Tuesdays, covering through the prior Friday); the daily poll just picks up new or revised rows promptly.
 **R2 Key**: `TIPS/GswTipsCurve.json`
 

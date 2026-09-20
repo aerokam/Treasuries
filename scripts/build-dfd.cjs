@@ -647,7 +647,7 @@ function level2Ingestion() {
   const jobs = [
     { id: '1.1',  name: ['Download', 'FedInvest prices', 'and calculate', 'yields'], data: 'FedInvest daily price list', reads: ['tipsref', 'hol'], writes: ['fedinv'], href: 'DFD_LEVEL3_INGEST_FEDINVEST.html' },
     { id: '1.2',  name: ['Download', 'market quotes'],              data: 'market quotes', reads: ['hol'],     writes: ['quotes'], href: V('knowledge/1.2_Download_Market_Quotes.md') },
-    { id: '1.3',  name: ['Calculate', 'yield curve', 'data sets'],  data: null, reads: ['fedinv', 'quotes', 'nsasa', 'hol'], writes: ['yc', 'bei', 'spread'] },
+    { id: '1.3',  name: ['Calculate', 'yield curve', 'data sets'],  data: null, reads: ['fedinv', 'quotes', 'nsasa', 'hol'], writes: ['yc', 'bei', 'spread'], href: V('knowledge/1.3_Calculate_Yield_Curve_Data_Sets.md') },
     { id: '1.4',  name: ['Fetch auction', 'results'],               data: 'auction results',            writes: ['auctions'], href: V('knowledge/1.4_Fetch_Auction_Results.md') },
     { id: '1.5',  name: ['Fetch tentative', 'auction', 'schedule'], data: 'tentative auction schedule', writes: ['tent'], href: V('knowledge/1.5_Fetch_Tentative_Auction_Schedule.md') },
     { id: '1.6',  name: ['Fetch TIPS', 'reference data'],           data: 'TIPS reference data',        writes: ['tipsref'], href: V('knowledge/1.6_Fetch_TIPS_Reference_Data.md') },
@@ -659,7 +659,7 @@ function level2Ingestion() {
     { id: '1.12', name: ['Fetch CPI', 'history'],                   data: 'monthly CPI-U',              writes: ['cpihist'], href: V('knowledge/1.12_Fetch_CPI_History.md') },
     { id: '1.13', name: ['Fetch daily', 'Ref CPI'],                 data: 'daily Ref CPI',              writes: ['refcpi'], href: V('knowledge/1.13_Fetch_Daily_Ref_CPI.md') },
     { id: '1.14', name: ['Enrich fund', 'holdings'],                data: 'fund holdings', reads: ['quotes', 'sasao'], writes: ['funds'], href: V('knowledge/1.14_Enrich_Fund_Holdings.md') },
-    { id: '1.15', name: ['Fetch GSW', 'curve parameters'],          data: 'GSW curve parameters',       writes: ['gsw'] },
+    { id: '1.15', name: ['Fetch GSW', 'curve parameters'],          data: 'GSW curve parameters',       writes: ['gsw'], href: V('knowledge/1.15_Fetch_GSW_Curve_Parameters.md') },
   ];
   const stores = {
     fedinv: ['FedInvest prices', DS('s1')], tipsref: ['TIPS reference data', DS('s2')],
@@ -794,7 +794,7 @@ function level2Ingestion() {
       '  1.3, 1.10 and 1.11 read no external source: they calculate from what the retrieving jobs have stored. 1.1, 1.2 and 1.14 read both an external source and one or more stores.',
       '  An entity feeding two jobs (FiscalData, BLS, CNBC) is drawn once, with a separately labelled flow to each — the same source, not two sources. FiscalData\'s two flows here match its two flows in the Data Dictionary; BLS\'s and CNBC\'s two jobs each read the same flow independently.',
       '  E7 through E12 are drawn as one box: the six fund-holdings providers, each with its own entry in the <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md">Data Dictionary</a>, are otherwise identical in shape from this diagram\'s point of view — one job reads all six.',
-      '  1.1 explodes at <a href="DFD_LEVEL3_INGEST_FEDINVEST.html">Level 3</a>. Every other job drills to <a href="viewer.html#/md/knowledge/Data_Pipeline.md">Data Pipeline</a> for its schedule and script path; its process spec is not yet written.'].join(NL)
+      '  1.1 explodes at <a href="DFD_LEVEL3_INGEST_FEDINVEST.html">Level 3</a>; every other job drills straight to its own process spec, which names its schedule and script path in turn, or to <a href="viewer.html#/md/knowledge/Data_Pipeline.md">Data Pipeline</a> for the schedule table across every job at once.'].join(NL)
   });
 }
 
