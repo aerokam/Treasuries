@@ -91,13 +91,14 @@ The old `Treasuries/TipsRef.csv` key was consolidated away (see `R2_Cleanup.md`)
 ## <a id="s6"></a>Yield history (S6)
 **File**: `yields-history/`
 **Description**: Single consolidated JSON, nested by symbol (US10Y, US30Y, … — all 14).
+**Written by**: [1.7 Update yield history](./1.7_Update_Yield_History.md).
 **Update Frequency**: Weekdays (end-of-day snapshots) via `updateYieldsHistory.js`.
 
 **Format**: one object keyed by symbol, each value a `{ x, y }` array, e.g. `{ "US10Y": [ { "x": "20260403150000", "y": 4.25 }, ... ], "US30Y": [ ... ], ... }`.
 - `x` is CNBC's compact `tradeTime` string `YYYYMMDDHHMMSS` (no separators). Daily-close bars are stamped at 15:00 ET (`...150000`) — the ~3PM benchmark close (see `YieldsMonitor/knowledge/Close_Price_Investigation.md`).
 - `y` is the yield as a number (percent, `%` stripped).
 
-**Refresh logic**: `updateYieldsHistory.js` rereads the 1Y/2Y/3Y daily feeds and merges the coarser 10Y/ALL feeds, skipping the current (provisional) ET day, and rewrites the whole file. One daily 3PM close per completed trading day per symbol. The browser stitches live intraday on top of this daily baseline. (Replaces the retired per-symbol `snapHistory.js` append model.)
+**Refresh logic**: `updateYieldsHistory.js` fetches the `ALL`, `5Y`, `6M`, `3M` and `1M` feeds for each symbol, coarsest first, and merges each into the existing accumulated history, so a date already captured at a finer resolution is not coarsened when only a coarser feed still covers it, while a fresher feed's value for a shared date overrides an older one. The current (provisional) ET day is skipped every time, since it tracks the live session rather than the 3 PM close. One daily 3PM close per completed trading day per symbol, in the merged result. The browser stitches live intraday on top of this daily baseline. (Replaces the retired per-symbol `snapHistory.js` append model.)
 
 **Live Sample**: [View consolidated history](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/yields-history/history.json)
 
@@ -107,7 +108,7 @@ The old `Treasuries/TipsRef.csv` key was consolidated away (see `R2_Cleanup.md`)
 **File**: `intraday-raw/{symbol}/{YYYYMMDD}.json`
 **R2 Key**: `Treasuries/yields-history/intraday-raw/{symbol}/{YYYYMMDD}.json`
 **Description**: One immutable daily snapshot per symbol of the raw feeds [CNBC (E5)](./DATA_DICTIONARY.md#e5) served that day.
-**Written by**: `YieldsMonitor/scripts/archiveIntraday.js` (job 1.8).
+**Written by**: [1.8 Archive intraday yields](./1.8_Archive_Intraday_Yields.md).
 **Update Frequency**: Weekdays 17:05 ET ([Data Pipeline](./Data_Pipeline.md)).
 **Read by**: Yields Monitor ([2.1 Assemble range data](../YieldsMonitor/knowledge/2.1_Assemble_Range_Data.md)), as the fallback when [CNBC (E5)](./DATA_DICTIONARY.md#e5)'s chart-bar feed itself returns nothing for a symbol.
 
