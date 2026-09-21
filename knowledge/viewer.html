@@ -15,7 +15,8 @@ nav a:hover{color:#aabbff}
 h1,h2,h3,h4{color:#9090ee;margin:1.8rem 0 .6rem;font-weight:600}
 h1{font-size:2.8em;border-bottom:3px solid #1e1e3a;padding-bottom:.4em}
 h2{font-size:2.2em}
-h3{font-size:1.6em;color:#7788cc}
+h3{font-size:1.6em;color:#7788cc;display:flex;justify-content:flex-start;align-items:baseline;gap:20px}
+.proc-up-link{font-size:.5em;white-space:nowrap;flex-shrink:0}
 p{margin:1.2em 0}
 a{color:#5577cc;font-weight:600;text-decoration:none}
 a:hover{color:#aabbff;text-decoration:underline}
@@ -114,6 +115,9 @@ function renderMath(el) {
 // A process spec's own "Specifies:" line already names the diagram it belongs to --
 // surface that as a real "up" link in the nav bar, since the only other way back to it
 // was the browser's own back button. Hidden on a reference doc, which has no such line.
+// A spec that decomposes into several numbered sub-processes (n.n.n headings) gets the
+// same link next to each one too: a diagram bubble drills down to that heading directly,
+// landing mid-document, so the nav-bar link alone would need a scroll back to the top.
 function updateUpLink(contentEl) {
     const upLink = document.getElementById('up-link');
     const strongs = contentEl.querySelectorAll('p > strong');
@@ -123,12 +127,29 @@ function updateUpLink(contentEl) {
         target = s.parentElement.querySelector('a');
         break;
     }
-    if (!target) { upLink.style.display = 'none'; return; }
+    if (!target) {
+        upLink.style.display = 'none';
+        addProcessUpLinks(contentEl, null, '');
+        return;
+    }
     const href = target.getAttribute('href');
     const levelMatch = href.match(/DFD_LEVEL(\d)/);
-    upLink.textContent = levelMatch ? `↑ Up to Level ${levelMatch[1]} DFD` : '↑ Up to DFD';
+    const label = levelMatch ? `↑ Up to Level ${levelMatch[1]} DFD` : '↑ Up to DFD';
+    upLink.textContent = label;
     upLink.setAttribute('href', href);
     upLink.style.display = '';
+    addProcessUpLinks(contentEl, href, label);
+}
+
+function addProcessUpLinks(contentEl, href, label) {
+    contentEl.querySelectorAll('h3').forEach(h3 => {
+        if (!href || !/^\d+\.\d+(\.\d+)+\s/.test(h3.textContent.trim())) return;
+        const link = document.createElement('a');
+        link.className = 'proc-up-link';
+        link.href = href;
+        link.textContent = label;
+        h3.appendChild(link);
+    });
 }
 
 async function loadMarkdown() {
