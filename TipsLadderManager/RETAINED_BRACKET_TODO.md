@@ -54,7 +54,9 @@ Nothing in `identifyBrackets` or `detectBracketFlags` has been changed.
 
 ## Evidence, so it does not have to be derived again
 
-Settlement 2026-09-03, market fixtures in `tests/e2e/`.
+Settlement 2026-09-22, market fixtures in `tests/e2e/`. Re-derived 2026-09-21 against the current
+`data/SampleHoldings.csv` — rescaled that day to 0.5x the real Kevin IRA (previously ~0.2x); every
+figure below is a fresh recomputation on the rescaled file, not the earlier values adjusted by hand.
 
 Identification, where the answer is known by construction:
 
@@ -64,14 +66,30 @@ Identification, where the answer is known by construction:
 | `tests/dev/RetainedExcessTwoYears.csv` | 2034, 2035 | 2034, 2035 |
 | `tests/dev/RetainedExcessTwoMaturities.csv` | 2035 | 2035 |
 
-Separation on the real portfolio is wide, so the threshold is not a knife edge: 2034 at 9.0 robust scales, the highest ordinary maturity year at 2.7, and the years at 1.42 to 1.47 times the median that sat just under the old fixed line at 0.5 to 1.4.
+(The two `tests/dev/` fixtures are separate, hand-built files at their own original — still 0.2x —
+scale, not derived from `data/SampleHoldings.csv` at runtime, so the rescale above does not touch
+them; their own numbers are unaffected and still verified by the passing shape-math tests.)
+
+Separation on the real portfolio is wide, so the threshold is not a knife edge: 2034 at 8.8 robust
+scales, the highest ordinary maturity year (2050) at 2.8, with 2036 next at 2.7 and 2026 at 2.6 —
+comfortably under the `k=4` threshold `findSpikes` flags at. Ordinary years otherwise range 1.08 to
+1.51 times the median.
 
 What ruling 2 changes, for the years actually flagged on `data/SampleHoldings.csv`:
 
 | flagged year | ARA | median baseline | curve baseline | excess, median | excess, curve |
 |---|---|---|---|---|---|
-| 2034 | 37,050 | 19,449 | 23,822 | 16 bonds | 12 bonds |
-| 2036 (active lower) | 27,197 | 19,449 | 23,615 | 7 bonds | 3 bonds |
+| 2034 | 93,854 | 48,774 | 57,611 | 41 bonds | 33 bonds |
+| 2036 (active lower) | 67,617 | 48,774 | not a spike (z=2.7, below k=4) | 18 bonds | 0 bonds |
+
+**2036 no longer registers as a curve-method spike at this scale** — a real, notable difference
+from the 0.2x-scale figures this table previously carried (which showed 2036 flagged under both
+methods). It still flags under the current median-based `detectBracketFlags` (ruling 1 is not wired
+in yet — item 1 below), so today's actual app behavior is unaffected; this only changes what ruling
+2's future curve-based detection would report for 2036 once implemented. Bond counts convert each
+year's dollar excess through that year's own held CUSIP's P+I-per-bond (`calculatePIPerBond`), the
+same unit ARA/DARA/excess are already expressed in throughout this codebase — not a market-cost
+conversion.
 
 The old branch `retained-bracket-work` (`078741f`) claimed 2032 and 2033 were identified while the app displayed their excess as zero. That does not reproduce: only one lower candidate is kept, so 2032, 2033 and 2035 are never flagged and take their own ARA as their DARA. The median baseline *would* assign them 4 bonds each if they were flagged, which is the same defect seen from the other side.
 
