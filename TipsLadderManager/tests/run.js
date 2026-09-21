@@ -2184,8 +2184,8 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
     }
 
     // (2b) Need shrinks -> the LEAST preferred maturity sells first; the most preferred is
-    // untouched. Under 'maturity', least-preferred = Jan (earliest-maturing); -3000 fully drains
-    // Jan's 2 bonds without touching Apr or Oct.
+    // untouched. Under 'maturity', least-preferred = Jan (earliest-maturing); -3000 sells some of
+    // Jan's held quantity without touching Apr or Oct.
     const shrunkDara = new Map(baseDaraMap);
     shrunkDara.set(2027, Math.max(1000, (shrunkDara.get(2027) ?? 0) - 3000));
     {
@@ -2242,12 +2242,31 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
     }
 
     // (2b-3) A residual too small to justify selling even one more Jan bond must not skip ahead to
-    // Apr just because Apr's per-bond value is smaller (Apr < Jan here) -- -1200 is below Jan's
-    // per-bond value, so nothing should sell at all; regression for the same bug as (2b-2), caught
-    // at the point where Jan itself doesn't move (as opposed to (2b-2), where Jan moves partially).
+    // Apr just because Apr's per-bond value is smaller (Apr < Jan here) -- nothing should sell at
+    // all; regression for the same bug as (2b-2), caught at the point where Jan itself doesn't move
+    // (as opposed to (2b-2), where Jan moves partially). The cut has to stay below Jan's rounding
+    // boundary, which is a function of Jan's live market price (via costPerBond) and portfolio scale
+    // -- a hardcoded dollar figure here drifted out of the window once (2b-2's own comment) and did
+    // again when SampleHoldings.csv was rescaled, so binary-search the boundary the same way (2b-2)
+    // does and cut one dollar short of it instead of guessing a fixed number.
     {
+      function janQtyAfterTinyCut(cut) {
+        const dm = new Map(baseDaraMap);
+        dm.set(2027, Math.max(1000, (dm.get(2027) ?? 0) - cut));
+        const { details: d } = runRebalance({
+          dara: scaledMedian, holdings, tipsMap, refCPI, settlementDate,
+          daraByYear: dm, allocationPolicy: 'maturity',
+        });
+        return d.find(x => x.cusip === JAN27 && x.fundedYear === 2027).qtyAfter;
+      }
+      const janQtyBefore = janQtyAfterTinyCut(0);
+      let lo = 0, hi = 10000;
+      while (hi - lo > 1) {
+        const mid = Math.floor((lo + hi) / 2);
+        if (janQtyAfterTinyCut(mid) < janQtyBefore) hi = mid; else lo = mid;
+      }
       const tinyDara = new Map(baseDaraMap);
-      tinyDara.set(2027, Math.max(1000, (tinyDara.get(2027) ?? 0) - 1200));
+      tinyDara.set(2027, Math.max(1000, (tinyDara.get(2027) ?? 0) - (hi - 1)));
       const { details } = runRebalance({
         dara: scaledMedian, holdings, tipsMap, refCPI, settlementDate,
         daraByYear: tinyDara, allocationPolicy: 'maturity',
