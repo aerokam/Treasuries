@@ -42,4 +42,7 @@ YieldCurves/logs/
 YieldCurves/scripts/testLogin.js
 YieldCurves/scripts/testCdpLogin.js
 
+# Cross-app research: scripts + write-ups are committed, fetched/generated data is not
+research/*/data/
+
 
