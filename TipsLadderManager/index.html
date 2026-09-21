@@ -992,6 +992,23 @@ async function loadData() {
           const dt = new DataTransfer(); dt.items.add(file);
           fileInput.files = dt.files;
           fileInput.dispatchEvent(new Event('change'));
+          // Chain the matching sample DARA plan once the holdings load has actually finished
+          // setting up the per-year panel (_panelYearRange) -- the 'change' handler above is async
+          // and dispatchEvent doesn't wait for it, so poll briefly rather than race it.
+          for (let i = 0; i < 100 && !_panelYearRange; i++) await new Promise(r => setTimeout(r, 50));
+          if (_panelYearRange) {
+            let planPath = './data/SampleDaraPlan.csv';
+            let planRes = await fetch(planPath);
+            if (!planRes.ok) { planPath = 'data/SampleDaraPlan.csv'; planRes = await fetch(planPath); }
+            if (planRes.ok) {
+              const planBlob = await planRes.blob();
+              const planFile = new File([planBlob], 'SampleDaraPlan.csv', { type: 'text/csv' });
+              const planDt = new DataTransfer(); planDt.items.add(planFile);
+              const planInput = document.getElementById('dara-plan-import-file');
+              planInput.files = planDt.files;
+              planInput.dispatchEvent(new Event('change'));
+            }
+          }
         }
       } catch (e) {}
     }
