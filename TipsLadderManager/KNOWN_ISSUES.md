@@ -8,6 +8,25 @@ production impact go here.
 
 ## OPEN
 
+### A same-maturity-year retained leg's own row does not label its trade as excess
+
+- **Found:** 2026-09-20, verifying the multi-bracket same-maturity-year fix (see FIXED, below).
+- **Symptom:** when a maturity year holds two TIPS — the active lower bracket and a retained
+  maturity sharing its year — and the retained one is genuinely over-allocated and sold down, the
+  trade is correct (the right CUSIP, the right quantity), but that CUSIP's own detail row reports
+  the change as `fundedYearQtyDelta` rather than `excessQtyDelta`. The row's own "Excess Amount"
+  popup shows 0 before and after regardless, since it is only wired for the recognized bracket-target
+  CUSIP of that year (`isBracketTarget`/`isBT`).
+- **Why:** the render-facing split (`exB`/`exA` in the detail-row loop, `rebalance-lib.js`) keys off
+  `h.cusip === buySellTargets[year].targetCUSIP` — true for the active lower bracket, never true for
+  a same-maturity-year retained leg, which is a different CUSIP in the same year. The trade itself is
+  computed and placed correctly upstream (see FIXED entry); only this display split doesn't know
+  about the second CUSIP yet.
+- **Status:** open, not started. Scope: extend the `isBT`-style detection to recognize a
+  same-maturity-year retained CUSIP as its own bracket role (with its own `bracketTargetFundedYearQtyBefore`-equivalent,
+  already computed as `ownFundedNeedQty` upstream), rather than adding a second special case per call
+  site.
+
 ### Help text still to be walked, section by section
 
 The worklist moved to `knowledge/Terminology_Worklist.md` on 2026-09-06, since the work now spans
@@ -309,25 +328,6 @@ developer are there.
   resolves last year 2055, engages no Future 30Y years, and proposes no trade in any 2056 or later
   maturity. (It still carries the funding gap above, net cash −17,112.)
 
-### Maturity preference must never cause churn inside a funded year
-
-- **Rule:** a rebalance must not sell one maturity to buy another within the same funded year. The
-  maturity preference is a preference, not a dictum: it decides what to buy when something is being
-  bought, never a reason to replace a holding that is already doing its job.
-- **Not currently violated, as far as this scenario shows.** The year-over-year reload traded only
-  2026, 2027, 2033, 2035, 2036 and 2040 — no 2030 trade at all, even though the preferred bond for
-  2030 changed during the year.
-- **Correction to an earlier note here:** a "2030 rung wanted 7 more bonds" figure recorded on
-  2026-08-26 came from comparing two *independent builds*, one in each world, not from a rebalance.
-  An Oct 2030 TIPS (91282CPH8) issued in Oct 2025 wins "last to mature" over the Jul 2030
-  (912828ZZ6) that a year-ago build picked, and because the new issue has almost no accrued
-  inflation — index ratio near 1.0 against roughly 1.3 — each of its bonds carries far less
-  principal, so a fresh build needs more of them at proportionally lower cost per bond. That is a
-  fact about building from scratch today, and says nothing about what a rebalance does.
-- **Still to verify:** whether any path *could* produce within-year churn — the target bond set is
-  selected from the preference at Run, so it is worth confirming that a held bond is never displaced
-  merely because a newer one now matches the preference better.
-
 ### Reproducing the year-over-year scenario
 
 `scripts/getFedInvestPricesForDate.js <YYYY-MM-DD>` writes a `YieldsFromFedInvestPrices.csv` for any
@@ -344,6 +344,63 @@ per-CUSIP prices for a past date (3.1 §4.0).
   it out of the displayed P+I: 1,014.38 implies 2 × 14.38 = 2.876%, against an actual 2.875%.
 - **Status:** open.
 ## FIXED
+
+### Multi-bracket bought — or sold — the wrong CUSIP when a maturity year holds two TIPS
+
+- **Found:** 2026-09-20, from two independent user reports. Report 1: a real portfolio holding only
+  Jan 2036 (91282CPU9, 218 units) as its lower bracket, no Jul 2036 at all — Multi-bracket bought
+  *more* Jan 2036 instead of buying the new active lower bracket, Jul 2036. Report 2: the real Kevin
+  IRA (loaded from `~/Downloads/SchwabAllAccounts.csv`, account **Kevin IRA**, with its own saved DARA
+  plan) carrying genuine retained excess at 2034 — Multi-bracket sold Jan 2036's funded holding and
+  bought Jul 2036 to replace it, a same-maturity-year buy-and-sell with no net benefit.
+- **Rule violated:** "Maturity preference must never cause churn inside a funded year" (a rule this
+  file previously carried as unverified, above) — a rebalance must not sell one maturity to buy
+  another within the same funded year, and per the [Active Lower Bracket](../knowledge/DATA_DICTIONARY.md#active-lower-bracket)
+  rule, a rebalance never buys a retained maturity, only the currently-active one.
+- **Root cause, report 1:** `rebalance-lib.js`'s degrade check comparing "is the orig-lower bracket
+  the same as the canonical active one" compared **maturity year**, not the bond itself. Jan 2036 and
+  Jul 2036 are both "2036" (a maturity year may hold a January and a July TIPS — DD §Bracket Year
+  TIPS), so the check wrongly treated them as the same bond and collapsed Multi-bracket to a
+  single-CUSIP solve, which then bought the growing excess into whichever CUSIP `identifyBrackets`
+  had picked from holdings — here, the retained one.
+- **Root cause, report 2:** even where the check above did not fire (a genuine cross-year retained
+  maturity, 2034, was correctly identified), an ordinary holding sharing the active lower bracket's
+  own maturity year (Jan 2036) was invisible to the retained-bracket solve entirely — every
+  year-keyed structure in the rebalance sweep (`bracketExcessTargetCost`, the per-year buy/sell
+  target, the funded-year drain) assumed one CUSIP per maturity year. The holding fell through to the
+  ordinary "sell whatever isn't the recognized target" drain, exactly as if it were a less-preferred
+  maturity for funding that year, rather than a retained bracket excess leg.
+- **Fix:** the degrade check now compares CUSIP, never year. Any OTHER held CUSIP sharing the active
+  lower bracket's own maturity year is now detected independently of the cross-year Excess ARA pick,
+  and enters the same `bracketWeightsN` solve as a second retained leg — funded need met from the
+  earliest maturity first, never bought further, sold only if genuinely over-allocated, earliest
+  maturity first among every retained leg found (RETAINED_BRACKET_TODO.md rulings 4 and 5).
+  `bracketExcessTargetCost` is now keyed by CUSIP rather than by year, since a year can now carry two
+  roles. 3.0 §Bracket Identification Rules and 2.0 §Retained Bracket Excess updated.
+- **Measured** (today's live market data, DARA $100,000, 2026–2050, only Jan 2036 held as report 1
+  describes): before the fix, Multi-bracket bought +16 more Jan 2036 and touched no Jul 2036 at all;
+  after, Jan 2036 trims by 2 bonds (a small, legitimate over-allocation sale) and Jul 2036 is
+  untouched. On `data/SampleHoldings.csv` (a scaled-down version of the Kevin IRA, not the account
+  itself) across a DARA sweep (5,000/15,000/25,000/30,000/60,000): Jan 2036 stays exactly unchanged
+  whenever it already covers its own funded need (the common case), Jul 2036 absorbs only the genuine
+  remainder, and at DARA 5,000 (deliberately over-allocated) the sell cascades earliest-maturity-first
+  — 2034 (the cross-year retained leg) depletes fully before Jan 2036 is touched at all — confirming
+  the two retained legs interact correctly together.
+- **Confirmed against report 2 directly, in-browser** (2026-09-21): loading the actual Kevin IRA
+  (`SchwabAllAccounts.csv` → account **Kevin IRA**) with no DARA plan, Multi-bracket buys only Jul
+  2036 for the lower bracket, as expected. With the account's own saved DARA plan
+  (`dara-plan-kevin-rmd.csv`) imported — the exact original repro — Multi-bracket now shows only a
+  sell of some Jan 2034 for the lower bracket, and 2-bracket still shows the buy of Jul 2036 it is
+  documented to force. Report 2 no longer reproduces.
+- **Verified:** all 444 `tests/run.js` cases and all 86 Playwright E2E cases pass unchanged.
+- **Known gap left behind:** the same-maturity-year retained leg's own detail row does not yet split
+  into a "funded" vs. "excess" display the way the recognized bracket-target row does — its own trade
+  (when one occurs) shows as a change to `fundedYearQtyDelta` rather than `excessQtyDelta` in the row
+  data, so an "Excess Amount" popup for that specific row does not yet explain a sale as
+  bracket-excess trimming. The recommended trade itself is correct; only that one row's own
+  drill-down label is not yet threaded through. Not yet filed as its own entry below — do that before
+  starting on it.
+- **Files:** `src/rebalance-lib.js`, `knowledge/2.0_TIPS_Ladders.md`, `knowledge/3.0_TIPS_Ladder_Rebalancing.md`.
 
 ### Amount After left out the cash credit on the rung the pool ran out in
 
