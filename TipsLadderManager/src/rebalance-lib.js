@@ -1336,10 +1336,13 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
     // order among its OTHER held maturities stays the existing oldest-first rule (2.0 §Retained
     // Bracket Excess) except for whichever single maturity maturityPref now funds — allocationPolicy
     // ('equal'/'saYield') is an ordinary-year concept the bracket/duration-match machinery never
-    // consults. A same-maturity-year retained leg (sameYearRetainedFinal, ruling 4) is excluded
-    // from candidacy: it already has its own unconditional earliest-first funded/excess split,
-    // computed above, independent of maturityPref — this only chooses the funded CUSIP among
-    // whatever ISN'T already claimed by that mechanism.
+    // consults. A same-maturity-year retained leg (sameYearRetainedFinal, ruling 4) IS a candidate
+    // here, not excluded: under 'first' it is very often the maturity maturityPref actually wants
+    // funding the year's need, since it already sits earlier than the active/canonical maturity
+    // (that's the recurring real-world shape ruling 4 itself describes). When it wins, its own
+    // excess share (already solved by bracketWeightsN, frozen, never increased) combines with the
+    // funded quantity resolved below onto the SAME row (fundedIsRetained further down) instead of
+    // the ruling-4 placement loop separately overwriting it — one owner per CUSIP's final quantity.
     // Ranked purely by maturity direction — used below both for the funded CUSIP (only under a
     // non-default maturityPref, see below) and for the sell order among this year's OTHER held
     // maturities (every maturityPref, including the default — reproduces today's oldest-first rule,
@@ -1362,9 +1365,10 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
     // unchanged default, which is a regression (a same-maturity-year buy+sell pair), not a fix. Only
     // an actual non-default maturityPref should ever move the funded role off targetCUSIP.
     const fundedCUSIP = (isBracket && maturityPref !== 'last')
-      ? (yearRank.find(r => !sameYearRetainedFinal.has(r.cusip))?.cusip ?? targetCUSIP)
+      ? (yearRank[0]?.cusip ?? targetCUSIP)
       : targetCUSIP;
     fundedCUSIPByYear[year] = fundedCUSIP;
+    const fundedIsRetained = isBracket && fundedCUSIP !== targetCUSIP && sameYearRetainedFinal.has(fundedCUSIP);
 
     // Ensure piMap has both CUSIPs — either may be absent from current holdings
     for (const c of new Set([targetCUSIP, fundedCUSIP])) {
@@ -1501,9 +1505,14 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
         // Place each same-maturity-year retained leg at its own resolved quantity (own funded
         // contribution, capped at what's held, plus its solved — never increased — excess share) —
         // excluded from the drain above, so it must be set explicitly rather than left to the
-        // generic "unchanged unless in postRebalQtyMap" fallback.
+        // generic "unchanged unless in postRebalQtyMap" fallback. Skip fundedCUSIP itself when it IS
+        // one of these legs (fundedIsRetained): maturityPref won that leg the funded role outright,
+        // so its final quantity is finalized below instead, combining that funded qty with the SAME
+        // excess share this loop would have used — one owner per CUSIP's final quantity, never two
+        // competing writes.
         if (isBracket && year === newLowerYear) {
           for (const [cusip, finalQty] of sameYearRetainedFinal) {
+            if (cusip === fundedCUSIP) continue;
             const heldQty = yi.holdings.find(h => h.cusip === cusip)?.qty ?? 0;
             postRebalQtyMap[cusip] = finalQty;
             if (finalQty !== heldQty) {
@@ -1522,12 +1531,18 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
         // canonical excess CUSIP. The excess row (targetCUSIP) carries excess only; the funded
         // row (fundedCUSIP) isn't the row buySellTargets[year] tracks, so it's finalized directly
         // into postRebalQtyMap/nonTargetSells — the same mechanism a same-maturity-year retained
-        // leg already uses (ruling 4).
+        // leg already uses (ruling 4). When fundedCUSIP IS one of those legs, its own excess share
+        // (already solved by bracketWeightsN, frozen, never increased — unaffected by maturityPref)
+        // combines onto that same row instead of a second, separate excess-only figure.
         postQ = excessQtyTarget;
         buySellTargets[year] = { targetCUSIP, targetFundedYearQty: 0, targetQty: postQ, postRebalQty: postQ, qtyDelta: postQ - targetCurrentQty, targetCost: 0, costDelta: -((postQ - targetCurrentQty) * costPerBond), costPerBond, isBracket };
-        postRebalQtyMap[fundedCUSIP] = tFundedYearQty;
-        if (tFundedYearQty !== fundedCurrentQty) {
-          nonTargetSells[fundedCUSIP] = { newQty: tFundedYearQty, qtyDelta: tFundedYearQty - fundedCurrentQty, costDelta: -((tFundedYearQty - fundedCurrentQty) * fCostPerBond), targetCost: tFundedYearQty * fCostPerBond };
+        const retainedExcessQty = fundedIsRetained && fCostPerBond > 0
+          ? Math.max(0, Math.round((bracketExcessTargetCost[fundedCUSIP] || 0) / fCostPerBond))
+          : 0;
+        const fundedFinalQty = tFundedYearQty + retainedExcessQty;
+        postRebalQtyMap[fundedCUSIP] = fundedFinalQty;
+        if (fundedFinalQty !== fundedCurrentQty) {
+          nonTargetSells[fundedCUSIP] = { newQty: fundedFinalQty, qtyDelta: fundedFinalQty - fundedCurrentQty, costDelta: -((fundedFinalQty - fundedCurrentQty) * fCostPerBond), targetCost: fundedFinalQty * fCostPerBond };
         }
       }
     } else if (year > lastYear && year <= derivedLastYear && yi.holdings.length > 0) {
