@@ -742,20 +742,23 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
     }
   }
 
-  // Rebalance respects existing holes: when the ladder has NO gap / Future-30Y block to
-  // duration-match, an in-range year the user holds none of is an INTENTIONAL empty rung. Its
-  // per-year target is honored as-is (so an explicitly raised DARA — e.g. from Infer LMP — still
-  // fills it), but sizeLadder's "fund at least one bond" validation is WAIVED for it: an empty year
-  // whose target rounds to 0 is a hole, not a too-low-DARA error. This is the knife-edge that the
-  // load mirror sits on (an empty year's stub DARA ≈ its own incoming LMI). With a gap/Future block
-  // present the bracket machinery owns the unheld years. 3.0 §Per-Year DARA from Portfolio / §Funding.
-  let optionalRungYears = null;
-  if (gapYears.length === 0 && future30yYears.length === 0) {
-    const _heldYearSet = new Set(holdingsYears);
-    optionalRungYears = new Set();
-    for (let year = firstYear; year <= lastYear; year++) {
-      if (!_heldYearSet.has(year)) optionalRungYears.add(year);
-    }
+  // Rebalance respects existing holes: an in-range year the user holds none of is an INTENTIONAL
+  // empty rung. Its per-year target is honored as-is (so an explicitly raised DARA — e.g. from Infer
+  // LMP — still fills it), but sizeLadder's "fund at least one bond" validation is WAIVED for it: an
+  // empty year whose target rounds to 0 is a hole, not a too-low-DARA error. This is the knife-edge
+  // that the load mirror sits on (an empty year's stub DARA ≈ its own incoming LMI). Computed for
+  // every unheld year regardless of whether the ladder also has a gap/Future-30Y block elsewhere —
+  // an unheld year is either a gap/future30y year itself (excluded from this preliminary sweep's
+  // rangeYears already, since a structural gap has no candidate TIPS to build a rung from) or an
+  // ordinary unheld interior/bracket-candidate year with no bracket role of its own (identifyBrackets
+  // runs later and, when it does pick one, replaces this preliminary figure entirely — the waiver only
+  // stops THIS early pass from throwing on a target that legitimately computes to zero). A gap/Future
+  // block present does not mean every unheld year is "owned" by the bracket machinery — only the
+  // specific year(s) identifyBrackets actually flags are. 3.0 §Per-Year DARA from Portfolio / §Funding.
+  const _heldYearSet = new Set(holdingsYears);
+  const optionalRungYears = new Set();
+  for (let year = firstYear; year <= lastYear; year++) {
+    if (!_heldYearSet.has(year)) optionalRungYears.add(year);
   }
 
   const araLaterMaturityInterestByYear = {};
