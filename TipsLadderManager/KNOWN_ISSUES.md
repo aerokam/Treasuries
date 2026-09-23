@@ -345,6 +345,55 @@ per-CUSIP prices for a past date (3.1 §4.0).
 - **Status:** open.
 ## FIXED
 
+### Empty-rung phantom buys, and maturity-preference churn on an already-funded bracket holding
+
+- **Found:** 2026-09-23, from live testing against a real Schwab account (Amy IRA).
+- **Symptom 1 — empty-rung phantom buys.** The per-year DARA panel correctly showed a tiny figure
+  (the incoming coupon dripping down from later maturities) for every maturity year the account held
+  nothing in, but clicking Rebalance Ladder sized those years as full rungs at the scalar DARA (~$4,000
+  when the true figure was a few hundred dollars) and bought real bonds into them.
+- **Symptom 2 — same-funded-year churn.** With Multi-bracket selected, the ladder recommended selling
+  Jan 2034 and buying Jul 2034 within the same funded year — the exact "sell one maturity, buy another,
+  no net benefit" pattern the `Multi-bracket bought — or sold — the wrong CUSIP` fix below already
+  ruled out, reintroduced by this session's own maturity-preference work (`fa3dd30`, `e4a426c`, both
+  2026-09-22).
+- **Root cause 1:** `runFundedRebalance`'s self-financing search recovers a broker/legacy mirror's
+  shape via `computePortfolioARAByYear(holdings, tipsMap, refCPI)` called with no year range — the
+  held-years-only form, which drops an empty interior year from the map entirely rather than giving it
+  a zero or near-zero entry. A year missing from the map falls through to `runRebalance`'s scalar-DARA
+  fallback and sizes as a full rung — a phantom buy. Those phantom buys then scale up *with* the
+  search's own trial level (nothing constrains them to the year's true small figure), inflating the
+  cash the ladder appears to need and dragging every other swept rung's DARA down with it to
+  compensate — a second, harder-to-notice symptom on top of the phantom buy itself.
+- **Root cause 2:** the maturity-preference fix (3.0 §Target CUSIP resolution) let a bracket year's
+  funded role move to whichever CUSIP `maturityPref` preferred whenever it differed from the
+  excess-bearing CUSIP — including when the excess-bearing CUSIP's entire current holding was already
+  legitimately funded, with no real retained excess behind it at all. Forcing "all of it becomes
+  excess" in that case collapsed its true excess target near zero, selling the whole position to
+  rebuy the identical dollar amount at the preferred maturity for no economic reason.
+- **Fix 1:** `computePortfolioARAByYear` is now called with the same `{firstYear, lastYear}` range the
+  display panel's own mirror already uses, so an empty interior year recovers at its true incoming-LMI
+  stub instead of vanishing from the map.
+- **Fix 2:** maturity preference now only ever redirects a *genuine shortfall* — new money the current
+  holdings don't already cover. The excess-bearing CUSIP's existing funded coverage freezes in place
+  (protected, never sold to relabel it under a preferred maturity); only the shortfall, if any, is
+  bought into the preferred CUSIP.
+- **Measured, fix 1** (Amy IRA, real holdings): before the fix, the self-financing search converged to
+  $43,699 against the account's true $51,172 median, buying 29–38 phantom bonds into years like
+  2046/2050; after, it converges to exactly $51,172 with `costDeltaSum = $0.00` and zero phantom trades.
+- **Measured, fix 2** (Amy IRA, real holdings): before the fix, `maturityPref='first'` sold Jan 2034
+  down and bought Jul 2034 to replace it (and the reverse pattern at 2036); after, the account trades
+  zero bonds across the entire ladder at every `maturityPref` value, fully self-financing already. A
+  synthetic fixture with a forced funding shortfall confirms the redirect mechanism itself still moves
+  a genuine shortfall to the preferred maturity when one exists.
+- **Verified:** all 444 `tests/run.js` cases and all 86 Playwright E2E cases pass. One unrelated,
+  pre-existing test-fragility bug found and fixed along the way: the Gap Dur bracket-weight-drill E2E
+  test's regex couldn't match a legitimately negative-zero weight (float noise at an exact-zero solve),
+  silently grabbing the wrong figure from the popup instead of failing outright.
+- **Files:** `src/rebalance-lib.js`, `knowledge/3.0_TIPS_Ladder_Rebalancing.md`, `RETAINED_BRACKET_TODO.md`, `tests/e2e/app.spec.js`.
+
+### Multi-bracket bought — or sold — the wrong CUSIP when a maturity year holds two TIPS
+
 ### Multi-bracket bought — or sold — the wrong CUSIP when a maturity year holds two TIPS
 
 - **Found:** 2026-09-20, from two independent user reports. Report 1: a real portfolio holding only
