@@ -2218,9 +2218,11 @@ test('Gap Dur popup: a bracket weight drill reports the same weight as the row i
     const link = popup.locator('.drill-l3[data-l3="bracketwt-' + which + '"]');
     if (await link.count() === 0) continue;
 
-    // The row reads "<duration>  ·  <weight>"; the weight is the second figure.
+    // The row reads "<duration>  ·  <weight>"; the weight is the second figure. A weight that
+    // solves to (near) exactly zero can format as "-0.0000" (float noise, sign arbitrary) -- the
+    // optional minus keeps that a real match instead of silently falling through to the wrong one.
     const rowText = await link.locator('xpath=ancestor::tr[1]').innerText();
-    const onRow = rowText.match(/(\d+\.\d{4})/);
+    const onRow = rowText.match(/(-?\d+\.\d{4})/);
     expect(onRow, which + ': row shows a weight').not.toBeNull();
 
     await link.click();
@@ -2229,7 +2231,7 @@ test('Gap Dur popup: a bracket weight drill reports the same weight as the row i
     // The drill's own bottom line, which the mode string reaching it decides. Weights also
     // appear among the inputs above it, so the last one is the result.
     const drillText = await nested.innerText();
-    const total = [...drillText.matchAll(/bracket weight\s+(\d+\.\d{4})/gi)].pop();
+    const total = [...drillText.matchAll(/bracket weight\s+(-?\d+\.\d{4})/gi)].pop();
     expect(total, which + ': drill shows a weight').not.toBeNull();
     expect(total[1], which + ': drill weight matches the row').toBe(onRow[1]);
 

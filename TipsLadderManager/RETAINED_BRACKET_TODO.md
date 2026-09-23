@@ -47,6 +47,17 @@ Nothing in `identifyBrackets` or `detectBracketFlags` has been changed.
    retained maturity, where `maturityPref='first'` kept buying the active (canonical) maturity as
    funded instead of the retained one — root cause was the funded-CUSIP ranking unconditionally
    excluding any same-maturity-year retained CUSIP from candidacy.
+
+   **2026-09-23 correction:** the same-day fix above still sold an already-adequate funded holding to
+   relabel it under the preferred maturity whenever the excess CUSIP itself carried real funded
+   coverage (not just a same-year retained maturity) — reported on a real account where the excess
+   CUSIP's entire held quantity was legitimately funded (no real retained excess at all), and switching
+   `maturityPref` to `'first'` sold the whole position and rebought the identical dollar amount at a
+   different maturity for no economic reason. The rule is now genuinely incremental: the excess CUSIP's
+   existing funded coverage freezes in place (never sold to satisfy a preference) and only a *shortfall*
+   the current holdings don't already cover gets bought into the preferred maturity. Verified zero-trade
+   on the reporting account across every `maturityPref` value; a synthetic fixture with a forced
+   shortfall confirms the redirect itself still works when genuinely needed.
 4. **Specs**: `2.0 §Retained Bracket Excess` and `3.0 §Bracket Identification Rules §Retained Maturities` updated 2026-09-20 for the same-maturity-year case (item 3). `3.0 §Before-State Preview`, `3.0 §Lower bracket priority rule`, and `4.0 §Computation Modules` (where `shape-math.js` is not yet documented) still open.
 5. **Detail-row display for the same-maturity-year retained leg** doesn't yet split funded vs. excess the way the recognized bracket-target row does (`TipsLadderManager/KNOWN_ISSUES.md`, OPEN: "A same-maturity-year retained leg's own row does not label its trade as excess"). The trade itself is correct; only the row's own drill-down label isn't wired yet.
 
