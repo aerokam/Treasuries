@@ -345,6 +345,36 @@ per-CUSIP prices for a past date (3.1 §4.0).
 - **Status:** open.
 ## FIXED
 
+### An unheld year in a ladder with any gap/Future-30Y block threw instead of sizing as a hole
+
+- **Found:** 2026-09-23, from live testing against a real Fidelity account (Kristen TOD).
+- **Symptom:** loading the account and clicking Rebalance Ladder produced an entirely blank/zeroed
+  After side — every After field, including Qty Δ, empty or 0. Reproduced independent of any manual
+  edit: even an untouched mirror threw.
+  `runFundedRebalance`'s first, unscaled `runRebalance` call is not wrapped in a try/catch, so the
+  thrown error propagated uncaught past the UI's own top-level handler in a way that left the table in
+  this blank state rather than showing the error text.
+- **Root cause:** the "an unheld in-range year is an intentional hole, not a too-low-DARA error"
+  waiver (§Intentional empty rungs and the rung-validation waiver, 3.0) was only ever computed when the
+  ladder had **no** gap or Future-30Y block anywhere in it (`gapYears.length === 0 && future30yYears.length
+  === 0`) — on the theory that "the bracket machinery owns the unheld years" once a gap exists. That
+  theory doesn't hold: an ordinary unheld interior year (2033 on the reporting account — not itself a
+  gap year, not flagged as bracket excess, just a maturity the account holds nothing in) is never
+  touched by the bracket machinery at all when `identifyBrackets` doesn't happen to pick it. With the
+  waiver switched off for the whole ladder, `sizeLadder`'s preliminary sweep validated it like any
+  ordinary funded year, found its tiny mirrored DARA couldn't fund one bond, and threw.
+- **Fix:** the waiver is now computed for every unheld in-range year unconditionally. It only ever
+  suppresses a throw on a preliminary target that legitimately computes to zero; it does not change
+  what that target is, and it never prevents a year `identifyBrackets` actually does flag from being
+  properly sized downstream by the bracket machinery, since that machinery replaces this preliminary
+  figure entirely for the years it owns.
+- **Measured:** reproduced on the reporting account with and without a manual DARA edit (both threw
+  identically before the fix — the thrown year, 2033, has nothing to do with 2027, confirming the
+  waiver's scope, not the edit itself, was the defect); after the fix, both run cleanly, and every
+  other Fidelity test account (`data/FidelityAllAccounts.csv`) rebalances without throwing too.
+- **Verified:** all 444 `tests/run.js` cases and all 86 Playwright E2E cases pass.
+- **Files:** `src/rebalance-lib.js`.
+
 ### Empty-rung phantom buys, and maturity-preference churn on an already-funded bracket holding
 
 - **Found:** 2026-09-23, from live testing against a real Schwab account (Amy IRA).
