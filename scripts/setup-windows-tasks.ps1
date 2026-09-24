@@ -60,7 +60,9 @@ function Register-DataTask {
         [string]   $Argument,
         [string]   $Cwd = $ProjectDir,
         [Nullable[TimeSpan]] $RestartInterval,
-        [int]      $RestartCount = 0
+        [int]      $RestartCount = 0,
+        [ValidateSet('S4U', 'Interactive')]
+        [string]   $LogonType = 'S4U'
     )
     if (Get-ScheduledTask -TaskName $Name -ErrorAction SilentlyContinue) {
         Unregister-ScheduledTask -TaskName $Name -Confirm:$false
@@ -79,8 +81,10 @@ function Register-DataTask {
     $settings  = New-ScheduledTaskSettingsSet @settingsArgs
     # S4U (not Interactive): runs whether the user is logged on or not, without storing a
     # password. Registering with S4U requires the elevated re-run above (Interactive alone
-    # doesn't).
-    $principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType S4U -RunLevel Limited
+    # doesn't). Interactive attaches to the user's real desktop session instead, so any
+    # window the task opens (e.g. Chrome) is visible — used for tasks that may need a
+    # manual step, at the cost of not running while logged off.
+    $principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType $LogonType -RunLevel Limited
     $task      = New-ScheduledTask -Action $action -Trigger $Triggers -Settings $settings -Principal $principal -Description $Description
     Register-ScheduledTask -TaskName $Name -InputObject $task | Out-Null
     Write-Host "  [OK] $Name"
@@ -96,11 +100,13 @@ function Register-CmdTask {
     param(
         [string]   $Name, [string]$Description, [object[]]$Triggers, [string]$CmdFile,
         [Nullable[TimeSpan]] $RestartInterval,
-        [int]      $RestartCount = 0
+        [int]      $RestartCount = 0,
+        [ValidateSet('S4U', 'Interactive')]
+        [string]   $LogonType = 'S4U'
     )
     Register-DataTask -Name $Name -Description $Description -Triggers $Triggers `
         -Execute "cmd.exe" -Argument "/c `"$CmdFile`"" `
-        -RestartInterval $RestartInterval -RestartCount $RestartCount
+        -RestartInterval $RestartInterval -RestartCount $RestartCount -LogonType $LogonType
 }
 
 [System.DayOfWeek[]] $Weekdays = 'Monday','Tuesday','Wednesday','Thursday','Friday'
@@ -232,27 +238,42 @@ Register-NodeTask "GswTipsCurve" `
     @(New-ScheduledTaskTrigger -Daily -At "7:15am") `
     "YieldCurves/scripts/updateGswTipsCurve.js"
 
-# FidelityQuotes  -  8:05am ET [PT: 5:05am], 12:35pm ET [PT: 9:35am], 5:05pm ET [PT: 2:05pm]
-# Bond market hours 8am-5pm ET; run at open, midday, and close.
+# FidelityQuotes  -  8:05am ET [PT: 5:05am]
+# Runs before market open, when the user is often not logged on yet — S4U so it runs
+# regardless. No visible window: if the automated MFA path (SMS code read from Phone
+# Link) needs a manual step nobody's there to do, it fails and dumps state to
+# logs/mfa-debug/; FidelityQuotesCatchup below is the visible retry.
 Register-CmdTask "FidelityQuotes" `
-    "Download Fidelity broker quotes (TIPS + Treasuries), upload FidelityTips.csv + FidelityTreasuries.csv" `
+    "Download Fidelity broker quotes (TIPS + Treasuries) before market open, upload FidelityTips.csv + FidelityTreasuries.csv" `
+    @(New-ScheduledTaskTrigger -Weekly -DaysOfWeek $Weekdays -At "5:05am") `
+    "$ProjectDir\YieldCurves\scripts\run-fidelity.cmd"
+
+# FidelityQuotesDaytime  -  12:35pm ET [PT: 9:35am], 5:05pm ET [PT: 2:05pm]
+# Runs during hours the user is normally at the desk — Interactive so the Chrome window
+# is visible on their desktop, giving them something to act on if the automated MFA
+# path (SMS code read from Phone Link) falls through to the manual-wait fallback.
+Register-CmdTask "FidelityQuotesDaytime" `
+    "Download Fidelity broker quotes (TIPS + Treasuries) midday and at close, upload FidelityTips.csv + FidelityTreasuries.csv; runs visibly so a manual MFA step can be completed" `
     @(
-        (New-ScheduledTaskTrigger -Weekly -DaysOfWeek $Weekdays -At "5:05am"),
         (New-ScheduledTaskTrigger -Weekly -DaysOfWeek $Weekdays -At "9:35am"),
         (New-ScheduledTaskTrigger -Weekly -DaysOfWeek $Weekdays -At "2:05pm")
     ) `
-    "$ProjectDir\YieldCurves\scripts\run-fidelity.cmd"
+    "$ProjectDir\YieldCurves\scripts\run-fidelity.cmd" `
+    -LogonType Interactive
 
 # FidelityQuotesCatchup  -  2 min after logon
-# Safety net for FidelityQuotes: if every run above was missed today (PC off or
-# restarting through them), this runs the download once as soon as the user logs back
-# on. No-ops when today's data is already on R2 (see fidelityCatchupIfStale.js).
+# Safety net for FidelityQuotes (the invisible 5:05am run): if it was missed or failed
+# today (PC off, or a manual MFA step nobody was there to complete), this runs the
+# download once as soon as the user logs back on. No-ops when today's data is already
+# on R2 (see fidelityCatchupIfStale.js). Interactive so the just-opened desktop session
+# makes the window visible, giving the user a real shot at a manual MFA step.
 $catchupTrigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
 $catchupTrigger.Delay = 'PT2M'
 Register-CmdTask "FidelityQuotesCatchup" `
-    "Logon safety net: run the Fidelity download once if today's data is still missing from R2" `
+    "Logon safety net: run the Fidelity download once if today's data is still missing from R2; runs visibly so a manual MFA step can be completed" `
     @($catchupTrigger) `
-    "$ProjectDir\YieldCurves\scripts\run-fidelity-catchup.cmd"
+    "$ProjectDir\YieldCurves\scripts\run-fidelity-catchup.cmd" `
+    -LogonType Interactive
 
 # Yield Curves fit (S13/S14/S15) is NOT independently scheduled — it has no standalone
 # trigger. It runs chained from inside run-fidelity.cmd (called by FidelityQuotes, above)
