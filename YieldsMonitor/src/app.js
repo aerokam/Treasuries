@@ -107,8 +107,14 @@ const REF_CPI_SA_URL = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/TIPS
 const HOLIDAYS_CSV_URL = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/misc/BondHolidaysSifma.csv';
 const TIPS_REF_URL = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/TIPS/TipsRef.csv';
 const CNBC_QUOTE_URL = 'https://quote.cnbc.com/quote-html-webservice/restQuote/symbolType/symbol';
-let showSaYield = true;
-let showQuotedYield = true;
+// Quoted/SA are independent per view group: Time Series has its own pair, Yield Curves and
+// Breakeven Inflation share a second pair (they're already driven by the same updateYieldCurves()
+// call). Time Series defaults to Quoted only; Yield Curves/BEI default to SA only.
+let showQuotedYieldTS = true;
+let showSaYieldTS = false;
+let showQuotedYieldCurve = false;
+let showSaYieldCurve = true;
+function isCurveScope() { return activeTab === 'yieldcurves' || activeTab === 'breakeven'; }
 let refCpiSaRows = null;
 let refCpiSaPromise = null;
 let tipsBondMeta = null; // { [symbol]: { maturity: Date, coupon: number(decimal) } } — TODAY's bond, from CNBC live
@@ -137,7 +143,7 @@ async function init() {
   setupTabs();
   setupSidebarResize();
   syncChartContainers();
-  const saReady = showSaYield ? ensureSaDataLoaded() : Promise.resolve();
+  const saReady = (showSaYieldTS || showSaYieldCurve) ? ensureSaDataLoaded() : Promise.resolve();
   await updateAllData();
   await saReady;
   refreshSaOverlays(true);
@@ -163,6 +169,12 @@ function setupTabs() {
       activeTab = tab;
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
       document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === `tab-${tab}`));
+      // The Quoted/SA checkboxes are shared DOM elements whose meaning switches with the
+      // active tab (see isCurveScope) — sync their displayed state and label to match.
+      const curve = isCurveScope();
+      document.getElementById('yieldToggleTitle').textContent = `Show TIPS yields (${curve ? 'Yield Curves / BEI' : 'Time Series'}):`;
+      document.getElementById('showQuotedYield').checked = curve ? showQuotedYieldCurve : showQuotedYieldTS;
+      document.getElementById('showSaYield').checked = curve ? showSaYieldCurve : showSaYieldTS;
       if (tab === 'yieldcurves' || tab === 'breakeven') {
         updateYieldCurves();
         setTimeout(() => Object.values(yieldCurveCharts).forEach(c => c && c.resize()), 50);
@@ -270,7 +282,7 @@ function setupUI() {
     return `<label class="sym-item-check" id="label-${sym}"><input type="checkbox" value="${sym}" ${activeSymbols.has(sym) ? 'checked' : ''}><span class="color-dot" style="background:${color}"></span><span class="sym-code">${SYMBOL_LABELS[sym] || sym}</span><span class="sym-yield" id="yield-${sym}">---</span><span class="sym-change" id="change-${sym}"></span><span class="sym-sa-yield" id="sa-yield-${sym}"></span></label>`;
   }).join('');
 
-  root.innerHTML = `<style>.range-picker { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 20px; } .range-btn { flex: 1; min-width: 45px; padding: 6px 0; border: none; background: var(--tab-inactive-bg); border-radius: 4px; cursor: pointer; font-weight: 700; font-size: 13px; color: var(--tab-inactive-text); text-transform: uppercase; letter-spacing: 0.04em; transition: background 0.1s; } .range-btn:hover:not(.active) { background: var(--btn-hover-bg); } .range-btn.active { background: var(--tab-active-bg); color: var(--tab-inactive-text); border-top: 3px solid var(--tab-active-accent); } .sym-group h4 { display: flex; justify-content: space-between; align-items: center; margin: 12px 0 6px; font-size: 13px; text-transform: uppercase; color: #000; font-weight: 800; letter-spacing: 0.05em; border-bottom: 1px solid #cbd5e1; padding-bottom: 2px; } .clear-btn { font-size: 11px; color: #64748b; cursor: pointer; text-transform: none; font-weight: 600; } .sym-item-check { display: flex; align-items: center; gap: 4px; padding: 4px 0; font-size: 15px; cursor: pointer; color: #000; } .color-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; } .sym-code { font-weight: 600; color: #000; width: 62px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .sym-yield { font-family: monospace; font-weight: 700; font-size: 15px; color: #000; width: 54px; flex-shrink: 0; text-align: right; } .sym-change { font-family: monospace; font-weight: 700; font-size: 13px; width: 50px; flex-shrink: 0; text-align: right; } .sym-change.up { color: #16a34a; } .sym-change.down { color: #dc2626; } .sym-sa-yield { font-family: monospace; font-weight: 700; font-size: 12px; color: #f59e0b; width: 48px; flex-shrink: 0; text-align: right; } .yield-toggle-group { margin-top: 15px; font-size: 14px; font-weight: 700; color: #334155; background: #f8fafc; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; } .yield-toggle-title { margin-bottom: 4px; } .yield-toggle-option { display: flex; align-items: center; gap: 6px; padding: 2px 0; cursor: pointer; font-weight: 600; } #fetchStatus { font-size: 13px; color: #000; margin-top: 20px; font-weight: 700; display: grid; grid-template-columns: auto auto; column-gap: 4px; row-gap: 2px; } #fetchStatus .fs-label { text-align: right; } #fetchStatus .fs-val { text-align: left; } .no-data-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: #000; background: rgba(255,255,255,0.9); pointer-events: none; z-index: 10; } .sync-zoom-label { display: flex; align-items: center; gap: 6px; margin-top: 15px; font-size: 14px; font-weight: 700; color: #334155; cursor: pointer; background: #f8fafc; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; } .custom-date-range { display: none; flex-direction: column; gap: 6px; padding: 10px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; margin-bottom: 4px; } .custom-date-label { font-size: 12px; font-weight: 800; color: #334155; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.04em; } .custom-date-inputs { display: flex; flex-direction: column; gap: 6px; } .custom-date-inputs label { font-size: 12px; font-weight: 700; color: #334155; display: flex; flex-direction: column; gap: 2px; } .custom-date-inputs .date-picker { width: 100%; font-size: 13px; } .custom-date-apply { margin-top: 4px; padding: 6px; background: var(--tab-active-bg); color: var(--tab-inactive-text); border: none; border-top: 3px solid var(--tab-active-accent); border-radius: 4px; font-size: 13px; font-weight: 700; cursor: pointer; width: 100%; } .custom-date-apply:hover { opacity: 0.85; }</style><div class="range-picker">${rangeHtml}</div><div class="custom-date-range" id="custom-date-range"><div class="custom-date-label">Custom Date Range</div><div class="custom-date-inputs"><label>Start Date<input type="date" id="customStart" class="date-picker"></label><label>End Date<input type="date" id="customEnd" class="date-picker"></label></div><button class="custom-date-apply" id="applyCustomRange">Apply</button></div><div class="sym-group"><h4>TIPS <span class="clear-btn" data-type="TIPS">Clear All</span></h4>${createGrid(tips)}<h4>Treasuries <span class="clear-btn" data-type="Nominal">Clear All</span></h4>${createGrid(nominals)}</div><label class="sync-zoom-label"><input type="checkbox" id="syncXAxis" ${syncXAxis ? 'checked' : ''}> Sync Zoom & Pan</label><label class="sync-zoom-label"><input type="checkbox" id="lockRight"> Lock Right</label><div class="yield-toggle-group"><div class="yield-toggle-title">Show TIPS yields:</div><label class="yield-toggle-option"><input type="checkbox" id="showQuotedYield" ${showQuotedYield ? 'checked' : ''}> Quoted</label><label class="yield-toggle-option"><input type="checkbox" id="showSaYield" ${showSaYield ? 'checked' : ''}> Seasonally Adjusted (SA)</label></div><div id="fetchStatus">Ready</div>`;
+  root.innerHTML = `<style>.range-picker { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 20px; } .range-btn { flex: 1; min-width: 45px; padding: 6px 0; border: none; background: var(--tab-inactive-bg); border-radius: 4px; cursor: pointer; font-weight: 700; font-size: 13px; color: var(--tab-inactive-text); text-transform: uppercase; letter-spacing: 0.04em; transition: background 0.1s; } .range-btn:hover:not(.active) { background: var(--btn-hover-bg); } .range-btn.active { background: var(--tab-active-bg); color: var(--tab-inactive-text); border-top: 3px solid var(--tab-active-accent); } .sym-group h4 { display: flex; justify-content: space-between; align-items: center; margin: 12px 0 6px; font-size: 13px; text-transform: uppercase; color: #000; font-weight: 800; letter-spacing: 0.05em; border-bottom: 1px solid #cbd5e1; padding-bottom: 2px; } .clear-btn { font-size: 11px; color: #64748b; cursor: pointer; text-transform: none; font-weight: 600; } .sym-item-check { display: flex; align-items: center; gap: 4px; padding: 4px 0; font-size: 15px; cursor: pointer; color: #000; } .color-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; } .sym-code { font-weight: 600; color: #000; width: 62px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .sym-yield { font-family: monospace; font-weight: 700; font-size: 15px; color: #000; width: 54px; flex-shrink: 0; text-align: right; } .sym-change { font-family: monospace; font-weight: 700; font-size: 13px; width: 50px; flex-shrink: 0; text-align: right; } .sym-change.up { color: #16a34a; } .sym-change.down { color: #dc2626; } .sym-sa-yield { font-family: monospace; font-weight: 700; font-size: 12px; color: #f59e0b; width: 48px; flex-shrink: 0; text-align: right; } .yield-toggle-group { margin-top: 15px; font-size: 14px; font-weight: 700; color: #334155; background: #f8fafc; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; } .yield-toggle-title { margin-bottom: 4px; } .yield-toggle-option { display: flex; align-items: center; gap: 6px; padding: 2px 0; cursor: pointer; font-weight: 600; } #fetchStatus { font-size: 13px; color: #000; margin-top: 20px; font-weight: 700; display: grid; grid-template-columns: auto auto; column-gap: 4px; row-gap: 2px; } #fetchStatus .fs-label { text-align: right; } #fetchStatus .fs-val { text-align: left; } .no-data-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: #000; background: rgba(255,255,255,0.9); pointer-events: none; z-index: 10; } .sync-zoom-label { display: flex; align-items: center; gap: 6px; margin-top: 15px; font-size: 14px; font-weight: 700; color: #334155; cursor: pointer; background: #f8fafc; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; } .custom-date-range { display: none; flex-direction: column; gap: 6px; padding: 10px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; margin-bottom: 4px; } .custom-date-label { font-size: 12px; font-weight: 800; color: #334155; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.04em; } .custom-date-inputs { display: flex; flex-direction: column; gap: 6px; } .custom-date-inputs label { font-size: 12px; font-weight: 700; color: #334155; display: flex; flex-direction: column; gap: 2px; } .custom-date-inputs .date-picker { width: 100%; font-size: 13px; } .custom-date-apply { margin-top: 4px; padding: 6px; background: var(--tab-active-bg); color: var(--tab-inactive-text); border: none; border-top: 3px solid var(--tab-active-accent); border-radius: 4px; font-size: 13px; font-weight: 700; cursor: pointer; width: 100%; } .custom-date-apply:hover { opacity: 0.85; }</style><div class="range-picker">${rangeHtml}</div><div class="custom-date-range" id="custom-date-range"><div class="custom-date-label">Custom Date Range</div><div class="custom-date-inputs"><label>Start Date<input type="date" id="customStart" class="date-picker"></label><label>End Date<input type="date" id="customEnd" class="date-picker"></label></div><button class="custom-date-apply" id="applyCustomRange">Apply</button></div><div class="sym-group"><h4>TIPS <span class="clear-btn" data-type="TIPS">Clear All</span></h4>${createGrid(tips)}<h4>Treasuries <span class="clear-btn" data-type="Nominal">Clear All</span></h4>${createGrid(nominals)}</div><label class="sync-zoom-label"><input type="checkbox" id="syncXAxis" ${syncXAxis ? 'checked' : ''}> Sync Zoom & Pan</label><label class="sync-zoom-label"><input type="checkbox" id="lockRight"> Lock Right</label><div class="yield-toggle-group"><div class="yield-toggle-title" id="yieldToggleTitle">Show TIPS yields (${isCurveScope() ? 'Yield Curves / BEI' : 'Time Series'}):</div><label class="yield-toggle-option"><input type="checkbox" id="showQuotedYield" ${(isCurveScope() ? showQuotedYieldCurve : showQuotedYieldTS) ? 'checked' : ''}> Quoted</label><label class="yield-toggle-option"><input type="checkbox" id="showSaYield" ${(isCurveScope() ? showSaYieldCurve : showSaYieldTS) ? 'checked' : ''}> Seasonally Adjusted (SA)</label></div><div id="fetchStatus">Ready</div>`;
 
   document.getElementById('syncXAxis').addEventListener('change', (e) => {
     syncXAxis = e.target.checked;
@@ -281,28 +293,45 @@ function setupUI() {
   });
   document.getElementById('lockRight').addEventListener('change', (e) => { lockRight = e.target.checked; });
   document.getElementById('showQuotedYield').addEventListener('change', async (e) => {
-    if (!e.target.checked && !showSaYield) {
-      // Deselecting the only remaining option: switch to the other one instead of no-op.
-      showSaYield = true;
-      document.getElementById('showSaYield').checked = true;
-      await ensureSaDataLoaded();
-      refreshSaOverlays(true);
-    }
-    showQuotedYield = e.target.checked;
-    refreshQuotedOverlays(true);
-    updateYieldCurves();
-  });
-  document.getElementById('showSaYield').addEventListener('change', async (e) => {
-    if (!e.target.checked && !showQuotedYield) {
-      // Deselecting the only remaining option: switch to the other one instead of no-op.
-      showQuotedYield = true;
-      document.getElementById('showQuotedYield').checked = true;
+    if (isCurveScope()) {
+      if (!e.target.checked && !showSaYieldCurve) {
+        // Deselecting the only remaining option: switch to the other one instead of no-op.
+        showSaYieldCurve = true;
+        document.getElementById('showSaYield').checked = true;
+        await ensureSaDataLoaded();
+      }
+      showQuotedYieldCurve = e.target.checked;
+      updateYieldCurves();
+    } else {
+      if (!e.target.checked && !showSaYieldTS) {
+        showSaYieldTS = true;
+        document.getElementById('showSaYield').checked = true;
+        await ensureSaDataLoaded();
+        refreshSaOverlays(true);
+      }
+      showQuotedYieldTS = e.target.checked;
       refreshQuotedOverlays(true);
     }
-    showSaYield = e.target.checked;
-    if (showSaYield) await ensureSaDataLoaded();
-    refreshSaOverlays(true);
-    updateYieldCurves();
+  });
+  document.getElementById('showSaYield').addEventListener('change', async (e) => {
+    if (isCurveScope()) {
+      if (!e.target.checked && !showQuotedYieldCurve) {
+        showQuotedYieldCurve = true;
+        document.getElementById('showQuotedYield').checked = true;
+      }
+      showSaYieldCurve = e.target.checked;
+      if (showSaYieldCurve) await ensureSaDataLoaded();
+      updateYieldCurves();
+    } else {
+      if (!e.target.checked && !showQuotedYieldTS) {
+        showQuotedYieldTS = true;
+        document.getElementById('showQuotedYield').checked = true;
+        refreshQuotedOverlays(true);
+      }
+      showSaYieldTS = e.target.checked;
+      if (showSaYieldTS) await ensureSaDataLoaded();
+      refreshSaOverlays(true);
+    }
   });
 
   document.querySelectorAll('.clear-btn').forEach(btn => btn.addEventListener('click', (e) => {
@@ -346,7 +375,7 @@ function setupUI() {
   }));
   document.getElementById('refreshAll').addEventListener('click', async () => {
     updateAllData(true);
-    if (showSaYield) { tipsBondMeta = await fetchTipsBondMeta(true); refreshSaOverlays(); updateYieldCurves(); }
+    if (showSaYieldTS || showSaYieldCurve) { tipsBondMeta = await fetchTipsBondMeta(true); refreshSaOverlays(); updateYieldCurves(); }
   });
   document.getElementById('resetAllZoom').addEventListener('click', () => { yOverrideSyms.clear(); isUpdatingData = true; Object.entries(charts).forEach(([sym, chart]) => applyDefaultBounds(sym, chart, rangeData[sym])); isUpdatingData = false; });
 }
@@ -706,7 +735,7 @@ function refreshSaOverlays(forceRescale = false) {
   SA_SYMBOLS.forEach(sym => {
     const chart = charts[sym];
     if (chart && chart.data.datasets[1]) {
-      chart.data.datasets[1].data = showSaYield ? computeSaSeries(sym, rangeData[sym]) : [];
+      chart.data.datasets[1].data = showSaYieldTS ? computeSaSeries(sym, rangeData[sym]) : [];
       if (forceRescale || !yOverrideSyms.has(sym)) rescaleYToVisible(chart, sym);
       else chart.update('none');
     }
@@ -715,7 +744,7 @@ function refreshSaOverlays(forceRescale = false) {
     const data = rangeData[sym];
     const latest = data && data.length ? data[data.length - 1] : null;
     const bondMeta = tipsBondMeta && tipsBondMeta[sym];
-    const saY = (showSaYield && latest) ? saYieldForQuote(latest.y, getEtDateStr(latest.x), bondMeta, saHolidaySet, refCpiSaRows) : null;
+    const saY = (showSaYieldTS && latest) ? saYieldForQuote(latest.y, getEtDateStr(latest.x), bondMeta, saHolidaySet, refCpiSaRows) : null;
     el.textContent = saY == null ? '' : `${saY.toFixed(3)}%`;
   });
 }
@@ -727,7 +756,7 @@ function refreshQuotedOverlays(forceRescale = false) {
   SA_SYMBOLS.forEach(sym => {
     const chart = charts[sym];
     if (!chart || !chart.data.datasets[0]) return;
-    chart.data.datasets[0].data = showQuotedYield ? (rangeData[sym] || []) : [];
+    chart.data.datasets[0].data = showQuotedYieldTS ? (rangeData[sym] || []) : [];
     if (forceRescale || !yOverrideSyms.has(sym)) rescaleYToVisible(chart, sym);
     else chart.update('none');
   });
@@ -963,8 +992,8 @@ function rescaleYToVisible(chart, sym) {
   // Bounds are fit only to whichever line(s) are actually shown — the "Show TIPS yields"
   // toggles (Quoted/SA) hide a line's chart.data but rangeData[sym] always has the raw
   // series, so gate it here too or the Y-axis would still fit hidden quoted data.
-  const data = (SA_SYMBOLS.has(sym) && !showQuotedYield) ? [] : raw;
-  const saData = (showSaYield && chart.data.datasets[1]) ? chart.data.datasets[1].data : [];
+  const data = (SA_SYMBOLS.has(sym) && !showQuotedYieldTS) ? [] : raw;
+  const saData = (showSaYieldTS && chart.data.datasets[1]) ? chart.data.datasets[1].data : [];
   const allPoints = data.concat(saData);
   const visible = allPoints.filter(p => { const t = +p.x; return p.y != null && t >= xMin && t <= xMax; }); if (visible.length === 0) return;
   const bounds = snapYBounds(Math.min(...visible.map(p=>p.y)), Math.max(...visible.map(p=>p.y)));
@@ -1091,7 +1120,7 @@ function updateCharts() {
     if (card) { const ov = card.querySelector('.no-data-overlay'); if (ov) ov.remove(); }
 
     if (chart) {
-      chart.data.datasets[0].data = (SA_SYMBOLS.has(sym) && !showQuotedYield) ? [] : data;
+      chart.data.datasets[0].data = (SA_SYMBOLS.has(sym) && !showQuotedYieldTS) ? [] : data;
       if (activeRange === '2D') {
         chart.options.scales.x.time.unit = 'hour';
         chart.options.scales.x.time.tooltipFormat = 'MM/dd/yy HH:mm:ss';
@@ -1257,30 +1286,30 @@ function updateYieldCurves() {
   // curve (direct SA yield) and the BEI curve (Nominal - SA yield). Same "overlay, don't
   // replace" convention as the Time Series SA line (see 2.4_Adjust_For_Seasonality.md).
   const saSeriesBySym = {};
-  if (showSaYield) SA_SYMBOLS.forEach(sym => { saSeriesBySym[sym] = computeSaSeries(sym, rangeData[sym]); });
+  if (showSaYieldCurve) SA_SYMBOLS.forEach(sym => { saSeriesBySym[sym] = computeSaSeries(sym, rangeData[sym]); });
 
-  // Legend entries labeled "(SA)" are gated on showSaYield, same as before. Non-"(SA)" (raw/
-  // quoted) entries are gated on showQuotedYield too, but only on charts that actually carry
+  // Legend entries labeled "(SA)" are gated on showSaYieldCurve, same as before. Non-"(SA)" (raw/
+  // quoted) entries are gated on showQuotedYieldCurve too, but only on charts that actually carry
   // an SA counterpart (TIPS curve, BEI) — the Nominal curve has no SA datasets at all and its
   // Start/End legend entries must always show regardless of the TIPS-scoped Quoted toggle.
   const curveOptions = { animation: false, responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, scales: { x: { grid: { color: '#f1f5f9' }, ticks: { font: { size: 10, weight: 'bold' }, color: '#000' } }, y: { grid: { color: '#f1f5f9' }, ticks: { font: { size: 9, family: 'monospace', weight: 'bold' }, color: '#000', callback: v => v.toFixed(3) + '%' } } }, plugins: { legend: { display: true, labels: { font: { size: 10, weight: 'bold' }, filter: (item, data) => {
     const label = String(data.datasets[item.datasetIndex].label);
-    if (label.includes('(SA)')) return showSaYield;
+    if (label.includes('(SA)')) return showSaYieldCurve;
     const chartHasSa = data.datasets.some(d => String(d.label).includes('(SA)'));
-    return !chartHasSa || showQuotedYield;
+    return !chartHasSa || showQuotedYieldCurve;
   } } }, zoom: { zoom: { wheel: { enabled: true }, mode: 'xy' }, pan: { enabled: true, mode: 'xy' } } } };
 
   // saEligible charts always reserve dataset slots 2/3 for the SA overlay (empty when SA is
   // off), so toggling SA doesn't need to recreate the chart — same pattern as the Time Series
   // charts reserving their SA dataset slot. Raw Start/End (dataset 0/1) are gated on
-  // showQuotedYield only when saEligible — the Nominal curve has no SA counterpart, so the
+  // showQuotedYieldCurve only when saEligible — the Nominal curve has no SA counterpart, so the
   // TIPS-scoped Quoted toggle never hides it.
   const buildYield = (id, key, syms, saEligible) => {
-    const rawGap = saEligible && !showQuotedYield;
+    const rawGap = saEligible && !showQuotedYieldCurve;
     const sD = rawGap ? syms.map(() => null) : syms.map(s => valueOnDate(s, startDateStr, false));
     const eD = rawGap ? syms.map(() => null) : syms.map(s => valueOnDate(s, endDateStr, true));
-    const saSD = saEligible ? syms.map(s => showSaYield ? valueFromSeriesOnDate(saSeriesBySym[s], startDateStr, false) : null) : null;
-    const saED = saEligible ? syms.map(s => showSaYield ? valueFromSeriesOnDate(saSeriesBySym[s], endDateStr, true) : null) : null;
+    const saSD = saEligible ? syms.map(s => showSaYieldCurve ? valueFromSeriesOnDate(saSeriesBySym[s], startDateStr, false) : null) : null;
+    const saED = saEligible ? syms.map(s => showSaYieldCurve ? valueFromSeriesOnDate(saSeriesBySym[s], endDateStr, true) : null) : null;
     if (yieldCurveCharts[key]) {
       const c = yieldCurveCharts[key];
       c.data.datasets[0].data = sD; c.data.datasets[0].label = sL;
@@ -1302,10 +1331,10 @@ function updateYieldCurves() {
   };
 
   const buildBei = (id, key, pairs) => {
-    const sD = !showQuotedYield ? pairs.map(() => null) : pairs.map(p => { const n = valueOnDate(p.n, startDateStr, false), t = valueOnDate(p.t, startDateStr, false); return (n == null || t == null) ? null : n - t; });
-    const eD = !showQuotedYield ? pairs.map(() => null) : pairs.map(p => { const n = valueOnDate(p.n, endDateStr, true), t = valueOnDate(p.t, endDateStr, true); return (n == null || t == null) ? null : n - t; });
+    const sD = !showQuotedYieldCurve ? pairs.map(() => null) : pairs.map(p => { const n = valueOnDate(p.n, startDateStr, false), t = valueOnDate(p.t, startDateStr, false); return (n == null || t == null) ? null : n - t; });
+    const eD = !showQuotedYieldCurve ? pairs.map(() => null) : pairs.map(p => { const n = valueOnDate(p.n, endDateStr, true), t = valueOnDate(p.t, endDateStr, true); return (n == null || t == null) ? null : n - t; });
     const saBei = (p, dateStr, pickLast) => {
-      if (!showSaYield || !SA_SYMBOLS.has(p.t)) return null;
+      if (!showSaYieldCurve || !SA_SYMBOLS.has(p.t)) return null;
       const n = valueOnDate(p.n, dateStr, pickLast), t = valueFromSeriesOnDate(saSeriesBySym[p.t], dateStr, pickLast);
       return (n == null || t == null) ? null : n - t;
     };
