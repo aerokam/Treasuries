@@ -447,9 +447,24 @@ function dateInputToEtEnd(dateStr) {
 function isAfterHoursEt(tsMs) { const parts = ET_FULL_FMT.formatToParts(new Date(tsMs)).reduce((a, p) => ({ ...a, [p.type]: +p.value }), {}); const mins = parts.hour * 60 + parts.minute; return mins < 8 * 60 || mins >= 17 * 60; }
 function isWeekendEt(date) { return ET_WDAY_FMT.format(date).match(/Sat|Sun/); }
 
-async function fetchWithTimeout(url, options = {}, timeout = 8000) {
-  const controller = new AbortController(), id = setTimeout(() => controller.abort(), timeout);
-  try { const response = await fetch(url, { ...options, signal: controller.signal, cache: 'no-cache' }); clearTimeout(id); return response; } catch (e) { clearTimeout(id); throw e; }
+// The single chokepoint for every network request in this app (every caller routes through
+// here) — retrying here covers a transient network/timeout failure (e.g. a cold CDN connection
+// on initial page load) for every fetcher at once. Only retries a thrown failure, never a
+// resolved non-ok response: several callers (e.g. the intraday-archive day walk) treat a 404
+// as a normal "nothing here" result, not an error, and must not have it retried.
+async function fetchWithTimeout(url, options = {}, timeout = 8000, retries = 2) {
+  for (let attempt = 0; ; attempt++) {
+    const controller = new AbortController(), id = setTimeout(() => controller.abort(), timeout);
+    try {
+      const response = await fetch(url, { ...options, signal: controller.signal, cache: 'no-cache' });
+      clearTimeout(id);
+      return response;
+    } catch (e) {
+      clearTimeout(id);
+      if (attempt >= retries) throw e;
+      await new Promise(r => setTimeout(r, 300 * 3 ** attempt));
+    }
+  }
 }
 
 // Single consolidated, symbol-nested history file: { "US10Y": [{x,y}, ...], ... }
