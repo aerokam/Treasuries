@@ -8,6 +8,46 @@ production impact go here.
 
 ## OPEN
 
+### Gap-year (and sparse-ladder) DARA inference uses a flat median, not the ladder's own shape
+
+- **Found:** 2026-09-26/27, testing the bracket-weight fix below with a minimal two-CUSIP file
+  (Jan 2036 + Feb 2040 only, no other holdings).
+- **The problem, in the user's own words:** the app already infers an intent — that the bracket
+  years cover the gap years — whenever it recommends a bracket-excess trade at all; that inference
+  is correct as a default (assuming DARA = 0 for the gap years would be the atypical case). But the
+  DARA value it assumes for the gap years, and for a bracket year with nothing else to compare
+  against, is a flat median computed over however many held years happen to exist — 2, in the
+  minimal test file — when the assumption being made is that this behaves like a real ladder segment
+  (5 conceptual rungs here: 2036-2040). The number of rungs used to estimate the value must match the
+  number of rungs the inference is actually assuming, not just whatever's literally held.
+- **Known prior art, already built but never wired in:** `src/shape-math.js` (`smoothCurve`,
+  `findSpikes`) fits a *local* running-median curve across the maturity-year sequence rather than one
+  flat ladder-wide number, specifically so a ladder with genuinely different segments (e.g. a step
+  down once Social Security starts) doesn't get flattened to a single value — and it explicitly
+  extrapolates the local *slope* at the two ends of the series rather than going flat there. It has
+  its own passing unit tests (real holdings, two retained years found correctly) but is not imported
+  by anything else in `src/` — grep confirms zero call sites outside its own test. This is very
+  likely the mechanism the user is recalling having built for this exact purpose and never finished
+  wiring in.
+- **Two separable tasks, not one:**
+  1. **Wire the shape-based (`smoothCurve`/local-slope) inference into the actual bracket/gap-year
+     DARA-inference path** (currently the flat `heldYearMedianExcluding` logic in
+     `before-state-lib.js`, and the analogous flat-median fallback used by the self-financing
+     re-derivation in `rebalance-lib.js`'s `derivePerYearDara`). For a real ladder with rungs well
+     before and after the gap, the gap years' assumed DARA should follow the local slope on each
+     side, not one ladder-wide number.
+  2. **Fall back to a mean when there aren't enough rungs to fit a shape from at all** — the
+     minimal-file case (2 real values, 3 unknown gap years) has no shape or slope to detect from two
+     points, so the fallback there is the mean of the known values, applied flat across the assumed
+     five rungs — not either value borrowing the other's number the way today's pairwise
+     "median-excluding-candidate" degenerates to.
+- **First step for both, per the user:** re-read `2.0_TIPS_Ladders.md` / `3.0_TIPS_Ladder_Rebalancing.md`
+  §Per-Year DARA from Portfolio and §Before-State Preview and Bracket-Year Excess Detection to check
+  whether the specs already describe shape/slope-based inference (and code just never caught up), or
+  whether the specs still describe the flat-median approach and need updating once the design is
+  agreed. Do not start implementation before that check.
+- **Status:** open, not started. Two-step worklist above.
+
 ### A same-maturity-year retained leg's own row does not label its trade as excess
 
 - **Found:** 2026-09-20, verifying the multi-bracket same-maturity-year fix (see FIXED, below).
@@ -344,6 +384,44 @@ per-CUSIP prices for a past date (3.1 §4.0).
   it out of the displayed P+I: 1,014.38 implies 2 × 14.38 = 2.876%, against an actual 2.875%.
 - **Status:** open.
 ## FIXED
+
+### A bracket's own solved weight never reached a trade when the retained and active lower brackets shared a maturity year
+
+- **Found:** 2026-09-26/27, from a forum report ("sells 133 of the Jan 2036 TIPS... 0 italicized")
+  and reproduced live with the poster's actual holdings, then isolated further with a minimal
+  two-CUSIP test file.
+- **Symptom:** the Gap Dur popup correctly solved and displayed three nonzero bracket weights
+  (retained lower / active lower / upper, summing to 1), but the trade table showed no buy at all for
+  the active lower bracket, and the retained lower bracket's own excess-quantity drill popup reported
+  the *active* bracket's weight instead of its own.
+- **Root cause, three sites, one shape:** the per-year trade loop's `targetCUSIP` resolution, the
+  `newLowerExcessCost3` summary figure, the LMI-credit allocator (`excessLMIAllocFor`), and the
+  `excessQtyAfter` drill popup in `drill.js` all picked a bracket role by comparing a row's
+  **maturity year** against `brackets.lowerYear` / `newLowerYear` / `upperYear`. The retained lower
+  bracket (identified by Excess ARA) and the active lower bracket (canonical, most-recently-issued
+  pre-gap TIPS) can mature in the **same calendar year** — that's the normal shape once a newer 10-year
+  TIPS has been issued since the ladder was last rebalanced — and year alone can't tell the two apart.
+  The drill.js bug had an extra wrinkle: it compared against `summary.lowerYear`, a field that was
+  never actually present on the summary object (the year lives at `summary.brackets.lowerYear`), so
+  that comparison was dead code and every 3-bracket excess row fell through to whichever of the other
+  two weights its year happened to match.
+- **Fix:** `bracketExcessTargetCost` (already CUSIP-keyed) is now read directly instead of via the
+  year-keyed `buySellTargets[newLowerYear]`; the active bracket's own buy is now emitted as its own
+  row (mirroring the existing "vanishing rung" synthetic-row mechanism used elsewhere for a
+  fresh-buy CUSIP with no prior holdings) when it isn't otherwise represented; `excessLMIAllocFor`/
+  `excessCoverageAmt` now take the CUSIP and use it to disambiguate the two brackets when their years
+  coincide; the drill.js weight lookup now keys off `d.cusip` against
+  `summary.brackets.lowerCUSIP` / `summary.newLowerCUSIP`, matching the pattern the `bracketAmtAfter`
+  drill already used correctly a few lines away.
+- **Verified:** all 444 unit tests and all 86 Playwright E2E tests pass. Live-verified against a real
+  two-CUSIP portfolio (Jan 2036 retained / Jul 2036 active / Feb 2040 upper): the active bracket's buy
+  now appears in the trade table (0 → 22 bonds), and the drill popup on the retained row now reports
+  its own weight (0.5320) rather than the active bracket's (0.0885).
+- **Left open, filed separately above:** the DARA value assumed for the gap years (and for a bracket
+  year with no other data to compare against) still uses a flat median over however many years happen
+  to be held, not a shape- or slope-aware estimate consistent with the number of rungs the inference
+  is actually assuming. See "Gap-year (and sparse-ladder) DARA inference uses a flat median" above.
+- **Files:** `src/rebalance-lib.js`, `src/drill.js`. Commit `b31a081`.
 
 ### An unheld year in a ladder with any gap/Future-30Y block threw instead of sizing as a hole
 
