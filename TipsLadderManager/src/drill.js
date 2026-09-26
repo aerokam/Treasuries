@@ -456,9 +456,17 @@ export function buildDrillHTML(d, colKey, summary) {
   } else if (colKey === 'excessQtyAfter') {
     const exQty = d.excessQtyAfter ?? d.excessQty;
     const is3B = summary.bracketMode === '3bracket';
+    // Keyed by CUSIP, not year: the retained and active lower brackets can mature in the SAME
+    // calendar year (3.0 §Bracket Identification Rules), and `summary.lowerYear` was never a real
+    // field on summary in the first place (the year lives at summary.brackets.lowerYear) — that typo
+    // made the first branch below dead code, so every 3-bracket excess row fell through to whichever
+    // of newLowerWeight3/upperWeight3 the fundedYear happened to match, showing the wrong bracket's
+    // weight whenever the retained and active legs shared a year.
     const weight = is3B
-      ? (d.fundedYear === summary.lowerYear ? summary.origLowerWeight : (d.fundedYear === summary.newLowerYear ? summary.newLowerWeight3 : summary.upperWeight3))
-      : (d.fundedYear === summary.lowerYear ? summary.lowerWeight : summary.upperWeight);
+      ? (d.cusip === summary.brackets?.lowerCUSIP ? summary.origLowerWeight
+         : d.cusip === summary.newLowerCUSIP ? summary.newLowerWeight3
+         : summary.upperWeight3)
+      : (d.cusip === summary.brackets?.lowerCUSIP ? summary.lowerWeight : summary.upperWeight);
     const targetExCost = (summary.gapParams?.totalCost ?? 0) * (weight ?? 0);
     const piPerBond = principalPerBond * (1 + d.coupon / 2 * nPeriods);
 

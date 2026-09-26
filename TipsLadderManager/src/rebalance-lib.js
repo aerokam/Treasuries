@@ -431,7 +431,14 @@ export function getGapYearBracketCandidates(tipsMap, lastYear = Infinity) {
 
 // Turn the raw ARA map into a per-year DARA map. Only suppress ARA > 1.5× median for
 // bracket-candidate years (adjacent to structural gaps); non-bracket years keep full ARA.
-export function derivePerYearDara(araByYear, bracketCandidates = new Set()) {
+// `gapYears` (structural gap years, 2037-2039) have no TIPS of their own, so their raw ARA is
+// just the bare LMI dripping down from later bonds — nowhere near a real funding target. They
+// take the funded-year median instead (3.0 §Per-Year DARA from Portfolio step 2, same rule the
+// on-screen mirror in index.html applies). Without this, a caller feeding this map straight into
+// calculateGapParameters sizes the gap years' synthetic quantities off that tiny raw ARA instead
+// of the intended target, collapsing the whole gap block's total cost and, with it, both
+// brackets' excess.
+export function derivePerYearDara(araByYear, bracketCandidates = new Set(), gapYears = new Set()) {
   const vals = Object.values(araByYear).filter(v => v > 0);
   if (vals.length === 0) return { median: 0, daraMap: new Map(), autoCappedYears: new Set() };
   const sorted = [...vals].sort((a, b) => a - b);
@@ -440,7 +447,10 @@ export function derivePerYearDara(araByYear, bracketCandidates = new Set()) {
   const autoCappedYears = new Set();
   for (const [y, ara] of Object.entries(araByYear)) {
     const year = parseInt(y);
-    if (bracketCandidates.has(year) && ara > 1.5 * median) {
+    if (gapYears.has(year)) {
+      daraMap.set(year, Math.round(median));
+      autoCappedYears.add(year);
+    } else if (bracketCandidates.has(year) && ara > 1.5 * median) {
       daraMap.set(year, Math.round(median));
       autoCappedYears.add(year);
     } else {
@@ -1231,21 +1241,26 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
   // The AMD net-out and intra-block add-back make the cover total read ≈ N×DARA (Rev 6). amdLifetime
   // is keyed by bracket year and scaled by qty over that cover's own target excess (both Future-30Y
   // covers populated; gap brackets are near par). Spec: 2.0 §Excess Amount (Bracket / Cover Display).
-  function excessLMIAllocFor(year) {   // weight × block coupon add-back (gap or future-30Y), per bracket year
+  function excessLMIAllocFor(year, cusip = null) {   // weight × block coupon add-back (gap or future-30Y), per bracket year
     if (future30yYears.length > 0 && year === future30yUpperYear)        return future30yUpperWeight * future30yLMITotal;
     if (future30yYears.length > 0 && year === future30yLowerYear)        return future30yLowerWeight * future30yLMITotal;
     if (gapYears.length > 0 && year === brackets.upperYear)              return upperWeight * (gapParams?.gapLMITotal ?? 0);
+    // The retained and active lower brackets can mature in the SAME calendar year (3.0 §Bracket
+    // Identification Rules) — when they do, year alone can't tell them apart, only the CUSIP can.
+    if (gapYears.length > 0 && is3Bracket && year === newLowerYear && year === brackets.lowerYear) {
+      return (cusip === newLowerCUSIP ? newLowerWeight3 : (origLowerWeight ?? 0)) * (gapParams?.gapLMITotal ?? 0);
+    }
     if (gapYears.length > 0 && is3Bracket && year === newLowerYear)      return lowerWeight * (gapParams?.gapLMITotal ?? 0);
     if (gapYears.length > 0 && year === brackets.lowerYear)              return (is3Bracket ? (origLowerWeight ?? 0) : lowerWeight) * (gapParams?.gapLMITotal ?? 0);
     return 0;
   }
-  function excessCoverageAmt(year, exQty, piPB) {
+  function excessCoverageAmt(year, exQty, piPB, cusip = null) {
     if (!(exQty > 0)) return 0;
     const amdFull = amdLifetimeByBracketYear.get(year) ?? 0;   // lifetime AMD at this cover's TARGET excess
     const targetExQty = year === future30yUpperYear ? future30yUpperExQty
                       : year === future30yLowerYear ? future30yLowerExQty : 0;   // own denominator per cover
     const amdScaled = targetExQty > 0 ? amdFull * exQty / targetExQty : 0;
-    return exQty * piPB - amdScaled + excessLMIAllocFor(year);
+    return exQty * piPB - amdScaled + excessLMIAllocFor(year, cusip);
   }
 
   let rebalYearSet = new Set();
@@ -1787,7 +1802,12 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
     const nlBond = tipsMap.get(newLowerCUSIP);
     newLowerCostPerBond3 = (nlBond?.price ?? 0) / 100 * (calcIndexRatio(refCPI, nlBond?.datedDateRefCpi ?? refCPI)) * 1000;
     newLowerPreviousExcessCost3 = Math.max(0, (yearInfo[newLowerYear]?.holdings?.find(h=>h.cusip===newLowerCUSIP)?.qty ?? 0) - (bracketTargetFundedYearQtyBefore[newLowerYear] ?? 0)) * newLowerCostPerBond3;
-    newLowerExcessCost3 = ((buySellTargets[newLowerYear]?.postRebalQty ?? 0) - (buySellTargets[newLowerYear]?.targetFundedYearQty ?? 0)) * newLowerCostPerBond3;
+    // Read the active bracket's own solved target directly (CUSIP-keyed, set at the bracketWeightsN
+    // solve above) rather than buySellTargets[newLowerYear] — when the active bracket's year
+    // coincides with the retained bracket's own year (both mature in the same calendar year),
+    // buySellTargets[newLowerYear] holds the RETAINED CUSIP's target, not the active one's, and this
+    // read the wrong bracket's numbers.
+    newLowerExcessCost3 = bracketExcessTargetCost[newLowerCUSIP] ?? 0;
   }
   
   const totalPreviousExcessCost = lowerPreviousExcessCost + upperPreviousExcessCost + newLowerPreviousExcessCost3;
@@ -1918,9 +1938,9 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
       isGapBracket: gapYears.length > 0 && (h.year === brackets.lowerYear || h.year === brackets.upperYear || (is3Bracket && h.year === newLowerYear)),
       excessQtyBefore: reallocExcessBefore, excessQtyAfter: exA,
       reallocFundedBefore, reallocExcessBefore, fundedYearQtyDelta, excessQtyDelta,
-      excessAmtBefore: excessCoverageAmt(h.year, reallocExcessBefore, piPB),
-      excessAmtAfter:  excessCoverageAmt(h.year, exA, piPB),
-      excessLMIAlloc:  excessLMIAllocFor(h.year),
+      excessAmtBefore: excessCoverageAmt(h.year, reallocExcessBefore, piPB, h.cusip),
+      excessAmtAfter:  excessCoverageAmt(h.year, exA, piPB, h.cusip),
+      excessLMIAlloc:  excessLMIAllocFor(h.year, h.cusip),
       excessLMI_Before: excessLMI_B, excessLMI_After: excessLMI_A,
       araBeforeTotal:    isLast ? aB : null, araAfterTotal:    isLast ? aA : null,
       araBeforePrincipal:   isLast ? (beforeARABreakdown[h.year]?.principal   ?? 0) : null,
@@ -2002,8 +2022,8 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
       reallocFundedBefore: 0, reallocExcessBefore: 0,
       fundedYearQtyDelta: bst.targetFundedYearQty, excessQtyDelta: exA,
       excessAmtBefore: 0,
-      excessAmtAfter:  excessCoverageAmt(bYear, exA, piPB),
-      excessLMIAlloc:  excessLMIAllocFor(bYear),
+      excessAmtAfter:  excessCoverageAmt(bYear, exA, piPB, bst.targetCUSIP),
+      excessLMIAlloc:  excessLMIAllocFor(bYear, bst.targetCUSIP),
       excessLMI_Before: 0, excessLMI_After: excessLMI,
       araBeforeTotal: araB, araAfterTotal: araA,
       araBeforePrincipal: 0, araBeforeOwnCoupon: 0, araBeforeLaterMatInt: lmiBefore,
@@ -2111,6 +2131,72 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
     const ri2 = details.findIndex(d => d.fundedYear > bYear);
     if (ri2 >= 0) { results.splice(ri2, 0, newResult); details.splice(ri2, 0, newDetail); }
     else { results.push(newResult); details.push(newDetail); }
+  }
+
+  // Emit the active lower bracket's own buy when its maturity year coincides with the retained
+  // bracket's own year (2.0 §Retained Bracket Excess; 3.0 §Bracket Identification Rules). The
+  // per-year loop above can only assign one CUSIP to a bracket year's `targetCUSIP` slot, and that
+  // slot stays on the retained CUSIP (brackets.lowerCUSIP) so its own excess/funded split keeps
+  // working. When the active lower bracket (newLowerCUSIP) happens to mature in that SAME
+  // calendar year, its own solved share (bracketExcessTargetCost[newLowerCUSIP], from
+  // bracketWeightsN) never gets a row anywhere — the same "vanishing rung" gap the two loops
+  // above exist for, one layer down: two CUSIPs sharing one year instead of a CUSIP with no prior
+  // holdings.
+  if (is3Bracket && newLowerYear === brackets.lowerYear && newLowerCUSIP
+      && !(yearInfo[newLowerYear]?.holdings ?? []).some(h => h.cusip === newLowerCUSIP)) {
+    const nlBond = tipsMap.get(newLowerCUSIP);
+    const exA = newLowerCostPerBond3 > 0 ? Math.max(0, Math.round((bracketExcessTargetCost[newLowerCUSIP] || 0) / newLowerCostPerBond3)) : 0;
+    if (nlBond?.maturity && exA > 0) {
+      const bYear = newLowerYear;
+      const ir = calcIndexRatio(refCPI, nlBond.datedDateRefCpi ?? refCPI);
+      const piPB = calculatePIPerBond(newLowerCUSIP, nlBond.maturity, refCPI, tipsMap);
+      const m = nlBond.maturity.getMonth() + 1;
+      const araB = beforeARAByYear[bYear] ?? 0;
+      const araA = postARAByYear[bYear] ?? 0;
+      const rowDARA = daraByYear?.get(bYear) ?? DARA;
+      const excessLMI = exA * 1000 * ir * (nlBond.coupon ?? 0);
+      const targetCost = exA * newLowerCostPerBond3;
+
+      const newDetail = {
+        cusip: newLowerCUSIP, maturityStr: fmtDate(nlBond.maturity), fundedYear: bYear,
+        coupon: nlBond.coupon, yield: nlBond.yield, saYield: nlBond.saYield ?? null, price: nlBond.price, datedDateRefCpi: nlBond.datedDateRefCpi, refCPI, indexRatio: ir,
+        principalPerBond: 1000 * ir, costPerBond: newLowerCostPerBond3, DARA: rowDARA,
+        qtyBefore: 0, qtyAfter: exA,
+        fundedYearQtyBefore: 0, fundedYearQtyAfter: 0,
+        isBracketTarget: true, isFuture30yCover: false, isGapBracket: true,
+        excessQtyBefore: 0, excessQtyAfter: exA,
+        reallocFundedBefore: 0, reallocExcessBefore: 0,
+        fundedYearQtyDelta: 0, excessQtyDelta: exA,
+        excessAmtBefore: 0,
+        excessAmtAfter: excessCoverageAmt(bYear, exA, piPB, newLowerCUSIP),
+        excessLMIAlloc: excessLMIAllocFor(bYear, newLowerCUSIP),
+        excessLMI_Before: 0, excessLMI_After: excessLMI,
+        // This row never carries the year's aggregate totals — the retained CUSIP's row (already
+        // emitted by the main loop, same as every non-last row there) owns those.
+        araBeforeTotal: null, araAfterTotal: null,
+        araBeforePrincipal: null, araBeforeOwnCoupon: null, araBeforeLaterMatInt: null, araBeforeHoldings: null,
+        araAfterPrincipal: null, araAfterOwnCoupon: null, araAfterLaterMatInt: null, araAfterHoldings: null,
+        preLadderCreditForYear: null, preLadderCreditForYearBefore: null,
+        future30yUpperAnnualAmd: null, future30yUpperAnnualAmdBefore: null,
+        future30yRollCoupon: null, future30yRollCouponBefore: null,
+        availableCashCredit: null, availableCashCreditBefore: null,
+        nPeriods: m < 7 ? 1 : 2,
+        mDuration: (nlBond?.yield != null) ? calculateMDuration(settlementDate, nlBond.maturity, nlBond.coupon ?? 0, nlBond.yield) : 0,
+      };
+      const fundedPI_A = 0;
+      const newResult = [
+        newLowerCUSIP, 0, fmtDate(nlBond.maturity), bYear,
+        0, 0, 0, 0,
+        exA, exA, targetCost, -targetCost,
+        araB, araB - rowDARA, araA, araA - rowDARA, 0, exA * piPB,
+        yearLaterMatIntSnapshot[bYear] ?? 0, // Trace: Incoming LMI
+        excessLMI, // Trace: Same-year excess interest
+        fundedPI_A  // Trace: Funded P+I
+      ];
+      const ri3 = details.findIndex(d => d.fundedYear > bYear);
+      if (ri3 >= 0) { results.splice(ri3, 0, newResult); details.splice(ri3, 0, newDetail); }
+      else { results.push(newResult); details.push(newDetail); }
+    }
   }
 
   // Emit display rows for canonical ladder rungs that are FULLY COVERED — zeroed by PLI, or by
@@ -2261,7 +2347,8 @@ export function runFundedRebalance({
       // sized it as a full rung at the scalar DARA -- a phantom buy the search then read as "excess
       // to fund" and sold the rest of the ladder down to pay for (3.0 §Funding the rebalance).
       const rawARA = computePortfolioARAByYear(holdings, tipsMap, refCPI, { firstYear: result.summary.firstYear, lastYear: result.summary.lastYear });
-      ({ daraMap } = derivePerYearDara(rawARA, getGapYearBracketCandidates(tipsMap, result.summary.lastYear)));
+      const _gapYearsInRange = new Set(getGapYears(tipsMap).filter(y => y >= result.summary.firstYear && y <= result.summary.lastYear));
+      ({ daraMap } = derivePerYearDara(rawARA, getGapYearBracketCandidates(tipsMap, result.summary.lastYear), _gapYearsInRange));
       correctCoverIncome = true;
     }
     try {
