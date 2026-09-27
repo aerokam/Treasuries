@@ -5,7 +5,7 @@ import { bondCalcs, calculateMDuration, yieldFromPrice, calcMktWtdAvg } from '..
 import { indexRatio as calcIndexRatio } from '../../shared/src/ref-cpi.js';
 export { yieldFromPrice };
 import { interpolateYield, syntheticCoupon, bracketWeights, bracketWeightsN, excessAmdSchedule, gapParamsWithUpperFeedback, future30yParamsCore } from './gap-math.js';
-import { findSpikes, mean, MIN_SHAPE_POINTS, inferShapeValue } from './shape-math.js';
+import { findSpikes, evenSpread, MIN_SHAPE_POINTS, inferShapeValue } from './shape-math.js';
 import { sizeLadder, selectLadderBonds, fundedYearAmount, sizeFuture30yCover, rmdCappedRemainingCoupons, latestRemainingCouponDate, maxLastYear } from './ladder-core.js';
 import { localDate, fmtDate, fmtDateLong, toDateStr } from './date-util.js';
 import { rankForYear, levelValues } from './allocation-policy.js';
@@ -443,11 +443,14 @@ export function getGapYearBracketCandidates(tipsMap, lastYear = Infinity) {
 //
 // Below MIN_SHAPE_POINTS held points (excluding the gap years themselves, which have no point of
 // their own to fit against) there's no shape to read at all — both the bracket-candidate check and
-// the gap-year fill fall back to the flat mean of the held years, same as before this only ever
-// used a single median (Task 2, 3.0 §Per-Year DARA from Portfolio). The bracket-candidate fallback
-// keeps the original 1.5x margin (a separate, deliberately conservative constant from the shape
-// replacement itself, unchanged here) so a low-data mirror isn't more eager to auto-cap a rung
-// than it was before.
+// the gap-year fill fall back to `evenSpread`: every known value's total, spread evenly across the
+// assumed rung span (min to max year, inclusive — NOT just the count of held points), same as
+// before this only ever used a single median (Task 2, 3.0 §Per-Year DARA from Portfolio). Two
+// holdings bracketing a 3-year gap represent five rungs' worth of income between them, not two —
+// dividing by the held-point count instead of the span is the same "borrowing" bug this whole
+// feature replaces, one level removed. The bracket-candidate fallback keeps the original 1.5x
+// margin (a separate, deliberately conservative constant from the shape replacement itself,
+// unchanged here) so a low-data mirror isn't more eager to auto-cap a rung than it was before.
 export function derivePerYearDara(araByYear, bracketCandidates = new Set(), gapYears = new Set()) {
   const entries = Object.entries(araByYear).map(([y, v]) => [parseInt(y, 10), v]);
   const positive = entries.filter(([, v]) => v > 0);
@@ -458,7 +461,9 @@ export function derivePerYearDara(araByYear, bracketCandidates = new Set(), gapY
   const shapeEntries = positive.filter(([y]) => !gapYears.has(y)).sort((a, b) => a[0] - b[0]);
   const shapeYears = shapeEntries.map(([y]) => y);
   const shapeValues = shapeEntries.map(([, v]) => v);
-  const flatMean = mean(shapeValues) ?? legacyMedian;
+  const allYears = entries.map(([y]) => y);
+  const spanCount = allYears.length ? Math.max(...allYears) - Math.min(...allYears) + 1 : 0;
+  const flatShare = evenSpread(shapeValues, spanCount) ?? legacyMedian;
   const enoughForShape = shapeValues.length >= MIN_SHAPE_POINTS;
   const spikeByYear = new Map();
   if (enoughForShape) {
@@ -470,12 +475,12 @@ export function derivePerYearDara(araByYear, bracketCandidates = new Set(), gapY
   for (const [year, ara] of entries) {
     if (gapYears.has(year)) {
       const shaped = enoughForShape ? inferShapeValue(shapeYears, shapeValues, year) : null;
-      daraMap.set(year, Math.round(shaped ?? flatMean));
+      daraMap.set(year, Math.round(shaped ?? flatShare));
       autoCappedYears.add(year);
     } else if (bracketCandidates.has(year)) {
-      const isExcess = enoughForShape ? spikeByYear.has(year) : ara > 1.5 * flatMean;
+      const isExcess = enoughForShape ? spikeByYear.has(year) : ara > 1.5 * flatShare;
       if (isExcess) {
-        daraMap.set(year, Math.round(enoughForShape ? spikeByYear.get(year) : flatMean));
+        daraMap.set(year, Math.round(enoughForShape ? spikeByYear.get(year) : flatShare));
         autoCappedYears.add(year);
       } else {
         daraMap.set(year, Math.round(ara));

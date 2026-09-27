@@ -1,5 +1,5 @@
 // shape-math.js -- The shape of a ladder's real cash flow, and the maturity years standing above it.
-// Exports: smoothCurve, findSpikes, mean, MIN_SHAPE_POINTS, inferShapeValue
+// Exports: smoothCurve, findSpikes, mean, evenSpread, MIN_SHAPE_POINTS, inferShapeValue
 //
 // A ladder's ARA plotted against maturity year is a curve with humps and dips, and a maturity year
 // holding excess TIPS shows as a spike departing from it. Comparing each year against a single
@@ -99,18 +99,32 @@ export function findSpikes(values, { width = 5, k = 4 } = {}) {
   return found.sort((a, b) => a.index - b.index);
 }
 
-// Arithmetic mean. The fallback baseline when a series is too short to fit a shape from at all —
-// a held-year MEDIAN over 2-4 points can degenerate to picking one of the raw values outright
-// (e.g. n=2 picks the larger one under this codebase's "sorted[floor(n/2)]" median convention),
-// which reads as one bracket year borrowing the other's raw number rather than an actual estimate.
+// Arithmetic mean.
 export function mean(arr) {
   if (!arr.length) return null;
   return arr.reduce((a, b) => a + b, 0) / arr.length;
 }
 
+// The fallback baseline when a series is too short to fit a shape from at all: every known
+// value's TOTAL, spread evenly across `spanCount` — the number of rungs the inference is actually
+// assuming, which is NOT the same as the number of known points. A held bracket year's ARA is
+// income meant to duration-match coverage across the gap it sits next to, not just its own single
+// rung, so two holdings bracketing a 3-year gap (5 rungs total, e.g. 2036 and 2040 around
+// 2037-2039) represent five rungs' worth of income between them, not two. Dividing their sum by 2
+// (a plain `mean`) reads as one bracket year borrowing the other's raw number nearly outright;
+// dividing by the assumed 5 puts every rung's guess in the ballpark the self-financing scale
+// (§Funding the rebalance) actually converges to, rather than something the scale then has to
+// correct by more than half. A held-year MEDIAN over 2-4 points has the same borrowing problem
+// under this codebase's "sorted[floor(n/2)]" convention (n=2 picks the larger value outright) —
+// this replaces that too, not just a plain mean.
+export function evenSpread(arr, spanCount) {
+  if (!arr.length || !spanCount) return null;
+  return arr.reduce((a, b) => a + b, 0) / spanCount;
+}
+
 // Below this many held points, smoothCurve's window covers the whole series and returns it
 // unchanged (see its own `values.length <= 2*h` check at width 5) — there is no shape signal to
-// fit, only a flat number. Callers fall back to `mean` in this regime.
+// fit, only a flat number. Callers fall back to `evenSpread` in this regime.
 export const MIN_SHAPE_POINTS = 5;
 
 // The value implied for a year with NO point of its own in the series at all -- a structural gap
@@ -121,7 +135,7 @@ export const MIN_SHAPE_POINTS = 5;
 //
 // A side only supplies a slope once it has at least two held points on it -- one point is a
 // number, not a rate of change. When neither side has two points there is no shape signal at all,
-// and the caller should fall back to the flat `mean` instead (3.0 §Per-Year DARA from Portfolio).
+// and the caller should fall back to `evenSpread` instead (3.0 §Per-Year DARA from Portfolio).
 //
 // `years`/`values` must be the same length, sorted ascending by year, holding only genuine data
 // points (a gap year's own bare LMI trickle must already be excluded by the caller, or it would

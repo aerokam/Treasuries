@@ -17,7 +17,7 @@
 import { bondCalcs } from '../../shared/src/bond-math.js';
 import { fmtDate } from './date-util.js';
 import { computePortfolioARAByYear, getGapYears } from './rebalance-lib.js';
-import { findSpikes, mean, MIN_SHAPE_POINTS } from './shape-math.js';
+import { findSpikes, evenSpread, MIN_SHAPE_POINTS } from './shape-math.js';
 
 export const LOWEST_LOWER_BRACKET_YEAR = 2032;
 export const UPPER_BRACKET_YEAR = 2040;
@@ -104,35 +104,52 @@ export function detectBracketFlags({ heldARAByYear, tipsMap, lastYear }) {
   // excluding-itself median: a year stands out (or doesn't) against the ladder's own shape, and
   // its filled-in DARA is the curve's own value there. Below MIN_SHAPE_POINTS held years,
   // smoothCurve/findSpikes have no shape to fit at all (see shape-math.js), so detection falls
-  // back to the same "exceeds the OTHER held years' baseline" comparison this replaces, with the
-  // mean substituted for the median (a held-year median over 2-4 points can degenerate to picking
-  // one of the raw values outright).
+  // back to `evenSpread`: every held year's total, spread across the assumed rung span (min to
+  // max held year, inclusive) rather than just the count of held points — two holdings bracketing
+  // a 3-year gap represent five rungs' worth of income between them, not two, so a held year is
+  // excess when it exceeds that fair SHARE, not when it exceeds the other held years' own raw
+  // average (which only ever flags the larger of two, arbitrarily, even though a sparse ladder's
+  // real deficiency is that BOTH holdings are large relative to a single rung's fair share).
   const orderedYears = [...heldYears].sort((a, b) => a - b);
   const orderedValues = orderedYears.map(y => heldARAByYear[y]);
   const spikeByYear = new Map();
   if (orderedValues.length >= MIN_SHAPE_POINTS) {
     for (const s of findSpikes(orderedValues)) spikeByYear.set(orderedYears[s.index], { value: s.curve, excess: s.excess });
   } else {
-    for (let i = 0; i < orderedYears.length; i++) {
-      const others = orderedValues.filter((_, j) => j !== i);
-      const m = mean(others);
-      if (m != null && orderedValues[i] > m) spikeByYear.set(orderedYears[i], { value: m, excess: orderedValues[i] - m });
+    const spanCount = orderedYears.length ? orderedYears[orderedYears.length - 1] - orderedYears[0] + 1 : 0;
+    const fairShare = evenSpread(orderedValues, spanCount);
+    if (fairShare != null) {
+      for (let i = 0; i < orderedYears.length; i++) {
+        if (orderedValues[i] > fairShare) spikeByYear.set(orderedYears[i], { value: fairShare, excess: orderedValues[i] - fairShare });
+      }
     }
   }
 
   // Lower bracket (2032-2035, i.e. below the Active Lower Bracket year — the active bracket
   // itself, e.g. 2036 today, is never a candidate; see getLowerBracketCandidateYears): keep only
-  // the one with the HIGHEST excess when more than one candidate is a spike — the real engine
-  // (`identifyBrackets`) still only ever acts on a single cross-year retained maturity
-  // (RETAINED_BRACKET_TODO.md item 2, not yet generalized), so the preview flags at most one too,
-  // to keep from showing an excess the engine wouldn't honor at Run. Ties (astronomically unlikely
-  // with real dollar ARAs) fall back to latest-maturing as a deterministic last resort.
+  // ONE when more than one candidate is a spike — the real engine (`identifyBrackets`) still only
+  // ever acts on a single cross-year retained maturity (RETAINED_BRACKET_TODO.md item 2, not yet
+  // generalized), so the preview flags at most one too, to keep from showing an excess the engine
+  // wouldn't honor at Run.
+  //
+  // EARLIEST wins unless a later candidate's excess is clearly (>5%) larger — not simply "highest
+  // excess wins". A retained bracket is conceptually the OLDER position left over once a newer
+  // active bracket rolled forward, so on a near-tie the earlier year is the more natural read, and
+  // two real, independently-genuine excess years (e.g. from raising a later maturity's holding
+  // on top of an already-excess earlier one) can land within a percent or two of each other —
+  // "highest excess wins" picked whichever grew first by a rounding-scale margin, which reversed
+  // what a real user reading the DARA column could plainly see was the earlier year's spike (that
+  // year keeps its own, much larger, raw ARA on screen since it lost the flag; the winner instead
+  // shows its curve guess, which looks unremarkable next to it). This is a re-tightening of the
+  // SAME rule an earlier revision of this module got wrong from the other side: a plain
+  // "latest-maturing wins" picked the wrong year outright when one candidate's excess was clearly
+  // larger, not merely a rounding-scale margin apart — "clearly larger" is the difference that
+  // still overrides earliest-wins here.
   if (minGap != null && lastYear >= minGap) {
     const lowerCandidates = getLowerBracketCandidateYears(tipsMap).filter(y => heldYears.has(y));
     const exceeding = lowerCandidates.filter(y => spikeByYear.has(y)).map(y => ({ year: y, ...spikeByYear.get(y) }));
     if (exceeding.length > 0) {
-      const chosen = exceeding.reduce((a, b) =>
-        b.excess > a.excess ? b : (b.excess === a.excess && b.year > a.year ? b : a));
+      const chosen = exceeding.reduce((best, cur) => cur.excess > best.excess * 1.05 ? cur : best);
       flags.set(chosen.year, { value: chosen.value, excess: chosen.excess });
     }
   }

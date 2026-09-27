@@ -2022,22 +2022,55 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
   assert('before-state: single-candidate flag count === 1', flags.size, 1);
 }
 
+// (b) Degenerate two-holding case: two bracket years bracketing a 3-year gap (5 rungs total)
+// represent five rungs' worth of income between them, not two — the flat fallback (below
+// MIN_SHAPE_POINTS) must divide their combined total by the assumed 5-rung span, not by the
+// 2 held points, or it collapses back to one bracket year borrowing the other's raw number
+// (the original reported bug this whole feature exists to fix). Expected values computed by
+// hand from the two real ARA figures, not read back from evenSpread/detectBracketFlags.
+{
+  const holdings = [
+    { cusip: '91282CPU9', qty: 218 }, // Jan 2036
+    { cusip: '912810QF8', qty: 129 }, // Feb 2040
+  ].filter(h => tipsMap.has(h.cusip));
+  const heldARA = computePortfolioARAByYear(holdings, tipsMap, refCPI);
+  const ara2036 = heldARA[2036], ara2040 = heldARA[2040];
+  const fairShare = (ara2036 + ara2040) / 5; // 2036..2040 inclusive = 5 rungs
+
+  const flags = detectBracketFlags({ heldARAByYear: heldARA, tipsMap, lastYear: 2040 });
+  assert('two-holding: 2036 flags (its ARA exceeds the 5-rung fair share)', flags.has(2036), true);
+  assert('two-holding: 2040 ALSO flags (its ARA exceeds the fair share too, not just the larger of the two)', flags.has(2040), true);
+  assert('two-holding: flagged value is the 5-rung fair share, not a 2-point average', Math.round(flags.get(2036).value), Math.round(fairShare));
+
+  const gapYears = new Set(getGapYears(tipsMap).filter(y => y > 2036 && y < 2040));
+  const rangeARA = computePortfolioARAByYear(holdings, tipsMap, refCPI, { firstYear: 2036, lastYear: 2040 });
+  const { daraMap } = derivePerYearDara(rangeARA, getGapYearBracketCandidates(tipsMap, 2040), gapYears);
+  for (const y of [2037, 2038, 2039]) {
+    assert(`two-holding: gap year ${y} DARA is the 5-rung fair share`, Math.round(daraMap.get(y)), Math.round(fairShare));
+  }
+  console.log(`        fair share (5 rungs): ${Math.round(fairShare).toLocaleString()}  (vs. a 2-point average of ${Math.round((ara2036 + ara2040) / 2).toLocaleString()})`);
+}
+
 // (b) N-candidate case where MORE THAN ONE lower-candidate year is a genuine spike against the
-// ladder's own shape (ruling 1): only the highest-excess one is flagged, since `identifyBrackets`
-// still only ever acts on a single cross-year retained maturity (RETAINED_BRACKET_TODO.md item 2).
-// A hand-built two-value holdings array can't exercise this — with only 5-8 points and two of them
-// the spikes, there isn't enough of a stable baseline for the curve to resist the rise into them
-// (this is the run-of-spikes-on-a-slope failure mode shape-math.js's own header comment describes).
-// tests/dev/RetainedExcessTwoYears.csv is a full real ladder (SampleHoldings.csv with Jul 2035
-// raised) where 2034 AND 2035 are both independently confirmed spikes (shape-math test above), so
-// this is the case to prove the "highest excess wins" tie-break against, not a synthetic stand-in.
+// ladder's own shape (ruling 1): only one is flagged, since `identifyBrackets` still only ever
+// acts on a single cross-year retained maturity (RETAINED_BRACKET_TODO.md item 2). Which one is
+// EARLIEST unless a later candidate's excess is clearly (>5%) larger, not simply "highest excess
+// wins" — tests/dev/RetainedExcessTwoYears.csv (SampleHoldings.csv with Jul 2035 raised) is the
+// real-world case that showed why: 2034's own excess (10,901) and 2035's (11,401) land within ~5%
+// of each other, both independently confirmed spikes (shape-math test above), and a user reading
+// the DARA column plainly sees 2034 as the outlier (it keeps its own much larger raw ARA on
+// screen since it isn't the one flagged) — "highest excess wins" flagged 2035 instead, on a
+// rounding-scale margin, which read as backwards. A hand-built two-value array can't exercise
+// this (too few points for the curve to resist the rise into two adjacent spikes at all — the
+// run-of-spikes-on-a-slope failure mode shape-math.js's own header comment describes), so this
+// real fixture is the case to prove the tie-break against, not a synthetic stand-in.
 {
   const csv = readFileSync(new URL('./dev/RetainedExcessTwoYears.csv', import.meta.url), 'utf8');
   const holdings = parseHoldings(csv);
   const heldARA = computePortfolioARAByYear(holdings, tipsMap, refCPI);
   const flags = detectBracketFlags({ heldARAByYear: heldARA, tipsMap, lastYear: 2056 });
-  assert('before-state: two lower-candidate spikes (2034, 2035) → only the higher-excess one flagged', flags.has(2034), false);
-  assert('before-state: 2035 (the higher-excess of the two) is the one flagged', flags.has(2035), true);
+  assert('before-state: two near-tied lower-candidate spikes (2034, 2035) → the EARLIER one is flagged', flags.has(2034), true);
+  assert('before-state: 2035 (barely higher excess, but not clearly so) is NOT the one flagged', flags.has(2035), false);
 }
 
 // ── Within-Year Allocation Policy (2.0 §Within-Year Allocation Policy; the E invariant) ───────

@@ -703,7 +703,7 @@ import { buildTipsMapFromYields, localDate, runFundedRebalance, inferScaledDARAF
 // a holdings-valuation computation, architecturally decoupled from the runRebalance/
 // runFundedRebalance engine imported above. Never calls into it.
 import { computeBeforeState, detectBracketFlags, UPPER_BRACKET_YEAR, FUTURE30Y_COVER_YEARS } from './src/before-state-lib.js';
-import { mean, inferShapeValue } from './src/shape-math.js';
+import { evenSpread, inferShapeValue } from './src/shape-math.js';
 import { runBuild } from './src/build-lib.js';
 import { maxLastYear } from './src/ladder-core.js';
 import { renderTable, COLS } from './src/render.js';
@@ -2832,20 +2832,23 @@ function _initRebalDaraFromPortfolio() {
   // curve instead — extending whichever neighboring held year's local slope is NEARER, so a
   // genuine step in the ladder's shape (e.g. DARA dropping once Social Security starts) reflects
   // the step rather than blending across it (3.0 §Per-Year DARA from Portfolio; shape-math.js
-  // inferShapeValue). Falls back to the flat mean of the held years when there aren't enough
-  // points on either side to read a slope from at all. Other empty in-range years take their
-  // current ARA (the LMI dripping down from longer TIPS).
+  // inferShapeValue). Falls back to `evenSpread` (every held year's total, spread across the
+  // assumed rung span from the earliest to the latest held year — NOT just the held-point count;
+  // two holdings bracketing a 3-year gap represent five rungs' worth of income between them, not
+  // two) when there aren't enough points on either side to read a slope from at all. Other empty
+  // in-range years take their current ARA (the LMI dripping down from longer TIPS).
   const gapYearSet = new Set(getGapYears(tipsMap));
   const heldYearsOrdered = Object.keys(heldARA).map(Number).sort((a, b) => a - b);
   const heldValuesOrdered = heldYearsOrdered.map(y => heldARA[y]);
-  const heldMean = mean(heldValuesOrdered);
+  const heldSpanCount = heldYearsOrdered.length ? heldYearsOrdered[heldYearsOrdered.length - 1] - heldYearsOrdered[0] + 1 : 0;
+  const heldFairShare = evenSpread(heldValuesOrdered, heldSpanCount);
   const store = new Map();
   for (let y = firstYear; y <= lastYear; y++) {
     if (flags.has(y)) {
       store.set(y, Math.round(flags.get(y).value));
     } else if (gapYearSet.has(y)) {
       const shaped = inferShapeValue(heldYearsOrdered, heldValuesOrdered, y);
-      store.set(y, Math.round(shaped ?? heldMean ?? median));
+      store.set(y, Math.round(shaped ?? heldFairShare ?? median));
       _bracketAutoCapYears.add(y);
     } else {
       store.set(y, Math.round(fullARA[y] ?? 0));
