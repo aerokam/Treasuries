@@ -69,6 +69,7 @@ const TERMS = {
   'view selections': 'view-selections', 'axis scales': 'axis-scales', 'drill request': 'drill-request',
   'charts and tables': 'charts-and-tables', 'drill popup': 'drill-popup',
   'live quotes': 'live-quotes', 'yield series': 'yield-series', 'day change': 'day-change',
+  'TIPS map': 'tips-map',
   'SA yield series': 'sa-yield-series',
 };
 const unlinked = new Set();
@@ -1008,22 +1009,15 @@ function level3TipsLadderManagerLoadMarketData() {
     { id: 'm4', name: ['fidelity-', 'parse.js'], href: M('m4') },
     { id: 'm1', name: ['csv.js'], href: M('m1') },
   ];
-  // TipsLadderManager has no per-process spec text yet -- that is the next phase, once the
-  // Level 2/3 shape itself is settled -- so every leaf here points at the same placeholder,
-  // its existing pre-template pipeline doc, rather than at raw source through the viewer
-  // (which renders a .js file as if it were markdown, unlike every other spec link in this
-  // portal). TipsLadderManager/knowledge/3.1_Data_Pipeline.md describes process 1's
-  // acquisition jobs, not this runtime fetch, so even this placeholder is a mismatch worth
-  // fixing once real specs are written.
-  const PLACEHOLDER = V('TipsLadderManager/knowledge/3.1_Data_Pipeline.md');
+  const S = a => V('TipsLadderManager/knowledge/4.1_Load_Market_Data.md' + (a ? '#' + a : ''));
   const procs = [
-    { id: '4.1.1', name: ['Fetch and parse', 'market quotes'], href: PLACEHOLDER, reads: ['quotes'], calls: ['m2', 'm3', 'm4'],
-      out: { '4.1.4': ['market data rows'] } },
-    { id: '4.1.2', name: ['Fetch and parse', 'FedInvest prices'], href: PLACEHOLDER, reads: ['fedinv'], calls: ['m1'],
-      out: { '4.1.4': ['market data rows'] } },
-    { id: '4.1.3', name: ['Fetch auxiliary', 'TIPS data'], href: PLACEHOLDER, reads: ['tipsref', 'refcpi', 'sasao', 'hol'], calls: ['m1', 'm2'],
-      out: { '4.1.1': ['TIPS reference data', 'Ref CPI', 'SA yields', 'bond holidays'], '4.1.2': ['TIPS reference data', 'Ref CPI', 'SA yields', 'bond holidays'] } },
-    { id: '4.1.4', name: ['Build the', 'TIPS map'], href: PLACEHOLDER, reads: [], calls: [], out: {} },
+    { id: '4.1.1', name: ['Fetch and parse', 'market quotes'], href: S('fetch-and-parse-market-quotes'), reads: ['quotes'], calls: ['m2', 'm3', 'm4'],
+      out: { '4.1.4': ['TIPS yields'] } },
+    { id: '4.1.2', name: ['Fetch and parse', 'FedInvest prices'], href: S('fetch-and-parse-fedinvest-prices'), reads: ['fedinv'], calls: ['m1'],
+      out: { '4.1.4': ['TIPS yields'] } },
+    { id: '4.1.3', name: ['Fetch auxiliary', 'TIPS data'], href: S('fetch-auxiliary-tips-data'), reads: ['tipsref', 'refcpi', 'sasao', 'hol'], calls: ['m1', 'm2'],
+      out: { '4.1.1': ['TIPS reference data', 'bond holidays'], '4.1.4': ['SA yields'] } },
+    { id: '4.1.4', name: ['Build the', 'TIPS map'], href: S('build-the-tips-map'), reads: [], calls: [], out: {} },
   ];
   const SX = 40, SW = 210, PR = 62, MR = 50, W = 1420, H = 1040;
   const sy = i => 100 + i * 165;
@@ -1054,6 +1048,11 @@ function level3TipsLadderManagerLoadMarketData() {
   const [ox, oy] = fromCircle(px['4.1.4'], py['4.1.4'], PR, W - 12, py['4.1.4']);
   P.push(flow(ox, oy, W - 12, py['4.1.4'], { obstacles: OBS.filter(o => !(o.x === px['4.1.4'] && o.y === py['4.1.4'])) }));
   P.push(labelAt(W - 16, py['4.1.4'] - 8, 'TIPS map  →  4.2 through 4.4', 'end'));
+  // Ref CPI passes through 4.1.3 to the rest of the app directly -- nothing inside 4.1
+  // itself reads it.
+  const [rx, ry] = fromCircle(px['4.1.3'], py['4.1.3'], PR, W - 12, py['4.1.3'] + 40);
+  P.push(flow(rx, ry, W - 12, py['4.1.3'] + 40, { obstacles: OBS.filter(o => !(o.x === px['4.1.3'] && o.y === py['4.1.3'])) }));
+  P.push(labelAt(W - 16, py['4.1.3'] + 32, 'Ref CPI  →  rest of app', 'end'));
   stores.forEach((s, i) => P.push(storeShape(SX, sy(i), SW, s.href, s.name)));
   procs.forEach(p => P.push(procShape(px[p.id], py[p.id], PR, p.href, p.id, p.name)));
   modules.forEach(m => P.push(moduleShape(mx[m.id], my[m.id], MR, m.href, m.id.toUpperCase(), m.name)));
