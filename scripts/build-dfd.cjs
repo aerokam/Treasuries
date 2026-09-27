@@ -169,7 +169,7 @@ const marker = () => `  <defs><marker id="a1" viewBox="0 0 10 10" refX="9" refY=
 // prose everywhere else uses (FedInvest (E1), Market quotes (S7)) — derived from
 // the href's own trailing anchor so every call site gets it with no data change.
 function idSuffix(href) {
-  const m = /#([es])(\d+)$/.exec(href);
+  const m = /#([esm])(\d+)$/.exec(href);
   return m ? ` (${m[1].toUpperCase()}${m[2]})` : '';
 }
 // An external entity, drawn as a box at whichever level the process reading it is
@@ -198,6 +198,20 @@ function procShape(cx, cy, r, href, id, lines, caption) {
     `    <text class="p-id" x="${cx}" y="${top}">${esc(id)}</text>`,
     ...lines.map((ln, k) => `    <text class="p-name" x="${cx}" y="${top + 21 + k * 16}">${esc(ln)}</text>`),
     ...(caption ? [`    <text class="p-app" x="${cx}" y="${cy + r + 17}">${esc(caption)}</text>`] : []),
+    `  </a>`].join(NL);
+}
+// A shared module: a real, independently reusable code file called by two or more sibling
+// processes, drawn as a square (not a circle) so it reads at a glance as something other
+// than a data-transformation step of this pipeline. Registered once in SharedModules.md;
+// every consuming process's own diagram draws its own copy of this shape, all pointing at
+// the identical href, per DFD_Worklist.md §2.0. r is the shape's half-side, so its visual
+// footprint matches a process circle of the same r.
+function moduleShape(cx, cy, r, href, id, lines) {
+  const top = cy - 14 - (lines.length - 1) * 7;
+  return [`  <a class="module" href="${href}">`,
+    `    <rect x="${(cx - r).toFixed(1)}" y="${(cy - r).toFixed(1)}" width="${(r * 2).toFixed(1)}" height="${(r * 2).toFixed(1)}" rx="4"/>`,
+    `    <text class="p-id" x="${cx}" y="${top}">${esc(id)}</text>`,
+    ...lines.map((ln, k) => `    <text class="m-name" x="${cx}" y="${top + 17 + k * 14}">${esc(ln)}</text>`),
     `  </a>`].join(NL);
 }
 // Draws every flow in a model whose processes name their outputs as { target: [labels] }.
@@ -917,7 +931,7 @@ function level2TipsLadderManager() {
     { id: 'hol', name: 'Bond holidays', href: DS('s16') },
   ];
   const procs = [
-    { id: '4.1', name: ['Load market', 'data'], href: V('TipsLadderManager/knowledge/3.1_Data_Pipeline.md'), reads: ['quotes', 'tipsref', 'refcpi', 'sasao', 'hol'],
+    { id: '4.1', name: ['Load market', 'data'], href: 'DFD_LEVEL3_TLM_LOAD.html', reads: ['quotes', 'tipsref', 'refcpi', 'sasao', 'hol'],
       out: { '4.2': ['TIPS map'], '4.3': ['TIPS map'], '4.4': ['TIPS map'] } },
     { id: '4.2', name: ['Import', 'holdings'], href: V('TipsLadderManager/knowledge/2.1_Broker_Import.md'), reads: [],
       out: { '4.3': ['DARA plan'], '4.4': ['holdings', 'DARA plan'] } },
@@ -978,6 +992,84 @@ function level2TipsLadderManager() {
   });
 }
 
+// ── Level 3: TipsLadderManager 4.1 ──────────────────────────────────────────
+function level3TipsLadderManagerLoadMarketData() {
+  const stores = [
+    { id: 'quotes', name: 'Market quotes', href: DS('s7') },
+    { id: 'fedinv', name: 'FedInvest prices', href: DS('s1') },
+    { id: 'tipsref', name: 'TIPS reference data', href: DS('s2') },
+    { id: 'refcpi', name: 'Ref CPI', href: DS('s3') },
+    { id: 'sasao', name: 'SA and SAO yields', href: DS('s10') },
+    { id: 'hol', name: 'Bond holidays', href: DS('s16') },
+  ];
+  const M = a => V('knowledge/SharedModules.md' + (a ? '#' + a : ''));
+  const modules = [
+    { id: 'm2', name: ['settlement.js'], href: M('m2') },
+    { id: 'm3', name: ['bond-math.js'], href: M('m3') },
+    { id: 'm4', name: ['fidelity-', 'parse.js'], href: M('m4') },
+    { id: 'm1', name: ['csv.js'], href: M('m1') },
+  ];
+  // TipsLadderManager has no per-process spec text yet -- that is the next phase, once the
+  // Level 2/3 shape itself is settled -- so every leaf here points at the same placeholder,
+  // its existing pre-template pipeline doc, rather than at raw source through the viewer
+  // (which renders a .js file as if it were markdown, unlike every other spec link in this
+  // portal). TipsLadderManager/knowledge/3.1_Data_Pipeline.md describes process 1's
+  // acquisition jobs, not this runtime fetch, so even this placeholder is a mismatch worth
+  // fixing once real specs are written.
+  const PLACEHOLDER = V('TipsLadderManager/knowledge/3.1_Data_Pipeline.md');
+  const procs = [
+    { id: '4.1.1', name: ['Fetch and parse', 'market quotes'], href: PLACEHOLDER, reads: ['quotes'], calls: ['m2', 'm3', 'm4'],
+      out: { '4.1.4': ['market data rows'] } },
+    { id: '4.1.2', name: ['Fetch and parse', 'FedInvest prices'], href: PLACEHOLDER, reads: ['fedinv'], calls: ['m1'],
+      out: { '4.1.4': ['market data rows'] } },
+    { id: '4.1.3', name: ['Fetch auxiliary', 'TIPS data'], href: PLACEHOLDER, reads: ['tipsref', 'refcpi', 'sasao', 'hol'], calls: ['m1', 'm2'],
+      out: { '4.1.1': ['TIPS reference data', 'Ref CPI', 'SA yields', 'bond holidays'], '4.1.2': ['TIPS reference data', 'Ref CPI', 'SA yields', 'bond holidays'] } },
+    { id: '4.1.4', name: ['Build the', 'TIPS map'], href: PLACEHOLDER, reads: [], calls: [], out: {} },
+  ];
+  const SX = 40, SW = 210, PR = 62, MR = 50, W = 1420, H = 1040;
+  const sy = i => 100 + i * 165;
+  const px = { '4.1.3': 460, '4.1.1': 720, '4.1.2': 720, '4.1.4': 980 };
+  const py = { '4.1.3': 640, '4.1.1': 260, '4.1.2': 940, '4.1.4': 500 };
+  const mx = { m2: 1150, m3: 1150, m4: 1150, m1: 1150 };
+  const my = { m3: 180, m4: 340, m2: 500, m1: 800 };
+  const OBS = [...procs.map(q => ({ x: px[q.id], y: py[q.id], r: PR })), ...modules.map(m => ({ x: mx[m.id], y: my[m.id], r: MR }))];
+  const LBL = [];
+  const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 3: TipsLadderManager 4.1, one process per source fetched, one that assembles the auxiliary TIPS data both sources need, one that builds the TIPS map, and the shared modules each calls into.">`, marker()];
+  const sIdx = Object.fromEntries(stores.map((s, i) => [s.id, i]));
+  procs.forEach(p => p.reads.forEach(id => {
+    const y = sy(sIdx[id]), [x2, y2] = toCircle(SX + SW + 5, y, px[p.id], py[p.id], PR);
+    P.push(flow(SX + SW + 5, y, x2, y2, { obstacles: OBS }));
+  }));
+  P.push(internalFlows(procs, px, py, PR, OBS, LBL));
+  // A module is called, not read: the arrow still points from the module toward the
+  // process, the same direction a store's data takes toward the job reading it, since a
+  // module is a resource a process draws on rather than a data-transformation step of its
+  // own (DFD_Worklist.md §2.0).
+  procs.forEach(p => (p.calls || []).forEach(id => {
+    const [x1, y1] = fromCircle(mx[id], my[id], MR, px[p.id], py[p.id]);
+    const [x2, y2] = toCircle(x1, y1, px[p.id], py[p.id], PR);
+    const others = OBS.filter(o => !(o.x === mx[id] && o.y === my[id]) && !(o.x === px[p.id] && o.y === py[p.id]));
+    P.push(flow(x1, y1, x2, y2, { obstacles: others }));
+  }));
+  // 4.1's own output at Level 2: the TIPS map, leaving 4.1.4 for the rest of the app.
+  const [ox, oy] = fromCircle(px['4.1.4'], py['4.1.4'], PR, W - 12, py['4.1.4']);
+  P.push(flow(ox, oy, W - 12, py['4.1.4'], { obstacles: OBS.filter(o => !(o.x === px['4.1.4'] && o.y === py['4.1.4'])) }));
+  P.push(labelAt(W - 16, py['4.1.4'] - 8, 'TIPS map  →  4.2 through 4.4', 'end'));
+  stores.forEach((s, i) => P.push(storeShape(SX, sy(i), SW, s.href, s.name)));
+  procs.forEach(p => P.push(procShape(px[p.id], py[p.id], PR, p.href, p.id, p.name)));
+  modules.forEach(m => P.push(moduleShape(mx[m.id], my[m.id], MR, m.href, m.id.toUpperCase(), m.name)));
+  P.push('</svg>');
+
+  return page({
+    title: 'TipsLadderManager 4.1 — Level 3', h1: 'Level 3 &mdash; TipsLadderManager 4.1 Load market data', maxWidth: W,
+    up: 'DFD_LEVEL2_TIPSLADDERMANAGER.html', upLabel: 'Level 2 — TipsLadderManager (draft)', svg: P.join(NL),
+    notes: ['  <b>4.1.1 and 4.1.2 are alternatives, not a pipeline.</b> Exactly one runs, chosen by a hardcoded constant (`YIELD_SOURCE` in `shared/src/market-data.js`) rather than by anything the user or the data selects at run time. Today that constant selects 4.1.1: Market quotes (S7) is the live default and FedInvest prices (S1) is a dormant cross-check path (DFD_Worklist.md §3.0 item 7).',
+      '  <b>The squares are shared modules, not process steps.</b> `settlement.js`, `bond-math.js` and `fidelity-parse.js` (4.1.1) and `csv.js` (4.1.2, 4.1.3) are real files called from here and from other processes across the portal — YieldCurves\' 3.1.7/3.1.8 also call bond-math.js, 3.1.2 also calls fidelity-parse.js. Each is registered once in <a href="' + M() + '">SharedModules.md</a>; drilling into any of its other callers reaches the identical spec.',
+      '  <b>4.1.4 is named for what it does, not for the file it lives in.</b> `buildTipsMapFromYields` is exported from `TipsLadderManager/src/rebalance-lib.js`, a name that suggests Rebalance-only logic, but it runs once for every page load — before Build or Rebalance — and neither mode owns it. Worth a code-organization cleanup later (moving it out of rebalance-lib.js); not done here, since this pass is diagrams only.',
+      '  Every 4.1.x href on this diagram is a placeholder pointing at the same pre-template doc (TipsLadderManager has no per-process spec text yet — that is the next phase, once the Level 2/3 shape itself is settled), and that placeholder is itself a mismatch: 3.1_Data_Pipeline.md describes process 1\'s acquisition jobs, not this runtime fetch. The M1-M4 module links are real and final — SharedModules.md is a proper spec already.'].join(NL)
+  });
+}
+
 // ── emit ────────────────────────────────────────────────────────────────────
 const outputs = [
   ['knowledge/DFD_LEVEL1.html', level1()],
@@ -989,6 +1081,7 @@ const outputs = [
   ['knowledge/DFD_LEVEL2_YIELDSMONITOR.html', level2YieldsMonitor()],
   ['knowledge/DFD_LEVEL3_YM_ASSEMBLE.html', level3YieldsMonitorAssemble()],
   ['knowledge/DFD_LEVEL2_TIPSLADDERMANAGER.html', level2TipsLadderManager()],
+  ['knowledge/DFD_LEVEL3_TLM_LOAD.html', level3TipsLadderManagerLoadMarketData()],
 ];
 if (unlinked.size) {
   console.log(String.fromCharCode(10) + "flow labels with no Data Dictionary entry:");

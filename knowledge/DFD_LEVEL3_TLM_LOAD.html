@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TipsLadderManager 4.1 — Level 3</title>
+<style>
+  :root {
+    --bg: #0d0d1a;
+    --border: #2a2a4a;
+    --text: #c0c8e0;
+    --accent: #7070cc;
+    --entity: #1a1a2e;
+    --process: #1a2a4e;
+    --store: #1a2e1a;
+    --flow: #55558c;
+    --flow-text: #8b93b8;
+    --font: 'Segoe UI', system-ui, sans-serif;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    margin: 0;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+  }
+
+  .nav-header {
+    width: 100%;
+    max-width: 1200px;
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 50px;
+    padding: 25px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 30px;
+  }
+  .nav-header a {
+    color: var(--accent);
+    text-decoration: none;
+    font-size: 1.2rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .nav-header a:hover { color: #aaaaff; text-decoration: underline; }
+  .nav-header a.portal-link { font-size: 11px; font-weight: 700; color: #475569; background: #e2e8f0; border: 1px solid #cbd5e1; border-radius: 4px; padding: 2px 10px; text-decoration: none; letter-spacing: 0.02em; text-transform: none; }
+  .nav-header a.portal-link:hover { background: #1e293b; color: #ffffff; border-color: #1e293b; text-decoration: none; }
+
+  h1 {
+    font-size: 1.5rem;
+    font-weight: 300;
+    letter-spacing: 2px;
+    color: var(--accent);
+    margin: 0 0 25px;
+    text-align: center;
+  }
+
+  .diagram { width: 100%; max-width: 1400px; }
+  .diagram svg { width: 100%; height: auto; display: block; }
+
+  /* Shapes */
+  .entity rect {
+    fill: var(--entity);
+    stroke: var(--border);
+    stroke-width: 1;
+  }
+  .entity:hover rect { stroke: var(--accent); }
+  .entity .e-name { fill: #c8d0ea; font-size: 13.5px; }
+  .entity:hover .e-name { fill: #ffffff; }
+
+  .process circle {
+    fill: var(--process);
+    stroke: var(--accent);
+    stroke-width: 2;
+  }
+  .process:hover circle { stroke: #aaaaff; filter: drop-shadow(0 0 12px rgba(112,112,204,0.6)); }
+  .process .p-id { fill: #8fa0d8; font-size: 12px; letter-spacing: 1px; }
+  .process .p-name { fill: #eef0ff; font-size: 15px; font-weight: 600; }
+
+  /* A module: a shared code file called by two or more sibling processes, drawn as a
+     square rather than a circle so it reads as "not a data-transformation step of this
+     pipeline" at a glance (DFD_Worklist.md §2.0, knowledge/SharedModules.md). Reuses the
+     process label classes (.p-id/.p-name) since the text content plays the same role. */
+  .module rect {
+    fill: #3a2e1a;
+    stroke: #cc9a40;
+    stroke-width: 2;
+  }
+  .module:hover rect { stroke: #ffcc66; filter: drop-shadow(0 0 12px rgba(204,154,64,0.6)); }
+  .module .m-name { fill: #eef0ff; font-size: 11.5px; font-weight: 600; }
+
+  a.entity, a.process, a.module { cursor: pointer; text-decoration: none; }
+  a text, g.entity text { text-anchor: middle; font-family: var(--font); }
+
+  /* Flows */
+  .flow { stroke: var(--flow); stroke-width: 1.6; fill: none; }
+  .flow-label {
+    fill: var(--flow-text);
+    font-size: 13px;
+    font-family: var(--font);
+    stroke: var(--bg);
+    stroke-width: 5;
+    paint-order: stroke;
+    stroke-linejoin: round;
+  }
+
+  .legend text { fill: #6f78a0; font-size: 12px; font-family: var(--font); }
+  .legend rect.sw { fill: var(--entity); stroke: var(--border); }
+  .legend circle.sw { fill: var(--process); stroke: var(--accent); stroke-width: 1.5; }
+
+  .notes {
+    max-width: 900px;
+    margin-top: 30px;
+    font-size: 0.8rem;
+    color: #7a83aa;
+    line-height: 1.7;
+    text-align: center;
+  }
+  .notes a { color: var(--accent); }
+
+  .index {
+    max-width: 980px;
+    margin: 45px 0 20px;
+    border-top: 1px solid var(--border);
+    padding-top: 25px;
+  }
+  .index h2 {
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #666699;
+    margin: 0 0 6px;
+    text-align: center;
+  }
+  .index p { font-size: 0.8rem; color: #7a83aa; text-align: center; margin: 0 0 20px; line-height: 1.6; }
+  .index-group { margin-bottom: 14px; display: flex; flex-wrap: wrap; gap: 10px; align-items: baseline; justify-content: center; }
+  .index-group .g-label { font-size: 0.7rem; letter-spacing: 1.5px; text-transform: uppercase; color: #666699; font-weight: 700; width: 100%; text-align: center; }
+  .index-group a {
+    color: var(--text);
+    text-decoration: none;
+    font-size: 0.85rem;
+    border: 1px solid var(--border);
+    background: var(--entity);
+    border-radius: 4px;
+    padding: 5px 12px;
+  }
+  .index-group a:hover { border-color: var(--accent); color: #ffffff; }
+  .flow-label a { cursor: pointer; }
+  tspan.lk { fill: #a8b2e0; text-decoration: underline; text-decoration-style: dotted; }
+  .flow-label a:hover tspan.lk { fill: #ffffff; }
+</style>
+<style>
+  .cat-band { fill-opacity: 0.13; stroke-opacity: 0.55; stroke-width: 1.5; }
+  .cat-label { font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.85; }
+  .store line { stroke: #4a8a4a; stroke-width: 2; }
+  .store:hover line { stroke: #7ada7a; }
+  .store .s-name { fill: #a8e6a8; font-size: 13px; }
+  a.store { cursor: pointer; text-decoration: none; }
+  .process .p-name { font-size: 12.5px; }
+  .process .p-app { fill: #c8d0ea; font-size: 12px; font-style: italic; text-anchor: middle; }
+  .flow-label { font-size: 12px; }
+  .flow-label a { cursor: pointer; }
+  tspan.lk { fill: #a8b2e0; text-decoration: underline; text-decoration-style: dotted; }
+  .flow-label a:hover tspan.lk { fill: #ffffff; }
+  .nav-header .spec-link { margin-left: auto; }
+  .diagram { max-width: 1420px; }
+</style>
+</head>
+<body>
+
+<div class="nav-header">
+  <a href="../" class="portal-link">&#8592; Portal</a>
+  <a href="DFD_LEVEL2_TIPSLADDERMANAGER.html">&#8593; Level 2 — TipsLadderManager (draft)</a>
+</div>
+
+<h1>Level 3 &mdash; TipsLadderManager 4.1 Load market data</h1>
+
+<div class="diagram">
+<svg viewBox="0 0 1420 1040" role="img" aria-label="Level 3: TipsLadderManager 4.1, one process per source fetched, one that assembles the auxiliary TIPS data both sources need, one that builds the TIPS map, and the shared modules each calls into.">
+  <defs><marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#55558c"/></marker></defs>
+  <path class="flow" d="M 255.0 100.0 Q 469.4 137.4 661.4 239.8" marker-end="url(#a1)"/>
+  <path class="flow" d="M 255.0 265.0 Q 519.8 542.6 684.8 888.9" marker-end="url(#a1)"/>
+  <path class="flow" d="M 255.0 430.0 Q 349.1 499.9 416.7 595.6" marker-end="url(#a1)"/>
+  <path class="flow" d="M 255.0 595.0 Q 329.8 599.3 399.4 626.7" marker-end="url(#a1)"/>
+  <path class="flow" d="M 255.0 760.0 Q 323.7 703.5 406.5 671.3" marker-end="url(#a1)"/>
+  <path class="flow" d="M 255.0 925.0 Q 320.6 794.2 423.8 690.3" marker-end="url(#a1)"/>
+  <path class="flow" d="M 765.6 302.1 Q 862.5 366.5 934.4 457.9" marker-end="url(#a1)"/>
+  <text class="flow-label" x="915" y="415" text-anchor="middle">market data rows</text>
+  <path class="flow" d="M 751.5 886.6 Q 823.3 704.2 948.5 553.4" marker-end="url(#a1)"/>
+  <text class="flow-label" x="896" y="600" text-anchor="middle">market data rows</text>
+  <path class="flow" d="M 470.3 571.9 Q 543.0 417.9 660.2 294.2" marker-end="url(#a1)"/>
+  <text class="flow-label" x="610" y="331" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#tips-reference-data"><tspan class="lk">TIPS reference data</tspan></a></text>
+  <path class="flow" d="M 486.8 583.2 Q 559.5 429.2 676.7 305.5" marker-end="url(#a1)"/>
+  <text class="flow-label" x="645" y="369" text-anchor="middle">Ref CPI</text>
+  <path class="flow" d="M 503.3 594.5 Q 576.0 440.4 693.2 316.8" marker-end="url(#a1)"/>
+  <text class="flow-label" x="643" y="353" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#sa-yields"><tspan class="lk">SA yields</tspan></a></text>
+  <path class="flow" d="M 519.8 605.8 Q 592.5 451.7 709.7 328.1" marker-end="url(#a1)"/>
+  <text class="flow-label" x="678" y="392" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#bond-holiday"><tspan class="lk">bond holidays</tspan></a></text>
+  <path class="flow" d="M 523.3 667.2 Q 629.2 756.0 702.1 873.5" marker-end="url(#a1)"/>
+  <text class="flow-label" x="683" y="822" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#tips-reference-data"><tspan class="lk">TIPS reference data</tspan></a></text>
+  <path class="flow" d="M 508.2 680.3 Q 614.1 769.1 687.0 886.6" marker-end="url(#a1)"/>
+  <text class="flow-label" x="651" y="864" text-anchor="middle">Ref CPI</text>
+  <path class="flow" d="M 493.0 693.4 Q 598.9 782.2 671.8 899.7" marker-end="url(#a1)"/>
+  <text class="flow-label" x="653" y="848" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#sa-yields"><tspan class="lk">SA yields</tspan></a></text>
+  <path class="flow" d="M 477.9 706.5 Q 583.8 795.3 656.7 912.8" marker-end="url(#a1)"/>
+  <text class="flow-label" x="621" y="891" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#bond-holiday"><tspan class="lk">bond holidays</tspan></a></text>
+  <path class="flow" d="M 1106.3 475.6 Q 955.1 356.3 774.1 290.2" marker-end="url(#a1)"/>
+  <path class="flow" d="M 1100.8 189.1 Q 945.7 244.5 781.0 248.7" marker-end="url(#a1)"/>
+  <path class="flow" d="M 1100.8 330.9 Q 936.1 326.7 781.0 271.3" marker-end="url(#a1)"/>
+  <path class="flow" d="M 1102.5 815.5 Q 949.1 894.0 779.0 920.8" marker-end="url(#a1)"/>
+  <path class="flow" d="M 1101.3 788.7 Q 800.1 767.8 520.4 654.0" marker-end="url(#a1)"/>
+  <path class="flow" d="M 1101.0 509.9 Q 841.5 719.7 520.8 627.7" marker-end="url(#a1)"/>
+  <path class="flow" d="M 1042.0 500.0 Q 1225.0 470.7 1408.0 500.0" marker-end="url(#a1)"/>
+  <text class="flow-label" x="1404" y="492" text-anchor="end">TIPS map  →  4.2 through 4.4</text>
+  <a class="store" href="viewer.html#/md/knowledge/DataStores.md#s7">
+    <rect x="40" y="80" width="210" height="40" fill="transparent" stroke="none"/>
+    <line x1="40" y1="80" x2="250" y2="80"/>
+    <line x1="40" y1="120" x2="250" y2="120"/>
+    <text class="s-name" x="145" y="105">Market quotes (S7)</text>
+  </a>
+  <a class="store" href="viewer.html#/md/knowledge/DataStores.md#s1">
+    <rect x="40" y="245" width="210" height="40" fill="transparent" stroke="none"/>
+    <line x1="40" y1="245" x2="250" y2="245"/>
+    <line x1="40" y1="285" x2="250" y2="285"/>
+    <text class="s-name" x="145" y="270">FedInvest prices (S1)</text>
+  </a>
+  <a class="store" href="viewer.html#/md/knowledge/DataStores.md#s2">
+    <rect x="40" y="410" width="210" height="40" fill="transparent" stroke="none"/>
+    <line x1="40" y1="410" x2="250" y2="410"/>
+    <line x1="40" y1="450" x2="250" y2="450"/>
+    <text class="s-name" x="145" y="435">TIPS reference data (S2)</text>
+  </a>
+  <a class="store" href="viewer.html#/md/knowledge/DataStores.md#s3">
+    <rect x="40" y="575" width="210" height="40" fill="transparent" stroke="none"/>
+    <line x1="40" y1="575" x2="250" y2="575"/>
+    <line x1="40" y1="615" x2="250" y2="615"/>
+    <text class="s-name" x="145" y="600">Ref CPI (S3)</text>
+  </a>
+  <a class="store" href="viewer.html#/md/knowledge/DataStores.md#s10">
+    <rect x="40" y="740" width="210" height="40" fill="transparent" stroke="none"/>
+    <line x1="40" y1="740" x2="250" y2="740"/>
+    <line x1="40" y1="780" x2="250" y2="780"/>
+    <text class="s-name" x="145" y="765">SA and SAO yields (S10)</text>
+  </a>
+  <a class="store" href="viewer.html#/md/knowledge/DataStores.md#s16">
+    <rect x="40" y="905" width="210" height="40" fill="transparent" stroke="none"/>
+    <line x1="40" y1="905" x2="250" y2="905"/>
+    <line x1="40" y1="945" x2="250" y2="945"/>
+    <text class="s-name" x="145" y="930">Bond holidays (S16)</text>
+  </a>
+  <a class="process" href="viewer.html#/md/TipsLadderManager/knowledge/3.1_Data_Pipeline.md">
+    <circle cx="720" cy="260" r="62"/>
+    <text class="p-id" x="720" y="240">4.1.1</text>
+    <text class="p-name" x="720" y="261">Fetch and parse</text>
+    <text class="p-name" x="720" y="277">market quotes</text>
+  </a>
+  <a class="process" href="viewer.html#/md/TipsLadderManager/knowledge/3.1_Data_Pipeline.md">
+    <circle cx="720" cy="940" r="62"/>
+    <text class="p-id" x="720" y="920">4.1.2</text>
+    <text class="p-name" x="720" y="941">Fetch and parse</text>
+    <text class="p-name" x="720" y="957">FedInvest prices</text>
+  </a>
+  <a class="process" href="viewer.html#/md/TipsLadderManager/knowledge/3.1_Data_Pipeline.md">
+    <circle cx="460" cy="640" r="62"/>
+    <text class="p-id" x="460" y="620">4.1.3</text>
+    <text class="p-name" x="460" y="641">Fetch auxiliary</text>
+    <text class="p-name" x="460" y="657">TIPS data</text>
+  </a>
+  <a class="process" href="viewer.html#/md/TipsLadderManager/knowledge/3.1_Data_Pipeline.md">
+    <circle cx="980" cy="500" r="62"/>
+    <text class="p-id" x="980" y="480">4.1.4</text>
+    <text class="p-name" x="980" y="501">Build the</text>
+    <text class="p-name" x="980" y="517">TIPS map</text>
+  </a>
+  <a class="module" href="viewer.html#/md/knowledge/SharedModules.md#m2">
+    <rect x="1100.0" y="450.0" width="100.0" height="100.0" rx="4"/>
+    <text class="p-id" x="1150" y="486">M2</text>
+    <text class="m-name" x="1150" y="503">settlement.js</text>
+  </a>
+  <a class="module" href="viewer.html#/md/knowledge/SharedModules.md#m3">
+    <rect x="1100.0" y="130.0" width="100.0" height="100.0" rx="4"/>
+    <text class="p-id" x="1150" y="166">M3</text>
+    <text class="m-name" x="1150" y="183">bond-math.js</text>
+  </a>
+  <a class="module" href="viewer.html#/md/knowledge/SharedModules.md#m4">
+    <rect x="1100.0" y="290.0" width="100.0" height="100.0" rx="4"/>
+    <text class="p-id" x="1150" y="319">M4</text>
+    <text class="m-name" x="1150" y="336">fidelity-</text>
+    <text class="m-name" x="1150" y="350">parse.js</text>
+  </a>
+  <a class="module" href="viewer.html#/md/knowledge/SharedModules.md#m1">
+    <rect x="1100.0" y="750.0" width="100.0" height="100.0" rx="4"/>
+    <text class="p-id" x="1150" y="786">M1</text>
+    <text class="m-name" x="1150" y="803">csv.js</text>
+  </a>
+</svg>
+</div>
+
+<p class="notes">
+  <b>4.1.1 and 4.1.2 are alternatives, not a pipeline.</b> Exactly one runs, chosen by a hardcoded constant (`YIELD_SOURCE` in `shared/src/market-data.js`) rather than by anything the user or the data selects at run time. Today that constant selects 4.1.1: Market quotes (S7) is the live default and FedInvest prices (S1) is a dormant cross-check path (DFD_Worklist.md §3.0 item 7).
+  <b>The squares are shared modules, not process steps.</b> `settlement.js`, `bond-math.js` and `fidelity-parse.js` (4.1.1) and `csv.js` (4.1.2, 4.1.3) are real files called from here and from other processes across the portal — YieldCurves' 3.1.7/3.1.8 also call bond-math.js, 3.1.2 also calls fidelity-parse.js. Each is registered once in <a href="viewer.html#/md/knowledge/SharedModules.md">SharedModules.md</a>; drilling into any of its other callers reaches the identical spec.
+  <b>4.1.4 is named for what it does, not for the file it lives in.</b> `buildTipsMapFromYields` is exported from `TipsLadderManager/src/rebalance-lib.js`, a name that suggests Rebalance-only logic, but it runs once for every page load — before Build or Rebalance — and neither mode owns it. Worth a code-organization cleanup later (moving it out of rebalance-lib.js); not done here, since this pass is diagrams only.
+  Every 4.1.x href on this diagram is a placeholder pointing at the same pre-template doc (TipsLadderManager has no per-process spec text yet — that is the next phase, once the Level 2/3 shape itself is settled), and that placeholder is itself a mismatch: 3.1_Data_Pipeline.md describes process 1's acquisition jobs, not this runtime fetch. The M1-M4 module links are real and final — SharedModules.md is a proper spec already.
+</p>
+
+</body>
+</html>
