@@ -2,8 +2,9 @@
 
 A module here is a real, independently reusable implementation — a whole file, not a single
 formula small enough to restate inline — called by two or more sibling processes. It is drawn on
-every consuming process's own diagram as a square, never a circle, so it reads as "not a
-data-transformation step of this pipeline" at a glance; each drawing points at the one entry below,
+every consuming process's own diagram as a circle in its own distinct color, never a rectangle —
+a rectangle is already the entity shape, so a module stays circular, process-like, and lets its
+color alone say "not a pipeline step of this diagram." Each drawing points at the one entry below,
 so drilling down through any caller reaches the same spec (`DFD_Worklist.md` §2.0). A module used by
 only one process today is not registered here — it becomes an entry the moment a second caller needs
 it, never ahead of that.

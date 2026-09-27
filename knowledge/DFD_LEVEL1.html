@@ -84,16 +84,18 @@
   .process .p-id { fill: #8fa0d8; font-size: 12px; letter-spacing: 1px; }
   .process .p-name { fill: #eef0ff; font-size: 15px; font-weight: 600; }
 
-  /* A module: a shared code file called by two or more sibling processes, drawn as a
-     square rather than a circle so it reads as "not a data-transformation step of this
-     pipeline" at a glance (DFD_Worklist.md §2.0, knowledge/SharedModules.md). Reuses the
-     process label classes (.p-id/.p-name) since the text content plays the same role. */
-  .module rect {
+  /* A module: a shared code file called by two or more sibling processes. A square was
+     tried and rejected — a rectangle is already the entity shape, and two rectangular
+     categories on one diagram invites confusing a module for an entity. A circle in this
+     distinct color reads as "process-like, but not a pipeline step of this diagram"
+     instead (DFD_Worklist.md §2.0, knowledge/SharedModules.md). Reuses the process id
+     label class (.p-id) since that role is identical. */
+  .module circle {
     fill: #3a2e1a;
     stroke: #cc9a40;
     stroke-width: 2;
   }
-  .module:hover rect { stroke: #ffcc66; filter: drop-shadow(0 0 12px rgba(204,154,64,0.6)); }
+  .module:hover circle { stroke: #ffcc66; filter: drop-shadow(0 0 12px rgba(204,154,64,0.6)); }
   .module .m-name { fill: #eef0ff; font-size: 11.5px; font-weight: 600; }
 
   a.entity, a.process, a.module { cursor: pointer; text-decoration: none; }

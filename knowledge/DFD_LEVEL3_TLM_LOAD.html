@@ -84,16 +84,18 @@
   .process .p-id { fill: #8fa0d8; font-size: 12px; letter-spacing: 1px; }
   .process .p-name { fill: #eef0ff; font-size: 15px; font-weight: 600; }
 
-  /* A module: a shared code file called by two or more sibling processes, drawn as a
-     square rather than a circle so it reads as "not a data-transformation step of this
-     pipeline" at a glance (DFD_Worklist.md §2.0, knowledge/SharedModules.md). Reuses the
-     process label classes (.p-id/.p-name) since the text content plays the same role. */
-  .module rect {
+  /* A module: a shared code file called by two or more sibling processes. A square was
+     tried and rejected — a rectangle is already the entity shape, and two rectangular
+     categories on one diagram invites confusing a module for an entity. A circle in this
+     distinct color reads as "process-like, but not a pipeline step of this diagram"
+     instead (DFD_Worklist.md §2.0, knowledge/SharedModules.md). Reuses the process id
+     label class (.p-id) since that role is identical. */
+  .module circle {
     fill: #3a2e1a;
     stroke: #cc9a40;
     stroke-width: 2;
   }
-  .module:hover rect { stroke: #ffcc66; filter: drop-shadow(0 0 12px rgba(204,154,64,0.6)); }
+  .module:hover circle { stroke: #ffcc66; filter: drop-shadow(0 0 12px rgba(204,154,64,0.6)); }
   .module .m-name { fill: #eef0ff; font-size: 11.5px; font-weight: 600; }
 
   a.entity, a.process, a.module { cursor: pointer; text-decoration: none; }
@@ -281,23 +283,23 @@
     <text class="p-name" x="980" y="517">TIPS map</text>
   </a>
   <a class="module" href="viewer.html#/md/knowledge/SharedModules.md#m2">
-    <rect x="1100.0" y="450.0" width="100.0" height="100.0" rx="4"/>
+    <circle cx="1150" cy="500" r="50"/>
     <text class="p-id" x="1150" y="486">M2</text>
     <text class="m-name" x="1150" y="503">settlement.js</text>
   </a>
   <a class="module" href="viewer.html#/md/knowledge/SharedModules.md#m3">
-    <rect x="1100.0" y="130.0" width="100.0" height="100.0" rx="4"/>
+    <circle cx="1150" cy="180" r="50"/>
     <text class="p-id" x="1150" y="166">M3</text>
     <text class="m-name" x="1150" y="183">bond-math.js</text>
   </a>
   <a class="module" href="viewer.html#/md/knowledge/SharedModules.md#m4">
-    <rect x="1100.0" y="290.0" width="100.0" height="100.0" rx="4"/>
+    <circle cx="1150" cy="340" r="50"/>
     <text class="p-id" x="1150" y="319">M4</text>
     <text class="m-name" x="1150" y="336">fidelity-</text>
     <text class="m-name" x="1150" y="350">parse.js</text>
   </a>
   <a class="module" href="viewer.html#/md/knowledge/SharedModules.md#m1">
-    <rect x="1100.0" y="750.0" width="100.0" height="100.0" rx="4"/>
+    <circle cx="1150" cy="800" r="50"/>
     <text class="p-id" x="1150" y="786">M1</text>
     <text class="m-name" x="1150" y="803">csv.js</text>
   </a>
@@ -306,7 +308,7 @@
 
 <p class="notes">
   <b>4.1.1 and 4.1.2 are alternatives, not a pipeline.</b> Exactly one runs, chosen by a hardcoded constant (`YIELD_SOURCE` in `shared/src/market-data.js`) rather than by anything the user or the data selects at run time. Today that constant selects 4.1.1: Market quotes (S7) is the live default and FedInvest prices (S1) is a dormant cross-check path (DFD_Worklist.md §3.0 item 7).
-  <b>The squares are shared modules, not process steps.</b> `settlement.js`, `bond-math.js` and `fidelity-parse.js` (4.1.1) and `csv.js` (4.1.2, 4.1.3) are real files called from here and from other processes across the portal — YieldCurves' 3.1.7/3.1.8 also call bond-math.js, 3.1.2 also calls fidelity-parse.js. Each is registered once in <a href="viewer.html#/md/knowledge/SharedModules.md">SharedModules.md</a>; drilling into any of its other callers reaches the identical spec.
+  <b>The amber circles are shared modules, not process steps of this diagram.</b> `settlement.js`, `bond-math.js` and `fidelity-parse.js` (4.1.1) and `csv.js` (4.1.2, 4.1.3) are real files called from here and from other processes across the portal — YieldCurves' 3.1.7/3.1.8 also call bond-math.js, 3.1.2 also calls fidelity-parse.js. Each is registered once in <a href="viewer.html#/md/knowledge/SharedModules.md">SharedModules.md</a>; drilling into any of its other callers reaches the identical spec.
   <b>4.1.4 is named for what it does, not for the file it lives in.</b> `buildTipsMapFromYields` is exported from `TipsLadderManager/src/rebalance-lib.js`, a name that suggests Rebalance-only logic, but it runs once for every page load — before Build or Rebalance — and neither mode owns it. Worth a code-organization cleanup later (moving it out of rebalance-lib.js); not done here, since this pass is diagrams only.
   Every 4.1.x href on this diagram is a placeholder pointing at the same pre-template doc (TipsLadderManager has no per-process spec text yet — that is the next phase, once the Level 2/3 shape itself is settled), and that placeholder is itself a mismatch: 3.1_Data_Pipeline.md describes process 1's acquisition jobs, not this runtime fetch. The M1-M4 module links are real and final — SharedModules.md is a proper spec already.
 </p>

@@ -201,15 +201,16 @@ function procShape(cx, cy, r, href, id, lines, caption) {
     `  </a>`].join(NL);
 }
 // A shared module: a real, independently reusable code file called by two or more sibling
-// processes, drawn as a square (not a circle) so it reads at a glance as something other
-// than a data-transformation step of this pipeline. Registered once in SharedModules.md;
-// every consuming process's own diagram draws its own copy of this shape, all pointing at
-// the identical href, per DFD_Worklist.md §2.0. r is the shape's half-side, so its visual
-// footprint matches a process circle of the same r.
+// processes. A square was tried and rejected: a rectangle is already the entity shape, and
+// two rectangular categories on one diagram invites confusing a module for an entity. A
+// circle in the module's own distinct color reads as "a process-like thing, but not a
+// pipeline step of this diagram" instead. Registered once in SharedModules.md; every
+// consuming process's own diagram draws its own copy of this shape, all pointing at the
+// identical href, per DFD_Worklist.md §2.0.
 function moduleShape(cx, cy, r, href, id, lines) {
   const top = cy - 14 - (lines.length - 1) * 7;
   return [`  <a class="module" href="${href}">`,
-    `    <rect x="${(cx - r).toFixed(1)}" y="${(cy - r).toFixed(1)}" width="${(r * 2).toFixed(1)}" height="${(r * 2).toFixed(1)}" rx="4"/>`,
+    `    <circle cx="${cx}" cy="${cy}" r="${r}"/>`,
     `    <text class="p-id" x="${cx}" y="${top}">${esc(id)}</text>`,
     ...lines.map((ln, k) => `    <text class="m-name" x="${cx}" y="${top + 17 + k * 14}">${esc(ln)}</text>`),
     `  </a>`].join(NL);
@@ -1064,7 +1065,7 @@ function level3TipsLadderManagerLoadMarketData() {
     title: 'TipsLadderManager 4.1 — Level 3', h1: 'Level 3 &mdash; TipsLadderManager 4.1 Load market data', maxWidth: W,
     up: 'DFD_LEVEL2_TIPSLADDERMANAGER.html', upLabel: 'Level 2 — TipsLadderManager (draft)', svg: P.join(NL),
     notes: ['  <b>4.1.1 and 4.1.2 are alternatives, not a pipeline.</b> Exactly one runs, chosen by a hardcoded constant (`YIELD_SOURCE` in `shared/src/market-data.js`) rather than by anything the user or the data selects at run time. Today that constant selects 4.1.1: Market quotes (S7) is the live default and FedInvest prices (S1) is a dormant cross-check path (DFD_Worklist.md §3.0 item 7).',
-      '  <b>The squares are shared modules, not process steps.</b> `settlement.js`, `bond-math.js` and `fidelity-parse.js` (4.1.1) and `csv.js` (4.1.2, 4.1.3) are real files called from here and from other processes across the portal — YieldCurves\' 3.1.7/3.1.8 also call bond-math.js, 3.1.2 also calls fidelity-parse.js. Each is registered once in <a href="' + M() + '">SharedModules.md</a>; drilling into any of its other callers reaches the identical spec.',
+      '  <b>The amber circles are shared modules, not process steps of this diagram.</b> `settlement.js`, `bond-math.js` and `fidelity-parse.js` (4.1.1) and `csv.js` (4.1.2, 4.1.3) are real files called from here and from other processes across the portal — YieldCurves\' 3.1.7/3.1.8 also call bond-math.js, 3.1.2 also calls fidelity-parse.js. Each is registered once in <a href="' + M() + '">SharedModules.md</a>; drilling into any of its other callers reaches the identical spec.',
       '  <b>4.1.4 is named for what it does, not for the file it lives in.</b> `buildTipsMapFromYields` is exported from `TipsLadderManager/src/rebalance-lib.js`, a name that suggests Rebalance-only logic, but it runs once for every page load — before Build or Rebalance — and neither mode owns it. Worth a code-organization cleanup later (moving it out of rebalance-lib.js); not done here, since this pass is diagrams only.',
       '  Every 4.1.x href on this diagram is a placeholder pointing at the same pre-template doc (TipsLadderManager has no per-process spec text yet — that is the next phase, once the Level 2/3 shape itself is settled), and that placeholder is itself a mismatch: 3.1_Data_Pipeline.md describes process 1\'s acquisition jobs, not this runtime fetch. The M1-M4 module links are real and final — SharedModules.md is a proper spec already.'].join(NL)
   });
