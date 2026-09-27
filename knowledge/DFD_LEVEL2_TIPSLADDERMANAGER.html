@@ -187,7 +187,7 @@
 <h1>Level 2 &mdash; TipsLadderManager (draft)</h1>
 
 <div class="diagram">
-<svg viewBox="0 0 1450 900" role="img" aria-label="Level 2 draft for TipsLadderManager: five processes reading five data stores, a holdings file and typed parameters from the user. No process writes a data store.">
+<svg viewBox="0 0 1450 900" role="img" aria-label="Level 2 draft for TipsLadderManager: five processes reading five data stores, an imported file and typed parameters from the user. No process writes a data store.">
   <defs><marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#55558c"/></marker></defs>
   <path class="flow" d="M 260.0 150.0 Q 355.1 263.1 410.2 400.3" marker-end="url(#a1)"/>
   <path class="flow" d="M 260.0 300.0 Q 336.8 345.6 395.4 412.9" marker-end="url(#a1)"/>
@@ -211,7 +211,7 @@
   <path class="flow" d="M 966.8 604.5 Q 970.7 576.2 983.2 550.5" marker-end="url(#a1)"/>
   <text class="flow-label" x="989" y="575" text-anchor="middle">rebalance result</text>
   <path class="flow" d="M 1235.0 220.0 Q 996.5 258.2 758.0 220.0" marker-end="url(#a1)"/>
-  <text class="flow-label" x="999" y="236" text-anchor="middle">holdings file</text>
+  <text class="flow-label" x="999" y="236" text-anchor="middle">imported file</text>
   <path class="flow" d="M 1235.0 320.0 Q 1121.5 338.2 1008.0 320.0" marker-end="url(#a1)"/>
   <text class="flow-label" x="1124" y="312" text-anchor="middle">ladder parameters</text>
   <path class="flow" d="M 1235.0 650.0 Q 1121.5 668.2 1008.0 650.0" marker-end="url(#a1)"/>
@@ -257,11 +257,11 @@
     <text class="p-name" x="440" y="451">Load market</text>
     <text class="p-name" x="440" y="467">data</text>
   </a>
-  <a class="process" href="viewer.html#/md/TipsLadderManager/knowledge/2.1_Broker_Import.md">
+  <a class="process" href="DFD_LEVEL3_TLM_IMPORT.html">
     <circle cx="700" cy="210" r="58"/>
     <text class="p-id" x="700" y="190">4.2</text>
-    <text class="p-name" x="700" y="211">Import</text>
-    <text class="p-name" x="700" y="227">holdings</text>
+    <text class="p-name" x="700" y="211">Import holdings</text>
+    <text class="p-name" x="700" y="227">and DARA plan</text>
   </a>
   <a class="process" href="viewer.html#/md/TipsLadderManager/knowledge/2.0_TIPS_Ladders.md">
     <circle cx="950" cy="330" r="58"/>
@@ -287,7 +287,7 @@
 <p class="notes">
   <b>Draft, not a finished decomposition.</b> This maps five processes directly onto today's code (shared/src/market-data.js, and TipsLadderManager/src/broker-import.js, build-lib.js, rebalance-lib.js, render.js) so the shape can be reviewed before anything is renumbered or specced. It supersedes nothing yet — the existing knowledge/TipsLadderManager.md Mermaid diagram and the TipsLadderManager/knowledge/1.0-6.0 numbering are reference material only, being pre-template.
   <b>Open question 1 — Build vs. Rebalance.</b> 4.3 and 4.4 are drawn as two processes because that is how the code is entered today (runBuild vs. runFundedRebalance, with different inputs — 4.4 alone reads holdings). Both call the same underlying engine (ladder-core.js, gap-math.js, allocation-policy.js, shape-math.js), shown here as ordinary implementation detail inside each process—the same way shared/src/bond-math.js is never drawn as its own box even though nearly every process in this portal calls it. Decomposing to Level 3 would not duplicate that shared engine as two boxes; each of 4.3/4.4 would simply cite the same shared functions, as 3.1.7/3.1.8 already do for their own shared calculation.
-  <b>Open question 2 — the holdings file.</b> The CSV a holder uploads (a broker export, a DARA-plan file, or this app’s own CUSIP/Qty export) is drawn here as a flow from User into 4.2, on the theory that the user, not the brokerage, is the one choosing and supplying it — unlike FedInvest (E1) or Fidelity Fixed Income (E6), this app never reaches out to a broker itself. The alternative, per the entity-is-the-source rule already applied to CNBC (DFD_Worklist.md &sect;4.0): draw the brokerage as its own external entity, since the file’s origin is really Fidelity/Schwab/Vanguard even though the mechanism of reaching this app is a manual upload rather than an API. Not resolved here.
+  <b>Open question 2 — the imported file — resolved at Level 3.</b> 4.2 explodes into two independent parses of the same uploaded text (holdings rows; a DARA plan and construction parameters), and the file itself stays a User flow rather than an external entity: unlike FedInvest (E1) or Fidelity Fixed Income (E6), no single named source describes what might be uploaded here — a Fidelity, Schwab or Vanguard export, a hand-typed cusip/qty file, tipsladder.com's own format, or this app's own prior export — so there is no one source to name as an entity. See <a href="DFD_LEVEL3_TLM_IMPORT.html">4.2's own Level 3</a>.
   4.1 reads Market quotes (S7), the live default (`YIELD_SOURCE` in shared/src/market-data.js). FedInvest prices (S1) is the same module’s dormant cross-check path (same source data, same aux fetches) and is not drawn.
   Flow labels here (TIPS map, DARA plan, build result, rebalance result, ladder parameters, ladder table, ladder export, holdings file) are provisional — none has a Data Dictionary entry yet, so none is linked. Naming them for real is spec work, once the process shape itself is settled.
 </p>

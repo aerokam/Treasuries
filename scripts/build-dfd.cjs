@@ -934,7 +934,7 @@ function level2TipsLadderManager() {
   const procs = [
     { id: '4.1', name: ['Load market', 'data'], href: 'DFD_LEVEL3_TLM_LOAD.html', reads: ['quotes', 'tipsref', 'refcpi', 'sasao', 'hol'],
       out: { '4.2': ['TIPS map'], '4.3': ['TIPS map'], '4.4': ['TIPS map'] } },
-    { id: '4.2', name: ['Import', 'holdings'], href: V('TipsLadderManager/knowledge/2.1_Broker_Import.md'), reads: [],
+    { id: '4.2', name: ['Import holdings', 'and DARA plan'], href: 'DFD_LEVEL3_TLM_IMPORT.html', reads: [],
       out: { '4.3': ['DARA plan'], '4.4': ['holdings', 'DARA plan'] } },
     { id: '4.3', name: ['Build', 'ladder'], href: V('TipsLadderManager/knowledge/2.0_TIPS_Ladders.md'), reads: [], out: { '4.5': ['build result'] } },
     { id: '4.4', name: ['Rebalance', 'ladder'], href: V('TipsLadderManager/knowledge/3.0_TIPS_Ladder_Rebalancing.md'), reads: [], out: { '4.5': ['rebalance result'] } },
@@ -947,7 +947,7 @@ function level2TipsLadderManager() {
   const H = 900, W = 1450;
   const OBS = procs.map(q => ({ x: px[q.id], y: py[q.id], r: PR }));
   const LBL = [];
-  const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 2 draft for TipsLadderManager: five processes reading five data stores, a holdings file and typed parameters from the user. No process writes a data store.">`, marker()];
+  const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 2 draft for TipsLadderManager: five processes reading five data stores, an imported file and typed parameters from the user. No process writes a data store.">`, marker()];
   const sIdx = Object.fromEntries(stores.map((s, i) => [s.id, i]));
   procs.forEach(p => p.reads.forEach(id => {
     const y = sy(sIdx[id]), [x2, y2] = toCircle(SX + SW + 5, y, px[p.id], py[p.id], PR);
@@ -971,7 +971,7 @@ function level2TipsLadderManager() {
     P.push(flow(UX - 5, yy, x2, yy, { obstacles: OBS.filter(o => !(o.x === px[id] && o.y === py[id])) }));
     P.push(labelAt((x2 + UX) / 2, yy + (above ? -8 : 16), label, 'middle'));
   };
-  flowFromUser('4.2', 'holdings file', false);
+  flowFromUser('4.2', 'imported file', false);
   flowFromUser('4.3', 'ladder parameters', true);
   flowFromUser('4.4', 'ladder parameters', true);
   flowToUser('4.5', 'ladder table', true);
@@ -987,7 +987,7 @@ function level2TipsLadderManager() {
     spec: V('knowledge/TipsLadderManager.md'), specLabel: 'TipsLadderManager overview', svg: P.join(NL),
     notes: ['  <b>Draft, not a finished decomposition.</b> This maps five processes directly onto today\'s code (shared/src/market-data.js, and TipsLadderManager/src/broker-import.js, build-lib.js, rebalance-lib.js, render.js) so the shape can be reviewed before anything is renumbered or specced. It supersedes nothing yet — the existing knowledge/TipsLadderManager.md Mermaid diagram and the TipsLadderManager/knowledge/1.0-6.0 numbering are reference material only, being pre-template.',
       '  <b>Open question 1 — Build vs. Rebalance.</b> 4.3 and 4.4 are drawn as two processes because that is how the code is entered today (runBuild vs. runFundedRebalance, with different inputs — 4.4 alone reads holdings). Both call the same underlying engine (ladder-core.js, gap-math.js, allocation-policy.js, shape-math.js), shown here as ordinary implementation detail inside each process—the same way shared/src/bond-math.js is never drawn as its own box even though nearly every process in this portal calls it. Decomposing to Level 3 would not duplicate that shared engine as two boxes; each of 4.3/4.4 would simply cite the same shared functions, as 3.1.7/3.1.8 already do for their own shared calculation.',
-      '  <b>Open question 2 — the holdings file.</b> The CSV a holder uploads (a broker export, a DARA-plan file, or this app’s own CUSIP/Qty export) is drawn here as a flow from User into 4.2, on the theory that the user, not the brokerage, is the one choosing and supplying it — unlike FedInvest (E1) or Fidelity Fixed Income (E6), this app never reaches out to a broker itself. The alternative, per the entity-is-the-source rule already applied to CNBC (DFD_Worklist.md &sect;4.0): draw the brokerage as its own external entity, since the file’s origin is really Fidelity/Schwab/Vanguard even though the mechanism of reaching this app is a manual upload rather than an API. Not resolved here.',
+      '  <b>Open question 2 — the imported file — resolved at Level 3.</b> 4.2 explodes into two independent parses of the same uploaded text (holdings rows; a DARA plan and construction parameters), and the file itself stays a User flow rather than an external entity: unlike FedInvest (E1) or Fidelity Fixed Income (E6), no single named source describes what might be uploaded here — a Fidelity, Schwab or Vanguard export, a hand-typed cusip/qty file, tipsladder.com\'s own format, or this app\'s own prior export — so there is no one source to name as an entity. See <a href="DFD_LEVEL3_TLM_IMPORT.html">4.2\'s own Level 3</a>.',
       '  4.1 reads Market quotes (S7), the live default (`YIELD_SOURCE` in shared/src/market-data.js). FedInvest prices (S1) is the same module’s dormant cross-check path (same source data, same aux fetches) and is not drawn.',
       '  Flow labels here (TIPS map, DARA plan, build result, rebalance result, ladder parameters, ladder table, ladder export, holdings file) are provisional — none has a Data Dictionary entry yet, so none is linked. Naming them for real is spec work, once the process shape itself is settled.'].join(NL)
   });
@@ -1071,6 +1071,58 @@ function level3TipsLadderManagerLoadMarketData() {
   });
 }
 
+// ── Level 3: TipsLadderManager 4.2 ──────────────────────────────────────────
+function level3TipsLadderManagerImport() {
+  const R = 'TipsLadderManager/knowledge/2.1_Broker_Import.md';
+  const PLACEHOLDER = V(R);
+  const procs = [
+    { id: '4.2.1', name: ['Detect and parse', 'holdings file'], href: PLACEHOLDER, out: {} },
+    { id: '4.2.2', name: ['Parse DARA plan', 'and parameters'], href: PLACEHOLDER, out: {} },
+  ];
+  const PR = 62, UX = 60, UW = 145, W = 1180, H = 560;
+  const px = { '4.2.1': 480, '4.2.2': 480 };
+  const py = { '4.2.1': 190, '4.2.2': 400 };
+  const OBS = procs.map(q => ({ x: px[q.id], y: py[q.id], r: PR }));
+  const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 3: TipsLadderManager 4.2, two independent parses of the same uploaded file -- one for CUSIP rows, one for a DARA plan and construction parameters.">`, marker()];
+
+  // The TIPS map arrives from 4.1, drawn against its own diagram, the same edge-arrival
+  // convention 3.7's Level 3 uses for input produced by a sibling process.
+  const [tx, ty] = toCircle(UX + UW + 60, 90, px['4.2.1'], py['4.2.1'], PR);
+  P.push(flow(UX + UW + 60, 90, tx, ty, { obstacles: OBS.filter(o => !(o.x === px['4.2.1'] && o.y === py['4.2.1'])) }));
+  P.push(labelAt(UX + UW + 64, 74, 'TIPS map  ←  4.1'));
+
+  // The user uploads one file, read as plain text; both processes independently look for
+  // what they each recognize in it, whichever Import menu choice (CUSIP/Qty or DARA Plan)
+  // the click came from -- the code itself does not branch on which menu item was clicked.
+  ['4.2.1', '4.2.2'].forEach(id => {
+    const [x2, y2] = toCircle(UX + UW + 5, py[id], px[id], py[id], PR);
+    P.push(flow(UX + UW + 5, py[id], x2, y2, { obstacles: OBS.filter(o => !(o.x === px[id] && o.y === py[id])) }));
+  });
+  P.push(labelAt(UX + UW + 12, (py['4.2.1'] + py['4.2.2']) / 2 - 8, 'imported file'));
+  P.push(`  <g class="entity"><rect x="${UX}" y="${(py['4.2.1'] + py['4.2.2']) / 2 - 130}" width="${UW}" height="260" rx="3"/><text class="e-name" x="${UX + UW / 2}" y="${(py['4.2.1'] + py['4.2.2']) / 2 + 5}">User</text></g>`);
+
+  // Each process's own output leaves at the right edge for whichever Level 2 sibling
+  // consumes it, the same convention 3.1's Level 3 uses for its own four outputs.
+  const out1 = fromCircle(px['4.2.1'], py['4.2.1'], PR, W - 12, py['4.2.1']);
+  P.push(flow(out1[0], out1[1], W - 12, py['4.2.1'], { obstacles: OBS.filter(o => !(o.x === px['4.2.1'] && o.y === py['4.2.1'])) }));
+  P.push(labelAt(W - 16, py['4.2.1'] - 8, 'holdings  →  4.4', 'end'));
+  const out2 = fromCircle(px['4.2.2'], py['4.2.2'], PR, W - 12, py['4.2.2']);
+  P.push(flow(out2[0], out2[1], W - 12, py['4.2.2'], { obstacles: OBS.filter(o => !(o.x === px['4.2.2'] && o.y === py['4.2.2'])) }));
+  P.push(labelAt(W - 16, py['4.2.2'] - 8, 'DARA plan  →  4.3 and 4.4', 'end'));
+
+  procs.forEach(p => P.push(procShape(px[p.id], py[p.id], PR, p.href, p.id, p.name)));
+  P.push('</svg>');
+
+  return page({
+    title: 'TipsLadderManager 4.2 — Level 3', h1: 'Level 3 &mdash; TipsLadderManager 4.2 Import holdings and DARA plan', maxWidth: W,
+    up: 'DFD_LEVEL2_TIPSLADDERMANAGER.html', upLabel: 'Level 2 — TipsLadderManager (draft)', svg: P.join(NL),
+    notes: ['  <b>4.2 is renamed from the Level 2 draft\'s "Import holdings"</b> — reviewing that draft is what surfaced this: a DARA plan is not holdings, and the app has a whole second, independent import path for it (a standalone plan file with no CUSIP rows at all, or a plan riding inside a CUSIP/Qty file as trailing metadata). Two processes, not one, because the code makes them two independent parses of the same text: 4.2.1 looks for CUSIP rows (five formats: two broker exports, a bare cusip,qty file, tipsladder.com\'s own format, and this app\'s own prior export), 4.2.2 looks for a `#fundedYear,dara` marker and a `#params` line. Neither depends on the other finding anything.',
+      '  <b>A real duplicate found here, not fixed (diagrams only this pass):</b> the holdings parse has three separate CSV-splitting implementations doing the same job at different levels of care — `shared/src/csv.js` (M1, registered for 4.1, quote-aware), `TipsLadderManager/src/broker-import.js`\'s own `parseCSVLine` (also quote-aware, used only here), and a third, bare `line.split(\',\')` inline in index.html for the three non-broker formats (no quote handling at all). None of the three call into either of the others. Logged in DFD_Worklist.md.',
+      '  <b>The holdings-file-as-entity question is resolved, not deferred.</b> Unlike FedInvest (E1) or Fidelity Fixed Income (E6), no single named source describes what a holder might upload here — a Fidelity or Schwab or Vanguard export, a hand-typed cusip/qty list, a tipsladder.com file, or this app\'s own prior export. The holder chooses and provides whichever one, so it stays a User flow rather than an entity.',
+      '  Every href on this diagram is a placeholder pointing at the existing TipsLadderManager/knowledge/2.1_Broker_Import.md — real per-process specs are the next phase, once the Level 2/3 shape itself is settled.'].join(NL)
+  });
+}
+
 // ── emit ────────────────────────────────────────────────────────────────────
 const outputs = [
   ['knowledge/DFD_LEVEL1.html', level1()],
@@ -1083,6 +1135,7 @@ const outputs = [
   ['knowledge/DFD_LEVEL3_YM_ASSEMBLE.html', level3YieldsMonitorAssemble()],
   ['knowledge/DFD_LEVEL2_TIPSLADDERMANAGER.html', level2TipsLadderManager()],
   ['knowledge/DFD_LEVEL3_TLM_LOAD.html', level3TipsLadderManagerLoadMarketData()],
+  ['knowledge/DFD_LEVEL3_TLM_IMPORT.html', level3TipsLadderManagerImport()],
 ];
 if (unlinked.size) {
   console.log(String.fromCharCode(10) + "flow labels with no Data Dictionary entry:");

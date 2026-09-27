@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TipsLadderManager 4.2 — Level 3</title>
+<style>
+  :root {
+    --bg: #0d0d1a;
+    --border: #2a2a4a;
+    --text: #c0c8e0;
+    --accent: #7070cc;
+    --entity: #1a1a2e;
+    --process: #1a2a4e;
+    --store: #1a2e1a;
+    --flow: #55558c;
+    --flow-text: #8b93b8;
+    --font: 'Segoe UI', system-ui, sans-serif;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    margin: 0;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+  }
+
+  .nav-header {
+    width: 100%;
+    max-width: 1200px;
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 50px;
+    padding: 25px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 30px;
+  }
+  .nav-header a {
+    color: var(--accent);
+    text-decoration: none;
+    font-size: 1.2rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .nav-header a:hover { color: #aaaaff; text-decoration: underline; }
+  .nav-header a.portal-link { font-size: 11px; font-weight: 700; color: #475569; background: #e2e8f0; border: 1px solid #cbd5e1; border-radius: 4px; padding: 2px 10px; text-decoration: none; letter-spacing: 0.02em; text-transform: none; }
+  .nav-header a.portal-link:hover { background: #1e293b; color: #ffffff; border-color: #1e293b; text-decoration: none; }
+
+  h1 {
+    font-size: 1.5rem;
+    font-weight: 300;
+    letter-spacing: 2px;
+    color: var(--accent);
+    margin: 0 0 25px;
+    text-align: center;
+  }
+
+  .diagram { width: 100%; max-width: 1400px; }
+  .diagram svg { width: 100%; height: auto; display: block; }
+
+  /* Shapes */
+  .entity rect {
+    fill: var(--entity);
+    stroke: var(--border);
+    stroke-width: 1;
+  }
+  .entity:hover rect { stroke: var(--accent); }
+  .entity .e-name { fill: #c8d0ea; font-size: 13.5px; }
+  .entity:hover .e-name { fill: #ffffff; }
+
+  .process circle {
+    fill: var(--process);
+    stroke: var(--accent);
+    stroke-width: 2;
+  }
+  .process:hover circle { stroke: #aaaaff; filter: drop-shadow(0 0 12px rgba(112,112,204,0.6)); }
+  .process .p-id { fill: #8fa0d8; font-size: 12px; letter-spacing: 1px; }
+  .process .p-name { fill: #eef0ff; font-size: 15px; font-weight: 600; }
+
+  /* A module: a shared code file called by two or more sibling processes. A square was
+     tried and rejected — a rectangle is already the entity shape, and two rectangular
+     categories on one diagram invites confusing a module for an entity. A circle in this
+     distinct color reads as "process-like, but not a pipeline step of this diagram"
+     instead (DFD_Worklist.md §2.0, knowledge/SharedModules.md). Reuses the process id
+     label class (.p-id) since that role is identical. */
+  .module circle {
+    fill: #3a2e1a;
+    stroke: #cc9a40;
+    stroke-width: 2;
+  }
+  .module:hover circle { stroke: #ffcc66; filter: drop-shadow(0 0 12px rgba(204,154,64,0.6)); }
+  .module .m-name { fill: #eef0ff; font-size: 11.5px; font-weight: 600; }
+
+  a.entity, a.process, a.module { cursor: pointer; text-decoration: none; }
+  a text, g.entity text { text-anchor: middle; font-family: var(--font); }
+
+  /* Flows */
+  .flow { stroke: var(--flow); stroke-width: 1.6; fill: none; }
+  .flow-label {
+    fill: var(--flow-text);
+    font-size: 13px;
+    font-family: var(--font);
+    stroke: var(--bg);
+    stroke-width: 5;
+    paint-order: stroke;
+    stroke-linejoin: round;
+  }
+
+  .legend text { fill: #6f78a0; font-size: 12px; font-family: var(--font); }
+  .legend rect.sw { fill: var(--entity); stroke: var(--border); }
+  .legend circle.sw { fill: var(--process); stroke: var(--accent); stroke-width: 1.5; }
+
+  .notes {
+    max-width: 900px;
+    margin-top: 30px;
+    font-size: 0.8rem;
+    color: #7a83aa;
+    line-height: 1.7;
+    text-align: center;
+  }
+  .notes a { color: var(--accent); }
+
+  .index {
+    max-width: 980px;
+    margin: 45px 0 20px;
+    border-top: 1px solid var(--border);
+    padding-top: 25px;
+  }
+  .index h2 {
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #666699;
+    margin: 0 0 6px;
+    text-align: center;
+  }
+  .index p { font-size: 0.8rem; color: #7a83aa; text-align: center; margin: 0 0 20px; line-height: 1.6; }
+  .index-group { margin-bottom: 14px; display: flex; flex-wrap: wrap; gap: 10px; align-items: baseline; justify-content: center; }
+  .index-group .g-label { font-size: 0.7rem; letter-spacing: 1.5px; text-transform: uppercase; color: #666699; font-weight: 700; width: 100%; text-align: center; }
+  .index-group a {
+    color: var(--text);
+    text-decoration: none;
+    font-size: 0.85rem;
+    border: 1px solid var(--border);
+    background: var(--entity);
+    border-radius: 4px;
+    padding: 5px 12px;
+  }
+  .index-group a:hover { border-color: var(--accent); color: #ffffff; }
+  .flow-label a { cursor: pointer; }
+  tspan.lk { fill: #a8b2e0; text-decoration: underline; text-decoration-style: dotted; }
+  .flow-label a:hover tspan.lk { fill: #ffffff; }
+</style>
+<style>
+  .cat-band { fill-opacity: 0.13; stroke-opacity: 0.55; stroke-width: 1.5; }
+  .cat-label { font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.85; }
+  .store line { stroke: #4a8a4a; stroke-width: 2; }
+  .store:hover line { stroke: #7ada7a; }
+  .store .s-name { fill: #a8e6a8; font-size: 13px; }
+  a.store { cursor: pointer; text-decoration: none; }
+  .process .p-name { font-size: 12.5px; }
+  .process .p-app { fill: #c8d0ea; font-size: 12px; font-style: italic; text-anchor: middle; }
+  .flow-label { font-size: 12px; }
+  .flow-label a { cursor: pointer; }
+  tspan.lk { fill: #a8b2e0; text-decoration: underline; text-decoration-style: dotted; }
+  .flow-label a:hover tspan.lk { fill: #ffffff; }
+  .nav-header .spec-link { margin-left: auto; }
+  .diagram { max-width: 1180px; }
+</style>
+</head>
+<body>
+
+<div class="nav-header">
+  <a href="../" class="portal-link">&#8592; Portal</a>
+  <a href="DFD_LEVEL2_TIPSLADDERMANAGER.html">&#8593; Level 2 — TipsLadderManager (draft)</a>
+</div>
+
+<h1>Level 3 &mdash; TipsLadderManager 4.2 Import holdings and DARA plan</h1>
+
+<div class="diagram">
+<svg viewBox="0 0 1180 560" role="img" aria-label="Level 3: TipsLadderManager 4.2, two independent parses of the same uploaded file -- one for CUSIP rows, one for a DARA plan and construction parameters.">
+  <defs><marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#55558c"/></marker></defs>
+  <path class="flow" d="M 265.0 90.0 Q 350.3 114.2 423.8 163.9" marker-end="url(#a1)"/>
+  <text class="flow-label" x="269" y="74">TIPS map  ←  4.1</text>
+  <path class="flow" d="M 210.0 190.0 Q 314.0 173.4 418.0 190.0" marker-end="url(#a1)"/>
+  <path class="flow" d="M 210.0 400.0 Q 314.0 383.4 418.0 400.0" marker-end="url(#a1)"/>
+  <text class="flow-label" x="217" y="287">imported file</text>
+  <g class="entity"><rect x="60" y="165" width="145" height="260" rx="3"/><text class="e-name" x="132.5" y="300">User</text></g>
+  <path class="flow" d="M 542.0 190.0 Q 855.0 139.9 1168.0 190.0" marker-end="url(#a1)"/>
+  <text class="flow-label" x="1164" y="182" text-anchor="end">holdings  →  4.4</text>
+  <path class="flow" d="M 542.0 400.0 Q 855.0 349.9 1168.0 400.0" marker-end="url(#a1)"/>
+  <text class="flow-label" x="1164" y="392" text-anchor="end">DARA plan  →  4.3 and 4.4</text>
+  <a class="process" href="viewer.html#/md/TipsLadderManager/knowledge/2.1_Broker_Import.md">
+    <circle cx="480" cy="190" r="62"/>
+    <text class="p-id" x="480" y="170">4.2.1</text>
+    <text class="p-name" x="480" y="191">Detect and parse</text>
+    <text class="p-name" x="480" y="207">holdings file</text>
+  </a>
+  <a class="process" href="viewer.html#/md/TipsLadderManager/knowledge/2.1_Broker_Import.md">
+    <circle cx="480" cy="400" r="62"/>
+    <text class="p-id" x="480" y="380">4.2.2</text>
+    <text class="p-name" x="480" y="401">Parse DARA plan</text>
+    <text class="p-name" x="480" y="417">and parameters</text>
+  </a>
+</svg>
+</div>
+
+<p class="notes">
+  <b>4.2 is renamed from the Level 2 draft's "Import holdings"</b> — reviewing that draft is what surfaced this: a DARA plan is not holdings, and the app has a whole second, independent import path for it (a standalone plan file with no CUSIP rows at all, or a plan riding inside a CUSIP/Qty file as trailing metadata). Two processes, not one, because the code makes them two independent parses of the same text: 4.2.1 looks for CUSIP rows (five formats: two broker exports, a bare cusip,qty file, tipsladder.com's own format, and this app's own prior export), 4.2.2 looks for a `#fundedYear,dara` marker and a `#params` line. Neither depends on the other finding anything.
+  <b>A real duplicate found here, not fixed (diagrams only this pass):</b> the holdings parse has three separate CSV-splitting implementations doing the same job at different levels of care — `shared/src/csv.js` (M1, registered for 4.1, quote-aware), `TipsLadderManager/src/broker-import.js`'s own `parseCSVLine` (also quote-aware, used only here), and a third, bare `line.split(',')` inline in index.html for the three non-broker formats (no quote handling at all). None of the three call into either of the others. Logged in DFD_Worklist.md.
+  <b>The holdings-file-as-entity question is resolved, not deferred.</b> Unlike FedInvest (E1) or Fidelity Fixed Income (E6), no single named source describes what a holder might upload here — a Fidelity or Schwab or Vanguard export, a hand-typed cusip/qty list, a tipsladder.com file, or this app's own prior export. The holder chooses and provides whichever one, so it stays a User flow rather than an entity.
+  Every href on this diagram is a placeholder pointing at the existing TipsLadderManager/knowledge/2.1_Broker_Import.md — real per-process specs are the next phase, once the Level 2/3 shape itself is settled.
+</p>
+
+</body>
+</html>
