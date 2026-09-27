@@ -279,7 +279,7 @@ function level1() {
   ];
   // Each app is named as the portal names it.
   const apps = [
-    { key: 'lm', cat: 'workflow', name: ['Ladder', 'Manager'], spec: V('knowledge/TipsLadderManager.md'), reads: ['fedinv', 'tipsref', 'refcpi', 'sasao', 'hol'] },
+    { key: 'lm', cat: 'workflow', name: ['Ladder', 'Manager'], spec: 'DFD_LEVEL2_TIPSLADDERMANAGER.html', reads: ['fedinv', 'quotes', 'tipsref', 'refcpi', 'sasao', 'hol'] },
     { key: 'tr', cat: 'reference', name: ['TIPS', 'Reference'], spec: V('TipsReference/knowledge/1.0_TIPS_Reference.md'), reads: ['tipsref', 'refcpi', 'sasao', 'hol'] },
     { key: 'pr', cat: 'educational', name: ['Treasury', 'Primer'], spec: V('Primer/knowledge/1.0_Primer.md'), reads: ['fedinv', 'tipsref', 'refcpi'] },
     { key: 'ce', cat: 'reference', name: ['CPI', 'Explorer'], spec: V('CpiExplorer/knowledge/1.0_Overview.md'), reads: ['refcpi', 'cpihist'] },
@@ -902,6 +902,80 @@ function level3IngestFedInvest() {
   });
 }
 
+// ── Level 2: TipsLadderManager (draft — maps directly onto today's code and data
+// flows; not yet a designed decomposition. See DFD_Worklist.md for the open questions
+// this draft is meant to surface: whether Build and Rebalance stay two processes,
+// and how a user-supplied CSV file should be modeled.) ─────────────────────────────
+function level2TipsLadderManager() {
+  const stores = [
+    { id: 'quotes', name: 'Market quotes', href: DS('s7') },
+    { id: 'tipsref', name: 'TIPS reference data', href: DS('s2') },
+    { id: 'refcpi', name: 'Ref CPI', href: DS('s3') },
+    { id: 'sasao', name: 'SA and SAO yields', href: DS('s10') },
+    { id: 'hol', name: 'Bond holidays', href: DS('s16') },
+  ];
+  const procs = [
+    { id: '4.1', name: ['Load market', 'data'], href: V('TipsLadderManager/knowledge/3.1_Data_Pipeline.md'), reads: ['quotes', 'tipsref', 'refcpi', 'sasao', 'hol'],
+      out: { '4.2': ['TIPS map'], '4.3': ['TIPS map'], '4.4': ['TIPS map'] } },
+    { id: '4.2', name: ['Import', 'holdings'], href: V('TipsLadderManager/knowledge/2.1_Broker_Import.md'), reads: [],
+      out: { '4.3': ['DARA plan'], '4.4': ['holdings', 'DARA plan'] } },
+    { id: '4.3', name: ['Build', 'ladder'], href: V('TipsLadderManager/knowledge/2.0_TIPS_Ladders.md'), reads: [], out: { '4.5': ['build result'] } },
+    { id: '4.4', name: ['Rebalance', 'ladder'], href: V('TipsLadderManager/knowledge/3.0_TIPS_Ladder_Rebalancing.md'), reads: [], out: { '4.5': ['rebalance result'] } },
+    { id: '4.5', name: ['Render', 'and export'], href: V('TipsLadderManager/knowledge/5.0_UI_Schema.md'), reads: [], out: {} },
+  ];
+  const SX = 40, SW = 215, PR = 58, UX = 1240, UW = 145;
+  const sy = i => 150 + i * 150;
+  const px = { '4.1': 440, '4.2': 700, '4.3': 950, '4.4': 950, '4.5': 1000 };
+  const py = { '4.1': 450, '4.2': 210, '4.3': 330, '4.4': 660, '4.5': 495 };
+  const H = 900, W = 1450;
+  const OBS = procs.map(q => ({ x: px[q.id], y: py[q.id], r: PR }));
+  const LBL = [];
+  const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 2 draft for TipsLadderManager: five processes reading five data stores, a holdings file and typed parameters from the user. No process writes a data store.">`, marker()];
+  const sIdx = Object.fromEntries(stores.map((s, i) => [s.id, i]));
+  procs.forEach(p => p.reads.forEach(id => {
+    const y = sy(sIdx[id]), [x2, y2] = toCircle(SX + SW + 5, y, px[p.id], py[p.id], PR);
+    P.push(flow(SX + SW + 5, y, x2, y2, { obstacles: OBS }));
+  }));
+  P.push(internalFlows(procs, px, py, PR, OBS, LBL));
+  // The user supplies a holdings file to 4.2, and typed run parameters directly to both
+  // 4.3 and 4.4 — this app has no single rendering process that is the user's only point
+  // of contact, unlike Yield Curves or Yields Monitor. Three inbound flows and one
+  // outbound, all against one tall User box, rather than the single in/out pair seen
+  // elsewhere.
+  const flowToUser = (id, label, above) => {
+    const [x1, y1] = fromCircle(px[id], py[id], PR, UX, py[id]);
+    const yy = py[id] + (above ? -10 : 10);
+    P.push(flow(x1, yy, UX - 5, yy, { obstacles: OBS.filter(o => !(o.x === px[id] && o.y === py[id])) }));
+    P.push(labelAt((x1 + UX) / 2, yy + (above ? -8 : 16), label, 'middle'));
+  };
+  const flowFromUser = (id, label, above) => {
+    const [x2, y2] = toCircle(UX - 5, py[id], px[id], py[id], PR);
+    const yy = py[id] + (above ? -10 : 10);
+    P.push(flow(UX - 5, yy, x2, yy, { obstacles: OBS.filter(o => !(o.x === px[id] && o.y === py[id])) }));
+    P.push(labelAt((x2 + UX) / 2, yy + (above ? -8 : 16), label, 'middle'));
+  };
+  flowFromUser('4.2', 'holdings file', false);
+  flowFromUser('4.3', 'ladder parameters', true);
+  flowFromUser('4.4', 'ladder parameters', true);
+  flowToUser('4.5', 'ladder table', true);
+  flowToUser('4.5', 'ladder export', false);
+  P.push(`  <g class="entity"><rect x="${UX}" y="80" width="${UW}" height="${H - 160}" rx="3"/><text class="e-name" x="${UX + UW / 2}" y="${H / 2}">User</text></g>`);
+  stores.forEach((s, i) => P.push(storeShape(SX, sy(i), SW, s.href, s.name)));
+  procs.forEach(p => P.push(procShape(px[p.id], py[p.id], PR, p.href, p.id, p.name)));
+  P.push('</svg>');
+
+  return page({
+    title: 'TipsLadderManager — Level 2 (draft)', h1: 'Level 2 &mdash; TipsLadderManager (draft)', maxWidth: W,
+    up: 'DFD_LEVEL1.html', upLabel: 'Level 1',
+    spec: V('knowledge/TipsLadderManager.md'), specLabel: 'TipsLadderManager overview', svg: P.join(NL),
+    notes: ['  <b>Draft, not a finished decomposition.</b> This maps five processes directly onto today\'s code (shared/src/market-data.js, and TipsLadderManager/src/broker-import.js, build-lib.js, rebalance-lib.js, render.js) so the shape can be reviewed before anything is renumbered or specced. It supersedes nothing yet — the existing knowledge/TipsLadderManager.md Mermaid diagram and the TipsLadderManager/knowledge/1.0-6.0 numbering are reference material only, being pre-template.',
+      '  <b>Open question 1 — Build vs. Rebalance.</b> 4.3 and 4.4 are drawn as two processes because that is how the code is entered today (runBuild vs. runFundedRebalance, with different inputs — 4.4 alone reads holdings). Both call the same underlying engine (ladder-core.js, gap-math.js, allocation-policy.js, shape-math.js), shown here as ordinary implementation detail inside each process—the same way shared/src/bond-math.js is never drawn as its own box even though nearly every process in this portal calls it. Decomposing to Level 3 would not duplicate that shared engine as two boxes; each of 4.3/4.4 would simply cite the same shared functions, as 3.1.7/3.1.8 already do for their own shared calculation.',
+      '  <b>Open question 2 — the holdings file.</b> The CSV a holder uploads (a broker export, a DARA-plan file, or this app’s own CUSIP/Qty export) is drawn here as a flow from User into 4.2, on the theory that the user, not the brokerage, is the one choosing and supplying it — unlike FedInvest (E1) or Fidelity Fixed Income (E6), this app never reaches out to a broker itself. The alternative, per the entity-is-the-source rule already applied to CNBC (DFD_Worklist.md &sect;4.0): draw the brokerage as its own external entity, since the file’s origin is really Fidelity/Schwab/Vanguard even though the mechanism of reaching this app is a manual upload rather than an API. Not resolved here.',
+      '  4.1 reads Market quotes (S7), the live default (`YIELD_SOURCE` in shared/src/market-data.js). FedInvest prices (S1) is the same module’s dormant cross-check path (same source data, same aux fetches) and is not drawn.',
+      '  Flow labels here (TIPS map, DARA plan, build result, rebalance result, ladder parameters, ladder table, ladder export, holdings file) are provisional — none has a Data Dictionary entry yet, so none is linked. Naming them for real is spec work, once the process shape itself is settled.'].join(NL)
+  });
+}
+
 // ── emit ────────────────────────────────────────────────────────────────────
 const outputs = [
   ['knowledge/DFD_LEVEL1.html', level1()],
@@ -912,6 +986,7 @@ const outputs = [
   ['knowledge/DFD_LEVEL3_YC_RENDER.html', level3YieldCurvesRender()],
   ['knowledge/DFD_LEVEL2_YIELDSMONITOR.html', level2YieldsMonitor()],
   ['knowledge/DFD_LEVEL3_YM_ASSEMBLE.html', level3YieldsMonitorAssemble()],
+  ['knowledge/DFD_LEVEL2_TIPSLADDERMANAGER.html', level2TipsLadderManager()],
 ];
 if (unlinked.size) {
   console.log(String.fromCharCode(10) + "flow labels with no Data Dictionary entry:");
