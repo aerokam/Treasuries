@@ -985,11 +985,9 @@ function level2TipsLadderManager() {
     title: 'TipsLadderManager — Level 2 (draft)', h1: 'Level 2 &mdash; TipsLadderManager (draft)', maxWidth: W,
     up: 'DFD_LEVEL1.html', upLabel: 'Level 1',
     spec: V('knowledge/TipsLadderManager.md'), specLabel: 'TipsLadderManager overview', svg: P.join(NL),
-    notes: ['  <b>Draft, not a finished decomposition.</b> This maps five processes directly onto today\'s code (shared/src/market-data.js, and TipsLadderManager/src/broker-import.js, build-lib.js, rebalance-lib.js, render.js) so the shape can be reviewed before anything is renumbered or specced. It supersedes nothing yet — the existing knowledge/TipsLadderManager.md Mermaid diagram and the TipsLadderManager/knowledge/1.0-6.0 numbering are reference material only, being pre-template.',
-      '  <b>Open question 1 — Build vs. Rebalance.</b> 4.3 and 4.4 are drawn as two processes because that is how the code is entered today (runBuild vs. runFundedRebalance, with different inputs — 4.4 alone reads holdings). Both call the same underlying engine (ladder-core.js, gap-math.js, allocation-policy.js, shape-math.js), shown here as ordinary implementation detail inside each process—the same way shared/src/bond-math.js is never drawn as its own box even though nearly every process in this portal calls it. Decomposing to Level 3 would not duplicate that shared engine as two boxes; each of 4.3/4.4 would simply cite the same shared functions, as 3.1.7/3.1.8 already do for their own shared calculation.',
-      '  <b>Open question 2 — the imported file — resolved at Level 3.</b> 4.2 explodes into two independent parses of the same uploaded text (holdings rows; a DARA plan and construction parameters), and the file itself stays a User flow rather than an external entity: unlike FedInvest (E1) or Fidelity Fixed Income (E6), no single named source describes what might be uploaded here — a Fidelity, Schwab or Vanguard export, a hand-typed cusip/qty file, tipsladder.com\'s own format, or this app\'s own prior export — so there is no one source to name as an entity. See <a href="DFD_LEVEL3_TLM_IMPORT.html">4.2\'s own Level 3</a>.',
-      '  4.1 reads Market quotes (S7), the live default (`YIELD_SOURCE` in shared/src/market-data.js). FedInvest prices (S1) is the same module’s dormant cross-check path (same source data, same aux fetches) and is not drawn.',
-      '  Flow labels here (TIPS map, DARA plan, build result, rebalance result, ladder parameters, ladder table, ladder export, holdings file) are provisional — none has a Data Dictionary entry yet, so none is linked. Naming them for real is spec work, once the process shape itself is settled.'].join(NL)
+    notes: ['  <b>Draft, mapped directly onto today\'s code — not yet a finished decomposition.</b> See <a href="viewer.html#/md/knowledge/DFD_Worklist.md">DFD_Worklist.md</a> item 27 for the open questions and findings behind this diagram.',
+      '  4.1 reads Market quotes (S7), the live default; FedInvest prices (S1) is the same module\'s dormant fallback and is not drawn.',
+      '  Flow labels here have no Data Dictionary entry yet — naming them for real is spec work.'].join(NL)
   });
 }
 
@@ -1064,10 +1062,9 @@ function level3TipsLadderManagerLoadMarketData() {
   return page({
     title: 'TipsLadderManager 4.1 — Level 3', h1: 'Level 3 &mdash; TipsLadderManager 4.1 Load market data', maxWidth: W,
     up: 'DFD_LEVEL2_TIPSLADDERMANAGER.html', upLabel: 'Level 2 — TipsLadderManager (draft)', svg: P.join(NL),
-    notes: ['  <b>4.1.1 and 4.1.2 are alternatives, not a pipeline.</b> Exactly one runs, chosen by a hardcoded constant (`YIELD_SOURCE` in `shared/src/market-data.js`) rather than by anything the user or the data selects at run time. Today that constant selects 4.1.1: Market quotes (S7) is the live default and FedInvest prices (S1) is a dormant cross-check path (DFD_Worklist.md §3.0 item 7).',
-      '  <b>The amber circles are shared modules, not process steps of this diagram.</b> `settlement.js`, `bond-math.js` and `fidelity-parse.js` (4.1.1) and `csv.js` (4.1.2, 4.1.3) are real files called from here and from other processes across the portal — YieldCurves\' 3.1.7/3.1.8 also call bond-math.js, 3.1.2 also calls fidelity-parse.js. Each is registered once in <a href="' + M() + '">SharedModules.md</a>; drilling into any of its other callers reaches the identical spec.',
-      '  <b>4.1.4 is named for what it does, not for the file it lives in.</b> `buildTipsMapFromYields` is exported from `TipsLadderManager/src/rebalance-lib.js`, a name that suggests Rebalance-only logic, but it runs once for every page load — before Build or Rebalance — and neither mode owns it. Worth a code-organization cleanup later (moving it out of rebalance-lib.js); not done here, since this pass is diagrams only.',
-      '  Every 4.1.x href on this diagram is a placeholder pointing at the same pre-template doc (TipsLadderManager has no per-process spec text yet — that is the next phase, once the Level 2/3 shape itself is settled), and that placeholder is itself a mismatch: 3.1_Data_Pipeline.md describes process 1\'s acquisition jobs, not this runtime fetch. The M1-M4 module links are real and final — SharedModules.md is a proper spec already.'].join(NL)
+    notes: ['  4.1.1 and 4.1.2 are alternatives, not a pipeline: exactly one runs, chosen by a hardcoded constant, not by the user.',
+      '  The amber circles are shared modules (<a href="' + M() + '">SharedModules.md</a>), not process steps of this diagram.',
+      '  See <a href="viewer.html#/md/knowledge/DFD_Worklist.md">DFD_Worklist.md</a> item 27 for what this pass found and logged.'].join(NL)
   });
 }
 
@@ -1116,10 +1113,8 @@ function level3TipsLadderManagerImport() {
   return page({
     title: 'TipsLadderManager 4.2 — Level 3', h1: 'Level 3 &mdash; TipsLadderManager 4.2 Import holdings and DARA plan', maxWidth: W,
     up: 'DFD_LEVEL2_TIPSLADDERMANAGER.html', upLabel: 'Level 2 — TipsLadderManager (draft)', svg: P.join(NL),
-    notes: ['  <b>4.2 is renamed from the Level 2 draft\'s "Import holdings"</b> — reviewing that draft is what surfaced this: a DARA plan is not holdings, and the app has a whole second, independent import path for it (a standalone plan file with no CUSIP rows at all, or a plan riding inside a CUSIP/Qty file as trailing metadata). Two processes, not one, because the code makes them two independent parses of the same text: 4.2.1 looks for CUSIP rows (five formats: two broker exports, a bare cusip,qty file, tipsladder.com\'s own format, and this app\'s own prior export), 4.2.2 looks for a `#fundedYear,dara` marker and a `#params` line. Neither depends on the other finding anything.',
-      '  <b>A real duplicate found here, not fixed (diagrams only this pass):</b> the holdings parse has three separate CSV-splitting implementations doing the same job at different levels of care — `shared/src/csv.js` (M1, registered for 4.1, quote-aware), `TipsLadderManager/src/broker-import.js`\'s own `parseCSVLine` (also quote-aware, used only here), and a third, bare `line.split(\',\')` inline in index.html for the three non-broker formats (no quote handling at all). None of the three call into either of the others. Logged in DFD_Worklist.md.',
-      '  <b>The holdings-file-as-entity question is resolved, not deferred.</b> Unlike FedInvest (E1) or Fidelity Fixed Income (E6), no single named source describes what a holder might upload here — a Fidelity or Schwab or Vanguard export, a hand-typed cusip/qty list, a tipsladder.com file, or this app\'s own prior export. The holder chooses and provides whichever one, so it stays a User flow rather than an entity.',
-      '  Every href on this diagram is a placeholder pointing at the existing TipsLadderManager/knowledge/2.1_Broker_Import.md — real per-process specs are the next phase, once the Level 2/3 shape itself is settled.'].join(NL)
+    notes: ['  Renamed from the Level 2 draft\'s "Import holdings": two independent parses of one uploaded file, neither depending on the other finding anything.',
+      '  See <a href="viewer.html#/md/knowledge/DFD_Worklist.md">DFD_Worklist.md</a> item 27 for what this pass found and logged, including a real code duplicate.'].join(NL)
   });
 }
 

@@ -214,10 +214,8 @@
 </div>
 
 <p class="notes">
-  <b>4.2 is renamed from the Level 2 draft's "Import holdings"</b> — reviewing that draft is what surfaced this: a DARA plan is not holdings, and the app has a whole second, independent import path for it (a standalone plan file with no CUSIP rows at all, or a plan riding inside a CUSIP/Qty file as trailing metadata). Two processes, not one, because the code makes them two independent parses of the same text: 4.2.1 looks for CUSIP rows (five formats: two broker exports, a bare cusip,qty file, tipsladder.com's own format, and this app's own prior export), 4.2.2 looks for a `#fundedYear,dara` marker and a `#params` line. Neither depends on the other finding anything.
-  <b>A real duplicate found here, not fixed (diagrams only this pass):</b> the holdings parse has three separate CSV-splitting implementations doing the same job at different levels of care — `shared/src/csv.js` (M1, registered for 4.1, quote-aware), `TipsLadderManager/src/broker-import.js`'s own `parseCSVLine` (also quote-aware, used only here), and a third, bare `line.split(',')` inline in index.html for the three non-broker formats (no quote handling at all). None of the three call into either of the others. Logged in DFD_Worklist.md.
-  <b>The holdings-file-as-entity question is resolved, not deferred.</b> Unlike FedInvest (E1) or Fidelity Fixed Income (E6), no single named source describes what a holder might upload here — a Fidelity or Schwab or Vanguard export, a hand-typed cusip/qty list, a tipsladder.com file, or this app's own prior export. The holder chooses and provides whichever one, so it stays a User flow rather than an entity.
-  Every href on this diagram is a placeholder pointing at the existing TipsLadderManager/knowledge/2.1_Broker_Import.md — real per-process specs are the next phase, once the Level 2/3 shape itself is settled.
+  Renamed from the Level 2 draft's "Import holdings": two independent parses of one uploaded file, neither depending on the other finding anything.
+  See <a href="viewer.html#/md/knowledge/DFD_Worklist.md">DFD_Worklist.md</a> item 27 for what this pass found and logged, including a real code duplicate.
 </p>
 
 </body>

@@ -285,11 +285,9 @@
 </div>
 
 <p class="notes">
-  <b>Draft, not a finished decomposition.</b> This maps five processes directly onto today's code (shared/src/market-data.js, and TipsLadderManager/src/broker-import.js, build-lib.js, rebalance-lib.js, render.js) so the shape can be reviewed before anything is renumbered or specced. It supersedes nothing yet — the existing knowledge/TipsLadderManager.md Mermaid diagram and the TipsLadderManager/knowledge/1.0-6.0 numbering are reference material only, being pre-template.
-  <b>Open question 1 — Build vs. Rebalance.</b> 4.3 and 4.4 are drawn as two processes because that is how the code is entered today (runBuild vs. runFundedRebalance, with different inputs — 4.4 alone reads holdings). Both call the same underlying engine (ladder-core.js, gap-math.js, allocation-policy.js, shape-math.js), shown here as ordinary implementation detail inside each process—the same way shared/src/bond-math.js is never drawn as its own box even though nearly every process in this portal calls it. Decomposing to Level 3 would not duplicate that shared engine as two boxes; each of 4.3/4.4 would simply cite the same shared functions, as 3.1.7/3.1.8 already do for their own shared calculation.
-  <b>Open question 2 — the imported file — resolved at Level 3.</b> 4.2 explodes into two independent parses of the same uploaded text (holdings rows; a DARA plan and construction parameters), and the file itself stays a User flow rather than an external entity: unlike FedInvest (E1) or Fidelity Fixed Income (E6), no single named source describes what might be uploaded here — a Fidelity, Schwab or Vanguard export, a hand-typed cusip/qty file, tipsladder.com's own format, or this app's own prior export — so there is no one source to name as an entity. See <a href="DFD_LEVEL3_TLM_IMPORT.html">4.2's own Level 3</a>.
-  4.1 reads Market quotes (S7), the live default (`YIELD_SOURCE` in shared/src/market-data.js). FedInvest prices (S1) is the same module’s dormant cross-check path (same source data, same aux fetches) and is not drawn.
-  Flow labels here (TIPS map, DARA plan, build result, rebalance result, ladder parameters, ladder table, ladder export, holdings file) are provisional — none has a Data Dictionary entry yet, so none is linked. Naming them for real is spec work, once the process shape itself is settled.
+  <b>Draft, mapped directly onto today's code — not yet a finished decomposition.</b> See <a href="viewer.html#/md/knowledge/DFD_Worklist.md">DFD_Worklist.md</a> item 27 for the open questions and findings behind this diagram.
+  4.1 reads Market quotes (S7), the live default; FedInvest prices (S1) is the same module's dormant fallback and is not drawn.
+  Flow labels here have no Data Dictionary entry yet — naming them for real is spec work.
 </p>
 
 </body>
