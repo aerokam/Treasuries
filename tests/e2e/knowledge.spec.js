@@ -7,7 +7,7 @@ import { test, expect } from '@playwright/test';
 // wording of any one bubble.
 test.describe('Knowledge Map and Viewer', () => {
   test('drills from the context diagram to level 1 and into an app', async ({ page }) => {
-    await page.goto('/knowledge/KNOWLEDGE_MAP.html');
+    await page.goto('/knowledge/DFD_LEVEL0.html');
     await expect(page.locator('h1')).toContainText('Context Diagram');
 
     await page.locator('a[href="DFD_LEVEL1.html"]').first().click();
@@ -62,7 +62,11 @@ test.describe('Knowledge Map and Viewer', () => {
   });
 
   test('follows an internal link inside a rendered mermaid diagram', async ({ page }) => {
-    await page.goto('/knowledge/viewer.html#/md/knowledge/TipsLadderManager.md');
+    // TreasuryAuctions.md is one of the two remaining pre-template apps still carrying a
+    // hand-drawn Mermaid diagram (TipsLadderManager's own copy was replaced by the generated
+    // DFD_LEVEL2_TIPSLADDERMANAGER.html); this test only exercises the viewer's Mermaid
+    // click-through wiring, not any one app's diagram content.
+    await page.goto('/knowledge/viewer.html#/md/knowledge/TreasuryAuctions.md');
 
     const mermaidSvg = page.locator('.mermaid svg');
     await expect(mermaidSvg).toBeVisible({ timeout: 15000 });
@@ -73,7 +77,7 @@ test.describe('Knowledge Map and Viewer', () => {
     // The target is whatever the diagram currently points at; what matters is
     // that the click loads another document rather than leaving the viewer.
     await expect(page).toHaveURL(/#\/md\/.+\.md/, { timeout: 10000 });
-    await expect(page).not.toHaveURL(/TipsLadderManager\.md$/);
+    await expect(page).not.toHaveURL(/TreasuryAuctions\.md$/);
     await expect(page.locator('#content h1')).toBeVisible({ timeout: 10000 });
   });
 

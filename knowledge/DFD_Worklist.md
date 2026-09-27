@@ -10,7 +10,7 @@ State of the levelled data flow diagrams and the spec rewrite that goes with the
 
 | Level | File | Generated |
 |---|---|---|
-| 0, context | `knowledge/KNOWLEDGE_MAP.html` | no, hand-written |
+| 0, context | `knowledge/DFD_LEVEL0.html` | no, hand-written |
 | 1 | `knowledge/DFD_LEVEL1.html` | yes |
 | 2, process 1 | `knowledge/DFD_LEVEL2_INGESTION.html` | yes |
 | 2, Yield Curves | `knowledge/DFD_LEVEL2_YIELDCURVES.html` | yes |

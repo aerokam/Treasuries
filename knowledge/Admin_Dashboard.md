@@ -51,15 +51,15 @@ The top-level portal (`index.html`) shows a discreet **"Dashboard Monitor →"**
 
 The knowledge base is a set of static files served by `npx serve . -p 8080` (the same static server used for Playwright tests). There are two entry points:
 
-- **`/knowledge/KNOWLEDGE_MAP`** — the visual DFD context diagram (`knowledge/KNOWLEDGE_MAP.html`). This is the top-level navigation hub; all app overviews and spec docs link out from here.
+- **`/knowledge/DFD_LEVEL0`** — the visual DFD context diagram (`knowledge/DFD_LEVEL0.html`), Level 0 of the levelled data flow diagrams (`DFD_Worklist.md` §1.0). This is the top-level navigation hub; all app overviews and spec docs are reachable from here, by drilling down through Level 1, 2 and 3 or via the flat Spec Index below the diagram. "Knowledge Map" is the user-facing name for that whole reachable set of diagrams and specs, not for this one file — this file is only its top level.
 - **`/knowledge/viewer#/md/<path>`** — the markdown viewer (`knowledge/viewer.html`). Fetches any `.md` file in the repo and renders it with syntax highlighting, Mermaid diagrams, and CSV preview inline.
 
 **Routing rules inside the viewer:**
 - Only `.md` files should be targeted as viewer hash paths. The viewer guards against `.html` targets: if the hash ever resolves to a `.html` file, it immediately redirects to that file's direct URL instead of trying to render its HTML source as markdown.
-- The `← KNOWLEDGE MAP` nav link uses the absolute path `/knowledge/KNOWLEDGE_MAP` (not a relative `.html` reference) to ensure it always navigates out of the viewer regardless of the current hash state.
+- The `← KNOWLEDGE MAP` nav link is a relative `DFD_LEVEL0.html` reference, resolved against `knowledge/`, the only directory the viewer is ever opened from.
 
 **URL conventions:**
-- `npx serve` strips `.html` extensions and serves clean URLs. Always reference these files by their clean URL (`/knowledge/KNOWLEDGE_MAP`, `/knowledge/viewer`), not by the `.html` filename. Source `href` attributes may still contain `.html` but the browser will be redirected to the clean URL.
+- `npx serve` strips `.html` extensions and serves clean URLs. Always reference these files by their clean URL (`/knowledge/DFD_LEVEL0`, `/knowledge/viewer`), not by the `.html` filename. Source `href` attributes may still contain `.html` but the browser will be redirected to the clean URL.
 
 ---
 

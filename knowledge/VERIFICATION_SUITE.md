@@ -3,19 +3,19 @@
 Follow these steps to verify that the navigation, rendering, and drill-down features are working correctly.
 
 ## 1. Context Diagram & Top-Level Navigation
-- [ ] Open `http://localhost:8080/knowledge/KNOWLEDGE_MAP`.
+- [ ] Open `http://localhost:8080/knowledge/DFD_LEVEL0`.
 - [ ] **Top Header**: Verify the only link above the diagram is the **Portal** back link. Everything else is reached by drilling into the diagram, or from the Spec Index below it.
 - [ ] **Diagram Shape**: Verify one process circle, **0 Treasury Investors Portal**, with the twelve external entities and the **User** around it. Every flow arrow carries a label, and no data store is drawn at this level.
 - [ ] **Spec Index**: Click **TipsLadderManager**.
     - *Expected*: Opens the rendered Overview in the viewer.
 - [ ] **Back Navigation**: From inside the viewer, click **← KNOWLEDGE MAP**.
-    - *Expected*: Returns to `/knowledge/KNOWLEDGE_MAP` (the full visual map). The viewer should not attempt to render an HTML file — if the guard trips, it redirects automatically.
+    - *Expected*: Returns to `/knowledge/DFD_LEVEL0` (the full visual map). The viewer should not attempt to render an HTML file — if the guard trips, it redirects automatically.
 - [ ] **Spec Index**: Click **Data Stores**.
     - *Expected*: Opens the detailed `DataStores.md` spec in the viewer.
 - [ ] **Source Drilling**: Click **FedInvest** in the map.
     - *Expected*: Opens `DATA_DICTIONARY.md` at the E1 schema section, which states the `Prices For:` date and the eight columns of the price table.
 - [ ] **Process Drilling**: Click the **0 Treasury Investors Portal** circle.
-    - *Expected*: Opens `Portal.md` in the viewer. (Replaced by the Level 1 diagram once it is drawn.)
+    - *Expected*: Opens the Level 1 diagram (`DFD_LEVEL1.html`).
 
 ## 2. Document Drill-Down (Inside Apps)
 - [ ] Open **TipsLadderManager Overview** via the Map.

@@ -2,7 +2,9 @@
 // Builds the levelled data flow diagrams under knowledge/ from the model below.
 // Run: node scripts/build-dfd.cjs
 //
-// Level 0 (knowledge/KNOWLEDGE_MAP.html) is hand-written and not generated here.
+// Level 0 (knowledge/DFD_LEVEL0.html, the context diagram) is hand-written and not generated
+// here. It is one level of the Knowledge Map, not the whole of it -- the user-facing term
+// covers every diagram and spec the portal has, not this one file.
 // Everything else is, so a diagram is never hand-edited out of step with its model.
 //
 // Naming: below Level 1 a process is named by a verb phrase stating what it does, with no
@@ -226,7 +228,7 @@ function barycentre(stores, apps) {
 }
 
 // ── page shell ──────────────────────────────────────────────────────────────
-const mapHtml = fs.readFileSync(path.join(ROOT, 'knowledge/KNOWLEDGE_MAP.html'), 'utf8');
+const mapHtml = fs.readFileSync(path.join(ROOT, 'knowledge/DFD_LEVEL0.html'), 'utf8');
 const sharedStyle = mapHtml.slice(mapHtml.indexOf('<style>'), mapHtml.indexOf('</style>') + 8);
 
 function page({ title, h1, up, upLabel, spec, specLabel, svg, notes, maxWidth }) {
@@ -385,12 +387,12 @@ function level1() {
 
   return page({
     title: 'Treasury Investors Portal — Level 1', h1: 'Level 1', maxWidth: W,
-    up: 'KNOWLEDGE_MAP.html', upLabel: 'Context Diagram', svg: P.join(NL),
+    up: 'DFD_LEVEL0.html', upLabel: 'Context Diagram', svg: P.join(NL),
     notes: ['  Process 1 writes every store drawn here. No app writes one: the apps read, and the scheduled jobs inside process 1 do all the writing.',
       '  Process 1 explodes at Level 2 into those jobs, one per store it writes.',
       '  The stores are drawn as one shape. Level 1 answers which app reads what rather than which file, and the shape opens the full list.',
       '  Three of those files are read by no app: YieldCurves.csv, BreakevenInflation.csv and BidAskSpreads.csv. They are written for the user to pull into a spreadsheet, so their flow goes to the user rather than to a process.',
-      '  External entities are not redrawn at this level. Their fourteen flows are drawn against each entity on the <a href="KNOWLEDGE_MAP.html">context diagram</a> and enter here as one flow.',
+      '  External entities are not redrawn at this level. Their fourteen flows are drawn against each entity on the <a href="DFD_LEVEL0.html">context diagram</a> and enter here as one flow.',
       '  The app column reproduces the portal index: the same three sections in the same order, and the same apps in the same order inside each.',
       '  Every app has the same pair of flows with the user, labelled once at the top. The user is drawn once, as a tall shape, so no flow to it crosses another.'].join(NL)
   });
@@ -897,7 +899,7 @@ function level3IngestFedInvest() {
     title: '1.1 Download FedInvest prices and calculate yields — Level 3', h1: 'Level 3 &mdash; 1.1 Download FedInvest prices and calculate yields', maxWidth: W,
     up: 'DFD_LEVEL2_INGESTION.html', upLabel: 'Level 2 — 1 Acquire and derive reference data', svg: P.join(NL),
     notes: ['  Every process here drills to its own section of <a href="' + S() + '">1.1 Download FedInvest prices and calculate yields</a>.',
-      '  The flow entering from the edge is the FedInvest daily price list, drawn against its source on the <a href="KNOWLEDGE_MAP.html">context diagram</a>. 1.1.1 reads the date it states, and 1.1.2 reads its rows.',
+      '  The flow entering from the edge is the FedInvest daily price list, drawn against its source on the <a href="DFD_LEVEL0.html">context diagram</a>. 1.1.1 reads the date it states, and 1.1.2 reads its rows.',
       '  On a Bond Holiday, or when the price list does not state prices for the run date, 1.1.1 produces no settlement date and FedInvest prices (S1) is not written.'].join(NL)
   });
 }
