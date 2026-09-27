@@ -6,47 +6,7 @@
 
 ## 1.0 App Context (Level 1 DFD)
 
-```mermaid
-graph LR
-    %% Data Stores (S)
-    S1[("S1 YieldsFromFedInvestPrices.csv")]
-    S3[(S3 RefCPI.csv)]
-    LS[(Local Storage)]
-
-    %% Processes (P)
-    P1((Build Logic))
-    P2((Rebalance Logic))
-    P3((Broker Import))
-    P4((UI Rendering))
-
-    %% User (E)
-    U[User / Investor]
-
-    %% Inbound Data
-    S1 --> P1
-    S1 --> P2
-    S3 --> P1
-    S3 --> P2
-    LS --> P2
-
-    %% Internal Flows
-    P1 --> P4
-    P2 --> P4
-    P3 --> P2
-    
-    %% User Interaction
-    U <-->|DARA / Holdings| P4
-    P4 -->|CSV Export| U
-
-    %% Links to Specs
-    click P1 "#/md/TipsLadderManager/knowledge/2.0_TIPS_Ladders.md" "View Build Logic"
-    click P2 "#/md/TipsLadderManager/knowledge/3.0_TIPS_Ladder_Rebalancing.md" "View Rebalance Logic"
-    click P3 "#/md/TipsLadderManager/knowledge/2.1_Broker_Import.md" "View Import Logic"
-    click P4 "#/md/TipsLadderManager/knowledge/5.0_UI_Schema.md" "View UI Specs"
-    click S1 "#/md/knowledge/DataStores.md#s1" "View Schema"
-    click S3 "#/md/knowledge/DataStores.md#s3" "View Schema"
-```
-
+*Superseded by the generated [Level 2 diagram](/knowledge/DFD_LEVEL2_TIPSLADDERMANAGER) — a draft, not yet a finished decomposition (see its own notes for the open questions). The Mermaid sketch this section used to carry was hand-drawn before that generator existed and had drifted from the code (e.g. it named the dormant FedInvest source as the only source, and showed no path for the app's default Market-quotes source); it is removed rather than fixed in place, since the generated diagram now owns this.*
 
 ---
 
