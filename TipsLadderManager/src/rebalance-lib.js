@@ -5,6 +5,7 @@ import { bondCalcs, calculateMDuration, yieldFromPrice, calcMktWtdAvg } from '..
 import { indexRatio as calcIndexRatio } from '../../shared/src/ref-cpi.js';
 export { yieldFromPrice };
 import { interpolateYield, syntheticCoupon, bracketWeights, bracketWeightsN, excessAmdSchedule, gapParamsWithUpperFeedback, future30yParamsCore } from './gap-math.js';
+import { findSpikes, mean, MIN_SHAPE_POINTS, inferShapeValue } from './shape-math.js';
 import { sizeLadder, selectLadderBonds, fundedYearAmount, sizeFuture30yCover, rmdCappedRemainingCoupons, latestRemainingCouponDate, maxLastYear } from './ladder-core.js';
 import { localDate, fmtDate, fmtDateLong, toDateStr } from './date-util.js';
 import { rankForYear, levelValues } from './allocation-policy.js';
@@ -429,35 +430,61 @@ export function getGapYearBracketCandidates(tipsMap, lastYear = Infinity) {
   return candidates;
 }
 
-// Turn the raw ARA map into a per-year DARA map. Only suppress ARA > 1.5× median for
-// bracket-candidate years (adjacent to structural gaps); non-bracket years keep full ARA.
-// `gapYears` (structural gap years, 2037-2039) have no TIPS of their own, so their raw ARA is
-// just the bare LMI dripping down from later bonds — nowhere near a real funding target. They
-// take the funded-year median instead (3.0 §Per-Year DARA from Portfolio step 2, same rule the
-// on-screen mirror in index.html applies). Without this, a caller feeding this map straight into
+// Turn the raw ARA map into a per-year DARA map. Bracket-candidate years (adjacent to structural
+// gaps) that stand out against the ladder's own shape are suppressed to that shape's value;
+// non-bracket years keep full ARA. `gapYears` (structural gap years, 2037-2039) have no TIPS of
+// their own, so their raw ARA is just the bare LMI dripping down from later bonds — nowhere near a
+// real funding target. They take a value read off the same shape instead (3.0 §Per-Year DARA from
+// Portfolio step 2, same mechanism the on-screen mirror in index.html applies; shape-math.js,
+// RETAINED_BRACKET_TODO.md rulings 1-2). Without this, a caller feeding this map straight into
 // calculateGapParameters sizes the gap years' synthetic quantities off that tiny raw ARA instead
 // of the intended target, collapsing the whole gap block's total cost and, with it, both
 // brackets' excess.
+//
+// Below MIN_SHAPE_POINTS held points (excluding the gap years themselves, which have no point of
+// their own to fit against) there's no shape to read at all — both the bracket-candidate check and
+// the gap-year fill fall back to the flat mean of the held years, same as before this only ever
+// used a single median (Task 2, 3.0 §Per-Year DARA from Portfolio). The bracket-candidate fallback
+// keeps the original 1.5x margin (a separate, deliberately conservative constant from the shape
+// replacement itself, unchanged here) so a low-data mirror isn't more eager to auto-cap a rung
+// than it was before.
 export function derivePerYearDara(araByYear, bracketCandidates = new Set(), gapYears = new Set()) {
-  const vals = Object.values(araByYear).filter(v => v > 0);
-  if (vals.length === 0) return { median: 0, daraMap: new Map(), autoCappedYears: new Set() };
-  const sorted = [...vals].sort((a, b) => a - b);
-  const median = sorted[Math.floor(sorted.length / 2)];
+  const entries = Object.entries(araByYear).map(([y, v]) => [parseInt(y, 10), v]);
+  const positive = entries.filter(([, v]) => v > 0);
+  if (positive.length === 0) return { median: 0, daraMap: new Map(), autoCappedYears: new Set() };
+  const sortedVals = positive.map(([, v]) => v).sort((a, b) => a - b);
+  const legacyMedian = sortedVals[Math.floor(sortedVals.length / 2)];
+
+  const shapeEntries = positive.filter(([y]) => !gapYears.has(y)).sort((a, b) => a[0] - b[0]);
+  const shapeYears = shapeEntries.map(([y]) => y);
+  const shapeValues = shapeEntries.map(([, v]) => v);
+  const flatMean = mean(shapeValues) ?? legacyMedian;
+  const enoughForShape = shapeValues.length >= MIN_SHAPE_POINTS;
+  const spikeByYear = new Map();
+  if (enoughForShape) {
+    for (const s of findSpikes(shapeValues)) spikeByYear.set(shapeYears[s.index], s.curve);
+  }
+
   const daraMap = new Map();
   const autoCappedYears = new Set();
-  for (const [y, ara] of Object.entries(araByYear)) {
-    const year = parseInt(y);
+  for (const [year, ara] of entries) {
     if (gapYears.has(year)) {
-      daraMap.set(year, Math.round(median));
+      const shaped = enoughForShape ? inferShapeValue(shapeYears, shapeValues, year) : null;
+      daraMap.set(year, Math.round(shaped ?? flatMean));
       autoCappedYears.add(year);
-    } else if (bracketCandidates.has(year) && ara > 1.5 * median) {
-      daraMap.set(year, Math.round(median));
-      autoCappedYears.add(year);
+    } else if (bracketCandidates.has(year)) {
+      const isExcess = enoughForShape ? spikeByYear.has(year) : ara > 1.5 * flatMean;
+      if (isExcess) {
+        daraMap.set(year, Math.round(enoughForShape ? spikeByYear.get(year) : flatMean));
+        autoCappedYears.add(year);
+      } else {
+        daraMap.set(year, Math.round(ara));
+      }
     } else {
       daraMap.set(year, Math.round(ara));
     }
   }
-  return { median: Math.round(median), daraMap, autoCappedYears };
+  return { median: Math.round(legacyMedian), daraMap, autoCappedYears };
 }
 
 // Parse the optional `#fundedYear,dara` metadata block appended to our own export files

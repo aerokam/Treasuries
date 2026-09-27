@@ -204,12 +204,12 @@ function daraInputHTML(fy, daraByYear, flaggedYears, gapSet, future30ySet) {
   // label the row, so the flag and the label cannot disagree.
   const holdsNoTips = !!gapSet?.has(fy) || !!future30ySet?.has(fy);
   const flagTip = holdsNoTips
-    ? '<b>Auto-set to median.</b> No TIPS have been issued for this maturity year, so there is '
-      + 'no quantity here to infer a DARA from. The DARA shown is a median ARA calculated '
-      + 'across the maturity years that hold TIPS. Adjust as necessary.'
-    : '<b>Auto-set to median.</b> The ARA for this maturity year is above the median ARA of '
+    ? '<b>Auto-set from the ladder’s shape.</b> No TIPS have been issued for this maturity year, so there is '
+      + 'no quantity here to infer a DARA from. The DARA shown is estimated from the maturity years '
+      + 'that do hold TIPS. Adjust as necessary.'
+    : '<b>Auto-set from the ladder’s shape.</b> The ARA for this maturity year stands out against '
       + 'the other maturity years that hold TIPS, which suggests it holds excess TIPS. The '
-      + 'DARA shown is that median. Adjust as necessary.';
+      + 'DARA shown is estimated from that shape. Adjust as necessary.';
   // data-tip-html rather than title: the browser sets how long a title waits before it appears
   // and that wait cannot be changed, while this tooltip shows on hover at once.
   const flagHTML = flagged

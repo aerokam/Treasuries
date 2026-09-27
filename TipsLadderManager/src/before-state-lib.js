@@ -17,6 +17,7 @@
 import { bondCalcs } from '../../shared/src/bond-math.js';
 import { fmtDate } from './date-util.js';
 import { computePortfolioARAByYear, getGapYears } from './rebalance-lib.js';
+import { findSpikes, mean, MIN_SHAPE_POINTS } from './shape-math.js';
 
 export const LOWEST_LOWER_BRACKET_YEAR = 2032;
 export const UPPER_BRACKET_YEAR = 2040;
@@ -82,7 +83,11 @@ export function getLowerBracketCandidateYears(tipsMap) {
 }
 
 // Detect bracket-candidate excess flags (3.0 §Before-State Preview and Bracket-Year Excess
-// Detection). Returns Map<year, { median, excess }> — one entry per FLAGGED year only.
+// Detection; RETAINED_BRACKET_TODO.md rulings 1-2). Returns Map<year, { value, excess }> — one
+// entry per FLAGGED year only. `value` is the year's filled-in DARA guess: the ladder's own
+// fitted curve at that year, not a flat median — a year is excess when it stands off the curve,
+// not when it merely exceeds a single number (ruling 1), and the baseline moves with the metric
+// (ruling 2).
 //
 // `heldARAByYear` = computePortfolioARAByYear(holdings, tipsMap, refCPI) (no-range form: held
 // years only). `lastYear` gates lower/upper candidates the same way
@@ -95,30 +100,40 @@ export function detectBracketFlags({ heldARAByYear, tipsMap, lastYear }) {
   const minGap = gapYears.length ? Math.min(...gapYears) : null;
   const activeYear = getActiveLowerBracketYear(tipsMap);
 
+  // One curve fit over every held maturity year at once, rather than a per-candidate
+  // excluding-itself median: a year stands out (or doesn't) against the ladder's own shape, and
+  // its filled-in DARA is the curve's own value there. Below MIN_SHAPE_POINTS held years,
+  // smoothCurve/findSpikes have no shape to fit at all (see shape-math.js), so detection falls
+  // back to the same "exceeds the OTHER held years' baseline" comparison this replaces, with the
+  // mean substituted for the median (a held-year median over 2-4 points can degenerate to picking
+  // one of the raw values outright).
+  const orderedYears = [...heldYears].sort((a, b) => a - b);
+  const orderedValues = orderedYears.map(y => heldARAByYear[y]);
+  const spikeByYear = new Map();
+  if (orderedValues.length >= MIN_SHAPE_POINTS) {
+    for (const s of findSpikes(orderedValues)) spikeByYear.set(orderedYears[s.index], { value: s.curve, excess: s.excess });
+  } else {
+    for (let i = 0; i < orderedYears.length; i++) {
+      const others = orderedValues.filter((_, j) => j !== i);
+      const m = mean(others);
+      if (m != null && orderedValues[i] > m) spikeByYear.set(orderedYears[i], { value: m, excess: orderedValues[i] - m });
+    }
+  }
+
   // Lower bracket (2032-2035, i.e. below the Active Lower Bracket year — the active bracket
-  // itself, e.g. 2036 today, is never a candidate; see getLowerBracketCandidateYears): evaluate
-  // every held candidate independently against its own excluding-self median, then keep only the
-  // one with the HIGHEST excess (rawARA − median) when more than one exceeds — the same "Excess
-  // ARA Priority" rule the real engine's retained-maturity identification already uses
-  // (3.0 §Bracket Identification Rules §Retained Maturities: "the single year with the highest
-  // Excess ARA is picked"), not a "latest-maturing wins" rule. (An earlier revision of this
-  // module picked the latest-maturing candidate instead; that produced the WRONG year on real
-  // holdings — e.g. a 2036-adjacent ladder where 2034 legitimately carries the largest retained
-  // excess got 2035 flagged instead, because 2035 merely matures later while carrying far less
-  // excess. Fixed to match the engine's own established rule, per CLAUDE.md "foundation wins over
-  // a conflicting dependent claim.") Ties (astronomically unlikely with real dollar ARAs) fall
-  // back to latest-maturing as a deterministic last resort.
+  // itself, e.g. 2036 today, is never a candidate; see getLowerBracketCandidateYears): keep only
+  // the one with the HIGHEST excess when more than one candidate is a spike — the real engine
+  // (`identifyBrackets`) still only ever acts on a single cross-year retained maturity
+  // (RETAINED_BRACKET_TODO.md item 2, not yet generalized), so the preview flags at most one too,
+  // to keep from showing an excess the engine wouldn't honor at Run. Ties (astronomically unlikely
+  // with real dollar ARAs) fall back to latest-maturing as a deterministic last resort.
   if (minGap != null && lastYear >= minGap) {
     const lowerCandidates = getLowerBracketCandidateYears(tipsMap).filter(y => heldYears.has(y));
-    const exceeding = [];
-    for (const y of lowerCandidates) {
-      const med = heldYearMedianExcluding(heldARAByYear, y);
-      if (med != null && heldARAByYear[y] > med) exceeding.push({ year: y, median: med, excess: heldARAByYear[y] - med });
-    }
+    const exceeding = lowerCandidates.filter(y => spikeByYear.has(y)).map(y => ({ year: y, ...spikeByYear.get(y) }));
     if (exceeding.length > 0) {
       const chosen = exceeding.reduce((a, b) =>
         b.excess > a.excess ? b : (b.excess === a.excess && b.year > a.year ? b : a));
-      flags.set(chosen.year, { median: chosen.median, excess: chosen.excess });
+      flags.set(chosen.year, { value: chosen.value, excess: chosen.excess });
     }
   }
 
@@ -132,10 +147,7 @@ export function detectBracketFlags({ heldARAByYear, tipsMap, lastYear }) {
   for (const y of [activeYear, UPPER_BRACKET_YEAR, ...FUTURE30Y_COVER_YEARS]) {
     if (y == null || !heldYears.has(y)) continue;
     if ((y === UPPER_BRACKET_YEAR || y === activeYear) && (minGap == null || lastYear < minGap)) continue;
-    const med = heldYearMedianExcluding(heldARAByYear, y);
-    if (med != null && heldARAByYear[y] > med) {
-      flags.set(y, { median: med, excess: heldARAByYear[y] - med });
-    }
+    if (spikeByYear.has(y)) flags.set(y, spikeByYear.get(y));
   }
   return flags;
 }
@@ -206,7 +218,7 @@ export function computeBeforeState({ holdings, tipsMap, refCPI, firstYear, lastY
     const enteredDara = daraByYear?.get(y);
     const rawARA = rangeARAByYear[y] ?? 0;
     const cusipMap = byYearCusip.get(y);
-    const yearDara = enteredDara ?? (flag ? flag.median : rawARA);
+    const yearDara = enteredDara ?? (flag ? flag.value : rawARA);
 
     if (!cusipMap || cusipMap.size === 0) {
       // Informational row — no CUSIP held for this year (ordinary empty year, or a structural
@@ -258,7 +270,7 @@ export function computeBeforeState({ holdings, tipsMap, refCPI, firstYear, lastY
     // ARA above is built from — not re-derived). Plain bond arithmetic, never duration-matching.
     let flaggedFundedQty = null;
     if (flag) {
-      const daraForSplit = enteredDara ?? flag.median;
+      const daraForSplit = enteredDara ?? flag.value;
       const [firstCusip] = cusipMap.keys();
       const flaggedBond = tipsMap.get(firstCusip);
       const { piPerBond: flaggedPiPerBond } = bondCalcs(flaggedBond, refCPI);
@@ -287,7 +299,7 @@ export function computeBeforeState({ holdings, tipsMap, refCPI, firstYear, lastY
         isGapBracket: false,
       };
       if (flag && first) {
-        const daraForExcess = enteredDara ?? flag.median;
+        const daraForExcess = enteredDara ?? flag.value;
         row.araBeforeTotal = daraForExcess;
         row.excessAmtBefore = excessAgainstDara(rawARA, daraForExcess);
         row.isGapBracket = true;

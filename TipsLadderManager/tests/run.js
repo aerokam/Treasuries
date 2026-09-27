@@ -257,8 +257,14 @@ runFullRebalanceTest('SampleHoldings (richest IRA)', './data/SampleHoldings.csv'
     const heldARA = computePortfolioARAByYear(holdings, tipsMap, refCPI);
     const flags = detectBracketFlags({ heldARAByYear: heldARA, tipsMap, lastYear: 2056 });
     assert('SampleHoldings.csv: 2034 is flagged as retained-bracket excess (not 2036)', flags.has(2034), true);
-    assert('SampleHoldings.csv: 2036 (active lower bracket) is ALSO flagged, independently of 2034', flags.has(2036), true);
-    if (flags.has(2034)) console.log('        2034 flag: median=' + Math.round(flags.get(2034).median) + '  excess=' + Math.round(flags.get(2034).excess));
+    // 2036 no longer registers as a curve-method spike at this portfolio's current scale (it did
+    // under the flat median this replaces): its ARA stands only ~2.7 robust scales above the
+    // ladder's own fitted curve, short of the k=4 threshold findSpikes flags at (ruling 1,
+    // RETAINED_BRACKET_TODO.md — the active lower bracket is EXPECTED to legitimately carry real
+    // funded income on top of any gap-coverage excess, so sitting close to its own curve here is
+    // not a detection miss).
+    assert('SampleHoldings.csv: 2036 (active lower bracket) does not register as a curve-method spike here', flags.has(2036), false);
+    if (flags.has(2034)) console.log('        2034 flag: value=' + Math.round(flags.get(2034).value) + '  excess=' + Math.round(flags.get(2034).excess));
   }
 }
 
@@ -1902,9 +1908,16 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
   assert('before-state: exactly one lower-bracket year flagged (of three candidates)', flags.size, 1);
   assert('before-state: the oversized, latest-maturing candidate (2035) is the one flagged', flags.has(2035), true);
 
-  const medianCheck = heldYearMedianExcluding(heldARA, 2035);
-  assert('before-state: flagged median === held-year median excluding the candidate itself', flags.get(2035).median, medianCheck, 1e-9);
-  assert('before-state: flagged excess === rawARA - median', flags.get(2035).excess, heldARA[2035] - medianCheck, 1e-9);
+  // The flagged value is the ladder's own fitted curve at that year (ruling 2, not the flat
+  // median heldYearMedianExcluding still computes for comparison in the shape-math tests above) —
+  // checked against an independently-run findSpikes call, not read back from detectBracketFlags's
+  // own internals, so a regression in the year<->index wiring would still be caught.
+  const orderedYears = Object.keys(heldARA).map(Number).sort((a, b) => a - b);
+  const orderedValues = orderedYears.map(y => heldARA[y]);
+  const spike2035 = findSpikes(orderedValues).find(s => orderedYears[s.index] === 2035);
+  assert('before-state: 2035 is an independently-confirmed spike', !!spike2035, true);
+  assert('before-state: flagged value === the curve value findSpikes reports for 2035', flags.get(2035).value, spike2035.curve, 1e-9);
+  assert('before-state: flagged excess === rawARA - curve value', flags.get(2035).excess, spike2035.excess, 1e-9);
 
   // (a) Standalone computation matches computePortfolioARAByYear for an ORDINARY (non-flagged) year.
   const { rows } = computeBeforeState({ holdings, tipsMap, refCPI, firstYear, lastYear });
@@ -1929,18 +1942,19 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
   assert('before-state: araBeforeHoldings[i].coupon is the real bond coupon (feeds buildPIPerBondDrill)',
     holding0.coupon, tipsMap.get(holding0.cusip).coupon);
 
-  // (c) Guessed-excess arithmetic: flagged year's group value is the median; its Gap sub-row excess
-  // is raw ARA minus that median.
+  // (c) Guessed-excess arithmetic: flagged year's group value is the curve guess; its Gap sub-row
+  // excess is raw ARA minus that guess.
+  const guess2035 = flags.get(2035).value;
   const rows2035 = rows.filter(r => r.fundedYear === 2035 && r.cusip);
   const araVal2035 = rows2035.find(r => r.araBeforeTotal != null)?.araBeforeTotal;
-  assert('before-state: flagged year Amount Before === median guess', Math.round(araVal2035), Math.round(medianCheck));
+  assert('before-state: flagged year Amount Before === curve guess', Math.round(araVal2035), Math.round(guess2035));
   const excessRow = rows2035.find(r => r.isGapBracket);
   assert('before-state: flagged year has exactly one Gap sub-row (no duplicate excess)', rows2035.filter(r => r.isGapBracket).length, 1);
-  assert('before-state: flagged Gap sub-row excess === rawARA - median', Math.round(excessRow.excessAmtBefore), Math.round(heldARA[2035] - medianCheck));
+  assert('before-state: flagged Gap sub-row excess === rawARA - curve guess', Math.round(excessRow.excessAmtBefore), Math.round(heldARA[2035] - guess2035));
 
   // (c) Recalc-on-edit arithmetic: once the user has entered a DARA for the flagged year, the
-  // excess recalculates against that entered value instead of the median — plain subtraction.
-  const entered = medianCheck + 5000;
+  // excess recalculates against that entered value instead of the guess — plain subtraction.
+  const entered = guess2035 + 5000;
   const { rows: rowsEdited } = computeBeforeState({
     holdings, tipsMap, refCPI, firstYear, lastYear, daraByYear: new Map([[2035, entered]]),
   });
@@ -1965,7 +1979,7 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
   const bond2035 = tipsMap.get('91282CML2');
   const { piPerBond: piPerBond2035, costPerBond: costPerBond2035 } = bondCalcs(bond2035, refCPI);
   const lmi2035 = excessRow.araBeforeLaterMatInt;
-  const expectedFundedQty2035 = Math.max(0, Math.round((medianCheck - lmi2035) / piPerBond2035));
+  const expectedFundedQty2035 = Math.max(0, Math.round((guess2035 - lmi2035) / piPerBond2035));
   const expectedExcessQty2035 = Math.max(0, heldQty2035 - expectedFundedQty2035);
   assert('before-state: flagged year fundedYearQtyBefore === round((DARA - LMI) / piPerBond)',
     excessRow.fundedYearQtyBefore, expectedFundedQty2035);
@@ -2008,21 +2022,22 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
   assert('before-state: single-candidate flag count === 1', flags.size, 1);
 }
 
-// (b) N-candidate case where MORE THAN ONE candidate exceeds the median: latest-maturing wins even
-// though an earlier one also exceeds.
+// (b) N-candidate case where MORE THAN ONE lower-candidate year is a genuine spike against the
+// ladder's own shape (ruling 1): only the highest-excess one is flagged, since `identifyBrackets`
+// still only ever acts on a single cross-year retained maturity (RETAINED_BRACKET_TODO.md item 2).
+// A hand-built two-value holdings array can't exercise this — with only 5-8 points and two of them
+// the spikes, there isn't enough of a stable baseline for the curve to resist the rise into them
+// (this is the run-of-spikes-on-a-slope failure mode shape-math.js's own header comment describes).
+// tests/dev/RetainedExcessTwoYears.csv is a full real ladder (SampleHoldings.csv with Jul 2035
+// raised) where 2034 AND 2035 are both independently confirmed spikes (shape-math test above), so
+// this is the case to prove the "highest excess wins" tie-break against, not a synthetic stand-in.
 {
-  const holdings = [
-    { cusip: '91282CBF7', qty: 10 }, // Jan 2031 — ordinary
-    { cusip: '91282CCM1', qty: 10 }, // Jul 2031 — ordinary
-    { cusip: '91282CDX6', qty: 8 },  // Jan 2032 — ordinary
-    { cusip: '91282CGK1', qty: 8 },  // Jan 2033 — lower candidate, NOT oversized
-    { cusip: '91282CJY8', qty: 50 }, // Jan 2034 — lower candidate, oversized
-    { cusip: '91282CML2', qty: 60 }, // Jan 2035 — lower candidate, oversized (later than 2034)
-  ].filter(h => tipsMap.has(h.cusip));
+  const csv = readFileSync(new URL('./dev/RetainedExcessTwoYears.csv', import.meta.url), 'utf8');
+  const holdings = parseHoldings(csv);
   const heldARA = computePortfolioARAByYear(holdings, tipsMap, refCPI);
-  const flags = detectBracketFlags({ heldARAByYear: heldARA, tipsMap, lastYear: 2039 });
-  assert('before-state: two candidates exceed median → only one flagged', flags.size, 1);
-  assert('before-state: the LATER-maturing of two exceeding candidates wins (2035, not 2034)', flags.has(2035), true);
+  const flags = detectBracketFlags({ heldARAByYear: heldARA, tipsMap, lastYear: 2056 });
+  assert('before-state: two lower-candidate spikes (2034, 2035) → only the higher-excess one flagged', flags.has(2034), false);
+  assert('before-state: 2035 (the higher-excess of the two) is the one flagged', flags.has(2035), true);
 }
 
 // ── Within-Year Allocation Policy (2.0 §Within-Year Allocation Policy; the E invariant) ───────

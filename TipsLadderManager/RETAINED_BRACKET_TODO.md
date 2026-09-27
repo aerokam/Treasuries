@@ -29,13 +29,37 @@ Read first: `knowledge/DATA_DICTIONARY.md`, `knowledge/2.0_TIPS_Ladders.md` (§R
 - `57e7368` — tests in `tests/run.js`. 444 pass.
 - `c996df3`, `029878b`, `95f2008`, `f15db47`, `5b1d424` — the amber flag on a per-year DARA input. Separate messages for a candidate year and for a maturity year with no issued TIPS, and the flag moved off `title` onto `data-tip-html` so it appears without the browser's own delay.
 
-Nothing in `identifyBrackets` or `detectBracketFlags` has been changed.
+Nothing in `identifyBrackets` has been changed.
+
+- **2026-09-27, `ladder-shape-dara-inference` session** — item 1 below is done. `detectBracketFlags`
+  (`src/before-state-lib.js`) now runs `findSpikes` once over every held funded year and flags a
+  candidate when it's a spike, replacing `heldYearMedianExcluding` for the flagged value and the
+  detection threshold both (rulings 1-2). `heldYearMedianExcluding` itself is kept, still exported
+  and still tested, purely as the comparison baseline the shape-math tests check the curve against
+  — it has no remaining call site inside `detectBracketFlags` or `derivePerYearDara`.
+
+  Extended past what this item originally scoped: `rebalance-lib.js#derivePerYearDara` (the
+  run-time self-financing recovery for a mirror plan, §Funding the rebalance — a separate median
+  computation from `detectBracketFlags`'s, not touched by ruling 1/2 as written) now runs the same
+  `findSpikes`/`inferShapeValue` mechanism, and a genuinely new low-data fallback was added
+  throughout: below `MIN_SHAPE_POINTS` (5) held points there's no curve to fit at all, so detection
+  and gap-year sizing fall back to the flat **mean** of the held years instead of the median this
+  whole feature replaces (a 2-point held series' median degenerates to picking one of the two raw
+  values outright under this codebase's convention — the sparse-ladder case a user bug report
+  surfaced independently of this TODO). See `TipsLadderManager/KNOWN_ISSUES.md` FIXED entry
+  "Gap-year (and sparse-ladder) DARA inference..." and `knowledge/4.0_Computation_Modules.md`
+  §shape-math.js for the wiring and the module's own spec entry (closing the "not yet documented"
+  gap item 4 below used to note).
+
+  Both spec defects below ("3.0 §198 propagates..." and "a gap year's filled-in DARA is
+  inconsistent with itself") are resolved by this pass — see 3.0 §Per-Year DARA from Portfolio and
+  §Before-State Preview and Bracket-Year Excess Detection, current text.
 
 ---
 
 ## Left to do, in order
 
-1. **Wire the curve into `detectBracketFlags`** (`src/before-state-lib.js`) for both detection and the filled-in DARA, replacing `heldYearMedianExcluding` for flagged years.
+1. ~~**Wire the curve into `detectBracketFlags`**~~ — done 2026-09-27, see above.
 2. **`identifyBrackets`** (`src/rebalance-lib.js:43`): still returns at most one CROSS-YEAR retained maturity via the `(araByYear[y] || 0) - DARA` metric — that part is unchanged. Multiple cross-year generations (e.g. genuine excess at both 2032 and 2034) are still not identified; the hardcoded single-element pick at `~:69`/`~:128` remains the known gap for that case.
 3. **Within-year split and sell order (rulings 4 and 5) — done for the one case that mattered in practice.** 2026-09-20: fixed for a maturity year holding the active lower bracket *plus* one other held CUSIP maturing in that same year (the recurring real-world shape — an older bond held from before the active lower bracket rolled forward into a new issue in the same year, e.g. Jan/Jul). `runRebalance` now detects that holding independent of the Excess ARA pick, computes its own funded-need-first split, and feeds it into `bracketWeightsN` as a second retained leg alongside whatever `identifyBrackets` found. See `TipsLadderManager/KNOWN_ISSUES.md` "Multi-bracket bought — or sold — the wrong CUSIP..." for the fix and its verification. **Still not general**: a bracket year holding *three or more* maturities, or two maturities in a year that is itself a cross-year retained pick (not the active year), is not covered — those would need the same treatment, generalized.
    **2026-09-22 addendum:** a same-maturity-year retained maturity is now a candidate for the year's own
@@ -58,7 +82,7 @@ Nothing in `identifyBrackets` or `detectBracketFlags` has been changed.
    the current holdings don't already cover gets bought into the preferred maturity. Verified zero-trade
    on the reporting account across every `maturityPref` value; a synthetic fixture with a forced
    shortfall confirms the redirect itself still works when genuinely needed.
-4. **Specs**: `2.0 §Retained Bracket Excess` and `3.0 §Bracket Identification Rules §Retained Maturities` updated 2026-09-20 for the same-maturity-year case (item 3). `3.0 §Before-State Preview`, `3.0 §Lower bracket priority rule`, and `4.0 §Computation Modules` (where `shape-math.js` is not yet documented) still open.
+4. **Specs**: `2.0 §Retained Bracket Excess` and `3.0 §Bracket Identification Rules §Retained Maturities` updated 2026-09-20 for the same-maturity-year case (item 3). `3.0 §Before-State Preview` and `4.0 §Computation Modules` (`shape-math.js` entry) updated 2026-09-27 for item 1 above. `3.0 §Lower bracket priority rule` still open.
 5. **Detail-row display for the same-maturity-year retained leg** doesn't yet split funded vs. excess the way the recognized bracket-target row does (`TipsLadderManager/KNOWN_ISSUES.md`, OPEN: "A same-maturity-year retained leg's own row does not label its trade as excess"). The trade itself is correct; only the row's own drill-down label isn't wired yet.
 
 ---
@@ -67,8 +91,15 @@ Nothing in `identifyBrackets` or `detectBracketFlags` has been changed.
 
 - **`2.0` and `3.0` describe a user control that does not exist.** Both call it "Retain lower bracket excess", on by default. No such control is in `index.html` or `src/`. The control is **Brackets**, with values *2-bracket* and *Multi-bracket*.
 - **`3.0 §Before-State Preview` is quoted in `before-state-lib.js` as saying "held funded years only".** The population is built by `computePortfolioARAByYear` from holdings alone, with no DARA consulted, so its members are maturity years the portfolio holds TIPS in. A bracket year whose DARA is 0, holding excess TIPS alone, is in that population and is not a funded year (DD §Funded Year). The developer and this session are settling a term for it; until then the user-facing string says "the maturity years that hold TIPS".
-- **A gap year's filled-in DARA is inconsistent with itself.** When a bracket year is flagged, a gap year is given the median with that bracket year excluded; when nothing is flagged, the same gap year is given the plain median. The exclusion exists so a candidate is not compared against itself, which cannot apply to a gap year, since a gap year is not in the population at all. Ruling 2 may retire this path; if it does not, it needs deciding.
-- **`3.0 §198` propagates the Excess-ARA rule into the preview** and cites it as the engine's established rule. Ruling 1 replaces it in both places.
+- **A gap year's filled-in DARA is inconsistent with itself — RESOLVED 2026-09-27.** This retired
+  path: a gap year now reads `inferShapeValue` (the nearer neighboring held year's own local slope,
+  extended to the gap year's position — never an excluding-self comparison, since a gap year was
+  never in the held population to exclude itself from in the first place), falling back to the flat
+  mean of the held years only when there aren't enough points on either side to read a slope from.
+- **`3.0 §198` propagates the Excess-ARA rule into the preview — RESOLVED 2026-09-27.** That
+  cross-reference is removed; the preview's lower-bracket pool now cites `identifyBrackets` only for
+  *why* it still keeps a single-winner tie-break (the real engine still only ever acts on one
+  cross-year retained maturity, item 2 above), not for the detection metric itself.
 
 ---
 
@@ -104,12 +135,14 @@ What ruling 2 changes, for the years actually flagged on `data/SampleHoldings.cs
 
 **2036 no longer registers as a curve-method spike at this scale** — a real, notable difference
 from the 0.2x-scale figures this table previously carried (which showed 2036 flagged under both
-methods). It still flags under the current median-based `detectBracketFlags` (ruling 1 is not wired
-in yet — item 1 below), so today's actual app behavior is unaffected; this only changes what ruling
-2's future curve-based detection would report for 2036 once implemented. Bond counts convert each
-year's dollar excess through that year's own held CUSIP's P+I-per-bond (`calculatePIPerBond`), the
-same unit ARA/DARA/excess are already expressed in throughout this codebase — not a market-cost
-conversion.
+methods), and, as of the 2026-09-27 wiring (item 1 above), a real, live change in what the app now
+shows: 2036 does not flag on `data/SampleHoldings.csv` today, where it used to under the median this
+replaced (`tests/run.js` "SampleHoldings.csv: 2036 (active lower bracket) does not register as a
+curve-method spike here" locks this in). The active bracket is expected to legitimately carry both
+real funded income and gap-coverage excess on top of it, so sitting close to its own curve here is
+not a detection miss. Bond counts convert each year's dollar excess through that year's own held
+CUSIP's P+I-per-bond (`calculatePIPerBond`), the same unit ARA/DARA/excess are already expressed in
+throughout this codebase — not a market-cost conversion.
 
 The old branch `retained-bracket-work` (`078741f`) claimed 2032 and 2033 were identified while the app displayed their excess as zero. That does not reproduce: only one lower candidate is kept, so 2032, 2033 and 2035 are never flagged and take their own ARA as their DARA. The median baseline *would* assign them 4 bonds each if they were flagged, which is the same defect seen from the other side.
 

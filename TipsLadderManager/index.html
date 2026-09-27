@@ -702,7 +702,8 @@ import { buildTipsMapFromYields, localDate, runFundedRebalance, inferScaledDARAF
 // Standalone Before-state preview (3.0 §Before-State Preview and Bracket-Year Excess Detection) —
 // a holdings-valuation computation, architecturally decoupled from the runRebalance/
 // runFundedRebalance engine imported above. Never calls into it.
-import { computeBeforeState, detectBracketFlags, heldYearMedianExcluding, UPPER_BRACKET_YEAR, FUTURE30Y_COVER_YEARS } from './src/before-state-lib.js';
+import { computeBeforeState, detectBracketFlags, UPPER_BRACKET_YEAR, FUTURE30Y_COVER_YEARS } from './src/before-state-lib.js';
+import { mean, inferShapeValue } from './src/shape-math.js';
 import { runBuild } from './src/build-lib.js';
 import { maxLastYear } from './src/ladder-core.js';
 import { renderTable, COLS } from './src/render.js';
@@ -2826,34 +2827,39 @@ function _initRebalDaraFromPortfolio() {
 
   const fullARA = computePortfolioARAByYear(currentHoldingsArray, tipsMap, rc, { firstYear, lastYear });
 
-  // Held years take the flagged median (if flagged) or their own raw ARA. Gap years (2037-2039)
-  // have no TIPS to read a DARA from, so they fall back to whichever flagged bracket appears to be
-  // funding them (upper bracket preferred, else lower), or the funded-year median if neither is
-  // flagged. Other empty in-range years take their current ARA (the LMI dripping down from longer
-  // TIPS).
+  // Held years take the flagged curve value (if flagged) or their own raw ARA. Gap years
+  // (2037-2039) have no TIPS to read a DARA from, so their value is read off the same held-year
+  // curve instead — extending whichever neighboring held year's local slope is NEARER, so a
+  // genuine step in the ladder's shape (e.g. DARA dropping once Social Security starts) reflects
+  // the step rather than blending across it (3.0 §Per-Year DARA from Portfolio; shape-math.js
+  // inferShapeValue). Falls back to the flat mean of the held years when there aren't enough
+  // points on either side to read a slope from at all. Other empty in-range years take their
+  // current ARA (the LMI dripping down from longer TIPS).
   const gapYearSet = new Set(getGapYears(tipsMap));
-  const lowerFlagEntry = [...flags.entries()].find(([y]) => y < Math.min(...gapYearSet, Infinity));
-  const gapFillMedian = flags.get(UPPER_BRACKET_YEAR)?.median ?? lowerFlagEntry?.[1]?.median ?? null;
+  const heldYearsOrdered = Object.keys(heldARA).map(Number).sort((a, b) => a - b);
+  const heldValuesOrdered = heldYearsOrdered.map(y => heldARA[y]);
+  const heldMean = mean(heldValuesOrdered);
   const store = new Map();
   for (let y = firstYear; y <= lastYear; y++) {
     if (flags.has(y)) {
-      store.set(y, Math.round(flags.get(y).median));
+      store.set(y, Math.round(flags.get(y).value));
     } else if (gapYearSet.has(y)) {
-      if (gapFillMedian != null) { store.set(y, Math.round(gapFillMedian)); _bracketAutoCapYears.add(y); }
-      else store.set(y, median);
+      const shaped = inferShapeValue(heldYearsOrdered, heldValuesOrdered, y);
+      store.set(y, Math.round(shaped ?? heldMean ?? median));
+      _bracketAutoCapYears.add(y);
     } else {
       store.set(y, Math.round(fullARA[y] ?? 0));
     }
   }
   // Future 30Y years (beyond the last issued TIPS) similarly fall back to a flagged cover's
-  // median where they have no other source (3.0 §Before-State Preview, final bullet).
+  // curve value where they have no other source (3.0 §Before-State Preview, final bullet).
   const tipsYearsAll = [...tipsMap.values()].filter(b => b.maturity).map(b => b.maturity.getFullYear());
   const maxTipsYear = tipsYearsAll.length ? Math.max(...tipsYearsAll) : 0;
   for (const cover of FUTURE30Y_COVER_YEARS) {
     const f = flags.get(cover);
     if (!f) continue;
     for (let y = maxTipsYear + 1; y <= lastYear; y++) {
-      if (!store.has(y) || !flags.has(y)) { store.set(y, Math.round(f.median)); _bracketAutoCapYears.add(y); }
+      if (!store.has(y) || !flags.has(y)) { store.set(y, Math.round(f.value)); _bracketAutoCapYears.add(y); }
     }
   }
   _daraByYearStore = store;
