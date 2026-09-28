@@ -186,120 +186,106 @@
 <h1>Level 3 &mdash; TipsLadderManager 4.1 Load market data</h1>
 
 <div class="diagram">
-<svg viewBox="0 0 1420 1040" role="img" aria-label="Level 3: TipsLadderManager 4.1, one process per source fetched, one that assembles the auxiliary TIPS data both sources need, one that builds the TIPS map, and the shared modules each calls into.">
+<svg viewBox="0 0 1420 760" role="img" aria-label="Level 3: TipsLadderManager 4.1, fetching market quotes and the auxiliary TIPS data they need, then building TIPS market data, plus the shared modules each calls into.">
   <defs><marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#55558c"/></marker></defs>
-  <path class="flow" d="M 255.0 100.0 Q 469.4 137.4 661.4 239.8" marker-end="url(#a1)"/>
-  <path class="flow" d="M 255.0 265.0 Q 519.8 542.6 684.8 888.9" marker-end="url(#a1)"/>
-  <path class="flow" d="M 255.0 430.0 Q 349.1 499.9 416.7 595.6" marker-end="url(#a1)"/>
-  <path class="flow" d="M 255.0 595.0 Q 329.8 599.3 399.4 626.7" marker-end="url(#a1)"/>
-  <path class="flow" d="M 255.0 760.0 Q 323.7 703.5 406.5 671.3" marker-end="url(#a1)"/>
-  <path class="flow" d="M 255.0 925.0 Q 320.6 794.2 423.8 690.3" marker-end="url(#a1)"/>
-  <path class="flow" d="M 765.6 302.1 Q 862.5 366.5 934.4 457.9" marker-end="url(#a1)"/>
-  <text class="flow-label" x="915" y="415" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#tips-yields"><tspan class="lk">TIPS yields</tspan></a></text>
-  <path class="flow" d="M 751.5 886.6 Q 823.3 704.2 948.5 553.4" marker-end="url(#a1)"/>
-  <text class="flow-label" x="896" y="600" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#tips-yields"><tspan class="lk">TIPS yields</tspan></a></text>
-  <path class="flow" d="M 486.8 583.2 Q 559.5 429.2 676.7 305.5" marker-end="url(#a1)"/>
-  <text class="flow-label" x="627" y="342" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#tips-reference-data"><tspan class="lk">TIPS reference data</tspan></a></text>
-  <path class="flow" d="M 503.3 594.5 Q 576.0 440.4 693.2 316.8" marker-end="url(#a1)"/>
-  <text class="flow-label" x="662" y="381" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#bond-holiday"><tspan class="lk">bond holidays</tspan></a></text>
-  <path class="flow" d="M 519.9 623.9 Q 711.4 538.0 920.1 516.1" marker-end="url(#a1)"/>
-  <text class="flow-label" x="843" y="512" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#sa-yields"><tspan class="lk">SA yields</tspan></a></text>
-  <path class="flow" d="M 1106.3 475.6 Q 955.1 356.3 774.1 290.2" marker-end="url(#a1)"/>
-  <path class="flow" d="M 1100.8 189.1 Q 945.7 244.5 781.0 248.7" marker-end="url(#a1)"/>
-  <path class="flow" d="M 1100.8 330.9 Q 936.1 326.7 781.0 271.3" marker-end="url(#a1)"/>
-  <path class="flow" d="M 1102.5 815.5 Q 949.1 894.0 779.0 920.8" marker-end="url(#a1)"/>
-  <path class="flow" d="M 1101.3 788.7 Q 800.1 767.8 520.4 654.0" marker-end="url(#a1)"/>
-  <path class="flow" d="M 1101.0 509.9 Q 841.5 719.7 520.8 627.7" marker-end="url(#a1)"/>
-  <path class="flow" d="M 1042.0 500.0 Q 1225.0 470.7 1408.0 500.0" marker-end="url(#a1)"/>
-  <text class="flow-label" x="1404" y="492" text-anchor="end"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#tips-map"><tspan class="lk">TIPS map</tspan></a>  →  4.2 through 4.4</text>
-  <path class="flow" d="M 521.9 642.6 Q 968.0 590.4 1408.0 680.0" marker-end="url(#a1)"/>
-  <text class="flow-label" x="1404" y="672" text-anchor="end">Ref CPI  →  rest of app</text>
+  <path class="flow" d="M 255.0 100.0 Q 335.5 124.5 404.3 172.8" marker-end="url(#a1)"/>
+  <path class="flow" d="M 255.0 250.0 Q 354.0 337.8 420.7 452.1" marker-end="url(#a1)"/>
+  <path class="flow" d="M 255.0 400.0 Q 335.5 424.5 404.3 472.8" marker-end="url(#a1)"/>
+  <path class="flow" d="M 255.0 550.0 Q 324.6 520.8 399.8 514.7" marker-end="url(#a1)"/>
+  <path class="flow" d="M 255.0 700.0 Q 322.8 608.8 415.6 543.3" marker-end="url(#a1)"/>
+  <path class="flow" d="M 519.6 217.2 Q 729.3 242.9 920.4 332.8" marker-end="url(#a1)"/>
+  <text class="flow-label" x="854" y="289" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#tips-yields"><tspan class="lk">TIPS yields</tspan></a></text>
+  <path class="flow" d="M 450.0 438.0 Q 435.9 350.0 450.0 262.0" marker-end="url(#a1)"/>
+  <text class="flow-label" x="435" y="291" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#tips-reference-data"><tspan class="lk">TIPS reference data</tspan></a></text>
+  <path class="flow" d="M 470.0 438.0 Q 455.9 350.0 470.0 262.0" marker-end="url(#a1)"/>
+  <text class="flow-label" x="477" y="306" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#bond-holiday"><tspan class="lk">bond holidays</tspan></a></text>
+  <path class="flow" d="M 519.6 482.8 Q 710.7 392.9 920.4 367.2" marker-end="url(#a1)"/>
+  <text class="flow-label" x="842" y="365" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#sa-yields"><tspan class="lk">SA yields</tspan></a></text>
+  <path class="flow" d="M 1102.4 404.8 Q 740.0 533.5 519.1 218.8" marker-end="url(#a1)"/>
+  <path class="flow" d="M 1100.5 107.2 Q 817.7 195.5 521.4 191.1" marker-end="url(#a1)"/>
+  <path class="flow" d="M 1100.2 255.7 Q 807.0 276.8 521.8 205.4" marker-end="url(#a1)"/>
+  <path class="flow" d="M 1100.3 574.2 Q 805.6 587.0 521.6 507.1" marker-end="url(#a1)"/>
+  <path class="flow" d="M 1100.3 425.8 Q 816.3 505.6 521.6 492.9" marker-end="url(#a1)"/>
+  <path class="flow" d="M 1042.0 350.0 Q 1225.0 320.7 1408.0 350.0" marker-end="url(#a1)"/>
+  <text class="flow-label" x="1404" y="342" text-anchor="end"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#tips-market-data"><tspan class="lk">TIPS market data</tspan></a>  →  4.2 through 4.4</text>
+  <path class="flow" d="M 522.0 501.3 Q 966.5 439.8 1408.0 520.0" marker-end="url(#a1)"/>
+  <text class="flow-label" x="1404" y="512" text-anchor="end">Ref CPI  →  rest of app</text>
+  <path class="flow" d="M 521.9 503.9 Q 969.4 461.1 1408.0 560.0" marker-end="url(#a1)"/>
+  <text class="flow-label" x="1404" y="552" text-anchor="end"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#bond-holiday"><tspan class="lk">bond holidays</tspan></a>  →  rest of app</text>
   <a class="store" href="viewer.html#/md/knowledge/DataStores.md#s7">
     <rect x="40" y="80" width="210" height="40" fill="transparent" stroke="none"/>
     <line x1="40" y1="80" x2="250" y2="80"/>
     <line x1="40" y1="120" x2="250" y2="120"/>
     <text class="s-name" x="145" y="105">Market quotes (S7)</text>
   </a>
-  <a class="store" href="viewer.html#/md/knowledge/DataStores.md#s1">
-    <rect x="40" y="245" width="210" height="40" fill="transparent" stroke="none"/>
-    <line x1="40" y1="245" x2="250" y2="245"/>
-    <line x1="40" y1="285" x2="250" y2="285"/>
-    <text class="s-name" x="145" y="270">FedInvest prices (S1)</text>
-  </a>
   <a class="store" href="viewer.html#/md/knowledge/DataStores.md#s2">
-    <rect x="40" y="410" width="210" height="40" fill="transparent" stroke="none"/>
-    <line x1="40" y1="410" x2="250" y2="410"/>
-    <line x1="40" y1="450" x2="250" y2="450"/>
-    <text class="s-name" x="145" y="435">TIPS reference data (S2)</text>
+    <rect x="40" y="230" width="210" height="40" fill="transparent" stroke="none"/>
+    <line x1="40" y1="230" x2="250" y2="230"/>
+    <line x1="40" y1="270" x2="250" y2="270"/>
+    <text class="s-name" x="145" y="255">TIPS reference data (S2)</text>
   </a>
   <a class="store" href="viewer.html#/md/knowledge/DataStores.md#s3">
-    <rect x="40" y="575" width="210" height="40" fill="transparent" stroke="none"/>
-    <line x1="40" y1="575" x2="250" y2="575"/>
-    <line x1="40" y1="615" x2="250" y2="615"/>
-    <text class="s-name" x="145" y="600">Ref CPI (S3)</text>
+    <rect x="40" y="380" width="210" height="40" fill="transparent" stroke="none"/>
+    <line x1="40" y1="380" x2="250" y2="380"/>
+    <line x1="40" y1="420" x2="250" y2="420"/>
+    <text class="s-name" x="145" y="405">Ref CPI (S3)</text>
   </a>
   <a class="store" href="viewer.html#/md/knowledge/DataStores.md#s10">
-    <rect x="40" y="740" width="210" height="40" fill="transparent" stroke="none"/>
-    <line x1="40" y1="740" x2="250" y2="740"/>
-    <line x1="40" y1="780" x2="250" y2="780"/>
-    <text class="s-name" x="145" y="765">SA and SAO yields (S10)</text>
+    <rect x="40" y="530" width="210" height="40" fill="transparent" stroke="none"/>
+    <line x1="40" y1="530" x2="250" y2="530"/>
+    <line x1="40" y1="570" x2="250" y2="570"/>
+    <text class="s-name" x="145" y="555">SA and SAO yields (S10)</text>
   </a>
   <a class="store" href="viewer.html#/md/knowledge/DataStores.md#s16">
-    <rect x="40" y="905" width="210" height="40" fill="transparent" stroke="none"/>
-    <line x1="40" y1="905" x2="250" y2="905"/>
-    <line x1="40" y1="945" x2="250" y2="945"/>
-    <text class="s-name" x="145" y="930">Bond holidays (S16)</text>
+    <rect x="40" y="680" width="210" height="40" fill="transparent" stroke="none"/>
+    <line x1="40" y1="680" x2="250" y2="680"/>
+    <line x1="40" y1="720" x2="250" y2="720"/>
+    <text class="s-name" x="145" y="705">Bond holidays (S16)</text>
   </a>
   <a class="process" href="viewer.html#/md/TipsLadderManager/knowledge/4.1_Load_Market_Data.md#fetch-and-parse-market-quotes">
-    <circle cx="720" cy="260" r="62"/>
-    <text class="p-id" x="720" y="240">4.1.1</text>
-    <text class="p-name" x="720" y="261">Fetch and parse</text>
-    <text class="p-name" x="720" y="277">market quotes</text>
-  </a>
-  <a class="process" href="viewer.html#/md/TipsLadderManager/knowledge/4.1_Load_Market_Data.md#fetch-and-parse-fedinvest-prices">
-    <circle cx="720" cy="940" r="62"/>
-    <text class="p-id" x="720" y="920">4.1.2</text>
-    <text class="p-name" x="720" y="941">Fetch and parse</text>
-    <text class="p-name" x="720" y="957">FedInvest prices</text>
+    <circle cx="460" cy="200" r="62"/>
+    <text class="p-id" x="460" y="180">4.1.1</text>
+    <text class="p-name" x="460" y="201">Fetch and parse</text>
+    <text class="p-name" x="460" y="217">market quotes</text>
   </a>
   <a class="process" href="viewer.html#/md/TipsLadderManager/knowledge/4.1_Load_Market_Data.md#fetch-auxiliary-tips-data">
-    <circle cx="460" cy="640" r="62"/>
-    <text class="p-id" x="460" y="620">4.1.3</text>
-    <text class="p-name" x="460" y="641">Fetch auxiliary</text>
-    <text class="p-name" x="460" y="657">TIPS data</text>
+    <circle cx="460" cy="500" r="62"/>
+    <text class="p-id" x="460" y="480">4.1.3</text>
+    <text class="p-name" x="460" y="501">Fetch auxiliary</text>
+    <text class="p-name" x="460" y="517">TIPS data</text>
   </a>
-  <a class="process" href="viewer.html#/md/TipsLadderManager/knowledge/4.1_Load_Market_Data.md#build-the-tips-map">
-    <circle cx="980" cy="500" r="62"/>
-    <text class="p-id" x="980" y="480">4.1.4</text>
-    <text class="p-name" x="980" y="501">Build the</text>
-    <text class="p-name" x="980" y="517">TIPS map</text>
+  <a class="process" href="viewer.html#/md/TipsLadderManager/knowledge/4.1_Load_Market_Data.md#build-tips-market-data">
+    <circle cx="980" cy="350" r="62"/>
+    <text class="p-id" x="980" y="330">4.1.4</text>
+    <text class="p-name" x="980" y="351">Build TIPS</text>
+    <text class="p-name" x="980" y="367">market data</text>
   </a>
   <a class="module" href="viewer.html#/md/knowledge/SharedModules.md#m2">
-    <circle cx="1150" cy="500" r="50"/>
-    <text class="p-id" x="1150" y="486">M2</text>
-    <text class="m-name" x="1150" y="503">settlement.js</text>
+    <circle cx="1150" cy="420" r="50"/>
+    <text class="p-id" x="1150" y="406">M2</text>
+    <text class="m-name" x="1150" y="423">settlement.js</text>
   </a>
   <a class="module" href="viewer.html#/md/knowledge/SharedModules.md#m3">
-    <circle cx="1150" cy="180" r="50"/>
-    <text class="p-id" x="1150" y="166">M3</text>
-    <text class="m-name" x="1150" y="183">bond-math.js</text>
+    <circle cx="1150" cy="100" r="50"/>
+    <text class="p-id" x="1150" y="86">M3</text>
+    <text class="m-name" x="1150" y="103">bond-math.js</text>
   </a>
   <a class="module" href="viewer.html#/md/knowledge/SharedModules.md#m4">
-    <circle cx="1150" cy="340" r="50"/>
-    <text class="p-id" x="1150" y="319">M4</text>
-    <text class="m-name" x="1150" y="336">fidelity-</text>
-    <text class="m-name" x="1150" y="350">parse.js</text>
+    <circle cx="1150" cy="260" r="50"/>
+    <text class="p-id" x="1150" y="239">M4</text>
+    <text class="m-name" x="1150" y="256">fidelity-</text>
+    <text class="m-name" x="1150" y="270">parse.js</text>
   </a>
   <a class="module" href="viewer.html#/md/knowledge/SharedModules.md#m1">
-    <circle cx="1150" cy="800" r="50"/>
-    <text class="p-id" x="1150" y="786">M1</text>
-    <text class="m-name" x="1150" y="803">csv.js</text>
+    <circle cx="1150" cy="580" r="50"/>
+    <text class="p-id" x="1150" y="566">M1</text>
+    <text class="m-name" x="1150" y="583">csv.js</text>
   </a>
 </svg>
 </div>
 
 <p class="notes">
-  4.1.1 and 4.1.2 are alternatives, not a pipeline: exactly one runs, chosen by a hardcoded constant, not by the user.
+  4.1.2 Fetch and parse FedInvest prices is specified but not drawn: a real, dormant code path, never selected in production, so it is not part of this diagram's active flow — see the spec's own note.
   The amber circles are shared modules (<a href="viewer.html#/md/knowledge/SharedModules.md">SharedModules.md</a>), not process steps of this diagram.
   See <a href="viewer.html#/md/knowledge/DFD_Worklist.md">DFD_Worklist.md</a> item 27 for what this pass found and logged.
 </p>

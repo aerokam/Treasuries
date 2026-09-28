@@ -69,7 +69,7 @@ const TERMS = {
   'view selections': 'view-selections', 'axis scales': 'axis-scales', 'drill request': 'drill-request',
   'charts and tables': 'charts-and-tables', 'drill popup': 'drill-popup',
   'live quotes': 'live-quotes', 'yield series': 'yield-series', 'day change': 'day-change',
-  'TIPS map': 'tips-map',
+  'TIPS market data': 'tips-market-data',
   'SA yield series': 'sa-yield-series',
 };
 const unlinked = new Set();
@@ -297,7 +297,7 @@ function level1() {
   ];
   // Each app is named as the portal names it.
   const apps = [
-    { key: 'lm', cat: 'workflow', name: ['Ladder', 'Manager'], spec: 'DFD_LEVEL2_TIPSLADDERMANAGER.html', reads: ['fedinv', 'quotes', 'tipsref', 'refcpi', 'sasao', 'hol'] },
+    { key: 'lm', cat: 'workflow', name: ['Ladder', 'Manager'], spec: 'DFD_LEVEL2_TIPSLADDERMANAGER.html', reads: ['quotes', 'tipsref', 'refcpi', 'sasao', 'hol'] },
     { key: 'tr', cat: 'reference', name: ['TIPS', 'Reference'], spec: V('TipsReference/knowledge/1.0_TIPS_Reference.md'), reads: ['tipsref', 'refcpi', 'sasao', 'hol'] },
     { key: 'pr', cat: 'educational', name: ['Treasury', 'Primer'], spec: V('Primer/knowledge/1.0_Primer.md'), reads: ['fedinv', 'tipsref', 'refcpi'] },
     { key: 'ce', cat: 'reference', name: ['CPI', 'Explorer'], spec: V('CpiExplorer/knowledge/1.0_Overview.md'), reads: ['refcpi', 'cpihist'] },
@@ -934,7 +934,7 @@ function level2TipsLadderManager() {
   ];
   const procs = [
     { id: '4.1', name: ['Load market', 'data'], href: 'DFD_LEVEL3_TLM_LOAD.html', reads: ['quotes', 'tipsref', 'refcpi', 'sasao', 'hol'],
-      out: { '4.2': ['TIPS map'], '4.3': ['TIPS map'], '4.4': ['TIPS map'] } },
+      out: { '4.2': ['TIPS market data'], '4.3': ['TIPS market data'], '4.4': ['TIPS market data'] } },
     { id: '4.2', name: ['Import holdings', 'and DARA plan'], href: 'DFD_LEVEL3_TLM_IMPORT.html', reads: [],
       out: { '4.3': ['DARA plan'], '4.4': ['holdings', 'DARA plan'] } },
     { id: '4.3', name: ['Build', 'ladder'], href: V('TipsLadderManager/knowledge/2.0_TIPS_Ladders.md'), reads: [], out: { '4.5': ['build result'] } },
@@ -996,7 +996,6 @@ function level2TipsLadderManager() {
 function level3TipsLadderManagerLoadMarketData() {
   const stores = [
     { id: 'quotes', name: 'Market quotes', href: DS('s7') },
-    { id: 'fedinv', name: 'FedInvest prices', href: DS('s1') },
     { id: 'tipsref', name: 'TIPS reference data', href: DS('s2') },
     { id: 'refcpi', name: 'Ref CPI', href: DS('s3') },
     { id: 'sasao', name: 'SA and SAO yields', href: DS('s10') },
@@ -1013,21 +1012,19 @@ function level3TipsLadderManagerLoadMarketData() {
   const procs = [
     { id: '4.1.1', name: ['Fetch and parse', 'market quotes'], href: S('fetch-and-parse-market-quotes'), reads: ['quotes'], calls: ['m2', 'm3', 'm4'],
       out: { '4.1.4': ['TIPS yields'] } },
-    { id: '4.1.2', name: ['Fetch and parse', 'FedInvest prices'], href: S('fetch-and-parse-fedinvest-prices'), reads: ['fedinv'], calls: ['m1'],
-      out: { '4.1.4': ['TIPS yields'] } },
     { id: '4.1.3', name: ['Fetch auxiliary', 'TIPS data'], href: S('fetch-auxiliary-tips-data'), reads: ['tipsref', 'refcpi', 'sasao', 'hol'], calls: ['m1', 'm2'],
       out: { '4.1.1': ['TIPS reference data', 'bond holidays'], '4.1.4': ['SA yields'] } },
-    { id: '4.1.4', name: ['Build the', 'TIPS map'], href: S('build-the-tips-map'), reads: [], calls: [], out: {} },
+    { id: '4.1.4', name: ['Build TIPS', 'market data'], href: S('build-tips-market-data'), reads: [], calls: [], out: {} },
   ];
-  const SX = 40, SW = 210, PR = 62, MR = 50, W = 1420, H = 1040;
-  const sy = i => 100 + i * 165;
-  const px = { '4.1.3': 460, '4.1.1': 720, '4.1.2': 720, '4.1.4': 980 };
-  const py = { '4.1.3': 640, '4.1.1': 260, '4.1.2': 940, '4.1.4': 500 };
+  const SX = 40, SW = 210, PR = 62, MR = 50, W = 1420, H = 760;
+  const sy = i => 100 + i * 150;
+  const px = { '4.1.3': 460, '4.1.1': 460, '4.1.4': 980 };
+  const py = { '4.1.3': 500, '4.1.1': 200, '4.1.4': 350 };
   const mx = { m2: 1150, m3: 1150, m4: 1150, m1: 1150 };
-  const my = { m3: 180, m4: 340, m2: 500, m1: 800 };
+  const my = { m3: 100, m4: 260, m2: 420, m1: 580 };
   const OBS = [...procs.map(q => ({ x: px[q.id], y: py[q.id], r: PR })), ...modules.map(m => ({ x: mx[m.id], y: my[m.id], r: MR }))];
   const LBL = [];
-  const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 3: TipsLadderManager 4.1, one process per source fetched, one that assembles the auxiliary TIPS data both sources need, one that builds the TIPS map, and the shared modules each calls into.">`, marker()];
+  const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 3: TipsLadderManager 4.1, fetching market quotes and the auxiliary TIPS data they need, then building TIPS market data, plus the shared modules each calls into.">`, marker()];
   const sIdx = Object.fromEntries(stores.map((s, i) => [s.id, i]));
   procs.forEach(p => p.reads.forEach(id => {
     const y = sy(sIdx[id]), [x2, y2] = toCircle(SX + SW + 5, y, px[p.id], py[p.id], PR);
@@ -1044,15 +1041,18 @@ function level3TipsLadderManagerLoadMarketData() {
     const others = OBS.filter(o => !(o.x === mx[id] && o.y === my[id]) && !(o.x === px[p.id] && o.y === py[p.id]));
     P.push(flow(x1, y1, x2, y2, { obstacles: others }));
   }));
-  // 4.1's own output at Level 2: the TIPS map, leaving 4.1.4 for the rest of the app.
+  // 4.1's own output at Level 2: TIPS market data, leaving 4.1.4 for the rest of the app.
   const [ox, oy] = fromCircle(px['4.1.4'], py['4.1.4'], PR, W - 12, py['4.1.4']);
   P.push(flow(ox, oy, W - 12, py['4.1.4'], { obstacles: OBS.filter(o => !(o.x === px['4.1.4'] && o.y === py['4.1.4'])) }));
-  P.push(labelAt(W - 16, py['4.1.4'] - 8, 'TIPS map  →  4.2 through 4.4', 'end'));
-  // Ref CPI passes through 4.1.3 to the rest of the app directly -- nothing inside 4.1
-  // itself reads it.
-  const [rx, ry] = fromCircle(px['4.1.3'], py['4.1.3'], PR, W - 12, py['4.1.3'] + 40);
-  P.push(flow(rx, ry, W - 12, py['4.1.3'] + 40, { obstacles: OBS.filter(o => !(o.x === px['4.1.3'] && o.y === py['4.1.3'])) }));
-  P.push(labelAt(W - 16, py['4.1.3'] + 32, 'Ref CPI  →  rest of app', 'end'));
+  P.push(labelAt(W - 16, py['4.1.4'] - 8, 'TIPS market data  →  4.2 through 4.4', 'end'));
+  // Ref CPI and Bond Holidays pass through 4.1.3 to the rest of the app directly, for use
+  // elsewhere in the app -- Ref CPI is read by nothing inside 4.1 itself.
+  const [rx, ry] = fromCircle(px['4.1.3'], py['4.1.3'], PR, W - 12, py['4.1.3'] + 20);
+  P.push(flow(rx, ry, W - 12, py['4.1.3'] + 20, { obstacles: OBS.filter(o => !(o.x === px['4.1.3'] && o.y === py['4.1.3'])) }));
+  P.push(labelAt(W - 16, py['4.1.3'] + 12, 'Ref CPI  →  rest of app', 'end'));
+  const [bx, by] = fromCircle(px['4.1.3'], py['4.1.3'], PR, W - 12, py['4.1.3'] + 60);
+  P.push(flow(bx, by, W - 12, py['4.1.3'] + 60, { obstacles: OBS.filter(o => !(o.x === px['4.1.3'] && o.y === py['4.1.3'])) }));
+  P.push(labelAt(W - 16, py['4.1.3'] + 52, 'bond holidays  →  rest of app', 'end'));
   stores.forEach((s, i) => P.push(storeShape(SX, sy(i), SW, s.href, s.name)));
   procs.forEach(p => P.push(procShape(px[p.id], py[p.id], PR, p.href, p.id, p.name)));
   modules.forEach(m => P.push(moduleShape(mx[m.id], my[m.id], MR, m.href, m.id.toUpperCase(), m.name)));
@@ -1061,7 +1061,7 @@ function level3TipsLadderManagerLoadMarketData() {
   return page({
     title: 'TipsLadderManager 4.1 — Level 3', h1: 'Level 3 &mdash; TipsLadderManager 4.1 Load market data', maxWidth: W,
     up: 'DFD_LEVEL2_TIPSLADDERMANAGER.html', upLabel: 'Level 2 — TipsLadderManager (draft)', svg: P.join(NL),
-    notes: ['  4.1.1 and 4.1.2 are alternatives, not a pipeline: exactly one runs, chosen by a hardcoded constant, not by the user.',
+    notes: ['  4.1.2 Fetch and parse FedInvest prices is specified but not drawn: a real, dormant code path, never selected in production, so it is not part of this diagram\'s active flow — see the spec\'s own note.',
       '  The amber circles are shared modules (<a href="' + M() + '">SharedModules.md</a>), not process steps of this diagram.',
       '  See <a href="viewer.html#/md/knowledge/DFD_Worklist.md">DFD_Worklist.md</a> item 27 for what this pass found and logged.'].join(NL)
   });
@@ -1081,11 +1081,11 @@ function level3TipsLadderManagerImport() {
   const OBS = procs.map(q => ({ x: px[q.id], y: py[q.id], r: PR }));
   const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 3: TipsLadderManager 4.2, two independent parses of the same uploaded file -- one for CUSIP rows, one for a DARA plan and construction parameters.">`, marker()];
 
-  // The TIPS map arrives from 4.1, drawn against its own diagram, the same edge-arrival
+  // TIPS market data arrives from 4.1, drawn against its own diagram, the same edge-arrival
   // convention 3.7's Level 3 uses for input produced by a sibling process.
   const [tx, ty] = toCircle(UX + UW + 60, 90, px['4.2.1'], py['4.2.1'], PR);
   P.push(flow(UX + UW + 60, 90, tx, ty, { obstacles: OBS.filter(o => !(o.x === px['4.2.1'] && o.y === py['4.2.1'])) }));
-  P.push(labelAt(UX + UW + 64, 74, 'TIPS map  ←  4.1'));
+  P.push(labelAt(UX + UW + 64, 74, 'TIPS market data  ←  4.1'));
 
   // The user uploads one file, read as plain text; both processes independently look for
   // what they each recognize in it, whichever Import menu choice (CUSIP/Qty or DARA Plan)

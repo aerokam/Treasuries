@@ -10,7 +10,7 @@ This document provides the operational details for every data store: R2 key, wri
 **Description**: The [Settlement Date](./DATA_DICTIONARY.md#settlement-date) of the day's FedInvest prices, then each TIPS and each market-based bill, note and bond with one price and the yield of that price.
 **Written by**: [1.1 Download FedInvest prices and calculate yields](./1.1_Download_FedInvest_Prices.md).
 **Update Frequency**: Weekdays ~1:05 PM ET ([Data Pipeline](./Data_Pipeline.md)).
-**Read by**: YieldCurves ([3.1.1](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#parse-fedinvest-prices)), the yield curves job (process 1.3), Treasury Primer, and TipsLadderManager and TipsReference when the FedInvest source is selected ([3.1 Data Pipeline §4.0](../TipsLadderManager/knowledge/3.1_Data_Pipeline.md)).
+**Read by**: YieldCurves ([3.1.1](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#parse-fedinvest-prices)), the yield curves job (process 1.3), and Treasury Primer. TipsLadderManager and TipsReference have a code path for it (`shared/src/market-data.js#fetchTipsData`), a dormant cross-check never selected in production — see [4.1.2](../TipsLadderManager/knowledge/4.1_Load_Market_Data.md#fetch-and-parse-fedinvest-prices).
 
 **Live Data**: [View Preview (Toggles Table)](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/YieldsFromFedInvestPrices.csv)
 
@@ -198,7 +198,7 @@ The old `Treasuries/TipsRef.csv` key was consolidated away (see `R2_Cleanup.md`)
 **Description**: [Fidelity Fixed Income (E6)](./DATA_DICTIONARY.md#e6)'s own rows, unchanged except for one transformation: every `="value"` Excel literal-string wrapper the export applies to a field is stripped to `value`. Combined Treasury + TIPS bid/ask quotes (replaces the old separate `FidelityTips.csv`/`FidelityTreasuries.csv` pair as of ~2026-06-23).
 **Written by**: [1.2 Download market quotes](./1.2_Download_Market_Quotes.md).
 **Update Frequency**: `FidelityQuotes` task, three weekday trigger windows — 5:05 AM PT, 9:35 AM PT, 2:05 PM PT ([Data Pipeline](./Data_Pipeline.md)).
-**Read by**: YieldCurves ([3.1.2](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#parse-market-quotes)), the yield curves job (process 1.3), the SA and SAO yields job (process 1.11), the fund holdings job (process 1.14), and TipsLadderManager and TipsReference when the Market source is selected ([3.1 Data Pipeline §4.0](../TipsLadderManager/knowledge/3.1_Data_Pipeline.md)).
+**Read by**: YieldCurves ([3.1.2](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#parse-market-quotes)), the yield curves job (process 1.3), the SA and SAO yields job (process 1.11), the fund holdings job (process 1.14), TipsLadderManager ([4.1.1](../TipsLadderManager/knowledge/4.1_Load_Market_Data.md#fetch-and-parse-market-quotes)) and TipsReference — the live default for both, per `shared/src/market-data.js#loadMarketData`.
 
 **Live Data**: [View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/FidelityTreasuriesTips.csv)
 
