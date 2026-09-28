@@ -11,7 +11,9 @@
 //
 // Strategy:
 //   - Resolution is daily for ~3yr (6M feed), weekly to 10yr (5Y feed), quarterly deep
-//     (ALL feed). We merge coarse->fine so the finest feed wins for recent dates.
+//     (ALL feed). CNBC dates a weekly/quarterly bar at the START of its period, but its close is
+//     the period's last trading day, so mergeHistory (cnbcBarDates.js) dates it there, and only
+//     where the period has no finer-resolution date.
 //   - MERGE with the existing consolidated file: dates we captured while dense are kept
 //     even after CNBC's feed coarsens them (accumulate-daily for 10Y/ALL). Fresh CNBC
 //     values override the same date (authoritative ~3 PM).
@@ -23,6 +25,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { mergeHistory } from './cnbcBarDates.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, '../../.env') });
@@ -105,16 +108,12 @@ async function main() {
   const out = {};
   let totalPts = 0;
   for (const sym of SYMBOLS) {
-    const merged = seriesToMap(existing[sym]); // keep accumulated history
-
-    for (const range of DAILY_RANGES) {       // coarse -> fine; fine overrides
-      const bars = await fetchRange(sym, range);
-      for (const p of bars) {
-        if (p.date >= todayET) continue;       // completed days only (skip provisional)
-        merged[p.date] = p.y;                  // fresh CNBC ~3PM value is authoritative
-      }
+    const feeds = {};
+    for (const range of DAILY_RANGES) {
+      feeds[range] = await fetchRange(sym, range);
       await new Promise(r => setTimeout(r, 120));
     }
+    const merged = mergeHistory(seriesToMap(existing[sym]), feeds, todayET); // keeps accumulated history
 
     const series = Object.keys(merged).sort().map(date => ({ x: `${date}150000`, y: merged[date] }));
     out[sym] = series;
