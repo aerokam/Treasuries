@@ -334,10 +334,14 @@ runFullRebalanceTest('SampleHoldings (richest IRA)', './data/SampleHoldings.csv'
     const { summary, details } = runRebalance({ dara, bracketMode: '3bracket', holdings, tipsMap, refCPI, settlementDate });
 
     assert('F4: origLower IS Jan 2036', summary.brackets.lowerCUSIP === '91282CPU9', true);
-    // When orig lower == new lower (both Jan 2036), 3-bracket falls back to 2-bracket.
-    // newLowerCUSIP is null; the standard 2-bracket weights apply.
-    assert('F4: newLowerCUSIP null (fell back to 2-bracket)', summary.newLowerCUSIP, null);
-    assert('F4: origLowerWeight is null (2-bracket path)',    summary.origLowerWeight, null);
+    // When orig lower == new lower (both Jan 2036, no separate Jul 2036 held here), Multi-bracket
+    // still resolves the canonical Active Lower Bracket rather than nulling it out — it stays active
+    // so a genuine same-maturity-year retained TIPS would still be found if one were held (2.0
+    // §Retained Bracket Excess). With none held, there is nothing to retain: retainedList is empty,
+    // which reduces bracketWeightsN to the plain 2-bracket weights exactly (verified: gap-math.js
+    // bracketWeightsN with retained=[]).
+    assert('F4: newLowerCUSIP equals the orig lower (no distinct retained maturity found)', summary.newLowerCUSIP, '91282CPU9');
+    assert('F4: origLowerWeight is 0 (empty retainedList)', summary.origLowerWeight, 0);
 
     const jan2036 = details.find(d => d.cusip === '91282CPU9' && d.isBracketTarget);
     // Format 4 has explicit excessQty=12 — the import value is used for the funded/excess split.
@@ -2443,6 +2447,66 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
   assert('synthetic prices below par when its coupon sits below its yield', g38.synPrice < 100, true);
   assert('gap cost is priced off the synthetic, not par', Math.round(g38.cost), Math.round(g38.qty * 1000 * g38.synPrice / 100));
 }
+
+// ── Test: same-maturity-year retained TIPS is recognized on its own, independent of whether a
+// separate, older bracket YEAR is also retained — and an already-correct reload is a no-op ────────
+// 2.0 §Retained Bracket Excess ("independently, any OTHER held CUSIP sharing the active lower
+// bracket's own maturity year"): a bracket year holding a January AND a July maturity (DD §Bracket
+// Year TIPS) is its own retained-maturity pattern, unrelated to Multi-bracket's other job of
+// supporting more than one retained bracket YEAR. Found on a real account 2026-09-28: reloading an
+// already-correct ladder (Jan 2036's retained excess and Jul 2036's active excess both exactly as a
+// prior rebalance/build had left them) produced a spurious trade — Jan 2036 sold down as an ordinary
+// funded holding, Jul 2036 bought up — because the same-year scan only ran when a distinct-CUSIP
+// retained pick from `identifyBrackets` also existed, which this single-year case never produces.
+{
+  console.log('\nSame-maturity-year retained TIPS (Jan 2036 retained / Jul 2036 active) — idempotent reload');
+  const rows = [
+    { cusip: 'TEST35JUL', maturity: '2035-07-15', coupon: 0.01875, datedDateRefCpi: 321.09758, price: 97.06,  yield: 0.0224 },
+    { cusip: 'TEST36JAN', maturity: '2036-01-15', coupon: 0.01875, datedDateRefCpi: 324.93471, price: 96.28,  yield: 0.0232 },
+    { cusip: 'TEST36JUL', maturity: '2036-07-15', coupon: 0.02375, datedDateRefCpi: 333.96974, price: 100.44, yield: 0.0233 },
+    { cusip: 'TEST40FEB', maturity: '2040-02-15', coupon: 0.02125, datedDateRefCpi: 216.1395,  price: 94.98,  yield: 0.0257 },
+  ];
+  const map = buildTipsMapFromYields(rows);
+  const toHoldings = (details) => details
+    .filter(d => (d.fundedYearQtyAfter ?? 0) + (d.excessQtyAfter ?? 0) > 0)
+    .map(d => ({ cusip: d.cusip, qty: d.fundedYearQtyAfter + d.excessQtyAfter, excessQty: d.excessQtyAfter }));
+
+  // Starting holdings mirror the real account's own shape (proportionally): Jan 2036 carries both a
+  // funded rung AND retained excess from before Jul 2036 existed; Jul 2036, the Active Lower Bracket,
+  // carries its own excess. Round 1 lets the engine settle any genuine over/under-allocation first —
+  // isolating round 2 (below) to the actual regression: does an ALREADY-SETTLED state stay settled.
+  const holdingsA = [
+    { cusip: 'TEST35JUL', qty: 34, excessQty: 0 },
+    { cusip: 'TEST36JAN', qty: 25, excessQty: 8 },
+    { cusip: 'TEST36JUL', qty: 27, excessQty: 27 },
+    { cusip: 'TEST40FEB', qty: 25, excessQty: 13 },
+  ];
+  const rebal1 = runRebalance({ dara: 20000, bracketMode: '3bracket', holdings: holdingsA, tipsMap: map, refCPI, settlementDate });
+  const jan36Round1 = rebal1.details.find(d => d.cusip === 'TEST36JAN');
+  const jul36Round1 = rebal1.details.find(d => d.cusip === 'TEST36JUL');
+  assert('fixture sanity: Jan 2036 is recognized as a bracket target, not an ordinary holding', jan36Round1?.isBracketTarget, true);
+  assert('fixture sanity: Jul 2036 is recognized as a bracket target', jul36Round1?.isBracketTarget, true);
+  const holdingsB = toHoldings(rebal1.details);
+
+  // Round 2: reload that exact, already-settled state and rebalance again with nothing changed — the
+  // scenario the bug hit. Must be a no-op: both same-year maturities already sit at their duration-
+  // matched targets, so re-running must not move either of them (2.0 §Retained Bracket Excess:
+  // retained excess is sold only when over-allocated, never bought; the active bracket is bought
+  // only to cover a genuine remainder).
+  const rebal2 = runRebalance({ dara: 20000, bracketMode: '3bracket', holdings: holdingsB, tipsMap: map, refCPI, settlementDate });
+  const jan36Row = rebal2.details.find(d => d.cusip === 'TEST36JAN');
+  const jul36Row = rebal2.details.find(d => d.cusip === 'TEST36JUL');
+  assert('idempotent reload: Jan 2036 funded-year qty untouched', jan36Row?.fundedYearQtyDelta ?? 0, 0);
+  assert('idempotent reload: Jan 2036 excess qty untouched', jan36Row?.excessQtyDelta ?? 0, 0);
+  assert('idempotent reload: Jul 2036 funded-year qty untouched', jul36Row?.fundedYearQtyDelta ?? 0, 0);
+  assert('idempotent reload: Jul 2036 excess-qty churn is at most 1 bond (whole-lot rounding, 2.0 §Round-Trip Rounding Note)', Math.abs(jul36Row?.excessQtyDelta ?? 0) <= 1, true);
+
+  // The retained CUSIP's own row must show its actual funded/excess split, not "100% funded" — the
+  // display half of the same bug (2.0 §Retained Bracket Excess).
+  assert('idempotent reload: Jan 2036 is recognized as a bracket target (isBracketTarget)', jan36Row?.isBracketTarget, true);
+  assert('idempotent reload: Jan 2036 excessQtyBefore reflects its imported split, not 0', (jan36Row?.excessQtyBefore ?? 0) > 0, true);
+}
+
 // ── Test: Available Cash — ladder-wide pool consumed earliest rung first ─────────────────────
 // 2.0 §Available Cash. Supersedes the settlement-year-only RMD cash override, which discarded any
 // amount beyond that one year’s need. The pool now zeroes each rung it covers and spills the

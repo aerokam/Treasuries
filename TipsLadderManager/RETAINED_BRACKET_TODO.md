@@ -99,8 +99,21 @@ Nothing in `identifyBrackets` has been changed.
    the current holdings don't already cover gets bought into the preferred maturity. Verified zero-trade
    on the reporting account across every `maturityPref` value; a synthetic fixture with a forced
    shortfall confirms the redirect itself still works when genuinely needed.
-4. **Specs**: `2.0 §Retained Bracket Excess` and `3.0 §Bracket Identification Rules §Retained Maturities` updated 2026-09-20 for the same-maturity-year case (item 3). `3.0 §Before-State Preview` and `4.0 §Computation Modules` (`shape-math.js` entry) updated 2026-09-27 for item 1 above. `3.0 §Lower bracket priority rule` still open.
-5. **Detail-row display for the same-maturity-year retained leg** doesn't yet split funded vs. excess the way the recognized bracket-target row does (`TipsLadderManager/KNOWN_ISSUES.md`, OPEN: "A same-maturity-year retained leg's own row does not label its trade as excess"). The trade itself is correct; only the row's own drill-down label isn't wired yet.
+
+   **2026-09-28 correction:** "done for the one case that mattered in practice" and the 2026-09-23
+   entry's "the trade itself is correct" (item 5, below) were both wrong for the shape that actually
+   recurs — a same-maturity-year retained TIPS with **no separate, older bracket YEAR also retained**.
+   The same-year scan this item describes was gated behind Multi-bracket's cross-year retained check
+   (`is3Bracket`/`newLowerCUSIP`), so it silently never ran unless a genuine cross-year retained
+   bracket also happened to be held. Reported on a real account reloading its own already-correct
+   ladder (Jan 2036 retained, Jul 2036 active, no other retained year) and getting a spurious
+   sell-Jan/buy-Jul trade on a no-op rerun. Fixed: the same-year scan now runs whenever Multi-bracket
+   is selected, independent of whether a cross-year retained bracket also exists, and the import's
+   per-CUSIP `excessQty` is honored for both maturities sharing the year rather than only the last one
+   processed. See `TipsLadderManager/KNOWN_ISSUES.md` FIXED, "A same-maturity-year retained TIPS was
+   invisible whenever no separate, older bracket YEAR was also retained."
+4. **Specs**: `2.0 §Retained Bracket Excess` and `3.0 §Bracket Identification Rules §Retained Maturities` updated 2026-09-20 for the same-maturity-year case (item 3). `3.0 §Before-State Preview` and `4.0 §Computation Modules` (`shape-math.js` entry) updated 2026-09-27 for item 1 above. `2.1 §Unified Output` corrected 2026-09-28: the import's `excessQty` split is honored per CUSIP, not per bracket year (item 3's 2026-09-28 correction). `3.0 §Lower bracket priority rule` still open.
+5. **Detail-row display for the same-maturity-year retained TIPS — fixed 2026-09-28** alongside item 3's correction above: the row now reports its own funded/excess split (`isBracketTarget`, `excessQtyBefore`/`excessQtyAfter`) instead of showing the whole holding as funded.
 
 ---
 

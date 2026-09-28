@@ -1070,15 +1070,20 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
   const upperBond = brackets.upperCUSIP ? tipsMap.get(brackets.upperCUSIP) : null;
   const lowerDuration = brackets.lowerMaturity ? calculateMDuration(settlementDate, brackets.lowerMaturity, lowerBond?.coupon ?? 0, lowerBond?.yield ?? 0) : 0;
   const upperDuration = brackets.upperMaturity ? calculateMDuration(settlementDate, brackets.upperMaturity, upperBond?.coupon ?? 0, upperBond?.yield ?? 0) : 0;
-  // 3-bracket requires a distinct orig-lower vs new-lower; when firstYear is inside the gap
-  // (e.g. 2038/2039), minGapYear = firstYear, so the latest-maturing pre-gap TIPS is the same for
-  // both orig-lower (from identifyBrackets fallback) and new-lower → same CUSIP → auto-degrades below.
+  // Multi-bracket ("Retain lower bracket excess" on, 2.0 §Retained Bracket Excess) always resolves
+  // the canonical Active Lower Bracket (latest-maturing TIPS below minGapYear) independently of
+  // identifyBrackets's own pick. The two coincide unless a genuinely older, cross-year retained
+  // maturity is also held (2.0 §632, §666): whether they coincide governs only `crossYearRetained`
+  // below, never whether Multi-bracket runs at all — a same-maturity-year retained TIPS (DD §Bracket
+  // Year TIPS: a bracket year may hold a January and a July maturity) is a second, independent
+  // retained pattern that has nothing to do with cross-year retention (see §sameYearRetained below).
   let is3Bracket = (bracketMode === '3bracket') && brackets.lowerCUSIP != null;
   let newLowerYear = null, newLowerCUSIP = null, newLowerMaturity = null, newLowerDuration = 0;
+  let crossYearRetained = false;
   if (is3Bracket && gapYears.length > 0) {
-    // New lower = latest-maturing TIPS strictly below minGapYear. minGapYear−1 may itself be a gap
-    // year (e.g. firstYear=2038 → minGapYear=2038 → 2037 has no TIPS), so walk tipsMap for the
-    // longest-dated maturity < minGapYear, same as anchorBefore in calculateGapParameters.
+    // Active Lower Bracket = latest-maturing TIPS strictly below minGapYear. minGapYear−1 may itself
+    // be a gap year (e.g. firstYear=2038 → minGapYear=2038 → 2037 has no TIPS), so walk tipsMap for
+    // the longest-dated maturity < minGapYear, same as anchorBefore in calculateGapParameters.
     for (const [_cusip, _bond] of tipsMap.entries()) {
       if (!_bond.maturity || !_bond.yield) continue;
       const _yr = _bond.maturity.getFullYear();
@@ -1091,14 +1096,13 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
     if (!newLowerCUSIP) throw new Error('Multi-bracket: no outstanding TIPS found before gap year ' + minGapYear);
     const _nlBond = tipsMap.get(newLowerCUSIP);
     newLowerDuration = calculateMDuration(settlementDate, newLowerMaturity, _nlBond?.coupon ?? 0, _nlBond?.yield ?? 0);
-    // When orig lower and new lower are literally the same bond, 3-bracket is a no-op: the "new
-    // lower" bond is already the orig lower. Fall back to standard 2-bracket. A shared MATURITY
-    // YEAR does not by itself mean this — a maturity year may hold a January and a July TIPS
-    // (DD §Bracket Year TIPS) — so the comparison is by CUSIP, never by year.
-    if (newLowerCUSIP === brackets.lowerCUSIP) {
-      is3Bracket = false;
-      newLowerYear = null; newLowerCUSIP = null; newLowerMaturity = null; newLowerDuration = 0;
-    }
+    // identifyBrackets's pick is a genuine cross-year retained maturity only when it names a
+    // different bond than the canonical Active Lower Bracket just resolved above. A shared MATURITY
+    // YEAR does not by itself mean they're the same bond — a maturity year may hold a January and a
+    // July TIPS (DD §Bracket Year TIPS) — so the comparison is by CUSIP, never by year. When they
+    // coincide there is simply no cross-year retained maturity; Multi-bracket stays active (is3Bracket
+    // unchanged) so the same-year retained scan below still runs.
+    crossYearRetained = newLowerCUSIP !== brackets.lowerCUSIP;
   }
 
   const future30yCoverYearSet = future30yYears.length > 0 ? new Set([future30yLowerYear, future30yUpperYear]) : new Set();
@@ -1114,6 +1118,10 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
   // Used for computing current excess = totalQty - fundedYearQty for bracket priority logic.
   // Future30y cover years skipped — they have no funded-year component.
   const bracketTargetFundedYearQtyBefore = {};
+  const bracketYearCUSIP = {};   // bYear -> the one CUSIP this year-keyed map speaks for (its Active
+                                  // Lower/Upper Bracket TIPS) — a same-maturity-year retained TIPS
+                                  // (DD §Bracket Year TIPS) is a DIFFERENT CUSIP and is never this one;
+                                  // its own funded/excess split is tracked separately (sameYearRetained).
   if (gapYears.length > 0) {
     for (const bYear of bracketYearSet) {
       if (future30yCoverYearSet.has(bYear)) continue;
@@ -1122,6 +1130,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
       else if (bYear === brackets.upperYear) { bCUSIP = brackets.upperCUSIP; bMat = brackets.upperMaturity; }
       else if (is3Bracket && bYear === newLowerYear) { bCUSIP = newLowerCUSIP; bMat = newLowerMaturity; }
       if (!bCUSIP) continue;
+      bracketYearCUSIP[bYear] = bCUSIP;
       if (!yearInfo[bYear]) yearInfo[bYear] = { holdings: [] };
       const yh = yearInfo[bYear].holdings;
       let laterMatIntBefore = 0;
@@ -1135,12 +1144,23 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
       bracketTargetFundedYearQtyBefore[bYear] = piB > 0 ? Math.max(0, Math.round((bDara - laterMatIntBefore - nonPI) / piB)) : 0;
     }
   }
+  // Future30y cover years carry no funded-year component of their own (skipped just above), but they
+  // still need a `bracketYearCUSIP` entry so the import-honoring loop right below — and the Before-ARA
+  // sweep further down, which also keys off it — recognize their cover CUSIP.
+  if (future30yYears.length > 0) {
+    if (future30yLowerCoverBond) bracketYearCUSIP[future30yLowerYear] = future30yLowerCoverBond.cusip;
+    if (future30yUpperCoverBond) bracketYearCUSIP[future30yUpperYear] = future30yUpperCoverBond.cusip;
+  }
 
   // When excessQty is provided by the import (Formats 4 or 5), it encodes the funded/excess split
-  // from the prior build/rebalance. Use it for ALL bracket years, overriding the DARA-derived estimate.
-  // Broker CSVs (Formats 1–3) have no excessQty: the LMI estimate above is used as the fallback.
+  // from the prior build/rebalance. Use it for that year's Active Lower/Upper Bracket CUSIP,
+  // overriding the DARA-derived estimate. Restricted to `bracketYearCUSIP[h.year]` (not "any holding
+  // in this year") because a bracket year can hold a second, same-maturity-year retained TIPS (DD
+  // §Bracket Year TIPS) — that CUSIP's own stated split is honored independently, below
+  // (§sameYearRetained), so it must not overwrite this year-keyed entry. Broker CSVs (Formats 1–3)
+  // have no excessQty: the LMI estimate above is used as the fallback.
   for (const h of holdings) {
-    if (h.excessQty != null && bracketYearSet.has(h.year)) {
+    if (h.excessQty != null && bracketYearSet.has(h.year) && h.cusip === bracketYearCUSIP[h.year]) {
       bracketTargetFundedYearQtyBefore[h.year] = h.qty - h.excessQty;
     }
   }
@@ -1170,7 +1190,13 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
       const b = tipsMap.get(h.cusip);
       if (!b?.maturity || b.maturity >= newLowerMaturity) continue;   // only an earlier maturity qualifies
       const piOwn = calculatePIPerBond(h.cusip, b.maturity, refCPI, tipsMap);
-      const ownFundedNeedQty = piOwn > 0 ? Math.max(0, Math.round((yDaraSameYear - laterMatIntBefore) / piOwn)) : 0;
+      // The import's own stated split (Formats 4/5) is authoritative when present — it preserves the
+      // funded/excess split from the prior build/rebalance exactly, the same way bracketYearCUSIP's
+      // holder is honored above. Only fall back to the DARA-derived estimate for a broker file
+      // (Formats 1–3), which carries no excessQty.
+      const ownFundedNeedQty = h.excessQty != null
+        ? Math.max(0, h.qty - h.excessQty)
+        : (piOwn > 0 ? Math.max(0, Math.round((yDaraSameYear - laterMatIntBefore) / piOwn)) : 0);
       sameYearRetained.push({
         year: newLowerYear, cusip: h.cusip, maturity: b.maturity,
         duration: calculateMDuration(settlementDate, b.maturity, b.coupon ?? 0, b.yield ?? 0),
@@ -1184,6 +1210,10 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
   let retainedExcessCostBefore = null, retainedBracketSold = false;
   const bracketExcessTargetCost = {};   // keyed by CUSIP, never by year — a year can hold two roles
   const sameYearRetainedFinal = new Map();   // same-year retained cusip -> its final post-rebalance qty
+  // same-year retained cusip -> its own funded-year need (frozen; excess is whatever it holds beyond
+  // this) — lets the details loop below split its row into funded/excess like any other bracket
+  // target, instead of showing its entire holding as "funded" (2.0 §Retained Bracket Excess).
+  const sameYearRetainedNeed = new Map(sameYearRetained.map(r => [r.cusip, r.ownFundedNeedQty]));
   if (gapYears.length > 0) {
     if (is3Bracket) {
       // Retained lower brackets are frozen at the excess already held and enter the
@@ -1201,9 +1231,12 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
 
       // Retained = every lower bracket older than the active one, EARLIEST MATURITY FIRST (the
       // order the solver depletes them in when the match is otherwise unsolvable) — a cross-year
-      // pick from identifyBrackets (Excess ARA) plus any same-maturity-year holding found above.
+      // pick from identifyBrackets (Excess ARA), only when it names a maturity distinct from the
+      // Active Lower Bracket (`crossYearRetained`), plus any same-maturity-year holding found above.
       const retainedList = [
-        { year: brackets.lowerYear, cusip: brackets.lowerCUSIP, maturity: brackets.lowerMaturity, duration: lowerDuration },
+        ...(crossYearRetained
+          ? [{ year: brackets.lowerYear, cusip: brackets.lowerCUSIP, maturity: brackets.lowerMaturity, duration: lowerDuration }]
+          : []),
         ...sameYearRetained,
       ]
         .filter(r => r.year != null && r.cusip != null)
@@ -1889,7 +1922,14 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
     if (!outLMI[h.year]) outLMI[h.year] = 0;
     outLMI[h.year] += tQ * 1000 * ir * b.coupon;
 
-    const isBT = !!(bst_loop?.isBracket && h.cusip === bst_loop.targetCUSIP);
+    // A same-maturity-year retained TIPS (DD §Bracket Year TIPS) is never `bst_loop.targetCUSIP` —
+    // that names the Active Lower/Upper Bracket CUSIP for the year — so without this it would fall
+    // through to the plain "unchanged holding" case below and its own funded/excess split (however
+    // it was resolved above) would be lost, showing the entire holding as funded. Its own frozen
+    // funded need overrides tFundedYearQty the same way `bst_loop`/`nonTargetSells` set it above.
+    const sameYearOwnNeed = sameYearRetainedNeed.get(h.cusip);
+    if (sameYearOwnNeed != null) tFundedYearQty = Math.min(h.qty, sameYearOwnNeed);
+    const isBT = !!(bst_loop?.isBracket && h.cusip === bst_loop.targetCUSIP) || sameYearOwnNeed != null;
     const cpbHere = (b.price ?? 0) / 100 * ir * 1000;
     // Current-holdings split at a bracket year: how much of what's actually held counts as this
     // year's own funded rung vs. extra held for gap coverage. This is a pure holdings-interpretation
@@ -1900,14 +1940,18 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
     // how we read the current holdings (see 3.0 §Named Quantities: the funded-first rule applies to
     // ALL standard bracket years, with no after-side exception).
     // - future30y cover years: cost-based formula (pure excess, no funded component).
+    // - same-maturity-year retained TIPS: its own need (sameYearOwnNeed), never the year-keyed
+    //   bracketTargetFundedYearQtyBefore — that speaks for the Active Lower/Upper Bracket CUSIP only.
     // - Format 4/5 (h.excessQty present): use explicit CSV value directly.
     // - every other bracket year: bracketTargetFundedYearQtyBefore (funded-first LMI/DARA formula).
     const exB = isBT && cpbHere > 0
       ? future30yCoverYearSet.has(h.year)
         ? Math.round((bracketExcessTargetCost[h.cusip] || 0) / cpbHere)
-        : h.excessQty != null
-          ? h.excessQty
-          : Math.max(0, h.qty - (bracketTargetFundedYearQtyBefore[h.year] ?? 0))
+        : sameYearOwnNeed != null
+          ? Math.max(0, h.qty - sameYearOwnNeed)
+          : h.excessQty != null
+            ? h.excessQty
+            : Math.max(0, h.qty - (bracketTargetFundedYearQtyBefore[h.year] ?? 0))
       : 0;
     const exA = isBT ? tQ - tFundedYearQty : 0;
 

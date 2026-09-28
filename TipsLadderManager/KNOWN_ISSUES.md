@@ -8,25 +8,6 @@ production impact go here.
 
 ## OPEN
 
-### A same-maturity-year retained leg's own row does not label its trade as excess
-
-- **Found:** 2026-09-20, verifying the multi-bracket same-maturity-year fix (see FIXED, below).
-- **Symptom:** when a maturity year holds two TIPS — the active lower bracket and a retained
-  maturity sharing its year — and the retained one is genuinely over-allocated and sold down, the
-  trade is correct (the right CUSIP, the right quantity), but that CUSIP's own detail row reports
-  the change as `fundedYearQtyDelta` rather than `excessQtyDelta`. The row's own "Excess Amount"
-  popup shows 0 before and after regardless, since it is only wired for the recognized bracket-target
-  CUSIP of that year (`isBracketTarget`/`isBT`).
-- **Why:** the render-facing split (`exB`/`exA` in the detail-row loop, `rebalance-lib.js`) keys off
-  `h.cusip === buySellTargets[year].targetCUSIP` — true for the active lower bracket, never true for
-  a same-maturity-year retained leg, which is a different CUSIP in the same year. The trade itself is
-  computed and placed correctly upstream (see FIXED entry); only this display split doesn't know
-  about the second CUSIP yet.
-- **Status:** open, not started. Scope: extend the `isBT`-style detection to recognize a
-  same-maturity-year retained CUSIP as its own bracket role (with its own `bracketTargetFundedYearQtyBefore`-equivalent,
-  already computed as `ownFundedNeedQty` upstream), rather than adding a second special case per call
-  site.
-
 ### Help text still to be walked, section by section
 
 The worklist moved to `knowledge/Terminology_Worklist.md` on 2026-09-06, since the work now spans
@@ -344,6 +325,52 @@ per-CUSIP prices for a past date (3.1 §4.0).
   it out of the displayed P+I: 1,014.38 implies 2 × 14.38 = 2.876%, against an actual 2.875%.
 - **Status:** open.
 ## FIXED
+
+### A same-maturity-year retained TIPS was invisible whenever no separate, older bracket YEAR was also retained
+
+- **Found:** 2026-09-28, from a real account report: reloading an already-correct ladder (Jan 2036
+  retained excess and Jul 2036 active excess both exactly as a prior rebalance had left them) and
+  rebalancing again produced a spurious trade — Jan 2036 sold 8 as an ordinary funded holding, Jul
+  2036 bought 10 into excess — even though the file explicitly stated both CUSIPs' funded/excess
+  split.
+- **This corrects two earlier claims in this file and in `RETAINED_BRACKET_TODO.md` item 3**, both
+  dated 2026-09-20: that "ruling 4" (a same-maturity-year retained TIPS gets its own funded-need-first
+  split) was fixed for "the one case that mattered in practice," and that its trade was "computed and
+  placed correctly upstream," with only the detail row's display split (`isBracketTarget`/`excessQtyBefore`)
+  left unwired. Neither claim held for the shape above: no cross-year retained bracket YEAR (e.g. Jan
+  2034) was also held, only the two same-year maturities.
+- **Root cause.** `runRebalance` (`rebalance-lib.js`) resolves the canonical Active Lower Bracket
+  (`newLowerCUSIP`, latest-maturing TIPS below the gap) and compares it by CUSIP against
+  `identifyBrackets`'s own pick (`brackets.lowerCUSIP`) to decide whether a genuine cross-year
+  retained maturity exists. When they coincide — no separate older bracket YEAR retained, which is
+  the common case — the code fell back `is3Bracket = false` and zeroed `newLowerCUSIP` entirely. The
+  same-maturity-year scan (`sameYearRetained`, 2.0 §Retained Bracket Excess: "independently, any
+  OTHER held CUSIP sharing the active lower bracket's own maturity year") is nested inside
+  `if (is3Bracket)`, so it never ran, and its own import-honoring loop
+  (`bracketTargetFundedYearQtyBefore[h.year] = h.qty - h.excessQty`) was additionally keyed by year
+  alone, so even when two same-year CUSIPs both carried a stated `excessQty`, only the
+  last-processed one's split survived — the other's was silently discarded and its entire holding
+  fell through to the ordinary funded-year sweep as 100% funded.
+- **Note on the Brackets control:** the two modes are **2-bracket** and **Multi-bracket** — no
+  "3-bracket" concept exists in the spec or the UI. `is3Bracket` is this file's internal variable
+  name for "Multi-bracket is selected," left as-is here. Multi-bracket's own job of supporting more
+  than one retained bracket *year* (`RETAINED_BRACKET_TODO.md` item 2, still open) is unrelated to a
+  single bracket year holding two maturities (DD §Bracket Year TIPS) — this fix is scoped to the
+  latter only.
+- **Fix:** the canonical Active Lower Bracket is now always resolved when Multi-bracket is selected,
+  never zeroed out; a separate flag (`crossYearRetained`) records whether `identifyBrackets`'s pick is
+  genuinely a different bond, gating only whether that pick is added to the retained list — never
+  whether the same-maturity-year scan runs. The import-honoring loop is now restricted to each bracket
+  year's own designated CUSIP (`bracketYearCUSIP`), so a second, same-year CUSIP's own `excessQty`
+  survives independently; the same-year scan honors that imported split directly (falling back to the
+  DARA-derived estimate only for broker files, which carry no `excessQty`). The detail-row display
+  (`isBracketTarget`, `excessQtyBefore`/`excessQtyAfter`) was fixed in the same pass — the row now
+  shows the CUSIP's real funded/excess split instead of reporting the whole holding as funded.
+- **Verified:** all 459 `tests/run.js` cases (8 new, added for this exact shape: settle a ladder with
+  both maturities held, then reload and rerun — both must be untouched) and all 86 Playwright E2E
+  cases pass. Reproduced and confirmed fixed against the reporting account's own file, run through
+  `rebalance-lib.js` with live market data directly (not just the synthetic fixture).
+- **Files:** `src/rebalance-lib.js`, `tests/run.js`, `knowledge/2.1_Broker_Import.md`.
 
 ### A bracket's own solved weight never reached a trade when the retained and active lower brackets shared a maturity year
 
