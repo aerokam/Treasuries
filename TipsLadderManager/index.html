@@ -1013,7 +1013,10 @@ async function loadData() {
         }
       } catch (e) {}
     }
-  } catch (err) { setStatus('Failed to load market data: ' + err.message, true); }
+  } catch (err) {
+    console.error('loadData() failed:', err);
+    setStatus('Market data failed to load. Try reloading the page in a few minutes.', true);
+  }
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -3139,6 +3142,15 @@ let currentImportedParams = null; // construction params from our own export's #
 let _holdingsLoadToken = 0;
 
 document.getElementById('holdings-file').addEventListener('change', async (e) => {
+  // Market data (tipsMap) loads asynchronously at page open; a file picked before it resolves (or
+  // after it failed to load) would otherwise crash deep inside format detection with a raw JS
+  // exception. Bail out here with a real message instead, and reset the input so re-picking the
+  // same file fires 'change' again once market data is ready.
+  if (!tipsMap) {
+    setStatus('TIPS market data hasn’t finished loading yet — wait a moment and try again.', true);
+    e.target.value = '';
+    return;
+  }
   const myLoadToken = ++_holdingsLoadToken;
   const file = e.target.files[0];
   currentHoldingsArray = null;
@@ -3290,7 +3302,8 @@ document.getElementById('holdings-file').addEventListener('change', async (e) =>
     _initRebalDaraFromPortfolio();
     _updateCashFlowBtnVisibility();
   } catch (err) {
-    setStatus('Error reading file: ' + err.message, true);
+    console.error('Holdings file load failed:', err);
+    setStatus('Could not read this file. If the problem continues, reload the page and try again.', true);
   }
 });
 
