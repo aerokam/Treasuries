@@ -42,9 +42,10 @@ function typeSuffix(t) {
 }
 
 // ─── Schwab Format 2 ─────────────────────────────────────────────────────────
-
-const SCHWAB_COL_HEADER =
-  '"Symbol","Description","Qty (Quantity)","Price","Mkt Val (Market Value)","Gain $ (Gain/Loss $)","Gain % (Gain/Loss %)","Asset Type",';
+//
+// Column order is not fixed: Schwab has added columns (Cost/Share, Cost Basis) between
+// exports before. Every account section repeats its own header row, so each section's
+// columns are located by name from that row rather than assumed by position.
 
 function parseQuotedRow(line) {
   const cols = [];
@@ -54,19 +55,38 @@ function parseQuotedRow(line) {
   return cols;
 }
 
+// Build a quoted CSV row matching headerCols' column order; columns not in `fields` default to "--".
+function buildSchwabRow(headerCols, fields) {
+  return headerCols.map(h => `"${fields[h] ?? '--'}"`).join(',') + ',';
+}
+
 // Scale a Schwab position and return { row, mktNum, scaledBonds, isTips }
 // scaledBonds is non-null only for Fixed Income with INFL IDX in description.
-function scaleSchwabPos(cols) {
-  const [sym, desc, qty, price, mktVal, , , assetType] = cols;
+// headerCols: the section's own header row (array of column names), used to locate fields by name.
+function scaleSchwabPos(cols, headerCols) {
+  const idx = name => headerCols.indexOf(name);
+  const col = name => { const i = idx(name); return i < 0 ? '' : (cols[i] ?? ''); };
+
+  const sym = col('Symbol');
   if (!sym || sym === 'Symbol' || sym === 'Positions Total') return null;
 
   if (sym === 'Cash & Cash Investments') {
     return {
-      row: '"Cash & Cash Investments","--","--","--","$0.00","--","--","Cash and Money Market",',
+      row: buildSchwabRow(headerCols, {
+        'Symbol': 'Cash & Cash Investments',
+        'Mkt Val (Market Value)': '$0.00',
+        'Asset Type': 'Cash and Money Market',
+      }),
       mktNum: 0,
       scaledBonds: null,
     };
   }
+
+  const desc = col('Description');
+  const qty = col('Qty (Quantity)');
+  const price = col('Price');
+  const mktVal = col('Mkt Val (Market Value)');
+  const assetType = col('Asset Type');
 
   const rawQty = parseFloat(qty.replace(/,/g, ''));
   const isFixed = assetType.includes('Fixed Income');
@@ -99,7 +119,16 @@ function scaleSchwabPos(cols) {
   const scaledBonds = isTips ? scaledQtyNum / 1000 : null;
 
   return {
-    row: `"${sym}","${desc}","${scaledQtyStr}","${price}","$${mktNum.toFixed(2)}","$0.00","0%","${assetType}",`,
+    row: buildSchwabRow(headerCols, {
+      'Symbol': sym,
+      'Description': desc,
+      'Qty (Quantity)': scaledQtyStr,
+      'Price': price,
+      'Mkt Val (Market Value)': `$${mktNum.toFixed(2)}`,
+      'Gain $ (Gain/Loss $)': '$0.00',
+      'Gain % (Gain/Loss %)': '0%',
+      'Asset Type': assetType,
+    }),
     mktNum,
     scaledBonds,
     sym,
@@ -122,9 +151,11 @@ function sanitizeSchwab(text) {
     if (!trimmed) continue;
     const headerMatch = trimmed.match(ACCOUNT_HEADER_RE);
     if (headerMatch) {
-      current = { rawName: headerMatch[1].split(' ...')[0], positions: [] };
+      current = { rawName: headerMatch[1].split(' ...')[0], positions: [], headerCols: null };
       sections.push(current);
-    } else if (current && trimmed !== SCHWAB_COL_HEADER && !trimmed.startsWith('"Symbol"')) {
+    } else if (current && trimmed.startsWith('"Symbol"')) {
+      current.headerCols = parseQuotedRow(trimmed);
+    } else if (current) {
       const cols = parseQuotedRow(trimmed);
       if (cols.length >= 8) current.positions.push(cols);
     }
@@ -138,11 +169,11 @@ function sanitizeSchwab(text) {
 
     outLines.push('', '');
     outLines.push(`Acct${idx + 1}${typeSuffix(section.type)} ...${String(idx + 1).padStart(3, '0')}`);
-    outLines.push(SCHWAB_COL_HEADER);
+    outLines.push(section.headerCols.map(h => `"${h}"`).join(',') + ',');
 
     let totalMkt = 0;
     for (const cols of section.positions) {
-      const result = scaleSchwabPos(cols);
+      const result = scaleSchwabPos(cols, section.headerCols);
       if (!result) continue;
       outLines.push(result.row);
       totalMkt += result.mktNum;
@@ -152,7 +183,11 @@ function sanitizeSchwab(text) {
       }
     }
 
-    outLines.push(`"Positions Total","","--","--","$${totalMkt.toFixed(2)}","--","--","--",`);
+    outLines.push(buildSchwabRow(section.headerCols, {
+      'Symbol': 'Positions Total',
+      'Description': '',
+      'Mkt Val (Market Value)': `$${totalMkt.toFixed(2)}`,
+    }));
   });
 
   // SampleHoldings source = the traditional IRA holding the most TIPS (by scaled face).
