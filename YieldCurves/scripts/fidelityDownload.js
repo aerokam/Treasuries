@@ -276,12 +276,34 @@ const browser = await chromium.connectOverCDP(`http://localhost:${DEBUG_PORT}`);
 const context = browser.contexts()[0];
 const page = context.pages()[0] ?? await context.newPage();
 
+const MAX_DOWNLOAD_ATTEMPTS = 3;
+
 try {
   await ensureLoggedIn(page);
-  await downloadCombined(page);
 
-  console.log('\nUploading to R2...');
-  await runUpload();
+  let lastErr = null;
+  for (let attempt = 1; attempt <= MAX_DOWNLOAD_ATTEMPTS; attempt++) {
+    try {
+      await downloadCombined(page);
+      console.log('\nUploading to R2...');
+      await runUpload();
+      lastErr = null;
+      break;
+    } catch (err) {
+      lastErr = err;
+      // A login/session was reachable and the capture still came back broken or the upload
+      // rejected it (uploadFidelityDownload.js's row-count guard) -- a one-off glitch in the
+      // Fidelity page (filter not applied in time, page not finished loading), not a login
+      // problem. Retry the download itself, same logged-in page, no fresh login/MFA.
+      console.error(`Attempt ${attempt}/${MAX_DOWNLOAD_ATTEMPTS} failed: ${err.message}`);
+      if (attempt < MAX_DOWNLOAD_ATTEMPTS) {
+        console.log('Retrying download...');
+        await sleep(5000);
+      }
+    }
+  }
+  if (lastErr) throw lastErr;
+
   console.log('Done.');
 } finally {
   await browser.close();
