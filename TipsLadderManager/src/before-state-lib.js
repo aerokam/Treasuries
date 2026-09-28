@@ -127,29 +127,25 @@ export function detectBracketFlags({ heldARAByYear, tipsMap, lastYear }) {
 
   // Lower bracket (2032-2035, i.e. below the Active Lower Bracket year — the active bracket
   // itself, e.g. 2036 today, is never a candidate; see getLowerBracketCandidateYears): keep only
-  // ONE when more than one candidate is a spike — the real engine (`identifyBrackets`) still only
-  // ever acts on a single cross-year retained maturity (RETAINED_BRACKET_TODO.md item 2, not yet
-  // generalized), so the preview flags at most one too, to keep from showing an excess the engine
-  // wouldn't honor at Run.
-  //
-  // EARLIEST wins unless a later candidate's excess is clearly (>5%) larger — not simply "highest
-  // excess wins". A retained bracket is conceptually the OLDER position left over once a newer
-  // active bracket rolled forward, so on a near-tie the earlier year is the more natural read, and
-  // two real, independently-genuine excess years (e.g. from raising a later maturity's holding
-  // on top of an already-excess earlier one) can land within a percent or two of each other —
-  // "highest excess wins" picked whichever grew first by a rounding-scale margin, which reversed
-  // what a real user reading the DARA column could plainly see was the earlier year's spike (that
-  // year keeps its own, much larger, raw ARA on screen since it lost the flag; the winner instead
-  // shows its curve guess, which looks unremarkable next to it). This is a re-tightening of the
-  // SAME rule an earlier revision of this module got wrong from the other side: a plain
-  // "latest-maturing wins" picked the wrong year outright when one candidate's excess was clearly
-  // larger, not merely a rounding-scale margin apart — "clearly larger" is the difference that
-  // still overrides earliest-wins here.
+  // the one with the HIGHEST excess when more than one candidate is a spike — the real engine
+  // (`identifyBrackets`) still only ever acts on a single cross-year retained maturity
+  // (RETAINED_BRACKET_TODO.md item 2 / project-retained-bracket-excess-worklist.md, not yet
+  // generalized to identify more than one), so the preview flags at most one too, to keep from
+  // showing an excess the engine wouldn't honor at Run. There is no reason to favor an earlier
+  // maturity as a tie-break on principle — a 2026-09-27 pass tried that (favoring the earlier year
+  // whenever the two were within 5%) after a synthetic test fixture with two near-tied artificial
+  // spikes read as "obviously the earlier one" to a quick look at its DARA column; checked against
+  // the developer's real holdings, where 2034 and 2035 are NOT close, plain highest-excess-wins
+  // already picks the right year, and the fixture's near-tie turned out to be a property of that
+  // one hand-edited file, not a general pattern worth a special-cased tie-break for. Ties
+  // (astronomically unlikely with real dollar ARAs) fall back to latest-maturing as a
+  // deterministic last resort.
   if (minGap != null && lastYear >= minGap) {
     const lowerCandidates = getLowerBracketCandidateYears(tipsMap).filter(y => heldYears.has(y));
     const exceeding = lowerCandidates.filter(y => spikeByYear.has(y)).map(y => ({ year: y, ...spikeByYear.get(y) }));
     if (exceeding.length > 0) {
-      const chosen = exceeding.reduce((best, cur) => cur.excess > best.excess * 1.05 ? cur : best);
+      const chosen = exceeding.reduce((a, b) =>
+        b.excess > a.excess ? b : (b.excess === a.excess && b.year > a.year ? b : a));
       flags.set(chosen.year, { value: chosen.value, excess: chosen.excess });
     }
   }

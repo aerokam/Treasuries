@@ -2052,25 +2052,26 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
 }
 
 // (b) N-candidate case where MORE THAN ONE lower-candidate year is a genuine spike against the
-// ladder's own shape (ruling 1): only one is flagged, since `identifyBrackets` still only ever
-// acts on a single cross-year retained maturity (RETAINED_BRACKET_TODO.md item 2). Which one is
-// EARLIEST unless a later candidate's excess is clearly (>5%) larger, not simply "highest excess
-// wins" — tests/dev/RetainedExcessTwoYears.csv (SampleHoldings.csv with Jul 2035 raised) is the
-// real-world case that showed why: 2034's own excess (10,901) and 2035's (11,401) land within ~5%
-// of each other, both independently confirmed spikes (shape-math test above), and a user reading
-// the DARA column plainly sees 2034 as the outlier (it keeps its own much larger raw ARA on
-// screen since it isn't the one flagged) — "highest excess wins" flagged 2035 instead, on a
-// rounding-scale margin, which read as backwards. A hand-built two-value array can't exercise
-// this (too few points for the curve to resist the rise into two adjacent spikes at all — the
-// run-of-spikes-on-a-slope failure mode shape-math.js's own header comment describes), so this
-// real fixture is the case to prove the tie-break against, not a synthetic stand-in.
+// ladder's own shape (ruling 1): only the highest-excess one is flagged, since `identifyBrackets`
+// still only ever acts on a single cross-year retained maturity (RETAINED_BRACKET_TODO.md item 2).
+// tests/dev/RetainedExcessTwoYears.csv (SampleHoldings.csv with Jul 2035 raised) is a hand-edited
+// fixture built specifically to put genuine excess in 2034 AND 2035 at once (both independently
+// confirmed spikes, shape-math test above) so the "more than one candidate" path has a case to
+// exercise at all — it is NOT the developer's real holdings and its two excess years landing close
+// together ($10,901 vs $11,401) is a property of this one file, not a general pattern. A tie-break
+// that favors the earlier year on a near-tie was tried and reverted: checked against real holdings,
+// where 2034's and 2035's excess are NOT close, plain highest-excess-wins already picks correctly,
+// so there is no reason to special-case a "which one looks right in this fixture" rule. A hand-built
+// two-value array can't exercise this case at all (too few points for the curve to resist the rise
+// into two adjacent spikes — the run-of-spikes-on-a-slope failure mode shape-math.js's own header
+// comment describes), so this real-shaped fixture is the only way to reach it.
 {
   const csv = readFileSync(new URL('./dev/RetainedExcessTwoYears.csv', import.meta.url), 'utf8');
   const holdings = parseHoldings(csv);
   const heldARA = computePortfolioARAByYear(holdings, tipsMap, refCPI);
   const flags = detectBracketFlags({ heldARAByYear: heldARA, tipsMap, lastYear: 2056 });
-  assert('before-state: two near-tied lower-candidate spikes (2034, 2035) → the EARLIER one is flagged', flags.has(2034), true);
-  assert('before-state: 2035 (barely higher excess, but not clearly so) is NOT the one flagged', flags.has(2035), false);
+  assert('before-state: two lower-candidate spikes (2034, 2035) → only the higher-excess one flagged', flags.has(2034), false);
+  assert('before-state: 2035 (the higher-excess of the two) is the one flagged', flags.has(2035), true);
 }
 
 // ── Within-Year Allocation Policy (2.0 §Within-Year Allocation Policy; the E invariant) ───────
