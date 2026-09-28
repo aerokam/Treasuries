@@ -326,6 +326,40 @@ per-CUSIP prices for a past date (3.1 §4.0).
 - **Status:** open.
 ## FIXED
 
+### A stated DARA plan was silently scaled down to what current holdings could self-finance
+
+- **Found:** 2026-09-28, from a real account: loaded a plain holdings file (no stated DARA) plus a
+  standalone DARA-plan file stating $20,000/year, ran Rebalance Ladder, and every year's Amount After
+  came back around $11,000–12,000 instead of the stated $20,000 — with nothing pinned yet, or even
+  after pinning individual rows, the untouched rows stayed swept away from the stated target.
+- **Root cause:** `runFundedRebalance` (`rebalance-lib.js`) treated a **stated** plan (one with its
+  own `#fundedYear,dara` block — this app's own CUSIP/Qty export, or a standalone DARA-plan file) the
+  same as a holdings-inferred mirror for the self-financing scale: an unedited stated plan was swept
+  in full, and an edited one was swept row-by-row around whatever was pinned. This was deliberate
+  design (reasoning: an aged export's DARA, restated upward to a newer Ref CPI date, might not pay
+  for itself) but wrong — it silently overrode a holder's own explicit DARA increase (adding cash to
+  the ladder by raising every rung) back down to whatever current holdings alone already supported.
+- **Ruling (developer, 2026-09-28):** self-financing exists only to size a plan the tool itself
+  inferred from holdings with no stated target at all. Any stated DARA — typed into a rung, a
+  selection Set DARA, or loaded from a file — is honored exactly, edited or not, and a negative net
+  cash is the correct, expected report of what reaching that target costs beyond what the ladder
+  returns on its own (the holder funds the difference). This is common and not an error — it's what a
+  deliberate "add more cash to the ladder" plan looks like.
+- **Fix:** `runFundedRebalance` now scales only when the plan is a holdings-inferred mirror
+  (`!daraPlanIsStated && daraPlanUnedited`) — never for a stated plan, regardless of edits. The
+  now-unreachable per-row pin/sweep machinery for a stated plan was removed (`pinnedDaraByYear` param
+  dropped from `runFundedRebalance` and its call site) rather than left dead. Help text and 3.0
+  §Funding the rebalance / 2.1 §Standalone DARA-plan file updated to match.
+- **Verified:** all 454 `tests/run.js` cases (rewrote the "aged stated plan gets scaled" and "pinned
+  rows swept around" tests, which encoded the old, now-wrong behavior) and all 86 Playwright E2E
+  cases pass. Reproduced and confirmed fixed against the reporting account's own files, run through
+  `rebalance-lib.js` with live market data directly: net cash now correctly reports the real
+  shortfall (−$123,679.75) instead of silently scaling every rung down to ~60% of the stated target.
+- **Side task, same session:** the Import/Export menu's **CUSIP/Qty** option is relabeled
+  **Holdings** — the export has carried funded/excess split, DARA, and construction params for a
+  while now, not just CUSIP and quantity.
+- **Files:** `src/rebalance-lib.js`, `index.html`, `tests/run.js`, `knowledge/3.0_TIPS_Ladder_Rebalancing.md`, `knowledge/2.1_Broker_Import.md`.
+
 ### A same-maturity-year retained TIPS was invisible whenever no separate, older bracket YEAR was also retained
 
 - **Found:** 2026-09-28, from a real account report: reloading an already-correct ladder (Jan 2036

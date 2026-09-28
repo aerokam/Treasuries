@@ -1619,15 +1619,14 @@ for (const gapFirstYear of [2037, 2038, 2039]) {
   }
 }
 
-// ── Test: a stated per-year plan is SCALED to self-finance, not discarded ──────────────────────
-// A file that carries its own #fundedYear,dara block used to be exempt from the self-financing scale
-// entirely, so an aged export — one whose DARA values were restated upward to a newer Ref CPI date —
-// reloaded as a ladder that could not pay for itself (measured at -12,745 on a real year-over-year
-// scenario). It is now scaled like any other unedited plan, with two things that must both hold:
-//   1. the plan's own SHAPE is what gets scaled (`daraPlanIsStated`), not a mirror re-derived from
-//      holdings — re-deriving discards the user's stated per-year targets;
-//   2. a plan that already funds itself is left where it is, so the same-day build → export → import
-//      round trip stays zero-trade.
+// ── Test: a stated per-year plan is NEVER scaled, edited or not, aged or not ────────────────────
+// 3.0 §Funding the rebalance, ruling 2026-09-28 (real account): self-financing exists only to size a
+// plan the tool itself inferred from holdings (no stated DARA at all). A file that carries its own
+// #fundedYear,dara block — or a standalone DARA-plan import — is the holder's own stated target and
+// is honored exactly, whether it already funds itself, was restated upward on import (an aged
+// export, §DARA Reference Date), or was edited afterward. A negative net cash on a plan that doesn't
+// fund itself is the correct, expected report (the holder funds the difference), not a defect to
+// scale away.
 {
   const lastYear = 2040, dara = 100000;
   const b = runBuild({ dara, firstYear: 2026, lastYear, tipsMap, refCPI, settlementDate });
@@ -1637,9 +1636,10 @@ for (const gapFirstYear of [2037, 2038, 2039]) {
   const plan = new Map();
   for (let y = 2026; y <= lastYear; y++) plan.set(y, dara);
 
-  console.log('\nrunFundedRebalance — stated per-year plan: scaled to self-finance, shape kept');
+  console.log('\nrunFundedRebalance — stated per-year plan: never scaled');
 
-  // 1. The plan as built already funds itself: nothing should move.
+  // 1. The plan as built already funds itself: nothing should move (unaffected by this ruling —
+  //    a self-financing plan run as stated is the same as a self-financing plan scaled to itself).
   const same = runFundedRebalance({
     dara, holdings, tipsMap, refCPI, settlementDate,
     daraByYear: plan, daraPlanUnedited: true, daraPlanIsStated: true,
@@ -1650,8 +1650,9 @@ for (const gapFirstYear of [2037, 2038, 2039]) {
   assert('stated plan, unchanged: round trip stays zero-trade', moved, 0);
   assert('stated plan, unchanged: net cash exactly 0', Math.round(same.summary.costDeltaSum), 0);
 
-  // 2. Restated upward, as an aged export is on import: cannot fund itself at the stated level, so
-  //    the whole shape scales down to the level that can.
+  // 2. Restated upward, as an aged export is on import: does NOT fund itself at the stated level —
+  //    the shape is honored exactly as given (every year at dara * 1.05), and net cash reports the
+  //    real shortfall (negative), not scaled toward non-negative.
   const aged = new Map();
   for (const [y, v] of plan) aged.set(y, v * 1.05);
   const res = runFundedRebalance({
@@ -1659,58 +1660,22 @@ for (const gapFirstYear of [2037, 2038, 2039]) {
     daraByYear: aged, daraPlanUnedited: true, daraPlanIsStated: true,
     firstYearOverride: 2026, lastYearOverride: lastYear,
   });
-  assert('aged stated plan: net cash is non-negative (scale applied)', res.summary.costDeltaSum >= 0, true);
-  assert('aged stated plan: net cash stays small relative to the ladder',
-    res.summary.costDeltaSum < b.summary.totalBuyCost * 0.01, true);
   const solved = res.summary.daraByYearResolved;
-  assert('aged stated plan: solved level sits between the stated level and the original',
-    solved.get(2030) <= dara * 1.05 && solved.get(2030) > dara * 0.9, true);
-  console.log(`        stated ${Math.round(dara * 1.05).toLocaleString()} -> solved ${Math.round(solved.get(2030)).toLocaleString()}, net cash ${Math.round(res.summary.costDeltaSum).toLocaleString()}`);
-}
+  assert('aged stated plan: run exactly as restated, no scale-down', Math.round(solved.get(2030)), Math.round(dara * 1.05));
+  assert('aged stated plan: net cash reports the real shortfall (negative)', res.summary.costDeltaSum < 0, true);
+  console.log(`        stated ${Math.round(dara * 1.05).toLocaleString()} -> resolved ${Math.round(solved.get(2030)).toLocaleString()}, net cash ${Math.round(res.summary.costDeltaSum).toLocaleString()}`);
 
-// ── Test: runFundedRebalance — pinned rows are held, the rest scale around them ────────────
-// A stated plan with a gap block to fund: when the user hand-states one or more rows
-// (`pinnedDaraByYear`), those rows keep their exact value and only the untouched rows are swept to
-// the self-financing level. This is what lets a user lower a single near-year DARA (so the rebalance
-// stops buying it) without the tool re-levelling every other rung away from the file.
-{
-  const lastYear = 2040, dara = 100000;
-  const b = runBuild({ dara, firstYear: 2026, lastYear, tipsMap, refCPI, settlementDate });
-  const holdings = b.details
-    .map(d => ({ cusip: d.cusip, qty: (d.fundedYearQty || 0) + (d.excessQty || 0), excessQty: d.excessQty || 0 }))
-    .filter(h => h.qty > 0);
-  const plan = new Map();
-  for (let y = 2026; y <= lastYear; y++) plan.set(y, dara);
-
-  console.log('\nrunFundedRebalance — pinned rows held, rest scaled around them');
-
-  // Pin 2026 well below the built level. It must come back at exactly the pinned value; the other
-  // rungs must move (they scale to re-absorb the cash 2026 no longer needs); net cash self-finances.
-  const pinned = new Map([[2026, Math.round(dara * 0.5)]]);
-  const pinnedPlan = new Map(plan); pinnedPlan.set(2026, Math.round(dara * 0.5));
-  const res = runFundedRebalance({
+  // 3. An edited stated plan (one row raised well above the rest, e.g. a holder adding cash to a
+  //    single near-year rung) is honored exactly too — no sweep around it, no scale of any kind.
+  const edited = new Map(plan); edited.set(2026, dara * 2);
+  const resEdited = runFundedRebalance({
     dara, holdings, tipsMap, refCPI, settlementDate,
-    daraByYear: pinnedPlan, daraPlanIsStated: true, pinnedDaraByYear: pinned,
+    daraByYear: edited, daraPlanUnedited: false, daraPlanIsStated: true,
     firstYearOverride: 2026, lastYearOverride: lastYear,
   });
-  assert('pinned test has a gap block (else it proves nothing)', res.summary.gapYears.length > 0, true);
-  const solved = res.summary.daraByYearResolved;
-  assert('pinned row 2026 comes back at exactly the pinned value', Math.round(solved.get(2026)), Math.round(dara * 0.5));
-  assert('an untouched row moved (scaled around the pin)', Math.round(solved.get(2032)) !== dara, true);
-  assert('pinned solve still self-finances: net cash small and non-negative',
-    res.summary.costDeltaSum >= -50 && res.summary.costDeltaSum < b.summary.totalBuyCost * 0.01, true);
-  console.log(`        2026 pinned ${Math.round(dara * 0.5).toLocaleString()}, 2032 solved ${Math.round(solved.get(2032)).toLocaleString()}, net cash ${Math.round(res.summary.costDeltaSum).toLocaleString()}`);
-
-  // Pin EVERY funded rung → nothing left to sweep → the stated shape runs as entered (no scale).
-  const allPinned = new Map();
-  for (let y = 2026; y <= lastYear; y++) allPinned.set(y, y === 2026 ? Math.round(dara * 0.5) : dara);
-  const resAll = runFundedRebalance({
-    dara, holdings, tipsMap, refCPI, settlementDate,
-    daraByYear: allPinned, daraPlanIsStated: true, pinnedDaraByYear: new Map(allPinned),
-    firstYearOverride: 2026, lastYearOverride: lastYear,
-  });
-  assert('all rungs pinned: 2026 stays at the entered value', Math.round(resAll.summary.daraByYearResolved.get(2026)), Math.round(dara * 0.5));
-  assert('all rungs pinned: 2032 stays at the entered value (no sweep)', Math.round(resAll.summary.daraByYearResolved.get(2032)), dara);
+  const solvedEdited = resEdited.summary.daraByYearResolved;
+  assert('edited stated plan: raised row keeps its exact edited value', Math.round(solvedEdited.get(2026)), dara * 2);
+  assert('edited stated plan: an untouched row stays exactly as stated too (no sweep)', Math.round(solvedEdited.get(2032)), dara);
 }
 
 // ── Test: Infer LMP DARA when lastYear lands inside the gap — orphaned bracket trade ────────────

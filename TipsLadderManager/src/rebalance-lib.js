@@ -2360,20 +2360,21 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
 // unit-testable:
 //   1. Run the rebalance on the given per-year DARA map directly. This honors the map as-is —
 //      including intentional empty rungs (a year the user holds none of stays a hole).
-//   2. If the ladder has a gap-year / Future-30Y block to duration-match (learned from the engine's
-//      own `summary.gapYears` / `summary.future30yYears`), re-run with a self-financing scale so the
-//      funded rungs sell down to fund the bracket excess. Rows the user hand-typed (or set via a
-//      selection Set DARA) — `pinnedDaraByYear` — are held at their stated value; the scale sweeps
-//      only the remaining rungs to the level where the whole rebalance nets to ≈0. With no such
-//      block there is nothing to buy — the direct run already nets to ≈0 and is returned unchanged.
+//   2. Self-financing exists ONLY to size a plan the tool itself inferred from current holdings (no
+//      stated DARA at all — a broker/legacy file). If the ladder has a gap-year / Future-30Y block to
+//      duration-match (learned from the engine's own `summary.gapYears` / `summary.future30yYears`)
+//      AND the plan is such an unedited, inferred mirror, re-run with a self-financing scale so the
+//      funded rungs sell down to fund the bracket excess. With no such block there is nothing to buy
+//      — the direct run already nets to ≈0 and is returned unchanged.
 //
-// The scale re-run fires when EITHER the plan is still exactly as loaded (`daraPlanUnedited` — a
-// pristine mirror or a fresh stated plan, scaled whole) OR the user has pinned one or more rows of a
-// stated plan (`pinnedDaraByYear` non-empty + `daraPlanIsStated` — the pinned rows stand, the rest
-// scale around them). Pin every funded rung and there is nothing left to sweep, so the stated shape
-// runs as entered and its net cash carries whatever surplus/shortfall it implies. A hand-edited
-// broker/legacy MIRROR (no stated block) keeps the old all-or-nothing behaviour for now — re-deriving
-// it from holdings drops the empty interior years (3.0 §Funding).
+// A STATED plan — the DARA came from the holder, whether typed into the per-year panel, a selection
+// Set DARA, or loaded from a file (our CUSIP/Qty export or a standalone DARA-plan file) — is never
+// scaled, edited or not, pinned rows or not. It is the holder's target, run exactly as stated; a
+// negative net cash on the report is the tool's honest answer to "here is what reaching that target
+// costs beyond what the ladder returns on its own" — the holder funds the difference, the same as a
+// negative net cash reads today after a manual per-rung raise. (A hand-edited broker/legacy MIRROR —
+// no stated block at all — keeps the old all-or-nothing behaviour: any edit switches the scale off
+// entirely, since there is no stated shape underneath it to fall back to.)
 //
 // REGRESSION HISTORY: this scale-application step was accidentally deleted in commit c0d233b
 // (2026-07-16, an unrelated Ref CPI/Index Ratio rounding refactor) — the flag kept being
@@ -2382,9 +2383,16 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
 // years weren't sold down at all). It went undetected for 9 days because the only unit test covering
 // this function exercised the gap-free NO-OP path, never the actual scale-application path — see the
 // paired test below ("runFundedRebalance — gap year or Future 30Y funding: scale actually applies").
+// A LATER regression (found 2026-09-28, real account): the scale was extended to stated plans too
+// (an unedited stated plan, or a stated plan with any row pinned), on the reasoning that an aged
+// export's DARA — restated upward to a newer Ref CPI date — might no longer pay for itself. That
+// silently overrode a holder's own explicit DARA increase (e.g. adding cash to the ladder by raising
+// every rung to a higher stated target) back down to whatever the current holdings alone support,
+// which is exactly the outcome a stated plan exists to prevent. Reverted: self-financing is scoped to
+// inferred mirrors only, per the ruling above.
 export function runFundedRebalance({
   dara, bracketMode = '2bracket', holdings, tipsMap, refCPI, settlementDate,
-  daraByYear = null, daraPlanUnedited = false, daraPlanIsStated = false, pinnedDaraByYear = null,
+  daraByYear = null, daraPlanUnedited = false, daraPlanIsStated = false,
   lastYearOverride = null, firstYearOverride = null, preLadderInterest = false, maturityPref = 'last',
   allocationPolicy = 'equal', yearRankOverrides = null, yearOverrides = null, bondHolidays = new Set(),
   availableCash = 0, rmdCouponMode = 'all', tradeDate = settlementDate,
@@ -2394,51 +2402,28 @@ export function runFundedRebalance({
     allocationPolicy, yearRankOverrides, yearOverrides, bondHolidays, availableCash, rmdCouponMode, tradeDate };
   let result = runRebalance({ ...base, daraByYear });
   const needsFunding = result.summary.gapYears.length > 0 || result.summary.future30yYears.length > 0;
-  const pins = pinnedDaraByYear && pinnedDaraByYear.size > 0 ? pinnedDaraByYear : null;
-  if (needsFunding && (daraPlanUnedited || (pins && daraPlanIsStated))) {
-    // Every funded rung pinned → nothing for the scale to sweep; the stated shape stands and its
-    // net cash lands wherever it lands (3.0 §Funding).
-    if (pins) {
-      const nonFunded = new Set([...result.summary.gapYears, ...result.summary.future30yYears]);
-      let sweepable = false;
-      for (let y = result.summary.firstYear; y <= result.summary.lastYear && !sweepable; y++)
-        if (!nonFunded.has(y) && !pins.has(y)) sweepable = true;
-      if (!sweepable) return result;
-    }
-    // WHICH shape gets scaled depends on where the plan came from. A file that states a per-year
-    // DARA for each year IS the shape — scale it directly, and take it at face value (no cover
-    // correction). Only when the plan was auto-derived from holdings (broker/legacy file, which
-    // states nothing) is the shape recovered from the portfolio's own ARA and corrected.
-    // Re-deriving in both cases was the bug behind a same-day reload of our own export proposing
-    // trades across the whole ladder: the stated plan was discarded and replaced by a mirror.
-    let daraMap, correctCoverIncome;
-    if (daraPlanIsStated && daraByYear && daraByYear.size > 0) {
-      daraMap = new Map(daraByYear);
-      correctCoverIncome = false;
-    } else {
-      // Range form: fills every empty in-range year at its incoming-LMI stub (matching the display
-      // panel, index.html's `fullARA`), instead of the held-years-only form silently dropping them.
-      // Without this, an unheld year had no entry in daraMap at all, buildMap() below never wrote it
-      // into a trial's daraByYear, and runRebalance's own `daraByYear?.get(year) ?? DARA` fallback
-      // sized it as a full rung at the scalar DARA -- a phantom buy the search then read as "excess
-      // to fund" and sold the rest of the ladder down to pay for (3.0 §Funding the rebalance).
-      const rawARA = computePortfolioARAByYear(holdings, tipsMap, refCPI, { firstYear: result.summary.firstYear, lastYear: result.summary.lastYear });
-      const _gapYearsInRange = new Set(getGapYears(tipsMap).filter(y => y >= result.summary.firstYear && y <= result.summary.lastYear));
-      ({ daraMap } = derivePerYearDara(rawARA, getGapYearBracketCandidates(tipsMap, result.summary.lastYear), _gapYearsInRange));
-      correctCoverIncome = true;
-    }
+  if (needsFunding && !daraPlanIsStated && daraPlanUnedited) {
+    // Recover the shape from the portfolio's own ARA (range form: fills every empty in-range year at
+    // its incoming-LMI stub, matching the display panel's own mirror, instead of the held-years-only
+    // form silently dropping them — without this, an unheld year had no entry in daraMap at all,
+    // buildMap() below never wrote it into a trial's daraByYear, and runRebalance's own
+    // `daraByYear?.get(year) ?? DARA` fallback sized it as a full rung at the scalar DARA -- a
+    // phantom buy the search then read as "excess to fund" and sold the rest of the ladder down to
+    // pay for (3.0 §Funding the rebalance)).
+    const rawARA = computePortfolioARAByYear(holdings, tipsMap, refCPI, { firstYear: result.summary.firstYear, lastYear: result.summary.lastYear });
+    const _gapYearsInRange = new Set(getGapYears(tipsMap).filter(y => y >= result.summary.firstYear && y <= result.summary.lastYear));
+    const { daraMap } = derivePerYearDara(rawARA, getGapYearBracketCandidates(tipsMap, result.summary.lastYear), _gapYearsInRange);
     try {
       const { scaledMap, scaledMedian } = inferScaledDARAFromPortfolio({
         daraMap, holdings, tipsMap, refCPI, settlementDate,
         bracketMode, lastYearOverride, firstYearOverride, preLadderInterest, flat: false, bondHolidays,
         availableCash, rmdCouponMode, tradeDate,
-        maturityPref, allocationPolicy, yearRankOverrides, yearOverrides, correctCoverIncome,
-        pinnedDaraByYear: daraPlanIsStated ? pins : null,
+        maturityPref, allocationPolicy, yearRankOverrides, yearOverrides, correctCoverIncome: true,
       });
       result = runRebalance({ ...base, dara: scaledMedian, daraByYear: scaledMap });
     } catch {
-      // Pins too expensive for the remaining rungs to fund — no self-financing level exists. Keep
-      // the stated shape; its net cash carries the shortfall (3.0 §Funding).
+      // No self-financing level exists for this mirror. Keep the direct-run result; its net cash
+      // carries the shortfall (3.0 §Funding).
     }
   }
   return result;
