@@ -61,6 +61,23 @@ Nothing in `identifyBrackets` has been changed.
 
 1. ~~**Wire the curve into `detectBracketFlags`**~~ — done 2026-09-27, see above.
 2. **`identifyBrackets`** (`src/rebalance-lib.js:43`): still returns at most one CROSS-YEAR retained maturity via the `(araByYear[y] || 0) - DARA` metric — that part is unchanged. Multiple cross-year generations (e.g. genuine excess at both 2032 and 2034) are still not identified; the hardcoded single-element pick at `~:69`/`~:128` remains the known gap for that case.
+
+   **2026-09-28, developer scoping.** Deprioritized: identifying several simultaneously-excess
+   cross-year candidates from a single snapshot load (what the `ladder-shape-dara-inference` session
+   spent 2026-09-27 chasing via `RetainedExcessTwoYears.csv`, a hand-edited fixture, not a real
+   report) — not worth further time until an actual account shows it. The scenario worth keeping in
+   mind instead: the active lower bracket rolls forward over TIME as new 10-year TIPS are issued and
+   the DARA plan changes, so a real portfolio can genuinely accumulate more than one retained
+   generation gradually (e.g. Jan 2034 was originally the active bracket; the plan later needed more
+   excess and some got added at 2035; by the time 2036 is active, both 2034 and 2035 are retained).
+   Not currently causing a problem for the developer's own ladder (duration-matching output isn't
+   being acted on there for now), and nobody has filed it as a bug or enhancement request.
+   **Preferred long-term direction, when this is picked up:** don't chase a better auto-inference
+   heuristic as the end state. Auto-detection (Excess ARA Priority, or the curve-based detection in
+   `before-state-lib.js`) will keep being right most of the time, but there is currently no way for
+   the user to override it when it isn't — give the user an explicit way to designate which maturity
+   year(s) are being used to hold retained excess, with auto-detection as the default/suggestion,
+   not the only path.
 3. **Within-year split and sell order (rulings 4 and 5) — done for the one case that mattered in practice.** 2026-09-20: fixed for a maturity year holding the active lower bracket *plus* one other held CUSIP maturing in that same year (the recurring real-world shape — an older bond held from before the active lower bracket rolled forward into a new issue in the same year, e.g. Jan/Jul). `runRebalance` now detects that holding independent of the Excess ARA pick, computes its own funded-need-first split, and feeds it into `bracketWeightsN` as a second retained leg alongside whatever `identifyBrackets` found. See `TipsLadderManager/KNOWN_ISSUES.md` "Multi-bracket bought — or sold — the wrong CUSIP..." for the fix and its verification. **Still not general**: a bracket year holding *three or more* maturities, or two maturities in a year that is itself a cross-year retained pick (not the active year), is not covered — those would need the same treatment, generalized.
    **2026-09-22 addendum:** a same-maturity-year retained maturity is now a candidate for the year's own
    funded need under a non-default `maturityPref` (3.0 §Named Quantities §Target CUSIP resolution) —
