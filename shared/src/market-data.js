@@ -149,7 +149,7 @@ const YIELD_SOURCE = 'fidelity';
 
 // The one entry point for market data. Returns the raw rows plus the dates whose derivation is
 // source-dependent, so no caller has to know -- or can get wrong -- which source is active.
-// Callers build the TIPS map themselves via buildTipsMapFromYields (TipsLadderManager's
+// Callers build TIPS market data themselves via buildTipsMarketData (TipsLadderManager's
 // rebalance-lib.js): this module is a leaf and does not import an orchestrator
 // (TipsLadderManager knowledge/4.0_Computation_Modules.md §Module Dependency Graph).
 export async function loadMarketData() {

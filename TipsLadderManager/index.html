@@ -698,7 +698,7 @@
 </div>
 
 <script type="module">
-import { buildTipsMapFromYields, localDate, runFundedRebalance, inferScaledDARAFromPortfolio, computePortfolioARAByYear, getGapYearBracketCandidates, getGapYears, derivePerYearDara, parseFundedYearDaraBlock, parseParamsBlock, inferFirstYearFromHoldings, inferLastYearFromHoldings, deriveHoldingsYearRange, yieldFromPrice, fmtDate, fmtDateLong, calculatePIPerBond } from './src/rebalance-lib.js';
+import { buildTipsMarketData, localDate, runFundedRebalance, inferScaledDARAFromPortfolio, computePortfolioARAByYear, getGapYearBracketCandidates, getGapYears, derivePerYearDara, parseFundedYearDaraBlock, parseParamsBlock, inferFirstYearFromHoldings, inferLastYearFromHoldings, deriveHoldingsYearRange, yieldFromPrice, fmtDate, fmtDateLong, calculatePIPerBond } from './src/rebalance-lib.js';
 // Standalone Before-state preview (3.0 §Before-State Preview and Bracket-Year Excess Detection) —
 // a holdings-valuation computation, architecturally decoupled from the runRebalance/
 // runFundedRebalance engine imported above. Never calls into it.
@@ -925,7 +925,7 @@ document.getElementById('help-overlay').addEventListener('click', e => {
 });
 
 // ─── Load data CSVs ───────────────────────────────────────────────────────────
-let tipsMap = null, refCpiRows = null, settlementDate = null, tipsRefMap = null;
+let tipsMarketData = null, refCpiRows = null, settlementDate = null, tipsRefMap = null;
 let _tradeDateStr = null, _settleDateStr = null; // Trade = "today" (asOfDate); Settle = T+1 (or T for dormant FedInvest)
 let _bondHolidays = null;
 
@@ -946,9 +946,9 @@ async function loadData() {
     _tradeDateStr = tradeDateStr;
     _defaultRefCpiDateStr = defaultRefCpiDateStr;
     _bondHolidays = bondHolidays;
-    tipsMap = buildTipsMapFromYields(yieldsRows, saYieldByCusip);
+    tipsMarketData = buildTipsMarketData(yieldsRows, saYieldByCusip);
 
-    const bfsYears = [...new Set([...tipsMap.values()].filter(b => b.maturity && b.maturity > settlementDate).map(b => b.maturity.getFullYear()))].sort((a, b) => a - b);
+    const bfsYears = [...new Set([...tipsMarketData.values()].filter(b => b.maturity && b.maturity > settlementDate).map(b => b.maturity.getFullYear()))].sort((a, b) => a - b);
     const _bfsYearSet = new Set(bfsYears);
     const _bfsMinY = bfsYears[0], _bfsMaxY = bfsYears[bfsYears.length - 1];
     const _bfsGapYears = new Set();
@@ -1550,7 +1550,7 @@ document.addEventListener('mouseup', () => {
 // selectLadderBonds uses internally, just re-derived here for the modal's checkbox lists.
 function _pickerCandidates(year) {
   const cands = [];
-  for (const bond of tipsMap.values()) {
+  for (const bond of tipsMarketData.values()) {
     if (!bond.maturity || bond.maturity <= settlementDate) continue;
     if (bond.maturity.getFullYear() !== year) continue;
     cands.push(bond);
@@ -1595,7 +1595,7 @@ function _effectiveYearRange() {
 function _pickerYears() {
   const { firstYear, lastYear } = _effectiveYearRange();
   const years = new Set();
-  for (const bond of tipsMap.values()) {
+  for (const bond of tipsMarketData.values()) {
     if (!bond.maturity || bond.maturity <= settlementDate) continue;
     const yr = bond.maturity.getFullYear();
     if (yr < firstYear || yr > lastYear) continue;
@@ -1645,7 +1645,7 @@ function _openMaturityPickerModal() {
     // Policy — unchecking a held CUSIP is a deliberate sell, not a silent default), while Build
     // seeds from its own last run (nothing held yet to mirror).
     const defaultCusips = isRebal
-      ? (currentHoldingsArray ?? []).filter(h => tipsMap.get(h.cusip)?.maturity?.getFullYear() === year).map(h => h.cusip)
+      ? (currentHoldingsArray ?? []).filter(h => tipsMarketData.get(h.cusip)?.maturity?.getFullYear() === year).map(h => h.cusip)
       : (buildDetails?.filter(d => d.fundedYear === year).map(d => d.cusip) ?? []);
     // An override key that IS present — even an empty array, an explicit "nothing" pick — wins
     // over the default; only a year with no key at all (never touched) falls back to the default.
@@ -1828,14 +1828,14 @@ document.getElementById('rebal-alloc-policy').addEventListener('click', () => {
 function _rankPickerYearOrder(year, useOverride) {
   const candidates = _pickerCandidates(year);
   const held = (currentHoldingsArray ?? [])
-    .filter(h => tipsMap.get(h.cusip)?.maturity?.getFullYear() === year)
-    .map(h => ({ ...h, maturity: tipsMap.get(h.cusip)?.maturity }));
+    .filter(h => tipsMarketData.get(h.cusip)?.maturity?.getFullYear() === year)
+    .map(h => ({ ...h, maturity: tipsMarketData.get(h.cusip)?.maturity }));
   const rc = lookupRefCpi(refCpiRows, _defaultRefCpiDateStr);
   const piMap = {};
-  for (const h of held) piMap[h.cusip] = calculatePIPerBond(h.cusip, h.maturity, rc, tipsMap);
+  for (const h of held) piMap[h.cusip] = calculatePIPerBond(h.cusip, h.maturity, rc, tipsMarketData);
   const override = useOverride ? _yearRankOverrides.get(year) : null;
   return rankForYear({
-    candidates, held, piMap, tipsMap,
+    candidates, held, piMap, tipsMarketData,
     policy: _allocationPolicy,
     rankOverride: override?.length ? override : null,
     // Live DOM value, not the `_maturityPrefRebal` snapshot -- that only refreshes on a mode
@@ -1852,7 +1852,7 @@ function _openRankPickerModal() {
     const rank = _rankPickerYearOrder(year, true);
     if (!rank.length) return '';
     const chips = rank.map((r, i) => {
-      const b = tipsMap.get(r.cusip);
+      const b = tipsMarketData.get(r.cusip);
       const label = b?.maturity ? (MP_MONTH_LABEL[b.maturity.getMonth() + 1] || (b.maturity.getMonth() + 1)) : '?';
       const coupon = b?.coupon != null ? (b.coupon * 100).toFixed(3) + '%' : '';
       const title = r.cusip + (b?.maturity ? ' · ' + (b.maturity.getMonth() + 1) + '/' + b.maturity.getFullYear() : '');
@@ -1954,7 +1954,7 @@ function _ttFm(n) { return '$' + Math.round(n).toLocaleString('en-US'); }
 // "cost" (not "principal") — Principal already means the inflation-adjusted FACE value
 // (1,000 × index ratio); this is the dollar amount paid, which also reflects market price.
 function _ttRowCost(d, qty) {
-  const bond = tipsMap?.get(d.cusip);
+  const bond = tipsMarketData?.get(d.cusip);
   const ttSettlementDate = localDate(_defaultRefCpiDateStr);
   const { accrued, A, E } = bond?.maturity
     ? accruedInterest(d.coupon ?? 0, ttSettlementDate, bond.maturity)
@@ -2162,12 +2162,12 @@ function _applyReceivedCashOffer() {
   _syncAvailableCashInput();
 }
 
-// A TIPS that has matured is no longer quoted, so it is absent from tipsMap. TipsRef carries every
+// A TIPS that has matured is no longer quoted, so it is absent from tipsMarketData. TipsRef carries every
 // TIPS ever issued, which is enough to value what a matured position paid out: maturity, coupon and
 // base CPI. Returns a bond in the shape the rest of this file uses, with no price — a matured bond
 // has no market value left, only the cash it has already paid.
 function _bondOrMatured(cusip) {
-  const quoted = tipsMap?.get(cusip);
+  const quoted = tipsMarketData?.get(cusip);
   if (quoted?.maturity) return quoted;
   const r = tipsRefMap?.get(cusip);
   if (!r?.maturity) return null;
@@ -2223,7 +2223,7 @@ function _settlementYearPaymentLedger(holdingsArr) {
 // "after Jul 15" must drop a Jul 15 coupon whether it was paid on the 15th or the 17th.
 function _settlementYearCashReceivedSince(holdingsArr, afterDateStr) {
   const none = { total: 0, coupons: 0, principal: 0, matured: [], after: null };
-  if (!holdingsArr || !tipsMap || !refCpiRows || !settlementDate) return none;
+  if (!holdingsArr || !tipsMarketData || !refCpiRows || !settlementDate) return none;
   const activeDateIso = _defaultRefCpiDateStr;
   const activeRc = lookupRefCpi(refCpiRows, activeDateIso);
   const today = localDate(_tradeDateStr);
@@ -2312,7 +2312,7 @@ function _shortDay(iso) {
 // the only source of real cash flow); After = _afterRebalHoldings() (the rebalance's target
 // portfolio, for previewing what the calendar looks like once the trades settle).
 function buildCashFlowData(holdingsArr) {
-  if (!holdingsArr || !tipsMap || !refCpiRows) return [];
+  if (!holdingsArr || !tipsMarketData || !refCpiRows) return [];
   const activeDateIso = _defaultRefCpiDateStr;
   const activeRc = lookupRefCpi(refCpiRows, activeDateIso);
   const today = localDate(_tradeDateStr);
@@ -2324,7 +2324,7 @@ function buildCashFlowData(holdingsArr) {
   const walkFrom = new Date(today); walkFrom.setDate(walkFrom.getDate() - 10);
   const events = [];
   for (const h of holdingsArr) {
-    const b = tipsMap.get(h.cusip);
+    const b = tipsMarketData.get(h.cusip);
     if (!b?.maturity || !h.qty) continue;
     for (const d of couponSchedule(walkFrom, b.maturity)) {
       if (_actualPaymentDate(d) < today) continue;
@@ -2420,8 +2420,8 @@ function _cashFlowRowsHTML(byYear) {
 
 function _updateCashFlowBtnVisibility() {
   const show = currentMode === 'build'
-    ? !!(buildRendered && buildDetails?.length && tipsMap && refCpiRows)
-    : !!(currentHoldingsArray && tipsMap && refCpiRows);
+    ? !!(buildRendered && buildDetails?.length && tipsMarketData && refCpiRows)
+    : !!(currentHoldingsArray && tipsMarketData && refCpiRows);
   document.getElementById('cash-flow-btn').style.display = show ? 'inline-block' : 'none';
 }
 
@@ -2655,15 +2655,15 @@ function updateRebalFirstYearDropdown() {
   const fieldDiv = document.getElementById('field-rebal-first-year');
   sel.innerHTML  = '';
 
-  if (!currentHoldingsArray || !tipsMap || currentMode !== 'rebalance') {
+  if (!currentHoldingsArray || !tipsMarketData || currentMode !== 'rebalance') {
     fieldDiv.style.display = 'none'; return;
   }
 
-  const _range = deriveHoldingsYearRange(currentHoldingsArray, tipsMap);
+  const _range = deriveHoldingsYearRange(currentHoldingsArray, tipsMarketData);
   if (!_range) { fieldDiv.style.display = 'none'; return; }
   const { firstYear: _firstY, lastYear: _derivedLY } = _range;
 
-  const _tipsYears = [...new Set([...tipsMap.values()].filter(b => b.maturity).map(b => b.maturity.getFullYear()))].sort((a, b) => a - b);
+  const _tipsYears = [...new Set([...tipsMarketData.values()].filter(b => b.maturity).map(b => b.maturity.getFullYear()))].sort((a, b) => a - b);
   const _minTipsY  = _tipsYears[0] ?? _firstY;
   const _maxTipsY  = _tipsYears[_tipsYears.length - 1] ?? _derivedLY;
   // Gap years: years in [_minTipsY, _maxTipsY] with no TIPS issued
@@ -2676,7 +2676,7 @@ function updateRebalFirstYearDropdown() {
     const _refCPI = refCpiRows && (_defaultRefCpiDateStr)
       ? lookupRefCpi(refCpiRows, _defaultRefCpiDateStr) : 0;
     if (_refCPI > 0 && settlementDate) {
-      const _inferred = inferFirstYearFromHoldings({ holdings: currentHoldingsArray, tipsMap, refCPI: _refCPI, settlementDate });
+      const _inferred = inferFirstYearFromHoldings({ holdings: currentHoldingsArray, tipsMarketData, refCPI: _refCPI, settlementDate });
       if (_inferred != null) _defaultFirstYear = _inferred;
     }
   }
@@ -2699,17 +2699,17 @@ function updateRebalLastYearDropdown() {
   const fieldDiv = document.getElementById('field-rebal-last-year');
   sel.innerHTML  = '';
 
-  if (!currentHoldingsArray || !tipsMap || currentMode !== 'rebalance') {
+  if (!currentHoldingsArray || !tipsMarketData || currentMode !== 'rebalance') {
     fieldDiv.style.display = 'none'; return;
   }
 
-  const _range = deriveHoldingsYearRange(currentHoldingsArray, tipsMap);
+  const _range = deriveHoldingsYearRange(currentHoldingsArray, tipsMarketData);
   if (!_range) { fieldDiv.style.display = 'none'; return; }
   const { firstYear: _firstY, lastYear: _derivedLY } = _range;
 
-  const _tipsYears = new Set([...tipsMap.values()].filter(b => b.maturity).map(b => b.maturity.getFullYear()));
+  const _tipsYears = new Set([...tipsMarketData.values()].filter(b => b.maturity).map(b => b.maturity.getFullYear()));
   const _maxTipsY  = Math.max(..._tipsYears);
-  const _hYearSet  = new Set(currentHoldingsArray.map(h => tipsMap.get(h.cusip)?.maturity?.getFullYear()));
+  const _hYearSet  = new Set(currentHoldingsArray.map(h => tipsMarketData.get(h.cusip)?.maturity?.getFullYear()));
   const _gapYears  = [];
   for (let y = _firstY; y <= _derivedLY; y++) {
     if (!_tipsYears.has(y) && !_hYearSet.has(y)) _gapYears.push(y);
@@ -2724,7 +2724,7 @@ function updateRebalLastYearDropdown() {
     const _refCPI = refCpiRows && (_defaultRefCpiDateStr)
       ? lookupRefCpi(refCpiRows, _defaultRefCpiDateStr) : 0;
     if (_refCPI > 0 && settlementDate) {
-      const _inferredLast = inferLastYearFromHoldings({ holdings: currentHoldingsArray, tipsMap, refCPI: _refCPI, settlementDate });
+      const _inferredLast = inferLastYearFromHoldings({ holdings: currentHoldingsArray, tipsMarketData, refCPI: _refCPI, settlementDate });
       if (_inferredLast != null && _inferredLast > _defaultLY) _defaultLY = _inferredLast;
     }
   }
@@ -2769,7 +2769,7 @@ function _initRebalDaraFromPortfolio() {
   if (currentImportedParams?.rmdCouponMode) _rmdCouponMode = currentImportedParams.rmdCouponMode;
   document.getElementById('dara').value = '';
 
-  if (currentMode !== 'rebalance' || !currentHoldingsArray || !tipsMap || !refCpiRows || !settlementDate) {
+  if (currentMode !== 'rebalance' || !currentHoldingsArray || !tipsMarketData || !refCpiRows || !settlementDate) {
     renderDaraByYearPanel();
     return;
   }
@@ -2806,7 +2806,7 @@ function _initRebalDaraFromPortfolio() {
   // from Portfolio). The range form of computePortfolioARAByYear fills every empty in-range year
   // with its incoming LMI, so each rung shows its true current ARA and the first Rebalance Ladder is
   // a no-op.
-  const heldARA = computePortfolioARAByYear(currentHoldingsArray, tipsMap, rc);
+  const heldARA = computePortfolioARAByYear(currentHoldingsArray, tipsMarketData, rc);
   if (Object.keys(heldARA).length === 0) { renderDaraByYearPanel(); return; }
 
   const heldYearNums = Object.keys(heldARA).map(Number);
@@ -2825,10 +2825,10 @@ function _initRebalDaraFromPortfolio() {
   // flagged year's store entry is immediately filled with its own held-year median (the same
   // "best guess" shown in the DARA input) rather than left unset, so Rebalance Ladder — which reads
   // whatever is on the form — picks up the guess by default until the user edits it.
-  const flags = detectBracketFlags({ heldARAByYear: heldARA, tipsMap, lastYear });
+  const flags = detectBracketFlags({ heldARAByYear: heldARA, tipsMarketData, lastYear });
   _bracketAutoCapYears = new Set(flags.keys());
 
-  const fullARA = computePortfolioARAByYear(currentHoldingsArray, tipsMap, rc, { firstYear, lastYear });
+  const fullARA = computePortfolioARAByYear(currentHoldingsArray, tipsMarketData, rc, { firstYear, lastYear });
 
   // Held years take the flagged curve value (if flagged) or their own raw ARA. Gap years
   // (2037-2039) have no TIPS to read a DARA from, so their value is read off the same held-year
@@ -2840,7 +2840,7 @@ function _initRebalDaraFromPortfolio() {
   // two holdings bracketing a 3-year gap represent five rungs' worth of income between them, not
   // two) when there aren't enough points on either side to read a slope from at all. Other empty
   // in-range years take their current ARA (the LMI dripping down from longer TIPS).
-  const gapYearSet = new Set(getGapYears(tipsMap));
+  const gapYearSet = new Set(getGapYears(tipsMarketData));
   const heldYearsOrdered = Object.keys(heldARA).map(Number).sort((a, b) => a - b);
   const heldValuesOrdered = heldYearsOrdered.map(y => heldARA[y]);
   const heldSpanCount = heldYearsOrdered.length ? heldYearsOrdered[heldYearsOrdered.length - 1] - heldYearsOrdered[0] + 1 : 0;
@@ -2859,7 +2859,7 @@ function _initRebalDaraFromPortfolio() {
   }
   // Future 30Y years (beyond the last issued TIPS) similarly fall back to a flagged cover's
   // curve value where they have no other source (3.0 §Before-State Preview, final bullet).
-  const tipsYearsAll = [...tipsMap.values()].filter(b => b.maturity).map(b => b.maturity.getFullYear());
+  const tipsYearsAll = [...tipsMarketData.values()].filter(b => b.maturity).map(b => b.maturity.getFullYear());
   const maxTipsYear = tipsYearsAll.length ? Math.max(...tipsYearsAll) : 0;
   for (const cover of FUTURE30Y_COVER_YEARS) {
     const f = flags.get(cover);
@@ -2889,12 +2889,12 @@ function _initRebalDaraFromPortfolio() {
 // groups is visible as soon as this preview renders, so those two buttons are usable immediately
 // too (6.0 §Before-State on Load (Rebalance)).
 function _renderBeforeStatePreview() {
-  if (currentMode !== 'rebalance' || !currentHoldingsArray || !tipsMap || !refCpiRows || !settlementDate) return;
+  if (currentMode !== 'rebalance' || !currentHoldingsArray || !tipsMarketData || !refCpiRows || !settlementDate) return;
   const rc = lookupRefCpi(refCpiRows, _defaultRefCpiDateStr);
   if (!(rc > 0)) return;
   const lastYear = parseInt(document.getElementById('rebal-last-year').value);
   const firstYear = parseInt(document.getElementById('rebal-first-year').value)
-    || Math.min(...currentHoldingsArray.map(h => tipsMap.get(h.cusip)?.maturity?.getFullYear()).filter(y => y != null));
+    || Math.min(...currentHoldingsArray.map(h => tipsMarketData.get(h.cusip)?.maturity?.getFullYear()).filter(y => y != null));
   if (!lastYear || !isFinite(firstYear)) return;
 
   // Do not clobber an already-run result — post-run, per-year DARA edits update the store for the
@@ -2903,7 +2903,7 @@ function _renderBeforeStatePreview() {
   if (rebalanceRendered) return;
 
   const { rows, gapYears, future30yYears } = computeBeforeState({
-    holdings: currentHoldingsArray, tipsMap, refCPI: rc, firstYear, lastYear, daraByYear: _daraByYearStore,
+    holdings: currentHoldingsArray, tipsMarketData, refCPI: rc, firstYear, lastYear, daraByYear: _daraByYearStore,
   });
 
   const summary = { firstYear, lastYear, gapYears, future30yYears, brackets: {}, bracketMode: document.getElementById('bracket-mode')?.value ?? '2bracket',
@@ -3142,11 +3142,11 @@ let currentImportedParams = null; // construction params from our own export's #
 let _holdingsLoadToken = 0;
 
 document.getElementById('holdings-file').addEventListener('change', async (e) => {
-  // Market data (tipsMap) loads asynchronously at page open; a file picked before it resolves (or
+  // Market data (tipsMarketData) loads asynchronously at page open; a file picked before it resolves (or
   // after it failed to load) would otherwise crash deep inside format detection with a raw JS
   // exception. Bail out here with a real message instead, and reset the input so re-picking the
   // same file fires 'change' again once market data is ready.
-  if (!tipsMap) {
+  if (!tipsMarketData) {
     setStatus('TIPS market data hasn’t finished loading yet — wait a moment and try again.', true);
     e.target.value = '';
     return;
@@ -3196,7 +3196,7 @@ document.getElementById('holdings-file').addEventListener('change', async (e) =>
     const rawLines = text.trim().split('\n').filter(l => l.trim());
     if (rawLines.length === 0) { setStatus('Holdings CSV is empty.', true); return; }
 
-    const brokerResult = parseBrokerCSV(text, tipsMap);
+    const brokerResult = parseBrokerCSV(text, tipsMarketData);
     const parsedAccounts = brokerResult.holdings || brokerResult; // Handle both old and new format
     const acctNames = Object.keys(parsedAccounts);
     if (acctNames.length === 0) {
@@ -3230,7 +3230,7 @@ document.getElementById('holdings-file').addEventListener('change', async (e) =>
             if (parts.length < 3) continue;
             const [cusip, qtyStr, yearStr] = parts;
             if (!CUSIP_RE.test(cusip)) continue;
-            const bond = tipsMap.get(cusip);
+            const bond = tipsMarketData.get(cusip);
             if (!bond?.maturity) continue;
             const qty = parseInt(qtyStr, 10);
             const year = parseInt(yearStr, 10);
@@ -3614,17 +3614,17 @@ function renderDaraByYearPanel() {
   // this is what keeps the top box and the per-year table from drifting out of sync (they're both
   // derived from the current store, never from whatever was last typed).
   const defaultDara = _daraIsByYear() ? (_medianOfStore() ?? _daraByYearPanelDefault) : _getDefaultDara();
-  if (!tipsMap || isNaN(defaultDara) || defaultDara <= 0) {
+  if (!tipsMarketData || isNaN(defaultDara) || defaultDara <= 0) {
     _daraByYearPanelDefault = null; updateDaraInput(); return;
   }
 
   // yearEntries: [{year, suffix}] where suffix is '' / '(gap)' / '(30Y)'
   let yearEntries = [];
 
-  // Compute tipsMap year set (used by both modes)
+  // Compute tipsMarketData year set (used by both modes)
   let maxTipsYear = 0;
   const tipsYearSet = new Set();
-  for (const bond of tipsMap.values()) {
+  for (const bond of tipsMarketData.values()) {
     if (bond.maturity && bond.maturity > settlementDate) {
       const yr = bond.maturity.getFullYear();
       tipsYearSet.add(yr);
@@ -3653,7 +3653,7 @@ function renderDaraByYearPanel() {
       } else {
         fy = Infinity;
         for (const h of currentHoldingsArray) {
-          const b = tipsMap.get(h.cusip);
+          const b = tipsMarketData.get(h.cusip);
           if (b?.maturity) fy = Math.min(fy, b.maturity.getFullYear());
         }
       }
@@ -3747,13 +3747,13 @@ function _updateSelectionToolbar() {
 // Shared prerequisites for a scoped self-financing infer; returns null when not ready (Build has
 // no holdings to solve against, so Infer is Rebalance-only).
 function _inferCtx() {
-  if (currentMode !== 'rebalance' || !currentHoldingsArray || !tipsMap || !refCpiRows || !settlementDate) return null;
+  if (currentMode !== 'rebalance' || !currentHoldingsArray || !tipsMarketData || !refCpiRows || !settlementDate) return null;
   const rc = lookupRefCpi(refCpiRows, _defaultRefCpiDateStr);
   if (!(rc > 0)) return null;
-  const rawARA = computePortfolioARAByYear(currentHoldingsArray, tipsMap, rc);
+  const rawARA = computePortfolioARAByYear(currentHoldingsArray, tipsMarketData, rc);
   if (Object.keys(rawARA).length === 0) return null;
   const lastYearOverride = parseInt(document.getElementById('rebal-last-year').value) || undefined;
-  const { daraMap } = derivePerYearDara(rawARA, getGapYearBracketCandidates(tipsMap, lastYearOverride ?? Infinity));
+  const { daraMap } = derivePerYearDara(rawARA, getGapYearBracketCandidates(tipsMarketData, lastYearOverride ?? Infinity));
   return {
     rc, daraMap,
     bracketMode: document.getElementById('bracket-mode').value,
@@ -3773,7 +3773,7 @@ function _inferYearsFlat(scopeYears) {
   const pinnedDaraByYear = new Map();
   for (const y of scopeYears) if (_daraManualYears.has(y)) pinnedDaraByYear.set(y, _daraByYearStore.get(y));
   const { scaledMap } = inferScaledDARAFromPortfolio({
-    daraMap: ctx.daraMap, holdings: currentHoldingsArray, tipsMap, refCPI: ctx.rc, settlementDate,
+    daraMap: ctx.daraMap, holdings: currentHoldingsArray, tipsMarketData, refCPI: ctx.rc, settlementDate,
     bracketMode: ctx.bracketMode, lastYearOverride: ctx.lastYearOverride, firstYearOverride: ctx.firstYearOverride,
     preLadderInterest: ctx.preLadderInterest, scopeYears, fixedDaraByYear: _daraByYearStore, pinnedDaraByYear, flat: true,
     bondHolidays: _bondHolidays, availableCash: _availableCash, rmdCouponMode: _rmdCouponMode,
@@ -4047,7 +4047,7 @@ function _runBuildFromForm() {
     dara,
     firstYear,
     lastYear,
-    tipsMap,
+    tipsMarketData,
     refCPI,
     settlementDate,
     // 'select' isn't a real ladder-core policy — it just means "some/all years were hand-picked
@@ -4118,7 +4118,7 @@ document.getElementById('run-btn').addEventListener('click', async () => {
       const result = runFundedRebalance({
         dara: finalDara,
         bracketMode: document.getElementById('bracket-mode').value,
-        holdings: currentHoldingsArray, tipsMap, refCPI, settlementDate,
+        holdings: currentHoldingsArray, tipsMarketData, refCPI, settlementDate,
         daraByYear: _runDaraByYear,
         daraPlanUnedited: _daraPlanUnedited(),
         daraPlanIsStated: !!(currentImportedDaraByYear && currentImportedDaraByYear.size > 0),
@@ -4328,8 +4328,8 @@ async function _showTipsRefModal(type) {
   document.getElementById('tipsref-mode-mkt').classList.toggle('active', type === 'Mkt');
   
   const rows = type === 'Ref'
-    ? Array.from(tipsMap.values()).map(r => ({...r, ...tipsRefMap.get(r.cusip)}))
-    : Array.from(tipsMap.values());
+    ? Array.from(tipsMarketData.values()).map(r => ({...r, ...tipsRefMap.get(r.cusip)}))
+    : Array.from(tipsMarketData.values());
   if (type === 'Mkt') rows.sort((a,b) => a.maturity - b.maturity);
 
   let html = '<thead><tr><th>CUSIP</th><th>Maturity</th><th>Coupon</th>';

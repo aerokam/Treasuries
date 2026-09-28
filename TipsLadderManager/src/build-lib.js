@@ -1,7 +1,7 @@
 // TIPS Ladder Builder — Build from Scratch
 // Pure computation only — no Node.js I/O, no file system, no CLI.
 //
-// Entry point: runBuild({ dara, lastYear, tipsMap, refCPI, settlementDate })
+// Entry point: runBuild({ dara, lastYear, tipsMarketData, refCPI, settlementDate })
 
 import { fmtDate } from './date-util.js';
 import { bondCalcs, calculateMDuration, rungAmount, calcMktWtdAvg } from '../../shared/src/bond-math.js';
@@ -11,7 +11,7 @@ import { sizeLadder, selectLadderBonds, fundedYearAmount, maxLastYear } from './
 // Inputs:
 //   dara           — number (required)
 //   lastYear       — number (last fiscal year to fund)
-//   tipsMap        — Map from buildTipsMapFromYields()
+//   tipsMarketData        — Map from buildTipsMarketData()
 //   refCPI         — number
 //   settlementDate — Date (firstYear is derived as settlementDate.getFullYear())
 //
@@ -22,7 +22,7 @@ import { sizeLadder, selectLadderBonds, fundedYearAmount, maxLastYear } from './
 // Returns: { results, HDR, summary }
 // Spec: knowledge/3.0_TIPS_Ladders.md and knowledge/4.0_TIPS_Ladder_Rebalancing.md §Full Rebalance
 // Variable naming note: fundedYearQty, excessQty, costPerBond (harmonized) — see §Code Variable Mapping
-export function runBuild({ dara, firstYear: firstYearOpt, lastYear, tipsMap, refCPI, settlementDate, maturityPref = 'last', couponPref = 'higher', preLadderInterest = false, daraByYear = null, yearOverrides = null, bondHolidays = new Set(), availableCash = 0, rmdCouponMode = 'all', tradeDate = settlementDate }) {
+export function runBuild({ dara, firstYear: firstYearOpt, lastYear, tipsMarketData, refCPI, settlementDate, maturityPref = 'last', couponPref = 'higher', preLadderInterest = false, daraByYear = null, yearOverrides = null, bondHolidays = new Set(), availableCash = 0, rmdCouponMode = 'all', tradeDate = settlementDate }) {
   const firstYear      = firstYearOpt ?? settlementDate.getFullYear();
   const settleDateDisp = fmtDate(settlementDate);
   const settlementYear = settlementDate.getFullYear();
@@ -31,7 +31,7 @@ export function runBuild({ dara, firstYear: firstYearOpt, lastYear, tipsMap, ref
   const {
     yearBondMap, yearTipsListMap, rangeYears, gapYears, future30yYears,
     future30yLowerYear, future30yUpperYear, future30yLowerCoverBond, future30yUpperCoverBond,
-  } = selectLadderBonds({ tipsMap, firstYear, lastYear, settlementDate, maturityPref, couponPref, yearOverrides });
+  } = selectLadderBonds({ tipsMarketData, firstYear, lastYear, settlementDate, maturityPref, couponPref, yearOverrides });
 
   if (!rangeYears.length) throw new Error('No TIPS bonds found in the specified year range');
 
@@ -52,7 +52,7 @@ export function runBuild({ dara, firstYear: firstYearOpt, lastYear, tipsMap, ref
   } = sizeLadder({
     dara, daraByYear, firstYear, lastYear,
     rangeYears, gapYears, future30yYears,
-    yearBondMap, yearTipsListMap, tipsMap, refCPI, settlementDate, settlementYear,
+    yearBondMap, yearTipsListMap, tipsMarketData, refCPI, settlementDate, settlementYear,
     preLadderInterest, bondHolidays, availableCash, rmdCouponMode, tradeDate,
     future30yLowerCoverBond, future30yUpperCoverBond, future30yLowerYear, future30yUpperYear,
   });

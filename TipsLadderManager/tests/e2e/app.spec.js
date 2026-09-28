@@ -1587,7 +1587,7 @@ test('Available Cash follows the Coupons setting, and stops once the holder sets
 });
 
 // A rung that has matured paid out its principal along with its final coupon, and that money is the
-// year's Amount arriving. The bond is no longer quoted, so it is absent from tipsMap and the rung
+// year's Amount arriving. The bond is no longer quoted, so it is absent from tipsMarketData and the rung
 // would otherwise read as unfunded -- the app would buy principal to replace cash already spent.
 // The fixture holds every 2026 maturity month, three of which have matured by late August.
 test('Available Cash counts maturity proceeds from rungs that have already matured', async ({ page }) => {

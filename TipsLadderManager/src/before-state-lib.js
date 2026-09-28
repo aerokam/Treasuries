@@ -46,14 +46,14 @@ export function heldYearMedianExcluding(heldARAByYear, excludeYear) {
 
 // The Active Lower Bracket (DATA_DICTIONARY.md §Active Lower Bracket; 3.0 §Bracket Identification
 // Rules): the latest-maturing outstanding TIPS below minGapYear — the most recently issued
-// 10-year. Computed from tipsMap only, the same search rebalance-lib.js's
+// 10-year. Computed from tipsMarketData only, the same search rebalance-lib.js's
 // `identifyBrackets`/`anchorBefore` use — holdings never consulted.
-export function getActiveLowerBracketYear(tipsMap) {
-  const gapYears = getGapYears(tipsMap);
+export function getActiveLowerBracketYear(tipsMarketData) {
+  const gapYears = getGapYears(tipsMarketData);
   if (gapYears.length === 0) return null;
   const minGap = Math.min(...gapYears);
   let activeYear = null;
-  for (const b of tipsMap.values()) {
+  for (const b of tipsMarketData.values()) {
     if (!b.maturity) continue;
     const yr = b.maturity.getFullYear();
     if (yr >= LOWEST_LOWER_BRACKET_YEAR && yr < minGap) {
@@ -70,11 +70,11 @@ export function getActiveLowerBracketYear(tipsMap) {
 // flag instead of always winning this pool's "highest excess" tie-break by virtue of usually
 // carrying the largest raw ARA (3.0 §Bracket-year excess detection: "Lower bracket candidates:
 // 2032–2035").
-export function getLowerBracketCandidateYears(tipsMap) {
-  const activeYear = getActiveLowerBracketYear(tipsMap);
+export function getLowerBracketCandidateYears(tipsMarketData) {
+  const activeYear = getActiveLowerBracketYear(tipsMarketData);
   if (activeYear == null) return [];
   const years = new Set();
-  for (const b of tipsMap.values()) {
+  for (const b of tipsMarketData.values()) {
     if (!b.maturity) continue;
     const yr = b.maturity.getFullYear();
     if (yr >= LOWEST_LOWER_BRACKET_YEAR && yr < activeYear) years.add(yr);
@@ -89,16 +89,16 @@ export function getLowerBracketCandidateYears(tipsMap) {
 // not when it merely exceeds a single number (ruling 1), and the baseline moves with the metric
 // (ruling 2).
 //
-// `heldARAByYear` = computePortfolioARAByYear(holdings, tipsMap, refCPI) (no-range form: held
+// `heldARAByYear` = computePortfolioARAByYear(holdings, tipsMarketData, refCPI) (no-range form: held
 // years only). `lastYear` gates lower/upper candidates the same way
 // rebalance-lib.js's getGapYearBracketCandidates does — a ladder that hasn't reached the
 // structural gap yet has no candidates at all.
-export function detectBracketFlags({ heldARAByYear, tipsMap, lastYear }) {
+export function detectBracketFlags({ heldARAByYear, tipsMarketData, lastYear }) {
   const flags = new Map();
   const heldYears = new Set(Object.keys(heldARAByYear).map(Number));
-  const gapYears = getGapYears(tipsMap);
+  const gapYears = getGapYears(tipsMarketData);
   const minGap = gapYears.length ? Math.min(...gapYears) : null;
-  const activeYear = getActiveLowerBracketYear(tipsMap);
+  const activeYear = getActiveLowerBracketYear(tipsMarketData);
 
   // One curve fit over every held maturity year at once, rather than a per-candidate
   // excluding-itself median: a year stands out (or doesn't) against the ladder's own shape, and
@@ -141,7 +141,7 @@ export function detectBracketFlags({ heldARAByYear, tipsMap, lastYear }) {
   // (astronomically unlikely with real dollar ARAs) fall back to latest-maturing as a
   // deterministic last resort.
   if (minGap != null && lastYear >= minGap) {
-    const lowerCandidates = getLowerBracketCandidateYears(tipsMap).filter(y => heldYears.has(y));
+    const lowerCandidates = getLowerBracketCandidateYears(tipsMarketData).filter(y => heldYears.has(y));
     const exceeding = lowerCandidates.filter(y => spikeByYear.has(y)).map(y => ({ year: y, ...spikeByYear.get(y) }));
     if (exceeding.length > 0) {
       const chosen = exceeding.reduce((a, b) =>
@@ -174,10 +174,10 @@ export function excessAgainstDara(rawARA, daraValue) {
 
 // Held qty/cost per year, straight off current holdings — no DARA, no funded/excess split
 // (3.0 §Before-State Preview: "Qty Before / Cost Before are never affected by any of this").
-function heldQtyCostByYear(holdings, tipsMap, refCPI) {
+function heldQtyCostByYear(holdings, tipsMarketData, refCPI) {
   const byYear = {};
   for (const h of holdings) {
-    const bond = tipsMap.get(h.cusip);
+    const bond = tipsMarketData.get(h.cusip);
     if (!bond?.maturity) continue;
     const { costPerBond } = bondCalcs(bond, refCPI);
     const year = bond.maturity.getFullYear();
@@ -201,22 +201,22 @@ function heldQtyCostByYear(holdings, tipsMap, refCPI) {
 // year the user has already edited recalculates its excess against the entered value instead of
 // the median (3.0: "If the user edits a flagged year's DARA input ... the excess recalculates
 // immediately — raw ARA − entered DARA").
-export function computeBeforeState({ holdings, tipsMap, refCPI, firstYear, lastYear, daraByYear = null }) {
-  const heldARAByYear = computePortfolioARAByYear(holdings, tipsMap, refCPI);
-  const rangeARAByYear = computePortfolioARAByYear(holdings, tipsMap, refCPI, { firstYear, lastYear });
-  const qtyCostByYear = heldQtyCostByYear(holdings, tipsMap, refCPI);
-  const gapYears = getGapYears(tipsMap).filter(y => y >= firstYear && y <= lastYear);
-  const tipsYears = [...tipsMap.values()].filter(b => b.maturity).map(b => b.maturity.getFullYear());
+export function computeBeforeState({ holdings, tipsMarketData, refCPI, firstYear, lastYear, daraByYear = null }) {
+  const heldARAByYear = computePortfolioARAByYear(holdings, tipsMarketData, refCPI);
+  const rangeARAByYear = computePortfolioARAByYear(holdings, tipsMarketData, refCPI, { firstYear, lastYear });
+  const qtyCostByYear = heldQtyCostByYear(holdings, tipsMarketData, refCPI);
+  const gapYears = getGapYears(tipsMarketData).filter(y => y >= firstYear && y <= lastYear);
+  const tipsYears = [...tipsMarketData.values()].filter(b => b.maturity).map(b => b.maturity.getFullYear());
   const maxTipsYear = tipsYears.length ? Math.max(...tipsYears) : 0;
   const future30yYears = [];
   for (let y = maxTipsYear + 1; y <= lastYear; y++) future30yYears.push(y);
 
-  const flags = detectBracketFlags({ heldARAByYear, tipsMap, lastYear });
+  const flags = detectBracketFlags({ heldARAByYear, tipsMarketData, lastYear });
 
   // Group held CUSIPs by funded year (consolidated qty across accounts/rows sharing a CUSIP).
   const byYearCusip = new Map(); // year -> Map(cusip -> qty)
   for (const h of holdings) {
-    const bond = tipsMap.get(h.cusip);
+    const bond = tipsMarketData.get(h.cusip);
     if (!bond?.maturity) continue;
     const year = bond.maturity.getFullYear();
     if (year < firstYear || year > lastYear) continue;
@@ -264,7 +264,7 @@ export function computeBeforeState({ holdings, tipsMap, refCPI, firstYear, lastY
     const araBeforeHoldings = [];
     let ownSum = 0;
     for (const [cusip, qty] of cusipMap) {
-      const bond = tipsMap.get(cusip);
+      const bond = tipsMarketData.get(cusip);
       const { principalPerBond, nPeriods } = bondCalcs(bond, refCPI);
       const coupon = bond.coupon ?? 0;
       araBeforeHoldings.push({
@@ -285,7 +285,7 @@ export function computeBeforeState({ holdings, tipsMap, refCPI, firstYear, lastY
     if (flag) {
       const daraForSplit = enteredDara ?? flag.value;
       const [firstCusip] = cusipMap.keys();
-      const flaggedBond = tipsMap.get(firstCusip);
+      const flaggedBond = tipsMarketData.get(firstCusip);
       const { piPerBond: flaggedPiPerBond } = bondCalcs(flaggedBond, refCPI);
       flaggedFundedQty = flaggedPiPerBond > 0
         ? Math.max(0, Math.round((daraForSplit - araBeforeLaterMatInt) / flaggedPiPerBond))
@@ -294,7 +294,7 @@ export function computeBeforeState({ holdings, tipsMap, refCPI, firstYear, lastY
 
     let first = true;
     for (const [cusip, qty] of cusipMap) {
-      const bond = tipsMap.get(cusip);
+      const bond = tipsMarketData.get(cusip);
       const { costPerBond, piPerBond, principalPerBond, nPeriods, indexRatio } = bondCalcs(bond, refCPI);
       const coupon = bond.coupon ?? 0;
       const row = {

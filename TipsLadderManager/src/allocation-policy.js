@@ -12,7 +12,7 @@
 // Trades are driven entirely by the caller's own need-vs-held math -- this function only ever
 // decides ORDER, never whether a trade happens (3.0 §Within-Year Allocation Policy, the E
 // invariant). `held`'s own relative order/values are never altered by ranking alone.
-export function rankForYear({ candidates = [], held = [], piMap = {}, tipsMap = null, policy = 'equal', rankOverride = null, maturityPref = 'last' }) {
+export function rankForYear({ candidates = [], held = [], piMap = {}, tipsMarketData = null, policy = 'equal', rankOverride = null, maturityPref = 'last' }) {
   const heldByCusip = new Map(held.map(h => [h.cusip, h]));
   const union = new Map();
   for (const c of candidates) if (!union.has(c.cusip)) union.set(c.cusip, c);
@@ -39,7 +39,7 @@ export function rankForYear({ candidates = [], held = [], piMap = {}, tipsMap = 
   if (policy === 'maturity') {
     sorted = cusips.slice().sort((a, b) => dir * (maturityOf(b) - maturityOf(a)));
   } else if (policy === 'saYield') {
-    const saYieldOf = cusip => tipsMap?.get(cusip)?.saYield;
+    const saYieldOf = cusip => tipsMarketData?.get(cusip)?.saYield;
     sorted = cusips.slice().sort((a, b) => {
       const av = saYieldOf(a), bv = saYieldOf(b);
       if (av == null && bv == null) return dir * (maturityOf(b) - maturityOf(a));

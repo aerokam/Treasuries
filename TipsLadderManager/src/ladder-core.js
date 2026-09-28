@@ -17,10 +17,10 @@ import { bracketWeights, bracketExcessQtys, fyQty as _fyQty, gapParamsWithUpperF
 // ─── Gap parameters adapter ─────────────────────────────────────────────────────
 // Build's "LMI above the gap" = prelim funded-year coupon (effective prelim: zeroed years = 0).
 // Sizing (incl. the 2040 upper-excess-coupon fixpoint) lives in the shared gapParamsWithUpperFeedback.
-function calcGapParams(gapYears, tipsMap, settlementDate, refCPI, dara, prelim, pliCreditByGapYear = {}, daraByYear = null, amdByYear = null) {
+function calcGapParams(gapYears, tipsMarketData, settlementDate, refCPI, dara, prelim, pliCreditByGapYear = {}, daraByYear = null, amdByYear = null) {
   const lmiAboveByYear = {};
   for (const [y, p] of Object.entries(prelim)) lmiAboveByYear[y] = p.annualInterest;
-  return gapParamsWithUpperFeedback({ gapYears, tipsMap, settlementDate, refCPI, dara, daraByYear, lmiAboveByYear, pliCreditByGapYear, amdByYear });
+  return gapParamsWithUpperFeedback({ gapYears, tipsMarketData, settlementDate, refCPI, dara, daraByYear, lmiAboveByYear, pliCreditByGapYear, amdByYear });
 }
 
 // ─── Future 30Y parameters adapter ──────────────────────────────────────────────
@@ -164,7 +164,7 @@ function selectYearTips(cands, pref, couponPref = 'higher') {
 
 // ─── Canonical ladder bond selection (shared by build and rebalance) ────────────
 // Picks the funded-year TIPS per year, the 2040 upper bracket, the pre-gap lower
-// bracket, and the future-30Y cover pair — purely from tipsMap. This is the single
+// bracket, and the future-30Y cover pair — purely from tipsMarketData. This is the single
 // source of truth for "which TIPS the target ladder holds", so build and rebalance
 // size against an identical set. Returns the structures sizeLadder consumes.
 //   yearTipsListMap[year] — the ordered funded-year TIPS list (≥1) per maturityPref.
@@ -175,10 +175,10 @@ function selectYearTips(cands, pref, couponPref = 'higher') {
 // Map<year, cusip[]> naming an explicit TIPS list for that year, bypassing `maturityPref` for
 // just that year. Every other year keeps following `maturityPref` as usual. An override whose
 // CUSIPs don't resolve to that year's candidates is ignored (falls back to the policy pick).
-export function selectLadderBonds({ tipsMap, firstYear, lastYear, settlementDate, maturityPref = 'last', couponPref = 'higher', yearOverrides = null }) {
+export function selectLadderBonds({ tipsMarketData, firstYear, lastYear, settlementDate, maturityPref = 'last', couponPref = 'higher', yearOverrides = null }) {
   // 1. Gather candidate TIPS per year (maturing after settlement, in range), then apply the policy.
   const candsByYear = {};
-  for (const bond of tipsMap.values()) {
+  for (const bond of tipsMarketData.values()) {
     if (!bond.maturity || bond.maturity <= settlementDate) continue;
     const yr = bond.maturity.getFullYear();
     if (yr < firstYear || yr > lastYear) continue;
@@ -200,7 +200,7 @@ export function selectLadderBonds({ tipsMap, firstYear, lastYear, settlementDate
   let rangeYears = Object.keys(yearBondMap).map(Number).sort((a, b) => a - b);
 
   let maxTipsYear = 0;
-  for (const bond of tipsMap.values()) {
+  for (const bond of tipsMarketData.values()) {
     if (bond.maturity) maxTipsYear = Math.max(maxTipsYear, bond.maturity.getFullYear());
   }
 
@@ -215,7 +215,7 @@ export function selectLadderBonds({ tipsMap, firstYear, lastYear, settlementDate
 
   // Add 2040 upper bracket if gap years exist and 2040 not already in range.
   if (gapYears.length > 0 && !yearBondMap[2040]) {
-    for (const bond of tipsMap.values()) {
+    for (const bond of tipsMarketData.values()) {
       if (!bond.maturity) continue;
       if (bond.maturity.getFullYear() !== 2040) continue;
       if (!yearBondMap[2040] || bond.maturity > yearBondMap[2040].maturity)
@@ -230,7 +230,7 @@ export function selectLadderBonds({ tipsMap, firstYear, lastYear, settlementDate
   if (gapYears.length > 0) {
     const minGapYearTmp = Math.min(...gapYears);
     let lbBond = null;
-    for (const bond of tipsMap.values()) {
+    for (const bond of tipsMarketData.values()) {
       if (!bond.maturity || !bond.yield) continue;
       const yr = bond.maturity.getFullYear();
       if (yr < minGapYearTmp && (!lbBond || bond.maturity > lbBond.maturity))
@@ -250,7 +250,7 @@ export function selectLadderBonds({ tipsMap, firstYear, lastYear, settlementDate
   let future30yLowerYear = null, future30yUpperYear = null;
   let future30yLowerCoverBond = null, future30yUpperCoverBond = null;
   if (future30yYears.length > 0) {
-    for (const bond of tipsMap.values()) {
+    for (const bond of tipsMarketData.values()) {
       if (!bond.maturity) continue;
       const yr = bond.maturity.getFullYear();
       if (yr === 2056 && (!future30yLowerCoverBond || bond.maturity > future30yLowerCoverBond.maturity))
@@ -398,7 +398,7 @@ export const maxLastYear = (maxTipsYear) => (maxTipsYear || 0) + 10;
 export function sizeLadder({
   dara, daraByYear = null, firstYear, lastYear, optionalYears = null,
   rangeYears, gapYears, future30yYears,
-  yearBondMap, yearTipsListMap = null, tipsMap, refCPI, settlementDate, settlementYear,
+  yearBondMap, yearTipsListMap = null, tipsMarketData, refCPI, settlementDate, settlementYear,
   preLadderInterest = false, bondHolidays = new Set(),
   availableCash = 0, rmdCouponMode = 'all', tradeDate = settlementDate,
   future30yLowerCoverBond = null, future30yUpperCoverBond = null,
@@ -635,7 +635,7 @@ export function sizeLadder({
       }
     }
 
-    gapParams = calcGapParams(gapYears, tipsMap, settlementDate, refCPI, dara, augmentedPrelim, pliCreditByGapYear, daraByYear, future30yUpperAnnualAmdByYear);
+    gapParams = calcGapParams(gapYears, tipsMarketData, settlementDate, refCPI, dara, augmentedPrelim, pliCreditByGapYear, daraByYear, future30yUpperAnnualAmdByYear);
 
     const upperBond = yearBondMap[upperYear];
     upperDuration = calculateMDuration(settlementDate, upperBond.maturity, upperBond.coupon ?? 0, upperBond.yield ?? 0);

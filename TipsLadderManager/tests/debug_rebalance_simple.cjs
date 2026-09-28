@@ -9,9 +9,9 @@ const yieldsRows = yieldsText.trim().split('\n').slice(1).map(line => {
     const p = line.split(',');
     return { settlementDate: p[0], cusip: p[1], maturity: p[2], coupon: parseFloat(p[3]), baseCpi: parseFloat(p[4]), price: parseFloat(p[5]), yield: parseFloat(p[6]) };
 });
-const tipsMap = new Map();
+const tipsMarketData = new Map();
 for (const r of yieldsRows) {
-    tipsMap.set(r.cusip, {
+    tipsMarketData.set(r.cusip, {
       cusip:    r.cusip,
       maturity: localDate(r.maturity),
       coupon:   r.coupon,
@@ -36,7 +36,7 @@ let nonContiguousCost = 0;
 const lastYearLimit = 2047;
 
 for (const h of holdingsRaw) {
-    const bond = tipsMap.get(h.cusip);
+    const bond = tipsMarketData.get(h.cusip);
     if (!bond) continue;
     const ir = refCPI / (bond.baseCpi || refCPI);
     const costPerBond = (bond.price / 100) * ir * 1000;

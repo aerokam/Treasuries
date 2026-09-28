@@ -20,7 +20,7 @@ export function parseCSVLine(str) {
   return arr.map(s => s.replace(/^"|"$/g, '').trim());
 }
 
-export function parseBrokerCSV(csvText, tipsMap) {
+export function parseBrokerCSV(csvText, tipsMarketData) {
   const lines = csvText.split(/\r?\n/).filter(l => l.trim().length > 0);
   let map = { accountNum: -1, accountName: -1, symbol: -1, quantity: -1, currentValue: -1, investmentName: -1 };
   let currentSchwabAccount = null;
@@ -29,9 +29,9 @@ export function parseBrokerCSV(csvText, tipsMap) {
   const totalAccountValues = {}; // Key: AccountName -> total current value (all positions)
 
   // Vanguard reverse lookup: "{couponPct}|{year}-{month}" → cusip
-  // tipsMap stores coupon as fraction (0.02125); Vanguard names use percentage (2.125)
+  // tipsMarketData stores coupon as fraction (0.02125); Vanguard names use percentage (2.125)
   const vanguardLookup = new Map();
-  for (const [cusip, bond] of tipsMap) {
+  for (const [cusip, bond] of tipsMarketData) {
     const yr = bond.maturity.getFullYear();
     const mo = String(bond.maturity.getMonth() + 1).padStart(2, '0');
     const cpnPct = parseFloat((bond.coupon * 100).toPrecision(6));
@@ -103,7 +103,7 @@ export function parseBrokerCSV(csvText, tipsMap) {
     }
 
     // Resolve CUSIP: direct match (Fidelity/Schwab) or name-based match (Vanguard)
-    let resolvedCusip = tipsMap.has(rawSym) ? rawSym : null;
+    let resolvedCusip = tipsMarketData.has(rawSym) ? rawSym : null;
 
     if (!resolvedCusip && map.investmentName > -1 && cols[map.investmentName]) {
       const invName = cols[map.investmentName];

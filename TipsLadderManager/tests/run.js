@@ -4,7 +4,7 @@
 
 import { readFileSync, readdirSync, existsSync } from 'fs';
 import path from 'path';
-import { buildTipsMapFromYields, localDate, runRebalance, runFundedRebalance, inferDARAFromCash, inferScaledDARAFromPortfolio, computePortfolioARAByYear, getGapYearBracketCandidates, getGapYears, derivePerYearDara, parseFundedYearDaraBlock, parseParamsBlock, inferFirstYearFromHoldings, inferLastYearFromHoldings } from '../src/rebalance-lib.js';
+import { buildTipsMarketData, localDate, runRebalance, runFundedRebalance, inferDARAFromCash, inferScaledDARAFromPortfolio, computePortfolioARAByYear, getGapYearBracketCandidates, getGapYears, derivePerYearDara, parseFundedYearDaraBlock, parseParamsBlock, inferFirstYearFromHoldings, inferLastYearFromHoldings } from '../src/rebalance-lib.js';
 import { computeBeforeState, detectBracketFlags, heldYearMedianExcluding } from '../src/before-state-lib.js';
 import { remainingCouponPaymentsThisYear, rmdCappedRemainingCoupons, latestRemainingCouponDate } from '../src/ladder-core.js';
 import { bracketWeights, bracketWeightsN } from '../src/gap-math.js';
@@ -20,7 +20,7 @@ import { accruedInterest, bondCalcs, daysBetween } from '../../shared/src/bond-m
 
 // Multi-format holdings parser — mirrors index.html logic for Formats 3, 4, 5.
 // Formats 1/2 (broker CSV) tested separately via parseBrokerCSV below.
-function parseHoldingsCSV(text, tipsMap) {
+function parseHoldingsCSV(text, tipsMarketData) {
   const CUSIP_RE = /^[A-Z0-9]{9}$/i;
   const rawLines = text.trim().split('\n').filter(l => l.trim());
   if (!rawLines.length) return [];
@@ -52,7 +52,7 @@ function parseHoldingsCSV(text, tipsMap) {
         if (parts.length < 3) continue;
         const [cusip, qtyStr, yearStr] = parts;
         if (!CUSIP_RE.test(cusip)) continue;
-        const bond = tipsMap.get(cusip);
+        const bond = tipsMarketData.get(cusip);
         if (!bond?.maturity) continue;
         const qty = parseInt(qtyStr, 10);
         const year = parseInt(yearStr, 10);
@@ -81,8 +81,8 @@ function parseHoldingsCSV(text, tipsMap) {
   return arr;
 }
 
-// Keep old name as alias for callers that don't need tipsMap (Format 3 files only)
-function parseHoldings(text) { return parseHoldingsCSV(text, tipsMap); }
+// Keep old name as alias for callers that don't need tipsMarketData (Format 3 files only)
+function parseHoldings(text) { return parseHoldingsCSV(text, tipsMarketData); }
 
 // ── Load shared data ──────────────────────────────────────────────────────────
 // Through the app's own loader, not a copy of it: loadMarketData() owns which source is live
@@ -98,7 +98,7 @@ console.log(`[Test Setup] Loaded ${yieldsRows.length} bonds from market data.`);
 
 const settlementDate = localDate(settleDateStr);
 console.log(`[Test Setup] Settlement:    ${settleDateStr} (T+1 from today ${_todayISO})`);
-const tipsMap = buildTipsMapFromYields(yieldsRows, saYieldByCusip);
+const tipsMarketData = buildTipsMarketData(yieldsRows, saYieldByCusip);
 const refCPI = lookupRefCpi(refCpiRows, settleDateStr);
 if (refCPI == null) {
   const last = refCpiRows.length ? refCpiRows[refCpiRows.length - 1].date : '(none)';
@@ -211,14 +211,14 @@ function runFullRebalanceTest(name, filePath) {
   console.log(`  Input: ${fullPath}`);
 
   const holdings = parseHoldings(readFileSync(fullPath, 'utf8'));
-  const rawARA = computePortfolioARAByYear(holdings, tipsMap, refCPI);
-  const bracketCandidates = getGapYearBracketCandidates(tipsMap);
+  const rawARA = computePortfolioARAByYear(holdings, tipsMarketData, refCPI);
+  const bracketCandidates = getGapYearBracketCandidates(tipsMarketData);
   const { daraMap } = derivePerYearDara(rawARA, bracketCandidates);
   const { scaledMap, scaledMedian } = inferScaledDARAFromPortfolio({
-    daraMap, holdings, tipsMap, refCPI, settlementDate,
+    daraMap, holdings, tipsMarketData, refCPI, settlementDate,
   });
   const { summary, details } = runRebalance({
-    dara: scaledMedian, holdings, tipsMap, refCPI, settlementDate,
+    dara: scaledMedian, holdings, tipsMarketData, refCPI, settlementDate,
     daraByYear: scaledMap,
   });
 
@@ -254,8 +254,8 @@ runFullRebalanceTest('SampleHoldings (richest IRA)', './data/SampleHoldings.csv'
   if (existsSync(fullPath)) {
     console.log('\nSampleHoldings.csv — bug #6 cross-check (2034 retained-bracket flag)');
     const holdings = parseHoldings(readFileSync(fullPath, 'utf8'));
-    const heldARA = computePortfolioARAByYear(holdings, tipsMap, refCPI);
-    const flags = detectBracketFlags({ heldARAByYear: heldARA, tipsMap, lastYear: 2056 });
+    const heldARA = computePortfolioARAByYear(holdings, tipsMarketData, refCPI);
+    const flags = detectBracketFlags({ heldARAByYear: heldARA, tipsMarketData, lastYear: 2056 });
     assert('SampleHoldings.csv: 2034 is flagged as retained-bracket excess (not 2036)', flags.has(2034), true);
     // 2036 no longer registers as a curve-method spike at this portfolio's current scale (it did
     // under the flat median this replaces): its ARA stands only ~2.7 robust scales above the
@@ -287,11 +287,11 @@ runFullRebalanceTest('SampleHoldings (richest IRA)', './data/SampleHoldings.csv'
     '91282CNS6,4',   // Jul 2035
   ].join('\n');
   const holdings = parseHoldings(holdingsCsv);
-  const rawARA2 = computePortfolioARAByYear(holdings, tipsMap, refCPI);
-  const bc2 = getGapYearBracketCandidates(tipsMap);
+  const rawARA2 = computePortfolioARAByYear(holdings, tipsMarketData, refCPI);
+  const bc2 = getGapYearBracketCandidates(tipsMarketData);
   const { daraMap: daraMap2 } = derivePerYearDara(rawARA2, bc2);
-  const { scaledMap: sMap2, scaledMedian: sDara2 } = inferScaledDARAFromPortfolio({ daraMap: daraMap2, holdings, tipsMap, refCPI, settlementDate });
-  const { summary, details } = runRebalance({ dara: sDara2, holdings, tipsMap, refCPI, settlementDate, daraByYear: sMap2 });
+  const { scaledMap: sMap2, scaledMedian: sDara2 } = inferScaledDARAFromPortfolio({ daraMap: daraMap2, holdings, tipsMarketData, refCPI, settlementDate });
+  const { summary, details } = runRebalance({ dara: sDara2, holdings, tipsMarketData, refCPI, settlementDate, daraByYear: sMap2 });
 
   assert('lastYear === 2035',   summary.lastYear, 2035);
   assert('no 2040 funded rung', details.some(d => d.fundedYear === 2040), false);
@@ -313,7 +313,7 @@ runFullRebalanceTest('SampleHoldings (richest IRA)', './data/SampleHoldings.csv'
   const filePath = path.resolve('./tests/dev/TipsLadderCom.csv');
   if (existsSync(filePath)) {
     console.log('\nFormat 4 (TipsLadderCom) — parsing + 3-bracket validation');
-    const holdings = parseHoldingsCSV(readFileSync(filePath, 'utf8'), tipsMap);
+    const holdings = parseHoldingsCSV(readFileSync(filePath, 'utf8'), tipsMarketData);
 
     // Verify funded/excess split: CPU9 (Jan 2036) = 8 funded + (6+4+2)=12 excess
     const cpu9 = holdings.find(h => h.cusip === '91282CPU9');
@@ -331,7 +331,7 @@ runFullRebalanceTest('SampleHoldings (richest IRA)', './data/SampleHoldings.csv'
 
     // Run rebalance — excessQtyBefore uses funded-first rule (LMI formula), not h.excessQty
     const dara = 20000;
-    const { summary, details } = runRebalance({ dara, bracketMode: '3bracket', holdings, tipsMap, refCPI, settlementDate });
+    const { summary, details } = runRebalance({ dara, bracketMode: '3bracket', holdings, tipsMarketData, refCPI, settlementDate });
 
     assert('F4: origLower IS Jan 2036', summary.brackets.lowerCUSIP === '91282CPU9', true);
     // When orig lower == new lower (both Jan 2036, no separate Jul 2036 held here), Multi-bracket
@@ -389,11 +389,11 @@ console.log('\n3-bracket real-holdings reconciliation (distinct orig-lower/new-l
     { cusip: '91282CGK1', qty: 52 }, { cusip: '91282CGW5', qty: 23 }, { cusip: '91282CHP9', qty: 36 },
     { cusip: '91282CJH5', qty: 30 }, { cusip: '91282CJY8', qty: 152 }, { cusip: '91282CKL4', qty: 22 },
     { cusip: '91282CML2', qty: 70 }, { cusip: '91282CNS6', qty: 19 }, { cusip: '91282CPU9', qty: 113 },
-  ].filter(h => tipsMap.has(h.cusip));
+  ].filter(h => tipsMarketData.has(h.cusip));
 
   if (holdings.length > 0) {
-    const { dara } = inferDARAFromCash({ bracketMode: '3bracket', holdings, tipsMap, refCPI, settlementDate });
-    const { details, summary } = runRebalance({ dara, bracketMode: '3bracket', holdings, tipsMap, refCPI, settlementDate });
+    const { dara } = inferDARAFromCash({ bracketMode: '3bracket', holdings, tipsMarketData, refCPI, settlementDate });
+    const { details, summary } = runRebalance({ dara, bracketMode: '3bracket', holdings, tipsMarketData, refCPI, settlementDate });
 
     assert('3B real: genuine 3-bracket (newLowerCUSIP present)', summary.newLowerCUSIP != null, true);
 
@@ -462,7 +462,7 @@ console.log('\n3-bracket real-holdings reconciliation (distinct orig-lower/new-l
       const fat = holdings.map(h => h.cusip === olCusip ? { ...h, qty: olFyQty + retainQty } : h);
       // Hold DARA at the base run's level: re-inferring would raise the target and absorb the
       // retained bonds as funded-year quantity instead of excess.
-      const { summary: s2, details: dt2 } = runRebalance({ dara, bracketMode: '3bracket', holdings: fat, tipsMap, refCPI, settlementDate });
+      const { summary: s2, details: dt2 } = runRebalance({ dara, bracketMode: '3bracket', holdings: fat, tipsMarketData, refCPI, settlementDate });
 
       assert('3B retained: retained leg actually carries excess', (s2.origLowerWeight ?? 0) > 0, true);
       const blend2 = (s2.origLowerWeight ?? 0) * s2.lowerDuration
@@ -537,10 +537,10 @@ console.log('\n3-bracket real-holdings reconciliation (distinct orig-lower/new-l
       }
       const exportText = exportRows.join('\n');
       const lines = exportText.split('\n');
-      const reimported = parseHoldingsCSV(exportText, tipsMap);
+      const reimported = parseHoldingsCSV(exportText, tipsMarketData);
       const rtDara = parseFundedYearDaraBlock(lines);
       const { details: rtDetails, summary: rtSummary } = runRebalance({
-        dara, bracketMode: '3bracket', holdings: reimported, tipsMap, refCPI, settlementDate, daraByYear: rtDara,
+        dara, bracketMode: '3bracket', holdings: reimported, tipsMarketData, refCPI, settlementDate, daraByYear: rtDara,
       });
       const churn = rtDetails.filter(d => (d.fundedYearQtyDelta || 0) !== 0 || (d.excessQtyDelta || 0) !== 0);
       const churnUnits = churn.reduce((s, d) => s + Math.abs(d.fundedYearQtyDelta || 0) + Math.abs(d.excessQtyDelta || 0), 0);
@@ -576,10 +576,10 @@ console.log('\n3-bracket real-holdings reconciliation (distinct orig-lower/new-l
     // the reallocation exists for: display must show "before" as already relabeled (no phantom funded
     // trade) with the whole change landing on excess, not a same-maturity buy+sell. Verify the
     // reallocation branch actually fires here (not a vacuous same-direction case).
-    const rawARA = computePortfolioARAByYear(holdings, tipsMap, refCPI);
-    const bracketCandidates = getGapYearBracketCandidates(tipsMap);
+    const rawARA = computePortfolioARAByYear(holdings, tipsMarketData, refCPI);
+    const bracketCandidates = getGapYearBracketCandidates(tipsMarketData);
     const { daraMap } = derivePerYearDara(rawARA, bracketCandidates);
-    const { scaledMap, scaledMedian } = inferScaledDARAFromPortfolio({ daraMap, holdings, tipsMap, refCPI, settlementDate, bracketMode: '3bracket' });
+    const { scaledMap, scaledMedian } = inferScaledDARAFromPortfolio({ daraMap, holdings, tipsMarketData, refCPI, settlementDate, bracketMode: '3bracket' });
     // The cut fraction that exercises the reallocation branch (funded delta 0, excess absorbs the
     // trade) is a function of live per-bond dollar values and the real portfolio's current excess
     // holdings, so it drifts day to day the same way the boundary in (2b-2) above does -- a fixed
@@ -590,7 +590,7 @@ console.log('\n3-bracket real-holdings reconciliation (distinct orig-lower/new-l
     function d2036For(mult) {
       const dm = new Map(scaledMap);
       dm.set(2036, Math.round((dm.get(2036) ?? scaledMedian) * mult));
-      const { details: d } = runRebalance({ dara: scaledMedian, bracketMode: '3bracket', holdings, tipsMap, refCPI, settlementDate, daraByYear: dm });
+      const { details: d } = runRebalance({ dara: scaledMedian, bracketMode: '3bracket', holdings, tipsMarketData, refCPI, settlementDate, daraByYear: dm });
       return d.find(x => x.fundedYear === 2036 && x.isBracketTarget);
     }
     let bracketMult = null;
@@ -603,7 +603,7 @@ console.log('\n3-bracket real-holdings reconciliation (distinct orig-lower/new-l
     }
     const customDara = new Map(scaledMap);
     customDara.set(2036, Math.round((customDara.get(2036) ?? scaledMedian) * bracketMult));
-    const { details: details2 } = runRebalance({ dara: scaledMedian, bracketMode: '3bracket', holdings, tipsMap, refCPI, settlementDate, daraByYear: customDara });
+    const { details: details2 } = runRebalance({ dara: scaledMedian, bracketMode: '3bracket', holdings, tipsMarketData, refCPI, settlementDate, daraByYear: customDara });
     const d2036 = details2.find(d => d.fundedYear === 2036 && d.isBracketTarget);
     assert('3B real (custom plan): 2036 bracket row present', d2036 != null, true);
     // Signature of the reallocation branch actually firing: the funded side fully absorbs into the
@@ -626,7 +626,7 @@ console.log('\n3-bracket real-holdings reconciliation (distinct orig-lower/new-l
     '912810QP6,20,0',    // funded only
     '912810QV3,21,0',
   ].join('\n');
-  const h5 = parseHoldingsCSV(csv5, tipsMap);
+  const h5 = parseHoldingsCSV(csv5, tipsMarketData);
 
   const cpu9_5 = h5.find(h => h.cusip === '91282CPU9');
   assert('F5: CPU9 total qty === 33',   cpu9_5?.qty,       33);
@@ -646,15 +646,15 @@ console.log('\n3-bracket real-holdings reconciliation (distinct orig-lower/new-l
   const filePath = path.resolve('./tests/dev/CusipQtyExcess.csv');
   if (existsSync(filePath)) {
     console.log('\nFormat 5 (CusipQtyExcess.csv) — file-based parsing + rebalance');
-    const holdings = parseHoldingsCSV(readFileSync(filePath, 'utf8'), tipsMap);
+    const holdings = parseHoldingsCSV(readFileSync(filePath, 'utf8'), tipsMarketData);
 
     // Every row must produce a valid excessQty (not undefined)
     const missingExcess = holdings.filter(h => h.excessQty == null);
     assert('F5 file: all rows have excessQty', missingExcess.length, 0);
 
     // Run a full rebalance and verify excessQtyBefore is non-zero for bracket targets
-    const { dara } = inferDARAFromCash({ holdings, tipsMap, refCPI, settlementDate });
-    const { summary, details } = runRebalance({ dara, holdings, tipsMap, refCPI, settlementDate });
+    const { dara } = inferDARAFromCash({ holdings, tipsMarketData, refCPI, settlementDate });
+    const { summary, details } = runRebalance({ dara, holdings, tipsMarketData, refCPI, settlementDate });
     const bracketTargets = details.filter(d => d.isBracketTarget);
     const hasImportedExcess = bracketTargets.some(d => d.excessQtyBefore > 0);
     assert('F5 file: bracket excessQtyBefore > 0 (from import or LMI fallback)', hasImportedExcess, true);
@@ -676,7 +676,7 @@ console.log('\n3-bracket real-holdings reconciliation (distinct orig-lower/new-l
     'X22222222,Owner2 IRA,91282CPU9,TIPS 0.125% 01/15/2031,3000,$100.00,$300000,Cash',
     'X22222222,Owner2 IRA,VTI,VANGUARD TOTAL STOCK,50,$200.00,$10000,Cash',
   ].join('\n');
-  const { holdings, tipsValues, totalAccountValues } = parseBrokerCSV(csv1, tipsMap);
+  const { holdings, tipsValues, totalAccountValues } = parseBrokerCSV(csv1, tipsMarketData);
   const accounts = holdings;
 
   assert('F1: Owner8 IRA has 2 TIPS', accounts['Owner8 IRA']?.length, 2);
@@ -708,7 +708,7 @@ console.log('\n3-bracket real-holdings reconciliation (distinct orig-lower/new-l
     '"91282CPU9","TIPS 0.125% 01/15/2031","3,000","100.00","$300,000.00","Fixed Income"',
     '"Account Total","","","","$300,000.00",""',
   ].join('\n');
-  const { holdings, tipsValues, totalAccountValues } = parseBrokerCSV(csv2, tipsMap);
+  const { holdings, tipsValues, totalAccountValues } = parseBrokerCSV(csv2, tipsMarketData);
   const accounts = holdings;
 
   assert('F2: Owner8 IRA has 2 TIPS', accounts['Owner8 IRA']?.length, 2);
@@ -733,7 +733,7 @@ console.log('\n3-bracket real-holdings reconciliation (distinct orig-lower/new-l
     '22222222,U S TREASURY NOTE INFLATION INDEX NOTE 1.875 01/15/36 01/15/06,null,3000,100.00,300000.00,',
     '22222222,VANGUARD TOTAL STOCK MARKET ETF,VTI,50,200.00,10000.00,',
   ].join('\n');
-  const { holdings, tipsValues, totalAccountValues } = parseBrokerCSV(csv3, tipsMap);
+  const { holdings, tipsValues, totalAccountValues } = parseBrokerCSV(csv3, tipsMarketData);
   const accounts = holdings;
 
   assert('F3: acct 11111111 has 2 TIPS', accounts['11111111']?.length, 2);
@@ -761,7 +761,7 @@ console.log('\n3-bracket real-holdings reconciliation (distinct orig-lower/new-l
     '11111111,U S TREASURY NOTE INFLATION INDEX NOTE 1 02/15/48 02/15/18,null,50000,74.125,37062.50,',
     '11111111,U S TREASURY NOTE INFLATION INDEX NOTE 1 02/15/49 02/15/19,null,60000,73.0625,43837.50,',
   ].join('\n');
-  const { holdings: holdings3b } = parseBrokerCSV(csv3b, tipsMap);
+  const { holdings: holdings3b } = parseBrokerCSV(csv3b, tipsMarketData);
   const sb5 = holdings3b['11111111']?.find(h => h.cusip === '912810SB5');
   const sg4 = holdings3b['11111111']?.find(h => h.cusip === '912810SG4');
   assert('F3b: SB5 (Feb 2048, 1.000% coupon) qty === 50 (name-resolved)', sb5?.qty, 50);
@@ -773,7 +773,7 @@ console.log('\nBuild — DARA=50000, lastYear=2040');
 {
   const dara = 50000, lastYear = 2040;
   const firstYear = settlementDate.getFullYear();
-  const { summary, results, details } = runBuild({ dara, lastYear, tipsMap, refCPI, settlementDate });
+  const { summary, results, details } = runBuild({ dara, lastYear, tipsMarketData, refCPI, settlementDate });
   assert('totalBuyCost > 0', summary.totalBuyCost > 0, true);
   assert('result rows > 0', results.length > 0, true);
   assert('lowerYear < upperYear', summary.lowerYear < summary.upperYear, true);
@@ -805,7 +805,7 @@ console.log('\nBuild — RMD Options (settlement-year remaining-coupon LMI)');
   const earlySettle = localDate(`${settlementDate.getFullYear()}-01-01`);
   const fy = earlySettle.getFullYear();
   const fundedQtyAt = (availableCash, rmdCouponMode) => {
-    const { details } = runBuild({ dara, lastYear, tipsMap, refCPI, settlementDate: earlySettle, availableCash, rmdCouponMode });
+    const { details } = runBuild({ dara, lastYear, tipsMarketData, refCPI, settlementDate: earlySettle, availableCash, rmdCouponMode });
     return details.filter(d => d.fundedYear === fy).reduce((s, d) => s + (d.fundedYearQty ?? 0), 0);
   };
   const qtyAll  = fundedQtyAt(0, 'all');
@@ -816,7 +816,7 @@ console.log('\nBuild — RMD Options (settlement-year remaining-coupon LMI)');
   assert('RMD Options: qty(last) >= qty(all)', qtyLast >= qtyAll, true);
   assert('RMD Options: qty(none) > qty(all) (the two extremes actually differ)', qtyNone > qtyAll, true);
 
-  const { details: defDetails } = runBuild({ dara, lastYear, tipsMap, refCPI, settlementDate: earlySettle });
+  const { details: defDetails } = runBuild({ dara, lastYear, tipsMarketData, refCPI, settlementDate: earlySettle });
   const qtyDefault = defDetails.filter(d => d.fundedYear === fy).reduce((s, d) => s + (d.fundedYearQty ?? 0), 0);
   assert('Coupon counting: omitting availableCash/rmdCouponMode reproduces "all" (no default-behavior change)', qtyDefault, qtyAll);
 
@@ -879,7 +879,7 @@ console.log("\nRMD Options 'last' mode: pool-wide latest date, not each bond's o
 console.log('\nBuild — DARA=50000, lastYear=2060 (Future 30Y years)');
 {
   const dara = 50000, lastYear = 2060;
-  const { summary } = runBuild({ dara, lastYear, tipsMap, refCPI, settlementDate });
+  const { summary } = runBuild({ dara, lastYear, tipsMarketData, refCPI, settlementDate });
   assert('future30yYears.length > 0', (summary.future30yYears?.length ?? 0) > 0, true);
   assert('future30yLowerYear === 2056', summary.future30yLowerYear, 2056);
   assert('future30yUpperYear === 2052', summary.future30yUpperYear, 2052);
@@ -907,7 +907,7 @@ console.log('\nBuild — DARA=50000, lastYear=2060 (Future 30Y years)');
 console.log('\nBuild — DARA=20000, lastYear=2057 (single Future-30Y year, avgDuration < lower cover)');
 {
   const dara = 20000, lastYear = 2057;
-  const { summary } = runBuild({ dara, lastYear, tipsMap, refCPI, settlementDate });
+  const { summary } = runBuild({ dara, lastYear, tipsMarketData, refCPI, settlementDate });
   assert('future30yYears.length > 0', (summary.future30yYears?.length ?? 0) > 0, true);
   assert('no weight is negative', Math.min(summary.future30yLowerWeight, summary.future30yUpperWeight) >= 0, true);
   assert('no weight exceeds 1', Math.max(summary.future30yLowerWeight, summary.future30yUpperWeight) <= 1, true);
@@ -929,11 +929,11 @@ console.log('\nBuild — DARA=20000, lastYear=2057 (single Future-30Y year, avgD
 console.log('\nRebalance — same DARA=20000, lastYear=2057 corner case, via build round-trip');
 {
   const dara = 20000, lastYear = 2057;
-  const { details: bD } = runBuild({ dara, lastYear, tipsMap, refCPI, settlementDate });
+  const { details: bD } = runBuild({ dara, lastYear, tipsMarketData, refCPI, settlementDate });
   const holdings = bD
     .map(d => ({ cusip: d.cusip, qty: d.fundedYearQty + d.excessQty, excessQty: d.excessQty }))
     .filter(h => h.qty > 0);
-  const { summary } = runRebalance({ dara, bracketMode: '2bracket', holdings, tipsMap, refCPI, settlementDate });
+  const { summary } = runRebalance({ dara, bracketMode: '2bracket', holdings, tipsMarketData, refCPI, settlementDate });
   assert('rebalance infers lastYear === 2057', summary.lastYear, 2057);
   assert('rebal: no weight is negative', Math.min(summary.future30yLowerWeight, summary.future30yUpperWeight) >= 0, true);
   assert('rebal: no weight exceeds 1', Math.max(summary.future30yLowerWeight, summary.future30yUpperWeight) <= 1, true);
@@ -950,11 +950,11 @@ console.log('\nRebalance — same DARA=20000, lastYear=2057 corner case, via bui
 // not this engine value, which was already correct here before the fix.)
 {
   const dara = 40000, lastYear = 2040;
-  const { details: bD } = runBuild({ dara, lastYear, tipsMap, refCPI, settlementDate });
+  const { details: bD } = runBuild({ dara, lastYear, tipsMarketData, refCPI, settlementDate });
   const holdings = bD
     .map(d => ({ cusip: d.cusip, qty: d.fundedYearQty + d.excessQty, excessQty: d.excessQty }))
     .filter(h => h.qty > 0);
-  const { summary } = runRebalance({ dara, bracketMode: '2bracket', holdings, tipsMap, refCPI, settlementDate });
+  const { summary } = runRebalance({ dara, bracketMode: '2bracket', holdings, tipsMarketData, refCPI, settlementDate });
   assert('rebalance infers lastYear === 2040 (held), not 2039 (last gap year)', summary.lastYear, 2040);
 }
 
@@ -965,13 +965,13 @@ console.log('\nRebalance — same DARA=20000, lastYear=2057 corner case, via bui
 console.log('\nRebalance — an unheld year above 2040 (e.g. 2048) no longer truncates lastYear');
 {
   const dara = 40000, lastYear = 2049;
-  const { details: bD } = runBuild({ dara, lastYear, tipsMap, refCPI, settlementDate });
-  const has2048 = bD.some(d => tipsMap.get(d.cusip)?.maturity?.getFullYear() === 2048 && (d.fundedYearQty + d.excessQty) > 0);
+  const { details: bD } = runBuild({ dara, lastYear, tipsMarketData, refCPI, settlementDate });
+  const has2048 = bD.some(d => tipsMarketData.get(d.cusip)?.maturity?.getFullYear() === 2048 && (d.fundedYearQty + d.excessQty) > 0);
   assert('fixture sanity: build actually funded a 2048 rung to remove', has2048, true);
   const holdings = bD
     .map(d => ({ cusip: d.cusip, qty: d.fundedYearQty + d.excessQty, excessQty: d.excessQty }))
-    .filter(h => h.qty > 0 && tipsMap.get(h.cusip)?.maturity?.getFullYear() !== 2048);
-  const { summary } = runRebalance({ dara, bracketMode: '2bracket', holdings, tipsMap, refCPI, settlementDate });
+    .filter(h => h.qty > 0 && tipsMarketData.get(h.cusip)?.maturity?.getFullYear() !== 2048);
+  const { summary } = runRebalance({ dara, bracketMode: '2bracket', holdings, tipsMarketData, refCPI, settlementDate });
   assert('rebalance infers lastYear === 2049, not truncated to 2047 by the 2048 hole', summary.lastYear, 2049);
 }
 
@@ -979,7 +979,7 @@ console.log('\nRebalance — an unheld year above 2040 (e.g. 2048) no longer tru
 console.log('\nBuild — Rev 6 cover Amount + roll coupon, DARA=40000, lastYear=2066');
 {
   const dara = 40000, lastYear = 2066, firstYear = settlementDate.getFullYear();
-  const { summary, details } = runBuild({ dara, lastYear, tipsMap, refCPI, settlementDate });
+  const { summary, details } = runBuild({ dara, lastYear, tipsMarketData, refCPI, settlementDate });
   const cover = details.filter(d => d.isFuture30yCover);
   const coverAmt = cover.reduce((s, d) => s + (d.excessAmt ?? 0), 0);
   const nFuture = summary.future30yYears.length;
@@ -1023,7 +1023,7 @@ console.log('\nBuild — Rev 6 cover Amount + roll coupon, DARA=40000, lastYear=
 console.log('\nBuild — firstYear=2036, lastYear=2056, preLadderInterest=true');
 {
   const dara = 20000, firstYear = 2036, lastYear = 2056;
-  const { summary, results, details } = runBuild({ dara, firstYear, lastYear, tipsMap, refCPI, settlementDate, preLadderInterest: true });
+  const { summary, results, details } = runBuild({ dara, firstYear, lastYear, tipsMarketData, refCPI, settlementDate, preLadderInterest: true });
   const lower = results.find(r => r[2] === summary.lowerYear);
   const upper = results.find(r => r[2] === summary.upperYear);
   const lowerTotalQty = (lower?.[3] ?? 0) + (lower?.[4] ?? 0); // fundedYearQty + excessQty
@@ -1061,7 +1061,7 @@ console.log('\nBuild→Rebalance symmetry — firstYear=2036, lastYear=2065, PLI
 
   // 1. Build
   const { details: buildDetails, summary: buildSummary } = runBuild({
-    dara: DARA, firstYear, lastYear, tipsMap, refCPI, settlementDate,
+    dara: DARA, firstYear, lastYear, tipsMarketData, refCPI, settlementDate,
     preLadderInterest: true,
   });
 
@@ -1075,7 +1075,7 @@ console.log('\nBuild→Rebalance symmetry — firstYear=2036, lastYear=2065, PLI
     dara: DARA,
     bracketMode: '2bracket',
     holdings,
-    tipsMap,
+    tipsMarketData,
     refCPI,
     settlementDate,
     preLadderInterest: true,
@@ -1110,18 +1110,18 @@ console.log('\nBuild→Rebalance symmetry — firstYear=2036, lastYear=2065, PLI
 console.log('\nBuild→Rebalance NO-override round-trip — firstYear=2026, lastYear=2066, DARA=40000');
 {
   const DARA = 40000, firstYear = settlementDate.getFullYear(), lastYear = 2066;
-  const { details: bD, summary: bS } = runBuild({ dara: DARA, firstYear, lastYear, tipsMap, refCPI, settlementDate });
+  const { details: bD, summary: bS } = runBuild({ dara: DARA, firstYear, lastYear, tipsMarketData, refCPI, settlementDate });
   const holdings = bD
     .map(d => ({ cusip: d.cusip, qty: d.fundedYearQty + d.excessQty, excessQty: d.excessQty }))
     .filter(h => h.qty > 0);
 
   // Direct inference check
-  const inferredLast = inferLastYearFromHoldings({ holdings, tipsMap, refCPI, settlementDate });
+  const inferredLast = inferLastYearFromHoldings({ holdings, tipsMarketData, refCPI, settlementDate });
   assert('inferLastYear from build holdings === 2066', inferredLast, 2066);
 
   // Rebalance with NO firstYearOverride / NO lastYearOverride — must self-infer.
   const { summary: rS, results: rR } = runRebalance({
-    dara: DARA, bracketMode: '2bracket', holdings, tipsMap, refCPI, settlementDate,
+    dara: DARA, bracketMode: '2bracket', holdings, tipsMarketData, refCPI, settlementDate,
   });
   assert('NO-override rebal infers lastYear 2066', rS.lastYear, 2066);
   assert('NO-override rebal preserves 2052 upper cover excess', rS.future30yUpperExQty, bS.future30yUpperExQty);
@@ -1139,7 +1139,7 @@ console.log('\nBuild→Rebalance NO-override round-trip — firstYear=2026, last
 console.log('\nBuild→Rebalance export-string round-trip — firstYear=2036, lastYear=2066, PLI, DARA=40000');
 {
   const DARA = 40000, firstYear = 2036, lastYear = 2066;
-  const { details: bD, summary: bS } = runBuild({ dara: DARA, firstYear, lastYear, tipsMap, refCPI, settlementDate, preLadderInterest: true });
+  const { details: bD, summary: bS } = runBuild({ dara: DARA, firstYear, lastYear, tipsMarketData, refCPI, settlementDate, preLadderInterest: true });
   const zeroed = new Set(bS.zeroedFundedYears ?? []);
 
   // Serialize exactly like index.html's export-cusip-qty handler
@@ -1149,14 +1149,14 @@ console.log('\nBuild→Rebalance export-string round-trip — firstYear=2036, la
     if (f + e > 0) rows.push(`${d.cusip},${f},${e}`);
     else if (zeroed.has(d.fundedYear)) rows.push(`${d.cusip},0,0`);
   }
-  const holdings = parseHoldingsCSV(rows.join('\n'), tipsMap);   // same parser the app uses (Format 5)
+  const holdings = parseHoldingsCSV(rows.join('\n'), tipsMarketData);   // same parser the app uses (Format 5)
 
-  const infLast = inferLastYearFromHoldings({ holdings, tipsMap, refCPI, settlementDate });
+  const infLast = inferLastYearFromHoldings({ holdings, tipsMarketData, refCPI, settlementDate });
   assert('PLI round-trip: last year recovered as 2066', infLast, 2066);
 
   // Rebalance the way the (fixed) UI would: recovered last year, PLI on, no first-year override.
   const { summary: rS, results: rR } = runRebalance({
-    dara: DARA, bracketMode: '2bracket', holdings, tipsMap, refCPI, settlementDate,
+    dara: DARA, bracketMode: '2bracket', holdings, tipsMarketData, refCPI, settlementDate,
     preLadderInterest: true, lastYearOverride: infLast,
   });
   const totalAbsQtyDelta = rR.reduce((s, r) => s + Math.abs(r[9] ?? 0), 0);
@@ -1195,7 +1195,7 @@ console.log('\nBuild→Rebalance export-string round-trip — firstYear=2036, la
     } else if (daraOverrides) {
       buildDaraByYear = new Map(Object.entries(daraOverrides).map(([y, v]) => [+y, v]));
     }
-    const { details: bD, summary: bS } = runBuild({ dara: DARA, firstYear, lastYear, tipsMap, refCPI, settlementDate, preLadderInterest: pli, daraByYear: buildDaraByYear });
+    const { details: bD, summary: bS } = runBuild({ dara: DARA, firstYear, lastYear, tipsMarketData, refCPI, settlementDate, preLadderInterest: pli, daraByYear: buildDaraByYear });
 
     // Serialize exactly like index.html export: Format-5 holdings + #fundedYear,dara block.
     const zeroed = new Set(bS.zeroedFundedYears ?? []);
@@ -1211,7 +1211,7 @@ console.log('\nBuild→Rebalance export-string round-trip — firstYear=2036, la
 
     // Import: holdings via the shared parser; explicit DARA via the shared block parser.
     const rawLines = csv.trim().split('\n').filter(l => l.trim());
-    const holdings = parseHoldingsCSV(csv, tipsMap);
+    const holdings = parseHoldingsCSV(csv, tipsMarketData);
     const importedDara = parseFundedYearDaraBlock(rawLines);
     assert(`${label}: #fundedYear,dara block parsed`, importedDara != null && importedDara.size > 0, true);
     const yrs = [...importedDara.keys()].sort((a, b) => a - b);
@@ -1220,7 +1220,7 @@ console.log('\nBuild→Rebalance export-string round-trip — firstYear=2036, la
 
     // Rebalance honoring explicit DARA (what _initRebalDaraFromPortfolio + Run handler now do).
     const { summary: rS, results: rR, details: rD } = runRebalance({
-      dara: med, bracketMode: '3bracket', holdings, tipsMap, refCPI, settlementDate,
+      dara: med, bracketMode: '3bracket', holdings, tipsMarketData, refCPI, settlementDate,
       daraByYear: importedDara, lastYearOverride: yrs[yrs.length - 1], firstYearOverride: yrs[0], preLadderInterest: pli,
     });
 
@@ -1306,7 +1306,7 @@ console.log('\nparseParamsBlock — #params line');
   assert('no #params line → null', parseParamsBlock(['cusip,qty', '91282CLE9,10']), null);
 
   // The values come from the summaries that the export reads.
-  const { summary: bSum } = runBuild({ dara: 40000, firstYear: 2034, lastYear: 2047, tipsMap, refCPI, settlementDate, preLadderInterest: true, maturityPref: 'first' });
+  const { summary: bSum } = runBuild({ dara: 40000, firstYear: 2034, lastYear: 2047, tipsMarketData, refCPI, settlementDate, preLadderInterest: true, maturityPref: 'first' });
   assert('build summary carries preLadderInterest', bSum.preLadderInterest, true);
   assert('build summary carries maturityPref', bSum.maturityPref, 'first');
 
@@ -1340,7 +1340,7 @@ console.log('\nBuild→Rebalance symmetry — firstYear=2036, lastYear=2065, PLI
 
   // 1. Build
   const { details: buildDetailsFull, summary: buildSummaryFull } = runBuild({
-    dara: DARA, firstYear, lastYear, tipsMap, refCPI, settlementDate,
+    dara: DARA, firstYear, lastYear, tipsMarketData, refCPI, settlementDate,
     preLadderInterest: true,
   });
 
@@ -1354,7 +1354,7 @@ console.log('\nBuild→Rebalance symmetry — firstYear=2036, lastYear=2065, PLI
     dara: DARA,
     bracketMode: '3bracket',
     holdings: holdingsFull,
-    tipsMap,
+    tipsMarketData,
     refCPI,
     settlementDate,
     preLadderInterest: true,
@@ -1400,7 +1400,7 @@ console.log('\nBuild→Rebalance DARA inference — firstYear=2035→2036, lastY
     dara: BUILD_DARA,
     firstYear: 2035,
     lastYear: 2064,
-    tipsMap, refCPI, settlementDate,
+    tipsMarketData, refCPI, settlementDate,
     preLadderInterest: true,
   });
 
@@ -1413,7 +1413,7 @@ console.log('\nBuild→Rebalance DARA inference — firstYear=2035→2036, lastY
     dara: null,
     bracketMode: '2bracket',
     holdings: inferHoldings,
-    tipsMap, refCPI, settlementDate,
+    tipsMarketData, refCPI, settlementDate,
     preLadderInterest: true,
     firstYearOverride: 2036,
     lastYearOverride: 2065,
@@ -1428,12 +1428,12 @@ console.log('\nBuild→Rebalance DARA inference — firstYear=2035→2036, lastY
 }
 
 // ── Test: Build — firstYear inside gap (2037/2038/2039) ──────────────────────
-// Lower bracket (Jan 2036) always exists — identified from tipsMap even when firstYear > 2036.
+// Lower bracket (Jan 2036) always exists — identified from tipsMarketData even when firstYear > 2036.
 // 2036 row: fundedYearQty = 0, excessQty > 0 (pure bracket excess for duration matching).
 for (const gapFirstYear of [2037, 2038, 2039]) {
   console.log(`\nBuild — firstYear=${gapFirstYear} (gap year), lastYear=2047`);
   const dara = 30000, lastYear = 2047;
-  const { summary, results, details } = runBuild({ dara, firstYear: gapFirstYear, lastYear, tipsMap, refCPI, settlementDate });
+  const { summary, results, details } = runBuild({ dara, firstYear: gapFirstYear, lastYear, tipsMarketData, refCPI, settlementDate });
   const gapYearsInRange = [];
   for (let y = gapFirstYear; y <= 2039; y++) gapYearsInRange.push(y);
   assert(`firstYear=${gapFirstYear}: gapYears covers [${gapFirstYear}–2039]`,
@@ -1468,13 +1468,13 @@ for (const gapFirstYear of [2037, 2038, 2039]) {
   const DARA = 30000, buildFirstYear = 2035, lastYear = 2047;
   const { details: bldDetails } = runBuild({
     dara: DARA, firstYear: buildFirstYear, lastYear,
-    tipsMap, refCPI, settlementDate,
+    tipsMarketData, refCPI, settlementDate,
   });
   const holdings = bldDetails.map(d => ({ cusip: d.cusip, qty: d.fundedYearQty + d.excessQty, excessQty: d.excessQty }));
 
   const { summary: rSummary } = runRebalance({
     dara: DARA, bracketMode: '2bracket',
-    holdings, tipsMap, refCPI, settlementDate,
+    holdings, tipsMarketData, refCPI, settlementDate,
     firstYearOverride: 2037, lastYearOverride: lastYear,
   });
   assert('Rebal firstYear=2037: lowerYear === 2036', rSummary.brackets.lowerYear, 2036);
@@ -1496,23 +1496,23 @@ for (const gapFirstYear of [2037, 2038, 2039]) {
 
   // Build with firstYear=2038 (gap year) → 2036 gets pure bracket excess, no funded component.
   for (const firstYearIn of [2037, 2038, 2039]) {
-    const { details: bldD } = runBuild({ dara: DARA, firstYear: firstYearIn, lastYear, tipsMap, refCPI, settlementDate });
+    const { details: bldD } = runBuild({ dara: DARA, firstYear: firstYearIn, lastYear, tipsMarketData, refCPI, settlementDate });
     // Simulate Format 5 CSV round-trip: include excessQty for all rows.
     const holdings = bldD.map(d => ({ cusip: d.cusip, qty: d.fundedYearQty + d.excessQty, excessQty: d.excessQty }));
-    const inferred = inferFirstYearFromHoldings({ holdings, tipsMap, refCPI, settlementDate });
+    const inferred = inferFirstYearFromHoldings({ holdings, tipsMarketData, refCPI, settlementDate });
     assert(`inferFirstYear from build firstYear=${firstYearIn}`, inferred, firstYearIn);
   }
 
   // Format 3 (no excessQty) → returns null (no inference possible).
-  const { details: bldD3 } = runBuild({ dara: DARA, firstYear: 2038, lastYear, tipsMap, refCPI, settlementDate });
+  const { details: bldD3 } = runBuild({ dara: DARA, firstYear: 2038, lastYear, tipsMarketData, refCPI, settlementDate });
   const holdingsNoExcess = bldD3.map(d => ({ cusip: d.cusip, qty: d.fundedYearQty + d.excessQty }));
-  const inferredNull = inferFirstYearFromHoldings({ holdings: holdingsNoExcess, tipsMap, refCPI, settlementDate });
+  const inferredNull = inferFirstYearFromHoldings({ holdings: holdingsNoExcess, tipsMarketData, refCPI, settlementDate });
   assert('inferFirstYear Format3 (no excessQty) → null', inferredNull, null);
 
   // Build with firstYear=2036 (funded year, not pure bracket) → 2036 has funded component → returns null.
-  const { details: bldD36 } = runBuild({ dara: DARA, firstYear: 2036, lastYear, tipsMap, refCPI, settlementDate });
+  const { details: bldD36 } = runBuild({ dara: DARA, firstYear: 2036, lastYear, tipsMarketData, refCPI, settlementDate });
   const holdings36 = bldD36.map(d => ({ cusip: d.cusip, qty: d.fundedYearQty + d.excessQty, excessQty: d.excessQty }));
-  const inferred36 = inferFirstYearFromHoldings({ holdings: holdings36, tipsMap, refCPI, settlementDate });
+  const inferred36 = inferFirstYearFromHoldings({ holdings: holdings36, tipsMarketData, refCPI, settlementDate });
   assert('inferFirstYear from build firstYear=2036 → null (2036 is funded, not pure bracket)', inferred36, null);
 }
 
@@ -1525,15 +1525,15 @@ for (const gapFirstYear of [2037, 2038, 2039]) {
   if (existsSync(fp)) {
     console.log('\nSpec-only infer on SampleHoldings (split 2047) — must converge, not throw');
     const holdings = parseHoldings(readFileSync(fp, 'utf8'));
-    const yrs = holdings.map(h => tipsMap.get(h.cusip)?.maturity?.getFullYear()).filter(Boolean);
+    const yrs = holdings.map(h => tipsMarketData.get(h.cusip)?.maturity?.getFullYear()).filter(Boolean);
     const fy = Math.min(...yrs), ly = Math.max(...yrs);
-    const rawARA = computePortfolioARAByYear(holdings, tipsMap, refCPI);
-    const { daraMap } = derivePerYearDara(rawARA, getGapYearBracketCandidates(tipsMap));
+    const rawARA = computePortfolioARAByYear(holdings, tipsMarketData, refCPI);
+    const { daraMap } = derivePerYearDara(rawARA, getGapYearBracketCandidates(tipsMarketData));
     const specYears = new Set(); for (let y = fy; y <= ly; y++) if (y > 2047) specYears.add(y);
     let median = null, threw = false;
     try {
       ({ scaledMedian: median } = inferScaledDARAFromPortfolio({
-        daraMap, holdings, tipsMap, refCPI, settlementDate,
+        daraMap, holdings, tipsMarketData, refCPI, settlementDate,
         scopeYears: specYears, fixedDaraByYear: daraMap, flat: true,
       }));
     } catch { threw = true; }
@@ -1553,22 +1553,22 @@ for (const gapFirstYear of [2037, 2038, 2039]) {
     { cusip: '912828V49', qty: 61 }, { cusip: '9128283R9', qty: 63 },
     { cusip: '91282CPH8', qty: 100 }, { cusip: '91282CCM1', qty: 84 },
     { cusip: '91282CHP9', qty: 96 },
-  ].filter(h => tipsMap.get(h.cusip)?.maturity);
+  ].filter(h => tipsMarketData.get(h.cusip)?.maturity);
 
   // Build the load mirror exactly as the UI does at file load (range form fills empty years w/ LMI).
-  const heldARA = computePortfolioARAByYear(rawHoldings, tipsMap, refCPI);
+  const heldARA = computePortfolioARAByYear(rawHoldings, tipsMarketData, refCPI);
   const heldYears = Object.keys(heldARA).map(Number);
   const firstYear = Math.min(...heldYears), lastYear = Math.max(...heldYears);
-  const fullARA = computePortfolioARAByYear(rawHoldings, tipsMap, refCPI, { firstYear, lastYear });
-  const { median, daraMap } = derivePerYearDara(heldARA, getGapYearBracketCandidates(tipsMap));
-  const gapSet = new Set(getGapYears(tipsMap));
+  const fullARA = computePortfolioARAByYear(rawHoldings, tipsMarketData, refCPI, { firstYear, lastYear });
+  const { median, daraMap } = derivePerYearDara(heldARA, getGapYearBracketCandidates(tipsMarketData));
+  const gapSet = new Set(getGapYears(tipsMarketData));
   const mirror = new Map();
   for (let y = firstYear; y <= lastYear; y++) {
     mirror.set(y, daraMap.has(y) ? daraMap.get(y) : (gapSet.has(y) ? median : Math.round(fullARA[y] ?? 0)));
   }
 
   const res = runFundedRebalance({
-    dara: median, holdings: rawHoldings, tipsMap, refCPI, settlementDate,
+    dara: median, holdings: rawHoldings, tipsMarketData, refCPI, settlementDate,
     daraByYear: mirror, daraPlanUnedited: true,
   });
   assert('gap-free: engine reports no gap years', res.summary.gapYears.length, 0);
@@ -1596,19 +1596,19 @@ for (const gapFirstYear of [2037, 2038, 2039]) {
     const rawHoldings = parseHoldings(readFileSync(fp, 'utf8'));
 
     // Build the load mirror exactly as the UI does at file load (range form fills empty years w/ LMI).
-    const heldARA = computePortfolioARAByYear(rawHoldings, tipsMap, refCPI);
+    const heldARA = computePortfolioARAByYear(rawHoldings, tipsMarketData, refCPI);
     const heldYears = Object.keys(heldARA).map(Number);
     const firstYear = Math.min(...heldYears), lastYear = Math.max(...heldYears);
-    const fullARA = computePortfolioARAByYear(rawHoldings, tipsMap, refCPI, { firstYear, lastYear });
-    const { median, daraMap } = derivePerYearDara(heldARA, getGapYearBracketCandidates(tipsMap));
-    const gapSet = new Set(getGapYears(tipsMap));
+    const fullARA = computePortfolioARAByYear(rawHoldings, tipsMarketData, refCPI, { firstYear, lastYear });
+    const { median, daraMap } = derivePerYearDara(heldARA, getGapYearBracketCandidates(tipsMarketData));
+    const gapSet = new Set(getGapYears(tipsMarketData));
     const mirror = new Map();
     for (let y = firstYear; y <= lastYear; y++) {
       mirror.set(y, daraMap.has(y) ? daraMap.get(y) : (gapSet.has(y) ? median : Math.round(fullARA[y] ?? 0)));
     }
 
     const res = runFundedRebalance({
-      dara: median, holdings: rawHoldings, tipsMap, refCPI, settlementDate,
+      dara: median, holdings: rawHoldings, tipsMarketData, refCPI, settlementDate,
       daraByYear: mirror, daraPlanUnedited: true,
     });
     const hasFundingBlock = res.summary.gapYears.length > 0 || res.summary.future30yYears.length > 0;
@@ -1629,7 +1629,7 @@ for (const gapFirstYear of [2037, 2038, 2039]) {
 // scale away.
 {
   const lastYear = 2040, dara = 100000;
-  const b = runBuild({ dara, firstYear: 2026, lastYear, tipsMap, refCPI, settlementDate });
+  const b = runBuild({ dara, firstYear: 2026, lastYear, tipsMarketData, refCPI, settlementDate });
   const holdings = b.details
     .map(d => ({ cusip: d.cusip, qty: (d.fundedYearQty || 0) + (d.excessQty || 0), excessQty: d.excessQty || 0 }))
     .filter(h => h.qty > 0);
@@ -1641,7 +1641,7 @@ for (const gapFirstYear of [2037, 2038, 2039]) {
   // 1. The plan as built already funds itself: nothing should move (unaffected by this ruling —
   //    a self-financing plan run as stated is the same as a self-financing plan scaled to itself).
   const same = runFundedRebalance({
-    dara, holdings, tipsMap, refCPI, settlementDate,
+    dara, holdings, tipsMarketData, refCPI, settlementDate,
     daraByYear: plan, daraPlanUnedited: true, daraPlanIsStated: true,
     firstYearOverride: 2026, lastYearOverride: lastYear,
   });
@@ -1656,7 +1656,7 @@ for (const gapFirstYear of [2037, 2038, 2039]) {
   const aged = new Map();
   for (const [y, v] of plan) aged.set(y, v * 1.05);
   const res = runFundedRebalance({
-    dara: Math.round(dara * 1.05), holdings, tipsMap, refCPI, settlementDate,
+    dara: Math.round(dara * 1.05), holdings, tipsMarketData, refCPI, settlementDate,
     daraByYear: aged, daraPlanUnedited: true, daraPlanIsStated: true,
     firstYearOverride: 2026, lastYearOverride: lastYear,
   });
@@ -1669,7 +1669,7 @@ for (const gapFirstYear of [2037, 2038, 2039]) {
   //    single near-year rung) is honored exactly too — no sweep around it, no scale of any kind.
   const edited = new Map(plan); edited.set(2026, dara * 2);
   const resEdited = runFundedRebalance({
-    dara, holdings, tipsMap, refCPI, settlementDate,
+    dara, holdings, tipsMarketData, refCPI, settlementDate,
     daraByYear: edited, daraPlanUnedited: false, daraPlanIsStated: true,
     firstYearOverride: 2026, lastYearOverride: lastYear,
   });
@@ -1694,23 +1694,23 @@ for (const gapFirstYear of [2037, 2038, 2039]) {
     { cusip: '9128283R9', qty: 10 }, { cusip: '9128285W6', qty: 10 },
     { cusip: '912828Z37', qty: 10 }, { cusip: '91282CBF7', qty: 10 },
     { cusip: '91282CDX6', qty: 10 }, { cusip: '912810QF8', qty: 40 }, // 2040, oversized
-  ].filter(h => tipsMap.get(h.cusip)?.maturity);
+  ].filter(h => tipsMarketData.get(h.cusip)?.maturity);
 
   const firstYear = 2028, lastYear = 2039;
-  const heldARA = computePortfolioARAByYear(holdings, tipsMap, refCPI);
-  const { daraMap } = derivePerYearDara(heldARA, getGapYearBracketCandidates(tipsMap));
+  const heldARA = computePortfolioARAByYear(holdings, tipsMarketData, refCPI);
+  const { daraMap } = derivePerYearDara(heldARA, getGapYearBracketCandidates(tipsMarketData));
 
   const lmpYears = new Set();
   for (let y = firstYear; y <= lastYear; y++) lmpYears.add(y);
   const { scaledMap, scaledMedian } = inferScaledDARAFromPortfolio({
-    daraMap, holdings, tipsMap, refCPI, settlementDate,
+    daraMap, holdings, tipsMarketData, refCPI, settlementDate,
     lastYearOverride: lastYear, firstYearOverride: firstYear,
     scopeYears: lmpYears, fixedDaraByYear: daraMap, flat: true,
   });
   assert('Infer LMP (last inside gap): returns a positive flat DARA', scaledMedian > 0, true);
 
   const result = runRebalance({
-    dara: scaledMedian, holdings, tipsMap, refCPI, settlementDate,
+    dara: scaledMedian, holdings, tipsMarketData, refCPI, settlementDate,
     daraByYear: scaledMap, lastYearOverride: lastYear, firstYearOverride: firstYear,
   });
   assert('Infer LMP (last inside gap): whole-portfolio net cash small & non-negative',
@@ -1868,12 +1868,12 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
     { cusip: '91282CGK1', qty: 8 },   // Jan 2033 — lower-bracket candidate, NOT oversized
     { cusip: '91282CJY8', qty: 8 },   // Jan 2034 — lower-bracket candidate, NOT oversized
     { cusip: '91282CML2', qty: 60 },  // Jan 2035 — lower-bracket candidate, oversized on purpose
-  ].filter(h => tipsMap.has(h.cusip));
+  ].filter(h => tipsMarketData.has(h.cusip));
   const firstYear = 2031, lastYear = 2039; // reaches into the structural gap so lower candidates apply
-  const heldARA = computePortfolioARAByYear(holdings, tipsMap, refCPI);
+  const heldARA = computePortfolioARAByYear(holdings, tipsMarketData, refCPI);
 
   // (b) 0/1/N candidate detection — the N-candidate, latest-maturing case.
-  const flags = detectBracketFlags({ heldARAByYear: heldARA, tipsMap, lastYear });
+  const flags = detectBracketFlags({ heldARAByYear: heldARA, tipsMarketData, lastYear });
   assert('before-state: exactly one lower-bracket year flagged (of three candidates)', flags.size, 1);
   assert('before-state: the oversized, latest-maturing candidate (2035) is the one flagged', flags.has(2035), true);
 
@@ -1889,7 +1889,7 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
   assert('before-state: flagged excess === rawARA - curve value', flags.get(2035).excess, spike2035.excess, 1e-9);
 
   // (a) Standalone computation matches computePortfolioARAByYear for an ORDINARY (non-flagged) year.
-  const { rows } = computeBeforeState({ holdings, tipsMap, refCPI, firstYear, lastYear });
+  const { rows } = computeBeforeState({ holdings, tipsMarketData, refCPI, firstYear, lastYear });
   const rows2031 = rows.filter(r => r.fundedYear === 2031 && r.cusip);
   const ara2031 = rows2031.find(r => r.araBeforeTotal != null)?.araBeforeTotal;
   assert('before-state: ordinary year Amount Before matches computePortfolioARAByYear', Math.round(ara2031), Math.round(heldARA[2031]));
@@ -1904,12 +1904,12 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
   // record itself (`bond.coupon`), and `yield` (which bondCalcs never touches at all, but
   // drill.js's bondVarRows reads for the bracketAmtBefore/bracketCostBefore popups).
   const row2031 = rows2031.find(r => r.cusip);
-  const bond2031 = tipsMap.get(row2031.cusip);
+  const bond2031 = tipsMarketData.get(row2031.cusip);
   assert('before-state: row.coupon is the real bond coupon, not undefined', row2031.coupon, bond2031.coupon);
   assert('before-state: row.yield is set (not undefined) so bondVarRows\' Yield line is never NaN', typeof row2031.yield !== 'undefined', true);
   const holding0 = row2031.araBeforeHoldings[0];
   assert('before-state: araBeforeHoldings[i].coupon is the real bond coupon (feeds buildPIPerBondDrill)',
-    holding0.coupon, tipsMap.get(holding0.cusip).coupon);
+    holding0.coupon, tipsMarketData.get(holding0.cusip).coupon);
 
   // (c) Guessed-excess arithmetic: flagged year's group value is the curve guess; its Gap sub-row
   // excess is raw ARA minus that guess.
@@ -1925,7 +1925,7 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
   // excess recalculates against that entered value instead of the guess — plain subtraction.
   const entered = guess2035 + 5000;
   const { rows: rowsEdited } = computeBeforeState({
-    holdings, tipsMap, refCPI, firstYear, lastYear, daraByYear: new Map([[2035, entered]]),
+    holdings, tipsMarketData, refCPI, firstYear, lastYear, daraByYear: new Map([[2035, entered]]),
   });
   const araValEdited = rowsEdited.filter(r => r.fundedYear === 2035 && r.cusip).find(r => r.araBeforeTotal != null)?.araBeforeTotal;
   const excessRowEdited = rowsEdited.find(r => r.fundedYear === 2035 && r.isGapBracket);
@@ -1934,7 +1934,7 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
 
   // Qty/Cost Before are unaffected by the funded/excess split for an ORDINARY (unflagged) year —
   // full held qty always shows there (3.0 §Before-State Preview).
-  const heldQty2031 = holdings.filter(h => tipsMap.get(h.cusip)?.maturity?.getFullYear() === 2031).reduce((s, h) => s + h.qty, 0);
+  const heldQty2031 = holdings.filter(h => tipsMarketData.get(h.cusip)?.maturity?.getFullYear() === 2031).reduce((s, h) => s + h.qty, 0);
   const rowsQty2031 = rows2031.reduce((s, r) => s + (r.fundedYearQtyBefore || 0), 0);
   assert('before-state: ordinary year Qty Before unaffected by the flag (full held qty)', rowsQty2031, heldQty2031);
 
@@ -1944,8 +1944,8 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
   // araBeforeLaterMatInt the raw-ARA figure is built from; excessQtyBefore is the remainder
   // (floored at 0); both costs are qty × costPerBond. The funded row and Gap sub-row must
   // reconcile to the full held quantity — no qty lost or invented by the split.
-  const heldQty2035 = holdings.filter(h => tipsMap.get(h.cusip)?.maturity?.getFullYear() === 2035).reduce((s, h) => s + h.qty, 0);
-  const bond2035 = tipsMap.get('91282CML2');
+  const heldQty2035 = holdings.filter(h => tipsMarketData.get(h.cusip)?.maturity?.getFullYear() === 2035).reduce((s, h) => s + h.qty, 0);
+  const bond2035 = tipsMarketData.get('91282CML2');
   const { piPerBond: piPerBond2035, costPerBond: costPerBond2035 } = bondCalcs(bond2035, refCPI);
   const lmi2035 = excessRow.araBeforeLaterMatInt;
   const expectedFundedQty2035 = Math.max(0, Math.round((guess2035 - lmi2035) / piPerBond2035));
@@ -1972,9 +1972,9 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
   const holdings = [
     { cusip: '91282CBF7', qty: 10 }, // Jan 2031
     { cusip: '91282CCM1', qty: 10 }, // Jul 2031
-  ].filter(h => tipsMap.has(h.cusip));
-  const heldARA = computePortfolioARAByYear(holdings, tipsMap, refCPI);
-  const flags = detectBracketFlags({ heldARAByYear: heldARA, tipsMap, lastYear: 2039 });
+  ].filter(h => tipsMarketData.has(h.cusip));
+  const heldARA = computePortfolioARAByYear(holdings, tipsMarketData, refCPI);
+  const flags = detectBracketFlags({ heldARAByYear: heldARA, tipsMarketData, lastYear: 2039 });
   assert('before-state: no lower-bracket holdings held → no flags', flags.size, 0);
 }
 
@@ -1984,9 +1984,9 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
     { cusip: '91282CBF7', qty: 10 }, // Jan 2031 — ordinary
     { cusip: '91282CCM1', qty: 10 }, // Jul 2031 — ordinary
     { cusip: '91282CGK1', qty: 200 }, // Jan 2033 — only lower candidate held, grossly oversized
-  ].filter(h => tipsMap.has(h.cusip));
-  const heldARA = computePortfolioARAByYear(holdings, tipsMap, refCPI);
-  const flags = detectBracketFlags({ heldARAByYear: heldARA, tipsMap, lastYear: 2039 });
+  ].filter(h => tipsMarketData.has(h.cusip));
+  const heldARA = computePortfolioARAByYear(holdings, tipsMarketData, refCPI);
+  const flags = detectBracketFlags({ heldARAByYear: heldARA, tipsMarketData, lastYear: 2039 });
   assert('before-state: single held lower-bracket candidate flagged when oversized', flags.has(2033), true);
   assert('before-state: single-candidate flag count === 1', flags.size, 1);
 }
@@ -2001,19 +2001,19 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
   const holdings = [
     { cusip: '91282CPU9', qty: 218 }, // Jan 2036
     { cusip: '912810QF8', qty: 129 }, // Feb 2040
-  ].filter(h => tipsMap.has(h.cusip));
-  const heldARA = computePortfolioARAByYear(holdings, tipsMap, refCPI);
+  ].filter(h => tipsMarketData.has(h.cusip));
+  const heldARA = computePortfolioARAByYear(holdings, tipsMarketData, refCPI);
   const ara2036 = heldARA[2036], ara2040 = heldARA[2040];
   const fairShare = (ara2036 + ara2040) / 5; // 2036..2040 inclusive = 5 rungs
 
-  const flags = detectBracketFlags({ heldARAByYear: heldARA, tipsMap, lastYear: 2040 });
+  const flags = detectBracketFlags({ heldARAByYear: heldARA, tipsMarketData, lastYear: 2040 });
   assert('two-holding: 2036 flags (its ARA exceeds the 5-rung fair share)', flags.has(2036), true);
   assert('two-holding: 2040 ALSO flags (its ARA exceeds the fair share too, not just the larger of the two)', flags.has(2040), true);
   assert('two-holding: flagged value is the 5-rung fair share, not a 2-point average', Math.round(flags.get(2036).value), Math.round(fairShare));
 
-  const gapYears = new Set(getGapYears(tipsMap).filter(y => y > 2036 && y < 2040));
-  const rangeARA = computePortfolioARAByYear(holdings, tipsMap, refCPI, { firstYear: 2036, lastYear: 2040 });
-  const { daraMap } = derivePerYearDara(rangeARA, getGapYearBracketCandidates(tipsMap, 2040), gapYears);
+  const gapYears = new Set(getGapYears(tipsMarketData).filter(y => y > 2036 && y < 2040));
+  const rangeARA = computePortfolioARAByYear(holdings, tipsMarketData, refCPI, { firstYear: 2036, lastYear: 2040 });
+  const { daraMap } = derivePerYearDara(rangeARA, getGapYearBracketCandidates(tipsMarketData, 2040), gapYears);
   for (const y of [2037, 2038, 2039]) {
     assert(`two-holding: gap year ${y} DARA is the 5-rung fair share`, Math.round(daraMap.get(y)), Math.round(fairShare));
   }
@@ -2037,8 +2037,8 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
 {
   const csv = readFileSync(new URL('./dev/RetainedExcessTwoYears.csv', import.meta.url), 'utf8');
   const holdings = parseHoldings(csv);
-  const heldARA = computePortfolioARAByYear(holdings, tipsMap, refCPI);
-  const flags = detectBracketFlags({ heldARAByYear: heldARA, tipsMap, lastYear: 2056 });
+  const heldARA = computePortfolioARAByYear(holdings, tipsMarketData, refCPI);
+  const flags = detectBracketFlags({ heldARAByYear: heldARA, tipsMarketData, lastYear: 2056 });
   assert('before-state: two lower-candidate spikes (2034, 2035) → only the higher-excess one flagged', flags.has(2034), false);
   assert('before-state: 2035 (the higher-excess of the two) is the one flagged', flags.has(2035), true);
 }
@@ -2055,11 +2055,11 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
   if (existsSync(fullPath)) {
     console.log('\nWithin-Year Allocation Policy (SampleHoldings, funded year 2027: Jan + Apr + Oct)');
     const holdings = parseHoldings(readFileSync(fullPath, 'utf8'));
-    const rawARA = computePortfolioARAByYear(holdings, tipsMap, refCPI);
-    const bracketCandidates = getGapYearBracketCandidates(tipsMap);
+    const rawARA = computePortfolioARAByYear(holdings, tipsMarketData, refCPI);
+    const bracketCandidates = getGapYearBracketCandidates(tipsMarketData);
     const { daraMap } = derivePerYearDara(rawARA, bracketCandidates);
     const { scaledMap: baseDaraMap, scaledMedian } = inferScaledDARAFromPortfolio({
-      daraMap, holdings, tipsMap, refCPI, settlementDate,
+      daraMap, holdings, tipsMarketData, refCPI, settlementDate,
     });
     const JAN27 = '912828V49', APR27 = '91282CEJ6', OCT27 = '91282CFR7';
 
@@ -2073,7 +2073,7 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
     // manufactures a trade -- proven here on the real three-way year, not a simplified pair.
     for (const policy of ['equal', 'maturity', 'saYield']) {
       const { details } = runRebalance({
-        dara: scaledMedian, holdings, tipsMap, refCPI, settlementDate,
+        dara: scaledMedian, holdings, tipsMarketData, refCPI, settlementDate,
         daraByYear: baseDaraMap, allocationPolicy: policy,
       });
       assert(`allocation policy '${policy}': need unchanged -> Jan 2027 qty delta === 0`, qtyDeltaFor(details, JAN27), 0);
@@ -2098,7 +2098,7 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
     equalGrownDara.set(2027, (equalGrownDara.get(2027) ?? 0) + 2500);
     {
       const { details } = runRebalance({
-        dara: scaledMedian, holdings, tipsMap, refCPI, settlementDate,
+        dara: scaledMedian, holdings, tipsMarketData, refCPI, settlementDate,
         daraByYear: equalGrownDara, allocationPolicy: 'equal',
       });
       assert("allocation policy 'equal': need grows -> Jan (lowest held value, tied w/ Oct) grows", qtyDeltaFor(details, JAN27) > 0, true);
@@ -2110,7 +2110,7 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
     // This is maturityPref's default ('last'), matching 2.0's own tie-break direction.
     {
       const { details } = runRebalance({
-        dara: scaledMedian, holdings, tipsMap, refCPI, settlementDate,
+        dara: scaledMedian, holdings, tipsMarketData, refCPI, settlementDate,
         daraByYear: grownDara, allocationPolicy: 'maturity',
       });
       assert("allocation policy 'maturity': need grows -> Oct (latest-maturing) absorbs it", qtyDeltaFor(details, OCT27) > 0, true);
@@ -2159,18 +2159,18 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
 
     // 'saYield': force Apr's SA yield above Oct's and Jan's -> Apr should be preferred instead.
     {
-      const saved = { j: tipsMap.get(JAN27).saYield, a: tipsMap.get(APR27).saYield, o: tipsMap.get(OCT27).saYield };
-      tipsMap.get(APR27).saYield = 0.03;
-      tipsMap.get(OCT27).saYield = 0.02;
-      tipsMap.get(JAN27).saYield = 0.01;
+      const saved = { j: tipsMarketData.get(JAN27).saYield, a: tipsMarketData.get(APR27).saYield, o: tipsMarketData.get(OCT27).saYield };
+      tipsMarketData.get(APR27).saYield = 0.03;
+      tipsMarketData.get(OCT27).saYield = 0.02;
+      tipsMarketData.get(JAN27).saYield = 0.01;
       const { details } = runRebalance({
-        dara: scaledMedian, holdings, tipsMap, refCPI, settlementDate,
+        dara: scaledMedian, holdings, tipsMarketData, refCPI, settlementDate,
         daraByYear: grownDara, allocationPolicy: 'saYield',
       });
       assert("allocation policy 'saYield': need grows -> highest-SA-yield (Apr, forced) absorbs it", qtyDeltaFor(details, APR27) > 0, true);
       assert("allocation policy 'saYield': need grows -> Jan (lowest forced) untouched", qtyDeltaFor(details, JAN27), 0);
       assert("allocation policy 'saYield': need grows -> Oct (middle forced) untouched", qtyDeltaFor(details, OCT27), 0);
-      tipsMap.get(APR27).saYield = saved.a; tipsMap.get(OCT27).saYield = saved.o; tipsMap.get(JAN27).saYield = saved.j;
+      tipsMarketData.get(APR27).saYield = saved.a; tipsMarketData.get(OCT27).saYield = saved.o; tipsMarketData.get(JAN27).saYield = saved.j;
     }
 
     // Regression: a brand-new candidate CUSIP (never held) that wins the rank must still get its
@@ -2184,11 +2184,11 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
     // makes it win the rank under 'all' (all three held maturities are legitimate targets too).
     {
       const NEW_JAN27 = '912810PS1';
-      const saved = { j: tipsMap.get(JAN27).saYield, a: tipsMap.get(APR27).saYield, o: tipsMap.get(OCT27).saYield, n: tipsMap.get(NEW_JAN27)?.saYield };
-      tipsMap.get(JAN27).saYield = 0.01; tipsMap.get(APR27).saYield = 0.01; tipsMap.get(OCT27).saYield = 0.01;
-      tipsMap.get(NEW_JAN27).saYield = 0.05;
+      const saved = { j: tipsMarketData.get(JAN27).saYield, a: tipsMarketData.get(APR27).saYield, o: tipsMarketData.get(OCT27).saYield, n: tipsMarketData.get(NEW_JAN27)?.saYield };
+      tipsMarketData.get(JAN27).saYield = 0.01; tipsMarketData.get(APR27).saYield = 0.01; tipsMarketData.get(OCT27).saYield = 0.01;
+      tipsMarketData.get(NEW_JAN27).saYield = 0.05;
       const { details } = runRebalance({
-        dara: scaledMedian, holdings, tipsMap, refCPI, settlementDate,
+        dara: scaledMedian, holdings, tipsMarketData, refCPI, settlementDate,
         daraByYear: grownDara, allocationPolicy: 'saYield', maturityPref: 'all',
       });
       const newRow = details.find(d => d.cusip === NEW_JAN27 && d.fundedYear === 2027);
@@ -2198,7 +2198,7 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
       assert('new-buy CUSIP regression: the previously-held Jan CUSIP is untouched', qtyDeltaFor(details, JAN27), 0);
       assert('new-buy CUSIP regression: Apr untouched', qtyDeltaFor(details, APR27), 0);
       assert('new-buy CUSIP regression: Oct untouched', qtyDeltaFor(details, OCT27), 0);
-      tipsMap.get(JAN27).saYield = saved.j; tipsMap.get(APR27).saYield = saved.a; tipsMap.get(OCT27).saYield = saved.o; tipsMap.get(NEW_JAN27).saYield = saved.n;
+      tipsMarketData.get(JAN27).saYield = saved.j; tipsMarketData.get(APR27).saYield = saved.a; tipsMarketData.get(OCT27).saYield = saved.o; tipsMarketData.get(NEW_JAN27).saYield = saved.n;
     }
 
     // (2b) Need shrinks -> the LEAST preferred maturity sells first; the most preferred is
@@ -2208,7 +2208,7 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
     shrunkDara.set(2027, Math.max(1000, (shrunkDara.get(2027) ?? 0) - 3000));
     {
       const { details } = runRebalance({
-        dara: scaledMedian, holdings, tipsMap, refCPI, settlementDate,
+        dara: scaledMedian, holdings, tipsMarketData, refCPI, settlementDate,
         daraByYear: shrunkDara, allocationPolicy: 'maturity',
       });
       assert("allocation policy 'maturity': need shrinks -> Jan (earliest-maturing, least preferred) sells", qtyDeltaFor(details, JAN27) < 0, true);
@@ -2234,7 +2234,7 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
         const dm = new Map(baseDaraMap);
         dm.set(2027, Math.max(1000, (dm.get(2027) ?? 0) - cut));
         const { details: d } = runRebalance({
-          dara: scaledMedian, holdings, tipsMap, refCPI, settlementDate,
+          dara: scaledMedian, holdings, tipsMarketData, refCPI, settlementDate,
           daraByYear: dm, allocationPolicy: 'maturity',
         });
         return d.find(x => x.cusip === JAN27 && x.fundedYear === 2027).qtyAfter;
@@ -2248,7 +2248,7 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
       const boundaryDara = new Map(baseDaraMap);
       boundaryDara.set(2027, Math.max(1000, (boundaryDara.get(2027) ?? 0) - hi));
       const { details } = runRebalance({
-        dara: scaledMedian, holdings, tipsMap, refCPI, settlementDate,
+        dara: scaledMedian, holdings, tipsMarketData, refCPI, settlementDate,
         daraByYear: boundaryDara, allocationPolicy: 'maturity',
       });
       const janDelta = qtyDeltaFor(details, JAN27);
@@ -2272,7 +2272,7 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
         const dm = new Map(baseDaraMap);
         dm.set(2027, Math.max(1000, (dm.get(2027) ?? 0) - cut));
         const { details: d } = runRebalance({
-          dara: scaledMedian, holdings, tipsMap, refCPI, settlementDate,
+          dara: scaledMedian, holdings, tipsMarketData, refCPI, settlementDate,
           daraByYear: dm, allocationPolicy: 'maturity',
         });
         return d.find(x => x.cusip === JAN27 && x.fundedYear === 2027).qtyAfter;
@@ -2286,7 +2286,7 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
       const tinyDara = new Map(baseDaraMap);
       tinyDara.set(2027, Math.max(1000, (tinyDara.get(2027) ?? 0) - (hi - 1)));
       const { details } = runRebalance({
-        dara: scaledMedian, holdings, tipsMap, refCPI, settlementDate,
+        dara: scaledMedian, holdings, tipsMarketData, refCPI, settlementDate,
         daraByYear: tinyDara, allocationPolicy: 'maturity',
       });
       assert("allocation policy 'maturity': sub-bond residual -> Jan untouched", qtyDeltaFor(details, JAN27), 0);
@@ -2312,7 +2312,7 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
         const dm = new Map(baseDaraMap);
         dm.set(2027, Math.max(1000, (dm.get(2027) ?? 0) - cut));
         const { details: d } = runRebalance({
-          dara: scaledMedian, holdings, tipsMap, refCPI, settlementDate,
+          dara: scaledMedian, holdings, tipsMarketData, refCPI, settlementDate,
           daraByYear: dm, allocationPolicy: 'equal',
         });
         return { jan: qtyDeltaFor(d, JAN27), apr: qtyDeltaFor(d, APR27), oct: qtyDeltaFor(d, OCT27) };
@@ -2333,7 +2333,7 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
       const equalShrunkDara = new Map(baseDaraMap);
       equalShrunkDara.set(2027, Math.max(1000, (equalShrunkDara.get(2027) ?? 0) - safeCut));
       const { details } = runRebalance({
-        dara: scaledMedian, holdings, tipsMap, refCPI, settlementDate,
+        dara: scaledMedian, holdings, tipsMarketData, refCPI, settlementDate,
         daraByYear: equalShrunkDara, allocationPolicy: 'equal',
       });
       assert("allocation policy 'equal': need shrinks -> Jan (lowest held value) untouched", qtyDeltaFor(details, JAN27), 0);
@@ -2346,7 +2346,7 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
     // first even though the global policy ('maturity') would normally prefer Oct.
     {
       const { details } = runRebalance({
-        dara: scaledMedian, holdings, tipsMap, refCPI, settlementDate,
+        dara: scaledMedian, holdings, tipsMarketData, refCPI, settlementDate,
         daraByYear: grownDara, allocationPolicy: 'maturity',
         yearRankOverrides: new Map([[2027, [APR27, OCT27, JAN27]]]),
       });
@@ -2362,7 +2362,7 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
     // discussion, generalized to the real three-way year.
     for (const maturityPref of ['first', 'all']) {
       const { details } = runRebalance({
-        dara: scaledMedian, holdings, tipsMap, refCPI, settlementDate,
+        dara: scaledMedian, holdings, tipsMarketData, refCPI, settlementDate,
         daraByYear: baseDaraMap, maturityPref,
       });
       assert(`maturityPref='${maturityPref}' with need unchanged: Jan 2027 untouched`, qtyDeltaFor(details, JAN27), 0);
@@ -2388,10 +2388,10 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
     { cusip: 'TEST36JUL', maturity: '2036-07-15', coupon: 0.02375, datedDateRefCpi: 333.96974, price: 100.44, yield: 0.0233 },
     { cusip: 'TEST40FEB', maturity: '2040-02-15', coupon: 0.02125, datedDateRefCpi: 216.1395,  price: 94.98,  yield: 0.0257 },
   ];
-  const map = buildTipsMapFromYields(rows);
+  const map = buildTipsMarketData(rows);
   assert('fixture sanity: gap years are 2037-2039', getGapYears(map).sort().join(','), '2037,2038,2039');
   const { summary, details } = runBuild({
-    dara: 40000, firstYear: 2035, lastYear: 2040, tipsMap: map,
+    dara: 40000, firstYear: 2035, lastYear: 2040, tipsMarketData: map,
     refCPI, settlementDate, maturityPref: 'last', couponPref: 'higher',
   });
   const anchorBefore = summary.gapParams?.anchors?.before?.maturity;
@@ -2431,7 +2431,7 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
     { cusip: 'TEST36JUL', maturity: '2036-07-15', coupon: 0.02375, datedDateRefCpi: 333.96974, price: 100.44, yield: 0.0233 },
     { cusip: 'TEST40FEB', maturity: '2040-02-15', coupon: 0.02125, datedDateRefCpi: 216.1395,  price: 94.98,  yield: 0.0257 },
   ];
-  const map = buildTipsMapFromYields(rows);
+  const map = buildTipsMarketData(rows);
   const toHoldings = (details) => details
     .filter(d => (d.fundedYearQtyAfter ?? 0) + (d.excessQtyAfter ?? 0) > 0)
     .map(d => ({ cusip: d.cusip, qty: d.fundedYearQtyAfter + d.excessQtyAfter, excessQty: d.excessQtyAfter }));
@@ -2446,7 +2446,7 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
     { cusip: 'TEST36JUL', qty: 27, excessQty: 27 },
     { cusip: 'TEST40FEB', qty: 25, excessQty: 13 },
   ];
-  const rebal1 = runRebalance({ dara: 20000, bracketMode: '3bracket', holdings: holdingsA, tipsMap: map, refCPI, settlementDate });
+  const rebal1 = runRebalance({ dara: 20000, bracketMode: '3bracket', holdings: holdingsA, tipsMarketData: map, refCPI, settlementDate });
   const jan36Round1 = rebal1.details.find(d => d.cusip === 'TEST36JAN');
   const jul36Round1 = rebal1.details.find(d => d.cusip === 'TEST36JUL');
   assert('fixture sanity: Jan 2036 is recognized as a bracket target, not an ordinary holding', jan36Round1?.isBracketTarget, true);
@@ -2458,7 +2458,7 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
   // matched targets, so re-running must not move either of them (2.0 §Retained Bracket Excess:
   // retained excess is sold only when over-allocated, never bought; the active bracket is bought
   // only to cover a genuine remainder).
-  const rebal2 = runRebalance({ dara: 20000, bracketMode: '3bracket', holdings: holdingsB, tipsMap: map, refCPI, settlementDate });
+  const rebal2 = runRebalance({ dara: 20000, bracketMode: '3bracket', holdings: holdingsB, tipsMarketData: map, refCPI, settlementDate });
   const jan36Row = rebal2.details.find(d => d.cusip === 'TEST36JAN');
   const jul36Row = rebal2.details.find(d => d.cusip === 'TEST36JUL');
   assert('idempotent reload: Jan 2036 funded-year qty untouched', jan36Row?.fundedYearQtyDelta ?? 0, 0);
@@ -2480,13 +2480,13 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
   console.log('\nAvailable Cash — ladder-wide pool, consumed earliest rung first');
   const dara = 40000, lastYear = 2040;
   const qtyByYear = (availableCash, opts = {}) => {
-    const { details } = runBuild({ dara, lastYear, tipsMap, refCPI, settlementDate, availableCash, ...opts });
+    const { details } = runBuild({ dara, lastYear, tipsMarketData, refCPI, settlementDate, availableCash, ...opts });
     const q = {};
     for (const d of details) if (d.fundedYear) q[d.fundedYear] = (q[d.fundedYear] ?? 0) + (d.fundedYearQty ?? 0);
     return q;
   };
   const totalBuy = (availableCash) =>
-    runBuild({ dara, lastYear, tipsMap, refCPI, settlementDate, availableCash }).summary.totalBuyCost;
+    runBuild({ dara, lastYear, tipsMarketData, refCPI, settlementDate, availableCash }).summary.totalBuyCost;
 
   const base = qtyByYear(0);
   const years = Object.keys(base).map(Number).sort((a, b) => a - b);
@@ -2515,11 +2515,11 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
   assert('Available Cash: works with pre-ladder interest off', qtyByYear(dara * 2.25, { preLadderInterest: false })[y0], 0);
 
   // Rebalance honors it too, through the same canonical sizing pass.
-  const holdings = runBuild({ dara, lastYear, tipsMap, refCPI, settlementDate }).details
+  const holdings = runBuild({ dara, lastYear, tipsMarketData, refCPI, settlementDate }).details
     .filter(d => (d.fundedYearQty ?? 0) + (d.excessQty ?? 0) > 0)
     .map(d => ({ cusip: d.cusip, qty: (d.fundedYearQty ?? 0) + (d.excessQty ?? 0), excessQty: d.excessQty ?? 0 }));
   const rebDara = new Map(years.map(y => [y, dara]));
-  const reb = runFundedRebalance({ dara, holdings, tipsMap, refCPI, settlementDate,
+  const reb = runFundedRebalance({ dara, holdings, tipsMarketData, refCPI, settlementDate,
     daraByYear: rebDara, daraPlanUnedited: false, lastYearOverride: lastYear, availableCash: dara * 2.25 });
   const rebFirst = reb.details.filter(d => d.fundedYear === y0).reduce((t, d) => t + (d.fundedYearQtyAfter ?? 0), 0);
   assert('Available Cash: Rebalance sizes the earliest rung down too', rebFirst, 0);
@@ -2528,7 +2528,7 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
   // longer do. The build/rebalance parity test above runs at zero cash, so the year the pool ran
   // out partway through reported an Amount short by exactly the cash it had been given, and
   // nothing caught it. Compared against build, which is the same ladder by construction.
-  const buildWithCash = runBuild({ dara, lastYear, tipsMap, refCPI, settlementDate, availableCash: dara * 2.25 });
+  const buildWithCash = runBuild({ dara, lastYear, tipsMarketData, refCPI, settlementDate, availableCash: dara * 2.25 });
   const buildAmt = new Map();
   for (const d of buildWithCash.details) if (d.fundedYear) buildAmt.set(d.fundedYear, d.fundedYearAmt);
   let worstAmt = 0, worstAmtY = null;
@@ -2563,7 +2563,7 @@ console.log('\nGap average duration — cost-weighted');
   const _d = new Map();
   for (let y = 2026; y <= 2047; y++) _d.set(y, 40000);
   _d.set(2037, 15000); _d.set(2039, 90000);
-  const { summary: _s } = runBuild({ dara: 40000, lastYear: 2047, tipsMap, refCPI, settlementDate, daraByYear: _d });
+  const { summary: _s } = runBuild({ dara: 40000, lastYear: 2047, tipsMarketData, refCPI, settlementDate, daraByYear: _d });
   const _bd = _s.gapParams.breakdown;
   const _costSum = _bd.reduce((a, g) => a + g.qty * g.costPerBond, 0);
   const _byCost  = _bd.reduce((a, g) => a + g.qty * g.costPerBond * g.dur, 0) / _costSum;
@@ -2583,10 +2583,10 @@ console.log('\nGap Dur popup — the duration match row is computed, not restate
   // not reach the average still displayed as if it had. Feed weights that miss the average on
   // purpose and check the row shows what they actually produce.
   const _dara = 20000;
-  const { details: _bD } = runBuild({ dara: _dara, lastYear: 2057, tipsMap, refCPI, settlementDate });
+  const { details: _bD } = runBuild({ dara: _dara, lastYear: 2057, tipsMarketData, refCPI, settlementDate });
   const _holdings = _bD.map(d => ({ cusip: d.cusip, qty: d.fundedYearQty + d.excessQty, excessQty: d.excessQty }))
                        .filter(h => h.qty > 0);
-  const { summary: _s } = runRebalance({ dara: _dara, bracketMode: '2bracket', holdings: _holdings, tipsMap, refCPI, settlementDate });
+  const { summary: _s } = runRebalance({ dara: _dara, bracketMode: '2bracket', holdings: _holdings, tipsMarketData, refCPI, settlementDate });
   const _rowOf = s => buildDurationPopupRows(s, 'rebal')
     .find(r => typeof r.label === 'string' && r.label.includes('Cost-weighted mean of the bracket year durations'));
 
@@ -2656,7 +2656,7 @@ console.log('\nFuture 30Y Dur popup — cost-weighted average, computed match, c
   // A Future 30Y run long enough that the hypothetical rungs differ in duration and in cost, so a
   // simple mean and a cost-weighted mean are different numbers. The popup labelled its total
   // "Avg (sum / count)" while the value beside it was the cost-weighted one.
-  const { summary: s } = runBuild({ dara: 20000, lastYear: 2062, tipsMap, refCPI, settlementDate });
+  const { summary: s } = runBuild({ dara: 20000, lastYear: 2062, tipsMarketData, refCPI, settlementDate });
   const bd = s.future30yParams.breakdown;
   assert('Future 30Y run spans several years (else this proves nothing)', bd.length > 2, true);
 
@@ -2740,9 +2740,9 @@ console.log('\nFuture 30Y Dur popup — cost-weighted average, computed match, c
   console.log('shape-math — two retained maturity years on real holdings');
   const csv = readFileSync(new URL('./dev/RetainedExcessTwoYears.csv', import.meta.url), 'utf8');
   const holdings = parseHoldings(csv);
-  const ara = computePortfolioARAByYear(holdings, tipsMap, refCPI);
+  const ara = computePortfolioARAByYear(holdings, tipsMarketData, refCPI);
   const years = Object.keys(ara).map(Number).filter(y => ara[y] > 0).sort((a, b) => a - b);
-  const minGap = Math.min(...getGapYears(tipsMap));
+  const minGap = Math.min(...getGapYears(tipsMarketData));
   const inRange = y => y >= 2032 && y < minGap;
   const found = findSpikes(years.map(y => ara[y])).map(x => years[x.index]).filter(inRange);
   assert('both 2034 and 2035 are found', found.join(','), '2034,2035');
@@ -2760,7 +2760,7 @@ console.log('\nFuture 30Y Dur popup — cost-weighted average, computed match, c
   console.log('shape-math — curve baseline vs the median it replaces (real holdings)');
   const csv = readFileSync(new URL('../data/SampleHoldings.csv', import.meta.url), 'utf8');
   const holdings = parseHoldings(csv);
-  const ara = computePortfolioARAByYear(holdings, tipsMap, refCPI);
+  const ara = computePortfolioARAByYear(holdings, tipsMarketData, refCPI);
   const years = Object.keys(ara).map(Number).filter(y => ara[y] > 0).sort((a, b) => a - b);
   const hit = findSpikes(years.map(y => ara[y])).find(x => years[x.index] === 2034);
   assert('2034 is the spike in the lower bracket range', !!hit, true);

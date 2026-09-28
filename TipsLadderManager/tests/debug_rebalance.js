@@ -1,5 +1,5 @@
 
-import { buildTipsMapFromYields, runRebalance, localDate } from './src/rebalance-lib.js';
+import { buildTipsMarketData, runRebalance, localDate } from './src/rebalance-lib.js';
 import { readFileSync } from 'fs';
 
 // YieldsFromFedInvestPrices.csv: row 1 = settlement date, row 2 = header (type,cusip,...,datedDateCpi,...), rows 3+ = data
@@ -11,7 +11,7 @@ const yieldsRows = yieldsAllLines.slice(2).map(line => {
     return { settlementDate: yieldsCsvSettle, cusip: p[1], maturity: p[2], coupon: parseFloat(p[3]), datedDateRefCpi: parseFloat(p[4]), price: parseFloat(p[5]), yield: parseFloat(p[6]) };
 });
 
-const tipsMap = buildTipsMapFromYields(yieldsRows);
+const tipsMarketData = buildTipsMarketData(yieldsRows);
 const settlementDate = localDate(yieldsRows[0].settlementDate);
 const refCPI = 315.549; // approx
 
@@ -25,7 +25,7 @@ const result = runRebalance({
     dara: null,
     method: 'Full',
     holdings: holdingsRaw,
-    tipsMap,
+    tipsMarketData,
     refCPI,
     settlementDate
 });

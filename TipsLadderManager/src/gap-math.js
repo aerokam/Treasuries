@@ -165,14 +165,14 @@ export function laterMatIntContribution(qty, annualInt) {
 // Everything here — anchors, synthetic construction, qty formula, cost-weighted avg
 // duration, gapLMITotal — is identical for both. Returns { avgDuration, totalCost,
 // breakdown, gapLMITotal }.
-export function gapParamsCore({ gapYears, tipsMap, settlementDate, dara, daraByYear = null, lmiAboveByYear = {}, pliCreditByGapYear = {}, amdByYear = null }) {
+export function gapParamsCore({ gapYears, tipsMarketData, settlementDate, dara, daraByYear = null, lmiAboveByYear = {}, pliCreditByGapYear = {}, amdByYear = null }) {
   if (!gapYears || gapYears.length === 0) return { avgDuration: 0, totalCost: 0, breakdown: [], gapLMITotal: 0 };
   const minGapYear = Math.min(...gapYears);
   const maxGapYear = Math.max(...gapYears);
 
   // Anchors: latest-maturing TIPS below the gap (the most recently issued 10-year); nearest Feb TIPS above.
   let anchorBefore = null, anchorAfter = null;
-  for (const bond of tipsMap.values()) {
+  for (const bond of tipsMarketData.values()) {
     if (!bond.maturity || !bond.yield) continue;
     const yr = bond.maturity.getFullYear(), mo = bond.maturity.getMonth() + 1;
     if (yr < minGapYear && (!anchorBefore || bond.maturity > anchorBefore.maturity))
@@ -245,7 +245,7 @@ export function gapParamsCore({ gapYears, tipsMap, settlementDate, dara, daraByY
 // (3-bracket rebalance reuses the same 2-bracket upper weight here — the feedback is a tiny,
 // second-order term and 3-bracket is not round-trip-symmetry-checked against build.)
 export function gapParamsWithUpperFeedback(args) {
-  const { gapYears, tipsMap, settlementDate, refCPI, creditUpperExcess = true } = args;
+  const { gapYears, tipsMarketData, settlementDate, refCPI, creditUpperExcess = true } = args;
   if (!creditUpperExcess || !gapYears?.length || !refCPI) return gapParamsCore(args);
 
   const minGapYear = Math.min(...gapYears), maxGapYear = Math.max(...gapYears);
@@ -253,7 +253,7 @@ export function gapParamsWithUpperFeedback(args) {
   // the gap; upper = nearest Feb TIPS above. Only the UPPER coupon flows up into the gap years
   // (the lower bracket matures before them), so only it feeds back here.
   let lowerBond = null, upperBond = null;
-  for (const b of tipsMap.values()) {
+  for (const b of tipsMarketData.values()) {
     if (!b.maturity || !b.yield) continue;
     const yr = b.maturity.getFullYear(), mo = b.maturity.getMonth() + 1;
     if (yr < minGapYear && (!lowerBond || b.maturity > lowerBond.maturity)) lowerBond = b;
