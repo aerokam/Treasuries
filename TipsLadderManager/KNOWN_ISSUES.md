@@ -546,7 +546,7 @@ per-CUSIP prices for a past date (3.1 §4.0).
   ruled out, reintroduced by this session's own maturity-preference work (`fa3dd30`, `e4a426c`, both
   2026-09-22).
 - **Root cause 1:** `runFundedRebalance`'s self-financing search recovers a broker/legacy mirror's
-  shape via `computePortfolioARAByYear(holdings, tipsMap, refCPI)` called with no year range — the
+  shape via `computePortfolioARAByYear(holdings, tipsMarketData, refCPI)` called with no year range — the
   held-years-only form, which drops an empty interior year from the map entirely rather than giving it
   a zero or near-zero entry. A year missing from the map falls through to `runRebalance`'s scalar-DARA
   fallback and sizes as a full rung — a phantom buy. Those phantom buys then scale up *with* the
