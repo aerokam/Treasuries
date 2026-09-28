@@ -211,9 +211,9 @@ export const CNBC_ROLLOVER_LOG = {
   // the next actual cohort, no special-casing needed), and to every US30YTIPS cohort before
   // the one cross-checked entry below (which is left untouched — more precise than the
   // derived rule for that one case, even though the rule reproduces it exactly). US30YTIPS
-  // is NOT extended earlier than 2023-03-01: 30-Year TIPS issuance itself had a ~9-year dead
-  // stretch (2001-2010) where no 30-Year TIPS existed at all, so a mechanically-derived
-  // "current cohort" for that gap wouldn't correspond to a real, actively-issued bond.
+  // is extended back to 2010-03-01, the first cohort after 30-Year TIPS' own ~9-year issuance
+  // hiatus (2001-2010, no 30-Year TIPS existed at all): earlier than that, a mechanically-derived
+  // "current cohort" wouldn't correspond to a real, actively-issued bond, so it stays a gap.
   US10YTIPS: [
     { from: '1997-02-03', maturity: '2007-01-15' },
     { from: '1998-02-02', maturity: '2008-01-15' },
@@ -271,6 +271,19 @@ export const CNBC_ROLLOVER_LOG = {
     { from: '2026-08-03', maturity: '2036-07-15' }, // current cohort
   ],
   US30YTIPS: [
+    { from: '2010-03-01', maturity: '2040-02-15' }, // issue-date fallback (see note above); first cohort after the 2001-2010 hiatus
+    { from: '2011-03-01', maturity: '2041-02-15' }, // issue-date fallback
+    { from: '2012-03-01', maturity: '2042-02-15' }, // issue-date fallback
+    { from: '2013-03-01', maturity: '2043-02-15' }, // issue-date fallback
+    { from: '2014-03-03', maturity: '2044-02-15' }, // issue-date fallback
+    { from: '2015-03-02', maturity: '2045-02-15' }, // issue-date fallback
+    { from: '2016-03-01', maturity: '2046-02-15' }, // issue-date fallback
+    { from: '2017-03-01', maturity: '2047-02-15' }, // issue-date fallback
+    { from: '2018-03-01', maturity: '2048-02-15' }, // issue-date fallback
+    { from: '2019-03-01', maturity: '2049-02-15' }, // issue-date fallback
+    { from: '2020-03-02', maturity: '2050-02-15' }, // issue-date fallback
+    { from: '2021-03-01', maturity: '2051-02-15' }, // issue-date fallback
+    { from: '2022-03-01', maturity: '2052-02-15' }, // issue-date fallback
     { from: '2023-03-01', maturity: '2053-02-15' }, // issue-date fallback (see note above)
     { from: '2024-03-01', maturity: '2054-02-15' }, // issue-date fallback
     { from: '2025-03-03', maturity: '2055-02-15' }, // issue-date fallback — this transition was ambiguous under the empirical cross-check (same pattern as the Feb 2025 US1YTIPS gap) and wasn't cross-checkable
