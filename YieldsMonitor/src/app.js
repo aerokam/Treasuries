@@ -6,6 +6,7 @@ import { saFactorForDate, maturitySaFactor } from '../../shared/src/ref-cpi.js';
 import { parseCsv } from '../../shared/src/csv.js';
 import { localDate, toIsoDate, nextBusinessDay, parseHolidaySet } from '../../shared/src/settlement.js';
 import { resolveTipsBond } from './cnbc-rollover-log.js';
+import { layerCustomSeries, archiveDatesToRead, customBounds, showMarkers, countVisible } from './custom-series.js';
 
 const AVAILABLE_SYMBOLS = {
   // TIPS
@@ -63,6 +64,11 @@ const charts = {};
 const liveCache = {};
 const historyCache = {};
 const rangeData = {};
+// The Time Series charts' own series where it differs from rangeData: only a Custom range's
+// checked symbols, at the finest resolution available (see fetchCustomChartSeries). The Yield
+// Curves and Breakeven Inflation tabs always read rangeData, which holds one value per day.
+const chartData = {};
+function chartSeries(sym) { return chartData[sym] ?? rangeData[sym]; }
 // Tracked separately, not as one combined value: TIPS and Nominal Treasuries can genuinely
 // diverge in freshness (e.g. a CNBC outage affecting only TIPS symbols, observed 2026-08-22),
 // and a single combined "Latest data" reading would either overclaim freshness for the group
@@ -377,7 +383,7 @@ function setupUI() {
     updateAllData(true);
     if (showSaYieldTS || showSaYieldCurve) { tipsBondMeta = await fetchTipsBondMeta(true); refreshSaOverlays(); updateYieldCurves(); }
   });
-  document.getElementById('resetAllZoom').addEventListener('click', () => { yOverrideSyms.clear(); isUpdatingData = true; Object.entries(charts).forEach(([sym, chart]) => applyDefaultBounds(sym, chart, rangeData[sym])); isUpdatingData = false; });
+  document.getElementById('resetAllZoom').addEventListener('click', () => { yOverrideSyms.clear(); isUpdatingData = true; Object.entries(charts).forEach(([sym, chart]) => applyDefaultBounds(sym, chart, chartSeries(sym))); isUpdatingData = false; });
 }
 
 function syncChartContainers() {
@@ -400,17 +406,31 @@ function syncChartContainers() {
   setTimeout(() => Object.values(charts).forEach(c => c.resize()), 0);
 }
 
+// Draws a series' points as markers only while adjacent visible points are far enough apart to be
+// told apart (see knowledge/Visual_Standards.md). Runs on every update, so a zoom or pan re-decides.
+const POINT_MARKER_RADIUS = 2.5;
+const pointMarkerPlugin = {
+  id: 'pointMarkers',
+  beforeDatasetsUpdate(chart) {
+    const x = chart.scales.x, width = chart.chartArea && chart.chartArea.width;
+    if (!x || !width) return;
+    chart.$markerRadius = chart.data.datasets.map(ds => showMarkers(countVisible(ds.data, x.min, x.max), width) ? POINT_MARKER_RADIUS : 0);
+  }
+};
+const markerRadius = ctx => (ctx.chart.$markerRadius && ctx.chart.$markerRadius[ctx.datasetIndex]) || 0;
+
 function createChartInstance(sym) {
   const ctx = document.getElementById(`chart-${sym}`).getContext('2d');
   const color = COLORS[Object.keys(AVAILABLE_SYMBOLS).indexOf(sym) % COLORS.length];
-  const saDataset = SA_SYMBOLS.has(sym) ? [{ label: `${sym} SA`, data: [], borderColor: SA_COLOR, backgroundColor: 'transparent', borderWidth: 1.5, pointRadius: 0, pointHoverRadius: 4, fill: false, tension: 0.1 }] : [];
+  const saDataset = SA_SYMBOLS.has(sym) ? [{ label: `${sym} SA`, data: [], borderColor: SA_COLOR, backgroundColor: 'transparent', pointBackgroundColor: SA_COLOR, borderWidth: 1.5, pointRadius: markerRadius, pointHoverRadius: 4, fill: false, tension: 0.1 }] : [];
   charts[sym] = new Chart(ctx, {
     type: 'line',
-    data: { datasets: [{ label: sym, data: [], borderColor: color, backgroundColor: color + '1A', borderWidth: 1.5, pointRadius: 0, pointHoverRadius: 4, fill: false, tension: 0.1, segment: { borderColor: ctx => { if (activeRange !== '2D' && activeRange !== '10D') return color; const mid = (ctx.p0.parsed.x + ctx.p1.parsed.x) / 2; return (isAfterHoursEt(mid) || isWeekendEt(new Date(mid))) ? color + '55' : color; } } }, ...saDataset] },
+    plugins: [pointMarkerPlugin],
+    data: { datasets: [{ label: sym, data: [], borderColor: color, backgroundColor: color + '1A', pointBackgroundColor: color, borderWidth: 1.5, pointRadius: markerRadius, pointHoverRadius: 4, fill: false, tension: 0.1, segment: { borderColor: ctx => { if (activeRange !== '2D' && activeRange !== '10D') return color; const mid = (ctx.p0.parsed.x + ctx.p1.parsed.x) / 2; return (isAfterHoursEt(mid) || isWeekendEt(new Date(mid))) ? color + '55' : color; } } }, ...saDataset] },
     options: {
       animation: false, responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
       scales: {
-        x: { type: 'time', time: { tooltipFormat: 'MM/dd/yy HH:mm:ss', displayFormats: { hour: 'MM/dd HH:mm', day: 'MMM dd', month: 'MMM yyyy', year: 'yyyy' } }, grid: { color: '#f1f5f9' }, ticks: { autoSkip: true, font: { size: 9, weight: 'bold' }, color: '#000', callback(value, index, ticks) { const d = new Date(value); if (activeRange === '2D') { const p = ET_HM_FMT.formatToParts(d).reduce((a, pt) => ({...a, [pt.type]: pt.value}), {}); return `${p.month}/${p.day} ${p.hour}:${p.minute}`; } if (activeRange === '10D') return ET_TICK_DAY_FMT.format(d); if ((this.max - this.min) < 90 * 86400000) { const label = ET_TICK_DAY_FMT.format(d); if (index > 0 && ET_TICK_DAY_FMT.format(new Date(ticks[index - 1].value)) === label) return ''; return label; } const label = ET_TICK_MON_FMT.format(d); if (index > 0 && ET_TICK_MON_FMT.format(new Date(ticks[index - 1].value)) === label) return ''; return label; } } },
+        x: { type: 'time', time: { tooltipFormat: 'MM/dd/yy HH:mm:ss', displayFormats: { hour: 'MM/dd HH:mm', day: 'MMM dd', month: 'MMM yyyy', year: 'yyyy' } }, grid: { color: '#f1f5f9' }, ticks: { autoSkip: true, font: { size: 9, weight: 'bold' }, color: '#000', callback(value, index, ticks) { const d = new Date(value); if (activeRange === '2D') { const p = ET_HM_FMT.formatToParts(d).reduce((a, pt) => ({...a, [pt.type]: pt.value}), {}); return `${p.month}/${p.day} ${p.hour}:${p.minute}`; } if (activeRange === '10D') return ET_TICK_DAY_FMT.format(d); if ((this.max - this.min) < 3 * 86400000) { const p = ET_HM_FMT.formatToParts(d).reduce((a, pt) => ({...a, [pt.type]: pt.value}), {}); return `${p.month}/${p.day} ${p.hour}:${p.minute}`; } if ((this.max - this.min) < 90 * 86400000) { const label = ET_TICK_DAY_FMT.format(d); if (index > 0 && ET_TICK_DAY_FMT.format(new Date(ticks[index - 1].value)) === label) return ''; return label; } const label = ET_TICK_MON_FMT.format(d); if (index > 0 && ET_TICK_MON_FMT.format(new Date(ticks[index - 1].value)) === label) return ''; return label; } } },
         y: { grid: { color: '#f1f5f9' }, ticks: { font: { size: 9, family: 'monospace', weight: 'bold' }, color: '#000', callback: v => v.toFixed(3) + '%' } }
       },
       plugins: { legend: { display: false }, zoom: { zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'xy', onZoom: ({chart}) => { if (lockRight) applyLockRight(chart, xMaxAnchors[sym]); if (syncXAxis) syncAllChartsX(chart); }, onZoomComplete: ({chart}) => { if (lockRight) applyLockRight(chart, xMaxAnchors[sym]); if (activeRange !== '2D' && activeRange !== '10D') applyXTimeUnit(chart); rescaleYToVisible(chart, sym); if (syncXAxis) syncAllChartsX(chart); } }, pan: { enabled: true, mode: 'xy', onPanStart: ({chart}) => { Object.entries(charts).forEach(([s, c]) => { panStartY[s] = { min: c.scales.y.min, max: c.scales.y.max }; }); }, onPan: ({chart}) => { if (syncXAxis) syncAllCharts(chart); }, onPanComplete: ({chart}) => { if (activeRange !== '2D' && activeRange !== '10D') applyXTimeUnit(chart); rescaleYToVisible(chart, sym); if (syncXAxis) syncAllCharts(chart); Object.keys(panStartY).forEach(k => delete panStartY[k]); } } }, annotation: { annotations: {} }, tooltip: { backgroundColor: 'rgba(255, 255, 255, 0.95)', titleColor: '#64748b', titleFont: { size: 11, weight: 'bold' }, bodyColor: '#000', borderColor: '#cbd5e1', borderWidth: 1, padding: 8, bodyFont: { size: 12, weight: 'bold' }, cornerRadius: 6, displayColors: false, callbacks: { title: (items) => { if (!items.length) return ''; const date = new Date(items[0].parsed.x); return date.toLocaleString('en-US', { timeZone: 'America/New_York', hourCycle: 'h23', month: '2-digit', day: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' ET'; }, label: ctx => `${ctx.datasetIndex === 1 ? 'SA Yield' : 'Yield'}: ${ctx.parsed.y.toFixed(3)}%` } } }
@@ -735,7 +755,7 @@ function refreshSaOverlays(forceRescale = false) {
   SA_SYMBOLS.forEach(sym => {
     const chart = charts[sym];
     if (chart && chart.data.datasets[1]) {
-      chart.data.datasets[1].data = showSaYieldTS ? computeSaSeries(sym, rangeData[sym]) : [];
+      chart.data.datasets[1].data = showSaYieldTS ? computeSaSeries(sym, chartSeries(sym)) : [];
       if (forceRescale || !yOverrideSyms.has(sym)) rescaleYToVisible(chart, sym);
       else chart.update('none');
     }
@@ -756,7 +776,7 @@ function refreshQuotedOverlays(forceRescale = false) {
   SA_SYMBOLS.forEach(sym => {
     const chart = charts[sym];
     if (!chart || !chart.data.datasets[0]) return;
-    chart.data.datasets[0].data = showQuotedYieldTS ? (rangeData[sym] || []) : [];
+    chart.data.datasets[0].data = showQuotedYieldTS ? (chartSeries(sym) || []) : [];
     if (forceRescale || !yOverrideSyms.has(sym)) rescaleYToVisible(chart, sym);
     else chart.update('none');
   });
@@ -946,6 +966,56 @@ async function fetchLive(symbol, range) {
   }
 }
 
+// A day's archive file never changes once written, so a fetched file is kept for the session; a
+// missing or failed read is not kept, so a later update retries it.
+const archiveMinuteCache = new Map();
+async function fetchArchiveMinuteBars(symbol, dateStr) {
+  const key = `${symbol}|${dateStr}`;
+  if (!archiveMinuteCache.has(key)) {
+    archiveMinuteCache.set(key, (async () => {
+      const archive = await fetchIntradayArchiveDay(symbol, dateStr);
+      const bars = archive?.feeds?.['1D']?.bars;
+      if (!bars || bars.length === 0) { archiveMinuteCache.delete(key); return null; }
+      return bars.map(b => ({ x: parseSourceTime(b.raw), y: parseFloat(String(b.close).replace('%', '')) })).filter(p => p.x && !isNaN(p.x) && !isNaN(p.y));
+    })());
+  }
+  return archiveMinuteCache.get(key);
+}
+
+function etYmdKey(date) { const [m, d, y] = getEtDateStr(date).split('/'); return `${y}${m.padStart(2, '0')}${d.padStart(2, '0')}`; }
+function nextYmd(s) { return new Date(Date.UTC(+s.slice(0, 4), +s.slice(4, 6) - 1, +s.slice(6, 8) + 1)).toISOString().slice(0, 10).replace(/-/g, ''); }
+function isWeekendYmd(s) { return [0, 6].includes(new Date(Date.UTC(+s.slice(0, 4), +s.slice(4, 6) - 1, +s.slice(6, 8))).getUTCDay()); }
+
+// The Time Series chart series for a Custom range: `daily` (what fetchOne assembled) layered with
+// the finest bars available, one-minute from the live 1D feed and the Intraday archive (S18),
+// five-minute from the live 5D feed, per knowledge/2.1_Assemble_Range_Data.md (2.1.4).
+async function fetchCustomChartSeries(symbol, daily, force) {
+  const startMs = customStartDate ? customStartDate.getTime() : 0, endMs = customEndDate ? customEndDate.getTime() : Date.now();
+  const now = Date.now(), todayStr = etYmdKey(new Date(now));
+  const fiveMin = liveCache[`${symbol}_5Dtip`] || [];
+  let liveMinute = [];
+  if (endMs > now - 5 * 86400000) {
+    const key = `${symbol}_1D`;
+    if (force || !liveCache[key]) { const live = await fetchLive(symbol, '1D'); if (live && live.length > 0) liveCache[key] = live; }
+    liveMinute = (liveCache[key] || []).filter(p => +p.x >= startMs && +p.x < endMs);
+  }
+  const liveFirst = liveMinute.length > 0 ? etYmdKey(liveMinute[0].x) : null;
+  // The window's most recent weekdays, oldest first: enough to cover the archive read cap plus
+  // the days the live feed already covers.
+  const weekdays = [];
+  const lastMs = Math.min(endMs, now) - 1;
+  for (let back = 0; back < 25; back++) {
+    const dayMs = lastMs - back * 86400000;
+    if (dayMs < startMs) break;
+    const ds = etYmdKey(new Date(dayMs));
+    if (!isWeekendYmd(ds) && !weekdays.includes(ds)) weekdays.unshift(ds);
+  }
+  const dates = archiveDatesToRead(weekdays, liveFirst, todayStr, nextYmd).filter(ds => !isWeekendYmd(ds));
+  const archived = await Promise.all(dates.map(ds => fetchArchiveMinuteBars(symbol, ds)));
+  const minute = liveMinute.concat(...archived.filter(Boolean));
+  return layerCustomSeries({ daily, fiveMin, minute, startMs, endMs, etDay: getEtDateStr, isWeekend: isWeekendEt });
+}
+
 function snapXMax(date) {
   const d = new Date(date);
   if (activeRange === '2D') { d.setTime(d.getTime() + 15 * 60 * 1000); }
@@ -975,19 +1045,19 @@ function applyDefaultBounds(sym, chart, data) {
     const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 10);
     chart.options.scales.x.min = cutoff.getTime();
   } else {
-    chart.options.scales.x.min = (activeRange === 'Custom' && customStartDate) ? customStartDate.getTime() : data[0].x.getTime();
+    chart.options.scales.x.min = activeRange === 'Custom' ? customBounds(data).min : data[0].x.getTime();
   }
   chart.options.scales.x.max = xMaxAnchors[sym] ?? snapXMax(data[data.length-1].x).getTime();
   if (activeRange !== '2D' && activeRange !== '10D') {
     // Use data bounds directly — chart.scales.x.min may be uninitialized on first load
-    chart.options.scales.x.time.unit = getXTimeUnit(chart.options.scales.x.max - data[0].x.getTime());
+    chart.options.scales.x.time.unit = getXTimeUnit(chart.options.scales.x.max - chart.options.scales.x.min);
   }
   chart.update('none');
   rescaleYToVisible(chart, sym);
 }
 
 function rescaleYToVisible(chart, sym) {
-  const raw = rangeData[sym]; if (!raw || raw.length === 0) return;
+  const raw = chartSeries(sym); if (!raw || raw.length === 0) return;
   const xMin = chart.options.scales.x.min ?? chart.scales.x.min, xMax = chart.options.scales.x.max ?? chart.scales.x.max;
   // Bounds are fit only to whichever line(s) are actually shown — the "Show TIPS yields"
   // toggles (Quoted/SA) hide a line's chart.data but rangeData[sym] always has the raw
@@ -1053,6 +1123,8 @@ async function fetchAllData(force = false) {
     Promise.all(allSyms.map(async sym => {
       const data = await fetchOne(sym, activeRange, force);
       rangeData[sym] = data;
+      if (activeRange === 'Custom' && activeSymbols.has(sym)) chartData[sym] = await fetchCustomChartSeries(sym, data || [], force);
+      else delete chartData[sym];
       const isTips = sym.endsWith('TIPS');
       const tsList = isTips ? tsListTips : tsListNominal;
       if (data && data.length > 0) tsList.push(data[data.length - 1].x);
@@ -1105,7 +1177,7 @@ function updateCharts() {
   isUpdatingData = true;
 
   Object.keys(charts).forEach(sym => {
-    const data = rangeData[sym], chart = charts[sym], card = document.getElementById(`card-${sym}`);
+    const data = chartSeries(sym), chart = charts[sym], card = document.getElementById(`card-${sym}`);
     if (!data || data.length === 0) {
       if (chart) { chart.data.datasets[0].data = []; chart.update(); }
       if (card && !card.querySelector('.no-data-overlay')) {
@@ -1141,7 +1213,7 @@ function updateCharts() {
       // otherwise the dashed stale-bridge line drawn above wouldn't be visible without the
       // user manually panning/zooming to find it.
       const staleTo = (activeRange === '2D' || activeRange === '10D') && staleQuoteTime(sym, data);
-      xMaxAnchors[sym] = (activeRange === 'Custom' && customEndDate) ? customEndDate.getTime() : snapXMax(staleTo ? new Date() : data[data.length - 1].x).getTime();
+      xMaxAnchors[sym] = activeRange === 'Custom' ? customBounds(data).max : snapXMax(staleTo ? new Date() : data[data.length - 1].x).getTime();
       applyDefaultBounds(sym, chart, data);
     }
 

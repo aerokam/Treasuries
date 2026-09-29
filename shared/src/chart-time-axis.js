@@ -4,12 +4,14 @@ const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
 
 // Returns the Chart.js time unit appropriate for the given visible span.
 // Thresholds match the tick label format rules in YieldsMonitor/knowledge/2.5_Render_Time_Series.md:
+//   < 6 hours → 'minute' (a zoomed-in intraday window)
 //   < 3 days  → 'hour'  (intraday, 2D range)
 //   < 90 days → 'day'   (MMM D labels)
 //   ≤ 548 days → 'month' (~18 months; MMM YYYY labels)
 //   > 548 days → 'year'  (MMM YYYY labels, annual grid)
 export function getXTimeUnit(spanMs) {
   const days = spanMs / DAY_MS;
+  if (days < 0.25) return 'minute';
   if (days < 3) return 'hour';
   if (days < 90) return 'day';
   if (days <= 548) return 'month';

@@ -20,6 +20,10 @@ Every chart, on every tab, supports the same navigation, from `shared/src/chart-
 - Click and drag: pans in any direction.
 - Keyboard arrows and +/-: pans or zooms around the chart's current center.
 
+## Data point markers
+
+Every Time Series chart draws each of its series' points as a marker, radius 2.5 px, while adjacent visible points are at least 8 px apart across the plot area, and draws only the line otherwise. The decision is made again on every update, so a zoom or pan that spreads the points apart shows the markers and one that bunches them hides them. Implemented by `YieldsMonitor/src/custom-series.js#showMarkers`.
+
 ## Sync Zoom & Pan
 
 A sidebar toggle, on by default, for the Time Series tab's own charts only — the Yield Curves and Breakeven Inflation tabs each hold a single chart, so there is nothing to synchronize there.
