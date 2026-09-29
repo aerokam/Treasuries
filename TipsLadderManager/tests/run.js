@@ -2044,16 +2044,17 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
 }
 
 // ── Within-Year Allocation Policy (2.0 §Within-Year Allocation Policy; the E invariant) ───────
-// SampleHoldings.csv's real funded year 2027 holds THREE maturities: Jan (912828V49), Apr
-// (91282CEJ6), Oct (91282CFR7) -- used exactly as-is, unfiltered, since this file mirrors real
-// IRA holdings and must never be trimmed/altered to fit a test's convenience. Baseline DARA
+// tests/dev/AllocationPolicyThreeMaturities2027.csv is a frozen copy of SampleHoldings.csv from before
+// the real IRA sold its Jan 2027 TIPS. Its funded year 2027 holds THREE maturities: Jan (912828V49), Apr
+// (91282CEJ6), Oct (91282CFR7). The live SampleHoldings.csv tracks the real account, so it no longer
+// holds all three and cannot supply this scenario. Baseline DARA
 // mirrors runFullRebalanceTest's own self-financing scale, so "need unchanged" genuinely means
 // zero ladder-wide trades, not just an arbitrary raw-ARA mirror. All magnitudes below were
 // verified empirically against this real data (not guessed).
 {
-  const fullPath = path.resolve('./data/SampleHoldings.csv');
+  const fullPath = path.resolve('./tests/dev/AllocationPolicyThreeMaturities2027.csv');
   if (existsSync(fullPath)) {
-    console.log('\nWithin-Year Allocation Policy (SampleHoldings, funded year 2027: Jan + Apr + Oct)');
+    console.log('\nWithin-Year Allocation Policy (AllocationPolicyThreeMaturities2027, funded year 2027: Jan + Apr + Oct)');
     const holdings = parseHoldings(readFileSync(fullPath, 'utf8'));
     const rawARA = computePortfolioARAByYear(holdings, tipsMarketData, refCPI);
     const bracketCandidates = getGapYearBracketCandidates(tipsMarketData);
