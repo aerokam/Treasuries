@@ -247,23 +247,23 @@ function runFullRebalanceTest(name, filePath) {
 runFullRebalanceTest('SampleHoldings (richest IRA)', './data/SampleHoldings.csv');
 
 // 1b. Cross-check bug #6 (2034 retained-bracket excess not detected pre-Run) against the committed
-// SampleHoldings.csv fixture too, not just the inline real-holdings array elsewhere in this file —
-// same real-holdings shape (2034/2036 pattern), independently loaded from disk.
+// tests/dev/SampleHoldingsSnapshot.csv (frozen copy of SampleHoldings.csv from 2026-09-28), not the live file: it tracks the real account and changes as the account is rebalanced —
+// so it cannot back an assertion about which years are flagged.
 {
-  const fullPath = path.resolve('./data/SampleHoldings.csv');
+  const fullPath = path.resolve('./tests/dev/SampleHoldingsSnapshot.csv');
   if (existsSync(fullPath)) {
-    console.log('\nSampleHoldings.csv — bug #6 cross-check (2034 retained-bracket flag)');
+    console.log('\nSampleHoldingsSnapshot.csv — bug #6 cross-check (2034 retained-bracket flag)');
     const holdings = parseHoldings(readFileSync(fullPath, 'utf8'));
     const heldARA = computePortfolioARAByYear(holdings, tipsMarketData, refCPI);
     const flags = detectBracketFlags({ heldARAByYear: heldARA, tipsMarketData, lastYear: 2056 });
-    assert('SampleHoldings.csv: 2034 is flagged as retained-bracket excess (not 2036)', flags.has(2034), true);
+    assert('Snapshot: 2034 is flagged as retained-bracket excess (not 2036)', flags.has(2034), true);
     // 2036 no longer registers as a curve-method spike at this portfolio's current scale (it did
     // under the flat median this replaces): its ARA stands only ~2.7 robust scales above the
     // ladder's own fitted curve, short of the k=4 threshold findSpikes flags at (ruling 1,
     // RETAINED_BRACKET_TODO.md — the active lower bracket is EXPECTED to legitimately carry real
     // funded income on top of any gap-coverage excess, so sitting close to its own curve here is
     // not a detection miss).
-    assert('SampleHoldings.csv: 2036 (active lower bracket) does not register as a curve-method spike here', flags.has(2036), false);
+    assert('Snapshot: 2036 (active lower bracket) does not register as a curve-method spike here', flags.has(2036), false);
     if (flags.has(2034)) console.log('        2034 flag: value=' + Math.round(flags.get(2034).value) + '  excess=' + Math.round(flags.get(2034).excess));
   }
 }
@@ -2044,7 +2044,7 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
 }
 
 // ── Within-Year Allocation Policy (2.0 §Within-Year Allocation Policy; the E invariant) ───────
-// tests/dev/AllocationPolicyThreeMaturities2027.csv is a frozen copy of SampleHoldings.csv from before
+// tests/dev/SampleHoldingsSnapshot.csv is a frozen copy of SampleHoldings.csv from before
 // the real IRA sold its Jan 2027 TIPS. Its funded year 2027 holds THREE maturities: Jan (912828V49), Apr
 // (91282CEJ6), Oct (91282CFR7). The live SampleHoldings.csv tracks the real account, so it no longer
 // holds all three and cannot supply this scenario. Baseline DARA
@@ -2052,9 +2052,9 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
 // zero ladder-wide trades, not just an arbitrary raw-ARA mirror. All magnitudes below were
 // verified empirically against this real data (not guessed).
 {
-  const fullPath = path.resolve('./tests/dev/AllocationPolicyThreeMaturities2027.csv');
+  const fullPath = path.resolve('./tests/dev/SampleHoldingsSnapshot.csv');
   if (existsSync(fullPath)) {
-    console.log('\nWithin-Year Allocation Policy (AllocationPolicyThreeMaturities2027, funded year 2027: Jan + Apr + Oct)');
+    console.log('\nWithin-Year Allocation Policy (SampleHoldingsSnapshot, funded year 2027: Jan + Apr + Oct)');
     const holdings = parseHoldings(readFileSync(fullPath, 'utf8'));
     const rawARA = computePortfolioARAByYear(holdings, tipsMarketData, refCPI);
     const bracketCandidates = getGapYearBracketCandidates(tipsMarketData);
@@ -2759,7 +2759,7 @@ console.log('\nFuture 30Y Dur popup — cost-weighted average, computed match, c
 {
   console.log('');
   console.log('shape-math — curve baseline vs the median it replaces (real holdings)');
-  const csv = readFileSync(new URL('../data/SampleHoldings.csv', import.meta.url), 'utf8');
+  const csv = readFileSync(new URL('./dev/SampleHoldingsSnapshot.csv', import.meta.url), 'utf8');
   const holdings = parseHoldings(csv);
   const ara = computePortfolioARAByYear(holdings, tipsMarketData, refCPI);
   const years = Object.keys(ara).map(Number).filter(y => ara[y] > 0).sort((a, b) => a - b);
