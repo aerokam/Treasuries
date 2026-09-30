@@ -22,7 +22,7 @@ Every chart, on every tab, supports the same navigation, from `shared/src/chart-
 
 ## Data point markers
 
-Every Time Series chart draws each of its series' points as a marker, radius 2.5 px, while adjacent visible points are at least 8 px apart across the plot area, and draws only the line otherwise. The decision is made again on every update, so a zoom or pan that spreads the points apart shows the markers and one that bunches them hides them. Implemented by `YieldsMonitor/src/custom-series.js#showMarkers`.
+Every Time Series chart draws each of its series' points as a marker, radius 2.5 px, while adjacent visible points are at least 8 px apart across the plot area, and draws only the line otherwise. The decision is made again on every update, so a zoom or pan that spreads the points apart shows the markers and one that bunches them hides them. A series may draw 8 px past the plot area's right edge, so the marker of a point at that edge is drawn whole. Implemented by `YieldsMonitor/src/custom-series.js#showMarkers`.
 
 ## Sync Zoom & Pan
 
