@@ -43,9 +43,10 @@ assert.equal(got.includes('20260807'), false);  // the 5 oldest weekdays are out
 assert.equal(got.includes('20260810'), true);   // first of the 10 most recent
 assert.equal(got.includes('20260822'), true);   // the day after the last one, for its evening bars
 
-// bounds run first to last point; a single timestamp gets one minute either side
+// bounds run first point to last point plus the right padding, in time (8 px of a 800 px plot = 1% of the span)
 assert.equal(customBounds([]), null);
 assert.deepEqual(customBounds([{ x: new Date(1000000) }, { x: new Date(11000000) }]), { min: 1000000, max: 11000000 });
+assert.deepEqual(customBounds([{ x: new Date(1000000) }, { x: new Date(11000000) }], 8, 800), { min: 1000000, max: 11000000 + 100000 });
 assert.deepEqual(customBounds([{ x: new Date(5000000) }]), { min: 5000000 - 60000, max: 5000000 + 60000 });
 
 // markers appear once adjacent visible points are at least 8 px apart
