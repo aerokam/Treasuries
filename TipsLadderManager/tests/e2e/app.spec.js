@@ -2240,3 +2240,19 @@ test('Gap Dur popup: a bracket weight drill reports the same weight as the row i
     await expect(nested).toBeHidden();
   }
 });
+
+// Regression: a ladder built over the gap years alone (2037-2039) holds its lower bracket in 2036 and its
+// upper bracket in 2040, both outside First Year to Last Year. Those groups were appended after the in-range
+// ones, so the table read 2037, 2038, 2039, 2036*, 2040*. Funded years always display in ascending order.
+test('build: gap-years-only ladder lists funded years in ascending order, bracket years included', async ({ page }) => {
+  await page.locator('.tab-btn[data-mode="build"]').click();
+  await page.locator('#first-year').selectOption({ value: '2037' });
+  await page.locator('#last-year').selectOption({ value: '2039' });
+  await page.locator('#run-btn').click();
+  await expect(page.locator('#build-output')).toHaveCSS('display', 'block', { timeout: 4_000 });
+  const years = await page.locator('#build-table tr.fy-group-header').evaluateAll(rows => rows.map(r => Number(r.dataset.fy)));
+  expect(years.length, 'the gap years and both brackets are listed').toBeGreaterThanOrEqual(5);
+  expect(years, 'ascending funded-year order').toEqual([...years].sort((a, b) => a - b));
+  expect(years).toContain(2036);
+  expect(years).toContain(2040);
+});
