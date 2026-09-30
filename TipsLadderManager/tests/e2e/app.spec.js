@@ -70,7 +70,7 @@ async function daraDisplay(page) {
   return placeholder === 'by year' ? 'by year' : '';
 }
 
-// Import/Export are a button+popup, not a native <select> (2.1 §Import/Export Menus — WebKit doesn't
+// Import/Export are a button+popup, not a native <select> (6.0 §Import/Export Menus — WebKit doesn't
 // carry a strong enough user gesture through a <select>'s 'change' event to open a file picker/save).
 // `menu` is 'import-menu' or 'export-menu'; `choice` is the target item's data-choice value.
 async function chooseMenu(page, menu, choice) {

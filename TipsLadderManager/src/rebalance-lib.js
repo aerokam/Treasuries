@@ -532,7 +532,7 @@ export function derivePerYearDara(araByYear, bracketCandidates = new Set(), gapY
 }
 
 // Parse the optional `#fundedYear,dara` metadata block appended to our own export files
-// (see 2.1 Broker Import). Returns Map<year, dara> — the durable build intent for EVERY year
+// (4.2.2 Parse DARA plan and parameters). Returns Map<year, dara> — the durable build intent for EVERY year
 // in [firstYear, lastYear], incl. gap + future-30Y — or null if absent. When present, the
 // import honors it directly (exact round-trip, no DARA/last-year inference). Backward-compatible:
 // the holdings parsers skip these lines (they aren't valid CUSIP rows). Uses the same
@@ -555,8 +555,8 @@ export function parseFundedYearDaraBlock(rawLines) {
 // construction parameters that per-year DARA does NOT encode but that still change the target
 // ladder — chiefly `preLadderInterest` (PLI zeroes early rungs), `maturityPref` (which bond
 // per year), and `couponPref` (which issue wins a same-month two-issue tie). On import these set
-// the UI controls so a round-trip reconstructs exactly; the user may then override them (see 2.1
-// Broker Import). Returns null when absent (broker/legacy files).
+// the UI controls so a round-trip reconstructs exactly; the user may then override them (see
+// 4.2.2 Parse DARA plan and parameters). Returns null when absent (broker/legacy files).
 export function parseParamsBlock(rawLines) {
   for (const line of rawLines) {
     const norm = line.replace(/\s/g, '').toLowerCase();
@@ -569,7 +569,7 @@ export function parseParamsBlock(rawLines) {
       else if (/^maturitypref$/i.test(k)) out.maturityPref = /^(first|semiannual|all)$/i.test(v) ? v.toLowerCase() : 'last';
       else if (/^couponpref$/i.test(k)) out.couponPref = /^lower$/i.test(v) ? 'lower' : 'higher';
       // `rmdCashOverride` is the superseded key for the same figure, read as an alias so files
-      // written before Available Cash went ladder-wide keep working (2.1 §`#params` line).
+      // written before Available Cash went ladder-wide keep working (4.2.2 Parse DARA plan and parameters).
       else if (/^(availablecash|rmdcashoverride)$/i.test(k)) { const n = parseFloat(v); if (!isNaN(n) && n >= 0) out.availableCash = n; }
       else if (/^rmdcouponmode$/i.test(k)) out.rmdCouponMode = /^(none|last)$/i.test(v) ? v.toLowerCase() : 'all';
       // The Ref CPI date the file's DARA values are denominated at (3.0 §DARA Reference Date).
@@ -582,7 +582,7 @@ export function parseParamsBlock(rawLines) {
 
 // BEST-EFFORT per-year DARA recovery for files that carry NO explicit DARA (broker imports,
 // legacy Format-5 exports, tipsladder Format-4). Our own current exports carry an explicit
-// `#fundedYear,dara` block (see 2.1 Broker Import) and bypass this entirely — for those the
+// `#fundedYear,dara` block (see 2.1 Export) and bypass this entirely — for those the
 // round-trip is exact by construction. This path only estimates a self-financing per-year
 // DARA from the held quantities, which is inherently lossy where build hid the DARA (e.g.
 // PLI-zeroed years) — hence "best effort".
@@ -2394,7 +2394,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
   const HDR = ['CUSIP','Qty','Maturity','FY','Principal','Interest','ARA','Cost','Target Qty','Qty Delta','Target Cost','Cost Delta','ARA (Before)','ARA-DARA Before','ARA (After)','ARA-DARA After','Excess ARA Before','Excess ARA After','Incoming LMI','Excess Interest','Funded PI'];
 
   // Resolved per-year DARA for EVERY year in [firstYear, lastYear] (incl. gap + future-30Y).
-  // Persisted on export as the `#fundedYear,dara` block so a re-import is exact. See 2.1 Broker Import.
+  // Persisted on export as the `#fundedYear,dara` block so a re-import is exact. See 2.1 Export.
   const daraByYearResolved = new Map();
   for (let y = firstYear; y <= lastYear; y++) daraByYearResolved.set(y, daraByYear?.get(y) ?? DARA);
 

@@ -71,6 +71,7 @@ const TERMS = {
   'live quotes': 'live-quotes', 'yield series': 'yield-series', 'day change': 'day-change',
   'TIPS market data': 'tips-market-data',
   'SA yield series': 'sa-yield-series',
+  'imported file': 'imported-file', 'holdings': 'holdings', 'DARA plan': 'dara-plan',
 };
 const unlinked = new Set();
 function labelMarkup(text) {
@@ -1069,11 +1070,10 @@ function level3TipsLadderManagerLoadMarketData() {
 
 // ── Level 3: TipsLadderManager 4.2 ──────────────────────────────────────────
 function level3TipsLadderManagerImport() {
-  const R = 'TipsLadderManager/knowledge/2.1_Broker_Import.md';
-  const PLACEHOLDER = V(R);
+  const S = a => V('TipsLadderManager/knowledge/4.2_Import_Holdings_And_DARA_Plan.md' + (a ? '#' + a : ''));
   const procs = [
-    { id: '4.2.1', name: ['Detect and parse', 'holdings file'], href: PLACEHOLDER, out: {} },
-    { id: '4.2.2', name: ['Parse DARA plan', 'and parameters'], href: PLACEHOLDER, out: {} },
+    { id: '4.2.1', name: ['Detect and parse', 'holdings file'], href: S('detect-and-parse-holdings-file'), out: {} },
+    { id: '4.2.2', name: ['Parse DARA plan', 'and parameters'], href: S('parse-dara-plan-and-parameters'), out: {} },
   ];
   const PR = 62, UX = 60, UW = 145, W = 1180, H = 560;
   const px = { '4.2.1': 480, '4.2.2': 480 };
