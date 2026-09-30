@@ -40,12 +40,16 @@ export function archiveDatesToRead(weekdays, liveFirst, today, nextDate) {
   return [...dates].filter(d => d < today).sort();
 }
 
-// Default bounds for a Custom chart: the first to the last point. A series whose points share one
-// timestamp gets one minute either side, since a scale needs a nonzero span.
-export function customBounds(points) {
+// Default bounds for a Custom chart: the first point to the last point plus `padRightPx` of the
+// plot area's `plotWidthPx` (in time), so the last point's marker is not clipped at the edge. A
+// series whose points share one timestamp gets one minute either side, since a scale needs a
+// nonzero span.
+export function customBounds(points, padRightPx = 0, plotWidthPx = 0) {
   if (!points || points.length === 0) return null;
   const first = +points[0].x, last = +points[points.length - 1].x;
-  return first === last ? { min: first - 60000, max: last + 60000 } : { min: first, max: last };
+  if (first === last) return { min: first - 60000, max: last + 60000 };
+  const pad = plotWidthPx > 0 ? (last - first) * padRightPx / plotWidthPx : 0;
+  return { min: first, max: last + pad };
 }
 
 // Whether markers are drawn: `visibleCount` points fall in a plot area `widthPx` wide.
