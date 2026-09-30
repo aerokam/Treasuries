@@ -361,6 +361,9 @@ export function renderTable({ details, mode, summary, daraByYear = null, flagged
     // Any group whose fy fell outside [firstYear, lastYear] (e.g. a Future 30Y cover CUSIP beyond
     // lastYear) is preserved in its original relative position rather than dropped.
     for (const g of groups) if (byYear.has(g.fy)) merged.push(g);
+    // Funded years always display in ascending order, including a bracket year outside the range (a
+    // ladder over the gap years alone holds its lower bracket in 2036 and its upper bracket in 2040).
+    merged.sort((x, y) => x.fy - y.fy);
     groups.length = 0;
     groups.push(...merged);
   }
