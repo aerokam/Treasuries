@@ -380,7 +380,9 @@ function setupUI() {
     syncChartContainers(); updateAllData();
   }));
   document.getElementById('refreshAll').addEventListener('click', async () => {
-    updateAllData(true);
+    const views = captureChartViews();
+    await updateAllData(true);
+    restoreChartViews(views);
     if (showSaYieldTS || showSaYieldCurve) { tipsBondMeta = await fetchTipsBondMeta(true); refreshSaOverlays(); updateYieldCurves(); }
   });
   document.getElementById('resetAllZoom').addEventListener('click', () => { yOverrideSyms.clear(); isUpdatingData = true; Object.entries(charts).forEach(([sym, chart]) => applyDefaultBounds(sym, chart, chartSeries(sym))); isUpdatingData = false; });
@@ -428,7 +430,7 @@ function createChartInstance(sym) {
     plugins: [pointMarkerPlugin],
     data: { datasets: [{ label: sym, data: [], borderColor: color, backgroundColor: color + '1A', pointBackgroundColor: color, borderWidth: 1.5, pointRadius: markerRadius, pointHoverRadius: 4, fill: false, tension: 0.1, segment: { borderColor: ctx => { if (activeRange !== '2D' && activeRange !== '10D') return color; const mid = (ctx.p0.parsed.x + ctx.p1.parsed.x) / 2; return (isAfterHoursEt(mid) || isWeekendEt(new Date(mid))) ? color + '55' : color; } } }, ...saDataset] },
     options: {
-      animation: false, responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+      animation: false, responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, layout: { padding: { right: 6 } },
       scales: {
         x: { type: 'time', time: { tooltipFormat: 'MM/dd/yy HH:mm:ss', displayFormats: { hour: 'MM/dd HH:mm', day: 'MMM dd', month: 'MMM yyyy', year: 'yyyy' } }, grid: { color: '#f1f5f9' }, ticks: { autoSkip: true, font: { size: 9, weight: 'bold' }, color: '#000', callback(value, index, ticks) { const d = new Date(value); if (activeRange === '2D') { const p = ET_HM_FMT.formatToParts(d).reduce((a, pt) => ({...a, [pt.type]: pt.value}), {}); return `${p.month}/${p.day} ${p.hour}:${p.minute}`; } if (activeRange === '10D') return ET_TICK_DAY_FMT.format(d); if ((this.max - this.min) < 3 * 86400000) { const p = ET_HM_FMT.formatToParts(d).reduce((a, pt) => ({...a, [pt.type]: pt.value}), {}); return `${p.month}/${p.day} ${p.hour}:${p.minute}`; } if ((this.max - this.min) < 90 * 86400000) { const label = ET_TICK_DAY_FMT.format(d); if (index > 0 && ET_TICK_DAY_FMT.format(new Date(ticks[index - 1].value)) === label) return ''; return label; } const label = ET_TICK_MON_FMT.format(d); if (index > 0 && ET_TICK_MON_FMT.format(new Date(ticks[index - 1].value)) === label) return ''; return label; } } },
         y: { grid: { color: '#f1f5f9' }, ticks: { font: { size: 9, family: 'monospace', weight: 'bold' }, color: '#000', callback: v => v.toFixed(3) + '%' } }
@@ -1053,7 +1055,45 @@ function applyDefaultBounds(sym, chart, data) {
     chart.options.scales.x.time.unit = getXTimeUnit(chart.options.scales.x.max - chart.options.scales.x.min);
   }
   chart.update('none');
+  defaultViews[sym] = { min: chart.scales.x.min, max: chart.scales.x.max };
   rescaleYToVisible(chart, sym);
+}
+
+// Refresh Data keeps a zoomed chart's window (see restoreChartViews). A chart still at its default
+// view is reset as usual, since the new default bounds already cover the new data.
+const defaultViews = {}; // sym -> { min, max } the x window applyDefaultBounds last set
+function captureChartViews() {
+  const views = {};
+  Object.entries(charts).forEach(([sym, chart]) => {
+    const x = chart.scales.x, def = defaultViews[sym], data = chartSeries(sym);
+    if (!def || !data || data.length === 0) return;
+    if (Math.abs(x.min - def.min) < 1000 && Math.abs(x.max - def.max) < 1000) return;
+    views[sym] = { min: x.min, max: x.max, lastX: +data[data.length - 1].x, yOverride: yOverrideSyms.has(sym), ymin: chart.scales.y.min, ymax: chart.scales.y.max, ystep: chart.options.scales.y.ticks.stepSize };
+  });
+  return views;
+}
+
+// A window whose right edge was at or beyond the old latest point slides forward by the new data's
+// extent, so the latest point stays visible with the same width; any other window is kept as is.
+// With Sync Zoom & Pan on, every chart slides by the same amount.
+function restoreChartViews(views) {
+  const syms = Object.keys(views).filter(s => charts[s] && chartSeries(s) && chartSeries(s).length > 0);
+  if (syms.length === 0) return;
+  const newLast = s => { const d = chartSeries(s); return +d[d.length - 1].x; };
+  const sharedDelta = syncXAxis ? Math.max(0, Math.max(...syms.map(newLast)) - Math.max(...syms.map(s => views[s].lastX))) : null;
+  isUpdatingData = true;
+  syms.forEach(sym => {
+    const v = views[sym], chart = charts[sym];
+    const slide = v.max >= v.lastX ? (sharedDelta ?? Math.max(0, newLast(sym) - v.lastX)) : 0;
+    chart.options.scales.x.min = v.min + slide; chart.options.scales.x.max = v.max + slide;
+    if (activeRange !== '2D' && activeRange !== '10D') applyXTimeUnit(chart);
+    chart.update('none');
+    if (v.yOverride) {
+      chart.options.scales.y.min = v.ymin; chart.options.scales.y.max = v.ymax; chart.options.scales.y.ticks.stepSize = v.ystep;
+      yOverrideSyms.add(sym); chart.update('none');
+    } else rescaleYToVisible(chart, sym);
+  });
+  isUpdatingData = false;
 }
 
 function rescaleYToVisible(chart, sym) {
