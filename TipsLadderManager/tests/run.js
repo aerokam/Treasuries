@@ -14,7 +14,7 @@ import { rankForYear, levelValues } from '../src/allocation-policy.js';
 import { runBuild } from '../src/build-lib.js';
 import { parseBrokerCSV } from '../src/broker-import.js';
 import { loadMarketData, nextBondTradingDay, lookupRefCpi } from '../../shared/src/market-data.js';
-import { installFixtureFetch, installPinnedClock, PINNED_TODAY } from './market-fixture.js';
+import { installFixtureFetch } from './market-fixture.js';
 import { accruedInterest, bondCalcs, daysBetween } from '../../shared/src/bond-math.js';
 
 
@@ -87,8 +87,8 @@ function parseHoldings(text) { return parseHoldingsCSV(text, tipsMarketData); }
 // ── Load shared data ──────────────────────────────────────────────────────────
 // Through the app's own loader, not a copy of it: loadMarketData() owns which source is live
 // (3.1 §4.0), so these tests cannot drift onto the dormant one.
-installPinnedClock();
-const _todayISO = PINNED_TODAY;
+const _now = new Date();
+const _todayISO = `${_now.getFullYear()}-${String(_now.getMonth()+1).padStart(2,'0')}-${String(_now.getDate()).padStart(2,'0')}`;
 installFixtureFetch({ settleDateStr: _todayISO });
 
 const _market = await loadMarketData();
@@ -97,7 +97,7 @@ console.log(`[Test Setup] Market Data:   ${_market.source} (tests/e2e fixtures)`
 console.log(`[Test Setup] Loaded ${yieldsRows.length} bonds from market data.`);
 
 const settlementDate = localDate(settleDateStr);
-console.log(`[Test Setup] Settlement:    ${settleDateStr} (T+1 from the pinned day ${_todayISO})`);
+console.log(`[Test Setup] Settlement:    ${settleDateStr} (T+1 from today ${_todayISO})`);
 const tipsMarketData = buildTipsMarketData(yieldsRows, saYieldByCusip);
 const refCPI = lookupRefCpi(refCpiRows, settleDateStr);
 if (refCPI == null) {

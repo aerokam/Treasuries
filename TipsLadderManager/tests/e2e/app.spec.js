@@ -14,28 +14,40 @@ import { fileURLToPath } from 'url';
 import { nextBondTradingDay } from '../../../shared/src/market-data.js';
 import { parseHolidaySet } from '../../../shared/src/settlement.js';
 import { parseCsv as parseCsvRows } from '../../../shared/src/csv.js';
-import { PINNED_TODAY, fidelityWithPinnedDownloadDate, fedInvestWithPinnedSettlement } from '../market-fixture.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const FIXTURES = path.join(ROOT, 'tests', 'e2e');
 const csv = name => readFileSync(path.join(FIXTURES, name), 'utf8');
 
-// T+1 settlement from the pinned day, by the same logic as the live app. The browser clock is pinned to
-// the same day in beforeEach, so the app and these fixtures agree (see PINNED_TODAY).
+// Compute today's T+1 settlement date using the same logic as the live app.
 function computeSettleDateStr() {
   const holidayText = readFileSync(path.join(FIXTURES, 'BondHolidaysSifma.csv'), 'utf8');
   const bondHolidays = parseHolidaySet(parseCsvRows(holidayText, false));
-  return nextBondTradingDay(PINNED_TODAY, bondHolidays);
+  const now = new Date();
+  const todayISO = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+  return nextBondTradingDay(todayISO, bondHolidays);
 }
 
-// Yields CSV with line 1 replaced by the pinned day's T+1 settlement date.
+// Yields CSV with line 1 replaced by today's T+1 settlement date.
 function yieldsWithTodaySettlement() {
-  return fedInvestWithPinnedSettlement(csv('YieldsFromFedInvestPrices.csv'), computeSettleDateStr());
+  const raw = csv('YieldsFromFedInvestPrices.csv');
+  const lines = raw.split('\n');
+  lines[0] = computeSettleDateStr();
+  return lines.join('\n');
 }
 
-// Fidelity CSV with the "Date downloaded" footer replaced by the pinned day.
+// Fidelity CSV with the "Date downloaded" footer replaced by today's actual date (not T+1 —
+// the app derives T+1 itself from this date, same as a real download would settle T+1 from
+// today). Numerically mirrors YieldsFromFedInvestPrices.csv's TIPS rows (see
+// tests/e2e/FidelityTreasuriesTips.csv provenance) so switching sources doesn't change any
+// computed ladder numbers in tests that don't care which source is active.
 function fidelityWithTodayDownloadDate() {
-  return fidelityWithPinnedDownloadDate(csv('FidelityTreasuriesTips.csv'));
+  const raw = csv('FidelityTreasuriesTips.csv');
+  const now = new Date();
+  const mo = String(now.getMonth() + 1).padStart(2, '0');
+  const dy = String(now.getDate()).padStart(2, '0');
+  const footer = `Date downloaded   ${mo}/${dy}/${now.getFullYear()} 12:00 PM`;
+  return raw.replace(/Date downloaded.*$/m, footer);
 }
 
 // Holdings CSV for rebalance tests (Format 3: cusip,qty) — single canonical copy in data/
@@ -64,7 +76,6 @@ async function chooseMenu(page, menu, choice) {
 }
 
 test.beforeEach(async ({ page }) => {
-  await page.clock.setFixedTime(new Date(PINNED_TODAY + 'T12:00:00'));
   const yieldsBody = yieldsWithTodaySettlement();
   await page.route('**/Treasuries/YieldsFromFedInvestPrices.csv', r =>
     r.fulfill({ body: yieldsBody, contentType: 'text/csv' }));
@@ -82,12 +93,6 @@ test.beforeEach(async ({ page }) => {
   await page.goto('./');
   // Wait for data load: run button must be enabled
   await expect(page.locator('#run-btn')).not.toBeDisabled({ timeout: 4_000 });
-});
-
-// The fixtures are one day's market; the browser must be on that day, or bonds, Ref CPI and the
-// settlement date drift apart as the real clock moves (tests/market-fixture.js, PINNED_TODAY).
-test('clock: the page runs on the pinned day the fixtures were captured on', async ({ page }) => {
-  expect(await page.evaluate(() => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })).toBe(PINNED_TODAY);
 });
 
 // ── 1. Data load ──────────────────────────────────────────────────────────────
@@ -1427,7 +1432,7 @@ test("the received-cash window is chosen from this portfolio's own payment dates
   expect(opts[0].value, 'every settlement-year payment is the first choice').toBe('');
   expect(opts[0].label).toContain('Every settlement-year payment');
   expect(opts[opts.length - 1].value, 'a stated amount is the last').toBe('manual');
-  const settleYear = Number(PINNED_TODAY.slice(0, 4));
+  const settleYear = new Date().getFullYear();
   for (const o of opts.slice(1, -1)) {
     expect(o.label, 'every other choice names a payment date').toContain('After');
     expect(o.value, 'and is a settlement-year date').toContain(String(settleYear) + '-');
@@ -1655,7 +1660,7 @@ test('Available Cash is offered from coupons already received, and only for a la
   // ladder that never had cash entered carries a zero. Reading that as "the file stated its cash"
   // would suppress the offer on precisely the aged exports it exists for.
   const planAged = test.info().outputPath('plan-stated-a-year-ago.csv');
-  const lastYear = new Date(PINNED_TODAY + 'T12:00:00'); lastYear.setFullYear(lastYear.getFullYear() - 1);
+  const lastYear = new Date(); lastYear.setFullYear(lastYear.getFullYear() - 1);
   writeFileSync(planAged, ['#params,availableCash=0,refCpiDate=' + lastYear.toISOString().slice(0, 10),
     '#fundedYear,dara', ...years.map(y => y + ',40000')].join('\n') + '\n');
   await chooseMenu(page, 'import-menu', 'dara-plan');
