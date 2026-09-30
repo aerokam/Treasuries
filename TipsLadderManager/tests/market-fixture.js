@@ -10,19 +10,35 @@ import { fileURLToPath } from 'url';
 
 const FIXTURES = path.join(path.dirname(fileURLToPath(import.meta.url)), 'e2e');
 
-// The Fidelity download date drives the settlement date, so it is rewritten to today: fixtures
-// carry a fixed historical footer, and tests assert against a settlement date derived from now
-// (so excluded-bond behavior matches reality). Same rewrite the E2E suite performs.
-export function fidelityWithTodayDownloadDate(raw) {
-  const now = new Date();
-  const mo = String(now.getMonth() + 1).padStart(2, '0');
-  const dy = String(now.getDate()).padStart(2, '0');
-  return raw.replace(/Date downloaded.*$/m, `Date downloaded   ${mo}/${dy}/${now.getFullYear()} 12:00 PM`);
+// The tests run on one pinned day, never the real one. Every fixture in tests/e2e is a snapshot of a
+// single day's market (quotes, Ref CPI, SA yields), and the real clock walks away from it: bonds
+// mature, the Ref CPI file runs out, month-end passes. Pinning "today" to the snapshot day keeps the
+// quotes, the holdings priced against them, and the settlement date one consistent day indefinitely.
+// To move the snapshot forward, refresh every tests/e2e fixture and change this date together.
+export const PINNED_TODAY = '2026-07-24';
+
+// Node side: make `new Date()` and Date.now() return the pinned day. The browser side does the same
+// through page.clock.setFixedTime (tests/e2e/app.spec.js).
+export function installPinnedClock() {
+  const RealDate = Date;
+  const t = new RealDate(PINNED_TODAY + 'T12:00:00').getTime();
+  class PinnedDate extends RealDate {
+    constructor(...args) { if (args.length === 0) super(t); else super(...args); }
+    static now() { return t; }
+  }
+  globalThis.Date = PinnedDate;
 }
 
-// FedInvest's fixture carries its own settlement date on line 1; keep it in step with today too,
+// The Fidelity download date drives the settlement date, so it is rewritten to the pinned day:
+// the fixture carries a fixed historical footer.
+export function fidelityWithPinnedDownloadDate(raw) {
+  const [y, mo, dy] = PINNED_TODAY.split('-');
+  return raw.replace(/Date downloaded.*$/m, `Date downloaded   ${mo}/${dy}/${y} 12:00 PM`);
+}
+
+// FedInvest's fixture carries its own settlement date on line 1; keep it in step with the pinned day too,
 // so the dormant cross-check path behaves the same way when it is switched on.
-export function fedInvestWithTodaySettlement(raw, settleDateStr) {
+export function fedInvestWithPinnedSettlement(raw, settleDateStr) {
   const lines = raw.split('\n');
   lines[0] = settleDateStr;
   return lines.join('\n');
@@ -37,9 +53,9 @@ export function installFixtureFetch({ settleDateStr } = {}) {
     catch {
       return { ok: false, status: 404, async text() { return ''; } };
     }
-    if (name === 'FidelityTreasuriesTips.csv') body = fidelityWithTodayDownloadDate(body);
+    if (name === 'FidelityTreasuriesTips.csv') body = fidelityWithPinnedDownloadDate(body);
     if (name === 'YieldsFromFedInvestPrices.csv' && settleDateStr) {
-      body = fedInvestWithTodaySettlement(body, settleDateStr);
+      body = fedInvestWithPinnedSettlement(body, settleDateStr);
     }
     return { ok: true, status: 200, async text() { return body; } };
   };
