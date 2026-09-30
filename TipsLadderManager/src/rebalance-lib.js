@@ -430,6 +430,42 @@ export function getGapYearBracketCandidates(tipsMarketData, lastYear = Infinity)
   return candidates;
 }
 
+// Whether the holder's own holdings show genuine intent to cover the structural gap years, checked
+// against the ONE signal that works regardless of which year the lower bracket happens to sit at: a
+// genuine retained lower bracket can legitimately live at an older year (2032-2034) without that
+// implying anything about gap coverage either way (2.0 §Retained Bracket Excess), so the lower side
+// can never answer this question on its own. The Upper Bracket year (maxGap+1, e.g. 2040) is fixed
+// by tipsMarketData alone, never by holdings, so a genuine excess held there — the same findSpikes
+// curve-fit before-state-lib.js's detectBracketFlags already uses for the Before-State Preview's
+// Upper bracket flag — is the one unambiguous "this ladder means to bridge the gap" signal. No held
+// excess at 2040 at all (including nothing held there) means no coverage intent, full stop.
+//
+// Ruling, 2026-09-30 (real account, McNeill Joint WROS): gap-year DARA used to be inferred from
+// whatever held year was nearest, however far away, treating the structural gap as always needing
+// funding. McNeill's ladder holds nothing from 2035 through 2047 — the nearest held years to the
+// gap are 2034 and 2048, fourteen years apart — and extrapolating a slope across that hole produced
+// nonsensical gap-year targets (one of them negative), which then fed the self-financing scale and
+// inflated the entire ladder roughly 5x trying to fund a gap nobody intended to cover. See
+// KNOWN_ISSUES.md and hasGapCoverageIntent's callers below.
+export function hasGapCoverageIntent(holdings, tipsMarketData, refCPI, lastYear) {
+  const gapYears = getGapYears(tipsMarketData);
+  if (gapYears.length === 0) return false;
+  const minGap = Math.min(...gapYears), maxGap = Math.max(...gapYears);
+  if (lastYear < minGap) return false;
+  const upperYear = maxGap + 1;
+  const heldARAByYear = computePortfolioARAByYear(holdings, tipsMarketData, refCPI);
+  if (!(upperYear in heldARAByYear)) return false; // nothing held at the upper bracket year at all
+  const orderedYears = Object.keys(heldARAByYear).map(Number).sort((a, b) => a - b);
+  const orderedValues = orderedYears.map(y => heldARAByYear[y]);
+  const idx = orderedYears.indexOf(upperYear);
+  if (orderedValues.length >= MIN_SHAPE_POINTS) {
+    return findSpikes(orderedValues).some(s => s.index === idx);
+  }
+  const spanCount = orderedYears[orderedYears.length - 1] - orderedYears[0] + 1;
+  const fairShare = evenSpread(orderedValues, spanCount);
+  return fairShare != null && heldARAByYear[upperYear] > fairShare;
+}
+
 // Turn the raw ARA map into a per-year DARA map. Bracket-candidate years (adjacent to structural
 // gaps) that stand out against the ladder's own shape are suppressed to that shape's value;
 // non-bracket years keep full ARA. `gapYears` (structural gap years, 2037-2039) have no TIPS of
@@ -451,7 +487,7 @@ export function getGapYearBracketCandidates(tipsMarketData, lastYear = Infinity)
 // feature replaces, one level removed. The bracket-candidate fallback keeps the original 1.5x
 // margin (a separate, deliberately conservative constant from the shape replacement itself,
 // unchanged here) so a low-data mirror isn't more eager to auto-cap a rung than it was before.
-export function derivePerYearDara(araByYear, bracketCandidates = new Set(), gapYears = new Set()) {
+export function derivePerYearDara(araByYear, bracketCandidates = new Set(), gapYears = new Set(), coverageIntent = true) {
   const entries = Object.entries(araByYear).map(([y, v]) => [parseInt(y, 10), v]);
   const positive = entries.filter(([, v]) => v > 0);
   if (positive.length === 0) return { median: 0, daraMap: new Map(), autoCappedYears: new Set() };
@@ -474,8 +510,11 @@ export function derivePerYearDara(araByYear, bracketCandidates = new Set(), gapY
   const autoCappedYears = new Set();
   for (const [year, ara] of entries) {
     if (gapYears.has(year)) {
-      const shaped = enoughForShape ? inferShapeValue(shapeYears, shapeValues, year) : null;
-      daraMap.set(year, Math.round(shaped ?? flatShare));
+      // No genuine gap-coverage intent (hasGapCoverageIntent above): the gap is not being bridged,
+      // so its rungs target 0 rather than a slope extrapolated across however large a holdings hole
+      // sits next to it (Ruling, 2026-09-30, real account).
+      const shaped = coverageIntent && enoughForShape ? inferShapeValue(shapeYears, shapeValues, year) : null;
+      daraMap.set(year, coverageIntent ? Math.round(shaped ?? flatShare) : 0);
       autoCappedYears.add(year);
     } else if (bracketCandidates.has(year)) {
       const isExcess = enoughForShape ? spikeByYear.has(year) : ara > 1.5 * flatShare;
@@ -641,8 +680,15 @@ export function inferScaledDARAFromPortfolio({ daraMap, median: _median, holding
 
   // Scaling pivots on the IN-SCOPE, non-pinned natural-ARA median, so the returned scaledMedian is
   // the segment's own median over the years it actually solves for (the whole-portfolio median when
-  // unscoped and nothing is pinned).
-  const _vals = [...daraMap.entries()].filter(([y, v]) => sweepable(y) && v > 0).map(([, v]) => v).sort((a, b) => a - b);
+  // unscoped and nothing is pinned). Genuinely HELD years only — a year with no TIPS of its own
+  // (the LMI trickling down from later holdings, or a gap year with no coverage intent) is not a
+  // real rung and must not be allowed to drag the median down: for a ladder with a long holdings-free
+  // stretch, those near-zero entries can outnumber the real funded years, and the search's own
+  // `lo = 1000` floor then forces a multiplier far above 1x even when the ladder was already close to
+  // self-financing (Ruling, 2026-09-30, real account — see hasGapCoverageIntent above).
+  const heldYears = new Set();
+  for (const h of holdingsRaw) { const b = tipsMarketData.get(h.cusip); if (b?.maturity) heldYears.add(b.maturity.getFullYear()); }
+  const _vals = [...daraMap.entries()].filter(([y, v]) => sweepable(y) && v > 0 && heldYears.has(y)).map(([, v]) => v).sort((a, b) => a - b);
   const median = _median ?? (_vals.length > 0 ? _vals[Math.floor(_vals.length / 2)] : 0);
 
   // daraByYear fed to each trial at DARA `level`: sweepable years take `level` flat (flat mode) or
@@ -2401,7 +2447,12 @@ export function runFundedRebalance({
     lastYearOverride, firstYearOverride, preLadderInterest, maturityPref,
     allocationPolicy, yearRankOverrides, yearOverrides, bondHolidays, availableCash, rmdCouponMode, tradeDate };
   let result = runRebalance({ ...base, daraByYear });
-  const needsFunding = result.summary.gapYears.length > 0 || result.summary.future30yYears.length > 0;
+  // A structural gap year in range is not, by itself, evidence this ladder means to bridge it
+  // (hasGapCoverageIntent above) — only a held excess at the Upper Bracket year is. Future 30Y
+  // funding has its own, unrelated trigger (years beyond the last issued TIPS) and is unaffected.
+  const gapCoverageIntent = result.summary.gapYears.length > 0
+    && hasGapCoverageIntent(holdings, tipsMarketData, refCPI, result.summary.lastYear);
+  const needsFunding = gapCoverageIntent || result.summary.future30yYears.length > 0;
   if (needsFunding && !daraPlanIsStated && daraPlanUnedited) {
     // Recover the shape from the portfolio's own ARA (range form: fills every empty in-range year at
     // its incoming-LMI stub, matching the display panel's own mirror, instead of the held-years-only
@@ -2412,7 +2463,7 @@ export function runFundedRebalance({
     // pay for (3.0 §Funding the rebalance)).
     const rawARA = computePortfolioARAByYear(holdings, tipsMarketData, refCPI, { firstYear: result.summary.firstYear, lastYear: result.summary.lastYear });
     const _gapYearsInRange = new Set(getGapYears(tipsMarketData).filter(y => y >= result.summary.firstYear && y <= result.summary.lastYear));
-    const { daraMap } = derivePerYearDara(rawARA, getGapYearBracketCandidates(tipsMarketData, result.summary.lastYear), _gapYearsInRange);
+    const { daraMap } = derivePerYearDara(rawARA, getGapYearBracketCandidates(tipsMarketData, result.summary.lastYear), _gapYearsInRange, gapCoverageIntent);
     try {
       const { scaledMap, scaledMedian } = inferScaledDARAFromPortfolio({
         daraMap, holdings, tipsMarketData, refCPI, settlementDate,

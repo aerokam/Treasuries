@@ -3,6 +3,12 @@
 // Reads data/SchwabAllAccounts.csv and data/FidelityAllAccounts.csv (private, gitignored)
 // Writes sanitized/scaled (÷5) versions to tests/ for use in test suite.
 // Also writes data/SampleHoldings.csv (Format 3: cusip,qty in bonds) — the app's pre-populate sample.
+// Also writes data/SampleDaraPlan.csv (÷5 of data/DaraPlanKevinRmd.csv, private/gitignored) — the
+// app's pre-populate DARA plan, scaled to match SampleHoldings.csv's own ÷5 (both come from the
+// Kevin_IRA account, so they must share one scale factor or the sample ladder isn't self-financing
+// against its own sample holdings — see KNOWN_ISSUES.md, "sample DARA plan drifted from sample
+// holdings" (2026-09-30): this step didn't exist before that, so 18+ SampleHoldings.csv refreshes
+// went out with a SampleDaraPlan.csv rescaled only once, by hand, at the pair's creation.
 //
 // Sanitization rules:
 //   - Bond face values: ÷5, rounded to nearest $1000
@@ -341,13 +347,33 @@ console.log(`Wrote ${schwabOut}   (${schwabCsv.split('\n').length} lines)`);
 console.log(`Wrote ${fidelityOut}  (${fidelityCsv.split('\n').length} lines)`);
 console.log(`Wrote ${holdingsOut} (${sampleTips.length} TIPS)`);
 
+// data/SampleDaraPlan.csv: ÷5 of data/DaraPlanKevinRmd.csv (private/gitignored, same Kevin_IRA
+// account SampleHoldings.csv is drawn from). Non-fatal if the source isn't there — unlike the
+// holdings guard above, a missing DARA plan source shouldn't block the Schwab/Fidelity/holdings
+// regen that real accounts' e2e coverage depends on; it just means the sample plan goes stale
+// again until the source file is refreshed in data/.
+const daraPlanSrc = path.join(DATA, 'DaraPlanKevinRmd.csv');
+const daraPlanOut = path.join(DATA, 'SampleDaraPlan.csv');
+if (existsSync(daraPlanSrc)) {
+  const lines = readFileSync(daraPlanSrc, 'utf8').trim().split('\n');
+  const out = [lines[0]];
+  for (let i = 1; i < lines.length; i++) {
+    const [yr, v] = lines[i].split(',');
+    out.push(`${yr},${Math.round(parseFloat(v) / 5)}`);
+  }
+  writeFileSync(daraPlanOut, out.join('\n') + '\n', 'utf8');
+  console.log(`Wrote ${daraPlanOut} (${out.length - 1} years)`);
+} else {
+  console.log(`Skipped ${daraPlanOut}: no ${daraPlanSrc} (copy dara-plan-kevin-rmd.csv from Downloads there to keep the sample plan in sync).`);
+}
+
 // ─── Auto-commit + push ────────────────────────────────────────────────────
 // Regenerated fixtures never sit dirty across sessions (was causing repeated noise in
 // `git status`): commit them here immediately, then push -- the repo's pre-push hook
 // (.githooks/pre-push -> scripts/pre-push-tests.js) runs TipsLadderManager's test suites
 // and blocks the push if anything fails, so a bad regen never reaches the remote.
 const REPO_ROOT = execFileSync('git', ['rev-parse', '--show-toplevel']).toString().trim();
-const fixtureFiles = [schwabOut, fidelityOut, holdingsOut];
+const fixtureFiles = [schwabOut, fidelityOut, holdingsOut, daraPlanOut];
 
 const dirty = execFileSync('git', ['status', '--porcelain', '--', ...fixtureFiles], { cwd: REPO_ROOT }).toString().trim();
 if (!dirty) {

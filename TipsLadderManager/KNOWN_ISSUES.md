@@ -8,6 +8,24 @@ production impact go here.
 
 ## OPEN
 
+### Multi-bracket mode's lower bracket can resolve to a retained year instead of the canonical Active Lower Bracket
+
+- **Found:** 2026-09-30, alongside the gap-coverage-intent fix above: on McNeill Joint WROS
+  (real account, Multi-bracket mode), `result.summary.brackets.lowerYear` resolved to 2032 — a
+  retained holding — instead of 2036, the canonical Active Lower Bracket (`getActiveLowerBracketYear`
+  in `before-state-lib.js`, resolved from `tipsMarketData` alone, holdings never consulted; 3.0
+  §Active Lower Bracket already documents this correctly). 2-bracket mode has an explicit override
+  for exactly this (`rebalance-lib.js` `runRebalance`, `bracketMode === '2bracket'` block); Multi-bracket
+  mode has no equivalent, so `identifyBrackets`'s own excess-ARA pick stands unchallenged.
+- **Deferred, not fixed:** the gap-coverage-intent fix above makes this moot for the reported case —
+  with no genuine coverage intent, no bracket-excess trade lands at 2032 or anywhere else, so the
+  wrong `lowerYear` had no visible effect once retested (net cash −$2,371,020 → $0, zero trades). The
+  developer asked to fix the bigger (gap-coverage) problem first; this is a real bug against an
+  already-correct spec and should still be looked at once a case with genuine coverage intent and a
+  retained lower-bracket holding can be tested against it.
+- **Files likely involved:** `src/rebalance-lib.js` (`identifyBrackets`, the `bracketMode` branch
+  around line 1055).
+
 ### Help text still to be walked, section by section
 
 The worklist moved to `knowledge/Terminology_Worklist.md` on 2026-09-06, since the work now spans
@@ -325,6 +343,65 @@ per-CUSIP prices for a past date (3.1 §4.0).
   it out of the displayed P+I: 1,014.38 implies 2 × 14.38 = 2.876%, against an actual 2.875%.
 - **Status:** open.
 ## FIXED
+
+### Gap years with no coverage intent were inflated into a ~5x whole-ladder blow-up
+
+- **Found:** 2026-09-30, from a real account (McNeill Joint WROS, loaded via Fidelity all-accounts
+  broker import, no DARA plan): Rebalance Ladder reported net cash of −$2,371,020, with every funded
+  year's Qty/Amount After roughly 5x its Before value. Also reproduced on the app's own default
+  startup state (sample holdings + sample DARA plan): net cash −$511,194.
+- **Root cause, two independent bugs, both in gap-year/self-financing logic wired in 2026-09-26/27:**
+  1. Gap-year DARA (2037–2039) was always inferred by extending the slope between whichever held
+     years were nearest the gap on each side (`shape-math.js#inferShapeValue`), with no check for
+     whether the ladder showed any actual intent to bridge the gap. McNeill's account held nothing
+     from 2035 through 2047 — the nearest held years were fourteen years apart — and extrapolating a
+     slope across that hole produced a negative gap-year target (−$295 at 2039) with no relationship
+     to the holdings at all.
+  2. That garbage daraMap fed `inferScaledDARAFromPortfolio`'s self-financing binary search
+     (`rebalance-lib.js`). Its scale-factor pivot (`median`) was computed over every year with a
+     positive value, including years the holder genuinely holds nothing in (LMI-only trickle, ~$190);
+     for a sparse ladder these dominated the median by count, pulling it down to $190. The search's
+     own hardcoded floor (`lo = $1,000`) then forced a minimum multiplier of `1000/190 ≈ 5.26x`,
+     applied uniformly to every year — even though the un-scaled ladder was already ~97% self-financing
+     on its own.
+  - A third, related observation (not yet fixed — see OPEN below): `result.summary.brackets.lowerYear`
+    resolved to 2032 (a retained holding) instead of the canonical Active Lower Bracket 2036, even in
+    Multi-bracket mode. Fixing (1) above makes this moot for the reported case (no trades land there
+    once gap coverage isn't inferred), so it's deferred rather than blocking this fix.
+- **Ruling (developer, 2026-09-30):** a structural gap year existing in the selected range is not
+  evidence the ladder means to cover it. The one unambiguous signal is a held excess at the Upper
+  Bracket year (2040 today, fixed by `tipsMarketData` alone, never by holdings) — the lower-bracket
+  side can't answer this on its own, since a genuine retained lower bracket can legitimately sit at an
+  older year (2032–2034) without that implying anything about gap intent either way. With no excess
+  held at 2040, gap years target 0 and the self-financing scale does not engage at all.
+- **Fix:** added `hasGapCoverageIntent` (`rebalance-lib.js`) — checks for a genuine spike at the Upper
+  Bracket year via the same `findSpikes` curve-fit `before-state-lib.js#detectBracketFlags` already
+  uses for the Before-State Preview. Wired into `index.html`'s `_initRebalDaraFromPortfolio()` mirror
+  (gap years render 0 with no intent, reusing the `flags` it already computes) and into
+  `derivePerYearDara` / `runFundedRebalance`'s `needsFunding` gate (gap-year component only; Future
+  30Y funding's own trigger is unrelated and untouched). Separately, `inferScaledDARAFromPortfolio`'s
+  median now excludes years the holder doesn't genuinely hold (matching step 3's own curve-fit
+  convention), so the search's floor can no longer force a multiplier unrelated to the real shortfall.
+- **Verified:** all 454 `tests/run.js` cases and all 86 Playwright E2E cases pass unchanged. Reproduced
+  and confirmed fixed live against the reporting account's own file: net cash −$2,371,020 → $0 (the
+  ladder was already exactly self-financing as held, zero trades). Also fixed the sample-holdings
+  default case: −$511,194 → +$22,596 (see next entry — that case also had a stale fixture).
+- **Files:** `src/rebalance-lib.js`, `index.html`, `knowledge/3.0_TIPS_Ladder_Rebalancing.md`.
+
+### Sample DARA plan drifted from sample holdings, both in the app's own default startup state
+
+- **Found:** 2026-09-30, alongside the gap-coverage bug above: the app's default startup (sample
+  holdings + sample DARA plan auto-loaded) reported net cash −$511,194 even independent of that bug.
+- **Root cause:** `data/SampleDaraPlan.csv` was written once, by hand, to match `data/SampleHoldings.csv`
+  at the time (commit 86860b5). `scripts/generate-test-fixtures.js` has since regenerated
+  `SampleHoldings.csv` from the real Kevin_IRA account 18+ times (scheduled, ÷5 scale) as the real
+  account's holdings changed — `SampleDaraPlan.csv` was never part of that regeneration and drifted to
+  roughly 2.4x too large relative to the current sample holdings.
+- **Fix:** rescaled `SampleDaraPlan.csv` from the current real `dara-plan-kevin-rmd.csv` (same ÷5
+  factor as the holdings). `generate-test-fixtures.js` now also regenerates `SampleDaraPlan.csv` from
+  `data/DaraPlanKevinRmd.csv` (private/gitignored, same convention as `SchwabAllAccounts.csv`) each
+  run, non-fatally skipping if that source file isn't present, so the pair can't drift apart again.
+- **Files:** `data/SampleDaraPlan.csv`, `scripts/generate-test-fixtures.js`.
 
 ### A stated DARA plan was silently scaled down to what current holdings could self-finance
 
