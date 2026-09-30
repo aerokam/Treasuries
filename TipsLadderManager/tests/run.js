@@ -15,6 +15,7 @@ import { runBuild } from '../src/build-lib.js';
 import { parseBrokerCSV } from '../src/broker-import.js';
 import { loadMarketData, nextBondTradingDay, lookupRefCpi } from '../../shared/src/market-data.js';
 import { installFixtureFetch } from './market-fixture.js';
+import { refreshMarketFixtures } from './refresh-market-fixtures.js';
 import { accruedInterest, bondCalcs, daysBetween } from '../../shared/src/bond-math.js';
 
 
@@ -87,13 +88,14 @@ function parseHoldings(text) { return parseHoldingsCSV(text, tipsMarketData); }
 // ── Load shared data ──────────────────────────────────────────────────────────
 // Through the app's own loader, not a copy of it: loadMarketData() owns which source is live
 // (3.1 §4.0), so these tests cannot drift onto the dormant one.
+await refreshMarketFixtures();
 const _now = new Date();
 const _todayISO = `${_now.getFullYear()}-${String(_now.getMonth()+1).padStart(2,'0')}-${String(_now.getDate()).padStart(2,'0')}`;
 installFixtureFetch({ settleDateStr: _todayISO });
 
 const _market = await loadMarketData();
 const { yieldsRows, refCpiRows, bondHolidays, saYieldByCusip, settleDateStr } = _market;
-console.log(`[Test Setup] Market Data:   ${_market.source} (tests/e2e fixtures)`);
+console.log(`[Test Setup] Market Data:   ${_market.source} (current R2 data, tests/e2e/market)`);
 console.log(`[Test Setup] Loaded ${yieldsRows.length} bonds from market data.`);
 
 const settlementDate = localDate(settleDateStr);
@@ -104,7 +106,7 @@ if (refCPI == null) {
   const last = refCpiRows.length ? refCpiRows[refCpiRows.length - 1].date : '(none)';
   throw new Error(
     `RefCPI fixture is stale: settlement ${settleDateStr} is beyond the last fixture date ${last}. ` +
-    `Refresh tests/e2e/RefCPI.csv from R2 (production keeps RefCPI through the last day of m+2). ` +
+    `R2's RefCPI.csv should reach today's settlement date (production keeps it through the last day of m+2). ` +
     `Exact-date lookup intentionally returns null beyond range — there is no snap-back.`
   );
 }

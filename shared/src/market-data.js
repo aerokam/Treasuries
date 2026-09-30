@@ -19,7 +19,7 @@ import { yieldFromPrice } from './bond-math.js';
 import { localDate, toIsoDate, nextBusinessDay, parseHolidaySet } from './settlement.js';
 import { parseCsv as parseCsvRows } from './csv.js';
 
-const R2_ROOT = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev';
+export const R2_ROOT = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev';
 const BASE_URL = R2_ROOT + '/Treasuries';
 
 const TIPS_URL = R2_ROOT + '/TIPS';

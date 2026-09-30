@@ -14,14 +14,17 @@ import { fileURLToPath } from 'url';
 import { nextBondTradingDay } from '../../../shared/src/market-data.js';
 import { parseHolidaySet } from '../../../shared/src/settlement.js';
 import { parseCsv as parseCsvRows } from '../../../shared/src/csv.js';
+import { MARKET_DIR, MARKET_FILES } from '../refresh-market-fixtures.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const FIXTURES = path.join(ROOT, 'tests', 'e2e');
-const csv = name => readFileSync(path.join(FIXTURES, name), 'utf8');
+// Market data comes from the current R2 copies the refresh step downloads (global-setup.js); the
+// other fixtures in tests/e2e are committed holdings files.
+const csv = name => readFileSync(path.join(MARKET_FILES.has(name) ? MARKET_DIR : FIXTURES, name), 'utf8');
 
 // Compute today's T+1 settlement date using the same logic as the live app.
 function computeSettleDateStr() {
-  const holidayText = readFileSync(path.join(FIXTURES, 'BondHolidaysSifma.csv'), 'utf8');
+  const holidayText = csv('BondHolidaysSifma.csv');
   const bondHolidays = parseHolidaySet(parseCsvRows(holidayText, false));
   const now = new Date();
   const todayISO = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;

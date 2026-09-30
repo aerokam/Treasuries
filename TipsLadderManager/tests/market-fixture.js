@@ -7,6 +7,7 @@
 import { readFileSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { MARKET_DIR, MARKET_FILES } from './refresh-market-fixtures.js';
 
 const FIXTURES = path.join(path.dirname(fileURLToPath(import.meta.url)), 'e2e');
 
@@ -33,7 +34,7 @@ export function installFixtureFetch({ settleDateStr } = {}) {
   globalThis.fetch = async (url) => {
     const name = String(url).split('/').pop().split('?')[0];
     let body;
-    try { body = readFileSync(path.join(FIXTURES, name), 'utf8'); }
+    try { body = readFileSync(path.join(MARKET_FILES.has(name) ? MARKET_DIR : FIXTURES, name), 'utf8'); }
     catch {
       return { ok: false, status: 404, async text() { return ''; } };
     }
