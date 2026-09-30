@@ -71,7 +71,8 @@ const TERMS = {
   'live quotes': 'live-quotes', 'yield series': 'yield-series', 'day change': 'day-change',
   'TIPS market data': 'tips-market-data',
   'SA yield series': 'sa-yield-series',
-  'imported file': 'imported-file', 'holdings': 'holdings', 'DARA plan': 'dara-plan',
+  'Holdings File': 'holdings-file', 'DARA Plan File': 'dara-plan-file',
+  'holdings': 'holdings', 'DARA plan': 'dara-plan',
 };
 const unlinked = new Set();
 function labelMarkup(text) {
@@ -973,7 +974,8 @@ function level2TipsLadderManager() {
     P.push(flow(UX - 5, yy, x2, yy, { obstacles: OBS.filter(o => !(o.x === px[id] && o.y === py[id])) }));
     P.push(labelAt((x2 + UX) / 2, yy + (above ? -8 : 16), label, 'middle'));
   };
-  flowFromUser('4.2', 'imported file', false);
+  flowFromUser('4.2', 'Holdings File', false);
+  flowFromUser('4.2', 'DARA Plan File', true);
   flowFromUser('4.3', 'ladder parameters', true);
   flowFromUser('4.4', 'ladder parameters', true);
   flowToUser('4.5', 'ladder table', true);
@@ -1079,7 +1081,7 @@ function level3TipsLadderManagerImport() {
   const px = { '4.2.1': 480, '4.2.2': 480 };
   const py = { '4.2.1': 190, '4.2.2': 400 };
   const OBS = procs.map(q => ({ x: px[q.id], y: py[q.id], r: PR }));
-  const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 3: TipsLadderManager 4.2, two independent parses of the same uploaded file -- one for CUSIP rows, one for a DARA plan and construction parameters.">`, marker()];
+  const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 3: TipsLadderManager 4.2, two independent processes -- one for a Holdings File's CUSIP rows, one for a DARA Plan File or a trailing DARA block.">`, marker()];
 
   // TIPS market data arrives from 4.1, drawn against its own diagram, the same edge-arrival
   // convention 3.7's Level 3 uses for input produced by a sibling process.
@@ -1087,15 +1089,20 @@ function level3TipsLadderManagerImport() {
   P.push(flow(UX + UW + 60, 90, tx, ty, { obstacles: OBS.filter(o => !(o.x === px['4.2.1'] && o.y === py['4.2.1'])) }));
   P.push(labelAt(UX + UW + 64, 74, 'TIPS market data  ←  4.1'));
 
-  // The user uploads one file, read as plain text; both processes independently look for
-  // what they each recognize in it, whichever Import menu choice (CUSIP/Qty or DARA Plan)
-  // the click came from -- the code itself does not branch on which menu item was clicked.
-  ['4.2.1', '4.2.2'].forEach(id => {
-    const [x2, y2] = toCircle(UX + UW + 5, py[id], px[id], py[id], PR);
-    P.push(flow(UX + UW + 5, py[id], x2, y2, { obstacles: OBS.filter(o => !(o.x === px[id] && o.y === py[id])) }));
-  });
-  P.push(labelAt(UX + UW + 12, (py['4.2.1'] + py['4.2.2']) / 2 - 8, 'imported file'));
-  P.push(`  <g class="entity"><rect x="${UX}" y="${(py['4.2.1'] + py['4.2.2']) / 2 - 130}" width="${UW}" height="260" rx="3"/><text class="e-name" x="${UX + UW / 2}" y="${(py['4.2.1'] + py['4.2.2']) / 2 + 5}">User</text></g>`);
+  // Two distinct uploads, from two distinct Import-menu items, not one undifferentiated file:
+  // a Holdings File (the **Holdings** item) is always read by 4.2.1, and by 4.2.2 too when it's
+  // one this app exported (trailing #fundedYear,dara block); a DARA Plan File (the **DARA Plan**
+  // item) is a standalone upload 4.2.1 never sees. 4.2.2 reads from whichever the user picked.
+  const midY = (py['4.2.1'] + py['4.2.2']) / 2;
+  const [h1x, h1y] = toCircle(UX + UW + 5, py['4.2.1'] + 10, px['4.2.1'], py['4.2.1'], PR);
+  P.push(flow(UX + UW + 5, py['4.2.1'] + 10, h1x, h1y, { obstacles: OBS.filter(o => !(o.x === px['4.2.1'] && o.y === py['4.2.1'])) }));
+  const [h2x, h2y] = toCircle(UX + UW + 5, py['4.2.2'] - 15, px['4.2.2'], py['4.2.2'], PR);
+  P.push(flow(UX + UW + 5, py['4.2.2'] - 15, h2x, h2y, { obstacles: OBS.filter(o => !(o.x === px['4.2.2'] && o.y === py['4.2.2'])) }));
+  P.push(labelAt(UX + UW + 12, midY - 8, 'Holdings File'));
+  const [d2x, d2y] = toCircle(UX + UW + 5, py['4.2.2'] + 20, px['4.2.2'], py['4.2.2'], PR);
+  P.push(flow(UX + UW + 5, py['4.2.2'] + 20, d2x, d2y, { obstacles: OBS.filter(o => !(o.x === px['4.2.2'] && o.y === py['4.2.2'])) }));
+  P.push(labelAt(UX + UW + 12, py['4.2.2'] + 34, 'DARA Plan File'));
+  P.push(`  <g class="entity"><rect x="${UX}" y="${midY - 130}" width="${UW}" height="260" rx="3"/><text class="e-name" x="${UX + UW / 2}" y="${midY + 5}">User</text></g>`);
 
   // Each process's own output leaves at the right edge for whichever Level 2 sibling
   // consumes it, the same convention 3.1's Level 3 uses for its own four outputs.
@@ -1112,7 +1119,7 @@ function level3TipsLadderManagerImport() {
   return page({
     title: 'TipsLadderManager 4.2 — Level 3', h1: 'Level 3 &mdash; TipsLadderManager 4.2 Import holdings and DARA plan', maxWidth: W,
     up: 'DFD_LEVEL2_TIPSLADDERMANAGER.html', upLabel: 'Level 2 — TipsLadderManager (draft)', svg: P.join(NL),
-    notes: ['  Renamed from the Level 2 draft\'s "Import holdings": two independent parses of one uploaded file, neither depending on the other finding anything.',
+    notes: ['  Renamed from the Level 2 draft\'s "Import holdings": two distinct uploads (Holdings File, DARA Plan File), not one undifferentiated file.',
       '  See <a href="viewer.html#/md/knowledge/DFD_Worklist.md">DFD_Worklist.md</a> item 27 for what this pass found and logged, including a real code duplicate.'].join(NL)
   });
 }

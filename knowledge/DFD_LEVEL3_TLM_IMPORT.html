@@ -186,13 +186,15 @@
 <h1>Level 3 &mdash; TipsLadderManager 4.2 Import holdings and DARA plan</h1>
 
 <div class="diagram">
-<svg viewBox="0 0 1180 560" role="img" aria-label="Level 3: TipsLadderManager 4.2, two independent parses of the same uploaded file -- one for CUSIP rows, one for a DARA plan and construction parameters.">
+<svg viewBox="0 0 1180 560" role="img" aria-label="Level 3: TipsLadderManager 4.2, two independent processes -- one for a Holdings File's CUSIP rows, one for a DARA Plan File or a trailing DARA block.">
   <defs><marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#55558c"/></marker></defs>
   <path class="flow" d="M 265.0 90.0 Q 350.3 114.2 423.8 163.9" marker-end="url(#a1)"/>
   <text class="flow-label" x="269" y="74"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#tips-market-data"><tspan class="lk">TIPS market data</tspan></a>  ←  4.1</text>
-  <path class="flow" d="M 210.0 190.0 Q 314.0 173.4 418.0 190.0" marker-end="url(#a1)"/>
-  <path class="flow" d="M 210.0 400.0 Q 314.0 383.4 418.0 400.0" marker-end="url(#a1)"/>
-  <text class="flow-label" x="217" y="287"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#imported-file"><tspan class="lk">imported file</tspan></a></text>
+  <path class="flow" d="M 210.0 200.0 Q 313.4 179.5 418.0 192.3" marker-end="url(#a1)"/>
+  <path class="flow" d="M 210.0 385.0 Q 315.0 374.1 418.1 396.6" marker-end="url(#a1)"/>
+  <text class="flow-label" x="217" y="287"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#holdings-file"><tspan class="lk">Holdings File</tspan></a></text>
+  <path class="flow" d="M 210.0 420.0 Q 312.9 395.6 418.2 404.6" marker-end="url(#a1)"/>
+  <text class="flow-label" x="217" y="434"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#dara-plan-file"><tspan class="lk">DARA Plan File</tspan></a></text>
   <g class="entity"><rect x="60" y="165" width="145" height="260" rx="3"/><text class="e-name" x="132.5" y="300">User</text></g>
   <path class="flow" d="M 542.0 190.0 Q 855.0 139.9 1168.0 190.0" marker-end="url(#a1)"/>
   <text class="flow-label" x="1164" y="182" text-anchor="end"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#holdings"><tspan class="lk">holdings</tspan></a>  →  4.4</text>
@@ -214,7 +216,7 @@
 </div>
 
 <p class="notes">
-  Renamed from the Level 2 draft's "Import holdings": two independent parses of one uploaded file, neither depending on the other finding anything.
+  Renamed from the Level 2 draft's "Import holdings": two distinct uploads (Holdings File, DARA Plan File), not one undifferentiated file.
   See <a href="viewer.html#/md/knowledge/DFD_Worklist.md">DFD_Worklist.md</a> item 27 for what this pass found and logged, including a real code duplicate.
 </p>
 
