@@ -698,7 +698,7 @@
 </div>
 
 <script type="module">
-import { buildTipsMarketData, localDate, runFundedRebalance, inferScaledDARAFromPortfolio, computePortfolioARAByYear, getGapYearBracketCandidates, getGapYears, derivePerYearDara, parseFundedYearDaraBlock, parseParamsBlock, inferFirstYearFromHoldings, inferLastYearFromHoldings, deriveHoldingsYearRange, yieldFromPrice, fmtDate, fmtDateLong, calculatePIPerBond } from './src/rebalance-lib.js';
+import { buildTipsMarketData, localDate, runFundedRebalance, inferScaledDARAFromPortfolio, computePortfolioARAByYear, getGapYearBracketCandidates, getGapYears, derivePerYearDara, hasGapCoverageIntent, parseFundedYearDaraBlock, parseParamsBlock, inferFirstYearFromHoldings, inferLastYearFromHoldings, deriveHoldingsYearRange, yieldFromPrice, fmtDate, fmtDateLong, calculatePIPerBond } from './src/rebalance-lib.js';
 // Standalone Before-state preview (3.0 §Before-State Preview and Bracket-Year Excess Detection) —
 // a holdings-valuation computation, architecturally decoupled from the runRebalance/
 // runFundedRebalance engine imported above. Never calls into it.
@@ -2831,16 +2831,21 @@ function _initRebalDaraFromPortfolio() {
   const fullARA = computePortfolioARAByYear(currentHoldingsArray, tipsMarketData, rc, { firstYear, lastYear });
 
   // Held years take the flagged curve value (if flagged) or their own raw ARA. Gap years
-  // (2037-2039) have no TIPS to read a DARA from, so their value is read off the same held-year
-  // curve instead — extending whichever neighboring held year's local slope is NEARER, so a
-  // genuine step in the ladder's shape (e.g. DARA dropping once Social Security starts) reflects
-  // the step rather than blending across it (3.0 §Per-Year DARA from Portfolio; shape-math.js
-  // inferShapeValue). Falls back to `evenSpread` (every held year's total, spread across the
-  // assumed rung span from the earliest to the latest held year — NOT just the held-point count;
-  // two holdings bracketing a 3-year gap represent five rungs' worth of income between them, not
-  // two) when there aren't enough points on either side to read a slope from at all. Other empty
-  // in-range years take their current ARA (the LMI dripping down from longer TIPS).
+  // (2037-2039) have no TIPS to read a DARA from, so their value depends on whether this ladder
+  // shows genuine gap-coverage intent: a held excess at the Upper Bracket year (2040 today — fixed
+  // by tipsMarketData alone, never by holdings, so it's the one signal that works regardless of
+  // where the lower bracket sits; `flags` above already computed this the same way the Before-State
+  // Preview's Upper bracket flag does). With intent confirmed, extend whichever neighboring held
+  // year's local slope is NEARER (shape-math.js inferShapeValue), falling back to `evenSpread` when
+  // there aren't enough points on either side to read a slope from. With NO intent — no held excess
+  // at 2040 at all, including nothing held there — the gap years target 0 rather than a slope
+  // extrapolated across however large a holdings hole sits next to them (Ruling, 2026-09-30, real
+  // account: a ladder holding nothing from 2035 through 2047 had its gap years inferred from a
+  // 14-year-distant holding, producing a negative target that then fed the self-financing scale and
+  // inflated the entire ladder roughly 5x). Other empty in-range years take their current ARA (the
+  // LMI dripping down from longer TIPS).
   const gapYearSet = new Set(getGapYears(tipsMarketData));
+  const gapCoverageIntent = flags.has(UPPER_BRACKET_YEAR);
   const heldYearsOrdered = Object.keys(heldARA).map(Number).sort((a, b) => a - b);
   const heldValuesOrdered = heldYearsOrdered.map(y => heldARA[y]);
   const heldSpanCount = heldYearsOrdered.length ? heldYearsOrdered[heldYearsOrdered.length - 1] - heldYearsOrdered[0] + 1 : 0;
@@ -2850,8 +2855,12 @@ function _initRebalDaraFromPortfolio() {
     if (flags.has(y)) {
       store.set(y, Math.round(flags.get(y).value));
     } else if (gapYearSet.has(y)) {
-      const shaped = inferShapeValue(heldYearsOrdered, heldValuesOrdered, y);
-      store.set(y, Math.round(shaped ?? heldFairShare ?? median));
+      if (gapCoverageIntent) {
+        const shaped = inferShapeValue(heldYearsOrdered, heldValuesOrdered, y);
+        store.set(y, Math.round(shaped ?? heldFairShare ?? median));
+      } else {
+        store.set(y, 0);
+      }
       _bracketAutoCapYears.add(y);
     } else {
       store.set(y, Math.round(fullARA[y] ?? 0));
