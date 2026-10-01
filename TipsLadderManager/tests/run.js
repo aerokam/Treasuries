@@ -1881,6 +1881,13 @@ console.log('\naccruedInterest — day-count proration');
   }
 }
 
+// Years for the before-state tests, derived from the outstanding TIPS so they follow the structural gap as 10-year
+// issues fill it in: two ordinary years, the three lower-bracket candidate years just below the active lower
+// bracket's year, that year itself, and the upper bracket's year.
+const BS = ladderRoles(tipsMarketData, settlementDate);
+const Y_LOW = BS.gap.first - 1, Y_UP = BS.gap.last + 1;
+const Y_C3 = Y_LOW - 1, Y_C2 = Y_LOW - 2, Y_C1 = Y_LOW - 3;
+const Y_ORD2 = Y_LOW - 4, Y_ORD = Y_LOW - 5;
 // ── Before-state preview — standalone before-state-lib.js ──────────────────────
 // (3.0 §Before-State Preview and Bracket-Year Excess Detection). This module must never import
 // runRebalance/runFundedRebalance — it's a holdings-valuation computation, not the engine.
@@ -1889,20 +1896,19 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
   // Three lower-bracket candidate years (2033-2035), only 2035 clearly oversized — exercises the
   // "N candidates, pick the latest-maturing one that exceeds the median" rule.
   const holdings = [
-    { cusip: '91282CBF7', qty: 10 },  // Jan 2031 — ordinary
-    { cusip: '91282CCM1', qty: 10 },  // Jul 2031 — ordinary
-    { cusip: '91282CDX6', qty: 8 },   // Jan 2032 — ordinary
-    { cusip: '91282CGK1', qty: 8 },   // Jan 2033 — lower-bracket candidate, NOT oversized
-    { cusip: '91282CJY8', qty: 8 },   // Jan 2034 — lower-bracket candidate, NOT oversized
-    { cusip: '91282CML2', qty: 60 },  // Jan 2035 — lower-bracket candidate, oversized on purpose
-  ].filter(h => tipsMarketData.has(h.cusip));
-  const firstYear = 2031, lastYear = 2039; // reaches into the structural gap so lower candidates apply
+    ...BS.allIn(Y_ORD).slice(0, 2).map(b => ({ cusip: b.cusip, qty: 10 })), // ordinary: two maturities in one year
+    { cusip: BS.allIn(Y_ORD2)[0].cusip, qty: 8 },   // ordinary
+    { cusip: BS.allIn(Y_C1)[0].cusip, qty: 8 },     // lower-bracket candidate, NOT oversized
+    { cusip: BS.allIn(Y_C2)[0].cusip, qty: 8 },     // lower-bracket candidate, NOT oversized
+    { cusip: BS.allIn(Y_C3)[0].cusip, qty: 60 },    // lower-bracket candidate, oversized on purpose
+  ];
+  const firstYear = Y_ORD, lastYear = BS.gap.last; // reaches into the structural gap so lower candidates apply
   const heldARA = computePortfolioARAByYear(holdings, tipsMarketData, refCPI);
 
   // (b) 0/1/N candidate detection — the N-candidate, latest-maturing case.
   const flags = detectBracketFlags({ heldARAByYear: heldARA, tipsMarketData, lastYear });
   assert('before-state: exactly one lower-bracket year flagged (of three candidates)', flags.size, 1);
-  assert('before-state: the oversized, latest-maturing candidate (2035) is the one flagged', flags.has(2035), true);
+  assert('before-state: the oversized, latest-maturing candidate is the one flagged', flags.has(Y_C3), true);
 
   // The flagged value is the ladder's own fitted curve at that year (ruling 2, not the flat
   // median heldYearMedianExcluding still computes for comparison in the shape-math tests above) —
@@ -1910,16 +1916,16 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
   // own internals, so a regression in the year<->index wiring would still be caught.
   const orderedYears = Object.keys(heldARA).map(Number).sort((a, b) => a - b);
   const orderedValues = orderedYears.map(y => heldARA[y]);
-  const spike2035 = findSpikes(orderedValues).find(s => orderedYears[s.index] === 2035);
-  assert('before-state: 2035 is an independently-confirmed spike', !!spike2035, true);
-  assert('before-state: flagged value === the curve value findSpikes reports for 2035', flags.get(2035).value, spike2035.curve, 1e-9);
-  assert('before-state: flagged excess === rawARA - curve value', flags.get(2035).excess, spike2035.excess, 1e-9);
+  const spike2035 = findSpikes(orderedValues).find(s => orderedYears[s.index] === Y_C3);
+  assert('before-state: the oversized candidate year is an independently-confirmed spike', !!spike2035, true);
+  assert('before-state: flagged value === the curve value findSpikes reports for that year', flags.get(Y_C3).value, spike2035.curve, 1e-9);
+  assert('before-state: flagged excess === rawARA - curve value', flags.get(Y_C3).excess, spike2035.excess, 1e-9);
 
   // (a) Standalone computation matches computePortfolioARAByYear for an ORDINARY (non-flagged) year.
   const { rows } = computeBeforeState({ holdings, tipsMarketData, refCPI, firstYear, lastYear });
-  const rows2031 = rows.filter(r => r.fundedYear === 2031 && r.cusip);
+  const rows2031 = rows.filter(r => r.fundedYear === Y_ORD && r.cusip);
   const ara2031 = rows2031.find(r => r.araBeforeTotal != null)?.araBeforeTotal;
-  assert('before-state: ordinary year Amount Before matches computePortfolioARAByYear', Math.round(ara2031), Math.round(heldARA[2031]));
+  assert('before-state: ordinary year Amount Before matches computePortfolioARAByYear', Math.round(ara2031), Math.round(heldARA[Y_ORD]));
 
   // (Issue #1, this pass — real root cause of the drill-popup NaN) `bondCalcs()` does NOT return a
   // `coupon` field (only indexRatio/principalPerBond/costPerBond/nPeriods/couponPerPeriod/
@@ -1940,28 +1946,28 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
 
   // (c) Guessed-excess arithmetic: flagged year's group value is the curve guess; its Gap sub-row
   // excess is raw ARA minus that guess.
-  const guess2035 = flags.get(2035).value;
-  const rows2035 = rows.filter(r => r.fundedYear === 2035 && r.cusip);
+  const guess2035 = flags.get(Y_C3).value;
+  const rows2035 = rows.filter(r => r.fundedYear === Y_C3 && r.cusip);
   const araVal2035 = rows2035.find(r => r.araBeforeTotal != null)?.araBeforeTotal;
   assert('before-state: flagged year Amount Before === curve guess', Math.round(araVal2035), Math.round(guess2035));
   const excessRow = rows2035.find(r => r.isGapBracket);
   assert('before-state: flagged year has exactly one Gap sub-row (no duplicate excess)', rows2035.filter(r => r.isGapBracket).length, 1);
-  assert('before-state: flagged Gap sub-row excess === rawARA - curve guess', Math.round(excessRow.excessAmtBefore), Math.round(heldARA[2035] - guess2035));
+  assert('before-state: flagged Gap sub-row excess === rawARA - curve guess', Math.round(excessRow.excessAmtBefore), Math.round(heldARA[Y_C3] - guess2035));
 
   // (c) Recalc-on-edit arithmetic: once the user has entered a DARA for the flagged year, the
   // excess recalculates against that entered value instead of the guess — plain subtraction.
   const entered = guess2035 + 5000;
   const { rows: rowsEdited } = computeBeforeState({
-    holdings, tipsMarketData, refCPI, firstYear, lastYear, daraByYear: new Map([[2035, entered]]),
+    holdings, tipsMarketData, refCPI, firstYear, lastYear, daraByYear: new Map([[Y_C3, entered]]),
   });
-  const araValEdited = rowsEdited.filter(r => r.fundedYear === 2035 && r.cusip).find(r => r.araBeforeTotal != null)?.araBeforeTotal;
-  const excessRowEdited = rowsEdited.find(r => r.fundedYear === 2035 && r.isGapBracket);
+  const araValEdited = rowsEdited.filter(r => r.fundedYear === Y_C3 && r.cusip).find(r => r.araBeforeTotal != null)?.araBeforeTotal;
+  const excessRowEdited = rowsEdited.find(r => r.fundedYear === Y_C3 && r.isGapBracket);
   assert('before-state: edited year Amount Before === entered DARA', Math.round(araValEdited), Math.round(entered));
-  assert('before-state: excess recalculates against entered DARA (raw − entered)', Math.round(excessRowEdited.excessAmtBefore), Math.round(heldARA[2035] - entered));
+  assert('before-state: excess recalculates against entered DARA (raw − entered)', Math.round(excessRowEdited.excessAmtBefore), Math.round(heldARA[Y_C3] - entered));
 
   // Qty/Cost Before are unaffected by the funded/excess split for an ORDINARY (unflagged) year —
   // full held qty always shows there (3.0 §Before-State Preview).
-  const heldQty2031 = holdings.filter(h => tipsMarketData.get(h.cusip)?.maturity?.getFullYear() === 2031).reduce((s, h) => s + h.qty, 0);
+  const heldQty2031 = holdings.filter(h => tipsMarketData.get(h.cusip)?.maturity?.getFullYear() === Y_ORD).reduce((s, h) => s + h.qty, 0);
   const rowsQty2031 = rows2031.reduce((s, r) => s + (r.fundedYearQtyBefore || 0), 0);
   assert('before-state: ordinary year Qty Before unaffected by the flag (full held qty)', rowsQty2031, heldQty2031);
 
@@ -1971,8 +1977,8 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
   // araBeforeLaterMatInt the raw-ARA figure is built from; excessQtyBefore is the remainder
   // (floored at 0); both costs are qty × costPerBond. The funded row and Gap sub-row must
   // reconcile to the full held quantity — no qty lost or invented by the split.
-  const heldQty2035 = holdings.filter(h => tipsMarketData.get(h.cusip)?.maturity?.getFullYear() === 2035).reduce((s, h) => s + h.qty, 0);
-  const bond2035 = tipsMarketData.get('91282CML2');
+  const heldQty2035 = holdings.filter(h => tipsMarketData.get(h.cusip)?.maturity?.getFullYear() === Y_C3).reduce((s, h) => s + h.qty, 0);
+  const bond2035 = tipsMarketData.get(BS.allIn(Y_C3)[0].cusip);
   const { piPerBond: piPerBond2035, costPerBond: costPerBond2035 } = bondCalcs(bond2035, refCPI);
   const lmi2035 = excessRow.araBeforeLaterMatInt;
   const expectedFundedQty2035 = Math.max(0, Math.round((guess2035 - lmi2035) / piPerBond2035));
@@ -1985,10 +1991,10 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
     excessRow.fundedYearQtyBefore + excessRow.excessQtyBefore, heldQty2035);
   assert('before-state: flagged year fundedYearCostBefore === fundedYearQtyBefore × costPerBond',
     Math.round(excessRow.fundedYearQtyBefore * costPerBond2035), Math.round(excessRow.fundedYearQtyBefore * excessRow.costPerBond));
-  console.log('        2035 (flagged) split: funded=' + excessRow.fundedYearQtyBefore + '  excess=' + excessRow.excessQtyBefore + '  held=' + heldQty2035);
+  console.log('        ' + Y_C3 + ' (flagged) split: funded=' + excessRow.fundedYearQtyBefore + '  excess=' + excessRow.excessQtyBefore + '  held=' + heldQty2035);
 
   // Recalculates live against an entered DARA too, same formula.
-  const excessRowEdited2 = rowsEdited.find(r => r.fundedYear === 2035 && r.isGapBracket);
+  const excessRowEdited2 = rowsEdited.find(r => r.fundedYear === Y_C3 && r.isGapBracket);
   const expectedFundedQtyEdited = Math.max(0, Math.round((entered - lmi2035) / piPerBond2035));
   assert('before-state: flagged year funded qty recalculates against an entered DARA',
     excessRowEdited2.fundedYearQtyBefore, expectedFundedQtyEdited);
@@ -1997,24 +2003,22 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
 // (b) 0-candidate case: no lower-bracket year held at all → no flags.
 {
   const holdings = [
-    { cusip: '91282CBF7', qty: 10 }, // Jan 2031
-    { cusip: '91282CCM1', qty: 10 }, // Jul 2031
-  ].filter(h => tipsMarketData.has(h.cusip));
+    ...BS.allIn(Y_ORD).slice(0, 2).map(b => ({ cusip: b.cusip, qty: 10 })),
+  ];
   const heldARA = computePortfolioARAByYear(holdings, tipsMarketData, refCPI);
-  const flags = detectBracketFlags({ heldARAByYear: heldARA, tipsMarketData, lastYear: 2039 });
+  const flags = detectBracketFlags({ heldARAByYear: heldARA, tipsMarketData, lastYear: BS.gap.last });
   assert('before-state: no lower-bracket holdings held → no flags', flags.size, 0);
 }
 
 // (b) 1-candidate case: exactly one lower-bracket year held and oversized → it alone is flagged.
 {
   const holdings = [
-    { cusip: '91282CBF7', qty: 10 }, // Jan 2031 — ordinary
-    { cusip: '91282CCM1', qty: 10 }, // Jul 2031 — ordinary
-    { cusip: '91282CGK1', qty: 200 }, // Jan 2033 — only lower candidate held, grossly oversized
-  ].filter(h => tipsMarketData.has(h.cusip));
+    ...BS.allIn(Y_ORD).slice(0, 2).map(b => ({ cusip: b.cusip, qty: 10 })), // ordinary
+    { cusip: BS.allIn(Y_C1)[0].cusip, qty: 200 }, // only lower candidate held, grossly oversized
+  ];
   const heldARA = computePortfolioARAByYear(holdings, tipsMarketData, refCPI);
-  const flags = detectBracketFlags({ heldARAByYear: heldARA, tipsMarketData, lastYear: 2039 });
-  assert('before-state: single held lower-bracket candidate flagged when oversized', flags.has(2033), true);
+  const flags = detectBracketFlags({ heldARAByYear: heldARA, tipsMarketData, lastYear: BS.gap.last });
+  assert('before-state: single held lower-bracket candidate flagged when oversized', flags.has(Y_C1), true);
   assert('before-state: single-candidate flag count === 1', flags.size, 1);
 }
 
@@ -2026,25 +2030,26 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
 // hand from the two real ARA figures, not read back from evenSpread/detectBracketFlags.
 {
   const holdings = [
-    { cusip: '91282CPU9', qty: 218 }, // Jan 2036
-    { cusip: '912810QF8', qty: 129 }, // Feb 2040
-  ].filter(h => tipsMarketData.has(h.cusip));
+    { cusip: BS.allIn(Y_LOW)[0].cusip, qty: 218 }, // the bracket year before the gap
+    { cusip: BS.upper.cusip, qty: 129 },           // the bracket year after the gap
+  ];
   const heldARA = computePortfolioARAByYear(holdings, tipsMarketData, refCPI);
-  const ara2036 = heldARA[2036], ara2040 = heldARA[2040];
-  const fairShare = (ara2036 + ara2040) / 5; // 2036..2040 inclusive = 5 rungs
+  const ara2036 = heldARA[Y_LOW], ara2040 = heldARA[Y_UP];
+  const rungs = Y_UP - Y_LOW + 1; // the two bracket years and every gap year between them
+  const fairShare = (ara2036 + ara2040) / rungs;
 
-  const flags = detectBracketFlags({ heldARAByYear: heldARA, tipsMarketData, lastYear: 2040 });
-  assert('two-holding: 2036 flags (its ARA exceeds the 5-rung fair share)', flags.has(2036), true);
-  assert('two-holding: 2040 ALSO flags (its ARA exceeds the fair share too, not just the larger of the two)', flags.has(2040), true);
-  assert('two-holding: flagged value is the 5-rung fair share, not a 2-point average', Math.round(flags.get(2036).value), Math.round(fairShare));
+  const flags = detectBracketFlags({ heldARAByYear: heldARA, tipsMarketData, lastYear: Y_UP });
+  assert('two-holding: the lower bracket year flags (its ARA exceeds the fair share)', flags.has(Y_LOW), true);
+  assert('two-holding: the upper bracket year ALSO flags (its ARA exceeds the fair share too, not just the larger of the two)', flags.has(Y_UP), true);
+  assert('two-holding: flagged value is the fair share over every rung, not a 2-point average', Math.round(flags.get(Y_LOW).value), Math.round(fairShare));
 
-  const gapYears = new Set(getGapYears(tipsMarketData).filter(y => y > 2036 && y < 2040));
-  const rangeARA = computePortfolioARAByYear(holdings, tipsMarketData, refCPI, { firstYear: 2036, lastYear: 2040 });
-  const { daraMap } = derivePerYearDara(rangeARA, getGapYearBracketCandidates(tipsMarketData, 2040), gapYears);
-  for (const y of [2037, 2038, 2039]) {
-    assert(`two-holding: gap year ${y} DARA is the 5-rung fair share`, Math.round(daraMap.get(y)), Math.round(fairShare));
+  const gapYears = new Set(getGapYears(tipsMarketData).filter(y => y > Y_LOW && y < Y_UP));
+  const rangeARA = computePortfolioARAByYear(holdings, tipsMarketData, refCPI, { firstYear: Y_LOW, lastYear: Y_UP });
+  const { daraMap } = derivePerYearDara(rangeARA, getGapYearBracketCandidates(tipsMarketData, Y_UP), gapYears);
+  for (let y = BS.gap.first; y <= BS.gap.last; y++) {
+    assert(`two-holding: gap year ${y} DARA is the fair share`, Math.round(daraMap.get(y)), Math.round(fairShare));
   }
-  console.log(`        fair share (5 rungs): ${Math.round(fairShare).toLocaleString()}  (vs. a 2-point average of ${Math.round((ara2036 + ara2040) / 2).toLocaleString()})`);
+  console.log(`        fair share (${rungs} rungs): ${Math.round(fairShare).toLocaleString()}  (vs. a 2-point average of ${Math.round((ara2036 + ara2040) / 2).toLocaleString()})`);
 }
 
 // (b) N-candidate case where MORE THAN ONE lower-candidate year is a genuine spike against the
