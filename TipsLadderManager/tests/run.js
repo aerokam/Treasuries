@@ -103,8 +103,8 @@ const refCPI = lookupRefCpi(refCpiRows, settleDateStr);
 if (refCPI == null) {
   const last = refCpiRows.length ? refCpiRows[refCpiRows.length - 1].date : '(none)';
   throw new Error(
-    `RefCPI fixture is stale: settlement ${settleDateStr} is beyond the last fixture date ${last}. ` +
-    `Refresh tests/e2e/RefCPI.csv from R2 (production keeps RefCPI through the last day of m+2). ` +
+    `R2's RefCPI.csv ends ${last}, before settlement ${settleDateStr}. ` +
+    `The monthly Ref CPI job keeps it through the last day of m+2; check that job. ` +
     `Exact-date lookup intentionally returns null beyond range — there is no snap-back.`
   );
 }
