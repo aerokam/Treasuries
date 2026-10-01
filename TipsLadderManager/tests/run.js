@@ -1720,13 +1720,13 @@ for (const gapFirstYear of GAP_YEARS) {
 // fund itself is the correct, expected report (the holder funds the difference), not a defect to
 // scale away.
 {
-  const lastYear = 2040, dara = 100000;
-  const b = runBuild({ dara, firstYear: 2026, lastYear, tipsMarketData, refCPI, settlementDate });
+  const lastYear = GAP.last + 1, dara = 100000, SYR = settlementDate.getFullYear();
+  const b = runBuild({ dara, firstYear: SYR, lastYear, tipsMarketData, refCPI, settlementDate });
   const holdings = b.details
     .map(d => ({ cusip: d.cusip, qty: (d.fundedYearQty || 0) + (d.excessQty || 0), excessQty: d.excessQty || 0 }))
     .filter(h => h.qty > 0);
   const plan = new Map();
-  for (let y = 2026; y <= lastYear; y++) plan.set(y, dara);
+  for (let y = SYR; y <= lastYear; y++) plan.set(y, dara);
 
   console.log('\nrunFundedRebalance — stated per-year plan: never scaled');
 
@@ -1735,7 +1735,7 @@ for (const gapFirstYear of GAP_YEARS) {
   const same = runFundedRebalance({
     dara, holdings, tipsMarketData, refCPI, settlementDate,
     daraByYear: plan, daraPlanUnedited: true, daraPlanIsStated: true,
-    firstYearOverride: 2026, lastYearOverride: lastYear,
+    firstYearOverride: SYR, lastYearOverride: lastYear,
   });
   assert('stated plan has a gap block to fund (else this test proves nothing)', same.summary.gapYears.length > 0, true);
   const moved = same.details.filter(d => Math.round((d.qtyAfter ?? 0) - (d.qtyBefore ?? 0)) !== 0).length;
@@ -1750,7 +1750,7 @@ for (const gapFirstYear of GAP_YEARS) {
   const res = runFundedRebalance({
     dara: Math.round(dara * 1.05), holdings, tipsMarketData, refCPI, settlementDate,
     daraByYear: aged, daraPlanUnedited: true, daraPlanIsStated: true,
-    firstYearOverride: 2026, lastYearOverride: lastYear,
+    firstYearOverride: SYR, lastYearOverride: lastYear,
   });
   const solved = res.summary.daraByYearResolved;
   assert('aged stated plan: run exactly as restated, no scale-down', Math.round(solved.get(2030)), Math.round(dara * 1.05));
@@ -1759,11 +1759,11 @@ for (const gapFirstYear of GAP_YEARS) {
 
   // 3. An edited stated plan (one row raised well above the rest, e.g. a holder adding cash to a
   //    single near-year rung) is honored exactly too — no sweep around it, no scale of any kind.
-  const edited = new Map(plan); edited.set(2026, dara * 2);
+  const edited = new Map(plan); edited.set(SYR, dara * 2);
   const resEdited = runFundedRebalance({
     dara, holdings, tipsMarketData, refCPI, settlementDate,
     daraByYear: edited, daraPlanUnedited: false, daraPlanIsStated: true,
-    firstYearOverride: 2026, lastYearOverride: lastYear,
+    firstYearOverride: SYR, lastYearOverride: lastYear,
   });
   const solvedEdited = resEdited.summary.daraByYearResolved;
   assert('edited stated plan: raised row keeps its exact edited value', Math.round(solvedEdited.get(2026)), dara * 2);
@@ -2660,8 +2660,8 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
 console.log('\nGap average duration — cost-weighted');
 {
   const _d = new Map();
-  for (let y = 2026; y <= 2047; y++) _d.set(y, 40000);
-  _d.set(2037, 15000); _d.set(2039, 90000);
+  for (let y = settlementDate.getFullYear(); y <= 2047; y++) _d.set(y, 40000);
+  _d.set(GAP.first, 15000); _d.set(GAP.last, 90000);
   const { summary: _s } = runBuild({ dara: 40000, lastYear: 2047, tipsMarketData, refCPI, settlementDate, daraByYear: _d });
   const _bd = _s.gapParams.breakdown;
   const _costSum = _bd.reduce((a, g) => a + g.qty * g.costPerBond, 0);
@@ -2682,7 +2682,7 @@ console.log('\nGap Dur popup — the duration match row is computed, not restate
   // not reach the average still displayed as if it had. Feed weights that miss the average on
   // purpose and check the row shows what they actually produce.
   const _dara = 20000;
-  const { details: _bD } = runBuild({ dara: _dara, lastYear: 2057, tipsMarketData, refCPI, settlementDate });
+  const { details: _bD } = runBuild({ dara: _dara, lastYear: MAX_YEAR + 1, tipsMarketData, refCPI, settlementDate });
   const _holdings = _bD.map(d => ({ cusip: d.cusip, qty: d.fundedYearQty + d.excessQty, excessQty: d.excessQty }))
                        .filter(h => h.qty > 0);
   const { summary: _s } = runRebalance({ dara: _dara, bracketMode: '2bracket', holdings: _holdings, tipsMarketData, refCPI, settlementDate });
@@ -2755,7 +2755,7 @@ console.log('\nFuture 30Y Dur popup — cost-weighted average, computed match, c
   // A Future 30Y run long enough that the hypothetical rungs differ in duration and in cost, so a
   // simple mean and a cost-weighted mean are different numbers. The popup labelled its total
   // "Avg (sum / count)" while the value beside it was the cost-weighted one.
-  const { summary: s } = runBuild({ dara: 20000, lastYear: 2062, tipsMarketData, refCPI, settlementDate });
+  const { summary: s } = runBuild({ dara: 20000, lastYear: MAX_YEAR + 6, tipsMarketData, refCPI, settlementDate });
   const bd = s.future30yParams.breakdown;
   assert('Future 30Y run spans several years (else this proves nothing)', bd.length > 2, true);
 
