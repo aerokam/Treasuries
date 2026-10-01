@@ -344,6 +344,30 @@ per-CUSIP prices for a past date (3.1 §4.0).
 - **Status:** open.
 ## FIXED
 
+### inferFirstYearFromHoldings required the pre-gap anchor to be a January maturity
+
+- **Found:** 2026-09-30 (jobs session, handed off), while fixing the broker-download fixture
+  pipeline: Build now buys Jul 2036 (91282CRE3) as the Active Lower Bracket (latest-maturing TIPS
+  below the structural gap, DD #active-lower-bracket) rather than a January bond. A Format 4/5
+  holdings file with no explicit `#fundedYear,dara` block, for a ladder whose true first year is
+  inside the structural gap (2037-2039), relies on `inferFirstYearFromHoldings`
+  (`src/rebalance-lib.js`) to recover that true first year from the retained lower-bracket excess —
+  and that function hardcoded "the anchor bond must mature in January," so it returned `null` for
+  any such ladder once the real active lower bracket became a July bond.
+- **Root cause:** the January check was never a real structural rule — it happened to be true only
+  because the Active Lower Bracket was a January bond at the time the function was written. The real
+  invariant is that the anchor is the canonical Active Lower Bracket (the latest-maturing TIPS below
+  the gap, from `tipsMarketData` alone, independent of month).
+- **Fix:** replaced the January-month check with the same canonical Active Lower Bracket computation
+  `runRebalance`'s 2-bracket override already uses, so the inference now works regardless of which
+  month the active lower bracket's own bond happens to mature in.
+- **Verified:** all 454 unit + 87 e2e tests pass unchanged (the committed test fixture still predates
+  Jul 2036, so this path isn't exercised by `npm test` yet). Reproduced the fix live against current
+  market data directly: `inferFirstYearFromHoldings` now correctly recovers firstYear 2037/2038/2039
+  for a ladder built over the gap and round-tripped through a Format 5 holdings file, where it
+  previously returned `null` for all three.
+- **Files:** `src/rebalance-lib.js`.
+
 ### Gap years with no coverage intent were inflated into a ~5x whole-ladder blow-up
 
 - **Found:** 2026-09-30, from a real account (McNeill Joint WROS, loaded via Fidelity all-accounts

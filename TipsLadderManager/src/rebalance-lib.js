@@ -188,10 +188,6 @@ export function inferFirstYearFromHoldings({ holdings, tipsMarketData, refCPI, s
   const firstYearExcess = firstYearH.reduce((s, h) => s + h.excessQty, 0);
   if (firstYearExcess !== firstYearTotal) return null;
 
-  // derivedFirstYear bond must be a Jan maturity (pre-gap anchor).
-  const bond0 = tipsMarketData.get(firstYearH[0].cusip);
-  if (!bond0 || bond0.maturity.getMonth() + 1 !== 1) return null;
-
   // Build structural gap: consecutive years below 2040 with no TIPS issued.
   const tipsMapYears = new Set([...tipsMarketData.values()].filter(b => b.maturity).map(b => b.maturity.getFullYear()));
   const structuralGap = [];
@@ -200,7 +196,24 @@ export function inferFirstYearFromHoldings({ holdings, tipsMarketData, refCPI, s
     else break;
   }
   if (!structuralGap.length) return null;
+  const minGapYear = structuralGap[structuralGap.length - 1]; // lowest gap year found, before reversing to ascending
   structuralGap.reverse(); // ascending: [2037, 2038, 2039]
+
+  // derivedFirstYear bond must be the canonical Active Lower Bracket -- the latest-maturing TIPS
+  // below the structural gap (DATA_DICTIONARY.md #active-lower-bracket; same computation runRebalance's
+  // 2-bracket override uses), not specifically a January maturity. (Fixed 2026-09-30: this previously
+  // required a January maturity outright, which coincidentally held until the active lower bracket
+  // itself became a July bond -- Build now buys Jul 2036 there -- so this inference always returned
+  // null for any ladder reaching the gap built or imported without an explicit #fundedYear,dara block.)
+  let activeLowerBracketYear = null, activeLowerBracketMaturity = null;
+  for (const b of tipsMarketData.values()) {
+    if (!b.maturity) continue;
+    const yr = b.maturity.getFullYear();
+    if (yr < minGapYear && (!activeLowerBracketMaturity || b.maturity > activeLowerBracketMaturity)) {
+      activeLowerBracketYear = yr; activeLowerBracketMaturity = b.maturity;
+    }
+  }
+  if (derivedFirstYear !== activeLowerBracketYear) return null;
 
   // Total P+I of excess bonds ≈ numGapYears × DARA  (spec §Gap Year Coverage Model).
   // Use this to directly compute numGapYears = round(totalExcessPI / roughDARA).
