@@ -408,11 +408,11 @@ console.log('\n3-bracket real-holdings reconciliation (distinct orig-lower/new-l
     // Before the bracketWeightsN fix the retained leg was priced at the active bracket's
     // duration, so this landed short and nothing noticed. Spec 2.0 §Retained Bracket Excess.
     {
-      const blend = (summary.origLowerWeight ?? 0) * summary.lowerDuration
+      const blend = summary.retainedLegs.reduce((s, l) => s + l.weight * l.duration, 0)
                   + (summary.newLowerWeight3 ?? 0) * summary.newLowerDuration
                   + (summary.upperWeight     ?? 0) * summary.upperDuration;
-      const wSum  = (summary.origLowerWeight ?? 0) + (summary.newLowerWeight3 ?? 0) + (summary.upperWeight ?? 0);
-      assert('3B real: bracket weights sum to 1 across all three legs', wSum, 1, 1e-9);
+      const wSum  = summary.retainedLegs.reduce((s, l) => s + l.weight, 0) + (summary.newLowerWeight3 ?? 0) + (summary.upperWeight ?? 0);
+      assert('3B real: bracket weights sum to 1 across every retained leg, the active lower bracket and the upper bracket', wSum, 1, 1e-9);
       assert('3B real: realized duration matches the gap block average', blend, summary.gapParams.avgDuration, 1e-6);
       console.log('        legs: retained ' + (summary.origLowerWeight ?? 0).toFixed(4) + '@' + summary.lowerDuration.toFixed(3)
         + '  active ' + (summary.newLowerWeight3 ?? 0).toFixed(4) + '@' + summary.newLowerDuration.toFixed(3)
@@ -471,19 +471,19 @@ console.log('\n3-bracket real-holdings reconciliation (distinct orig-lower/new-l
       const { summary: s2, details: dt2 } = runRebalance({ dara, bracketMode: '3bracket', holdings: fat, tipsMarketData, refCPI, settlementDate });
 
       assert('3B retained: retained leg actually carries excess', (s2.origLowerWeight ?? 0) > 0, true);
-      const blend2 = (s2.origLowerWeight ?? 0) * s2.lowerDuration
+      const blend2 = s2.retainedLegs.reduce((s, l) => s + l.weight * l.duration, 0)
                    + (s2.newLowerWeight3 ?? 0) * s2.newLowerDuration
                    + (s2.upperWeight     ?? 0) * s2.upperDuration;
       assert('3B retained: weights sum to 1',
-        (s2.origLowerWeight ?? 0) + (s2.newLowerWeight3 ?? 0) + (s2.upperWeight ?? 0), 1, 1e-9);
+        s2.retainedLegs.reduce((s, l) => s + l.weight, 0) + (s2.newLowerWeight3 ?? 0) + (s2.upperWeight ?? 0), 1, 1e-9);
       assert('3B retained: realized duration matches the gap block average',
         blend2, s2.gapParams.avgDuration, 1e-6);
 
       // What the pre-fix code would have produced on this same portfolio: retained dollars
       // priced at the ACTIVE bracket's duration, upper weight never recompensated.
       const old = bracketWeights(s2.newLowerDuration, s2.upperDuration, s2.gapParams.avgDuration);
-      const wRet = s2.origLowerWeight ?? 0;
-      const oldBlend = wRet * s2.lowerDuration
+      const wRet = s2.retainedLegs.reduce((s, l) => s + l.weight, 0);
+      const oldBlend = s2.retainedLegs.reduce((s, l) => s + l.weight * l.duration, 0)
                      + Math.max(0, old.lowerWeight - wRet) * s2.newLowerDuration
                      + old.upperWeight * s2.upperDuration;
       assert('3B retained: pre-fix treatment really did under-match this portfolio',
