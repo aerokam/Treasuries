@@ -45,5 +45,4 @@ YieldCurves/scripts/testCdpLogin.js
 # Cross-app research: scripts + write-ups are committed, fetched/generated data is not
 research/*/data/
 
-# Market-data test fixtures, downloaded from R2 before each test run (tests/refresh-market-fixtures.js)
-TipsLadderManager/tests/e2e/market/
+

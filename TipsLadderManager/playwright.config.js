@@ -8,7 +8,6 @@ const PORT = process.env.TLM_TEST_PORT || 8080;
 
 export default defineConfig({
   testDir: 'tests',
-  globalSetup: './tests/global-setup.js',
   // Failures should fail fast, but the cap must sit just ABOVE the spec's inline { timeout: 4_000 }
   // assertion waits, else a slow-but-legit test races the cap and flakes. 4.5s is that floor; to go
   // shorter, lower the per-assertion 4_000 waits in app.spec.js too.
