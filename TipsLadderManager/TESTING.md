@@ -34,12 +34,33 @@ regenerates these from the real account each time it runs (see Process below); a
 today's CUSIPs would fail the next time that script runs, for a reason that has nothing to do with a
 real regression.
 
+**Holdings a test actually constructs come from one of three places, never a copy of a real
+account:** a Build export (a real user flow — build a ladder, export it, use that as the holdings
+file), hand-made bond rows (a synthetic market built for the test), or a small synthetic far-future
+market (the broker-format parser tests use maturities in 2098/99 specifically so they never collide
+with real issuance). `SampleHoldings.csv` itself is reserved for properties that hold for any
+holdings, never a specific-CUSIP assertion.
+
+**E2E years are written relative to the settlement year, not as literals** — a gap year is `SY + n`,
+read from the First Year dropdown, never a hardcoded calendar year, for the same reason as the
+derived structural roles above. The Available Cash maturity test names the bonds maturing this year
+by looking them up in TIPS reference data rather than hardcoding a CUSIP, and skips — with a stated
+reason, not silently — only in the days before the first maturity of the year, when there is
+genuinely nothing yet to test.
+
 ## Don't build fixtures for the hypothetical
 
 Prefer the formats actually seen in the wild — a real broker export, this app's own current
 Holdings/DARA-plan export format — over hand-built files covering a corner case nothing has actually
 produced. A fixture for a case that doesn't occur is speculative coverage: it can't be checked against
 reality, and it's one more file to keep in sync with the export format as that format evolves.
+
+**Removed under this rule:** `tests/fixtures/yearago/`, `tests/dev/{SampleHoldingsSnapshot,
+RetainedExcessTwoYears, TipsLadderCom, CusipQtyExcess}.csv`, `tests/e2e/{OfxInteriorHoles,
+CusipQtyEmptyRung}.csv` — hand-built corner cases, not current formats. `3.0 TIPS Ladder
+Rebalancing §DARA Reference Date` has been updated to stop citing the removed year-ago fixtures;
+`KNOWN_ISSUES.md` still mentions `tests/fixtures/yearago/` in its own historical entries (that file
+is `ladder` session's, left as-is — a historical log, not a live reference).
 
 ## "Round trip"
 
@@ -67,8 +88,30 @@ direction being the real invariant to test.
 A test helper that quietly filters out or skips what it can't find (`.filter(h =>
 tipsMarketData.has(h.cusip))`, `if (existsSync(...))`) makes a broken assumption shrink the test's
 coverage instead of failing it — the test still goes green, just checking less than it claims to.
-About a dozen of these remain in `tests/run.js`, not yet swept; each one found should fail loudly
-(throw, not filter) rather than being patched quietly in place.
+**Done** (`7d90508` and earlier): no test filters out a missing bond or skips a missing file anymore —
+a missing `SampleHoldings.csv` or fixture now fails loudly instead.
+
+## Structure comes from the market, not literals
+
+A test does not hardcode which year is the structural gap, which TIPS is the active lower bracket,
+or where the ladder ends — those shift as Treasury issues. `tests/ladder-fixtures.js`'s `ladderRoles`
+derives the gap, the active lower bracket (the latest-maturing TIPS before the gap), the upper
+bracket, and the last maturity year from the outstanding TIPS themselves, each run; Build/Rebalance
+tests read those derived roles rather than a written-in year. The Future 30Y cover pair is the one
+exception — it stays the 2056 and 2052 TIPS (2.0 TIPS Ladders line 676), a fact the spec states
+outright rather than something a test derives from the market.
+
+Two Treasury issue dates change this structure and are worth knowing about when a test starts
+failing for no apparent reason: the January 2027 auction of the Jan 2037 10-year narrows the
+2037-39 gap to 2038-39, and the February 2027 auction of the Feb 2057 30-year moves the Future 30Y
+boundary. A verification harness (not a committed test) simulates a March 2027 market —
+`sim-year-turn.cjs` — to check the suite still holds up after either issue lands; run it after any
+change that touches ladder structure. As of this writing it fails two tests that are open engine
+questions, not a harness problem (see `ladder` session for status).
+
+**Known coverage gap:** the 3-bracket custom-plan reallocation signature (the active bond still
+being bought alongside large retained legs) could not be reproduced as a fixture. The relevant test
+asserts the invariants that must hold at every cut instead of reproducing that exact signature.
 
 ## Process: the fixture-refresh pipeline
 
@@ -77,3 +120,8 @@ fixtures above from the real account and commits + pushes the refresh. `.githook
 full unit and E2E suites and blocks that push (or any push) on a failure — this file's rulings exist
 to keep that gate meaningful rather than a thing contributors route around. The ingestion scripts
 themselves (what fetches and writes R2) are specified at 3.1 Data Pipeline §2.0, not here.
+
+**Committing `tests/run.js`:** its blob is stored with CRLF line endings, and `git commit -- <path>`
+under `core.autocrlf=true` can silently convert it to LF — a whole-file diff that looks like a
+rewrite. After committing a change to this file, check `git show HEAD:TipsLadderManager/tests/run.js
+| grep -c $'\r'` to confirm the line endings survived.
