@@ -206,7 +206,7 @@ function assertReconciles(details, label) {
 // ── Helper: Run Full Rebalance on a holdings file (per-year ARA path) ────────
 function runFullRebalanceTest(name, filePath) {
   const fullPath = path.resolve(filePath);
-  if (!existsSync(fullPath)) return;
+  if (!existsSync(fullPath)) throw new Error('tests need ' + fullPath + ' but it is missing');
 
   console.log(`\n${name} — Full rebalance (per-year ARA path)`);
   console.log(`  Input: ${fullPath}`);
@@ -296,36 +296,29 @@ runFullRebalanceTest('SampleHoldings (richest IRA)', './data/SampleHoldings.csv'
   }
 }
 
-// 2. Regression: portfolio with no 2040+ bonds — lastYear must stop at 2035, not extend to 2045
-//    (Bug: lastYear derivation incorrectly reached into >2040 holdings when 2040 not held,
-//     causing spurious gap/bracket rows and rebuilding 2045/2051 as funded rungs.)
-//    Uses Owner8_IRA 2031-2035 bonds (far from maturity, stable for years).
+// 2. Regression: portfolio with no upper-bracket-year or later bonds: lastYear must stop at the last year held,
+//    not extend into the long tier
+//    (Bug: lastYear derivation incorrectly reached into later holdings when the upper bracket year was not held,
+//     causing spurious gap/bracket rows and rebuilding long-tier years as funded rungs.)
+//    Holds every bond of the five years ending two years before the gap.
 {
-  console.log('\nIRA 2031-2035 — lastYear regression (no 2040+ in holdings)');
-  const holdingsCsv = [
-    'cusip,qty',
-    '91282CBF7,6',   // Jan 2031
-    '91282CCM1,9',   // Jul 2031
-    '91282CDX6,7',   // Jan 2032
-    '91282CEZ0,9',   // Jul 2032
-    '91282CGK1,10',  // Jan 2033
-    '91282CHP9,7',   // Jul 2033
-    '91282CJY8,30',  // Jan 2034
-    '91282CML2,14',  // Jan 2035
-    '91282CNS6,4',   // Jul 2035
-  ].join('\n');
-  const holdings = parseHoldings(holdingsCsv);
+  console.log('');
+  console.log('Five ordinary years — lastYear regression (nothing from the upper bracket year on)');
+  const roles2 = ladderRoles(tipsMarketData, settlementDate);
+  const LAST_HELD = roles2.gap.first - 2;
+  const holdings = [];
+  for (let y = LAST_HELD - 4; y <= LAST_HELD; y++) for (const b of roles2.allIn(y)) holdings.push({ cusip: b.cusip, qty: 7 });
   const rawARA2 = computePortfolioARAByYear(holdings, tipsMarketData, refCPI);
   const bc2 = getGapYearBracketCandidates(tipsMarketData);
   const { daraMap: daraMap2 } = derivePerYearDara(rawARA2, bc2);
   const { scaledMap: sMap2, scaledMedian: sDara2 } = inferScaledDARAFromPortfolio({ daraMap: daraMap2, holdings, tipsMarketData, refCPI, settlementDate });
   const { summary, details } = runRebalance({ dara: sDara2, holdings, tipsMarketData, refCPI, settlementDate, daraByYear: sMap2 });
 
-  assert('lastYear === 2035',   summary.lastYear, 2035);
-  assert('no 2040 funded rung', details.some(d => d.fundedYear === 2040), false);
+  assert('lastYear is the last year held',   summary.lastYear, LAST_HELD);
+  assert('no upper bracket year funded rung', details.some(d => d.fundedYear === roles2.gap.last + 1), false);
   // Key regression: long-tier bonds beyond lastYear must NOT be rebuilt
-  const d2045 = details.find(d => d.cusip === '912810RL4');
-  const d2051 = details.find(d => d.cusip === '912810SV1');
+  const d2045 = details.find(d => d.cusip === roles2.latestIn(roles2.gap.last + 6).cusip);
+  const d2051 = details.find(d => d.cusip === roles2.latestIn(roles2.gap.last + 12).cusip);
   const delta2045 = d2045 ? (d2045.qtyAfter - d2045.qtyBefore) : 0;
   const delta2051 = d2051 ? (d2051.qtyAfter - d2051.qtyBefore) : 0;
   assert('2045 not rebuilt (qtyDelta 0 or absent)', delta2045, 0);
@@ -336,52 +329,68 @@ runFullRebalanceTest('SampleHoldings (richest IRA)', './data/SampleHoldings.csv'
   console.log(`        netCash:       ${Math.round(summary.costDeltaSum).toLocaleString()}`);
 }
 
-// ── Test: Format 4 parsing (TipsLadderCom — no header, multi-row per CUSIP) ──
+// ── Test: Format 4 parsing (no header, multi-row per CUSIP) ──
+// A Format 4 export states a funded quantity and bracket excess as one row per (CUSIP, funded year). The file is
+// generated from the outstanding TIPS: one bond per ordinary year, the lower bracket split across its own year and
+// the gap years, and the upper bracket likewise.
 {
-  const filePath = path.resolve('./tests/dev/TipsLadderCom.csv');
-  if (existsSync(filePath)) {
-    console.log('\nFormat 4 (TipsLadderCom) — parsing + 3-bracket validation');
-    const holdings = parseHoldingsCSV(readFileSync(filePath, 'utf8'), tipsMarketData);
+  console.log('');
+  console.log('Format 4 — parsing + 3-bracket validation');
+  const roles = ladderRoles(tipsMarketData, settlementDate);
+  // The held lower bracket: the earlier bond of the lower bracket year when it has two (the one a previous
+  // rebalance bought as the then-active bracket), otherwise the active lower bracket itself.
+  const heldLower = roles.allIn(roles.gap.first - 1)[0];
+  const upper = roles.upper;
+  const lowerExcessRows = [6, 4, 2].slice(0, GAP_YEARS.length);
+  const upperExcessRows = [1, 3, 4].slice(0, GAP_YEARS.length);
+  const sum = a => a.reduce((x, y) => x + y, 0);
+  const ordinary = roles.ordinaryYears.map(y => ({ bond: roles.latestIn(y), year: y }));
+  const rows = [
+    ...ordinary.map(o => [o.bond.cusip, 6, o.year]),
+    [heldLower.cusip, 8, heldLower.year], ...lowerExcessRows.map((q, i) => [heldLower.cusip, q, GAP_YEARS[i]]),
+    ...upperExcessRows.map((q, i) => [upper.cusip, q, GAP_YEARS[i]]), [upper.cusip, 5, upper.year],
+  ];
+  {
+    const holdings = parseHoldingsCSV(rows.map(r => r.join(', ')).join(String.fromCharCode(10)), tipsMarketData);
 
-    // Verify funded/excess split: CPU9 (Jan 2036) = 8 funded + (6+4+2)=12 excess
-    const cpu9 = holdings.find(h => h.cusip === '91282CPU9');
-    assert('F4: CPU9 total qty === 20',    cpu9?.qty,       20);
-    assert('F4: CPU9 excessQty === 12',   cpu9?.excessQty, 12);
+    // Funded/excess split: the lower bracket = 8 funded + the excess rows
+    const low = holdings.find(h => h.cusip === heldLower.cusip);
+    assert('F4: lower bracket total qty = funded + excess rows', low?.qty, 8 + sum(lowerExcessRows));
+    assert('F4: lower bracket excessQty = the excess rows', low?.excessQty, sum(lowerExcessRows));
 
-    // QF8 (Feb 2040) = 5 funded + (1+3+4)=8 excess
-    const qf8 = holdings.find(h => h.cusip === '912810QF8');
-    assert('F4: QF8 total qty === 13',    qf8?.qty,       13);
-    assert('F4: QF8 excessQty === 8',     qf8?.excessQty,  8);
+    // The upper bracket = 5 funded + the excess rows
+    const up = holdings.find(h => h.cusip === upper.cusip);
+    assert('F4: upper bracket total qty = funded + excess rows', up?.qty, 5 + sum(upperExcessRows));
+    assert('F4: upper bracket excessQty = the excess rows', up?.excessQty, sum(upperExcessRows));
 
     // Non-bracket CUSIPs have no excess (single row each)
-    const cfr7 = holdings.find(h => h.cusip === '91282CFR7');
-    assert('F4: CFR7 excessQty === 0',    cfr7?.excessQty ?? 0, 0);
+    const plain = holdings.find(h => h.cusip === ordinary[0].bond.cusip);
+    assert('F4: an ordinary year has excessQty === 0', plain?.excessQty ?? 0, 0);
 
     // Run rebalance — excessQtyBefore uses funded-first rule (LMI formula), not h.excessQty
     const dara = 20000;
     const { summary, details } = runRebalance({ dara, bracketMode: '3bracket', holdings, tipsMarketData, refCPI, settlementDate });
 
-    assert('F4: origLower IS Jan 2036', summary.brackets.lowerCUSIP === '91282CPU9', true);
-    // summary.brackets.lowerCUSIP is identifyBrackets' raw excess-ARA pick, which the file fixes at
-    // CPU9. The canonical Active Lower Bracket (newLowerCUSIP) comes from the market data alone: the
-    // latest-maturing TIPS before the gap (2.0 §Retained Bracket Excess; DD §Active Lower Bracket).
-    // When it is the held bond itself nothing is retained and the weights reduce to the plain 2-bracket
-    // ones (origLowerWeight 0). When a newer bond has been issued (Jul 2036), the held bond is a retained
-    // maturity relative to it and carries real duration-match weight, strictly between 0 and 1.
-    const activeLower = ladderRoles(tipsMarketData, settlementDate).activeLower;
-    assert('F4: newLowerCUSIP is the canonical Active Lower Bracket', summary.newLowerCUSIP, activeLower.cusip);
-    if (activeLower.cusip === '91282CPU9') {
+    // summary.brackets.lowerCUSIP is identifyBrackets' raw excess-ARA pick, which the file fixes at the held
+    // lower bracket. The canonical Active Lower Bracket (newLowerCUSIP) comes from the market data alone: the
+    // latest-maturing TIPS before the gap (2.0 §Retained Bracket Excess; DD §Active Lower Bracket). When it is
+    // the held bond itself nothing is retained and the weights reduce to the plain 2-bracket ones
+    // (origLowerWeight 0). When a newer bond has been issued, the held bond is a retained maturity relative to
+    // it and carries real duration-match weight, strictly between 0 and 1.
+    assert('F4: the raw lower bracket pick is the held lower bracket', summary.brackets.lowerCUSIP, heldLower.cusip);
+    assert('F4: newLowerCUSIP is the canonical Active Lower Bracket', summary.newLowerCUSIP, roles.activeLower.cusip);
+    if (heldLower.cusip === roles.activeLower.cusip) {
       assert('F4: origLowerWeight is 0 (the held bond is itself the active lower bracket)', summary.origLowerWeight, 0);
     } else {
       assert('F4: origLowerWeight is strictly between 0 and 1 (the held bond is retained)', summary.origLowerWeight > 0 && summary.origLowerWeight < 1, true);
     }
 
-    const jan2036 = details.find(d => d.cusip === '91282CPU9' && d.isBracketTarget);
-    // Format 4 has explicit excessQty=12 — the import value is used for the funded/excess split.
-    assert('F4: CPU9 excessQtyBefore === 12', jan2036?.excessQtyBefore, 12);
-    assert('F4: CPU9 fundedYearQtyBefore === 8', jan2036?.fundedYearQtyBefore, 8);
-    console.log(`        CPU9 before:   funded=${jan2036?.fundedYearQtyBefore} excess=${jan2036?.excessQtyBefore}`);
-    console.log(`        QF8 total:     ${qf8?.qty}  excess=${qf8?.excessQty}`);
+    const lowRow = details.find(d => d.cusip === heldLower.cusip && d.isBracketTarget);
+    // Format 4 has explicit excess rows — the import value is used for the funded/excess split.
+    assert('F4: lower bracket excessQtyBefore = the imported excess', lowRow?.excessQtyBefore, sum(lowerExcessRows));
+    assert('F4: lower bracket fundedYearQtyBefore = the imported funded quantity', lowRow?.fundedYearQtyBefore, 8);
+    console.log(`        lower bracket before: funded=${lowRow?.fundedYearQtyBefore} excess=${lowRow?.excessQtyBefore}`);
+    console.log(`        upper bracket total:  ${up?.qty}  excess=${up?.excessQty}`);
   }
 }
 
@@ -661,37 +670,57 @@ console.log('\n3-bracket real-holdings reconciliation (distinct orig-lower/new-l
   }
 }
 
+// The parser tests below resolve a bond by its CUSIP (Formats 1, 2, 5) or by the coupon and maturity in its name
+// (Format 3). They need some bonds in a market, not particular real ones, so they run on a small synthetic
+// market whose maturities lie far out (2098/2099) and so cannot age.
+const parseMkt = buildTipsMarketData([
+  { cusip: 'PARSEAAA1', maturity: '2098-01-15', coupon: 0.01875, datedDateRefCpi: 300, price: 100, yield: 0.02 },
+  { cusip: 'PARSEBBB2', maturity: '2098-02-15', coupon: 0.02125, datedDateRefCpi: 300, price: 100, yield: 0.02 },
+  { cusip: 'PARSECCC3', maturity: '2098-02-15', coupon: 0.01,    datedDateRefCpi: 300, price: 100, yield: 0.02 },
+  { cusip: 'PARSEDDD4', maturity: '2099-02-15', coupon: 0.01,    datedDateRefCpi: 300, price: 100, yield: 0.02 },
+  { cusip: 'PARSEEEE5', maturity: '2099-04-15', coupon: 0.0125,  datedDateRefCpi: 300, price: 100, yield: 0.02 },
+  { cusip: 'PARSEFFF6', maturity: '2099-07-15', coupon: 0.0125,  datedDateRefCpi: 300, price: 100, yield: 0.02 },
+]);
+
 // ── Test: Format 5 parsing (cusip,qty,excess header) ─────────────────────────
 {
   console.log('\nFormat 5 (inline) — parsing: header detection + excessQty');
   const csv5 = [
     'cusip,qty,excess',
-    '91282CPU9,0,33',    // all excess (PLI-zeroed funded)
-    '912810QF8,19,24',   // funded + excess
-    '912810QP6,20,0',    // funded only
-    '912810QV3,21,0',
+    'PARSEAAA1,0,33',    // all excess (PLI-zeroed funded)
+    'PARSEBBB2,19,24',   // funded + excess
+    'PARSEEEE5,20,0',    // funded only
+    'PARSEFFF6,21,0',
   ].join('\n');
-  const h5 = parseHoldingsCSV(csv5, tipsMarketData);
+  const h5 = parseHoldingsCSV(csv5, parseMkt);
 
-  const cpu9_5 = h5.find(h => h.cusip === '91282CPU9');
+  const cpu9_5 = h5.find(h => h.cusip === 'PARSEAAA1');
   assert('F5: CPU9 total qty === 33',   cpu9_5?.qty,       33);
   assert('F5: CPU9 excessQty === 33',   cpu9_5?.excessQty, 33);
 
-  const qf8_5 = h5.find(h => h.cusip === '912810QF8');
+  const qf8_5 = h5.find(h => h.cusip === 'PARSEBBB2');
   assert('F5: QF8 total qty === 43',    qf8_5?.qty,        43);
   assert('F5: QF8 excessQty === 24',    qf8_5?.excessQty,  24);
 
-  const qp6_5 = h5.find(h => h.cusip === '912810QP6');
+  const qp6_5 = h5.find(h => h.cusip === 'PARSEEEE5');
   assert('F5: QP6 total qty === 20',    qp6_5?.qty,        20);
   assert('F5: QP6 excessQty === 0',     qp6_5?.excessQty,  0);
 }
 
-// ── Test: Format 5 from file (tests/dev/CusipQtyExcess.csv) ─────────────────
+// ── Test: Format 5 from an exported ladder (cusip,qty,excess) ─────────────────
+// The file is what Build's holdings export writes: a built ladder with one row per bond and its excess.
 {
-  const filePath = path.resolve('./tests/dev/CusipQtyExcess.csv');
-  if (existsSync(filePath)) {
-    console.log('\nFormat 5 (CusipQtyExcess.csv) — file-based parsing + rebalance');
-    const holdings = parseHoldingsCSV(readFileSync(filePath, 'utf8'), tipsMarketData);
+  console.log('');
+  console.log('Format 5 (exported Build ladder) — parsing + rebalance');
+  const roles5 = ladderRoles(tipsMarketData, settlementDate);
+  const built5 = runBuild({ dara: 30000, firstYear: roles5.ordinaryYears[0], lastYear: roles5.gap.last + 10, tipsMarketData, refCPI, settlementDate });
+  const lines5 = ['cusip,qty,excess'];
+  for (const d of built5.details) {
+    const f = d.fundedYearQty || 0, x = d.excessQty || 0;
+    if (f + x > 0) lines5.push(d.cusip + ',' + (f + x) + ',' + x);
+  }
+  {
+    const holdings = parseHoldingsCSV(lines5.join(String.fromCharCode(10)), tipsMarketData);
 
     // Every row must produce a valid excessQty (not undefined)
     const missingExcess = holdings.filter(h => h.excessQty == null);
@@ -715,22 +744,22 @@ console.log('\n3-bracket real-holdings reconciliation (distinct orig-lower/new-l
   console.log('\nFormat 1 (Fidelity) — broker import parsing');
   const csv1 = [
     'Account Number,Account Name,Symbol,Description,Quantity,Last Price,Current Value,Type',
-    'X11111111,Owner8 IRA,91282CPU9,TIPS 0.125% 01/15/2031,5000,$100.00,$500000,Cash',
-    'X11111111,Owner8 IRA,912810QF8,TIPS 0.25% 02/15/2040,8000,$100.00,$800000,Cash',
+    'X11111111,Owner8 IRA,PARSEAAA1,TIPS 0.125% 01/15/2031,5000,$100.00,$500000,Cash',
+    'X11111111,Owner8 IRA,PARSEBBB2,TIPS 0.25% 02/15/2040,8000,$100.00,$800000,Cash',
     'X11111111,Owner8 IRA,FDLXX,FIDELITY MONEY MARKET,1234.56,$1.00,$1234.56,Cash',
-    'X22222222,Owner2 IRA,91282CPU9,TIPS 0.125% 01/15/2031,3000,$100.00,$300000,Cash',
+    'X22222222,Owner2 IRA,PARSEAAA1,TIPS 0.125% 01/15/2031,3000,$100.00,$300000,Cash',
     'X22222222,Owner2 IRA,VTI,VANGUARD TOTAL STOCK,50,$200.00,$10000,Cash',
   ].join('\n');
-  const { holdings, tipsValues, totalAccountValues } = parseBrokerCSV(csv1, tipsMarketData);
+  const { holdings, tipsValues, totalAccountValues } = parseBrokerCSV(csv1, parseMkt);
   const accounts = holdings;
 
   assert('F1: Owner8 IRA has 2 TIPS', accounts['Owner8 IRA']?.length, 2);
-  const cpu9 = accounts['Owner8 IRA']?.find(h => h.cusip === '91282CPU9');
+  const cpu9 = accounts['Owner8 IRA']?.find(h => h.cusip === 'PARSEAAA1');
   assert('F1: CPU9 qty === 5', cpu9?.qty, 5);
-  const qf8 = accounts['Owner8 IRA']?.find(h => h.cusip === '912810QF8');
+  const qf8 = accounts['Owner8 IRA']?.find(h => h.cusip === 'PARSEBBB2');
   assert('F1: QF8 qty === 8', qf8?.qty, 8);
   assert('F1: FDLXX filtered out', accounts['Owner8 IRA']?.find(h => h.cusip === 'FDLXX'), undefined);
-  assert('F1: Owner2 IRA CPU9 qty === 3', accounts['Owner2 IRA']?.find(h => h.cusip === '91282CPU9')?.qty, 3);
+  assert('F1: Owner2 IRA CPU9 qty === 3', accounts['Owner2 IRA']?.find(h => h.cusip === 'PARSEAAA1')?.qty, 3);
   assert('F1: VTI filtered out', accounts['Owner2 IRA']?.find(h => h.cusip === 'VTI'), undefined);
   console.log(`        accounts: ${Object.keys(accounts).join(', ')}`);
 }
@@ -743,51 +772,51 @@ console.log('\n3-bracket real-holdings reconciliation (distinct orig-lower/new-l
     '',
     '"Owner8 IRA ...1234"',
     '"Symbol","Description","Qty (Quantity)","Price","Mkt Val (Market Value)","Asset Type"',
-    '"91282CPU9","TIPS 0.125% 01/15/2031","5,000","100.00","$500,000.00","Fixed Income"',
-    '"912810QF8","TIPS 0.25% 02/15/2040","8,000","100.00","$800,000.00","Fixed Income"',
+    '"PARSEAAA1","TIPS 0.125% 01/15/2031","5,000","100.00","$500,000.00","Fixed Income"',
+    '"PARSEBBB2","TIPS 0.25% 02/15/2040","8,000","100.00","$800,000.00","Fixed Income"',
     '"SCHZ","SCHWAB AGG BOND ETF","100","50.00","$5,000.00","ETFs"',
     '"Account Total","","","","$1,305,000.00",""',
     '',
     '"Owner2 IRA ...5678"',
     '"Symbol","Description","Qty (Quantity)","Price","Mkt Val (Market Value)","Asset Type"',
-    '"91282CPU9","TIPS 0.125% 01/15/2031","3,000","100.00","$300,000.00","Fixed Income"',
+    '"PARSEAAA1","TIPS 0.125% 01/15/2031","3,000","100.00","$300,000.00","Fixed Income"',
     '"Account Total","","","","$300,000.00",""',
   ].join('\n');
-  const { holdings, tipsValues, totalAccountValues } = parseBrokerCSV(csv2, tipsMarketData);
+  const { holdings, tipsValues, totalAccountValues } = parseBrokerCSV(csv2, parseMkt);
   const accounts = holdings;
 
   assert('F2: Owner8 IRA has 2 TIPS', accounts['Owner8 IRA']?.length, 2);
-  const cpu9 = accounts['Owner8 IRA']?.find(h => h.cusip === '91282CPU9');
+  const cpu9 = accounts['Owner8 IRA']?.find(h => h.cusip === 'PARSEAAA1');
   assert('F2: CPU9 qty === 5 (comma-qty parsed)', cpu9?.qty, 5);
-  const qf8 = accounts['Owner8 IRA']?.find(h => h.cusip === '912810QF8');
+  const qf8 = accounts['Owner8 IRA']?.find(h => h.cusip === 'PARSEBBB2');
   assert('F2: QF8 qty === 8', qf8?.qty, 8);
   assert('F2: SCHZ filtered out', accounts['Owner8 IRA']?.find(h => h.cusip === 'SCHZ'), undefined);
-  assert('F2: Owner2 IRA CPU9 qty === 3', accounts['Owner2 IRA']?.find(h => h.cusip === '91282CPU9')?.qty, 3);
+  assert('F2: Owner2 IRA CPU9 qty === 3', accounts['Owner2 IRA']?.find(h => h.cusip === 'PARSEAAA1')?.qty, 3);
   console.log(`        accounts: ${Object.keys(accounts).join(', ')}`);
 }
 
 // ── Test: Format 3 (Vanguard) — broker import parsing ────────────────────────
 {
   console.log('\nFormat 3 (Vanguard) — broker import parsing');
-  // Uses real CUSIPs from test data: 91282CPU9 (1.875% Jan 2036), 912810QF8 (2.125% Feb 2040)
+  // The bonds are synthetic (parseMkt): PARSEAAA1 (1.875% Jan 2098), PARSEBBB2 (2.125% Feb 2098)
   const csv3 = [
     'Account Number,Investment Name,Symbol,Shares,Share Price,Total Value,',
-    '11111111,U S TREASURY NOTE INFLATION INDEX NOTE 1.875 01/15/36 01/15/06,null,5000,100.00,500000.00,',
-    '11111111,U S TREASURY NOTE INFLATION INDEX NOTE 2.125 02/15/40 02/15/10,null,8000,100.00,800000.00,',
+    '11111111,U S TREASURY NOTE INFLATION INDEX NOTE 1.875 01/15/98 01/15/68,null,5000,100.00,500000.00,',
+    '11111111,U S TREASURY NOTE INFLATION INDEX NOTE 2.125 02/15/98 02/15/68,null,8000,100.00,800000.00,',
     '11111111,VANGUARD FEDERAL MONEY MARKET INVESTOR CL,VMFXX,1234.56,1,1234.56,',
-    '22222222,U S TREASURY NOTE INFLATION INDEX NOTE 1.875 01/15/36 01/15/06,null,3000,100.00,300000.00,',
+    '22222222,U S TREASURY NOTE INFLATION INDEX NOTE 1.875 01/15/98 01/15/68,null,3000,100.00,300000.00,',
     '22222222,VANGUARD TOTAL STOCK MARKET ETF,VTI,50,200.00,10000.00,',
   ].join('\n');
-  const { holdings, tipsValues, totalAccountValues } = parseBrokerCSV(csv3, tipsMarketData);
+  const { holdings, tipsValues, totalAccountValues } = parseBrokerCSV(csv3, parseMkt);
   const accounts = holdings;
 
   assert('F3: acct 11111111 has 2 TIPS', accounts['11111111']?.length, 2);
-  const cpu9 = accounts['11111111']?.find(h => h.cusip === '91282CPU9');
+  const cpu9 = accounts['11111111']?.find(h => h.cusip === 'PARSEAAA1');
   assert('F3: CPU9 qty === 5 (name-resolved)', cpu9?.qty, 5);
-  const qf8 = accounts['11111111']?.find(h => h.cusip === '912810QF8');
+  const qf8 = accounts['11111111']?.find(h => h.cusip === 'PARSEBBB2');
   assert('F3: QF8 qty === 8 (name-resolved)', qf8?.qty, 8);
   assert('F3: VMFXX filtered out', accounts['11111111']?.find(h => h.cusip === 'VMFXX'), undefined);
-  assert('F3: acct 22222222 CPU9 qty === 3', accounts['22222222']?.find(h => h.cusip === '91282CPU9')?.qty, 3);
+  assert('F3: acct 22222222 CPU9 qty === 3', accounts['22222222']?.find(h => h.cusip === 'PARSEAAA1')?.qty, 3);
   assert('F3: VTI filtered out', accounts['22222222']?.find(h => h.cusip === 'VTI'), undefined);
   assert('F3: tipsValues 11111111 ≈ 1300000', Math.abs((tipsValues['11111111'] || 0) - 1300000) < 1, true);
   assert('F3: totalAccountValues 11111111 > tipsValues', totalAccountValues['11111111'] > tipsValues['11111111'], true);
@@ -799,18 +828,18 @@ console.log('\n3-bracket real-holdings reconciliation (distinct orig-lower/new-l
   console.log('\nFormat 3 (Vanguard) — whole-number coupon name parsing');
   // Real bug: Vanguard prints exact 1.000% coupons as bare "1" (no decimal point at all),
   // same way it prints sub-1% coupons as ".125" (no leading zero, fixed in a80ddba).
-  // 912810SB5 (Feb 2048) and 912810SG4 (Feb 2049) both carry a 1.000% coupon — the old
+  // PARSECCC3 (Feb 2098) and PARSEDDD4 (Feb 2099) both carry a 1.000% coupon — the old
   // regex `(\d*\.\d+)` required a decimal point and silently dropped both.
   const csv3b = [
     'Account Number,Investment Name,Symbol,Shares,Share Price,Total Value,',
-    '11111111,U S TREASURY NOTE INFLATION INDEX NOTE 1 02/15/48 02/15/18,null,50000,74.125,37062.50,',
-    '11111111,U S TREASURY NOTE INFLATION INDEX NOTE 1 02/15/49 02/15/19,null,60000,73.0625,43837.50,',
+    '11111111,U S TREASURY NOTE INFLATION INDEX NOTE 1 02/15/98 02/15/68,null,50000,74.125,37062.50,',
+    '11111111,U S TREASURY NOTE INFLATION INDEX NOTE 1 02/15/99 02/15/69,null,60000,73.0625,43837.50,',
   ].join('\n');
-  const { holdings: holdings3b } = parseBrokerCSV(csv3b, tipsMarketData);
-  const sb5 = holdings3b['11111111']?.find(h => h.cusip === '912810SB5');
-  const sg4 = holdings3b['11111111']?.find(h => h.cusip === '912810SG4');
-  assert('F3b: SB5 (Feb 2048, 1.000% coupon) qty === 50 (name-resolved)', sb5?.qty, 50);
-  assert('F3b: SG4 (Feb 2049, 1.000% coupon) qty === 60 (name-resolved)', sg4?.qty, 60);
+  const { holdings: holdings3b } = parseBrokerCSV(csv3b, parseMkt);
+  const sb5 = holdings3b['11111111']?.find(h => h.cusip === 'PARSECCC3');
+  const sg4 = holdings3b['11111111']?.find(h => h.cusip === 'PARSEDDD4');
+  assert('F3b: SB5 (1.000% coupon) qty === 50 (name-resolved)', sb5?.qty, 50);
+  assert('F3b: SG4 (1.000% coupon) qty === 60 (name-resolved)', sg4?.qty, 60);
 }
 
 // ── Test: Build from scratch — deterministic output ───────────────────────────
@@ -1578,7 +1607,8 @@ for (const gapFirstYear of GAP_YEARS) {
 // SampleHoldings (2040 gap, lumpy ARA) does.
 {
   const fp = path.resolve('./data/SampleHoldings.csv');
-  if (existsSync(fp)) {
+  assert('SampleHoldings.csv is present', existsSync(fp), true);
+  {
     console.log('\nSpec-only infer on SampleHoldings (split 2047) — must converge, not throw');
     const holdings = parseHoldings(readFileSync(fp, 'utf8'));
     const yrs = holdings.map(h => tipsMarketData.get(h.cusip)?.maturity?.getFullYear()).filter(Boolean);
@@ -1652,7 +1682,8 @@ for (const gapFirstYear of GAP_YEARS) {
 // test exercises the branch where the scale must actually fire.
 {
   const fp = path.resolve('./data/SampleHoldings.csv');
-  if (existsSync(fp)) {
+  assert('SampleHoldings.csv is present', existsSync(fp), true);
+  {
     console.log('\nrunFundedRebalance — SampleHoldings pristine mirror: scale must apply and self-finance');
     const rawHoldings = parseHoldings(readFileSync(fp, 'utf8'));
 
