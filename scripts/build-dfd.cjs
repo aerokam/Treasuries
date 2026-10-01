@@ -940,7 +940,7 @@ function level2TipsLadderManager() {
     { id: '4.2', name: ['Import holdings', 'and DARA plan'], href: 'DFD_LEVEL3_TLM_IMPORT.html', reads: [],
       out: { '4.3': ['DARA plan'], '4.4': ['holdings', 'DARA plan'] } },
     { id: '4.3', name: ['Build', 'ladder'], href: 'DFD_LEVEL3_TLM_BUILD.html', reads: [], out: { '4.5': ['build result'] } },
-    { id: '4.4', name: ['Rebalance', 'ladder'], href: 'DFD_LEVEL3_TLM_REBALANCE.html', reads: [], out: { '4.5': ['rebalance result'] } },
+    { id: '4.4', name: ['Rebalance', 'ladder'], href: 'DFD_LEVEL3_TLM_REBALANCE.html', reads: [], out: { '4.5': ['before-state preview', 'rebalance result'] } },
     { id: '4.5', name: ['Render', 'and export'], href: V('TipsLadderManager/knowledge/5.0_UI_Schema.md'), reads: [], out: {} },
   ];
   const SX = 40, SW = 215, PR = 58, UX = 1240, UW = 145;
@@ -1093,15 +1093,16 @@ function level3TipsLadderManagerImport() {
   // a Holdings File (the **Holdings** item) is always read by 4.2.1, and by 4.2.2 too when it's
   // one this app exported (trailing #fundedYear,dara block); a DARA Plan File (the **DARA Plan**
   // item) is a standalone upload 4.2.1 never sees. 4.2.2 reads from whichever the user picked.
-  const midY = (py['4.2.1'] + py['4.2.2']) / 2;
   const [h1x, h1y] = toCircle(UX + UW + 5, py['4.2.1'] + 10, px['4.2.1'], py['4.2.1'], PR);
   P.push(flow(UX + UW + 5, py['4.2.1'] + 10, h1x, h1y, { obstacles: OBS.filter(o => !(o.x === px['4.2.1'] && o.y === py['4.2.1'])) }));
+  P.push(labelAt(UX + UW + 12, py['4.2.1'] + 24, 'Holdings File'));
   const [h2x, h2y] = toCircle(UX + UW + 5, py['4.2.2'] - 15, px['4.2.2'], py['4.2.2'], PR);
   P.push(flow(UX + UW + 5, py['4.2.2'] - 15, h2x, h2y, { obstacles: OBS.filter(o => !(o.x === px['4.2.2'] && o.y === py['4.2.2'])) }));
-  P.push(labelAt(UX + UW + 12, midY - 8, 'Holdings File'));
+  P.push(labelAt(UX + UW + 12, py['4.2.2'] - 24, 'Holdings File'));
   const [d2x, d2y] = toCircle(UX + UW + 5, py['4.2.2'] + 20, px['4.2.2'], py['4.2.2'], PR);
   P.push(flow(UX + UW + 5, py['4.2.2'] + 20, d2x, d2y, { obstacles: OBS.filter(o => !(o.x === px['4.2.2'] && o.y === py['4.2.2'])) }));
   P.push(labelAt(UX + UW + 12, py['4.2.2'] + 34, 'DARA Plan File'));
+  const midY = (py['4.2.1'] + py['4.2.2']) / 2;
   P.push(`  <g class="entity"><rect x="${UX}" y="${midY - 130}" width="${UW}" height="260" rx="3"/><text class="e-name" x="${UX + UW / 2}" y="${midY + 5}">User</text></g>`);
 
   // Each process's own output leaves at the right edge for whichever Level 2 sibling
@@ -1234,6 +1235,9 @@ function level3TipsLadderManagerRebalance() {
   const [ox, oy] = fromCircle(px['4.4.3'], py['4.4.3'], PR, W - 12, py['4.4.3']);
   P.push(flow(ox, oy, W - 12, py['4.4.3'], { obstacles: OBS.filter(o => !(o.x === px['4.4.3'] && o.y === py['4.4.3'])) }));
   P.push(labelAt(W - 16, py['4.4.3'] - 8, 'rebalance result  →  4.5', 'end'));
+  const [o2x, o2y] = fromCircle(px['4.4.2'], py['4.4.2'], PR, W - 12, py['4.4.2']);
+  P.push(flow(o2x, o2y, W - 12, py['4.4.2'], { obstacles: OBS.filter(o => !(o.x === px['4.4.2'] && o.y === py['4.4.2'])) }));
+  P.push(labelAt(W - 16, py['4.4.2'] - 8, 'before-state preview  →  4.5', 'end'));
 
   procs.forEach(p => P.push(procShape(px[p.id], py[p.id], PR, p.href, p.id, p.name)));
   modules.forEach(m => P.push(moduleShape(mx[m.id], my[m.id], MR, m.href, m.id.toUpperCase(), m.name)));
