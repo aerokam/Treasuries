@@ -916,7 +916,7 @@ console.log('\nBuild — DARA=50000, lastYear=2060 (Future 30Y years)');
   const dara = 50000, lastYear = (MAX_YEAR + 4);
   const { summary } = runBuild({ dara, lastYear, tipsMarketData, refCPI, settlementDate });
   assert('future30yYears.length > 0', (summary.future30yYears?.length ?? 0) > 0, true);
-  assert('future30yLowerYear is the latest real maturity year', summary.future30yLowerYear, MAX_YEAR);
+  assert('future30yLowerYear is the 2056 TIPS (2.0: the lower cover is always the 2056)', summary.future30yLowerYear, 2056);
   assert('future30yUpperYear is earlier than the lower cover', summary.future30yUpperYear < summary.future30yLowerYear, true);
   assert('future30yLowerWeight + future30yUpperWeight ≈ 1',
     (summary.future30yLowerWeight ?? 0) + (summary.future30yUpperWeight ?? 0), 1, 0.0001);
@@ -1025,8 +1025,8 @@ console.log('\nBuild — Rev 6 cover Amount + roll coupon, DARA=40000, lastYear=
 {
   const dara = 40000, lastYear = (MAX_YEAR + 10), firstYear = settlementDate.getFullYear();
   const { summary, details } = runBuild({ dara, lastYear, tipsMarketData, refCPI, settlementDate });
-  const U = summary.future30yUpperYear; // the upper cover year; the lower cover is the latest real maturity year
-  assert('future30yLowerYear is the latest real maturity year', summary.future30yLowerYear, MAX_YEAR);
+  const U = summary.future30yUpperYear, L = summary.future30yLowerYear; // the cover pair (2.0: lower is always the 2056 TIPS)
+  assert('future30yLowerYear is the 2056 TIPS (2.0: the lower cover is always the 2056)', L, 2056);
   const cover = details.filter(d => d.isFuture30yCover);
   const coverAmt = cover.reduce((s, d) => s + (d.excessAmt ?? 0), 0);
   const nFuture = summary.future30yYears.length;
@@ -1039,7 +1039,7 @@ console.log('\nBuild — Rev 6 cover Amount + roll coupon, DARA=40000, lastYear=
   // 6a: the 2056 lower cover also nets its lifetime AMD out (deep-discount cover, flipped on Rev 7).
   // Its Amount can sit ABOVE raw par (large LMI add-back, weight ≈0.76, exceeds its AMD) — so assert
   // the net-out is actually applied via the formula identity rather than a raw-par inequality.
-  const c2056 = cover.find(d => d.fundedYear === MAX_YEAR);
+  const c2056 = cover.find(d => d.fundedYear === L);
   assert('2056 excessAmdLifetime > 0', c2056.excessAmdLifetime > 0, true);
   assert('2056 cover Amount = par − AMD + LMI add-back (net-out applied)',
     c2056.excessAmt,
@@ -1048,20 +1048,20 @@ console.log('\nBuild — Rev 6 cover Amount + roll coupon, DARA=40000, lastYear=
   // both held-to-maturity), so 2053–56 carry BOTH the 2052 roll coupon and the 2056-cover AMD.
   const roll = y => details.find(d => d.fundedYear === y)?.future30yRollCoupon ?? 0;
   const amd  = y => details.find(d => d.fundedYear === y)?.future30yUpperAnnualAmd ?? 0;
-  for (let y = U + 1; y <= MAX_YEAR; y++) assert(`roll coupon credited @${y}`, roll(y) > 0, true);
+  for (let y = U + 1; y <= L; y++) assert(`roll coupon credited @${y}`, roll(y) > 0, true);
   assert('no roll coupon @2052', roll(U), 0);
-  assert('no roll coupon @2057', roll((MAX_YEAR + 1)), 0);
+  assert('no roll coupon @2057', roll((L + 1)), 0);
   assert('AMD present @2052', amd(U) > 0, true);
   assert('AMD present @2053 (from 2056 cover)', amd((U + 1)) > 0, true);
-  assert('no AMD @2057 (covers matured by 2056)', amd((MAX_YEAR + 1)), 0);
+  assert('no AMD @2057 (covers matured by 2056)', amd((L + 1)), 0);
   // Every funded year in 2050–2056 still lands on DARA after the credits.
-  for (const y of [U - 2, U, U + 1, MAX_YEAR]) {
+  for (const y of [U - 2, U, U + 1, L]) {
     const d = details.find(x => x.fundedYear === y);
     assert(`amount ≈ DARA @${y}`, d.fundedYearAmt, dara, 700);
   }
   console.log(`        cover Amount total:  ${Math.round(coverAmt).toLocaleString()} vs ${nFuture}×DARA = ${(nFuture*dara).toLocaleString()}`);
   console.log(`        2052 cover: amt ${Math.round(c2052.excessAmt).toLocaleString()}  rawPI ${Math.round(c2052.excessQty*c2052.fundedYearPi).toLocaleString()}  amdLifetime ${Math.round(c2052.excessAmdLifetime).toLocaleString()}`);
-  console.log(`        roll ${U + 1}–${MAX_YEAR}: ${Array.from({ length: MAX_YEAR - U }, (_, i) => roll(U + 1 + i)).map(v=>Math.round(v)).join(' / ')}`);
+  console.log(`        roll ${U + 1}–${L}: ${Array.from({ length: L - U }, (_, i) => roll(U + 1 + i)).map(v=>Math.round(v)).join(' / ')}`);
 }
 
 // ── Test: Build — firstYear=2036, lastYear=2056, preLadderInterest=true ───────
