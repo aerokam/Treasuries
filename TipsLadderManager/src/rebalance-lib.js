@@ -1265,6 +1265,13 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
   }
 
   let lowerWeight = 0, upperWeight = 0, origLowerWeight = null, newLowerWeight3 = null, upperWeight3 = null;
+  // Every retained maturity (cross-year AND same-maturity-year), each with the weight
+  // bracketWeightsN actually solved for it -- origLowerWeight below exposes only retainedList[0]
+  // (the cross-year one), so a ladder with a same-year retained maturity too (2.0 §Retained Bracket
+  // Excess) has no way, from the summary alone, to verify Σ wᵣ·dᵣ + w_active·d_active +
+  // w_upper·d_upper = dGap or that every retained maturity's weight sums to 1 with the active and
+  // upper weights. One entry per retainedList item, same order (earliest maturity first).
+  let retainedLegs = [];
   let bracketFellBack3to2 = false, bracketSolveReason = null;
   let retainedExcessCostBefore = null, retainedBracketSold = false;
   const bracketExcessTargetCost = {};   // keyed by CUSIP, never by year — a year can hold two roles
@@ -1338,6 +1345,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
       // Effective weights for summary reporting.
       origLowerWeight = wN.retainedWeights[0] ?? 0;
       newLowerWeight3 = wN.activeWeight;
+      retainedLegs = retainedList.map((r, i) => ({ cusip: r.cusip, year: r.year, duration: r.duration, weight: wN.retainedWeights[i] ?? 0 }));
 
       // Resolve each same-maturity-year retained leg's final quantity now (frozen funded
       // contribution, capped at what's held, plus its solved — never increased — excess share),
@@ -2411,7 +2419,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
   const daraByYearResolved = new Map();
   for (let y = firstYear; y <= lastYear; y++) daraByYearResolved.set(y, daraByYear?.get(y) ?? DARA);
 
-  return { results, HDR, summary: { settleDateDisp, refCPI, DARA, daraByYearResolved, inferredDARA, daraIsInferred: dara === null, settlementYear, availableCash, rmdCouponMode, firstYear, lastYear, derivedFirstYear, rungCount, gapYears, future30yYears, brackets, lowerWeight, upperWeight, costDeltaSum, costForNewRungs, gapCoverageSurplus, gapParams, bracketMode, lowerDuration, upperDuration, newLowerYear, newLowerCUSIP, newLowerMaturity, newLowerDuration, newLowerWeight3, origLowerWeight, bracketFellBack3to2, bracketSolveReason, retainedExcessCostBefore, retainedBracketSold, beforeLowerWeight, beforeUpperWeight, beforeNewLowerWeight, afterLowerWeight, afterUpperWeight, afterNewLowerWeight, totalPreviousExcessCost, totalExcessCost, araByYear, future30yLowerYear, future30yUpperYear, future30yLowerCoverCUSIP: future30yLowerCoverBond?.cusip, future30yUpperCoverCUSIP: future30yUpperCoverBond?.cusip, future30yParams, future30yLowerDuration, future30yUpperDuration, future30yUpperWeight, future30yLowerWeight, future30yUpperExQty, future30yLowerExQty, future30yFellBack, future30yCoverReason, future30yLowerMonth, future30yUpperMonth, future30yUpperAnnualAmdByYear, future30yLMITotal, preLadderInterest, maturityPref, preLadderPool, preLadderCouponPool, preLadderAmdPool, preLadderRollCouponPool, zeroedFundedYears: [...zeroedFundedYears].sort((a, b) => a - b), weightedAvgDuration, weightedAvgYield, weightedAvgSaYield }, details };
+  return { results, HDR, summary: { settleDateDisp, refCPI, DARA, daraByYearResolved, inferredDARA, daraIsInferred: dara === null, settlementYear, availableCash, rmdCouponMode, firstYear, lastYear, derivedFirstYear, rungCount, gapYears, future30yYears, brackets, lowerWeight, upperWeight, costDeltaSum, costForNewRungs, gapCoverageSurplus, gapParams, bracketMode, lowerDuration, upperDuration, newLowerYear, newLowerCUSIP, newLowerMaturity, newLowerDuration, newLowerWeight3, origLowerWeight, retainedLegs, bracketFellBack3to2, bracketSolveReason, retainedExcessCostBefore, retainedBracketSold, beforeLowerWeight, beforeUpperWeight, beforeNewLowerWeight, afterLowerWeight, afterUpperWeight, afterNewLowerWeight, totalPreviousExcessCost, totalExcessCost, araByYear, future30yLowerYear, future30yUpperYear, future30yLowerCoverCUSIP: future30yLowerCoverBond?.cusip, future30yUpperCoverCUSIP: future30yUpperCoverBond?.cusip, future30yParams, future30yLowerDuration, future30yUpperDuration, future30yUpperWeight, future30yLowerWeight, future30yUpperExQty, future30yLowerExQty, future30yFellBack, future30yCoverReason, future30yLowerMonth, future30yUpperMonth, future30yUpperAnnualAmdByYear, future30yLMITotal, preLadderInterest, maturityPref, preLadderPool, preLadderCouponPool, preLadderAmdPool, preLadderRollCouponPool, zeroedFundedYears: [...zeroedFundedYears].sort((a, b) => a - b), weightedAvgDuration, weightedAvgYield, weightedAvgSaYield }, details };
 }
 
 // Execute a rebalance with shape-preserving self-financing FUNDING (3.0 §Funding the rebalance).
