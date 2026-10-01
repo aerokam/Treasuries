@@ -743,10 +743,11 @@ Some values are true only until Treasury issues more TIPS. Left inline as approx
 
 - <a id="tips-market-data"></a>**TIPS Market Data** = `{ @CUSIP + Maturity_Date + Coupon_Rate + Ref_CPI_dated + Price + Yield + ( SA_Yield ) }`
   *Every TIPS Market quotes (S7) states, keyed by CUSIP, its [SA Yield](#sa-yield) attached where [SA and SAO yields (S10)](#s10) has an entry for it. The app's own name for this table: the "Mkt" tab of its TIPS Ref/Mkt popup titles it "TIPS Mkt Data".*
-- <a id="holdings-file"></a>**Holdings File** = *Raw uploaded text identifying TIPS positions held — a broker export, or a file this app itself previously exported — in any of several supported layouts. A Holdings File this app wrote also carries a trailing `#fundedYear,dara` block.*
+- <a id="holdings-file"></a>**Holdings File** = `[ Broker export (Fidelity, Schwab or Vanguard) | This app's own prior Holdings export | tipsladder.com's own format | Plain CUSIP/Quantity format ]`
+  *Raw uploaded text identifying TIPS positions held, in one of these four layouts. A Holdings File this app wrote also carries a trailing `#fundedYear,dara` block.*
 - <a id="dara-plan-file"></a>**DARA Plan File** = *Raw uploaded text carrying only a `#fundedYear,dara` block and an optional `#params` line — no CUSIP rows at all.*
 - <a id="holdings"></a>**Holdings** = `{ @CUSIP + Qty + ( Excess_Qty ) }`
-  *Per-CUSIP quantities parsed from a [Holdings File](#holdings-file). `Excess_Qty` (the funded/excess split already known, rather than left for DARA math to derive) is present for some supported layouts and absent for others.*
+  *Per-CUSIP quantities parsed from a [Holdings File](#holdings-file). `Excess_Qty` (the funded/excess split already known, rather than left for DARA math to derive) is present when the file is this app's own export or tipsladder.com's format, absent for the other two layouts.*
 - <a id="dara-plan"></a>**DARA Plan** = `{ Funded_Year + DARA } + ( Construction_Parameters )`
   *The holder's own stated per-year [DARA](#dara) target, for every year a `#fundedYear,dara` block names — gap and Future 30Y years included.*
 - <a id="construction-parameters"></a>**Construction Parameters** = [Pre-Ladder Interest](#pre-ladder-interest) + Maturity_Preference + Coupon_Preference + [Available Cash](#available-cash) + Settlement_Year_Coupon_Mode + DARA_Reference_Date
