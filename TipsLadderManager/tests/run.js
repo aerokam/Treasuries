@@ -2062,42 +2062,48 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
 }
 
 // ── Within-Year Allocation Policy (2.0 §Within-Year Allocation Policy; the E invariant) ───────
-// tests/dev/SampleHoldingsSnapshot.csv is a frozen copy of SampleHoldings.csv from before
-// the real IRA sold its Jan 2027 TIPS. Its funded year 2027 holds THREE maturities: Jan (912828V49), Apr
-// (91282CEJ6), Oct (91282CFR7). The live SampleHoldings.csv tracks the real account, so it no longer
-// holds all three and cannot supply this scenario. Baseline DARA
-// mirrors runFullRebalanceTest's own self-financing scale, so "need unchanged" genuinely means
-// zero ladder-wide trades, not just an arbitrary raw-ARA mirror. All magnitudes below were
-// verified empirically against this real data (not guessed).
+// A one-year ladder built from hand-made bond rows: three maturities held in one funded year (Jan, Apr,
+// Oct) and a second January issue that is not held. The policy under test acts inside one funded year, so
+// nothing here needs a real account or the day's market: real quotes drift daily, and a real holding that
+// matures or is sold would silently change the scenario. The year sits five years after settlement, and
+// the quantities and the per-bond dollar values below fix the ordering the assertions rely on: Jan and
+// Oct have the lowest held values (the same quantity; Jan the lowest, Oct a little above), Apr the highest, and Apr costs less per bond than
+// Jan (its dated-date Ref CPI is higher, so its index ratio is lower). The second January issue carries the higher coupon, so it is the one a January pick prefers. Baseline DARA is what the held
+// bonds already provide, so need-unchanged genuinely means zero trades.
 {
-  const fullPath = path.resolve('./tests/dev/SampleHoldingsSnapshot.csv');
-  if (existsSync(fullPath)) {
-    console.log('\nWithin-Year Allocation Policy (SampleHoldingsSnapshot, funded year 2027: Jan + Apr + Oct)');
-    const holdings = parseHoldings(readFileSync(fullPath, 'utf8'));
+  {
+    console.log('');
+    console.log('Within-Year Allocation Policy (one funded year: Jan + Apr + Oct held, a second Jan issue unheld)');
+    const Y = settlementDate.getFullYear() + 5;
+    const tipsMarketData = buildTipsMarketData([
+      { cusip: 'ALLOCJAN', maturity: Y + '-01-15', coupon: 0.0125, datedDateRefCpi: 300, price: 100, yield: 0.02 },
+      { cusip: 'ALLOCAPR', maturity: Y + '-04-15', coupon: 0.0125, datedDateRefCpi: 330, price: 100, yield: 0.02 },
+      { cusip: 'ALLOCOCT', maturity: Y + '-10-15', coupon: 0.0125, datedDateRefCpi: 280, price: 100, yield: 0.02 },
+      { cusip: 'ALLOCNEW', maturity: Y + '-01-15', coupon: 0.015, datedDateRefCpi: 290, price: 100, yield: 0.02 },
+    ]);
+    const JAN27 = 'ALLOCJAN', APR27 = 'ALLOCAPR', OCT27 = 'ALLOCOCT';
+    const holdings = [{ cusip: JAN27, qty: 5 }, { cusip: APR27, qty: 12 }, { cusip: OCT27, qty: 5 }];
     const rawARA = computePortfolioARAByYear(holdings, tipsMarketData, refCPI);
-    const bracketCandidates = getGapYearBracketCandidates(tipsMarketData);
-    const { daraMap } = derivePerYearDara(rawARA, bracketCandidates);
-    const { scaledMap: baseDaraMap, scaledMedian } = inferScaledDARAFromPortfolio({
-      daraMap, holdings, tipsMarketData, refCPI, settlementDate,
-    });
-    const JAN27 = '912828V49', APR27 = '91282CEJ6', OCT27 = '91282CFR7';
+    const scaledMedian = Math.round(rawARA[Y]);
+    const baseDaraMap = new Map([[Y, scaledMedian]]);
+    const runAlloc = (o) => runRebalance({ firstYearOverride: Y, lastYearOverride: Y, ...o });
 
     function qtyDeltaFor(details, cusip) {
-      const row = details.find(d => d.cusip === cusip && d.fundedYear === 2027);
+      const row = details.find(d => d.cusip === cusip && d.fundedYear === Y);
       return row ? (row.qtyAfter - row.qtyBefore) : null;
     }
 
-    // (1) Need unchanged -> zero trades in 2027, for all three held maturities, under all three
+    // (1) Need unchanged -> zero trades in the year, for all three held maturities, under all three
     // policies. This is THE invariant (3.0 §Within-Year Allocation Policy): a policy alone never
     // manufactures a trade -- proven here on the real three-way year, not a simplified pair.
     for (const policy of ['equal', 'maturity', 'saYield']) {
-      const { details } = runRebalance({
+      const { details } = runAlloc({
         dara: scaledMedian, holdings, tipsMarketData, refCPI, settlementDate,
         daraByYear: baseDaraMap, allocationPolicy: policy,
       });
-      assert(`allocation policy '${policy}': need unchanged -> Jan 2027 qty delta === 0`, qtyDeltaFor(details, JAN27), 0);
-      assert(`allocation policy '${policy}': need unchanged -> Apr 2027 qty delta === 0`, qtyDeltaFor(details, APR27), 0);
-      assert(`allocation policy '${policy}': need unchanged -> Oct 2027 qty delta === 0`, qtyDeltaFor(details, OCT27), 0);
+      assert(`allocation policy '${policy}': need unchanged -> Jan qty delta === 0`, qtyDeltaFor(details, JAN27), 0);
+      assert(`allocation policy '${policy}': need unchanged -> Apr qty delta === 0`, qtyDeltaFor(details, APR27), 0);
+      assert(`allocation policy '${policy}': need unchanged -> Oct qty delta === 0`, qtyDeltaFor(details, OCT27), 0);
     }
 
     // (2) Need grows -> under 'maturity'/'saYield' (a fixed preference order), exactly one of the
@@ -2106,7 +2112,7 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
     // splits growth across whichever are tied at the bottom (levelValues in allocation-policy.js),
     // so more than one can move within a single run.
     const grownDara = new Map(baseDaraMap);
-    grownDara.set(2027, (grownDara.get(2027) ?? 0) + 5000);
+    grownDara.set(Y, (grownDara.get(Y) ?? 0) + 5000);
 
     // 'equal': Jan and Oct are the two lowest-held-value maturities and level toward each other,
     // splitting the growth between them; Apr (highest held value) stays untouched throughout. Uses
@@ -2114,9 +2120,9 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
     // legitimately spills leveling past Apr too (correct levelValues behavior, just a different
     // scenario than this assertion demonstrates), so this stays within the two-way leveling capacity.
     const equalGrownDara = new Map(baseDaraMap);
-    equalGrownDara.set(2027, (equalGrownDara.get(2027) ?? 0) + 2500);
+    equalGrownDara.set(Y, (equalGrownDara.get(Y) ?? 0) + 2500);
     {
-      const { details } = runRebalance({
+      const { details } = runAlloc({
         dara: scaledMedian, holdings, tipsMarketData, refCPI, settlementDate,
         daraByYear: equalGrownDara, allocationPolicy: 'equal',
       });
@@ -2128,7 +2134,7 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
     // 'maturity': latest-maturing (Oct) is preferred -> absorbs the growth; Jan/Apr untouched.
     // This is maturityPref's default ('last'), matching 2.0's own tie-break direction.
     {
-      const { details } = runRebalance({
+      const { details } = runAlloc({
         dara: scaledMedian, holdings, tipsMarketData, refCPI, settlementDate,
         daraByYear: grownDara, allocationPolicy: 'maturity',
       });
@@ -2146,9 +2152,9 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
     // assertion with something unrelated to the tie-break direction itself.
     {
       const candidates = [
-        { cusip: 'JAN', maturity: new Date('2027-01-15') },
-        { cusip: 'APR', maturity: new Date('2027-04-15') },
-        { cusip: 'OCT', maturity: new Date('2027-10-15') },
+        { cusip: 'JAN', maturity: new Date(Y + '-01-15') },
+        { cusip: 'APR', maturity: new Date(Y + '-04-15') },
+        { cusip: 'OCT', maturity: new Date(Y + '-10-15') },
       ];
       const lastRank = rankForYear({ candidates, policy: 'maturity', maturityPref: 'last' });
       assert("rankForYear maturityPref='last' (default): latest-maturing (Oct) ranked first", lastRank[0].cusip, 'OCT');
@@ -2182,7 +2188,7 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
       tipsMarketData.get(APR27).saYield = 0.03;
       tipsMarketData.get(OCT27).saYield = 0.02;
       tipsMarketData.get(JAN27).saYield = 0.01;
-      const { details } = runRebalance({
+      const { details } = runAlloc({
         dara: scaledMedian, holdings, tipsMarketData, refCPI, settlementDate,
         daraByYear: grownDara, allocationPolicy: 'saYield',
       });
@@ -2197,20 +2203,20 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
     // correctly grow, but the winning buy was completely absent from the table/Trade Ticket/export
     // (qtyDelta/cashDelta both showed 0 at the year level) because the synthetic new-buy row was
     // only ever emitted for a funded year with ZERO existing holdings, not for a year that already
-    // had other held CUSIPs but was missing this one specific new CUSIP. 912810PS1 is a second real
-    // TIPS also maturing Jan 2027 (distinct from the held 912828V49) present in the fixture universe
-    // but never held in SampleHoldings.csv -- forcing its SA yield above the three held maturities'
+    // had other held CUSIPs but was missing this one specific new CUSIP. ALLOCNEW is a second
+    // TIPS also maturing Jan (distinct from the held ALLOCJAN), present in the market data
+    // but never held -- forcing its SA yield above the three held maturities'
     // makes it win the rank under 'all' (all three held maturities are legitimate targets too).
     {
-      const NEW_JAN27 = '912810PS1';
+      const NEW_JAN27 = 'ALLOCNEW';
       const saved = { j: tipsMarketData.get(JAN27).saYield, a: tipsMarketData.get(APR27).saYield, o: tipsMarketData.get(OCT27).saYield, n: tipsMarketData.get(NEW_JAN27)?.saYield };
       tipsMarketData.get(JAN27).saYield = 0.01; tipsMarketData.get(APR27).saYield = 0.01; tipsMarketData.get(OCT27).saYield = 0.01;
       tipsMarketData.get(NEW_JAN27).saYield = 0.05;
-      const { details } = runRebalance({
+      const { details } = runAlloc({
         dara: scaledMedian, holdings, tipsMarketData, refCPI, settlementDate,
         daraByYear: grownDara, allocationPolicy: 'saYield', maturityPref: 'all',
       });
-      const newRow = details.find(d => d.cusip === NEW_JAN27 && d.fundedYear === 2027);
+      const newRow = details.find(d => d.cusip === NEW_JAN27 && d.fundedYear === Y);
       assert('new-buy CUSIP regression: the winning new CUSIP gets its own row in details', !!newRow, true);
       assert('new-buy CUSIP regression: its qtyBefore is 0 (never held)', newRow?.qtyBefore, 0);
       assert('new-buy CUSIP regression: it actually bought a positive quantity', newRow?.qtyAfter > 0, true);
@@ -2224,9 +2230,9 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
     // untouched. Under 'maturity', least-preferred = Jan (earliest-maturing); -3000 sells some of
     // Jan's held quantity without touching Apr or Oct.
     const shrunkDara = new Map(baseDaraMap);
-    shrunkDara.set(2027, Math.max(1000, (shrunkDara.get(2027) ?? 0) - 3000));
+    shrunkDara.set(Y, Math.max(1000, (shrunkDara.get(Y) ?? 0) - 3000));
     {
-      const { details } = runRebalance({
+      const { details } = runAlloc({
         dara: scaledMedian, holdings, tipsMarketData, refCPI, settlementDate,
         daraByYear: shrunkDara, allocationPolicy: 'maturity',
       });
@@ -2251,12 +2257,12 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
     {
       function janQtyAfterCut(cut) {
         const dm = new Map(baseDaraMap);
-        dm.set(2027, Math.max(1000, (dm.get(2027) ?? 0) - cut));
-        const { details: d } = runRebalance({
+        dm.set(Y, Math.max(1000, (dm.get(Y) ?? 0) - cut));
+        const { details: d } = runAlloc({
           dara: scaledMedian, holdings, tipsMarketData, refCPI, settlementDate,
           daraByYear: dm, allocationPolicy: 'maturity',
         });
-        return d.find(x => x.cusip === JAN27 && x.fundedYear === 2027).qtyAfter;
+        return d.find(x => x.cusip === JAN27 && x.fundedYear === Y).qtyAfter;
       }
       const janQtyBefore = janQtyAfterCut(0);  // qtyBefore, read via a zero-cut baseline run
       let lo = 0, hi = 10000;  // hi comfortably drains Jan's whole holding at any plausible price
@@ -2265,14 +2271,14 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
         if (janQtyAfterCut(mid) < janQtyBefore) hi = mid; else lo = mid;
       }
       const boundaryDara = new Map(baseDaraMap);
-      boundaryDara.set(2027, Math.max(1000, (boundaryDara.get(2027) ?? 0) - hi));
-      const { details } = runRebalance({
+      boundaryDara.set(Y, Math.max(1000, (boundaryDara.get(Y) ?? 0) - hi));
+      const { details } = runAlloc({
         dara: scaledMedian, holdings, tipsMarketData, refCPI, settlementDate,
         daraByYear: boundaryDara, allocationPolicy: 'maturity',
       });
       const janDelta = qtyDeltaFor(details, JAN27);
       assert("allocation policy 'maturity': rounding boundary -> Jan sells partially (not fully drained)", janDelta < 0, true);
-      const janRow = details.find(d => d.cusip === JAN27 && d.fundedYear === 2027);
+      const janRow = details.find(d => d.cusip === JAN27 && d.fundedYear === Y);
       assert("allocation policy 'maturity': rounding boundary -> Jan still holds qty > 0 after the partial sell", janRow.qtyAfter > 0, true);
       assert("allocation policy 'maturity': rounding boundary -> Apr untouched while Jan still held", qtyDeltaFor(details, APR27), 0);
       assert("allocation policy 'maturity': rounding boundary -> Oct (target) untouched while Jan still held", qtyDeltaFor(details, OCT27), 0);
@@ -2284,17 +2290,17 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
     // (as opposed to (2b-2), where Jan moves partially). The cut has to stay below Jan's rounding
     // boundary, which is a function of Jan's live market price (via costPerBond) and portfolio scale
     // -- a hardcoded dollar figure here drifted out of the window once (2b-2's own comment) and did
-    // again when SampleHoldings.csv was rescaled, so binary-search the boundary the same way (2b-2)
+    // again when the holdings were rescaled, so binary-search the boundary the same way (2b-2)
     // does and cut one dollar short of it instead of guessing a fixed number.
     {
       function janQtyAfterTinyCut(cut) {
         const dm = new Map(baseDaraMap);
-        dm.set(2027, Math.max(1000, (dm.get(2027) ?? 0) - cut));
-        const { details: d } = runRebalance({
+        dm.set(Y, Math.max(1000, (dm.get(Y) ?? 0) - cut));
+        const { details: d } = runAlloc({
           dara: scaledMedian, holdings, tipsMarketData, refCPI, settlementDate,
           daraByYear: dm, allocationPolicy: 'maturity',
         });
-        return d.find(x => x.cusip === JAN27 && x.fundedYear === 2027).qtyAfter;
+        return d.find(x => x.cusip === JAN27 && x.fundedYear === Y).qtyAfter;
       }
       const janQtyBefore = janQtyAfterTinyCut(0);
       let lo = 0, hi = 10000;
@@ -2303,8 +2309,8 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
         if (janQtyAfterTinyCut(mid) < janQtyBefore) hi = mid; else lo = mid;
       }
       const tinyDara = new Map(baseDaraMap);
-      tinyDara.set(2027, Math.max(1000, (tinyDara.get(2027) ?? 0) - (hi - 1)));
-      const { details } = runRebalance({
+      tinyDara.set(Y, Math.max(1000, (tinyDara.get(Y) ?? 0) - (hi - 1)));
+      const { details } = runAlloc({
         dara: scaledMedian, holdings, tipsMarketData, refCPI, settlementDate,
         daraByYear: tinyDara, allocationPolicy: 'maturity',
       });
@@ -2329,15 +2335,15 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
     {
       function equalDeltasForCut(cut) {
         const dm = new Map(baseDaraMap);
-        dm.set(2027, Math.max(1000, (dm.get(2027) ?? 0) - cut));
-        const { details: d } = runRebalance({
+        dm.set(Y, Math.max(1000, (dm.get(Y) ?? 0) - cut));
+        const { details: d } = runAlloc({
           dara: scaledMedian, holdings, tipsMarketData, refCPI, settlementDate,
           daraByYear: dm, allocationPolicy: 'equal',
         });
         return { jan: qtyDeltaFor(d, JAN27), apr: qtyDeltaFor(d, APR27), oct: qtyDeltaFor(d, OCT27) };
       }
       let curStart = null, bestStart = null, bestEnd = null, bestLen = -1;
-      for (let cut = 500; cut <= 9000; cut += 50) {
+      for (let cut = 500; cut <= 15000; cut += 50) {
         const { jan, apr, oct } = equalDeltasForCut(cut);
         const ok = jan === 0 && apr < 0 && oct < 0 && Math.abs(apr) >= Math.abs(oct);
         if (ok) {
@@ -2346,12 +2352,12 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
         } else curStart = null;
       }
       if (bestStart == null) {
-        throw new Error("allocation policy 'equal': no cut in [500, 9000] satisfies the need-shrinks scenario -- needs revisiting against current real holdings.");
+        throw new Error("allocation policy 'equal': no cut in [500, 15000] satisfies the need-shrinks scenario -- the one-year scenario needs revisiting.");
       }
       const safeCut = Math.round((bestStart + bestEnd) / 2);
       const equalShrunkDara = new Map(baseDaraMap);
-      equalShrunkDara.set(2027, Math.max(1000, (equalShrunkDara.get(2027) ?? 0) - safeCut));
-      const { details } = runRebalance({
+      equalShrunkDara.set(Y, Math.max(1000, (equalShrunkDara.get(Y) ?? 0) - safeCut));
+      const { details } = runAlloc({
         dara: scaledMedian, holdings, tipsMarketData, refCPI, settlementDate,
         daraByYear: equalShrunkDara, allocationPolicy: 'equal',
       });
@@ -2364,29 +2370,29 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
     // (3) Per-year manual rank override wins over the global policy for that year: force Apr
     // first even though the global policy ('maturity') would normally prefer Oct.
     {
-      const { details } = runRebalance({
+      const { details } = runAlloc({
         dara: scaledMedian, holdings, tipsMarketData, refCPI, settlementDate,
         daraByYear: grownDara, allocationPolicy: 'maturity',
-        yearRankOverrides: new Map([[2027, [APR27, OCT27, JAN27]]]),
+        yearRankOverrides: new Map([[Y, [APR27, OCT27, JAN27]]]),
       });
-      assert('per-year rank override: Apr wins over the global maturity-order policy for 2027', qtyDeltaFor(details, APR27) > 0, true);
+      assert('per-year rank override: Apr wins over the global maturity-order policy for the year', qtyDeltaFor(details, APR27) > 0, true);
       assert('per-year rank override: Jan untouched when overridden out of first place', qtyDeltaFor(details, JAN27), 0);
       assert('per-year rank override: Oct untouched when overridden out of first place', qtyDeltaFor(details, OCT27), 0);
     }
 
     // (4) The E invariant, in the candidate-set (maturityPref) dimension: switching the global
-    // maturity preference alone, with 2027's need UNCHANGED, must never trade any of the three
+    // maturity preference alone, with the year's need UNCHANGED, must never trade any of the three
     // held maturities, even under a preference that wouldn't have picked them from scratch (2.0
     // §Within-Year Allocation Policy). This is the "Apr+Oct/semiannual" scenario from the design
     // discussion, generalized to the real three-way year.
     for (const maturityPref of ['first', 'all']) {
-      const { details } = runRebalance({
+      const { details } = runAlloc({
         dara: scaledMedian, holdings, tipsMarketData, refCPI, settlementDate,
         daraByYear: baseDaraMap, maturityPref,
       });
-      assert(`maturityPref='${maturityPref}' with need unchanged: Jan 2027 untouched`, qtyDeltaFor(details, JAN27), 0);
-      assert(`maturityPref='${maturityPref}' with need unchanged: Apr 2027 untouched`, qtyDeltaFor(details, APR27), 0);
-      assert(`maturityPref='${maturityPref}' with need unchanged: Oct 2027 untouched`, qtyDeltaFor(details, OCT27), 0);
+      assert(`maturityPref='${maturityPref}' with need unchanged: Jan untouched`, qtyDeltaFor(details, JAN27), 0);
+      assert(`maturityPref='${maturityPref}' with need unchanged: Apr untouched`, qtyDeltaFor(details, APR27), 0);
+      assert(`maturityPref='${maturityPref}' with need unchanged: Oct untouched`, qtyDeltaFor(details, OCT27), 0);
     }
   }
 }
