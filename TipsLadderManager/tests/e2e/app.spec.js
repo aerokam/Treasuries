@@ -11,7 +11,7 @@ import { test, expect } from 'playwright/test';
 import { readFileSync, writeFileSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { nextBondTradingDay } from '../../../shared/src/market-data.js';
+import { nextBondTradingDay, R2_ROOT } from '../../../shared/src/market-data.js';
 import { parseHolidaySet } from '../../../shared/src/settlement.js';
 import { parseCsv as parseCsvRows } from '../../../shared/src/csv.js';
 
@@ -19,9 +19,19 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const FIXTURES = path.join(ROOT, 'tests', 'e2e');
 const csv = name => readFileSync(path.join(FIXTURES, name), 'utf8');
 
+// Series the monthly jobs keep current are read from R2, once per run, not mirrored in tests/e2e.
+const liveR2 = new Map();
+function r2Text(r2Path) {
+  if (!liveR2.has(r2Path)) liveR2.set(r2Path, fetch(R2_ROOT + '/' + r2Path, { cache: 'no-cache' }).then(res => {
+    if (!res.ok) throw new Error(r2Path + ': HTTP ' + res.status);
+    return res.text();
+  }));
+  return liveR2.get(r2Path);
+}
+
 // Compute today's T+1 settlement date using the same logic as the live app.
-function computeSettleDateStr() {
-  const holidayText = readFileSync(path.join(FIXTURES, 'BondHolidaysSifma.csv'), 'utf8');
+async function computeSettleDateStr() {
+  const holidayText = await r2Text('misc/BondHolidaysSifma.csv');
   const bondHolidays = parseHolidaySet(parseCsvRows(holidayText, false));
   const now = new Date();
   const todayISO = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
@@ -29,10 +39,10 @@ function computeSettleDateStr() {
 }
 
 // Yields CSV with line 1 replaced by today's T+1 settlement date.
-function yieldsWithTodaySettlement() {
+async function yieldsWithTodaySettlement() {
   const raw = csv('YieldsFromFedInvestPrices.csv');
   const lines = raw.split('\n');
-  lines[0] = computeSettleDateStr();
+  lines[0] = await computeSettleDateStr();
   return lines.join('\n');
 }
 
@@ -76,19 +86,19 @@ async function chooseMenu(page, menu, choice) {
 }
 
 test.beforeEach(async ({ page }) => {
-  const yieldsBody = yieldsWithTodaySettlement();
+  const yieldsBody = await yieldsWithTodaySettlement();
   await page.route('**/Treasuries/YieldsFromFedInvestPrices.csv', r =>
     r.fulfill({ body: yieldsBody, contentType: 'text/csv' }));
   await page.route('**/Treasuries/FidelityTreasuriesTips.csv', r =>
     r.fulfill({ body: fidelityWithTodayDownloadDate(), contentType: 'text/csv' }));
-  await page.route('**/TIPS/RefCPI.csv', r =>
-    r.fulfill({ body: csv('RefCPI.csv'), contentType: 'text/csv' }));
-  await page.route('**/TIPS/TipsRef.csv', r =>
-    r.fulfill({ body: csv('TipsRef.csv'), contentType: 'text/csv' }));
+  await page.route('**/TIPS/RefCPI.csv', async r =>
+    r.fulfill({ body: await r2Text('TIPS/RefCPI.csv'), contentType: 'text/csv' }));
+  await page.route('**/TIPS/TipsRef.csv', async r =>
+    r.fulfill({ body: await r2Text('TIPS/TipsRef.csv'), contentType: 'text/csv' }));
   await page.route('**/TIPS/YieldsSaSao.csv', r =>
     r.fulfill({ body: csv('YieldsSaSao.csv'), contentType: 'text/csv' }));
-  await page.route('**/misc/BondHolidaysSifma.csv', r =>
-    r.fulfill({ body: csv('BondHolidaysSifma.csv'), contentType: 'text/csv' }));
+  await page.route('**/misc/BondHolidaysSifma.csv', async r =>
+    r.fulfill({ body: await r2Text('misc/BondHolidaysSifma.csv'), contentType: 'text/csv' }));
   // Allow sample pre-populate to succeed (fetches data/SampleHoldings.csv via serve)
   await page.goto('./');
   // Wait for data load: run button must be enabled

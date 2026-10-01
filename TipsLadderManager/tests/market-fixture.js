@@ -28,10 +28,17 @@ export function fedInvestWithTodaySettlement(raw, settleDateStr) {
   return lines.join('\n');
 }
 
-// Replaces global fetch with a reader over the fixture directory, matched on the URL's basename.
+// These come straight from R2: they are the series the monthly BLS job and the pipeline keep current,
+// so a committed copy only ever ages. Everything else is read from the fixture directory.
+const LIVE_FROM_R2 = new Set(['RefCPI.csv', 'TipsRef.csv', 'BondHolidaysSifma.csv']);
+
+// Replaces global fetch with a reader over the fixture directory, matched on the URL's basename;
+// the LIVE_FROM_R2 files go to the real fetch.
 export function installFixtureFetch({ settleDateStr } = {}) {
+  const realFetch = globalThis.fetch;
   globalThis.fetch = async (url) => {
     const name = String(url).split('/').pop().split('?')[0];
+    if (LIVE_FROM_R2.has(name)) return realFetch(url, { cache: 'no-cache' });
     let body;
     try { body = readFileSync(path.join(FIXTURES, name), 'utf8'); }
     catch {
