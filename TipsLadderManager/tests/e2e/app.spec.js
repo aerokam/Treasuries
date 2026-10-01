@@ -60,9 +60,46 @@ async function fidelityWithTodayDownloadDate() {
 
 // Holdings CSV for rebalance tests (Format 3: cusip,qty) — single canonical copy in data/
 const HOLDINGS_PATH = path.join(ROOT, 'data', 'SampleHoldings.csv');
-// Built on real market data from a year ago with every maturity month held, so its 2026 rungs for
-// January, April and July have since matured (tests/fixtures/yearago/build-fixtures.mjs).
-const YEARAGO_ALL_PATH = path.join(ROOT, 'tests', 'fixtures', 'yearago', 'ladder-2026-2040-dara40k-all.csv');
+// The settlement year, set before each test: the ladder's first year, so years in these tests are written relative
+// to it (SY + 1 is the second year) and do not go stale when the calendar turns.
+let SY = 0;
+
+// cusip -> maturity year for every TIPS in today's quotes, to tell which year a bond in an exported file belongs to.
+// The structural gap, read from the First Year dropdown (the gap years are labelled): Build tab only.
+async function gapYears(page) {
+  return page.locator('#first-year option').evaluateAll(os => os.filter(o => /gap/.test(o.textContent)).map(o => Number(o.value)));
+}
+
+async function maturityYears() {
+  const years = new Map();
+  // The description holds commas inside its quotes, so this goes through the shared CSV parser.
+  for (const f of parseCsvRows(await r2Text('Treasuries/FidelityTreasuriesTips.csv'), false)) {
+    if (f[0] === 'TIPS') years.set(f[2], Number(f[6].slice(0, 4)));
+  }
+  return years;
+}
+
+// A holdings file made the way a user makes one: Build a ladder, export CUSIP/Qty. `dropYears` removes the bonds of
+// those years, to leave interior holes. Only the bond rows are kept (no per-year DARA block), so the result reads
+// as a plain position list.
+async function makeLadderFile(page, name, { lastYear, dropYears = [] }) {
+  await page.locator('.tab-btn[data-mode="build"]').click();
+  await page.locator('#last-year').selectOption({ value: String(lastYear) });
+  await page.locator('#dara').fill('40000');
+  await page.locator('#run-btn').click();
+  await expect(page.locator('#build-output')).toHaveCSS('display', 'block', { timeout: 4_000 });
+  const dl = page.waitForEvent('download');
+  await chooseMenu(page, 'export-menu', 'cusip-qty');
+  const raw = test.info().outputPath(name + '-raw.csv');
+  await (await dl).saveAs(raw);
+  const years = await maturityYears();
+  const drop = new Set(dropYears);
+  const lines = readFileSync(raw, 'utf8').split(/\r?\n/).filter(l => /^[A-Z0-9]{9},/.test(l) && !drop.has(years.get(l.split(',')[0])));
+  const out = test.info().outputPath(name);
+  writeFileSync(out, ['cusip,qty,excess', ...lines].join('\n') + '\n');
+  await page.locator('.tab-btn[data-mode="rebalance"]').click();
+  return out;
+}
 
 // The #dara box shows a literal number for a flat scalar, or is blank with a "by year" placeholder
 // whenever the shape is custom per-year (a single number would be misleading there).
@@ -85,6 +122,7 @@ async function chooseMenu(page, menu, choice) {
 
 test.beforeEach(async ({ page }) => {
   const yieldsBody = await yieldsWithTodaySettlement();
+  SY = Number((await computeSettleDateStr()).slice(0, 4));
   await page.route('**/Treasuries/YieldsFromFedInvestPrices.csv', r =>
     r.fulfill({ body: yieldsBody, contentType: 'text/csv' }));
   await page.route('**/Treasuries/FidelityTreasuriesTips.csv', async r =>
@@ -489,7 +527,8 @@ test('drill popup: gap-year PLI credit drills into pool composition', async ({ p
   // The Bracket Amount popup lists each gap year's "↳ PLI credit"; each must drill into the shared
   // pool composition (slice encoded in the data-l3 key as plcpool:<slice>).
   await page.locator('.tab-btn[data-mode="build"]').click();
-  await page.locator('#first-year').selectOption({ label: '2036' });    // gaps 2037–2039 get PLI credit
+  const gap = await gapYears(page);
+  await page.locator('#first-year').selectOption({ label: String(gap[0] - 1) });    // the gap years get PLI credit
   const lastYearSel = page.locator('#last-year');
   const lyCount = await lastYearSel.locator('option').count();
   await lastYearSel.selectOption({ index: lyCount - 1 });               // 2066 → future-30Y cover → AMD in pool
@@ -708,20 +747,20 @@ test('build: Select maturities picks determine the ladder range, not the stale L
 test('build: deselecting the first year entirely moves the ladder\'s real first year forward', async ({ page }) => {
   test.setTimeout(20_000);
   await page.locator('.tab-btn[data-mode="build"]').click();
-  await page.locator('#last-year').selectOption({ value: '2030' });
+  await page.locator('#last-year').selectOption({ value: String(SY + 4) });
   await page.locator('#build-maturity').selectOption({ value: 'select' });
   await expect(page.locator('#maturity-picker-overlay')).toBeVisible({ timeout: 2_000 });
 
   for (const btn of await page.locator('.mp-col-none').all()) await btn.click();
-  await page.locator('input[type=checkbox][data-year="2027"]').first().check();
+  await page.locator(`input[type=checkbox][data-year="${SY + 1}"]`).first().check();
   await page.locator('#maturity-picker-apply').click();
   await expect(page.locator('#build-output')).toHaveCSS('display', 'block', { timeout: 4_000 });
 
   const rangeText = await page.locator('#val-range').textContent();
-  expect(rangeText, `Range should start at 2027 (the earliest actual pick), not 2026 (got "${rangeText}")`).toContain('2027');
-  expect(rangeText).not.toContain('2026');
+  expect(rangeText, `Range should start at ${SY + 1} (the earliest actual pick), not ${SY} (got "${rangeText}")`).toContain(String(SY + 1));
+  expect(rangeText).not.toContain(String(SY));
   await expect(page.locator('#first-year')).toBeDisabled();
-  await expect(page.locator('#first-year')).toHaveValue('2027');
+  await expect(page.locator('#first-year')).toHaveValue(String(SY + 1));
 });
 
 // Regression: switching the Maturity preference away from "Select maturities" used to wipe every
@@ -730,19 +769,19 @@ test('build: deselecting the first year entirely moves the ladder\'s real first 
 test('build: Select maturities picks survive switching to a named policy and back', async ({ page }) => {
   test.setTimeout(20_000);
   await page.locator('.tab-btn[data-mode="build"]').click();
-  await page.locator('#last-year').selectOption({ value: '2030' });
+  await page.locator('#last-year').selectOption({ value: String(SY + 4) });
   await page.locator('#build-maturity').selectOption({ value: 'select' });
   await expect(page.locator('#maturity-picker-overlay')).toBeVisible({ timeout: 2_000 });
 
   for (const btn of await page.locator('.mp-col-none').all()) await btn.click();
-  await page.locator('input[type=checkbox][data-year="2027"]').first().check();
+  await page.locator(`input[type=checkbox][data-year="${SY + 1}"]`).first().check();
   await page.locator('#maturity-picker-apply').click();
   await expect(page.locator('#build-output')).toHaveCSS('display', 'block', { timeout: 4_000 });
 
   await page.locator('#build-maturity').selectOption({ value: 'last' });
   await page.locator('#build-maturity').selectOption({ value: 'select' });
   await expect(page.locator('#maturity-picker-overlay')).toBeVisible({ timeout: 2_000 });
-  await expect(page.locator('input[type=checkbox][data-year="2027"]').first()).toBeChecked();
+  await expect(page.locator(`input[type=checkbox][data-year="${SY + 1}"]`).first()).toBeChecked();
 });
 
 // Same rule applies in Rebalance — not just Build. Loads real holdings, then narrows via Select
@@ -756,14 +795,14 @@ test('rebalance: Select maturities picks determine the effective range there too
   await page.locator('#build-maturity').selectOption({ value: 'select' });
   await expect(page.locator('#maturity-picker-overlay')).toBeVisible({ timeout: 2_000 });
   for (const btn of await page.locator('.mp-col-none').all()) await btn.click();
-  await page.locator('input[type=checkbox][data-year="2027"]').first().check();
+  await page.locator(`input[type=checkbox][data-year="${SY + 1}"]`).first().check();
   await page.locator('#maturity-picker-apply').click();
   await expect(page.locator('#maturity-picker-overlay')).toBeHidden();
 
   await expect(page.locator('#rebal-first-year')).toBeDisabled();
   await expect(page.locator('#rebal-last-year')).toBeDisabled();
-  await expect(page.locator('#rebal-first-year')).toHaveValue('2027');
-  await expect(page.locator('#rebal-last-year')).toHaveValue('2027');
+  await expect(page.locator('#rebal-first-year')).toHaveValue(String(SY + 1));
+  await expect(page.locator('#rebal-last-year')).toHaveValue(String(SY + 1));
 });
 
 // Rebuilding #simple-table on every Rebalance Ladder run wipes every fy-group-header's
@@ -950,7 +989,7 @@ test('rebalance: net cash is non-negative and small (self-financing scale)', asy
 // ~30% to "fund" them — small net cash but huge trades. Assert the Qty Delta column is ~0.
 // (3.0 §Funding the rebalance — the scale is gated on gap/Future-30Y years existing.)
 test('rebalance: gap-free portfolio with interior holes makes no large trades', async ({ page }) => {
-  await page.locator('#holdings-file').setInputFiles(path.join(FIXTURES, 'OfxInteriorHoles.csv'));
+  await page.locator('#holdings-file').setInputFiles(await makeLadderFile(page, 'interior-holes.csv', { lastYear: SY + 7, dropYears: [SY + 3, SY + 6] }));
   await page.locator('#run-btn').click();
   await expect(page.locator('#simple-table')).toBeVisible({ timeout: 4_000 });
 
@@ -987,18 +1026,18 @@ test('rebalance: gap-free portfolio with interior holes makes no large trades', 
 // table, then Infer DARA (3.0 §Per-Rung DARA Selection).
 test('rebalance: Infer DARA over a selected range fills an empty interior year', async ({ page }) => {
   test.setTimeout(20_000);
-  await page.locator('#holdings-file').setInputFiles(path.join(FIXTURES, 'OfxInteriorHoles.csv'));
+  await page.locator('#holdings-file').setInputFiles(await makeLadderFile(page, 'interior-holes.csv', { lastYear: SY + 7, dropYears: [SY + 3, SY + 6] }));
   await expect(page.locator('.fy-dara-input[data-year]').first()).toBeVisible({ timeout: 4_000 });
 
-  await page.locator('#simple-table tr.fy-group-header[data-fy="2029"]').click({ delay: 650 });
-  await page.locator('#simple-table tr.fy-group-header[data-fy="2031"]').click({ modifiers: ['Shift'] });
+  await page.locator(`#simple-table tr.fy-group-header[data-fy="${SY + 3}"]`).click({ delay: 650 });
+  await page.locator(`#simple-table tr.fy-group-header[data-fy="${SY + 5}"]`).click({ modifiers: ['Shift'] });
   await expect(page.locator('#selection-toolbar')).toBeVisible();
   await page.locator('#selection-infer-btn').click();
 
   // Panel now shows a flat inferred DARA on 2029 (the empty year) — visible in the rung itself,
   // which is why Infer needs no separate Apply step and closes its own selection once done.
-  const val2029 = await page.locator('.fy-dara-input[data-year="2029"]').inputValue();
-  expect(parseFloat(val2029.replace(/[^0-9.-]/g, '')), '2029 shows the inferred DARA in the panel').toBeGreaterThan(1000);
+  const val2029 = await page.locator(`#simple-table .fy-dara-input[data-year="${SY + 3}"]`).inputValue();
+  expect(parseFloat(val2029.replace(/[^0-9.-]/g, '')), `${SY + 3} shows the inferred DARA in the panel`).toBeGreaterThan(1000);
   await expect(page.locator('#selection-toolbar'), 'Infer DARA applies immediately and closes the selection, same as Set DARA').not.toBeVisible();
 
   await page.locator('#run-btn').click();
@@ -1007,10 +1046,10 @@ test('rebalance: Infer DARA over a selected range fills an empty interior year',
   // The per-funded-year total lives in the group-header row (e.g. "▶ 2029 … 0  64  +64 …").
   // Find the 2029 group row and assert it shows a positive Qty Delta — i.e. 2029 was BOUGHT to the
   // inferred DARA rather than left as an empty hole.
-  const row2029 = page.locator('#simple-table tr.fy-group-header[data-fy="2029"]').first();
+  const row2029 = page.locator(`#simple-table tr.fy-group-header[data-fy="${SY + 3}"]`).first();
   await expect(row2029).toBeVisible();
   const rowText = (await row2029.textContent() ?? '').replace(/\s+/g, ' ');
-  expect(rowText, `2029 must FILL to the inferred DARA (got "${rowText.trim()}"), not stay an empty hole`).toMatch(/\+\s*[1-9]\d*/);
+  expect(rowText, `${SY + 3} must FILL to the inferred DARA (got "${rowText.trim()}"), not stay an empty hole`).toMatch(/\+\s*[1-9]\d*/);
 });
 
 // A click-drag across rows (3.0 §Per-Rung DARA Selection §Selecting rungs) must show the row under
@@ -1166,7 +1205,7 @@ test('build variable DARA then rebalance: per-year panel round-trips exactly', a
   await page.locator('.tab-btn[data-mode="build"]').click();
 
   // Select last year 2029 and default first year (settlement year ≈ 2026)
-  await page.locator('#last-year').selectOption('2029');
+  await page.locator('#last-year').selectOption(String(SY + 3));
   await page.locator('#dara').fill('40000');
 
   // Build once to materialize the table's inline per-year DARA inputs (Build mode has no
@@ -1182,7 +1221,7 @@ test('build variable DARA then rebalance: per-year panel round-trips exactly', a
   const firstYear = await firstInput.getAttribute('data-year');
   await firstInput.fill('20000');
   await firstInput.blur();
-  const lastYearInput = page.locator('#build-table .fy-dara-input[data-year="2029"]');
+  const lastYearInput = page.locator(`#build-table .fy-dara-input[data-year="${SY + 3}"]`);
   await lastYearInput.fill('50000');
   await lastYearInput.blur();
   await expect(page.locator('#build-table tbody tr').first()).toBeVisible({ timeout: 6_000 });
@@ -1212,8 +1251,8 @@ test('build variable DARA then rebalance: per-year panel round-trips exactly', a
   // year like 2029 exists (with a coincidentally matching value) in both tables at this point.
   await expect(page.locator(`#simple-table .fy-dara-input[data-year="${firstYear}"]`),
     'first-year DARA should round-trip to exactly 20000').toHaveValue('20000', { timeout: 3_000 });
-  await expect(page.locator('#simple-table .fy-dara-input[data-year="2029"]'),
-    '2029 DARA should round-trip to exactly 50000').toHaveValue('50000', { timeout: 3_000 });
+  await expect(page.locator(`#simple-table .fy-dara-input[data-year="${SY + 3}"]`),
+    `${SY + 3} DARA should round-trip to exactly 50000`).toHaveValue('50000', { timeout: 3_000 });
 
   // Run rebalance — reconstructing the same targets reproduces the same ladder, so net cash is
   // near zero (not a proportional-scaling self-financing search; see comment above).
@@ -1229,7 +1268,7 @@ test('build variable DARA then rebalance: per-year panel round-trips exactly', a
 // Regression for the bug where importing a built 2026–2066 ladder defaulted the rebalance
 // last-year to 2056 (longest actual TIPS), so the 2052/2056 Future-30Y cover excess was sold
 // to DARA. The last-year must be recovered (2066) from the cover excess so the round-trip is flat.
-test('round-trip: build 2026–2066 → export CUSIP/Qty → import → last-year recovers 2066, ~0 net cash', async ({ page }) => {
+test('round-trip: build to the last Future 30Y year → export CUSIP/Qty → import → last-year recovered, ~0 net cash', async ({ page }) => {
   test.setTimeout(20_000);
 
   // 1. Build 2026–2066 @ DARA 40k
@@ -1305,7 +1344,7 @@ test('Set/Infer DARA touch only the selected rungs, never any other rung', async
 
   // 1. Infer the bottom range alone (2026-2047) → it flattens to one value; the top range, which was
   //    never selected, is untouched.
-  await _selectRange(page, '#simple-table', 2026, 2047);
+  await _selectRange(page, '#simple-table', SY, 2047);
   await page.locator('#selection-infer-btn').click();
   const lmp1 = await _lmpVals(page);
   expect(new Set(lmp1).size, 'all rungs in the selection share one flat DARA').toBe(1);
@@ -1338,7 +1377,7 @@ test('a hand-typed rung survives an Infer over a selection that includes it', as
   await _selRebalSetup(page, 'selpin.csv');
 
   // Hand-type one specific bottom-range year — this is the user's stated intent for that rung.
-  const pinnedRung = page.locator('#simple-table .fy-dara-input[data-year="2030"]');
+  const pinnedRung = page.locator(`#simple-table .fy-dara-input[data-year="${SY + 4}"]`);
   await pinnedRung.fill('12345');
   await pinnedRung.blur();
   await expect(pinnedRung).toHaveValue('12345');
@@ -1348,7 +1387,7 @@ test('a hand-typed rung survives an Infer over a selection that includes it', as
   // Infer the bottom range, which includes the pinned 2030 rung — it must survive untouched even
   // though the rest of the bottom range (its own selection) gets restamped around it. The top range,
   // never selected, is untouched.
-  await _selectRange(page, '#simple-table', 2026, 2047);
+  await _selectRange(page, '#simple-table', SY, 2047);
   await page.locator('#selection-infer-btn').click();
   await expect(pinnedRung, 'hand-typed rung is not overwritten by its own selection\'s Infer').toHaveValue('12345');
   const lmpAfter = await _lmpVals(page);
@@ -1365,7 +1404,7 @@ test('inferring every segment of the ladder drives whole-portfolio net cash towa
   // to the whole ladder) drives whole-portfolio net cash toward zero.
   await _selectRange(page, '#simple-table', 2048, 2055);
   await page.locator('#selection-infer-btn').click();
-  await _selectRange(page, '#simple-table', 2026, 2047);
+  await _selectRange(page, '#simple-table', SY, 2047);
   await page.locator('#selection-infer-btn').click();
   await page.locator('#run-btn').click();
   await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 6_000 });
@@ -1600,10 +1639,23 @@ test('Available Cash follows the Coupons setting, and stops once the holder sets
 // The fixture holds every 2026 maturity month, three of which have matured by late August.
 test('Available Cash counts maturity proceeds from rungs that have already matured', async ({ page }) => {
   test.setTimeout(20_000);
+  // The rungs that have matured this settlement year are named in the TIPS reference data (a matured bond is no
+  // longer quoted); the ladder file is a Build export with those bonds added.
+  const settle = await computeSettleDateStr();
+  const maturedBonds = [];
+  for (const line of (await r2Text('TIPS/TipsRef.csv')).split(/\r?\n/)) {
+    const f = line.split(',');
+    if (/^[A-Z0-9]{9}$/.test(f[0]) && f[1] && f[1] < settle && f[1].slice(0, 4) === String(SY)) maturedBonds.push({ cusip: f[0], maturity: f[1] });
+  }
+  test.skip(maturedBonds.length === 0, 'no TIPS has matured yet this settlement year');
+  const rungs = [...new Map(maturedBonds.map(m => [m.maturity, m])).values()]; // one bond per maturity date
   const cash = page.locator('#available-cash');
   await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 4_000 });
 
-  await page.locator('#holdings-file').setInputFiles(YEARAGO_ALL_PATH);
+  const base = await makeLadderFile(page, 'matured-base.csv', { lastYear: SY + 10 });
+  const ladderFile = test.info().outputPath('matured-ladder.csv');
+  writeFileSync(ladderFile, readFileSync(base, 'utf8') + rungs.map(m => m.cusip + ',10,0').join('\n') + '\n');
+  await page.locator('#holdings-file').setInputFiles(ladderFile);
   await expect(page.locator('#available-cash-auto')).toBeVisible({ timeout: 4_000 });
   const offered = Number(await cash.inputValue());
 
@@ -1615,10 +1667,10 @@ test('Available Cash counts maturity proceeds from rungs that have already matur
   expect(text).toMatch(/principal/i);
   expect(text).toMatch(/rungs that have matured/i);
 
-  // Maturity proceeds dwarf the coupons here: three whole rungs against half a year of coupons.
+  // Maturity proceeds dwarf the coupons here: whole rungs of ten bonds each against part of a year of coupons.
   const matured = text.match(/matured \d{2}\/\d{2}\/\d{4}/g) ?? [];
-  expect(matured.length, 'three 2026 rungs have matured by late August').toBe(3);
-  expect(offered, 'three matured rungs plus coupons is a large figure').toBeGreaterThan(20000);
+  expect(matured.length, 'every matured rung is named').toBe(rungs.length);
+  expect(offered, 'the matured rungs plus coupons are a large figure').toBeGreaterThan(8000 * rungs.length);
 });
 
 // Coupons a held ladder has already collected this year are money in hand (2.0 §Available Cash),
@@ -2254,13 +2306,14 @@ test('Gap Dur popup: a bracket weight drill reports the same weight as the row i
 // ones, so the table read 2037, 2038, 2039, 2036*, 2040*. Funded years always display in ascending order.
 test('build: gap-years-only ladder lists funded years in ascending order, bracket years included', async ({ page }) => {
   await page.locator('.tab-btn[data-mode="build"]').click();
-  await page.locator('#first-year').selectOption({ value: '2037' });
-  await page.locator('#last-year').selectOption({ value: '2039' });
+  const gap = await gapYears(page);
+  await page.locator('#first-year').selectOption({ value: String(gap[0]) });
+  await page.locator('#last-year').selectOption({ value: String(gap[gap.length - 1]) });
   await page.locator('#run-btn').click();
   await expect(page.locator('#build-output')).toHaveCSS('display', 'block', { timeout: 4_000 });
   const years = await page.locator('#build-table tr.fy-group-header').evaluateAll(rows => rows.map(r => Number(r.dataset.fy)));
   expect(years.length, 'the gap years and both brackets are listed').toBeGreaterThanOrEqual(5);
   expect(years, 'ascending funded-year order').toEqual([...years].sort((a, b) => a - b));
-  expect(years).toContain(2036);
-  expect(years).toContain(2040);
+  expect(years).toContain(gap[0] - 1);
+  expect(years).toContain(gap[gap.length - 1] + 1);
 });
