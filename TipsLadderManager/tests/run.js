@@ -596,8 +596,11 @@ console.log('\n3-bracket real-holdings reconciliation (distinct orig-lower/new-l
     function d2036For(mult) {
       const dm = new Map(scaledMap);
       dm.set(2036, Math.round((dm.get(2036) ?? scaledMedian) * mult));
-      const { details: d } = runRebalance({ dara: scaledMedian, bracketMode: '3bracket', holdings, tipsMarketData, refCPI, settlementDate, daraByYear: dm });
-      return d.find(x => x.fundedYear === 2036 && x.isBracketTarget);
+      const { details: d, summary: sm } = runRebalance({ dara: scaledMedian, bracketMode: '3bracket', holdings, tipsMarketData, refCPI, settlementDate, daraByYear: dm });
+      // Filter by CUSIP: 2036 now has two bracket-target rows, the canonical active lower bracket and a
+      // same-year retained holding whose funded quantity is frozen by construction, so only the active
+      // bracket's row can show funded delta 0 with the change landing on excess.
+      return d.find(x => x.fundedYear === 2036 && x.isBracketTarget && x.cusip === sm.newLowerCUSIP);
     }
     let bracketMult = null;
     for (let mult = 0.95; mult >= 0.5; mult -= 0.01) {
@@ -609,8 +612,8 @@ console.log('\n3-bracket real-holdings reconciliation (distinct orig-lower/new-l
     }
     const customDara = new Map(scaledMap);
     customDara.set(2036, Math.round((customDara.get(2036) ?? scaledMedian) * bracketMult));
-    const { details: details2 } = runRebalance({ dara: scaledMedian, bracketMode: '3bracket', holdings, tipsMarketData, refCPI, settlementDate, daraByYear: customDara });
-    const d2036 = details2.find(d => d.fundedYear === 2036 && d.isBracketTarget);
+    const { details: details2, summary: summary2 } = runRebalance({ dara: scaledMedian, bracketMode: '3bracket', holdings, tipsMarketData, refCPI, settlementDate, daraByYear: customDara });
+    const d2036 = details2.find(d => d.fundedYear === 2036 && d.isBracketTarget && d.cusip === summary2.newLowerCUSIP);
     assert('3B real (custom plan): 2036 bracket row present', d2036 != null, true);
     // Signature of the reallocation branch actually firing: the funded side fully absorbs into the
     // reallocated Before (delta 0) while the whole real trade lands on excess — matches the reported

@@ -1,10 +1,10 @@
 // E2E regression tests — guards against GUI breakage (inop buttons, broken table render, drill popups)
 // Run: npx playwright test
-// Mocks EVERY R2 fetch with a local fixture (YieldsFromFedInvestPrices.csv, FidelityTreasuriesTips.csv,
-// RefCPI.csv, TipsRef.csv, YieldsSaSao.csv, BondHolidaysSifma.csv) via page.route() in beforeEach below —
+// Mocks EVERY R2 fetch (YieldsFromFedInvestPrices.csv, FidelityTreasuriesTips.csv,
+// RefCPI.csv, TipsRef.csv, YieldsSaSao.csv, BondHolidaysSifma.csv) via page.route() in beforeEach below, fulfilled with the file's current R2 content (r2Text, fetched once per run; nothing market-related is committed);
 // the test browser has no live network egress in a sandboxed session, so an unmocked R2 URL fails with
 // "Failed to fetch" (this is by design, not flakiness; well-known, see 3.1_Data_Pipeline.md §Testing).
-// Any new required R2 fetch added to shared/src/market-data.js MUST get a matching fixture file + route() mock here, or
+// Any new required R2 fetch added to shared/src/market-data.js MUST get a matching route() mock here, or
 // every test hangs/fails at the beforeEach's data-load wait, not just tests that touch the new field.
 
 import { test, expect } from 'playwright/test';
@@ -40,7 +40,7 @@ async function computeSettleDateStr() {
 
 // Yields CSV with line 1 replaced by today's T+1 settlement date.
 async function yieldsWithTodaySettlement() {
-  const raw = csv('YieldsFromFedInvestPrices.csv');
+  const raw = await r2Text('Treasuries/YieldsFromFedInvestPrices.csv');
   const lines = raw.split('\n');
   lines[0] = await computeSettleDateStr();
   return lines.join('\n');
@@ -48,11 +48,9 @@ async function yieldsWithTodaySettlement() {
 
 // Fidelity CSV with the "Date downloaded" footer replaced by today's actual date (not T+1 —
 // the app derives T+1 itself from this date, same as a real download would settle T+1 from
-// today). Numerically mirrors YieldsFromFedInvestPrices.csv's TIPS rows (see
-// tests/e2e/FidelityTreasuriesTips.csv provenance) so switching sources doesn't change any
-// computed ladder numbers in tests that don't care which source is active.
-function fidelityWithTodayDownloadDate() {
-  const raw = csv('FidelityTreasuriesTips.csv');
+// today).
+async function fidelityWithTodayDownloadDate() {
+  const raw = await r2Text('Treasuries/FidelityTreasuriesTips.csv');
   const now = new Date();
   const mo = String(now.getMonth() + 1).padStart(2, '0');
   const dy = String(now.getDate()).padStart(2, '0');
@@ -89,14 +87,14 @@ test.beforeEach(async ({ page }) => {
   const yieldsBody = await yieldsWithTodaySettlement();
   await page.route('**/Treasuries/YieldsFromFedInvestPrices.csv', r =>
     r.fulfill({ body: yieldsBody, contentType: 'text/csv' }));
-  await page.route('**/Treasuries/FidelityTreasuriesTips.csv', r =>
-    r.fulfill({ body: fidelityWithTodayDownloadDate(), contentType: 'text/csv' }));
+  await page.route('**/Treasuries/FidelityTreasuriesTips.csv', async r =>
+    r.fulfill({ body: await fidelityWithTodayDownloadDate(), contentType: 'text/csv' }));
   await page.route('**/TIPS/RefCPI.csv', async r =>
     r.fulfill({ body: await r2Text('TIPS/RefCPI.csv'), contentType: 'text/csv' }));
   await page.route('**/TIPS/TipsRef.csv', async r =>
     r.fulfill({ body: await r2Text('TIPS/TipsRef.csv'), contentType: 'text/csv' }));
-  await page.route('**/TIPS/YieldsSaSao.csv', r =>
-    r.fulfill({ body: csv('YieldsSaSao.csv'), contentType: 'text/csv' }));
+  await page.route('**/TIPS/YieldsSaSao.csv', async r =>
+    r.fulfill({ body: await r2Text('TIPS/YieldsSaSao.csv'), contentType: 'text/csv' }));
   await page.route('**/misc/BondHolidaysSifma.csv', async r =>
     r.fulfill({ body: await r2Text('misc/BondHolidaysSifma.csv'), contentType: 'text/csv' }));
   // Allow sample pre-populate to succeed (fetches data/SampleHoldings.csv via serve)
