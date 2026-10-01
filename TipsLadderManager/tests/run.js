@@ -1564,14 +1564,19 @@ for (const gapFirstYear of [2037, 2038, 2039]) {
 // ── Test: runFundedRebalance — gap-free pristine mirror is a no-op (no scale) ──────────────────
 // A portfolio with no gap years (2037-39) / Future-30Y block has nothing to duration-match, so the
 // self-financing scale must NOT run: the load mirror already nets to ≈0. Guards the 3.0 §Funding gate
-// (previously only e2e-covered). Holdings 2027-2033 with holes at 2029/2032 (intentional empties).
+// (previously only e2e-covered). A ladder with two interior holes (intentional empties).
 {
   console.log('\nrunFundedRebalance — gap-free pristine mirror makes no large trades');
-  const rawHoldings = [
-    { cusip: '912828V49', qty: 61 }, { cusip: '9128283R9', qty: 63 },
-    { cusip: '91282CPH8', qty: 100 }, { cusip: '91282CCM1', qty: 84 },
-    { cusip: '91282CHP9', qty: 96 },
-  ].filter(h => tipsMarketData.get(h.cusip)?.maturity);
+  // A built ladder over the years before the gap, then two years removed so the interior holes the
+  // heading describes exist. Built from the outstanding TIPS, so no particular bond has to be held.
+  const roles = ladderRoles(tipsMarketData, settlementDate);
+  const builtGapFree = runBuild({ dara: 30000, firstYear: roles.ordinaryYears[0], lastYear: roles.gap.first - 4, tipsMarketData, refCPI, settlementDate });
+  const holeYears = new Set([roles.ordinaryYears[2], roles.ordinaryYears[5]]);
+  const rawHoldings = builtGapFree.details
+    .filter(d => !holeYears.has(d.fundedYear))
+    .map(d => ({ cusip: d.cusip, qty: (d.fundedYearQty || 0) + (d.excessQty || 0) }))
+    .filter(h => h.qty > 0);
+  assert('gap-free: the built ladder is non-trivial (five or more years held)', new Set(rawHoldings.map(h => tipsMarketData.get(h.cusip).maturity.getFullYear())).size >= 5, true);
 
   // Build the load mirror exactly as the UI does at file load (range form fills empty years w/ LMI).
   const heldARA = computePortfolioARAByYear(rawHoldings, tipsMarketData, refCPI);
@@ -1703,18 +1708,22 @@ for (const gapFirstYear of [2037, 2038, 2039]) {
 // self-financing search (flat=true, scopeYears = the whole LMP range, no speculative segment — what
 // "Infer LMP DARA" runs with no split set) must still count that trade's cash delta, or the search
 // converges on a DARA that leaves large, oversized 2040 holdings unaccounted for and the reported
-// whole-portfolio net cash lands far from zero (real-world case: a $38k, 26-bond 2040 position sized
+// whole-portfolio net cash lands far from zero (real-world case: a $38k, 26-bond upper-bracket position sized
 // for build-era duration matching outlived its ladder — Dana's combined Schwab accounts, net cash
-// +$12k+ before the fix). Oversize the 2040 position relative to the tiny 3-year gap it must cover.
+// +$12k+ before the fix). Oversize the upper-bracket position relative to the tiny 3-year gap it must cover.
 {
   console.log('\nInfer LMP DARA — lastYear inside gap, oversized 2040 bracket must be counted');
+  // Five ordinary years of ten bonds each and an upper bracket held at four times that, generated from the
+  // outstanding TIPS (the upper bracket is the earliest-maturing TIPS after the gap).
+  const roles = ladderRoles(tipsMarketData, settlementDate);
+  const heldYears = roles.ordinaryYears.slice(0, 5);
   const holdings = [
-    { cusip: '9128283R9', qty: 10 }, { cusip: '9128285W6', qty: 10 },
-    { cusip: '912828Z37', qty: 10 }, { cusip: '91282CBF7', qty: 10 },
-    { cusip: '91282CDX6', qty: 10 }, { cusip: '912810QF8', qty: 40 }, // 2040, oversized
-  ].filter(h => tipsMarketData.get(h.cusip)?.maturity);
+    ...heldYears.map(y => ({ cusip: roles.latestIn(y).cusip, qty: 10 })),
+    { cusip: roles.upper.cusip, qty: 40 }, // oversized
+  ];
 
-  const firstYear = 2028, lastYear = 2039;
+
+  const firstYear = heldYears[0], lastYear = roles.gap.last;
   const heldARA = computePortfolioARAByYear(holdings, tipsMarketData, refCPI);
   const { daraMap } = derivePerYearDara(heldARA, getGapYearBracketCandidates(tipsMarketData));
 
