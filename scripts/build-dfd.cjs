@@ -72,6 +72,7 @@ const TERMS = {
   'TIPS market data': 'tips-market-data',
   'SA yield series': 'sa-yield-series',
   'Holdings File': 'holdings-file', 'DARA Plan File': 'dara-plan-file',
+  'per-year DARA': 'per-year-dara',
   'holdings': 'holdings', 'DARA plan': 'dara-plan',
 };
 const unlinked = new Set();
@@ -1127,15 +1128,15 @@ function level3TipsLadderManagerImport() {
 
 // ── Level 3: TipsLadderManager 4.3 ──────────────────────────────────────────
 function level3TipsLadderManagerBuild() {
-  const PLACEHOLDER = V('TipsLadderManager/knowledge/2.0_TIPS_Ladders.md');
+  const S = a => V('TipsLadderManager/knowledge/4.3_Build_Ladder.md' + (a ? '#' + a : ''));
   const M = a => V('knowledge/SharedModules.md' + (a ? '#' + a : ''));
   const modules = [
     { id: 'm5', name: ['ladder-', 'core.js'], href: M('m5') },
     { id: 'm3', name: ['bond-math.js'], href: M('m3') },
   ];
   const procs = [
-    { id: '4.3.1', name: ['Resolve per-', 'year DARA'], href: PLACEHOLDER, calls: [], out: { '4.3.2': ['per-year DARA'] } },
-    { id: '4.3.2', name: ['Build the', 'ladder'], href: PLACEHOLDER, calls: ['m5', 'm3'], out: {} },
+    { id: '4.3.1', name: ['Resolve per-', 'year DARA'], href: S('resolve-per-year-dara'), calls: [], out: { '4.3.2': ['per-year DARA'] } },
+    { id: '4.3.2', name: ['Build the', 'ladder'], href: S('build-the-ladder'), calls: ['m5', 'm3'], out: {} },
   ];
   const PR = 62, MR = 50, UX = 60, UW = 145, W = 1180, H = 480;
   const px = { '4.3.1': 420, '4.3.2': 420 };
@@ -1177,7 +1178,7 @@ function level3TipsLadderManagerBuild() {
   return page({
     title: 'TipsLadderManager 4.3 — Level 3', h1: 'Level 3 &mdash; TipsLadderManager 4.3 Build ladder', maxWidth: W,
     up: 'DFD_LEVEL2_TIPSLADDERMANAGER.html', upLabel: 'Level 2 — TipsLadderManager (draft)', svg: P.join(NL),
-    notes: ['  Draft: no process spec yet, both boxes link to 2.0 TIPS Ladders as a placeholder — see DFD_Worklist.md item 27.',
+    notes: ['  M5 (ladder-core.js)\'s own sizing algorithm is specified at 2.0 TIPS Ladders, not in SharedModules.md or here — see DFD_Worklist.md item 27.',
       '  Built in tandem with 4.4 Rebalance ladder, since both call the same shared sizing engine (ladder-core.js, M5) rather than each carrying its own copy.',
       '  The amber circles are shared modules (<a href="' + M() + '">SharedModules.md</a>), not process steps of this diagram.'].join(NL)
   });
@@ -1185,16 +1186,16 @@ function level3TipsLadderManagerBuild() {
 
 // ── Level 3: TipsLadderManager 4.4 ──────────────────────────────────────────
 function level3TipsLadderManagerRebalance() {
-  const PLACEHOLDER = V('TipsLadderManager/knowledge/3.0_TIPS_Ladder_Rebalancing.md');
+  const S = a => V('TipsLadderManager/knowledge/4.4_Rebalance_Ladder.md' + (a ? '#' + a : ''));
   const M = a => V('knowledge/SharedModules.md' + (a ? '#' + a : ''));
   const modules = [
     { id: 'm5', name: ['ladder-', 'core.js'], href: M('m5') },
     { id: 'm3', name: ['bond-math.js'], href: M('m3') },
   ];
   const procs = [
-    { id: '4.4.1', name: ['Derive per-year', 'DARA from', 'holdings or', 'DARA plan'], href: PLACEHOLDER, calls: [], out: { '4.4.3': ['per-year DARA'] } },
-    { id: '4.4.2', name: ['Preview before-', 'state'], href: PLACEHOLDER, calls: [], out: {} },
-    { id: '4.4.3', name: ['Rebalance the', 'ladder'], href: PLACEHOLDER, calls: ['m5', 'm3'], out: {} },
+    { id: '4.4.1', name: ['Derive per-year', 'DARA from', 'holdings or', 'DARA plan'], href: S('derive-per-year-dara-from-holdings-or-dara-plan'), calls: [], out: { '4.4.3': ['per-year DARA'] } },
+    { id: '4.4.2', name: ['Preview before-', 'state'], href: S('preview-before-state'), calls: [], out: {} },
+    { id: '4.4.3', name: ['Rebalance the', 'ladder'], href: S('rebalance-the-ladder'), calls: ['m5', 'm3'], out: {} },
   ];
   const PR = 62, MR = 50, UX = 60, UW = 145, W = 1180, H = 640;
   const px = { '4.4.1': 400, '4.4.2': 680, '4.4.3': 400 };
@@ -1246,8 +1247,7 @@ function level3TipsLadderManagerRebalance() {
   return page({
     title: 'TipsLadderManager 4.4 — Level 3', h1: 'Level 3 &mdash; TipsLadderManager 4.4 Rebalance ladder', maxWidth: W,
     up: 'DFD_LEVEL2_TIPSLADDERMANAGER.html', upLabel: 'Level 2 — TipsLadderManager (draft)', svg: P.join(NL),
-    notes: ['  Draft: no process spec yet, all three boxes link to 3.0 TIPS Ladder Rebalancing as a placeholder — see DFD_Worklist.md item 27.',
-      '  4.4.1 and 4.4.2 both run at file-load time, independently of each other and of Run; 4.4.3 runs only on Rebalance Ladder.',
+    notes: ['  4.4.1 and 4.4.2 both run at file-load time, independently of each other and of Run; 4.4.3 runs only on Rebalance Ladder.',
       '  Built in tandem with 4.3 Build ladder, since both call the same shared sizing engine (ladder-core.js, M5) rather than each carrying its own copy.',
       '  The amber circles are shared modules (<a href="' + M() + '">SharedModules.md</a>), not process steps of this diagram.'].join(NL)
   });

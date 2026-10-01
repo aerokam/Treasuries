@@ -49,7 +49,7 @@ caller's own spec.
 - `termYears(settle, maturity)` — the one term measure (`DFD_Worklist.md` §3.9).
 - `cashflowSchedule`, `daysBetween`, `hasLeapDayBetween`, `daysInYearFrom`, `calcMktWtdAvg`, `rungAmount` — supporting calculations for the above.
 
-**Called by**: [4.1.1 Fetch and parse market quotes](../TipsLadderManager/knowledge/4.1_Load_Market_Data.md#fetch-and-parse-market-quotes) (TipsLadderManager, `yieldFromPrice`), the Build and Rebalance ladder processes (TipsLadderManager — `accruedInterest`, `bondCalcs`, `couponSchedule`), [3.1.7 Calculate TIPS yields](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#calculate-tips-yields) and [3.1.8 Calculate Treasury yields](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#calculate-treasury-yields) (YieldCurves), and other processes across the portal — not yet swept for a complete list.
+**Called by**: [4.1.1 Fetch and parse market quotes](../TipsLadderManager/knowledge/4.1_Load_Market_Data.md#fetch-and-parse-market-quotes) (TipsLadderManager, `yieldFromPrice`), [4.3.2 Build the ladder](../TipsLadderManager/knowledge/4.3_Build_Ladder.md#build-the-ladder) and [4.4.3 Rebalance the ladder](../TipsLadderManager/knowledge/4.4_Rebalance_Ladder.md#rebalance-the-ladder) (TipsLadderManager — `accruedInterest`, `bondCalcs`, `couponSchedule`), [3.1.7 Calculate TIPS yields](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#calculate-tips-yields) and [3.1.8 Calculate Treasury yields](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#calculate-treasury-yields) (YieldCurves), and other processes across the portal — not yet swept for a complete list.
 
 ---
 
@@ -68,11 +68,7 @@ caller's own spec.
 
 ## <a id="m5"></a>ladder-core.js (M5)
 **File**: `TipsLadderManager/src/ladder-core.js`
-**Purpose**: The single authoritative implementation of "size the target ladder from a DARA" — Build and Rebalance both call it and neither reimplements funded sizing, the pre-ladder-interest pool, gap/Future-30Y duration matching, or the corrected sweep (4.0 Computation Modules).
-**Exports**:
-- `selectLadderBonds({ tipsMarketData, firstYear, lastYear, settlementDate, maturityPref?, couponPref?, yearOverrides? })` — the canonical bond set for the ladder: the funded-year TIPS list per year, the active/upper gap brackets, and the Future 30Y cover pair, resolved purely from [TIPS Market Data](./DATA_DICTIONARY.md#tips-market-data).
-- `sizeLadder({ dara, daraByYear?, firstYear, lastYear, rangeYears, gapYears, future30yYears, yearBondMap, yearTipsListMap?, tipsMarketData, refCPI, settlementDate, preLadderInterest?, ... })` — per-year DARA + the bond set → target quantities: the prelim sweep, Future-30Y duration match + AMD, the PLI/Available-Cash pool, gap duration match + bracket excess, then the corrected long→short funded sweep.
-- `sizeFuture30yCover({ future30yYears, future30yLowerCoverBond, future30yUpperCoverBond, settlementDate, dara, daraByYear?, refCPI })` — the Future-30Y half of duration matching alone, pulled out because Rebalance needs the cover excess quantity before the rest of `sizeLadder` runs (its own pre-PLI AMD pass).
-- `sizeYearRungs(list, need, refCPI)` / `aggregateRungs(rungs)` — splits one funded year's P+I need across its ordered multi-TIPS list (2.0 §Multi-TIPS Funded-Year Split).
+**Purpose**: The single authoritative implementation of "size the target ladder from a DARA." Unlike M1-M4, this module's own algorithm is too large for a registry entry — it is specified in full at [2.0 TIPS Ladders](../TipsLadderManager/knowledge/2.0_TIPS_Ladders.md) (§Algorithm and the duration-matching/PLI/AMD sections it covers), not here. This entry only names the exports and their callers.
+**Exports**: `selectLadderBonds`, `sizeLadder`, `sizeFuture30yCover`, `sizeYearRungs`/`aggregateRungs` — see 2.0 for what each does.
 
-**Called by**: the Build ladder and Rebalance ladder processes (TipsLadderManager) — not yet given real sub-process anchors; both still link here from their own Level 3 diagrams pending their process specs.
+**Called by**: [Build the ladder (4.3.2)](../TipsLadderManager/knowledge/4.3_Build_Ladder.md#build-the-ladder) and [Rebalance the ladder (4.4.3)](../TipsLadderManager/knowledge/4.4_Rebalance_Ladder.md#rebalance-the-ladder).

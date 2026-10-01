@@ -37,7 +37,7 @@
 
 **O** &nbsp; [Outstanding TIPS](#outstanding-tips)
 
-**P** &nbsp; [P+I](#pi) &middot; [P+I per TIPS](#pi-per-tips) &middot; [Par Value (Adjusted)](#par-value-adjusted) &middot; [Par Value (Nominal)](#par-value) &middot; [Par Yield](#par-yield) &middot; [PIMCO (E9)](#e9) &middot; [pre ladder interest](#pre-ladder-credit) *(see Pre-Ladder Interest (PLI))* &middot; [Pre-Ladder Interest (PLI)](#pre-ladder-credit) &middot; [Price](#price)
+**P** &nbsp; [P+I](#pi) &middot; [P+I per TIPS](#pi-per-tips) &middot; [Par Value (Adjusted)](#par-value-adjusted) &middot; [Par Value (Nominal)](#par-value) &middot; [Par Yield](#par-yield) &middot; [Per-Year DARA](#per-year-dara) &middot; [PIMCO (E9)](#e9) &middot; [pre ladder interest](#pre-ladder-credit) *(see Pre-Ladder Interest (PLI))* &middot; [Pre-Ladder Interest (PLI)](#pre-ladder-credit) &middot; [Price](#price)
 
 **Q** &nbsp; [Quantity](#quantity)
 
@@ -750,5 +750,7 @@ Some values are true only until Treasury issues more TIPS. Left inline as approx
   *Per-CUSIP quantities parsed from a [Holdings File](#holdings-file). `Excess_Qty` (the funded/excess split already known, rather than left for DARA math to derive) is present when the file is this app's own export or tipsladder.com's format, absent for the other two layouts.*
 - <a id="dara-plan"></a>**DARA Plan** = `{ Funded_Year + DARA } + ( Construction_Parameters )`
   *The holder's own stated per-year [DARA](#dara) target, for every year a `#fundedYear,dara` block names — gap and Future 30Y years included.*
+- <a id="per-year-dara"></a>**Per-Year DARA** = `{ Funded_Year + DARA }`
+  *The resolved [DARA](#dara) target for every year in a ladder's range, however it was arrived at — typed by hand, mirrored from holdings, or a loaded [DARA Plan](#dara-plan) — the shape the ladder-sizing engine itself consumes.*
 - <a id="construction-parameters"></a>**Construction Parameters** = [Pre-Ladder Interest](#pre-ladder-interest) + Maturity_Preference + Coupon_Preference + [Available Cash](#available-cash) + Settlement_Year_Coupon_Mode + DARA_Reference_Date
   *Settings a `#fundedYear,dara` block cannot itself encode but which still change the target ladder — maturity preference and coupon preference, the settlement-year coupon-counting choice, and the Ref CPI date the plan's DARA values are denominated at. Carried in an optional `#params,key=value,...` line alongside a [DARA Plan](#dara-plan)'s own `#fundedYear,dara` block, present only when the source file carries one.*

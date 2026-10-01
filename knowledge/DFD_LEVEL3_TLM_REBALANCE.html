@@ -200,14 +200,14 @@
   <text class="flow-label" x="217" y="492">ladder parameters</text>
   <g class="entity"><rect x="60" y="60" width="145" height="530" rx="3"/><text class="e-name" x="132.5" y="330">User</text></g>
   <path class="flow" d="M 400.0 212.0 Q 418.1 325.0 400.0 438.0" marker-end="url(#a1)"/>
-  <text class="flow-label" x="416" y="394" text-anchor="middle">per-year DARA</text>
+  <text class="flow-label" x="416" y="394" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#per-year-dara"><tspan class="lk">per-year DARA</tspan></a></text>
   <path class="flow" d="M 930.3 445.1 Q 699.8 506.9 461.7 493.6" marker-end="url(#a1)"/>
   <path class="flow" d="M 930.5 573.2 Q 690.8 578.3 461.4 508.5" marker-end="url(#a1)"/>
   <path class="flow" d="M 462.0 500.0 Q 815.0 443.5 1168.0 500.0" marker-end="url(#a1)"/>
   <text class="flow-label" x="1164" y="492" text-anchor="end">rebalance result  →  4.5</text>
   <path class="flow" d="M 742.0 330.0 Q 955.0 295.9 1168.0 330.0" marker-end="url(#a1)"/>
   <text class="flow-label" x="1164" y="322" text-anchor="end">before-state preview  →  4.5</text>
-  <a class="process" href="viewer.html#/md/TipsLadderManager/knowledge/3.0_TIPS_Ladder_Rebalancing.md">
+  <a class="process" href="viewer.html#/md/TipsLadderManager/knowledge/4.4_Rebalance_Ladder.md#derive-per-year-dara-from-holdings-or-dara-plan">
     <circle cx="400" cy="150" r="62"/>
     <text class="p-id" x="400" y="114">4.4.1</text>
     <text class="p-name" x="400" y="135">Derive per-year</text>
@@ -215,13 +215,13 @@
     <text class="p-name" x="400" y="167">holdings or</text>
     <text class="p-name" x="400" y="183">DARA plan</text>
   </a>
-  <a class="process" href="viewer.html#/md/TipsLadderManager/knowledge/3.0_TIPS_Ladder_Rebalancing.md">
+  <a class="process" href="viewer.html#/md/TipsLadderManager/knowledge/4.4_Rebalance_Ladder.md#preview-before-state">
     <circle cx="680" cy="330" r="62"/>
     <text class="p-id" x="680" y="310">4.4.2</text>
     <text class="p-name" x="680" y="331">Preview before-</text>
     <text class="p-name" x="680" y="347">state</text>
   </a>
-  <a class="process" href="viewer.html#/md/TipsLadderManager/knowledge/3.0_TIPS_Ladder_Rebalancing.md">
+  <a class="process" href="viewer.html#/md/TipsLadderManager/knowledge/4.4_Rebalance_Ladder.md#rebalance-the-ladder">
     <circle cx="400" cy="500" r="62"/>
     <text class="p-id" x="400" y="480">4.4.3</text>
     <text class="p-name" x="400" y="501">Rebalance the</text>
@@ -242,7 +242,6 @@
 </div>
 
 <p class="notes">
-  Draft: no process spec yet, all three boxes link to 3.0 TIPS Ladder Rebalancing as a placeholder — see DFD_Worklist.md item 27.
   4.4.1 and 4.4.2 both run at file-load time, independently of each other and of Run; 4.4.3 runs only on Rebalance Ladder.
   Built in tandem with 4.3 Build ladder, since both call the same shared sizing engine (ladder-core.js, M5) rather than each carrying its own copy.
   The amber circles are shared modules (<a href="viewer.html#/md/knowledge/SharedModules.md">SharedModules.md</a>), not process steps of this diagram.
