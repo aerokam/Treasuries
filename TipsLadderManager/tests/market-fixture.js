@@ -28,26 +28,21 @@ export function fedInvestWithTodaySettlement(raw, settleDateStr) {
   return lines.join('\n');
 }
 
-// These come straight from R2: they are the series the monthly BLS job and the pipeline keep current,
-// so a committed copy only ever ages. Everything else is read from the fixture directory.
-const LIVE_FROM_R2 = new Set(['RefCPI.csv', 'TipsRef.csv', 'BondHolidaysSifma.csv']);
-
-// Replaces global fetch with a reader over the fixture directory, matched on the URL's basename;
-// the LIVE_FROM_R2 files go to the real fetch.
+// Replaces global fetch so the app's own loader reads the live R2 files. Nothing market-related is
+// mirrored in this repo: the quote files, SA yields, Ref CPI, TIPS reference data and holiday calendar
+// are kept current by the pipeline and the monthly jobs, and a committed copy only ever ages.
+// Two values are rewritten on top of the live files, since a test run is not a download day: the
+// Fidelity download date becomes today (it drives settlement), and FedInvest's first line is the
+// settlement date the caller passes.
 export function installFixtureFetch({ settleDateStr } = {}) {
   const realFetch = globalThis.fetch;
   globalThis.fetch = async (url) => {
     const name = String(url).split('/').pop().split('?')[0];
-    if (LIVE_FROM_R2.has(name)) return realFetch(url, { cache: 'no-cache' });
-    let body;
-    try { body = readFileSync(path.join(FIXTURES, name), 'utf8'); }
-    catch {
-      return { ok: false, status: 404, async text() { return ''; } };
-    }
+    const res = await realFetch(url, { cache: 'no-cache' });
+    if (!res.ok) return res;
+    let body = await res.text();
     if (name === 'FidelityTreasuriesTips.csv') body = fidelityWithTodayDownloadDate(body);
-    if (name === 'YieldsFromFedInvestPrices.csv' && settleDateStr) {
-      body = fedInvestWithTodaySettlement(body, settleDateStr);
-    }
+    if (name === 'YieldsFromFedInvestPrices.csv' && settleDateStr) body = fedInvestWithTodaySettlement(body, settleDateStr);
     return { ok: true, status: 200, async text() { return body; } };
   };
 }
