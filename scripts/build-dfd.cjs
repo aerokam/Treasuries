@@ -939,8 +939,8 @@ function level2TipsLadderManager() {
       out: { '4.2': ['TIPS market data'], '4.3': ['TIPS market data'], '4.4': ['TIPS market data'] } },
     { id: '4.2', name: ['Import holdings', 'and DARA plan'], href: 'DFD_LEVEL3_TLM_IMPORT.html', reads: [],
       out: { '4.3': ['DARA plan'], '4.4': ['holdings', 'DARA plan'] } },
-    { id: '4.3', name: ['Build', 'ladder'], href: V('TipsLadderManager/knowledge/2.0_TIPS_Ladders.md'), reads: [], out: { '4.5': ['build result'] } },
-    { id: '4.4', name: ['Rebalance', 'ladder'], href: V('TipsLadderManager/knowledge/3.0_TIPS_Ladder_Rebalancing.md'), reads: [], out: { '4.5': ['rebalance result'] } },
+    { id: '4.3', name: ['Build', 'ladder'], href: 'DFD_LEVEL3_TLM_BUILD.html', reads: [], out: { '4.5': ['build result'] } },
+    { id: '4.4', name: ['Rebalance', 'ladder'], href: 'DFD_LEVEL3_TLM_REBALANCE.html', reads: [], out: { '4.5': ['rebalance result'] } },
     { id: '4.5', name: ['Render', 'and export'], href: V('TipsLadderManager/knowledge/5.0_UI_Schema.md'), reads: [], out: {} },
   ];
   const SX = 40, SW = 215, PR = 58, UX = 1240, UW = 145;
@@ -1124,6 +1124,131 @@ function level3TipsLadderManagerImport() {
   });
 }
 
+// ── Level 3: TipsLadderManager 4.3 ──────────────────────────────────────────
+function level3TipsLadderManagerBuild() {
+  const PLACEHOLDER = V('TipsLadderManager/knowledge/2.0_TIPS_Ladders.md');
+  const M = a => V('knowledge/SharedModules.md' + (a ? '#' + a : ''));
+  const modules = [
+    { id: 'm5', name: ['ladder-', 'core.js'], href: M('m5') },
+    { id: 'm3', name: ['bond-math.js'], href: M('m3') },
+  ];
+  const procs = [
+    { id: '4.3.1', name: ['Resolve per-', 'year DARA'], href: PLACEHOLDER, calls: [], out: { '4.3.2': ['per-year DARA'] } },
+    { id: '4.3.2', name: ['Build the', 'ladder'], href: PLACEHOLDER, calls: ['m5', 'm3'], out: {} },
+  ];
+  const PR = 62, MR = 50, UX = 60, UW = 145, W = 1180, H = 480;
+  const px = { '4.3.1': 420, '4.3.2': 420 };
+  const py = { '4.3.1': 190, '4.3.2': 360 };
+  const mx = { m5: 920, m3: 920 };
+  const my = { m5: 220, m3: 360 };
+  const OBS = [...Object.keys(px).map(id => ({ x: px[id], y: py[id], r: PR })), ...modules.map(m => ({ x: mx[m.id], y: my[m.id], r: MR }))];
+  const LBL = [];
+  const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 3: TipsLadderManager 4.3, resolving the ladder's per-year DARA then building it against the shared sizing engine.">`, marker()];
+
+  const [tx, ty] = toCircle(UX + UW + 60, 80, px['4.3.1'], py['4.3.1'], PR);
+  P.push(flow(UX + UW + 60, 80, tx, ty, { obstacles: OBS.filter(o => !(o.x === px['4.3.1'] && o.y === py['4.3.1'])) }));
+  P.push(labelAt(UX + UW + 64, 64, 'TIPS market data  ←  4.1'));
+  const [dx, dy] = toCircle(UX + UW + 60, 120, px['4.3.1'], py['4.3.1'], PR);
+  P.push(flow(UX + UW + 60, 120, dx, dy, { obstacles: OBS.filter(o => !(o.x === px['4.3.1'] && o.y === py['4.3.1'])) }));
+  P.push(labelAt(UX + UW + 64, 136, 'DARA plan  ←  4.2'));
+
+  const [ux1, uy1] = toCircle(UX + UW + 5, py['4.3.1'], px['4.3.1'], py['4.3.1'], PR);
+  P.push(flow(UX + UW + 5, py['4.3.1'], ux1, uy1, { obstacles: OBS.filter(o => !(o.x === px['4.3.1'] && o.y === py['4.3.1'])) }));
+  P.push(labelAt(UX + UW + 12, py['4.3.1'] - 8, 'ladder parameters'));
+  P.push(`  <g class="entity"><rect x="${UX}" y="${py['4.3.1'] - 90}" width="${UW}" height="180" rx="3"/><text class="e-name" x="${UX + UW / 2}" y="${py['4.3.1'] + 95}">User</text></g>`);
+
+  P.push(internalFlows(procs, px, py, PR, OBS, LBL));
+  procs.forEach(p => (p.calls || []).forEach(id => {
+    const [x1, y1] = fromCircle(mx[id], my[id], MR, px[p.id], py[p.id]);
+    const [x2, y2] = toCircle(x1, y1, px[p.id], py[p.id], PR);
+    const others = OBS.filter(o => !(o.x === mx[id] && o.y === my[id]) && !(o.x === px[p.id] && o.y === py[p.id]));
+    P.push(flow(x1, y1, x2, y2, { obstacles: others }));
+  }));
+
+  const [ox, oy] = fromCircle(px['4.3.2'], py['4.3.2'], PR, W - 12, py['4.3.2']);
+  P.push(flow(ox, oy, W - 12, py['4.3.2'], { obstacles: OBS.filter(o => !(o.x === px['4.3.2'] && o.y === py['4.3.2'])) }));
+  P.push(labelAt(W - 16, py['4.3.2'] - 8, 'build result  →  4.5', 'end'));
+
+  procs.forEach(p => P.push(procShape(px[p.id], py[p.id], PR, p.href, p.id, p.name)));
+  modules.forEach(m => P.push(moduleShape(mx[m.id], my[m.id], MR, m.href, m.id.toUpperCase(), m.name)));
+  P.push('</svg>');
+
+  return page({
+    title: 'TipsLadderManager 4.3 — Level 3', h1: 'Level 3 &mdash; TipsLadderManager 4.3 Build ladder', maxWidth: W,
+    up: 'DFD_LEVEL2_TIPSLADDERMANAGER.html', upLabel: 'Level 2 — TipsLadderManager (draft)', svg: P.join(NL),
+    notes: ['  Draft: no process spec yet, both boxes link to 2.0 TIPS Ladders as a placeholder — see DFD_Worklist.md item 27.',
+      '  Built in tandem with 4.4 Rebalance ladder, since both call the same shared sizing engine (ladder-core.js, M5) rather than each carrying its own copy.',
+      '  The amber circles are shared modules (<a href="' + M() + '">SharedModules.md</a>), not process steps of this diagram.'].join(NL)
+  });
+}
+
+// ── Level 3: TipsLadderManager 4.4 ──────────────────────────────────────────
+function level3TipsLadderManagerRebalance() {
+  const PLACEHOLDER = V('TipsLadderManager/knowledge/3.0_TIPS_Ladder_Rebalancing.md');
+  const M = a => V('knowledge/SharedModules.md' + (a ? '#' + a : ''));
+  const modules = [
+    { id: 'm5', name: ['ladder-', 'core.js'], href: M('m5') },
+    { id: 'm3', name: ['bond-math.js'], href: M('m3') },
+  ];
+  const procs = [
+    { id: '4.4.1', name: ['Derive per-year', 'DARA from', 'holdings or', 'DARA plan'], href: PLACEHOLDER, calls: [], out: { '4.4.3': ['per-year DARA'] } },
+    { id: '4.4.2', name: ['Preview before-', 'state'], href: PLACEHOLDER, calls: [], out: {} },
+    { id: '4.4.3', name: ['Rebalance the', 'ladder'], href: PLACEHOLDER, calls: ['m5', 'm3'], out: {} },
+  ];
+  const PR = 62, MR = 50, UX = 60, UW = 145, W = 1180, H = 640;
+  const px = { '4.4.1': 400, '4.4.2': 680, '4.4.3': 400 };
+  const py = { '4.4.1': 150, '4.4.2': 330, '4.4.3': 500 };
+  const mx = { m5: 980, m3: 980 };
+  const my = { m5: 440, m3: 580 };
+  const OBS = [...Object.keys(px).map(id => ({ x: px[id], y: py[id], r: PR })), ...modules.map(m => ({ x: mx[m.id], y: my[m.id], r: MR }))];
+  const LBL = [];
+  const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 3: TipsLadderManager 4.4, deriving per-year DARA and a before-state preview from holdings, then rebalancing against the shared sizing engine.">`, marker()];
+
+  const [tx, ty] = toCircle(UX + UW + 60, 60, px['4.4.1'], py['4.4.1'], PR);
+  P.push(flow(UX + UW + 60, 60, tx, ty, { obstacles: OBS.filter(o => !(o.x === px['4.4.1'] && o.y === py['4.4.1'])) }));
+  P.push(labelAt(UX + UW + 64, 44, 'TIPS market data  ←  4.1'));
+
+  const [hx, hy] = toCircle(UX + UW + 5, py['4.4.1'] + 20, px['4.4.1'], py['4.4.1'], PR);
+  P.push(flow(UX + UW + 5, py['4.4.1'] + 20, hx, hy, { obstacles: OBS.filter(o => !(o.x === px['4.4.1'] && o.y === py['4.4.1'])) }));
+  P.push(labelAt(UX + UW + 12, py['4.4.1'] + 48, 'holdings  ←  4.2'));
+  const [d1x, d1y] = toCircle(UX + UW + 5, py['4.4.1'] - 15, px['4.4.1'], py['4.4.1'], PR);
+  P.push(flow(UX + UW + 5, py['4.4.1'] - 15, d1x, d1y, { obstacles: OBS.filter(o => !(o.x === px['4.4.1'] && o.y === py['4.4.1'])) }));
+  P.push(labelAt(UX + UW + 12, py['4.4.1'] - 22, 'DARA plan  ←  4.2'));
+  const [h2x, h2y] = toCircle(UX + UW + 5, py['4.4.2'], px['4.4.2'], py['4.4.2'], PR);
+  P.push(flow(UX + UW + 5, py['4.4.2'], h2x, h2y, { obstacles: OBS.filter(o => !(o.x === px['4.4.2'] && o.y === py['4.4.2'])) }));
+  P.push(labelAt(UX + UW + 12, py['4.4.2'] - 8, 'holdings  ←  4.2'));
+
+  const [ux3, uy3] = toCircle(UX + UW + 5, py['4.4.3'], px['4.4.3'], py['4.4.3'], PR);
+  P.push(flow(UX + UW + 5, py['4.4.3'], ux3, uy3, { obstacles: OBS.filter(o => !(o.x === px['4.4.3'] && o.y === py['4.4.3'])) }));
+  P.push(labelAt(UX + UW + 12, py['4.4.3'] - 8, 'ladder parameters'));
+  P.push(`  <g class="entity"><rect x="${UX}" y="${py['4.4.1'] - 90}" width="${UW}" height="${py['4.4.3'] - py['4.4.1'] + 180}" rx="3"/><text class="e-name" x="${UX + UW / 2}" y="${(py['4.4.1'] + py['4.4.3']) / 2 + 5}">User</text></g>`);
+
+  P.push(internalFlows(procs, px, py, PR, OBS, LBL));
+  procs.forEach(p => (p.calls || []).forEach(id => {
+    const [x1, y1] = fromCircle(mx[id], my[id], MR, px[p.id], py[p.id]);
+    const [x2, y2] = toCircle(x1, y1, px[p.id], py[p.id], PR);
+    const others = OBS.filter(o => !(o.x === mx[id] && o.y === my[id]) && !(o.x === px[p.id] && o.y === py[p.id]));
+    P.push(flow(x1, y1, x2, y2, { obstacles: others }));
+  }));
+
+  const [ox, oy] = fromCircle(px['4.4.3'], py['4.4.3'], PR, W - 12, py['4.4.3']);
+  P.push(flow(ox, oy, W - 12, py['4.4.3'], { obstacles: OBS.filter(o => !(o.x === px['4.4.3'] && o.y === py['4.4.3'])) }));
+  P.push(labelAt(W - 16, py['4.4.3'] - 8, 'rebalance result  →  4.5', 'end'));
+
+  procs.forEach(p => P.push(procShape(px[p.id], py[p.id], PR, p.href, p.id, p.name)));
+  modules.forEach(m => P.push(moduleShape(mx[m.id], my[m.id], MR, m.href, m.id.toUpperCase(), m.name)));
+  P.push('</svg>');
+
+  return page({
+    title: 'TipsLadderManager 4.4 — Level 3', h1: 'Level 3 &mdash; TipsLadderManager 4.4 Rebalance ladder', maxWidth: W,
+    up: 'DFD_LEVEL2_TIPSLADDERMANAGER.html', upLabel: 'Level 2 — TipsLadderManager (draft)', svg: P.join(NL),
+    notes: ['  Draft: no process spec yet, all three boxes link to 3.0 TIPS Ladder Rebalancing as a placeholder — see DFD_Worklist.md item 27.',
+      '  4.4.1 and 4.4.2 both run at file-load time, independently of each other and of Run; 4.4.3 runs only on Rebalance Ladder.',
+      '  Built in tandem with 4.3 Build ladder, since both call the same shared sizing engine (ladder-core.js, M5) rather than each carrying its own copy.',
+      '  The amber circles are shared modules (<a href="' + M() + '">SharedModules.md</a>), not process steps of this diagram.'].join(NL)
+  });
+}
+
 // ── emit ────────────────────────────────────────────────────────────────────
 const outputs = [
   ['knowledge/DFD_LEVEL1.html', level1()],
@@ -1137,6 +1262,8 @@ const outputs = [
   ['knowledge/DFD_LEVEL2_TIPSLADDERMANAGER.html', level2TipsLadderManager()],
   ['knowledge/DFD_LEVEL3_TLM_LOAD.html', level3TipsLadderManagerLoadMarketData()],
   ['knowledge/DFD_LEVEL3_TLM_IMPORT.html', level3TipsLadderManagerImport()],
+  ['knowledge/DFD_LEVEL3_TLM_BUILD.html', level3TipsLadderManagerBuild()],
+  ['knowledge/DFD_LEVEL3_TLM_REBALANCE.html', level3TipsLadderManagerRebalance()],
 ];
 if (unlinked.size) {
   console.log(String.fromCharCode(10) + "flow labels with no Data Dictionary entry:");

@@ -63,3 +63,16 @@ caller's own spec.
 - `cleanFidelityField(val)`, `fidPriceField(raw)`, `fidParseMaturity(s)` — field-shape helpers for Fidelity's own CSV quirks.
 
 **Called by**: [4.1.1 Fetch and parse market quotes](../TipsLadderManager/knowledge/4.1_Load_Market_Data.md#fetch-and-parse-market-quotes) (TipsLadderManager, `parseFidelityTipsRows`) and [3.1.2 Parse market quotes](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#parse-market-quotes) (YieldCurves, both row parsers, for the app and for the acquisition job that writes [Yield curves (S13)](./DataStores.md#s13)).
+
+---
+
+## <a id="m5"></a>ladder-core.js (M5)
+**File**: `TipsLadderManager/src/ladder-core.js`
+**Purpose**: The single authoritative implementation of "size the target ladder from a DARA" — Build and Rebalance both call it and neither reimplements funded sizing, the pre-ladder-interest pool, gap/Future-30Y duration matching, or the corrected sweep (4.0 Computation Modules).
+**Exports**:
+- `selectLadderBonds({ tipsMarketData, firstYear, lastYear, settlementDate, maturityPref?, couponPref?, yearOverrides? })` — the canonical bond set for the ladder: the funded-year TIPS list per year, the active/upper gap brackets, and the Future 30Y cover pair, resolved purely from [TIPS Market Data](./DATA_DICTIONARY.md#tips-market-data).
+- `sizeLadder({ dara, daraByYear?, firstYear, lastYear, rangeYears, gapYears, future30yYears, yearBondMap, yearTipsListMap?, tipsMarketData, refCPI, settlementDate, preLadderInterest?, ... })` — per-year DARA + the bond set → target quantities: the prelim sweep, Future-30Y duration match + AMD, the PLI/Available-Cash pool, gap duration match + bracket excess, then the corrected long→short funded sweep.
+- `sizeFuture30yCover({ future30yYears, future30yLowerCoverBond, future30yUpperCoverBond, settlementDate, dara, daraByYear?, refCPI })` — the Future-30Y half of duration matching alone, pulled out because Rebalance needs the cover excess quantity before the rest of `sizeLadder` runs (its own pre-PLI AMD pass).
+- `sizeYearRungs(list, need, refCPI)` / `aggregateRungs(rungs)` — splits one funded year's P+I need across its ordered multi-TIPS list (2.0 §Multi-TIPS Funded-Year Split).
+
+**Called by**: the Build ladder and Rebalance ladder processes (TipsLadderManager) — not yet given real sub-process anchors; both still link here from their own Level 3 diagrams pending their process specs.
