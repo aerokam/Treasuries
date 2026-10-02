@@ -140,7 +140,10 @@ test.beforeEach(async ({ page }) => {
 });
 
 // ── 1. Data load ──────────────────────────────────────────────────────────────
-test('data loads: info strip shows Trade/Settle, no Ref CPI control in either mode, run button enabled', async ({ page }) => {
+// @SampleHoldings marks the tests whose result depends on what data/SampleHoldings.csv holds (and the
+// two that catch a file that no longer loads). A push that changes only the sample files runs just
+// these (knowledge/Testing.md §3.0).
+test('data loads: info strip shows Trade/Settle, no Ref CPI control in either mode, run button enabled', { tag: '@SampleHoldings' }, async ({ page }) => {
   await expect(page.locator('#info-source')).toContainText('Trade:');
   await expect(page.locator('#info-source')).toContainText('Settle:');
   await expect(page.locator('#run-btn')).not.toBeDisabled();
@@ -196,7 +199,7 @@ test('Import menu popup is closed by default, opens on button click, closes on o
 });
 
 // ── 3. Rebalance run ──────────────────────────────────────────────────────────
-test('rebalance: uploading holdings and clicking Run renders table with rows', async ({ page }) => {
+test('rebalance: uploading holdings and clicking Run renders table with rows', { tag: '@SampleHoldings' }, async ({ page }) => {
   await page.locator('#holdings-file').setInputFiles(HOLDINGS_PATH);
   await page.locator('#run-btn').click();
 
@@ -208,7 +211,7 @@ test('rebalance: uploading holdings and clicking Run renders table with rows', a
   expect(await rows.count()).toBeGreaterThan(0);
 });
 
-test('rebalance: net-cash-inline visible and DARA populated after run', async ({ page }) => {
+test('rebalance: net-cash-inline visible and DARA populated after run', { tag: '@SampleHoldings' }, async ({ page }) => {
   await page.locator('#holdings-file').setInputFiles(HOLDINGS_PATH);
   await page.locator('#run-btn').click();
   await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 4_000 });
@@ -217,7 +220,7 @@ test('rebalance: net-cash-inline visible and DARA populated after run', async ({
   expect(await daraDisplay(page)).not.toBe('');
 });
 
-test('rebalance: net cash value populated after run', async ({ page }) => {
+test('rebalance: net cash value populated after run', { tag: '@SampleHoldings' }, async ({ page }) => {
   await page.locator('#holdings-file').setInputFiles(HOLDINGS_PATH);
   await page.locator('#run-btn').click();
   await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 4_000 });
@@ -632,7 +635,7 @@ async function assertNoNaN(page, tableSelector) {
   }
 }
 
-test('rebalance: no NaN in table cells or drill popup (auto-infer DARA)', async ({ page }) => {
+test('rebalance: no NaN in table cells or drill popup (auto-infer DARA)', { tag: '@SampleHoldings' }, async ({ page }) => {
   await page.locator('#holdings-file').setInputFiles(HOLDINGS_PATH);
   await page.locator('#run-btn').click();
   await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 4_000 });
@@ -645,7 +648,7 @@ test('rebalance: no NaN in table cells or drill popup (auto-infer DARA)', async 
   await page.locator('#drill-close').click();
 });
 
-test('rebalance: no NaN in table cells at low DARA ($5,000)', async ({ page }) => {
+test('rebalance: no NaN in table cells at low DARA ($5,000)', { tag: '@SampleHoldings' }, async ({ page }) => {
   await page.locator('#holdings-file').setInputFiles(HOLDINGS_PATH);
   await page.locator('#dara').fill('5000');
   await page.locator('#run-btn').click();
@@ -875,7 +878,7 @@ test('rebalance: pressing Enter (no overlay open) triggers Rebalance Ladder', as
 });
 
 // ── 13. DARA populated from portfolio on file load ────────────────────────────
-test('rebalance: DARA populated from portfolio ARA on file load', async ({ page }) => {
+test('rebalance: DARA populated from portfolio ARA on file load', { tag: '@SampleHoldings' }, async ({ page }) => {
   await page.locator('#holdings-file').setInputFiles(HOLDINGS_PATH);
 
   // DARA is set from portfolio ARA at file load — shows numeric median or "by year"
@@ -920,7 +923,7 @@ test('build: export menu Ladder CSV option enabled after run', async ({ page }) 
   await expect(page.locator('#export-opt-ladder-csv')).toBeEnabled();
 });
 
-test('rebalance: no negative Qty After values at low DARA', async ({ page }) => {
+test('rebalance: no negative Qty After values at low DARA', { tag: '@SampleHoldings' }, async ({ page }) => {
   await page.locator('#holdings-file').setInputFiles(HOLDINGS_PATH);
   await page.locator('#dara').fill('5000');
   await page.locator('#run-btn').click();
@@ -953,7 +956,7 @@ function parseNetCash(text) {
 }
 
 // ── 16. Net cash small and NON-NEGATIVE after rebalance with portfolio-derived DARA ────
-test('rebalance: net cash is non-negative and small (self-financing scale)', async ({ page }) => {
+test('rebalance: net cash is non-negative and small (self-financing scale)', { tag: '@SampleHoldings' }, async ({ page }) => {
   await page.locator('#holdings-file').setInputFiles(HOLDINGS_PATH);
   // The #holdings-file 'change' handler has one async gap (`await file.text()`); everything after
   // it — parsing, currentHoldingsArray, the rebal-first/last-year dropdowns, auto-inferred DARA —
@@ -1156,7 +1159,7 @@ test('rebalance: Shift-click after a click-and-drag extends the selection from t
 });
 
 // ── 18. DARA stays stable across multiple runs ────────────────────────────────
-test('rebalance: Full method does not overwrite DARA when field is already filled', async ({ page }) => {
+test('rebalance: Full method does not overwrite DARA when field is already filled', { tag: '@SampleHoldings' }, async ({ page }) => {
   await page.locator('#holdings-file').setInputFiles(HOLDINGS_PATH);
   await page.locator('#run-btn').click();
   await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 4_000 });
@@ -1174,7 +1177,7 @@ test('rebalance: Full method does not overwrite DARA when field is already fille
 
 // ── 19. Clearing DARA uses panel default; net cash stays near zero ─────────────
 // ── 20b. DARA stays stable when bracket mode changes ──────────────────────────
-test('rebalance: auto-inferred DARA is re-inferred when bracket mode changes', async ({ page }) => {
+test('rebalance: auto-inferred DARA is re-inferred when bracket mode changes', { tag: '@SampleHoldings' }, async ({ page }) => {
   await page.locator('#holdings-file').setInputFiles(HOLDINGS_PATH);
 
   // First run — DARA from portfolio ARA
@@ -1783,7 +1786,7 @@ test('DARA plan with no Ref CPI date: used as written, then scaled once a date i
 // fund (SampleHoldings has the structural 2037-39 gap) was silently discarded at Run and replaced
 // with a freshly self-financing-scaled map derived from the portfolio's own natural ARA shape --
 // Amt After tracked the untouched mirror, not the imported target, with no error or indication.
-test('per-year DARA: an imported plan is honored exactly at Run on a ladder with a gap block, not silently overwritten by the self-financing scale', async ({ page }) => {
+test('per-year DARA: an imported plan is honored exactly at Run on a ladder with a gap block, not silently overwritten by the self-financing scale', { tag: '@SampleHoldings' }, async ({ page }) => {
   test.setTimeout(20_000);
   await page.locator('#holdings-file').setInputFiles(HOLDINGS_PATH);
   await expect(page.locator('.fy-dara-input[data-year]').first()).toBeVisible({ timeout: 4_000 });
@@ -2214,7 +2217,7 @@ test('popup resize: west edge stops at the minimum width instead of sliding', as
 // alone: a bracket year can hold both a January and a July maturity (DD §Bracket Maturity). It also
 // uses the current vocabulary — active lower / retained lower, not the retired "new lower"/"orig
 // lower" (DD §Active Lower Bracket, §Retained Lower Bracket).
-test('Gap Dur popup: brackets are named by maturity, in current vocabulary', async ({ page }) => {
+test('Gap Dur popup: brackets are named by maturity, in current vocabulary', { tag: '@SampleHoldings' }, async ({ page }) => {
   await page.locator('#holdings-file').setInputFiles(HOLDINGS_PATH);
   await page.locator('#run-btn').click();
   await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 4_000 });
@@ -2233,7 +2236,7 @@ test('Gap Dur popup: brackets are named by maturity, in current vocabulary', asy
   expect(text).not.toMatch(/orig lower/i);
 });
 
-test('Gap Dur popup: a bracket weight opens a nested popup, not hover text', async ({ page }) => {
+test('Gap Dur popup: a bracket weight opens a nested popup, not hover text', { tag: '@SampleHoldings' }, async ({ page }) => {
   await page.locator('#holdings-file').setInputFiles(HOLDINGS_PATH);
   await page.locator('#run-btn').click();
   await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 4_000 });
@@ -2263,7 +2266,7 @@ test('Gap Dur popup: a bracket weight opens a nested popup, not hover text', asy
   expect(text).not.toMatch(/\bretained dur\b/i);
 });
 
-test('Gap Dur popup: a bracket weight drill reports the same weight as the row it opens from', async ({ page }) => {
+test('Gap Dur popup: a bracket weight drill reports the same weight as the row it opens from', { tag: '@SampleHoldings' }, async ({ page }) => {
   await page.locator('#holdings-file').setInputFiles(HOLDINGS_PATH);
   await page.locator('#run-btn').click();
   await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 4_000 });

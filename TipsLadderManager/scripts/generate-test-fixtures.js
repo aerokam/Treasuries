@@ -1,25 +1,24 @@
 #!/usr/bin/env node
 // scripts/generate-test-fixtures.js
-// Reads data/SchwabAllAccounts.csv (private, gitignored)
-// Writes sanitized/scaled (÷5) versions to tests/ for use in test suite.
-// Also writes data/SampleHoldings.csv (Format 3: cusip,qty in bonds) — the app's pre-populate sample.
-// Also writes data/SampleDaraPlan.csv (÷5 of data/DaraPlanKevinRmd.csv, private/gitignored) — the
-// app's pre-populate DARA plan, scaled to match SampleHoldings.csv's own ÷5 (both come from the
+// Reads data/SchwabAllAccounts.csv (private, gitignored).
+// Writes data/SampleHoldings.csv (Format 3: cusip,qty in bonds) — the app's pre-populate sample.
+// Also writes data/SampleDaraPlan.csv (SCALE x data/DaraPlanKevinRmd.csv, private/gitignored) — the
+// app's pre-populate DARA plan, scaled by the same SCALE as SampleHoldings.csv (both come from the
 // Kevin_IRA account, so they must share one scale factor or the sample ladder isn't self-financing
 // against its own sample holdings — see KNOWN_ISSUES.md, "sample DARA plan drifted from sample
 // holdings" (2026-09-30): this step didn't exist before that, so 18+ SampleHoldings.csv refreshes
 // went out with a SampleDaraPlan.csv rescaled only once, by hand, at the pair's creation.
 //
 // Sanitization rules:
-//   - Bond face values: ÷5, rounded to nearest $1000
-//   - ETF/MM share counts: ÷5
+//   - Bond face values: x SCALE, rounded to nearest $1000
+//   - ETF/MM share counts: x SCALE
 //   - Gain/loss, cost basis: zeroed / replaced with "--"
 //   - Account numbers (Schwab suffix): replaced with sequential fakes
 //   - Account NAMES: discarded entirely, replaced with synthetic "Acct<N>" labels that retain ONLY
 //     the account-type keyword (IRA / Roth IRA) — the only thing downstream logic needs (see
 //     detectAccountType in src/account-allocation.js). No real name can leak: the label is re-derived
 //     from the type, never copied, so new or renamed accounts are safe by construction.
-//   - Market values: recalculated for bonds, scaled ÷5 for other positions
+//   - Market values: recalculated for bonds, x SCALE for other positions
 //   - SampleHoldings.csv: the TIPS of the traditional IRA holding the most TIPS (the richest tIRA).
 
 import { readFileSync, writeFileSync, existsSync, unlinkSync } from 'fs';
@@ -30,7 +29,12 @@ import { execFileSync } from 'child_process';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT  = path.resolve(__dirname, '..');
 const DATA  = path.join(ROOT, 'data');
-const TESTS = path.join(ROOT, 'tests');
+
+// The one scale factor for every sample file drawn from the real account: SampleHoldings.csv and
+// SampleDaraPlan.csv must share it, or the sample ladder is not self-financing against its own plan.
+// 0.5 since 86860b5 (2026-09-21); this script still divided by 5 until 2026-10-02, so each Schwab
+// download in between put both files back to 0.2.
+const SCALE = 0.5;
 
 function die(msg) { console.error('ERROR:', msg); process.exit(1); }
 
@@ -98,10 +102,10 @@ function scaleSchwabPos(cols, headerCols) {
 
   let scaledQtyNum, scaledQtyStr;
   if (isFixed) {
-    scaledQtyNum = Math.round(rawQty / 5 / 1000) * 1000;
+    scaledQtyNum = Math.round(rawQty * SCALE / 1000) * 1000;
     scaledQtyStr = scaledQtyNum.toLocaleString('en-US');
   } else {
-    scaledQtyNum = rawQty / 5;
+    scaledQtyNum = rawQty * SCALE;
     const cleanQty = qty.replace(/,/g, '');
     const dotIdx = cleanQty.indexOf('.');
     if (dotIdx >= 0) {
@@ -117,7 +121,7 @@ function scaleSchwabPos(cols, headerCols) {
   if (isFixed) {
     mktNum = scaledQtyNum * parseFloat(price) / 100;
   } else {
-    mktNum = parseFloat(mktVal.replace(/[$,]/g, '')) / 5;
+    mktNum = parseFloat(mktVal.replace(/[$,]/g, '')) * SCALE;
   }
 
   const isTips = isFixed && desc.includes('INFL IDX');
@@ -211,12 +215,9 @@ const schwabSrc = path.join(DATA, 'SchwabAllAccounts.csv');
 if (!existsSync(schwabSrc))   die(`Missing ${schwabSrc}\n  Copy SchwabAllAccounts.csv from Downloads to data/`);
 
 console.log('Reading', schwabSrc);
-const { csv: schwabCsv, sampleTips } = sanitizeSchwab(readFileSync(schwabSrc, 'utf8'));
+const { sampleTips } = sanitizeSchwab(readFileSync(schwabSrc, 'utf8'));
 
-const schwabOut   = path.join(TESTS, 'SchwabAllAccounts.csv');
 const holdingsOut = path.join(DATA,  'SampleHoldings.csv'); // single canonical copy: app pre-populate + tests both read here
-
-writeFileSync(schwabOut,   schwabCsv,   'utf8');
 
 // Guard: never silently overwrite the canonical holdings file with a header-only stub.
 // (A prior regen with no richest-tIRA TIPS flattened it and broke pre-populate + e2e.)
@@ -224,10 +225,9 @@ if (sampleTips.length === 0) die(`No traditional-IRA TIPS extracted from ${schwa
 const holdingsCsv = ['cusip,qty', ...sampleTips].join('\n') + '\n';
 writeFileSync(holdingsOut, holdingsCsv, 'utf8');
 
-console.log(`Wrote ${schwabOut}   (${schwabCsv.split('\n').length} lines)`);
 console.log(`Wrote ${holdingsOut} (${sampleTips.length} TIPS)`);
 
-// data/SampleDaraPlan.csv: ÷5 of data/DaraPlanKevinRmd.csv (private/gitignored, same Kevin_IRA
+// data/SampleDaraPlan.csv: SCALE x data/DaraPlanKevinRmd.csv (private/gitignored, same Kevin_IRA
 // account SampleHoldings.csv is drawn from). Non-fatal if the source isn't there — unlike the
 // holdings guard above, a missing DARA plan source shouldn't block the Schwab/holdings
 // regen that real accounts' e2e coverage depends on; it just means the sample plan goes stale
@@ -236,13 +236,14 @@ const daraPlanSrc = path.join(DATA, 'DaraPlanKevinRmd.csv');
 const daraPlanOut = path.join(DATA, 'SampleDaraPlan.csv');
 if (existsSync(daraPlanSrc)) {
   const lines = readFileSync(daraPlanSrc, 'utf8').trim().split('\n');
-  const out = [lines[0]];
-  for (let i = 1; i < lines.length; i++) {
-    const [yr, v] = lines[i].split(',');
-    out.push(`${yr},${Math.round(parseFloat(v) / 5)}`);
-  }
+  // Scales the year,DARA rows; any other line (the #fundedYear,dara header, a #params line) is
+  // copied unchanged.
+  const out = lines.map(line => {
+    const m = line.trim().match(/^(\d{4}),([\d.]+)$/);
+    return m ? `${m[1]},${Math.round(parseFloat(m[2]) * SCALE)}` : line.trimEnd();
+  });
   writeFileSync(daraPlanOut, out.join('\n') + '\n', 'utf8');
-  console.log(`Wrote ${daraPlanOut} (${out.length - 1} years)`);
+  console.log(`Wrote ${daraPlanOut}`);
 } else {
   console.log(`Skipped ${daraPlanOut}: no ${daraPlanSrc} (copy dara-plan-kevin-rmd.csv from Downloads there to keep the sample plan in sync).`);
 }
@@ -260,7 +261,7 @@ if (existsSync(daraPlanSrc)) {
 // of `main`, steps 3-4). The commit also names its paths, so nothing another session has
 // staged is swept into it.
 const REPO_ROOT = execFileSync('git', ['rev-parse', '--show-toplevel']).toString().trim();
-const fixtureFiles = [schwabOut, holdingsOut, daraPlanOut];
+const fixtureFiles = [holdingsOut, daraPlanOut];
 const git = (args, opts = {}) => execFileSync('git', args, { cwd: REPO_ROOT, ...opts }).toString().trim();
 
 const dirty = git(['status', '--porcelain', '--', ...fixtureFiles]);
