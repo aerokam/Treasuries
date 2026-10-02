@@ -24,7 +24,7 @@ test.describe('Yields Monitor Regression Tests', () => {
       await btn.click();
       
       // Wait for fetch status to indicate update
-      await expect(page.locator('#fetchStatus')).toContainText('Latest data:');
+      await expect(page.locator('#fetchStatus')).toContainText('TIPS latest:');
       
       // Check data point count via evaluate
       const count = await chartCanvas.evaluate((canvas) => {
@@ -60,7 +60,7 @@ test.describe('Yields Monitor Regression Tests', () => {
     await btn.click();
     
     // Wait for data
-    await expect(page.locator('#fetchStatus')).toContainText('Latest data:');
+    await expect(page.locator('#fetchStatus')).toContainText('TIPS latest:');
     await page.waitForTimeout(1000); // Wait for potential late updates
 
     const xRange = await chartCanvas.evaluate((canvas) => {
@@ -142,49 +142,32 @@ test.describe('Yields Monitor Regression Tests', () => {
     expect(newSpan).toBeGreaterThan(initialSpan);
   });
 
-  test('Panning should not snap Y axis (regression test for onPanComplete removal)', async ({ page }) => {
-    const chartCanvas = await page.locator('canvas#chart-US10YTIPS');
-    
-    const getYRange = async () => {
-      return await chartCanvas.evaluate((canvas) => {
-        const chart = Chart.getChart(canvas);
-        return { min: chart.scales.y.min, max: chart.scales.y.max };
-      });
-    };
+  // YieldsMonitor/knowledge/Visual_Standards.md §Y-axis auto-rescale: a chart the user has manually
+  // zoomed on Y is left alone by the visible-range rescale, so a vertical pan afterward moves the
+  // Y-axis window instead of snapping it back. (A plain wheel zoom, both axes at once, is followed by
+  // the rescale, so it does not count as a manual Y zoom; Shift+wheel, Y only, does.)
+  test('After a manual Y zoom, a vertical pan moves the Y axis without snapping back', async ({ page }) => {
+    const chartCanvas = page.locator('canvas#chart-US10YTIPS');
+    const getYRange = () => chartCanvas.evaluate((canvas) => {
+      const chart = Chart.getChart(canvas);
+      return { min: chart.scales.y.min, max: chart.scales.y.max };
+    });
 
-    // Zoom in first to have something to pan
-    console.log('Zooming in before pan...');
-    await page.mouse.move(
-      (await chartCanvas.boundingBox()).x + 100,
-      (await chartCanvas.boundingBox()).y + 100
-    );
-    await page.mouse.wheel(0, -1000); // Stronger zoom
-    await page.waitForTimeout(1000); // Wait longer for any potential animations/rescaling
-
-    const rangeAfterZoom = await getYRange();
-    console.log('Range after zoom:', rangeAfterZoom);
-    const spanAfterZoom = rangeAfterZoom.max - rangeAfterZoom.min;
-
-    // Pan vertically
-    console.log('Panning vertically...');
     const box = await chartCanvas.boundingBox();
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.keyboard.down('Shift');
+    await page.mouse.wheel(0, -500); // Y-only zoom in
+    await page.keyboard.up('Shift');
+    await page.waitForTimeout(300);
+    const rangeAfterZoom = await getYRange();
+
     await page.mouse.down();
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2 + 100, { steps: 20 });
     await page.mouse.up();
-
     await page.waitForTimeout(500);
     const rangeAfterPan = await getYRange();
-    console.log('Range after pan:', rangeAfterPan);
-    const spanAfterPan = rangeAfterPan.max - rangeAfterPan.min;
-    
-    // If it snapped, the range would have been recalculated by rescaleYToVisible.
-    // Since we pan vertically, min and max should both change by approximately the same amount.
-    expect(rangeAfterPan.min).not.toBe(rangeAfterZoom.min);
-    expect(rangeAfterPan.max).not.toBe(rangeAfterZoom.max);
-    
-    // The span should be preserved within a small tolerance (rounding errors etc)
-    console.log('Span diff:', Math.abs(spanAfterPan - spanAfterZoom));
-    expect(Math.abs(spanAfterPan - spanAfterZoom)).toBeLessThan(0.01); // Increased tolerance slightly
+
+    expect(rangeAfterPan.min).not.toBeCloseTo(rangeAfterZoom.min, 6);
+    expect(rangeAfterPan.max - rangeAfterPan.min).toBeCloseTo(rangeAfterZoom.max - rangeAfterZoom.min, 6);
   });
 });
