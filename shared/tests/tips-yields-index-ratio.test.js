@@ -10,7 +10,7 @@ import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import path from 'path';
 import { parseFidelityTipsRows } from '../src/fidelity-parse.js';
-import { parseTipsRefRows } from '../src/market-data.js';
+import { parseTipsRefRows, R2_ROOT } from '../src/market-data.js';
 import { parseCsv } from '../src/csv.js';
 import { tipsIndexRatios } from '../src/ref-cpi.js';
 
@@ -22,8 +22,9 @@ const FIXTURE = path.join(REPO_ROOT, 'YieldCurves', 'tests', 'fixtures', 'Fideli
 // Real S4 (Ref CPI NSA and SA) rows -- the settlement-date Ref CPI source in hand (§3.12
 // found S4's NSA column identical to S3's authoritative retrieved series on every date tested).
 const REF_CPI_NSA_SA = path.join(REPO_ROOT, 'SeasonalAdjustments', 'data', 'RefCpiNsaSa.snapshot.csv');
-// Real S2 (TipsRef.csv) rows -- the dated date Ref CPI source, keyed by CUSIP.
-const TIPS_REF = path.join(REPO_ROOT, 'TipsLadderManager', 'tests', 'e2e', 'TipsRef.csv');
+// Real S2 (TipsRef.csv) rows -- the dated date Ref CPI source, keyed by CUSIP. Read live from R2
+// (TipsLadderManager/TESTING.md: no committed copy of a file the monthly jobs keep current).
+const TIPS_REF_URL = `${R2_ROOT}/TIPS/TipsRef.csv`;
 
 // The 2026-06-25 download date's own T+1 (3.1.6): a Thursday to a Friday, no bond holiday
 // between them -- see §3.12.
@@ -32,14 +33,14 @@ const MARKET_SETTLE_ISO = '2026-06-26';
 let pass = 0, fail = 0;
 const ok = (cond, msg) => { if (cond) pass++; else { fail++; console.error('  ✗ ' + msg); } };
 
-function main() {
+async function main() {
   const fidText = readFileSync(FIXTURE, 'utf8');
   const tipsQuotes = parseFidelityTipsRows(fidText);
   ok(tipsQuotes.length === 53, `expected 53 TIPS quotes in the fixture (got ${tipsQuotes.length})`);
   const quotesByCusip = new Map(tipsQuotes.map(r => [r.cusip, r]));
 
   const refCpiRows = parseCsv(readFileSync(REF_CPI_NSA_SA, 'utf8'));
-  const tipsRefRows = parseTipsRefRows(readFileSync(TIPS_REF, 'utf8'));
+  const tipsRefRows = parseTipsRefRows(await (await fetch(TIPS_REF_URL)).text());
   const tipsRefByCusip = new Map(tipsRefRows.map(r => [r.cusip, r]));
 
   const indexRatioByCusip = tipsIndexRatios([], refCpiRows, quotesByCusip, true, MARKET_SETTLE_ISO, tipsRefByCusip);
@@ -61,4 +62,4 @@ function main() {
   process.exit(fail ? 1 : 0);
 }
 
-main();
+main().catch(err => { console.error(err); process.exit(1); });
