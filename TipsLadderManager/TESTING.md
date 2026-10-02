@@ -25,8 +25,7 @@ and stops being true the moment that stops holding.
 
 ## No test depends on specific holdings
 
-`SampleHoldings.csv` and any file derived from a real broker account (`SchwabAllAccounts.csv`,
-`VanguardAllAccounts.csv`) change: the account sells
+`SampleHoldings.csv` and `SampleDaraPlan.csv`, both derived from the real account, change: the account sells
 positions and TIPS mature out of it. No test may assert on a specific CUSIP or maturity year these
 files happen to hold today — only on a property that holds for *any* holdings (a shape, an
 invariant, a relationship between two computed figures). `scripts/generate-test-fixtures.js`
@@ -138,8 +137,9 @@ asserts the invariants that must hold at every cut instead of reproducing that e
 
 ## Process: the fixture-refresh pipeline
 
-The Schwab positions importer runs `scripts/generate-test-fixtures.js`, which regenerates the
-holdings/DARA fixtures above from the real account, commits them, and pushes that commit alone
+A Schwab positions download or a Kevin IRA DARA plan download runs
+`scripts/generate-test-fixtures.js`, which regenerates `SampleHoldings.csv` and `SampleDaraPlan.csv`
+from the real account at one scale factor (0.5), commits them, and pushes that commit alone
 ([knowledge/Testing.md §4.0](../knowledge/Testing.md)). `.githooks/pre-push` runs the
 unit and UI suites and blocks that push (or any push) on a failure — this file's rulings exist
 to keep that gate meaningful rather than a thing contributors route around. The ingestion scripts

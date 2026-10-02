@@ -73,6 +73,15 @@ const SUITES = [
   { script: 'test:Unit:Shared', dir: 'shared' },
 ];
 const TEST_WIRING = new Set(['package.json', 'playwright.config.js', 'scripts/pre-push-tests.js', '.githooks/pre-push']);
+
+// The sample files a Schwab positions or DARA plan download rewrites. A push changing only these
+// runs the TipsLadderManager unit suite and the UI tests tagged @SampleHoldings, not the whole UI
+// suite: no other test result depends on what the sample account holds.
+const SAMPLE_FILES = new Set(['TipsLadderManager/data/SampleHoldings.csv', 'TipsLadderManager/data/SampleDaraPlan.csv']);
+const SAMPLE_SUITES = [
+  { script: 'test:Unit:TipsLadderManager', dir: 'TipsLadderManager' },
+  { script: 'test:UI:TipsLadderManager:SampleHoldings', dir: 'TipsLadderManager' },
+];
 const CODE_FILE = /\.(m?js|cjs|html)$/;
 
 function changedFiles(range) {
@@ -120,6 +129,7 @@ function importingDirs(sharedFiles) {
 
 function suitesFor(files) {
   if (files.some(f => TEST_WIRING.has(f))) return SUITES;
+  if (files.length && files.every(f => SAMPLE_FILES.has(f))) return SAMPLE_SUITES;
   const dirs = new Set();
   const sharedSrc = [];
   for (const f of files) {

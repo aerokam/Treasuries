@@ -15,6 +15,7 @@ A suite is a script in the root `package.json`, named `test:<kind>:<App>`, and r
 |---|---|---|
 | `test:Unit:TipsLadderManager` | TipsLadderManager calculations | `TipsLadderManager/tests/run.js` |
 | `test:UI:TipsLadderManager` | TipsLadderManager | `TipsLadderManager/tests/UI/` |
+| `test:UI:TipsLadderManager:SampleHoldings` | The TipsLadderManager UI tests tagged `@SampleHoldings` (§3.0) | `TipsLadderManager/tests/UI/` |
 | `test:UI:YieldCurves` | YieldCurves | `YieldCurves/tests/UI/` |
 | `test:UI:TreasuryAuctions` | TreasuryAuctions | `TreasuryAuctions/tests/UI/` |
 | `test:Unit:YieldsMonitor` | YieldsMonitor history dating and Custom range | `YieldsMonitor/tests/*.test.js` |
@@ -43,6 +44,7 @@ The other apps have no suite. A suite is added for an app when that app is next 
 
 | Changed file | Suites run |
 |---|---|
+| Only `TipsLadderManager/data/SampleHoldings.csv` and/or `SampleDaraPlan.csv` | `test:Unit:TipsLadderManager` and `test:UI:TipsLadderManager:SampleHoldings`: the UI tests tagged `@SampleHoldings`, whose results depend on what the sample account holds |
 | A file in an app's directory | That app's suites |
 | `shared/src/<file>` | `test:Unit:Shared`, plus the suites of every app whose code imports that file, directly or through another file in `shared/src/` |
 | A file in `shared/tests/` | `test:Unit:Shared` |
@@ -60,4 +62,4 @@ The other apps have no suite. A suite is added for an app when that app is next 
 
 ## 4.0 Holdings Fixture Refresh
 
-A Schwab positions download rebuilds the sample holdings and the sanitized Schwab test file from the real account, commits them, and pushes that commit alone. Other unpushed commits on `main` are not pushed with it. The import step is specified in `projects/Local/SPEC.md`; the files it writes, in [TipsLadderManager/TESTING.md §Process](../TipsLadderManager/TESTING.md). A Fidelity positions download writes the Google Sheet only.
+A Schwab positions download or a Kevin IRA DARA plan download (`dara-plan-kevin-rmd.csv`) rebuilds `TipsLadderManager/data/SampleHoldings.csv` and `SampleDaraPlan.csv` from the real account at a scale factor of 0.5, commits them, and pushes that commit alone. Other unpushed commits on `main` are not pushed with it. The import steps are specified in `projects/Local/SPEC.md`; the files they write, in [TipsLadderManager/TESTING.md §Process](../TipsLadderManager/TESTING.md). A Fidelity positions download writes the Google Sheet only.

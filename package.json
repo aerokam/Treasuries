@@ -10,6 +10,7 @@
     "dashboard": "node Dashboard/server.js",
     "test:Unit:TipsLadderManager": "npm run test:Unit:TipsLadderManager -w TipsLadderManager",
     "test:UI:TipsLadderManager": "playwright test -c TipsLadderManager/playwright.config.js",
+    "test:UI:TipsLadderManager:SampleHoldings": "playwright test -c TipsLadderManager/playwright.config.js --grep @SampleHoldings",
     "test:UI:YieldCurves": "playwright test -c YieldCurves/playwright.config.js",
     "test:UI:TreasuryAuctions": "playwright test --project=TreasuryAuctions",
     "test:UI:YieldsMonitor": "playwright test --project=YieldsMonitor",
