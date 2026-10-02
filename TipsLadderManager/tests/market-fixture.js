@@ -1,14 +1,9 @@
-// Serves the tests/e2e/*.csv fixtures to the app's own data loader.
+// Serves the live R2 market files to the app's own data loader.
 //
 // Tests must not re-implement the market-data load: which source is live is decided inside
 // shared/src/market-data.js's loadMarketData() (3.1 §4.0 Yield Sources), and a test that parses a CSV itself has to
 // pick a source, which is the one thing it cannot get right by construction. Installing this shim
 // and calling loadMarketData() gives a test exactly the rows, dates, and source the app gets.
-import { readFileSync } from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-const FIXTURES = path.join(path.dirname(fileURLToPath(import.meta.url)), 'e2e');
 
 // The Fidelity download date drives the settlement date, so it is rewritten to today: fixtures
 // carry a fixed historical footer, and tests assert against a settlement date derived from now

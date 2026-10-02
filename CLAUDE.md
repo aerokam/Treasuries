@@ -97,11 +97,11 @@ small pieces as it goes.
   ordinary commit, merge, or push.
 - **Before a work pass**, run `git status` and `ListAgents`. If another session is editing the same
   files, message it (`SendMessage`) and agree who goes first.
-- **Two full `npm run test:e2e` runs against the 8080 server at once interfere** and report
+- **Two runs of the same `test:UI:*` suite against the 8080 server at once interfere** and report
   failures that are not real. Check `ListAgents` before starting one. The pre-push hook already
   runs the suites for a push, so a routine push needs no separate run.
 - **A bug fix or other low-risk commit pushes itself, immediately after commit, once it passes
-  the repo's automated gates** (`npm test`, `npm run test:e2e`, `.githooks/pre-push`) — no waiting
+  the repo's automated gates** (the suites `.githooks/pre-push` selects, §Tests) — no waiting
   for the developer's review first. This exists because a session can hit its own usage limit at
   any point with no way to know that in advance, and a fix stuck in a dead session's uncommitted
   or unpushed state is a real loss (it happened twice in one day, 2026-09-15). The rule: if what's
@@ -149,16 +149,34 @@ branch other sessions are committing on.
 - More ports need the developer to widen the R2 CORS allowlist (repo-root
   `knowledge/Data_Pipeline.md`). Ask.
 
+## Tests
+
+Every suite is a root `package.json` script named `test:<kind>:<App>`, run from the repo root:
+`Unit` calls an app's code directly, `UI` drives the app in a browser against the 8080 server.
+
+```bash
+npm run test:Unit:TipsLadderManager
+npm run test:UI:TipsLadderManager
+npm run test:UI:YieldCurves
+npm run test:UI:TreasuryAuctions
+npm run test:Unit:YieldsMonitor
+npm run test:UI:YieldsMonitor
+npm run test:UI:KnowledgeMap      # knowledge/ diagrams and viewer.html
+npm run test:Unit:Shared          # shared/src, used by every app
+```
+
+Each app's tests live in `<App>/tests/UI/` (and its unit tests in `<App>/tests/`). Debug a UI
+suite headed by appending `-- --headed`.
+
+`.githooks/pre-push` runs only the suites a push can affect: an app's own suites when its
+directory changes; for a change to `shared/src/<file>`, `test:Unit:Shared` plus the suites of every
+app whose code imports that file, directly or through another shared file; every suite when the
+test wiring itself changes. To see what a set of changes would run:
+`git diff --name-only origin/main | node scripts/pre-push-tests.js --files --list`.
+
 ## Commands (TipsLadderManager)
 
 ```bash
-# Unit/algorithm tests
-npm test
-
-# E2E regression tests (run after every change)
-npm run test:e2e          # headless, ~7s
-npx playwright test --headed   # headed (debug)
-
 # Serve locally (no build step required)
 npx serve .
 ```
@@ -207,8 +225,6 @@ Definitions (TIPS, funded year, bracket year, gap year, synthetic TIPS, LMI, ret
 ### Commands
 
 ```bash
-npm run test:e2e          # E2E regression tests (headless, ~14s)
-npx playwright test --headed   # headed debug
 npx serve .               # Serve locally (run from root of Treasuries repo)
 ```
 

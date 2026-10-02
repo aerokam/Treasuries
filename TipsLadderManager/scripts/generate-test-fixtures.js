@@ -31,7 +31,6 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT  = path.resolve(__dirname, '..');
 const DATA  = path.join(ROOT, 'data');
 const TESTS = path.join(ROOT, 'tests');
-const E2E   = path.join(TESTS, 'e2e');
 
 function die(msg) { console.error('ERROR:', msg); process.exit(1); }
 

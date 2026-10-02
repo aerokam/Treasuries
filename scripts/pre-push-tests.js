@@ -1,4 +1,4 @@
-// pre-push gate: runs each pushed-to project's test suite(s) and blocks the push on any failure.
+// pre-push gate: runs the test suites a push can affect and blocks the push on any failure.
 // Wired via .githooks/pre-push (core.hooksPath .githooks). See Treasuries/CLAUDE.md.
 //
 // Standing rule (2026-07-25, after the runFundedRebalance self-financing-scale regression shipped
@@ -7,8 +7,16 @@
 // env-var skip. The only override is git's native `--no-verify`, which is always available outside
 // this script's control and requires deliberately typing it every push.
 //
-// Only runs a project's suite(s) if this push actually touches that project's directory, so a
-// Primer-only push doesn't pay for TipsLadderManager/YieldCurves test time.
+// Runs only the suites the pushed changes can affect:
+//   - a change inside an app's directory runs that app's own suites;
+//   - a change to shared/src/<file> runs the Shared unit tests plus the suites of every app whose
+//     code imports that file, directly or through another shared/src file (read from the import
+//     statements at push time, not from a hand-kept list);
+//   - a change to shared/tests runs the Shared unit tests;
+//   - a change to the test wiring itself (package.json, playwright.config.js, this script, the
+//     hook) runs every suite.
+// So a Primer-only push runs nothing, and a YieldsMonitor-only push never pays for
+// TipsLadderManager's suites.
 
 import { execFileSync, spawn } from 'child_process';
 import { readFileSync, appendFileSync } from 'fs';
@@ -23,7 +31,7 @@ const ZERO = '0000000000000000000000000000000000000000';
 // the machine, not the code:
 //   - a process-level crash: Playwright's Chromium dying under Windows with an OS exception code
 //     like 3221226505 (0xC0000409) before any test even ran. Exit code is huge (>255) instead of 1.
-//   - a load-induced timeout: the automated Fidelity-download pipeline (Sheets write, git commit,
+//   - a load-induced timeout: the automated broker-download pipeline (Sheets write, git commit,
 //     fixture regen, this very test run) runs several CPU-heavy steps back to back, and a test can
 //     occasionally race its own timeout budget under that contention even though it's correct --
 //     confirmed 2026-08-13 when a "failed" e2e test passed standalone in 474ms against a 4000ms
@@ -52,20 +60,75 @@ function runNpmScript(cwd, script) {
   });
 }
 
-// Projects with a test suite this hook knows how to run, keyed by top-level directory name.
-const PROJECTS = {
-  TipsLadderManager: ['test', 'test:e2e'],
-  YieldCurves: ['test:e2e'],
-};
+// Every suite this hook knows how to run: the root package.json script, and the top-level
+// directory whose changes it covers.
+const SUITES = [
+  { script: 'test:Unit:TipsLadderManager', dir: 'TipsLadderManager' },
+  { script: 'test:UI:TipsLadderManager', dir: 'TipsLadderManager' },
+  { script: 'test:UI:YieldCurves', dir: 'YieldCurves' },
+  { script: 'test:UI:TreasuryAuctions', dir: 'TreasuryAuctions' },
+  { script: 'test:Unit:YieldsMonitor', dir: 'YieldsMonitor' },
+  { script: 'test:UI:YieldsMonitor', dir: 'YieldsMonitor' },
+  { script: 'test:UI:KnowledgeMap', dir: 'knowledge' },
+  { script: 'test:Unit:Shared', dir: 'shared' },
+];
+const TEST_WIRING = new Set(['package.json', 'playwright.config.js', 'scripts/pre-push-tests.js', '.githooks/pre-push']);
+const CODE_FILE = /\.(m?js|cjs|html)$/;
 
-function changedTopLevelDirs(range) {
+function changedFiles(range) {
   const out = execFileSync('git', ['diff', '--name-only', ...range], { cwd: ROOT }).toString();
+  return out.split('\n').map(l => l.trim()).filter(Boolean);
+}
+
+function trackedFiles(dir) {
+  const out = execFileSync('git', ['ls-files', '--', dir], { cwd: ROOT }).toString();
+  return out.split('\n').map(l => l.trim()).filter(l => CODE_FILE.test(l));
+}
+
+// The changed shared/src files plus every shared/src file that imports one of them, repeated until
+// nothing new is added: a change to csv.js reaches every app that imports market-data.js.
+function affectedSharedFiles(changed) {
+  const affected = new Set(changed);
+  const sharedSrc = trackedFiles('shared/src');
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (const f of sharedSrc) {
+      if (affected.has(f)) continue;
+      const text = readFileSync(path.join(ROOT, f), 'utf8');
+      for (const a of affected) {
+        if (text.includes("'./" + path.posix.basename(a) + "'")) { affected.add(f); grew = true; break; }
+      }
+    }
+  }
+  return affected;
+}
+
+// Top-level directories whose code imports any of the given shared/src files.
+function importingDirs(sharedFiles) {
   const dirs = new Set();
-  for (const line of out.split('\n')) {
-    const top = line.split('/')[0];
-    if (top) dirs.add(top);
+  for (const { dir } of SUITES) {
+    if (dir === 'shared' || dirs.has(dir)) continue;
+    for (const f of trackedFiles(dir)) {
+      const text = readFileSync(path.join(ROOT, f), 'utf8');
+      // 'shared/src/x.js' appears in every relative import of x.js, from any depth.
+      if ([...sharedFiles].some(n => text.includes(n))) { dirs.add(dir); break; }
+    }
   }
   return dirs;
+}
+
+function suitesFor(files) {
+  if (files.some(f => TEST_WIRING.has(f))) return SUITES;
+  const dirs = new Set();
+  const sharedSrc = [];
+  for (const f of files) {
+    const top = f.split('/')[0];
+    if (f.startsWith('shared/src/')) sharedSrc.push(f);
+    dirs.add(top);
+  }
+  if (sharedSrc.length) for (const d of importingDirs(affectedSharedFiles(sharedSrc))) dirs.add(d);
+  return SUITES.filter(s => dirs.has(s.dir));
 }
 
 function readStdin() {
@@ -75,10 +138,14 @@ function readStdin() {
 const stdinText = readStdin();
 const lines = stdinText.split('\n').map(l => l.trim()).filter(Boolean);
 
-let touchedDirs = new Set();
-if (lines.length === 0) {
+let runAll = false;
+const files = new Set();
+if (process.argv.includes('--files')) {
+  // File list on stdin instead of git's ref lines (see --list below).
+  for (const f of lines) files.add(f);
+} else if (lines.length === 0) {
   // No refs on stdin (unusual) -- be conservative and check everything with tests.
-  touchedDirs = new Set(Object.keys(PROJECTS));
+  runAll = true;
 } else {
   for (const line of lines) {
     const [, localSha, , remoteSha] = line.split(' ');
@@ -86,49 +153,50 @@ if (lines.length === 0) {
     if (!remoteSha || remoteSha === ZERO) {
       // Brand-new remote ref (first push of a new branch) -- no prior remote state to diff
       // against, so there's no sound way to scope this to "what's touched". Be conservative
-      // and just check every project with a test suite.
-      for (const p of Object.keys(PROJECTS)) touchedDirs.add(p);
+      // and run every suite.
+      runAll = true;
       continue;
     }
     try {
-      for (const d of changedTopLevelDirs([remoteSha, localSha])) touchedDirs.add(d);
+      for (const f of changedFiles([remoteSha, localSha])) files.add(f);
     } catch {
       // Couldn't diff (e.g. remoteSha unknown locally) -- be conservative.
-      for (const p of Object.keys(PROJECTS)) touchedDirs.add(p);
+      runAll = true;
     }
   }
 }
 
-const toRun = Object.entries(PROJECTS).filter(([dir]) => touchedDirs.has(dir));
+const toRun = runAll ? SUITES : suitesFor([...files]);
 if (toRun.length === 0) {
-  console.log('pre-push: no test-covered project changed, skipping.');
+  console.log('pre-push: no change a test suite covers, skipping.');
   process.exit(0);
 }
+console.log(`pre-push: running ${toRun.map(s => s.script).join(', ')}`);
+// --list prints the selection and stops, to check it by hand:
+//   git diff --name-only <from> <to> | node scripts/pre-push-tests.js --files --list
+if (process.argv.includes('--list')) process.exit(0);
 
 let failed = false;
-for (const [dir, scripts] of toRun) {
-  const cwd = path.join(ROOT, dir);
-  for (const script of scripts) {
-    console.log(`\npre-push: running ${dir} -> npm run ${script}`);
-    let res = await runNpmScript(cwd, script);
+for (const { dir, script } of toRun) {
+  console.log(`\npre-push: npm run ${script}`);
+  let res = await runNpmScript(ROOT, script);
 
-    if (res.status !== 0) {
-      const isCrash = res.status > CRASH_EXIT_THRESHOLD;
-      const isTimeout = !isCrash && TIMEOUT_PATTERN.test(res.output);
+  if (res.status !== 0) {
+    const isCrash = res.status > CRASH_EXIT_THRESHOLD;
+    const isTimeout = !isCrash && TIMEOUT_PATTERN.test(res.output);
 
-      if (isCrash || isTimeout) {
-        const reason = isCrash ? 'crash' : 'timeout';
-        console.error(`pre-push: ${dir} "${script}" ${isCrash ? 'crashed' : 'timed out'} (exit ${res.status}, not an assertion failure) -- retrying once.`);
-        logRetry(dir, script, res.status, reason);
-        res = await runNpmScript(cwd, script);
-        if (res.status !== 0) logRetry(dir, script, res.status, `${reason}-retry-failed`);
-      }
+    if (isCrash || isTimeout) {
+      const reason = isCrash ? 'crash' : 'timeout';
+      console.error(`pre-push: ${dir} "${script}" ${isCrash ? 'crashed' : 'timed out'} (exit ${res.status}, not an assertion failure) -- retrying once.`);
+      logRetry(dir, script, res.status, reason);
+      res = await runNpmScript(ROOT, script);
+      if (res.status !== 0) logRetry(dir, script, res.status, `${reason}-retry-failed`);
     }
+  }
 
-    if (res.status !== 0) {
-      console.error(`pre-push: ${dir} "${script}" FAILED.`);
-      failed = true;
-    }
+  if (res.status !== 0) {
+    console.error(`pre-push: ${dir} "${script}" FAILED.`);
+    failed = true;
   }
 }
 
@@ -138,5 +206,5 @@ if (failed) {
   process.exit(1);
 }
 
-console.log('\npre-push: all test-covered projects passed.');
+console.log('\npre-push: all selected suites passed.');
 process.exit(0);

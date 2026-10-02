@@ -8,9 +8,14 @@
   ],
   "scripts": {
     "dashboard": "node Dashboard/server.js",
-    "test": "npm test -w TipsLadderManager",
-    "test:knowledge": "playwright test tests/e2e/knowledge.spec.js",
-    "test:e2e": "npm run test:e2e -w TipsLadderManager"
+    "test:Unit:TipsLadderManager": "npm run test:Unit:TipsLadderManager -w TipsLadderManager",
+    "test:UI:TipsLadderManager": "playwright test -c TipsLadderManager/playwright.config.js",
+    "test:UI:YieldCurves": "playwright test -c YieldCurves/playwright.config.js",
+    "test:UI:TreasuryAuctions": "playwright test --project=TreasuryAuctions",
+    "test:UI:YieldsMonitor": "playwright test --project=YieldsMonitor",
+    "test:Unit:YieldsMonitor": "node --test \"YieldsMonitor/tests/*.test.js\"",
+    "test:UI:KnowledgeMap": "playwright test --project=KnowledgeMap",
+    "test:Unit:Shared": "node --test \"shared/tests/*.test.js\""
   },
   "dependencies": {
     "express": "^4.21.2",

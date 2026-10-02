@@ -1,22 +1,22 @@
 # Testing Conventions
 
-Rulings about how this app's test suite (`npm test`, `npm run test:e2e`) is built and what it may
+Rulings about how this app's test suite (`npm run test:Unit:TipsLadderManager`, `npm run test:UI:TipsLadderManager`) is built and what it may
 and may not depend on. Not a spec — a spec says what the app does; this says what a test is allowed
 to assume while checking that. Settled by the developer across several sessions; previously existed
 only in commit messages and code comments, which is why this file exists.
 
 ## Live market data, never a committed snapshot
 
-`tests/e2e/app.spec.js` and `tests/run.js` read every piece of market data a test needs — Market
+`tests/UI/app.spec.js` and `tests/run.js` read every piece of market data a test needs — Market
 quotes, SA/SAO yields, Ref CPI, TIPS reference data, the bond-holiday calendar — directly from R2 at
 run time (`r2Text` in `app.spec.js`, `tests/market-fixture.js` for `run.js`), never from a file
-committed to the repo. A committed copy can only age: `tests/e2e/RefCPI.csv` ran out the day
+committed to the repo. A committed copy can only age: a committed `RefCPI.csv` ran out the day
 settlement passed its last row, and a committed quotes file lacked every bond issued after the copy
 was taken (e.g. the TIPS maturing July 2036). Two values are rewritten on top of the live data, since
 a test run is not itself a download day: the Fidelity download date becomes today (it drives
 settlement), and the first line of the FedInvest file becomes the settlement date.
 
-Consequence: the test suite needs live network access to R2, and the E2E browser sandbox has none —
+Consequence: the test suite needs live network access to R2, and the UI-test browser sandbox has none —
 see 3.1 Data Pipeline §5.0 for the fixture-mocking mechanics this requires.
 
 **The test clock is never pinned to an old date.** A pinned date is exactly the committed-snapshot
@@ -47,7 +47,7 @@ rather than any real holding. The quantities and index ratios on those rows are 
 to fix the ordering the assertions depend on, the same "synthetic market built for the test"
 category as the bond-row holdings above, scoped to exactly the one year this test needs.
 
-**E2E years are written relative to the settlement year, not as literals** — a gap year is `SY + n`,
+**UI-test years are written relative to the settlement year, not as literals** — a gap year is `SY + n`,
 read from the First Year dropdown, never a hardcoded calendar year, for the same reason as the
 derived structural roles above. The Available Cash maturity test names the bonds maturing this year
 by looking them up in TIPS reference data rather than hardcoding a CUSIP, and skips — with a stated
@@ -140,7 +140,7 @@ asserts the invariants that must hold at every cut instead of reproducing that e
 
 The broker importer runs `scripts/generate-test-fixtures.js`, which regenerates the holdings/DARA
 fixtures above from the real account and commits + pushes the refresh. `.githooks/pre-push` runs the
-full unit and E2E suites and blocks that push (or any push) on a failure — this file's rulings exist
+unit and UI suites and blocks that push (or any push) on a failure — this file's rulings exist
 to keep that gate meaningful rather than a thing contributors route around. The ingestion scripts
 themselves (what fetches and writes R2) are specified at 3.1 Data Pipeline §2.0, not here.
 

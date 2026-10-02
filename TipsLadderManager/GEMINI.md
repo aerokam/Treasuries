@@ -67,7 +67,7 @@ Adhere to the following variable mappings:
 ### 4. Testing & Validation
 - **STOP ON FAIL (MANDATORY)**: If any test fails, stop immediately and debug.
 - **Unit Tests**: Run `npm test`.
-- **E2E Tests**: Run `cmd /c "npm run test:e2e -- --max-failures=1"`.
+- **E2E Tests**: Run `cmd /c "npm run test:UI:TipsLadderManager -- --max-failures=1"` (from the repo root).
 - **Verification**: After any logic change, ensure the "After ARA" in the UI still approximates the target DARA within rounding limits (~$1).
 
 ---
@@ -75,7 +75,7 @@ Adhere to the following variable mappings:
 ## Key Commands (Win32 Standards)
 - **Run Locally**: `node ..\node_modules\serve\bin\serve.js .. -p 8080` (Run from root or use correct relative path).
 - **Regression Tests**: `node tests/run.js`
-- **E2E Tests**: `cmd /c "npm run test:e2e -- --max-failures=1"`
+- **E2E Tests**: `cmd /c "npm run test:UI:TipsLadderManager -- --max-failures=1"` (from the repo root)
 - **Update Data**: `node scripts/getYieldsFedInvest.js` (Run from root).
 
 ---

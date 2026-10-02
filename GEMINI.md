@@ -24,7 +24,7 @@ This environment has restricted script execution. Follow these rules for ALL ter
 
 1. **NO `npm` for scripts**: Use `node` directly. Instead of `npm test`, run `node tests/run.js`.
 2. **Separator**: Use `;` (semicolon) instead of `&&`. Example: `cd dir; node script.js`.
-3. **E2E Testing**: To run Playwright tests, use `Start-Process bash -ArgumentList "-c", "'(cd /c/Users/aerok/projects/Treasuries/TipsLadderManager && npm run test:e2e -- --max-failures=1 2>&1)'" -Wait -NoNewWindow`. This ensures PowerShell does not misinterpret the Bash operators.
+3. **E2E Testing**: To run Playwright tests, use `Start-Process bash -ArgumentList "-c", "'(cd /c/Users/aerok/projects/Treasuries && npm run test:UI:TipsLadderManager -- --max-failures=1 2>&1)'" -Wait -NoNewWindow`. This ensures PowerShell does not misinterpret the Bash operators.
 4. **STOP ON FAIL (MANDATORY)**: If any test fails, stop immediately. Do not proceed with other tasks until the failure is diagnosed and fixed.
 5. **Shell**: All commands are executed via `powershell.exe -NoProfile -Command`.
 
@@ -32,7 +32,7 @@ This environment has restricted script execution. Follow these rules for ALL ter
 | Task | Command | Directory |
 | :--- | :--- | :--- |
 | **Regression Tests** | `node tests/run.js` | `TipsLadderManager/` |
-| **E2E Tests** | `Start-Process bash -ArgumentList "-c", "'(cd /c/Users/aerok/projects/Treasuries/TipsLadderManager && npm run test:e2e -- --max-failures=1 2>&1)'" -Wait -NoNewWindow` | Root |
+| **E2E Tests** | `Start-Process bash -ArgumentList "-c", "'(cd /c/Users/aerok/projects/Treasuries && npm run test:UI:TipsLadderManager -- --max-failures=1 2>&1)'" -Wait -NoNewWindow` | Root |
 | **Serve UI** | `node .\node_modules\serve\bin\serve.js . -p 8080` | Root |
 | **Update Data** | `node scripts/getYieldsFedInvest.js` | Root |
 

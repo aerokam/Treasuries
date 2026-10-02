@@ -16,8 +16,6 @@ import { parseHolidaySet } from '../../../shared/src/settlement.js';
 import { parseCsv as parseCsvRows } from '../../../shared/src/csv.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const FIXTURES = path.join(ROOT, 'tests', 'e2e');
-const csv = name => readFileSync(path.join(FIXTURES, name), 'utf8');
 
 // Series the monthly jobs keep current are read from R2, once per run, not mirrored in tests/e2e.
 const liveR2 = new Map();
