@@ -23,7 +23,9 @@ test('Historical table headers are sticky vertically and first column is sticky 
   const mainThead = page.locator('#mainThead');
   const firstHeader = mainThead.locator('th').first();
   const lastHeader = mainThead.locator('th').last();
-  const filterRow = mainThead.locator('.filter-row');
+  // The sticky element is each filter cell, not the <tr>: a row's own box stays in flow while its
+  // cells stick, so measuring the <tr> reports it scrolling away even when every cell is pinned.
+  const filterRow = mainThead.locator('.filter-row td').first();
 
   // Debug: check overflow style of tableWrap and parents
   const overflow = await tableWrap.evaluate(el => window.getComputedStyle(el).overflow);
@@ -55,7 +57,9 @@ test('Historical table headers are sticky vertically and first column is sticky 
   // Y position should remain identical to initial if sticky
   expect(scrolledFirstHeaderPos.y).toBeCloseTo(initialFirstHeaderPos.y, 1);
   expect(scrolledLastHeaderPos.y).toBeCloseTo(initialLastHeaderPos.y, 1);
-  expect(scrolledFilterRowPos.y).toBeCloseTo(initialFilterRowPos.y, 1);
+  // Precision 0 (< 0.5px): app.js sets the cells' top from the header row's offsetHeight, an
+  // integer, so a fractional header height leaves a sub-pixel offset.
+  expect(scrolledFilterRowPos.y).toBeCloseTo(initialFilterRowPos.y, 0);
 
   // 2. Horizontal scrolling test
   // Reset vertical, scroll horizontal
@@ -76,13 +80,12 @@ test('Historical table headers are sticky vertically and first column is sticky 
     expect(hScrolledLastHeaderPos.x).toBeLessThan(initialLastHeaderPos.x - 300);
   }
 
-  // 3. Visual integrity check
-  const tbodyRow = page.locator('#mainTbody tr').nth(10);
+  // 3. Visual integrity check: with data rows scrolled underneath, the pinned filter cell is the
+  // element painted on top at its own position, not a data cell showing through.
   await tableWrap.evaluate(el => el.scrollTop = 500);
   await page.waitForTimeout(200);
-  const scrolledTbodyRowPos = await tbodyRow.boundingBox();
-
-  // The top of any scrolled data row should be below the bottom of the filter row
-  const currentFilterRowPos = await filterRow.boundingBox();
-  expect(scrolledTbodyRowPos.y).toBeGreaterThanOrEqual(currentFilterRowPos.y + currentFilterRowPos.height - 1);
+  const box = await filterRow.boundingBox();
+  const onTop = await page.evaluate(({ x, y }) => !!document.elementFromPoint(x, y)?.closest('.filter-row'),
+    { x: box.x + box.width / 2, y: box.y + box.height / 2 });
+  expect(onTop).toBe(true);
 });
