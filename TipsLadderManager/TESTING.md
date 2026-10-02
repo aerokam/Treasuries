@@ -26,7 +26,7 @@ and stops being true the moment that stops holding.
 ## No test depends on specific holdings
 
 `SampleHoldings.csv` and any file derived from a real broker account (`FidelityAllAccounts.csv`,
-`SchwabAllAccounts.csv`, `VanguardAllAccounts.csv`, `ladder-fixtures.js`) change: the account sells
+`SchwabAllAccounts.csv`, `VanguardAllAccounts.csv`) change: the account sells
 positions and TIPS mature out of it. No test may assert on a specific CUSIP or maturity year these
 files happen to hold today — only on a property that holds for *any* holdings (a shape, an
 invariant, a relationship between two computed figures). `scripts/generate-test-fixtures.js`
@@ -40,6 +40,12 @@ file), hand-made bond rows (a synthetic market built for the test), or a small s
 market (the broker-format parser tests use maturities in 2098/99 specifically so they never collide
 with real issuance). `SampleHoldings.csv` itself is reserved for properties that hold for any
 holdings, never a specific-CUSIP assertion.
+
+**The within-year allocation-policy tests run on a hand-made one-year ladder** — three held
+maturities plus an unheld second January issue, built from bond rows five years after settlement —
+rather than any real holding. The quantities and index ratios on those rows are deliberately chosen
+to fix the ordering the assertions depend on, the same "synthetic market built for the test"
+category as the bond-row holdings above, scoped to exactly the one year this test needs.
 
 **E2E years are written relative to the settlement year, not as literals** — a gap year is `SY + n`,
 read from the First Year dropdown, never a hardcoded calendar year, for the same reason as the
@@ -104,10 +110,27 @@ outright rather than something a test derives from the market.
 Two Treasury issue dates change this structure and are worth knowing about when a test starts
 failing for no apparent reason: the January 2027 auction of the Jan 2037 10-year narrows the
 2037-39 gap to 2038-39, and the February 2027 auction of the Feb 2057 30-year moves the Future 30Y
-boundary. A verification harness (not a committed test) simulates a March 2027 market —
-`sim-year-turn.cjs` — to check the suite still holds up after either issue lands; run it after any
-change that touches ladder structure. As of this writing it fails two tests that are open engine
-questions, not a harness problem (see `ladder` session for status).
+boundary. A verification harness (not a committed test), `TipsLadderManager/tests/sim-year-turn.cjs`,
+simulates a March 2027 market to check the suite still holds up after either issue lands — run it
+after any change that touches ladder structure. From `TipsLadderManager/`:
+```
+node tests/sim-year-turn.cjs && node tests/_sim_run.js
+```
+then delete the generated `tests/_sim_run.js` (gitignored — it's the harness's own scratch output,
+not a fixture to keep). Gotcha: a synthetic bond needs a full nine-character CUSIP — the file
+parsers silently drop a shorter one rather than erroring, so a shortened placeholder CUSIP just
+vanishes from the simulated market with no warning.
+
+As of this writing it fails on two open engine questions, not a harness problem (both `ladder`
+session's, not yet fixed):
+- The retained-excess round trip, when the active lower bracket's own year holds a single bond —
+  reimporting a build/rebalance export can lose the retained identification, producing about 35
+  bonds of churn in the simulated market.
+- A Pre-Ladder Interest bug when the first year equals the active lower bracket year — the gap's
+  total cost drops to 0. `ladder` will fix this and add a regression test once it lands.
+
+(The roll-coupon item once flagged here is resolved — 2.0's own formula is dynamic, and the test
+assertion now follows the last real maturity year rather than a fixed one.)
 
 **Known coverage gap:** the 3-bracket custom-plan reallocation signature (the active bond still
 being bought alongside large retained legs) could not be reproduced as a fixture. The relevant test
