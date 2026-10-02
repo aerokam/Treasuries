@@ -92,6 +92,7 @@ See [Data_Pipeline.md](./Data_Pipeline.md) for schedules, owners, and script pat
 | [TIPS_Basics.md](./TIPS_Basics.md) | TIPS mechanics and index ratio arithmetic |
 | [Treasury_CUSIP_Reference.md](./Treasury_CUSIP_Reference.md) | CUSIP structure and lookup reference |
 | [VERIFICATION_SUITE.md](./VERIFICATION_SUITE.md) | Setup checks and data validation procedures |
+| [Testing.md](./Testing.md) | Automated test suites per app and which ones run before a push |
 | [Admin_Dashboard.md](./Admin_Dashboard.md) | Local monitoring dashboard for pipeline health |
 
 ---

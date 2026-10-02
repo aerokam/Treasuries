@@ -138,8 +138,9 @@ asserts the invariants that must hold at every cut instead of reproducing that e
 
 ## Process: the fixture-refresh pipeline
 
-The broker importer runs `scripts/generate-test-fixtures.js`, which regenerates the holdings/DARA
-fixtures above from the real account and commits + pushes the refresh. `.githooks/pre-push` runs the
+The Schwab positions importer runs `scripts/generate-test-fixtures.js`, which regenerates the
+holdings/DARA fixtures above from the real account, commits them, and pushes that commit alone
+([knowledge/Testing.md §4.0](../knowledge/Testing.md)). `.githooks/pre-push` runs the
 unit and UI suites and blocks that push (or any push) on a failure — this file's rulings exist
 to keep that gate meaningful rather than a thing contributors route around. The ingestion scripts
 themselves (what fetches and writes R2) are specified at 3.1 Data Pipeline §2.0, not here.

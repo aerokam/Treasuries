@@ -132,9 +132,13 @@ scoped push is done). Same steps either way:
    of already-verified commits usually does not need re-testing).
 3. From the primary checkout: `git push origin ship-<desc>:main` — ships only this. The developer
    approves the push itself, same as any push.
-4. From the primary checkout on `main`: `git merge -s ours origin/main` — folds the shipped work
-   back into local `main` without disturbing what is still unpushed (the working tree does not
-   change).
+4. From the primary checkout on `main`, `git fetch origin`, then fold the shipped work back into
+   local `main` without disturbing what is still unpushed:
+   `git merge --ff-only $(git commit-tree "HEAD^{tree}" -p HEAD -p origin/main -m "Merge origin/main (shipped separately)")`.
+   This makes the same commit `git merge -s ours origin/main` would, but `merge -s ours` refuses to
+   run while any session has files staged, which is the normal state of this checkout. The tree is
+   unchanged, so staged and unstaged work is untouched; if a commit lands on `main` in between,
+   `--ff-only` refuses rather than losing it.
 5. `git worktree remove ../Treasuries-ship` and `git branch -d ship-<desc>`.
 
 Never instead rewind `main` to the pushed commit and replay the rest afterward — that rewrites the
@@ -151,8 +155,8 @@ branch other sessions are committing on.
 
 ## Tests
 
-Every suite is a root `package.json` script named `test:<kind>:<App>`, run from the repo root:
-`Unit` calls an app's code directly, `UI` drives the app in a browser against the 8080 server.
+Suites, where their files live, and which ones pre-push runs: `knowledge/Testing.md`. Run from the
+repo root:
 
 ```bash
 npm run test:Unit:TipsLadderManager
@@ -165,14 +169,8 @@ npm run test:UI:KnowledgeMap      # knowledge/ diagrams and viewer.html
 npm run test:Unit:Shared          # shared/src, used by every app
 ```
 
-Each app's tests live in `<App>/tests/UI/` (and its unit tests in `<App>/tests/`). Debug a UI
-suite headed by appending `-- --headed`.
-
-`.githooks/pre-push` runs only the suites a push can affect: an app's own suites when its
-directory changes; for a change to `shared/src/<file>`, `test:Unit:Shared` plus the suites of every
-app whose code imports that file, directly or through another shared file; every suite when the
-test wiring itself changes. To see what a set of changes would run:
-`git diff --name-only origin/main | node scripts/pre-push-tests.js --files --list`.
+Debug a UI suite headed by appending `-- --headed`. To see what a set of changes would run before
+a push: `git diff --name-only origin/main | node scripts/pre-push-tests.js --files --list`.
 
 ## Commands (TipsLadderManager)
 
