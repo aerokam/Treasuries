@@ -25,8 +25,8 @@ and stops being true the moment that stops holding.
 
 ## No test depends on specific holdings
 
-`SampleHoldings.csv` and any file derived from a real broker account (`FidelityAllAccounts.csv`,
-`SchwabAllAccounts.csv`, `VanguardAllAccounts.csv`) change: the account sells
+`SampleHoldings.csv` and any file derived from a real broker account (`SchwabAllAccounts.csv`,
+`VanguardAllAccounts.csv`) change: the account sells
 positions and TIPS mature out of it. No test may assert on a specific CUSIP or maturity year these
 files happen to hold today — only on a property that holds for *any* holdings (a shape, an
 invariant, a relationship between two computed figures). `scripts/generate-test-fixtures.js`

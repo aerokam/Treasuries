@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // scripts/generate-test-fixtures.js
-// Reads data/SchwabAllAccounts.csv and data/FidelityAllAccounts.csv (private, gitignored)
+// Reads data/SchwabAllAccounts.csv (private, gitignored)
 // Writes sanitized/scaled (÷5) versions to tests/ for use in test suite.
 // Also writes data/SampleHoldings.csv (Format 3: cusip,qty in bonds) — the app's pre-populate sample.
 // Also writes data/SampleDaraPlan.csv (÷5 of data/DaraPlanKevinRmd.csv, private/gitignored) — the
@@ -14,7 +14,7 @@
 //   - Bond face values: ÷5, rounded to nearest $1000
 //   - ETF/MM share counts: ÷5
 //   - Gain/loss, cost basis: zeroed / replaced with "--"
-//   - Account numbers (Schwab suffix, Fidelity account#): replaced with sequential fakes
+//   - Account numbers (Schwab suffix): replaced with sequential fakes
 //   - Account NAMES: discarded entirely, replaced with synthetic "Acct<N>" labels that retain ONLY
 //     the account-type keyword (IRA / Roth IRA) — the only thing downstream logic needs (see
 //     detectAccountType in src/account-allocation.js). No real name can leak: the label is re-derived
@@ -205,137 +205,19 @@ function sanitizeSchwab(text) {
   return { csv: outLines.join('\n') + '\n', sampleTips };
 }
 
-// ─── Fidelity Format 1 ───────────────────────────────────────────────────────
-
-const FIDELITY_HEADER =
-  'Account Number,Account Name,Symbol,Description,Quantity,Last Price,Last Price Change,' +
-  'Current Value,Today\'s Gain/Loss Dollar,Today\'s Gain/Loss Percent,' +
-  'Total Gain/Loss Dollar,Total Gain/Loss Percent,Percent Of Account,' +
-  'Cost Basis Total,Average Cost Basis,Type';
-
-function isCusip(sym) { return /^[A-Z0-9]{9}$/.test(sym); }
-
-function scaleFidQty(qty, sym) {
-  if (!qty || !qty.trim()) return '';
-  const raw = parseFloat(qty);
-  if (isNaN(raw)) return qty;
-  if (isCusip(sym)) {
-    // Bond face value: ÷5, round to nearest 1000
-    return String(Math.round(raw / 5 / 1000) * 1000);
-  }
-  // ETF/MM shares: ÷5, same decimal places
-  const scaled = raw / 5;
-  const dotIdx = qty.indexOf('.');
-  if (dotIdx >= 0) {
-    const dec = qty.length - dotIdx - 1;
-    return scaled.toFixed(dec);
-  }
-  return String(Math.round(scaled));
-}
-
-function scaleDollar(val) {
-  if (!val || val === '--') return val ?? '--';
-  const sign = val.startsWith('-') ? '-' : '';
-  const num = parseFloat(val.replace(/[^0-9.]/g, ''));
-  if (isNaN(num)) return val;
-  return `${sign}$${(num / 5).toFixed(2)}`;
-}
-
-function sanitizeFidelity(text) {
-  const lines = text.split('\n');
-  const outLines = [FIDELITY_HEADER];
-
-  const acctMap = {};
-  const counters = { X: 0, Z: 0, N: 0 };
-  function fakeAcct(real) {
-    if (acctMap[real]) return acctMap[real];
-    let fake;
-    if (real.startsWith('X')) fake = `X${String(++counters.X).padStart(8, '0')}`;
-    else if (real.startsWith('Z')) fake = `Z${String(++counters.Z).padStart(8, '0')}`;
-    else fake = String(200000000 + ++counters.N);
-    acctMap[real] = fake;
-    return fake;
-  }
-
-  // Synthetic account NAME per real account (keyed on the real account number, assigned in
-  // encounter order). Real name discarded; only the IRA/Roth type keyword is re-derived and kept.
-  const nameMap = {};
-  let nameSeq = 0;
-  function fakeName(realNum, realName) {
-    if (!(realNum in nameMap)) {
-      nameSeq++;
-      nameMap[realNum] = `Acct${nameSeq}${typeSuffix(detectType(realName))}`;
-    }
-    return nameMap[realNum];
-  }
-
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i];
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    // Stop at footer
-    if (trimmed.startsWith('"The data') || trimmed.startsWith('"Brokerage') || trimmed.startsWith('"Date')) break;
-
-    const cols = trimmed.split(',');
-    const acctNum  = cols[0] ?? '';
-    const acctName = fakeName(acctNum, cols[1] ?? '');  // synthetic label; real name discarded
-    const sym      = cols[2] ?? '';
-    const desc     = cols[3] ?? '';
-    const qty      = cols[4] ?? '';
-    const lastPrice = cols[5] ?? '';
-    // col 6: Last Price Change — zero
-    const curVal   = cols[7] ?? '';
-    // cols 8-11: gain/loss — '--'
-    const pctOfAcct = cols[12] || '--';
-    // cols 13-14: cost basis — '--'
-    const type     = cols[15] ?? '';
-
-    const fakeNum = fakeAcct(acctNum);
-
-    if (sym === 'SPAXX**') {
-      const sv = scaleDollar(curVal);
-      outLines.push(`${fakeNum},${acctName},SPAXX**,HELD IN MONEY MARKET,,,, ${sv},,,,,${pctOfAcct},,,${type},`);
-      continue;
-    }
-
-    if (sym === 'Pending activity') {
-      const sv = scaleDollar(curVal);
-      outLines.push(`${fakeNum},${acctName},Pending activity,,,,,${sv},,,,,,`);
-      continue;
-    }
-
-    const scaledQty = scaleFidQty(qty, sym);
-    const scaledVal = scaleDollar(curVal);
-
-    outLines.push(
-      `${fakeNum},${acctName},${sym},${desc},${scaledQty},${lastPrice},$0.00,` +
-      `${scaledVal},--,--,--,--,${pctOfAcct},--,--,${type},`
-    );
-  }
-
-  return outLines.join('\n') + '\n';
-}
-
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 const schwabSrc = path.join(DATA, 'SchwabAllAccounts.csv');
-const fidelitySrc = path.join(DATA, 'FidelityAllAccounts.csv');
 
 if (!existsSync(schwabSrc))   die(`Missing ${schwabSrc}\n  Copy SchwabAllAccounts.csv from Downloads to data/`);
-if (!existsSync(fidelitySrc)) die(`Missing ${fidelitySrc}\n  Copy FidelityAllAccounts.csv from Downloads to data/`);
 
 console.log('Reading', schwabSrc);
 const { csv: schwabCsv, sampleTips } = sanitizeSchwab(readFileSync(schwabSrc, 'utf8'));
 
-console.log('Reading', fidelitySrc);
-const fidelityCsv = sanitizeFidelity(readFileSync(fidelitySrc, 'utf8'));
-
 const schwabOut   = path.join(TESTS, 'SchwabAllAccounts.csv');
-const fidelityOut = path.join(TESTS, 'FidelityAllAccounts.csv');
 const holdingsOut = path.join(DATA,  'SampleHoldings.csv'); // single canonical copy: app pre-populate + tests both read here
 
 writeFileSync(schwabOut,   schwabCsv,   'utf8');
-writeFileSync(fidelityOut, fidelityCsv, 'utf8');
 
 // Guard: never silently overwrite the canonical holdings file with a header-only stub.
 // (A prior regen with no richest-tIRA TIPS flattened it and broke pre-populate + e2e.)
@@ -344,12 +226,11 @@ const holdingsCsv = ['cusip,qty', ...sampleTips].join('\n') + '\n';
 writeFileSync(holdingsOut, holdingsCsv, 'utf8');
 
 console.log(`Wrote ${schwabOut}   (${schwabCsv.split('\n').length} lines)`);
-console.log(`Wrote ${fidelityOut}  (${fidelityCsv.split('\n').length} lines)`);
 console.log(`Wrote ${holdingsOut} (${sampleTips.length} TIPS)`);
 
 // data/SampleDaraPlan.csv: ÷5 of data/DaraPlanKevinRmd.csv (private/gitignored, same Kevin_IRA
 // account SampleHoldings.csv is drawn from). Non-fatal if the source isn't there — unlike the
-// holdings guard above, a missing DARA plan source shouldn't block the Schwab/Fidelity/holdings
+// holdings guard above, a missing DARA plan source shouldn't block the Schwab/holdings
 // regen that real accounts' e2e coverage depends on; it just means the sample plan goes stale
 // again until the source file is refreshed in data/.
 const daraPlanSrc = path.join(DATA, 'DaraPlanKevinRmd.csv');
@@ -373,7 +254,7 @@ if (existsSync(daraPlanSrc)) {
 // (.githooks/pre-push -> scripts/pre-push-tests.js) runs TipsLadderManager's test suites
 // and blocks the push if anything fails, so a bad regen never reaches the remote.
 const REPO_ROOT = execFileSync('git', ['rev-parse', '--show-toplevel']).toString().trim();
-const fixtureFiles = [schwabOut, fidelityOut, holdingsOut, daraPlanOut];
+const fixtureFiles = [schwabOut, holdingsOut, daraPlanOut];
 
 const dirty = execFileSync('git', ['status', '--porcelain', '--', ...fixtureFiles], { cwd: REPO_ROOT }).toString().trim();
 if (!dirty) {
