@@ -9,7 +9,7 @@
 // YieldsMonitor's SA historical reconstruction sweeping settle across every calendar
 // day — and diverged from priceFromYield, which never had that special case).
 
-import { yieldFromPrice, priceFromYield, daysBetween } from '../src/bond-math.js';
+import { yieldFromPrice, priceFromYield, daysBetween, accruedInterest } from '../src/bond-math.js';
 
 let pass = 0, fail = 0;
 const ok = (cond, msg) => { if (cond) { pass++; } else { fail++; console.error('  ✗ ' + msg); } };
@@ -91,6 +91,27 @@ function roundTrips(settle, mature, coupon, yld, tol = 1e-9) {
   const price = 92.265000;
   const y = yieldFromPrice(price, 0, settle, mature);
   ok(Math.abs(y - 0.08237) < 0.0002, `>6mo bill via frequency=2 matches Treasury's quadratic CEY to within display rounding: ${y} vs 0.08237`);
+}
+
+// accruedInterest: day-count proration (2.1 TIPS Basics, Trade Ticket). Moved here from
+// TipsLadderManager/tests/run.js, since it tests this module and not ladder logic.
+{
+  const coupon = 0.02; // 2% annual: 1.0 per $100 semiannual
+  const maturity = new Date(2036, 0, 15); // coupon dates Jan15/Jul15
+  const E_expected = daysBetween(new Date(2025, 6, 15), new Date(2026, 0, 15)); // 184 days
+
+  // One day after the coupon date: A=1, accrued is a thin sliver of the semiannual coupon.
+  const early = accruedInterest(coupon, new Date(2025, 6, 16), maturity);
+  ok(early.E === E_expected, `accruedInterest: E matches period length (${early.E} vs ${E_expected})`);
+  ok(early.A === 1, `accruedInterest: A=1 the day after a coupon (got ${early.A})`);
+  ok(Math.abs(early.accrued - 1 / E_expected) < 1e-9, `accruedInterest: accrued = semiCoupon x 1/E (got ${early.accrued})`);
+
+  // One day before the next coupon: A=E-1, accrued is nearly the full semiannual coupon,
+  // not the flat cpn/2 x par of a non-prorated calculation.
+  const late = accruedInterest(coupon, new Date(2026, 0, 14), maturity);
+  ok(late.A === E_expected - 1, `accruedInterest: A=E-1 the day before the next coupon (got ${late.A})`);
+  ok(Math.abs(late.accrued - (E_expected - 1) / E_expected) < 1e-9, `accruedInterest: accrued = semiCoupon x (E-1)/E (got ${late.accrued})`);
+  ok(late.accrued < 1.0, `accruedInterest: accrued strictly below the full semiannual coupon (got ${late.accrued})`);
 }
 
 console.log(`\n${fail === 0 ? 'PASS' : 'FAIL'} — ${pass} passed, ${fail} failed`);
