@@ -82,12 +82,18 @@ cost), never bit-perfect idempotency.
 An assertion that depends on the day's actual market shape (whether a Future 30Y fallback path
 fires, how close `avgAmt` lands to `DARA`) states the invariant that holds regardless of that shape,
 with any tolerance expressed as a percentage of the spec's own named quantity — not a bare number
-that reads as more precise than it is. A tolerance must never paper over a real, one-directional
-bias: `2.0 TIPS Ladders §Gap Year Coverage Model` originally stated the `avgAmt ≈ DARA` residual as a
-fixed "~0.6%" bound; real runs against live market data showed it is not symmetric noise but a
-one-directional overfunding bias that varies with the day's own shape (observed 0.3-1.7% of `DARA`,
-never below it) — the spec was corrected to assert the direction, not a specific percentage, with the
-direction being the real invariant to test.
+that reads as more precise than it is. A tolerance must never paper over a real bias worth chasing to
+its actual cause, and a loosened assertion that still holds is not proof the loosening was the right
+fix. `2.0 TIPS Ladders §Gap Year Coverage Model`'s `avgAmt ≈ DARA` residual went through two rounds:
+it was first stated as a fixed "~0.6%" bound, which real runs showed was wrong — the residual was
+actually a one-directional overfunding bias (0.3-1.7% of `DARA`, never below it), so the assertion
+was loosened to test the direction instead of a magnitude. That direction turned out to be the
+symptom of a real, fixable bug: gap-bracket excess bought at a discount was reporting its full P+I
+as coverage instead of accruing AMD the way the Future-30Y covers already did (`948410f`, §Gap
+Bracket AMD). With that modeled, the residual has no direction at all — it lands between −0.36% and
++0.60% across the same 18 test cases, under in 8 and over in 10. The lesson isn't "assert the
+direction" or "assert the magnitude" in the abstract — it's that an assertion loose enough to pass
+despite a real bug is itself a signal to keep looking, not a stopping point.
 
 ## Silent-skip guards fail loudly instead
 
