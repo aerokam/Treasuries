@@ -22,7 +22,7 @@
 //   - Market values: recalculated for bonds, scaled ÷5 for other positions
 //   - SampleHoldings.csv: the TIPS of the traditional IRA holding the most TIPS (the richest tIRA).
 
-import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, unlinkSync } from 'fs';
 import { fileURLToPath } from 'url';
 import path from 'path';
 import { execFileSync } from 'child_process';
@@ -252,26 +252,80 @@ if (existsSync(daraPlanSrc)) {
 // `git status`): commit them here immediately, then push -- the repo's pre-push hook
 // (.githooks/pre-push -> scripts/pre-push-tests.js) runs TipsLadderManager's test suites
 // and blocks the push if anything fails, so a bad regen never reaches the remote.
+//
+// Only this commit is pushed. Other sessions' unpushed commits on main are work the developer
+// has not reviewed yet, so they stay local: the fixture change is rebuilt as its own commit on
+// top of origin/main (a temporary index, no checkout) and that commit alone is pushed, then
+// folded back into local main with `merge -s ours` (Treasuries/CLAUDE.md §Shipping less than all
+// of `main`, steps 3-4). The commit also names its paths, so nothing another session has
+// staged is swept into it.
 const REPO_ROOT = execFileSync('git', ['rev-parse', '--show-toplevel']).toString().trim();
 const fixtureFiles = [schwabOut, holdingsOut, daraPlanOut];
+const git = (args, opts = {}) => execFileSync('git', args, { cwd: REPO_ROOT, ...opts }).toString().trim();
 
-const dirty = execFileSync('git', ['status', '--porcelain', '--', ...fixtureFiles], { cwd: REPO_ROOT }).toString().trim();
+const dirty = git(['status', '--porcelain', '--', ...fixtureFiles]);
 if (!dirty) {
   console.log('\nFixtures unchanged; nothing to commit.');
 } else {
-  const branch = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: REPO_ROOT }).toString().trim();
+  const branch = git(['rev-parse', '--abbrev-ref', 'HEAD']);
+  const msg = 'TipsLadderManager: refresh sample/test holdings fixtures';
 
-  execFileSync('git', ['add', '--', ...fixtureFiles], { cwd: REPO_ROOT });
-  execFileSync('git', ['commit', '-m', 'TipsLadderManager: refresh sample/test holdings fixtures'], { cwd: REPO_ROOT, stdio: 'inherit' });
+  git(['add', '--', ...fixtureFiles]);
+  execFileSync('git', ['commit', '-m', msg, '--', ...fixtureFiles], { cwd: REPO_ROOT, stdio: 'inherit' });
 
   if (branch !== 'main') {
     console.log(`\nCommitted on branch "${branch}" (not main) -- not auto-pushing. Merge to main and push manually.`);
   } else {
     try {
-      execFileSync('git', ['push'], { cwd: REPO_ROOT, stdio: 'inherit' });
-      console.log('\nPushed.');
+      git(['fetch', 'origin']);
+      const fixtureSha = git(['rev-parse', 'HEAD']);
+      const unpushed = git(['rev-list', 'origin/main..HEAD']).split('\n').filter(Boolean);
+
+      if (unpushed.length === 1 && unpushed[0] === fixtureSha) {
+        // Nothing else waiting on main: a plain push carries only this commit.
+        execFileSync('git', ['push', 'origin', 'main'], { cwd: REPO_ROOT, stdio: 'inherit' });
+        console.log('\nPushed.');
+      } else {
+        console.log(`\n${unpushed.length - 1} other unpushed commit(s) on main stay local; pushing the fixture commit alone.`);
+        const relPaths = fixtureFiles.map(f => path.relative(REPO_ROOT, f).split(path.sep).join('/'));
+        const tmpIndex = path.join(REPO_ROOT, '.git', 'fixture-ship.index');
+        const env = { ...process.env, GIT_INDEX_FILE: tmpIndex };
+        try {
+          git(['read-tree', 'origin/main'], { env });
+          for (const rel of relPaths) {
+            const entry = git(['ls-tree', fixtureSha, '--', rel]); // "<mode> blob <sha>\t<path>"
+            if (!entry) continue;
+            const [mode, , blob] = entry.split(/\s+/);
+            git(['update-index', '--add', '--cacheinfo', `${mode},${blob},${rel}`], { env });
+          }
+          const tree = git(['write-tree'], { env });
+          if (tree === git(['rev-parse', 'origin/main^{tree}'])) {
+            console.log('origin/main already has these fixtures; nothing to push.');
+          } else {
+            const shipSha = git(['commit-tree', tree, '-p', 'origin/main', '-m', msg]);
+            execFileSync('git', ['push', 'origin', `${shipSha}:refs/heads/main`], { cwd: REPO_ROOT, stdio: 'inherit' });
+            console.log('\nPushed the fixture commit alone.');
+          }
+        } finally {
+          try { unlinkSync(tmpIndex); } catch {}
+        }
+        // Fold back: the same commit `merge -s ours` makes (local tree, parents HEAD and
+        // origin/main), but built with commit-tree and reached by fast-forward, because git
+        // refuses any real merge while another session has files staged -- the normal state
+        // here. The tree is unchanged, so staged and unstaged work is untouched. If a commit
+        // lands on main in between, --ff-only refuses instead of losing it.
+        try {
+          git(['fetch', 'origin']);
+          const foldSha = git(['commit-tree', 'HEAD^{tree}', '-p', 'HEAD', '-p', 'origin/main', '-m', 'Merge origin/main (fixture commit already shipped on its own)']);
+          git(['merge', '--ff-only', foldSha]);
+          console.log('Folded origin/main back into local main (working tree and index unchanged).');
+        } catch (e) {
+          console.error(`\nPushed, but folding origin/main back into local main failed: ${e.message}\nRe-run the fold-back (commit-tree HEAD^{tree} -p HEAD -p origin/main, then merge --ff-only) before the next push.`);
+          process.exitCode = 1;
+        }
+      }
     } catch {
-      console.error('\nPush BLOCKED (pre-push hook failed, likely a broken fixture regen). The commit is local -- fix the failing test, then run `git push` manually.');
+      console.error('\nPush BLOCKED (pre-push hook failed, likely a broken fixture regen). The commit is local -- fix the failing test, then push it.');
       process.exitCode = 1;
     }
   }
