@@ -451,9 +451,8 @@ export function sizeLadder({
   // like coupon interest. `amdByYear` is the COMBINED per-year credit (used in sizing); the
   // per-bracket-year lifetime AMD is tracked separately so the cover/bracket Amount can net it
   // out (its accretion is delivered to the earlier years, not to the block — see build-lib excessAmt).
-  // Both Future-30Y covers (2052 upper, 2056 lower) carry a market discount and are modeled; push
-  // the gap brackets 2036 / 2040 here too once specced and everything downstream (sizing, display,
-  // rebalance) picks them up — they are near par so the effect is small. Spec 2.0 §AMD.
+  // Both Future-30Y covers (2052 upper, 2056 lower) carry a market discount and are modeled here;
+  // the gap brackets join the same ledger once their excess is sized (step 4b below). Spec 2.0 §AMD.
   const amdExcessBonds = [];
   if (future30yUpperExQty > 0 && future30yUpperCoverBond)
     amdExcessBonds.push({ year: future30yUpperYear, bond: future30yUpperCoverBond, exQty: future30yUpperExQty });
@@ -649,6 +648,24 @@ export function sizeLadder({
     ({ lowerWeight, upperWeight } = bracketWeights(lowerDuration, upperDuration, gapParams.avgDuration));
     ({ lowerExQty: lowerExQty, upperExQty: upperExQty } = bracketExcessQtys(gapParams.totalCost, lowerWeight, upperWeight, lowerCPB, upperCPB));
     totalExcessCost = lowerExQty * lowerCPB + upperExQty * upperCPB;
+
+    // Gap-bracket AMD (2.0 §Gap Bracket AMD), into the same ledger as the Future-30Y covers: the
+    // per-funded-year credit the corrected sweep below reads, and the lifetime the bracket Amount
+    // nets out. Added here rather than with the covers above because the bracket excess is only
+    // known once the duration match has run. The upper bracket's accretion over the gap years
+    // themselves was already credited inside the gap fixpoint (gapParamsWithUpperFeedback); those
+    // years have no funded sweep entry, so their ledger entries here are never read twice.
+    for (const { year, bond, exQty } of [
+      { year: lowerYear, bond: lowerBond, exQty: lowerExQty },
+      { year: upperYear, bond: upperBond, exQty: upperExQty },
+    ]) {
+      let lifetime = 0;
+      for (const [y, v] of excessAmdSchedule({ bond, exQty, refCPI, settlementYear })) {
+        future30yUpperAnnualAmdByYear.set(y, (future30yUpperAnnualAmdByYear.get(y) ?? 0) + v);
+        lifetime += v;
+      }
+      if (lifetime) amdLifetimeByBracketYear.set(year, (amdLifetimeByBracketYear.get(year) ?? 0) + lifetime);
+    }
   }
 
   // 5. Corrected long→short sweep over actual funded years (LMI pool includes bracket excess interest).

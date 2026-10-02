@@ -270,16 +270,30 @@ export function gapParamsWithUpperFeedback(args) {
   const lowerDur = calculateMDuration(settlementDate, lowerBond.maturity, lowerBond.coupon ?? 0, lowerBond.yield ?? 0);
   const upperDur = calculateMDuration(settlementDate, upperBond.maturity, upperBond.coupon ?? 0, upperBond.yield ?? 0);
   const baseLMI = args.lmiAboveByYear ?? {};
+  // The upper bracket's excess also accretes toward par through the gap years it spans (2.0 §Gap
+  // Bracket AMD), and that accretion is income those years receive exactly like its coupon — so it
+  // joins the same fixpoint. Both terms are functions of the upper excess quantity, so convergence
+  // is on that quantity. The caller's own amdByYear (the Future-30Y covers' accretion) is kept and
+  // the upper bracket's added to it, gap years only being read by gapParamsCore.
+  const settlementYear = settlementDate.getFullYear();
+  const baseAmd = args.amdByYear ?? null;
+  const withUpperAmd = (sched) => {
+    if (!sched || sched.size === 0) return baseAmd;
+    const m = new Map(baseAmd ?? []);
+    for (const [y, v] of sched) m.set(y, (m.get(y) ?? 0) + v);
+    return m;
+  };
 
-  let extra = 0, params = null;
+  let extra = 0, upperAmd = null, usedQty = null, params = null;
   for (let i = 0; i < 6; i++) {
     const lmi = { ...baseLMI, [upperYear]: (baseLMI[upperYear] ?? 0) + extra };
-    params = gapParamsCore({ ...args, lmiAboveByYear: lmi });
+    params = gapParamsCore({ ...args, lmiAboveByYear: lmi, amdByYear: withUpperAmd(upperAmd) });
     const { upperWeight } = bracketWeights(lowerDur, upperDur, params.avgDuration);
     const upperExQty = Math.round(params.totalCost * upperWeight / upperCPB);
-    const newExtra = upperExQty * upperAnnCpnPerBond;
-    if (newExtra === extra) break;   // fixed point: params already reflects this extra
-    extra = newExtra;
+    if (upperExQty === usedQty) break;   // fixed point: params already reflects this quantity
+    usedQty = upperExQty;
+    extra = upperExQty * upperAnnCpnPerBond;
+    upperAmd = excessAmdSchedule({ bond: upperBond, exQty: upperExQty, refCPI, settlementYear });
   }
   return params;
 }
@@ -323,10 +337,9 @@ export function future30yParamsCore({ future30yYears, coverBond2056, settlementD
 }
 
 // ─── Excess-holding AMD schedule (Accrued Market Discount as interest) ──────────
-// Spec: 2.0 §Future 30Y Upper Cover AMD. Single source of truth for build AND rebalance.
-// GENERIC over any discount excess holding: pass the bond + its excess qty. Today only the
-// Future-30Y upper cover (2052) is wired in; the 2056 / 2036 / 2040 excess can reuse this same
-// function once specced (see sizeLadder's `amdExcessBonds`) — nothing here is 2052-specific.
+// Spec: 2.0 §Future 30Y Cover AMD, §Gap Bracket AMD. Single source of truth for build AND rebalance.
+// GENERIC over any discount excess holding: pass the bond + its excess qty. Wired in for both
+// Future-30Y covers, both gap brackets, and (rebalance) any retained lower-bracket maturity.
 //
 // A deep-discount, low-coupon TIPS (e.g. the 2052: ~2.7% yield vs 0.125% coupon) returns almost all
 // of its yield as price accretion, not coupon. AMD is treated EXACTLY like coupon interest — the only
@@ -346,8 +359,11 @@ export function excessAmdSchedule({ bond, exQty, refCPI, settlementYear }) {
   const matYear     = bond.maturity.getFullYear();
   const parPerBond  = ir * 1000;                      // redemption value in settlement-real dollars
   const adjPrice = (year) => {                        // constant-yield real price at last cal day of Feb
+    // The bond reaches par within its own maturity year, whatever the month. Keying this on the
+    // February sale date instead left a July maturity (the active lower bracket) short by its last
+    // Feb→Jul accretion, so Σ a(Y) fell below par − cost.
+    if (year >= matYear) return parPerBond;
     const saleDate = new Date(year, 2, 0);
-    if (saleDate >= bond.maturity) return parPerBond;  // at/after maturity → par
     const p = priceFromYield(bond.yield ?? 0, bond.coupon ?? 0, saleDate, bond.maturity);
     return p == null ? null : p / 100 * ir * 1000;
   };

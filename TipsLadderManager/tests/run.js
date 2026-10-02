@@ -856,10 +856,10 @@ console.log('\nBuild — DARA=50000, lastYear=2040');
   const totalAmt = details.reduce((s, d) => s + (d.fundedYearAmt ?? 0) + (d.excessAmt ?? 0), 0);
   const avgAmt = totalAmt / numRungs;
   // Tolerance is 2% of DARA, stated as a percentage the way 2.0 §Gap Year Coverage Model states the
-  // avgAmt ≈ DARA invariant. That section gives ~0.6%, but the residual measured across lastYear x DARA
-  // combinations is consistently positive (overfunded) at about 0.3%-1.7%, so 0.6% is not a bound.
-  // Whole-bond rounding and the upper-excess-coupon fixpoint (gap-math gapParamsWithUpperFeedback)
-  // both feed it. A one-directional bias is worth a separate look; this bound must not hide it.
+  // avgAmt ≈ DARA invariant. The residual is whole-bond rounding with no direction: across lastYear x
+  // DARA combinations it lands between about −0.4% and +0.6%. It used to overfund consistently, by
+  // 0.3%-1.7%, until the gap brackets' accrued market discount was netted out of their Amount
+  // (2.0 §Gap Bracket AMD); a return to a one-sided residual would point at that netting.
   assert('avgAmt ≈ DARA (gap LMI included), within 2% of DARA', avgAmt, dara, dara * 0.02);
   console.log(`        totalBuyCost:  ${Math.round(summary.totalBuyCost).toLocaleString()}`);
   console.log(`        lowerYear:     ${summary.lowerYear}, upperYear: ${summary.upperYear}`);

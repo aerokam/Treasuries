@@ -30,8 +30,8 @@ function coverageAmtRows(label, grossPI, lmiAdd, finalAmt) {
   if (amdNet > 0.5) fmla += ' − <span class="formula-var" data-source="amdn">AMD credited earlier</span>';
   if (lmiAdd  > 0.5) fmla += ' + <span class="formula-var" data-source="lmiadd">coupon add-back</span>';
   return row('Excess P+I', '<span class="formula-var" data-source="pipb">P+I per TIPS</span> \xd7 <span class="formula-var" data-source="qty">Excess Quantity</span>', fm(grossPI), false, undefined, 'expi')
-    + (amdNet > 0.5 ? row('AMD credited to earlier years', 'this cover’s market discount is delivered to the years it accrues in (AMD line items), not coverage here', '−' + fm(amdNet), false, undefined, 'amdn') : '')
-    + (lmiAdd  > 0.5 ? row('+ synthetic coupon add-back', 'this cover’s share of the coupon on the synthetic rungs, which sized them down', fm(lmiAdd), false, undefined, 'lmiadd') : '')
+    + (amdNet > 0.5 ? row('AMD credited to earlier years', 'the market discount on this excess is credited to the years it accrues in (AMD line items), so it is not counted as coverage here', '−' + fm(amdNet), false, undefined, 'amdn') : '')
+    + (lmiAdd  > 0.5 ? row('+ synthetic coupon add-back', 'the share of the income that sized the synthetic rungs down, allocated to this excess by its duration-match weight', fm(lmiAdd), false, undefined, 'lmiadd') : '')
     + sep()
     + row(label, fmla, fm(finalAmt), true);
 }
@@ -264,15 +264,17 @@ export function buildDrillHTML(d, colKey, summary) {
         + row('Excess Quantity', 'round(<span class="formula-var" data-source="tec">target cost</span> \xf7 <span class="formula-var" data-source="cpb">Cost per TIPS</span>)', d.excessQty);
       if (isAmt) {
         const bracketLMIAlloc = d.gapLMIAlloc ?? 0;
+        const amdNet = d.excessAmdLifetime || 0;   // this excess's accretion, credited to the years it accrues in
         rows += sep()
           + bondVarRows(d, nPeriods, principalPerBond, couponPct)
           + sep()
           + row('P+I per TIPS', '<span class="formula-var" data-source="ppb">Par Value/TIPS</span> \xd7 (1 + <span class="formula-var" data-source="cpp">coupon/period</span> \xd7 <span class="formula-var" data-source="cp">periods</span>)', fm2(d.fundedYearPi), false, undefined, 'pipb')
           + sep()
           + row('P+I from excess TIPS', '<span class="formula-var" data-source="pipb">P+I/TIPS</span> \xd7 <span class="formula-var" data-source="qty">Excess Qty</span>', fm(d.excessQty * d.fundedYearPi), false, undefined, 'pix')
-          + (bracketLMIAlloc > 0 ? row('Bracket LMI credit', 'Bracket weight \xd7 the LMI the gap years receive, from the actual TIPS maturing above them and from the synthetic TIPS for the longer gap years', fm(bracketLMIAlloc), false, undefined, 'glmi') : '')
+          + (amdNet > 0 ? row('AMD credited to earlier years', 'the market discount on this excess is credited to the years it accrues in (AMD line items), so it is not counted as coverage here', '−' + fm(amdNet), false, undefined, 'amdn') : '')
+          + (bracketLMIAlloc > 0 ? row('Bracket LMI credit', 'Bracket weight \xd7 the income that sized the gap years down: LMI from the actual TIPS maturing above them and from the synthetic TIPS for the longer gap years, plus any accrued market discount credited to them', fm(bracketLMIAlloc), false, undefined, 'glmi') : '')
           + sep()
-          + row('Bracket Amount', '<span class="formula-var" data-source="pix">P+I from excess</span>' + (bracketLMIAlloc > 0 ? ' + <span class="formula-var" data-source="glmi">Bracket LMI credit</span>' : ''), fm(d.excessAmt), true);
+          + row('Bracket Amount', '<span class="formula-var" data-source="pix">P+I from excess</span>' + (amdNet > 0 ? ' − <span class="formula-var" data-source="amdn">AMD credited earlier</span>' : '') + (bracketLMIAlloc > 0 ? ' + <span class="formula-var" data-source="glmi">Bracket LMI credit</span>' : ''), fm(d.excessAmt), true);
       } else {
         rows += row('Bracket Cost', '<span class="formula-var" data-source="cpb">Cost per TIPS</span> \xd7 <span class="formula-var" data-source="qty">Excess Quantity</span>', fm(d.excessCost), true);
       }

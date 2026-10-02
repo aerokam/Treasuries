@@ -8,6 +8,17 @@ production impact go here.
 
 ## OPEN
 
+### When should gap-bracket AMD credit end: at maturity, or at the expected sale?
+
+- **Study item, raised by the developer 2026-10-02.** Gap-bracket excess accrued market discount
+  (2.0 §Gap Bracket AMD) is credited on a held-to-maturity schedule, as the Future-30Y covers' is.
+  The excess is in fact sold within about three years, as each new 10-year TIPS is issued, and the
+  newer TIPS bought with the proceeds pay a higher coupon that delivers the income the discounted
+  bond would have delivered as accretion. The held-to-maturity schedule is the income the position
+  delivers either way, so it is in use; whether the credit should instead end around the expected
+  sale, with the coupon on the newer TIPS credited from then on, is undecided. Most visible on the upper
+  bracket (2040), whose discount is deeper and whose schedule runs through the gap years.
+
 ### Multi-bracket mode's lower bracket can resolve to a retained year instead of the canonical Active Lower Bracket
 
 - **Found:** 2026-09-30, alongside the gap-coverage-intent fix above: on McNeill Joint WROS
@@ -343,6 +354,36 @@ per-CUSIP prices for a past date (3.1 §4.0).
   it out of the displayed P+I: 1,014.38 implies 2 × 14.38 = 2.876%, against an actual 2.875%.
 - **Status:** open.
 ## FIXED
+
+### Gap brackets bought at a discount overstated their coverage and over-sized the ladder
+
+- **Found:** 2026-09-30, investigating a systematic overfunding in `avgAmt` (every lastYear x DARA
+  case over, by 0.26%-1.66%). Isolated to the gap brackets: a $50,000 ladder through 2040 showed
+  bracket coverage 6.5% above 3 x DARA, while the quantity bought matched the gap's cost to within
+  rounding. The Jul 2036 active lower bracket traded at 95.77 (2.375% coupon, 2.87% yield) and the
+  Feb 2040 at a deeper discount, so each one's P+I exceeded what its excess contributes: part of
+  that P+I is accretion toward par, income in the years it accrues in.
+- **Root cause:** accrued market discount was modeled for the Future-30Y covers only; 2.0 had held
+  the gap brackets back as "near par, effect small", which no longer held. Separately,
+  `excessAmdSchedule` stepped to par only when the February pricing date was past maturity, so a
+  July maturity lost its last Feb-to-Jul accretion.
+- **Fix (developer directive: internally consistent, not display-only):** the gap brackets join the
+  AMD ledger in `sizeLadder` (Build) and in Rebalance's target ledger (every gap-bracket CUSIP in
+  `bracketExcessTargetCost`, retained maturities included) and Before ledger (held excess). The
+  upper bracket's accretion over the gap years joins the `gapParamsWithUpperFeedback` fixpoint next
+  to its coupon. Rebalance nets each row's AMD by CUSIP (`exQty x lifetime AMD per bond`), replacing
+  a year-keyed rescale that could not tell an active and a same-year retained TIPS apart.
+  `excessAmdSchedule` steps to par in the maturity year. Bracket Amount drills (Build and Rebalance)
+  show the AMD line.
+- **Verified:** 455 unit + 87 e2e pass, including every Build/Rebalance round-trip parity check. Same
+  $50,000 ladder through 2040 (2026-10-02): bracket coverage +6.51% -> -0.36% of 3 x DARA; avgAmt
+  +1.58% -> +0.12%; total buy cost $626,178 -> $617,075. Across the 18 lastYear x DARA cases avgAmt
+  now lands between -0.36% and +0.60%, in both directions.
+- **Investigated and ruled out:** consolidating Rebalance's gap parameters into Build's. They already
+  agree to the cent (same total cost, average duration, weights) through the shared
+  `gapParamsWithUpperFeedback`; the duplicated construction was the AMD ledger.
+- **Files:** `src/gap-math.js`, `src/ladder-core.js`, `src/rebalance-lib.js`, `src/drill.js`,
+  `knowledge/2.0_TIPS_Ladders.md`, `knowledge/4.0_Computation_Modules.md`, `tests/run.js` (comment).
 
 ### inferFirstYearFromHoldings required the pre-gap anchor to be a January maturity
 
