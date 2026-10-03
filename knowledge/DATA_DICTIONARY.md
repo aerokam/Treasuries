@@ -13,7 +13,7 @@
 
 **A** &nbsp; [AA](#aa) &middot; [Accrued Interest (Adjusted)](#accrued-interest-adjusted) &middot; [Accrued Interest (Nominal)](#accrued-interest-nominal) &middot; [accrued market discount](#amd) *(see Accrued Market Discount (AMD))* &middot; [Accrued Market Discount (AMD)](#amd) &middot; [Active Lower Bracket](#active-lower-bracket) &middot; [Annual Interest (Nominal)](#annual-interest-nominal) &middot; [Annual Interest (Real)](#annual-interest-real) &middot; [App Inputs](#app-inputs) &middot; [App Outputs](#app-outputs) &middot; [ARA](#ara) &middot; [Ask / Bid](#ask) &middot; [Auction Results](#auction-results) &middot; [Auction results (S5)](#s5) &middot; [Available Cash](#available-cash) &middot; [Axis Scales](#axis-scales)
 
-**B** &nbsp; [bei](#breakeven-inflation) *(see Breakeven Inflation (BEI))* &middot; [bid](#ask) *(see Ask / Bid)* &middot; [Bid and Ask Spreads](#bid-and-ask-spreads) &middot; [Bid and ask spreads (S15)](#s15) &middot; [BlackRock iShares (E12)](#e12) &middot; [BLS (E4)](#e4) &middot; [Bond Holiday](#bond-holiday) &middot; [Bond holidays (S16)](#s16) &middot; [Bond Ladder](#bond-ladder) &middot; [BondBloxx product-page holdings table (E11)](#e11) &middot; [bracket maturity](#bracket-year-tips) *(see Bracket Year TIPS)* &middot; [Bracket Weight](#bracket-weight) &middot; [Bracket Year](#bracket-year) &middot; [Bracket Year TIPS](#bracket-year-tips) &middot; [Breakeven Inflation (BEI)](#breakeven-inflation) &middot; [Breakeven inflation (S14)](#s14)
+**B** &nbsp; [bei](#breakeven-inflation) *(see Breakeven Inflation (BEI))* &middot; [bid](#ask) *(see Ask / Bid)* &middot; [Bid and Ask Spreads](#bid-and-ask-spreads) &middot; [Bid and ask spreads (S15)](#s15) &middot; [BlackRock iShares (E12)](#e12) &middot; [BLS (E4)](#e4) &middot; [Bond Holiday](#bond-holiday) &middot; [Bond holidays (S16)](#s16) &middot; [Bond Ladder](#bond-ladder) &middot; [BondBloxx product-page holdings table (E11)](#e11) &middot; [bracket maturity](#bracket-year-tips) *(see Bracket Year TIPS)* &middot; [Bracket Weight](#bracket-weight) &middot; [Bracket Year](#bracket-year) &middot; [Bracket Year TIPS](#bracket-year-tips) &middot; [Breakeven Inflation (BEI)](#breakeven-inflation) &middot; [Breakeven inflation (S14)](#s14) &middot; [Broker Export](#broker-export)
 
 **C** &nbsp; [Cash Flow Calendar](#cash-flow-calendar) &middot; [Charts and Tables](#charts-and-tables) &middot; [clean price](#price) *(see Price)* &middot; [CNBC (E5)](#e5) &middot; [Construction Parameters](#construction-parameters) &middot; [Cost per TIPS](#cost-per-tips) &middot; [Coupon Rate](#coupon-rate) &middot; [Cover Excess](#cover-excess) &middot; [cover maturity](#cover-year-tips) *(see Cover Year TIPS)* &middot; [Cover Weight](#cover-weight) &middot; [Cover Year](#cover-year) &middot; [Cover Year TIPS](#cover-year-tips) &middot; [CPI CAGR](#cpi-cagr) &middot; [CPI Change (Month-over-Month)](#cpi-change-mom) &middot; [CPI Change (Point-to-Point)](#cpi-change-p2p) &middot; [CPI Change (Year-over-Year)](#cpi-change-yoy) &middot; [CPI history (S8)](#s8) &middot; [CPI-U NSA](#cpi-nsa) &middot; [CPI-U SA](#cpi-sa) &middot; [Credibility Factor](#credibility-factor) &middot; [CUSIP](#cusip)
 
@@ -25,7 +25,7 @@
 
 **G** &nbsp; [Gap Years](#gap-years) &middot; [GSW Curve Parameters](#gsw-curve-parameters) &middot; [GSW curve parameters (S12)](#s12)
 
-**H** &nbsp; [Holdings](#holdings) &middot; [Holdings File](#holdings-file)
+**H** &nbsp; [Holdings](#holdings) &middot; [Holdings Export](#holdings-export-format) &middot; [Holdings File](#holdings-file)
 
 **I** &nbsp; [Index Ratio](#index-ratio) &middot; [Inflation Compensation](#inflation-compensation) &middot; [inflation factor](#index-ratio) *(see Index Ratio)* &middot; [Intraday archive (S18)](#s18) &middot; [IQR Clip](#iqr-clip)
 
@@ -37,7 +37,7 @@
 
 **O** &nbsp; [Outstanding TIPS](#outstanding-tips)
 
-**P** &nbsp; [P+I](#pi) &middot; [P+I per TIPS](#pi-per-tips) &middot; [Par Value (Adjusted)](#par-value-adjusted) &middot; [Par Value (Nominal)](#par-value) &middot; [Par Yield](#par-yield) &middot; [Per-Year DARA](#per-year-dara) &middot; [PIMCO (E9)](#e9) &middot; [pre ladder interest](#pre-ladder-credit) *(see Pre-Ladder Interest (PLI))* &middot; [Pre-Ladder Interest (PLI)](#pre-ladder-credit) &middot; [Price](#price)
+**P** &nbsp; [P+I](#pi) &middot; [P+I per TIPS](#pi-per-tips) &middot; [Par Value (Adjusted)](#par-value-adjusted) &middot; [Par Value (Nominal)](#par-value) &middot; [Par Yield](#par-yield) &middot; [Per-Year DARA](#per-year-dara) &middot; [PIMCO (E9)](#e9) &middot; [Plain CUSIP/Quantity Format](#plain-format) &middot; [pre ladder interest](#pre-ladder-credit) *(see Pre-Ladder Interest (PLI))* &middot; [Pre-Ladder Interest (PLI)](#pre-ladder-credit) &middot; [Price](#price)
 
 **Q** &nbsp; [Quantity](#quantity)
 
@@ -45,7 +45,7 @@
 
 **S** &nbsp; [SA and SAO yields (S10)](#s10) &middot; [SA Factor](#sa-factor) &middot; [SA Price Factor](#sa-price-factor) &middot; [SA Yield](#sa-yield) &middot; [SA Yield Series](#sa-yield-series) &middot; [SA Yields](#sa-yields) &middot; [SACP](#sacp) &middot; [same year excess interest](#same-maturity-excess-interest) *(see Same-Maturity Excess Interest)* &middot; [Same-Maturity Excess Interest](#same-maturity-excess-interest) &middot; [SAO Blend Weight](#sao-blend-weight) &middot; [SAO Yield](#sao-yield) &middot; [SAO Yields](#sao-yields) &middot; [Schwab Asset Management holdings export (E10)](#e10) &middot; [Seasonal Amplitude](#seasonal-amplitude) &middot; [Seasonal Factor Drift](#seasonal-factor-drift) &middot; [Settlement Date](#settlement-date) &middot; [Source Data](#source-data) &middot; [Spot Yield](#spot-yield) &middot; [Spot Yield Curves](#spot-yield-curves) &middot; [Synthetic TIPS](#synthetic-tips)
 
-**T** &nbsp; [Tentative Auction Schedule](#tentative-auction-schedule) &middot; [Tentative auction schedule (S9)](#s9) &middot; [Term](#term) &middot; [TIPS](#tips) &middot; [TIPS Ladder](#tips-ladder) &middot; [TIPS Market Data](#tips-market-data) &middot; [TIPS Prices](#tips-prices) &middot; [TIPS Quotes](#tips-quotes) &middot; [TIPS Reference Data](#tips-reference-data) &middot; [TIPS reference data (S2)](#s2) &middot; [TIPS Yields](#tips-yields) &middot; [Total Cost](#total-cost) &middot; [Trade Ticket](#trade-ticket) &middot; [Treasury Bill](#treasury-bill) &middot; [Treasury Bond](#treasury-bond) &middot; [Treasury Note](#treasury-note) &middot; [Treasury Prices](#treasury-prices) &middot; [Treasury Quotes](#treasury-quotes) &middot; [Treasury Tentative Auction Schedule (E14)](#e14) &middot; [Treasury Yields](#treasury-yields) &middot; [TreasuryDirect SecIndex (E2)](#e2)
+**T** &nbsp; [Tentative Auction Schedule](#tentative-auction-schedule) &middot; [Tentative auction schedule (S9)](#s9) &middot; [Term](#term) &middot; [TIPS](#tips) &middot; [TIPS Ladder](#tips-ladder) &middot; [TIPS Market Data](#tips-market-data) &middot; [TIPS Prices](#tips-prices) &middot; [TIPS Quotes](#tips-quotes) &middot; [TIPS Reference Data](#tips-reference-data) &middot; [TIPS reference data (S2)](#s2) &middot; [TIPS Yields](#tips-yields) &middot; [tipsladder.com Format](#tipsladdercom-format) &middot; [Total Cost](#total-cost) &middot; [Trade Ticket](#trade-ticket) &middot; [Treasury Bill](#treasury-bill) &middot; [Treasury Bond](#treasury-bond) &middot; [Treasury Note](#treasury-note) &middot; [Treasury Prices](#treasury-prices) &middot; [Treasury Quotes](#treasury-quotes) &middot; [Treasury Tentative Auction Schedule (E14)](#e14) &middot; [Treasury Yields](#treasury-yields) &middot; [TreasuryDirect SecIndex (E2)](#e2)
 
 **V** &nbsp; [Vanguard Advisors (E7)](#e7) &middot; [View Selections](#view-selections)
 
@@ -743,11 +743,19 @@ Some values are true only until Treasury issues more TIPS. Left inline as approx
 
 - <a id="tips-market-data"></a>**TIPS Market Data** = `{ @CUSIP + Maturity_Date + Coupon_Rate + Ref_CPI_dated + Price + Yield + ( SA_Yield ) }`
   *Every TIPS Market quotes (S7) states, keyed by CUSIP, its [SA Yield](#sa-yield) attached where [SA and SAO yields (S10)](#s10) has an entry for it. The app's own name for this table: the "Mkt" tab of its TIPS Ref/Mkt popup titles it "TIPS Mkt Data".*
-- <a id="holdings-file"></a>**Holdings File** = `[ Broker export (Fidelity, Schwab or Vanguard) | This app's own prior Holdings export | tipsladder.com's own format | Plain CUSIP/Quantity format ]`
-  *Raw uploaded text identifying TIPS positions held, in one of these four layouts. A Holdings File this app wrote also carries a trailing `#fundedYear,dara` block.*
+- <a id="holdings-file"></a>**Holdings File** = `[ Broker Export | Holdings Export | tipsladder.com Format | Plain CUSIP/Quantity Format ]`
+  *Raw uploaded text identifying TIPS positions held, in one of these four layouts.*
+- <a id="broker-export"></a>**Broker Export** = `{ ( Symbol | CUSIP ) + Quantity + ( Account_Number | Account_Name ) + ( Current_Value ) + ( Investment_Name ) }`
+  *A Fidelity, Schwab or Vanguard positions export — one of the four [Holdings File](#holdings-file) layouts. `Quantity` is stated as [Face Value](#face-value). A Schwab export's account identity comes from a header line preceding each account's rows rather than a column of its own; a Fidelity export carries it in `Account_Name`/`Account_Number` instead.*
+- <a id="holdings-export-format"></a>**Holdings Export** = `{ @CUSIP + Qty + Excess_Qty }`, header `cusip,qty,excess`, one row per CUSIP
+  *This app's own prior export — one of the four [Holdings File](#holdings-file) layouts. May carry a trailing [DARA Plan](#dara-plan)'s `#fundedYear,dara` block and [Construction Parameters](#construction-parameters)' `#params` line.*
+- <a id="tipsladdercom-format"></a>**tipsladder.com Format** = `{ CUSIP + Qty + Year }` per row, no header, one or more rows per CUSIP
+  *One of the four [Holdings File](#holdings-file) layouts. A row's `Year` equal to its CUSIP's own maturity year states that CUSIP's funded quantity; any other `Year` states an excess quantity covering that year.*
+- <a id="plain-format"></a>**Plain CUSIP/Quantity Format** = `{ CUSIP + Qty }` per row, optional header
+  *One of the four [Holdings File](#holdings-file) layouts. No funded/excess split — every row states a plain total quantity.*
 - <a id="dara-plan-file"></a>**DARA Plan File** = *Raw uploaded text carrying only a `#fundedYear,dara` block and an optional `#params` line — no CUSIP rows at all.*
 - <a id="holdings"></a>**Holdings** = `{ @CUSIP + Qty + ( Excess_Qty ) }`
-  *Per-CUSIP quantities parsed from a [Holdings File](#holdings-file). `Excess_Qty` (the funded/excess split already known, rather than left for DARA math to derive) is present when the file is this app's own export or tipsladder.com's format, absent for the other two layouts.*
+  *Per-CUSIP quantities parsed from a [Holdings File](#holdings-file). `Excess_Qty` (the funded/excess split already known, rather than left for DARA math to derive) is present for the [Holdings Export](#holdings-export-format) and [tipsladder.com](#tipsladdercom-format) layouts, absent for [Broker Export](#broker-export) and [Plain CUSIP/Quantity](#plain-format).*
 - <a id="dara-plan"></a>**DARA Plan** = `{ Funded_Year + DARA } + ( Construction_Parameters )`
   *The holder's own stated per-year [DARA](#dara) target, for every year a `#fundedYear,dara` block names — gap and Future 30Y years included.*
 - <a id="per-year-dara"></a>**Per-Year DARA** = `{ Funded_Year + DARA }`
