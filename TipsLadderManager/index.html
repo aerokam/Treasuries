@@ -137,7 +137,7 @@
   .rp-chip button:not(:disabled):hover { background:#e2e8f0; }
 
   /* ── Formula inspector ── */
-  .source-highlight { background: #d4edec !important; transition: background 0.15s; }
+  .source-highlight { background: #fde047 !important; transition: background 0.15s; }
   .drill-l3:hover { background: #e8f5f5 !important; }
   .formula-var { cursor: help; border-bottom: 1px dashed #94a3b8; }
   .formula-var:hover { color: #1a56db; border-bottom-style: solid; }
@@ -3361,6 +3361,9 @@ let _drillDragging = false;
     _modal.style.transform = 'none';
     _modal.style.left = rect.left + 'px';
     _modal.style.top  = rect.top  + 'px';
+    // Without the centering transform the modal re-flows to a shrink-to-fit width, so a move
+    // would also resize it. Hold the width it had.
+    _modal.style.width = rect.width + 'px';
     _offX = e.clientX - rect.left;
     _offY = e.clientY - rect.top;
     _drillDragging = true;
@@ -4189,19 +4192,20 @@ document.getElementById('drill-overlay').addEventListener('click', e => {
   if (e.target.id === 'drill-overlay') e.target.style.display = 'none';
 });
 
-// Hovering a formula-var span (e.g. "Quantity") highlights just the value it's sourced
-// from (matched by data-row-id, on that row's last cell), within whichever popup
-// container the hover happened in — the main drill overlay (#drill-content) or either
-// shared popup instance (#shared-popup / #shared-popup-l3, popup.js).
+// Hovering a formula-var span (e.g. "Quantity") highlights the row it's sourced from
+// (matched by data-row-id), label and value cells, within whichever popup container the
+// hover happened in — the main drill overlay (#drill-content) or either shared popup
+// instance (#shared-popup / #shared-popup-l3, popup.js).
 document.addEventListener('mouseover', e => {
   const target = e.target.closest('.formula-var');
   if (!target) return;
   const sourceId = target.dataset.source;
   const container = target.closest('#drill-content, #shared-popup, #shared-popup-l3');
   if (!sourceId || !container) return;
-  const sourceEl = container.querySelector('[data-row-id="' + sourceId + '"]');
-  const valueCell = sourceEl?.closest('tr')?.lastElementChild;
-  if (valueCell) valueCell.classList.add('source-highlight');
+  const sourceRow = container.querySelector('[data-row-id="' + sourceId + '"]')?.closest('tr');
+  if (!sourceRow) return;
+  sourceRow.firstElementChild.classList.add('source-highlight');
+  sourceRow.lastElementChild.classList.add('source-highlight');
 });
 document.addEventListener('mouseout', e => {
   if (!e.target.closest('.formula-var')) return;
@@ -4222,6 +4226,7 @@ document.addEventListener('click', e => {
     const html = buildDrillHTML(d, colKey, summary);
     document.getElementById('drill-title').textContent = (d.maturityStr || d.fundedYear) + ' — ' + colKey;
     document.getElementById('drill-content').innerHTML = html;
+    document.getElementById('drill-modal').style.width = '';   // a drag pins the width; size to the new content
     document.getElementById('drill-overlay').style.display = 'block';
     return;
   }

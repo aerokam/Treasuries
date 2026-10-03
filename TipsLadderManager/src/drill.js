@@ -22,6 +22,18 @@ function row(label, formula, value, isTotal, drillKey, rowId) {
 
 function sep() { return '<tr><td colspan="3" style="padding:4px 0;border-bottom:1px dashed #e2e8f0"></td></tr>'; }
 
+// Rows that every `price/100 × index ratio` formula hovers to. A popup that already shows
+// bondVarRows (which carry the index ratio) needs only the price row.
+function priceRow(d) { return row('Price (unadjusted)', '', fd(d.price, 4), false, undefined, 'price'); }
+function indexRatioRows(d) {
+  return row('Ref CPI (settlement date)', '', fd(d.refCPI, 5), false, 'refCPI', 'refcpi')
+    + row('Dated date Ref CPI', '', fd(d.datedDateRefCpi, 5), false, undefined, 'datedDateRefCpi')
+    + row('Index ratio', '<span class="formula-var" data-source="refcpi">Ref CPI</span> \xf7 <span class="formula-var" data-source="datedDateRefCpi">Dated date Ref CPI</span>', fd(d.indexRatio, 5), false, 'indexRatio', 'ir');
+}
+function costPerTipsRow(d) {
+  return row('Cost per TIPS', '<span class="formula-var" data-source="price">price/100</span> \xd7 <span class="formula-var" data-source="ir">index ratio</span> \xd7 1,000', fm2(d.costPerBond), false, undefined, 'cpb');
+}
+
 // Bracket/cover Amount breakdown (Rev 6): Excess P+I − AMD credited earlier + block-coupon add-back
 // = coverage delivered. `lmiAdd` is the cover's block-LMI allocation; AMD net-out is derived to reconcile.
 function coverageAmtRows(label, grossPI, lmiAdd, finalAmt) {
@@ -206,7 +218,7 @@ export function buildDrillHTML(d, colKey, summary) {
         (_roll > 0 ? row('Cover-roll coupon (2052)', 'coupon on the Future 30Y TIPS bought when the 2052 upper cover matures and its proceeds are reinvested; the share attributed to the upper cover', fm(_roll), false, undefined, 'roll') : '') +
         (_cashCredit > 0 ? row('Available cash', 'cash on hand applied to this year', fm(_cashCredit)) : '') +
         sep() +
-        row('Funded Year Amount', totalFmla, fm(d.fundedYearAmt), true) +
+        row('Funded Year Amount', totalFmla, fm(d.fundedYearAmt), true, undefined, 'total') +
         sep() +
         row('DARA', '', fm(d.dara), false, undefined, 'dara') +
         row('Surplus / Deficit', '<span class="formula-var" data-source="total">FY Amount</span> − <span class="formula-var" data-source="dara">DARA</span>', (d.fundedYearAmt - d.dara >= 0 ? '+' : '') + Math.round(d.fundedYearAmt - d.dara).toLocaleString('en-US'));
@@ -227,7 +239,7 @@ export function buildDrillHTML(d, colKey, summary) {
       (_roll > 0 ? row('Cover-roll coupon (2052)', 'coupon on the Future 30Y TIPS bought when the 2052 upper cover matures and its proceeds are reinvested; the share attributed to the upper cover', fm(_roll), false, undefined, 'roll') : '') +
       (_cashCredit > 0 ? row('Available cash', 'cash on hand applied to this year', fm(_cashCredit)) : '') +
       sep() +
-      row('Funded Year Amount', totalFmla, fm(d.fundedYearAmt), true) +
+      row('Funded Year Amount', totalFmla, fm(d.fundedYearAmt), true, undefined, 'total') +
       sep() +
       row('DARA', '', fm(d.dara), false, undefined, 'dara') +
       row('Surplus / Deficit', '<span class="formula-var" data-source="total">FY Amount</span> \u2212 <span class="formula-var" data-source="dara">DARA</span>', (d.fundedYearAmt - d.dara >= 0 ? '+' : '') + Math.round(d.fundedYearAmt - d.dara).toLocaleString('en-US'));
@@ -252,16 +264,18 @@ export function buildDrillHTML(d, colKey, summary) {
     if (s) {
       const isLower = d.fundedYear === s.lowerYear;
       const weight  = isLower ? s.lowerWeight  : s.upperWeight;
-      const wLabel  = isLower ? 'Lower weight' : 'Upper weight';
+      const wLabel  = isLower ? 'Lower bracket weight' : 'Upper bracket weight';
       const exCost  = s.gapParams.totalCost * weight;
-      rows = row('Bracket weights', 'see Duration Calcs \u2197', fd(weight, 4))
+      rows = row(wLabel, 'see Duration Calcs \u2197', fd(weight, 4), false, undefined, 'wt')
         + sep()
         + gapBreakdownRows(s.gapParams, s.DARA)
         + row('Gap total cost', 'Sum of gap year theoretical costs', fm(s.gapParams.totalCost), true, undefined, 'gtc')
-        + row('Target excess cost', '<span class="formula-var" data-source="gtc">total cost</span> \xd7 ' + wLabel.toLowerCase(), fm(exCost), false, undefined, 'tec')
+        + row('Target excess cost', '<span class="formula-var" data-source="gtc">Gap total cost</span> \xd7 <span class="formula-var" data-source="wt">' + wLabel.toLowerCase() + '</span>', fm(exCost), false, undefined, 'tec')
         + sep()
-        + row('Cost per TIPS', '<span class="formula-var" data-source="price">price/100</span> \xd7 <span class="formula-var" data-source="ir">index ratio</span> \xd7 1,000', fm2(d.costPerBond), false, undefined, 'cpb')
-        + row('Excess Quantity', 'round(<span class="formula-var" data-source="tec">target cost</span> \xf7 <span class="formula-var" data-source="cpb">Cost per TIPS</span>)', d.excessQty);
+        + (isAmt ? '' : indexRatioRows(d))
+        + priceRow(d)
+        + costPerTipsRow(d)
+        + row('Excess Quantity', 'round(<span class="formula-var" data-source="tec">target cost</span> \xf7 <span class="formula-var" data-source="cpb">Cost per TIPS</span>)', d.excessQty, false, undefined, 'qty');
       if (isAmt) {
         const bracketLMIAlloc = d.gapLMIAlloc ?? 0;
         rows += sep()
@@ -285,16 +299,18 @@ export function buildDrillHTML(d, colKey, summary) {
     if (s) {
       const isLower = d.fundedYear === s.future30yLowerYear;
       const weight  = isLower ? s.future30yLowerWeight : s.future30yUpperWeight;
-      const wLabel  = isLower ? 'Lower weight' : 'Upper weight';
+      const wLabel  = isLower ? 'Lower cover weight' : 'Upper cover weight';
       const exCost  = (s.future30yParams?.future30yTotalCost ?? 0) * weight;
-      rows = row('Cover weights', 'see Future 30Y Duration Calcs \u2197', fd(weight, 4))
+      rows = row(wLabel, 'see Future 30Y Duration Calcs \u2197', fd(weight, 4), false, undefined, 'wt')
         + sep()
         + future30yBreakdownRows(s.future30yParams)
         + row('Future 30Y total cost', 'Sum of the synthetic Future 30Y year costs', fm(s.future30yParams?.future30yTotalCost ?? 0), true, undefined, 'ftc')
-        + row('Target excess cost', '<span class="formula-var" data-source="ftc">total cost</span> \xd7 ' + wLabel.toLowerCase(), fm(exCost), false, undefined, 'tec')
+        + row('Target excess cost', '<span class="formula-var" data-source="ftc">Future 30Y total cost</span> \xd7 <span class="formula-var" data-source="wt">' + wLabel.toLowerCase() + '</span>', fm(exCost), false, undefined, 'tec')
         + sep()
-        + row('Cost per TIPS', '<span class="formula-var" data-source="price">price/100</span> \xd7 <span class="formula-var" data-source="ir">index ratio</span> \xd7 1,000', fm2(d.costPerBond), false, undefined, 'cpb')
-        + row('Excess Quantity', 'round(<span class="formula-var" data-source="tec">target cost</span> \xf7 <span class="formula-var" data-source="cpb">Cost per TIPS</span>)', d.excessQty);
+        + (isAmt ? '' : indexRatioRows(d))
+        + priceRow(d)
+        + costPerTipsRow(d)
+        + row('Excess Quantity', 'round(<span class="formula-var" data-source="tec">target cost</span> \xf7 <span class="formula-var" data-source="cpb">Cost per TIPS</span>)', d.excessQty, false, undefined, 'qty');
       if (isAmt) {
         const grossPI = d.excessQty * d.fundedYearPi;
         const amdNet  = d.excessAmdLifetime || 0;     // accretion delivered to earlier years as AMD
@@ -476,7 +492,7 @@ export function buildDrillHTML(d, colKey, summary) {
       + row('Bracket weight', 'from <a class="info-link" data-popup="duration" style="border-bottom:1px dotted #94a3b8;color:inherit;text-decoration:none;">Duration Calcs</a>', (weight ?? 0).toFixed(4), false, undefined, 'bw')
       + row('Target excess cost', '<span class="formula-var" data-source="gtc">Gap total cost</span> × <span class="formula-var" data-source="bw">Bracket weight</span>', fm(targetExCost), false, undefined, 'tec')
       + row('Cost per TIPS', 'price/100 × index ratio × 1,000', fm2(d.costPerBond), false, undefined, 'cpbn')
-      + row('Excess Quantity', 'round(<span class="formula-var" data-source="tec">Target cost</span> ÷ <span class="formula-var" data-source="cpbn">Cost per TIPS</span>)', exQty, true)
+      + row('Excess Quantity', 'round(<span class="formula-var" data-source="tec">Target cost</span> ÷ <span class="formula-var" data-source="cpbn">Cost per TIPS</span>)', exQty, true, undefined, 'qty')
       + sep()
       + bondVarRows(d, nPeriods, principalPerBond, couponPct)
       + sep()
@@ -536,7 +552,7 @@ export function buildDrillHTML(d, colKey, summary) {
           + sep()
           + coverageAmtRows('Excess Amount Before', exQty * piPerBond, d.excessLMIAlloc ?? 0, d.excessAmtBefore ?? exQty * piPerBond);
       } else {
-        rows += row('Cost per TIPS', '<span class="formula-var" data-source="price">price/100</span> \xd7 <span class="formula-var" data-source="ir">index ratio</span> \xd7 1,000', fm2(d.costPerBond), false, undefined, 'cpb')
+        rows += priceRow(d) + costPerTipsRow(d)
           + sep()
           + row('Excess Cost Before', '<span class="formula-var" data-source="cpb">Cost per TIPS</span> \xd7 <span class="formula-var" data-source="qty">Excess Quantity</span>', fm(exQty * d.costPerBond), true);
       }
@@ -546,17 +562,19 @@ export function buildDrillHTML(d, colKey, summary) {
       const weight  = isLower ? (s.origLowerWeight ?? s.lowerWeight)
                    : isNewLower ? (s.newLowerWeight3 ?? 0)
                    : s.upperWeight;
-      const wLabel  = isLower ? 'Orig lower weight' : isNewLower ? 'New lower weight' : 'Upper weight';
+      const wLabel  = isLower ? 'Orig lower bracket weight' : isNewLower ? 'New lower bracket weight' : 'Upper bracket weight';
       const exCost  = s.gapParams.totalCost * weight;
       const exQty   = d.excessQtyAfter;
-      rows = row('Excess Quantity', 'round(target cost \xf7 <span class="formula-var" data-source="cpb">Cost per TIPS</span>)', exQty, false, undefined, 'qty')
+      rows = row('Excess Quantity', 'round(<span class="formula-var" data-source="tec">target cost</span> \xf7 <span class="formula-var" data-source="cpb">Cost per TIPS</span>)', exQty, false, undefined, 'qty')
         + sep()
-        + row('Bracket weights', 'see Duration Calcs \u2197', fd(weight, 4))
+        + row(wLabel, 'see Duration Calcs \u2197', fd(weight, 4), false, undefined, 'wt')
         + sep()
-        + row('Gap year total cost', '', fm(s.gapParams.totalCost), false, undefined, 'total')
-        + row('Target excess cost', '<span class="formula-var" data-source="total">total cost</span> \xd7 ' + wLabel.toLowerCase(), fm(exCost))
+        + row('Gap total cost', '', fm(s.gapParams.totalCost), false, undefined, 'gtc')
+        + row('Target excess cost', '<span class="formula-var" data-source="gtc">Gap total cost</span> \xd7 <span class="formula-var" data-source="wt">' + wLabel.toLowerCase() + '</span>', fm(exCost), false, undefined, 'tec')
         + sep()
-        + row('Cost per TIPS', '<span class="formula-var" data-source="price">price/100</span> \xd7 <span class="formula-var" data-source="ir">index ratio</span> \xd7 1,000', fm2(d.costPerBond), false, undefined, 'cpb')
+        + (isAmt ? '' : indexRatioRows(d))
+        + priceRow(d)
+        + costPerTipsRow(d)
         + sep();
       if (isAmt) {
         rows += bondVarRows(d, nPeriods, principalPerBond, couponPct) + sep()
@@ -583,23 +601,26 @@ export function buildDrillHTML(d, colKey, summary) {
           + sep()
           + coverageAmtRows('Future 30Y Cover Amount Before', exQty * piPerBond, d.excessLMIAlloc ?? 0, d.excessAmtBefore ?? exQty * piPerBond);
       } else {
-        rows += row('Cost per TIPS', '<span class="formula-var" data-source="price">price/100</span> \xd7 <span class="formula-var" data-source="ir">index ratio</span> \xd7 1,000', fm2(d.costPerBond), false, undefined, 'cpb')
+        rows += priceRow(d) + costPerTipsRow(d)
           + sep()
           + row('Future 30Y Cover Cost Before', '<span class="formula-var" data-source="cpb">Cost per TIPS</span> \xd7 <span class="formula-var" data-source="qty">Excess Quantity</span>', fm(exQty * d.costPerBond), true);
       }
     } else if (s) {
       const isLower = d.cusip === s.future30yLowerCoverCUSIP;
       const weight  = isLower ? s.future30yLowerWeight : s.future30yUpperWeight;
-      const wLabel  = isLower ? 'Lower weight' : 'Upper weight';
+      const wLabel  = isLower ? 'Lower cover weight' : 'Upper cover weight';
       const exCost  = (s.future30yParams?.future30yTotalCost ?? 0) * weight;
       const exQty   = d.excessQtyAfter;
-      rows = row('Excess Quantity', 'round(target cost \xf7 <span class="formula-var" data-source="cpb">Cost per TIPS</span>)', exQty, false, undefined, 'qty')
+      rows = row('Excess Quantity', 'round(<span class="formula-var" data-source="tec">target cost</span> \xf7 <span class="formula-var" data-source="cpb">Cost per TIPS</span>)', exQty, false, undefined, 'qty')
         + sep()
-        + row('Cost per TIPS', '<span class="formula-var" data-source="price">price/100</span> \xd7 <span class="formula-var" data-source="ir">index ratio</span> \xd7 1,000', fm2(d.costPerBond), false, undefined, 'cpb')
+        + (isAmt ? '' : indexRatioRows(d))
+        + priceRow(d)
+        + costPerTipsRow(d)
         + sep()
+        + row(wLabel, 'see Future 30Y Duration Calcs ↗', fd(weight, 4), false, undefined, 'wt')
         + future30yBreakdownRows(s.future30yParams)
         + row('Future 30Y total cost', 'Sum of the synthetic Future 30Y year costs', fm(s.future30yParams?.future30yTotalCost ?? 0), true, undefined, 'ftc')
-        + row('Target excess cost', '<span class="formula-var" data-source="ftc">total cost</span> \xd7 ' + wLabel.toLowerCase(), fm(exCost));
+        + row('Target excess cost', '<span class="formula-var" data-source="ftc">Future 30Y total cost</span> \xd7 <span class="formula-var" data-source="wt">' + wLabel.toLowerCase() + '</span>', fm(exCost), false, undefined, 'tec');
       if (isAmt) {
         rows += sep()
           + bondVarRows(d, nPeriods, principalPerBond, couponPct)
