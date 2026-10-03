@@ -236,11 +236,17 @@ const daraPlanSrc = path.join(DATA, 'DaraPlanKevinRmd.csv');
 const daraPlanOut = path.join(DATA, 'SampleDaraPlan.csv');
 if (existsSync(daraPlanSrc)) {
   const lines = readFileSync(daraPlanSrc, 'utf8').trim().split('\n');
-  // Scales the year,DARA rows; any other line (the #fundedYear,dara header, a #params line) is
-  // copied unchanged.
+  // Scales the dollar values: each year,DARA row, and availableCash in the #params line (also read
+  // under its older name rmdCashOverride). refCpiDate and rmdCouponMode are not amounts and the
+  // #fundedYear,dara header is not data, so they are copied unchanged.
   const out = lines.map(line => {
     const m = line.trim().match(/^(\d{4}),([\d.]+)$/);
-    return m ? `${m[1]},${Math.round(parseFloat(m[2]) * SCALE)}` : line.trimEnd();
+    if (m) return `${m[1]},${Math.round(parseFloat(m[2]) * SCALE)}`;
+    if (/^#params,/i.test(line.trim())) {
+      return line.trim().replace(/\b(availableCash|rmdCashOverride)=([\d.]+)/gi,
+        (_, k, v) => `${k}=${Math.round(parseFloat(v) * SCALE)}`);
+    }
+    return line.trimEnd();
   });
   writeFileSync(daraPlanOut, out.join('\n') + '\n', 'utf8');
   console.log(`Wrote ${daraPlanOut}`);
