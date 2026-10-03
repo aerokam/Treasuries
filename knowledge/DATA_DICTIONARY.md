@@ -742,23 +742,24 @@ Some values are true only until Treasury issues more TIPS. Left inline as approx
 ### 6.5 TipsLadderManager
 
 - <a id="tips-market-data"></a>**TIPS Market Data** = `{ @CUSIP + Maturity_Date + Coupon_Rate + Ref_CPI_dated + Price + Yield + ( SA_Yield ) }`
-  *Every TIPS Market quotes (S7) states, keyed by CUSIP, its [SA Yield](#sa-yield) attached where [SA and SAO yields (S10)](#s10) has an entry for it. The app's own name for this table: the "Mkt" tab of its TIPS Ref/Mkt popup titles it "TIPS Mkt Data".*
+  *Every TIPS Market quotes (S7) states, keyed by CUSIP, its [SA Yield](#sa-yield) attached where [SA and SAO yields (S10)](#s10) has an entry for it. The app names this table "TIPS Mkt Data," the title of its TIPS Ref/Mkt popup's "Mkt" tab.*
 - <a id="holdings-file"></a>**Holdings File** = `[ Broker Export | Holdings Export | tipsladder.com Format | Plain CUSIP/Quantity Format ]`
-  *Raw uploaded text identifying TIPS positions held, in one of these four layouts.*
+  *A file identifying TIPS positions held, in one of these four layouts.*
 - <a id="broker-export"></a>**Broker Export** = `{ ( Symbol | CUSIP ) + Quantity + ( Account_Number | Account_Name ) + ( Current_Value ) + ( Investment_Name ) }`
-  *A Fidelity, Schwab or Vanguard positions export — one of the four [Holdings File](#holdings-file) layouts. `Quantity` is stated as [Face Value](#face-value). A Schwab export's account identity comes from a header line preceding each account's rows rather than a column of its own; a Fidelity export carries it in `Account_Name`/`Account_Number` instead.*
+  *A Fidelity, Schwab or Vanguard positions export — one of the four [Holdings File](#holdings-file) layouts. `Quantity` is stated as [Face Value](#face-value). A Schwab export's account identity comes from a header line preceding each account's rows, not a column; a Fidelity export carries it in `Account_Name`/`Account_Number` instead.*
 - <a id="holdings-export-format"></a>**Holdings Export** = `{ @CUSIP + Qty + Excess_Qty }`, header `cusip,qty,excess`, one row per CUSIP
-  *This app's own prior export — one of the four [Holdings File](#holdings-file) layouts. May carry a trailing [DARA Plan](#dara-plan)'s `#fundedYear,dara` block and [Construction Parameters](#construction-parameters)' `#params` line.*
+  *This app's prior export — one of the four [Holdings File](#holdings-file) layouts. May carry a trailing [DARA Plan](#dara-plan)'s `#fundedYear,dara` block and [Construction Parameters](#construction-parameters)' `#params` line.*
 - <a id="tipsladdercom-format"></a>**tipsladder.com Format** = `{ CUSIP + Qty + Year }` per row, no header, one or more rows per CUSIP
-  *One of the four [Holdings File](#holdings-file) layouts. A row's `Year` equal to its CUSIP's own maturity year states that CUSIP's funded quantity; any other `Year` states an excess quantity covering that year.*
+  *One of the four [Holdings File](#holdings-file) layouts. A row's `Year` equal to the CUSIP's maturity year states its funded quantity; any other `Year` states an excess quantity covering that year.*
 - <a id="plain-format"></a>**Plain CUSIP/Quantity Format** = `{ CUSIP + Qty }` per row, optional header
-  *One of the four [Holdings File](#holdings-file) layouts. No funded/excess split — every row states a plain total quantity.*
-- <a id="dara-plan-file"></a>**DARA Plan File** = *Raw uploaded text carrying only a `#fundedYear,dara` block and an optional `#params` line — no CUSIP rows at all.*
+  *One of the four [Holdings File](#holdings-file) layouts. Every row states a total quantity, with no funded/excess split.*
+- <a id="dara-plan-file"></a>**DARA Plan File** = `#fundedYear,dara` marker line + `{ Year + DARA }` rows + ( `#params` line )
+  *A file holding a [DARA Plan](#dara-plan).*
 - <a id="holdings"></a>**Holdings** = `{ @CUSIP + Qty + ( Excess_Qty ) }`
   *Per-CUSIP quantities parsed from a [Holdings File](#holdings-file). `Excess_Qty` (the funded/excess split already known, rather than left for DARA math to derive) is present for the [Holdings Export](#holdings-export-format) and [tipsladder.com](#tipsladdercom-format) layouts, absent for [Broker Export](#broker-export) and [Plain CUSIP/Quantity](#plain-format).*
 - <a id="dara-plan"></a>**DARA Plan** = `{ Funded_Year + DARA } + ( Construction_Parameters )`
-  *The holder's own stated per-year [DARA](#dara) target, for every year a `#fundedYear,dara` block names — gap and Future 30Y years included.*
+  *The holder's stated per-year [DARA](#dara) target, for every year a `#fundedYear,dara` block names — gap and Future 30Y years included. May carry [Construction Parameters](#construction-parameters) alongside it.*
 - <a id="per-year-dara"></a>**Per-Year DARA** = `{ Funded_Year + DARA }`
-  *The resolved [DARA](#dara) target for every year in a ladder's range, however it was arrived at — typed by hand, mirrored from holdings, or a loaded [DARA Plan](#dara-plan) — the shape the ladder-sizing engine itself consumes.*
+  *The resolved [DARA](#dara) target for every year in a ladder's range, however it was arrived at — typed by hand, mirrored from holdings, or a loaded [DARA Plan](#dara-plan) — the shape the ladder-sizing engine consumes.*
 - <a id="construction-parameters"></a>**Construction Parameters** = [Pre-Ladder Interest](#pre-ladder-interest) + Maturity_Preference + Coupon_Preference + [Available Cash](#available-cash) + Settlement_Year_Coupon_Mode + DARA_Reference_Date
-  *Settings a `#fundedYear,dara` block cannot itself encode but which still change the target ladder — maturity preference and coupon preference, the settlement-year coupon-counting choice, and the Ref CPI date the plan's DARA values are denominated at. Carried in an optional `#params,key=value,...` line alongside a [DARA Plan](#dara-plan)'s own `#fundedYear,dara` block, present only when the source file carries one.*
+  *Settings a `#fundedYear,dara` block cannot encode but which still change the target ladder — maturity preference and coupon preference, the settlement-year coupon-counting choice, and the Ref CPI date the plan's DARA values are denominated at. Carried in an optional `#params,key=value,...` line alongside a [DARA Plan](#dara-plan)'s `#fundedYear,dara` block, present only when the source file carries one.*

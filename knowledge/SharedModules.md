@@ -2,7 +2,7 @@
 
 A module here is a real, independently reusable implementation — a whole file, not a single
 formula small enough to restate inline — called by two or more sibling processes. It is drawn on
-every consuming process's own diagram as a circle in its own distinct color, never a rectangle —
+every consuming process's diagram as a circle in a distinct color, never a rectangle —
 a rectangle is already the entity shape, so a module stays circular, process-like, and lets its
 color alone say "not a pipeline step of this diagram." Each drawing points at the one entry below,
 so drilling down through any caller reaches the same spec (`DFD_Worklist.md` §2.0). A module used by
@@ -11,7 +11,7 @@ it, never ahead of that.
 
 Each entry names the module's purpose and the exports its callers actually use, and lists every
 process that calls it. It does not restate what a caller does with the export — that belongs to the
-caller's own spec.
+caller's spec.
 
 ---
 
@@ -32,7 +32,7 @@ caller's own spec.
 - `localDate(s)` — parses `'YYYY-MM-DD'` into a local-time `Date`.
 - `toIsoDate(date)` — formats a `Date` back to `'YYYY-MM-DD'`.
 - `nextBusinessDay(date, holidaySet)` — the next date that is not a weekend or a listed holiday; always advances at least one day.
-- `parseHolidaySet(rows)` — builds the holiday `Set` from [Bond holidays (S16)](./DataStores.md#s16)'s own rows.
+- `parseHolidaySet(rows)` — builds the holiday `Set` from [Bond holidays (S16)](./DataStores.md#s16)'s rows.
 - `actualPaymentDate(d, holidaySet)` — the date a payment scheduled for `d` is actually made: `d` itself if already a trading day, otherwise the next one. Not the same as `nextBusinessDay`, which always advances.
 
 **Called by**: [4.1.1 Fetch and parse market quotes](../TipsLadderManager/knowledge/4.1_Load_Market_Data.md#fetch-and-parse-market-quotes) and [4.1.3 Fetch auxiliary TIPS data](../TipsLadderManager/knowledge/4.1_Load_Market_Data.md#fetch-auxiliary-tips-data) (TipsLadderManager), and the Rebalance ladder process (`actualPaymentDate` for the Cash Flow Calendar and settlement-year LMI — see [2.0 TIPS Ladders §Gap Year Coverage Model](../TipsLadderManager/knowledge/2.0_TIPS_Ladders.md#gap-year-coverage-model)), [3.1.6 Determine settlement date](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#determine-settlement-date) (YieldCurves), and other processes across the portal — not yet swept for a complete list.
@@ -57,10 +57,10 @@ caller's own spec.
 **File**: `shared/src/fidelity-parse.js`
 **Purpose**: Parses Fidelity's combined Treasury+TIPS export ([Market quotes (S7)](./DataStores.md#s7)) — the row-shape and field-cleanup logic every consumer of that source shares, so which CUSIPs are kept, which settlement date the quote is stated at, and what to do with a dropped row stays with each caller.
 **Exports**:
-- `parseFidelityTipsRows(text)` — one row per TIPS CUSIP, Fidelity's own quoted fields.
-- `parseFidelityNominalRows(text, { settleIso, onUnknownCusip })` — one row per non-TIPS CUSIP (Bills, Notes, Bonds and STRIPS alike), both yields calculated from the quoted ask/bid price rather than read from Fidelity's own stated yields.
+- `parseFidelityTipsRows(text)` — one row per TIPS CUSIP, Fidelity's quoted fields.
+- `parseFidelityNominalRows(text, { settleIso, onUnknownCusip })` — one row per non-TIPS CUSIP (Bills, Notes, Bonds and STRIPS alike), both yields calculated from the quoted ask/bid price rather than read from Fidelity's stated yields.
 - `parseFidelityDownloadDate(text)` / `fidelityDownloadDateIso(dateStr)` — the `"Date downloaded"` footer, parsed and normalized to ISO.
-- `cleanFidelityField(val)`, `fidPriceField(raw)`, `fidParseMaturity(s)` — field-shape helpers for Fidelity's own CSV quirks.
+- `cleanFidelityField(val)`, `fidPriceField(raw)`, `fidParseMaturity(s)` — field-shape helpers for Fidelity's CSV quirks.
 
 **Called by**: [4.1.1 Fetch and parse market quotes](../TipsLadderManager/knowledge/4.1_Load_Market_Data.md#fetch-and-parse-market-quotes) (TipsLadderManager, `parseFidelityTipsRows`) and [3.1.2 Parse market quotes](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#parse-market-quotes) (YieldCurves, both row parsers, for the app and for the acquisition job that writes [Yield curves (S13)](./DataStores.md#s13)).
 
@@ -68,7 +68,7 @@ caller's own spec.
 
 ## <a id="m5"></a>ladder-core.js (M5)
 **File**: `TipsLadderManager/src/ladder-core.js`
-**Purpose**: The single authoritative implementation of "size the target ladder from a DARA." Unlike M1-M4, this module's own algorithm is too large for a registry entry — it is specified in full at [2.0 TIPS Ladders](../TipsLadderManager/knowledge/2.0_TIPS_Ladders.md) (§Algorithm and the duration-matching/PLI/AMD sections it covers), not here. This entry only names the exports and their callers.
+**Purpose**: The single authoritative implementation of "size the target ladder from a DARA." Unlike M1-M4, this module's algorithm is too large for a registry entry — it is specified in full at [2.0 TIPS Ladders](../TipsLadderManager/knowledge/2.0_TIPS_Ladders.md) (§Algorithm and the duration-matching/PLI/AMD sections it covers), not here. This entry only names the exports and their callers.
 **Exports**: `selectLadderBonds`, `sizeLadder`, `sizeFuture30yCover`, `sizeYearRungs`/`aggregateRungs` — see 2.0 for what each does.
 
 **Called by**: [Build the ladder (4.3.2)](../TipsLadderManager/knowledge/4.3_Build_Ladder.md#build-the-ladder) and [Rebalance the ladder (4.4.3)](../TipsLadderManager/knowledge/4.4_Rebalance_Ladder.md#rebalance-the-ladder).
