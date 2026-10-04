@@ -11,7 +11,7 @@
 
 *Every term below, alphabetically, including synonyms. The entries themselves are grouped by category in the sections that follow.*
 
-**A** &nbsp; [AA](#aa) &middot; [Accrued Interest (Adjusted)](#accrued-interest-adjusted) &middot; [Accrued Interest (Nominal)](#accrued-interest-nominal) &middot; [accrued market discount](#amd) *(see Accrued Market Discount (AMD))* &middot; [Accrued Market Discount (AMD)](#amd) &middot; [Active Lower Bracket](#active-lower-bracket) &middot; [Annual Interest (Nominal)](#annual-interest-nominal) &middot; [Annual Interest (Real)](#annual-interest-real) &middot; [App Inputs](#app-inputs) &middot; [App Outputs](#app-outputs) &middot; [ARA](#ara) &middot; [Ask / Bid](#ask) &middot; [Auction Results](#auction-results) &middot; [Auction results (S5)](#s5) &middot; [Available Cash](#available-cash) &middot; [Axis Scales](#axis-scales)
+**A** &nbsp; [AA](#aa) &middot; [Accrued Interest (Adjusted)](#accrued-interest-adjusted) &middot; [Accrued Interest (Nominal)](#accrued-interest-nominal) &middot; [accrued market discount](#amd) *(see Accrued Market Discount (AMD))* &middot; [Accrued Market Discount (AMD)](#amd) &middot; [Active Lower Bracket](#active-lower-bracket) &middot; [amount](#ara) *(see ARA)* &middot; [Annual Interest (Nominal)](#annual-interest-nominal) &middot; [Annual Interest (Real)](#annual-interest-real) &middot; [App Inputs](#app-inputs) &middot; [App Outputs](#app-outputs) &middot; [ARA](#ara) &middot; [Ask / Bid](#ask) &middot; [Auction Results](#auction-results) &middot; [Auction results (S5)](#s5) &middot; [Available Cash](#available-cash) &middot; [Axis Scales](#axis-scales)
 
 **B** &nbsp; [bei](#breakeven-inflation) *(see Breakeven Inflation (BEI))* &middot; [bid](#ask) *(see Ask / Bid)* &middot; [Bid and Ask Spreads](#bid-and-ask-spreads) &middot; [Bid and ask spreads (S15)](#s15) &middot; [BlackRock iShares (E12)](#e12) &middot; [BLS (E4)](#e4) &middot; [Bond Holiday](#bond-holiday) &middot; [Bond holidays (S16)](#s16) &middot; [Bond Ladder](#bond-ladder) &middot; [BondBloxx product-page holdings table (E11)](#e11) &middot; [bracket maturity](#bracket-year-tips) *(see Bracket Year TIPS)* &middot; [Bracket Weight](#bracket-weight) &middot; [Bracket Year](#bracket-year) &middot; [Bracket Year TIPS](#bracket-year-tips) &middot; [Breakeven Inflation (BEI)](#breakeven-inflation) &middot; [Breakeven inflation (S14)](#s14)
 
@@ -439,6 +439,7 @@ For nominal Treasuries, 31 CFR §356.2 applies: *"Dated date means the date from
 `DARA` = *Desired Annual Real Amount: target total cash flow for a funded year in real (inflation-adjusted) terms (TIPS ladders)*
 
 <a id="ara"></a>
+<a id="amount"></a>
 ### ARA
 `ARA` = `Funded_PI + LMI + Same_Maturity_Excess_Interest` *(Annual Real Amount: total real cash flow produced for a Funded Year)*
 
@@ -743,9 +744,9 @@ Some values are true only until Treasury issues more TIPS. Left inline as approx
 
 - <a id="tips-market-data"></a>**TIPS Market Data** = `{ @CUSIP + Maturity_Date + Coupon_Rate + Ref_CPI_dated + Price + Yield + ( SA_Yield ) }`
   *Every TIPS Market quotes (S7) states, keyed by CUSIP, its [SA Yield](#sa-yield) attached where [SA and SAO yields (S10)](#s10) has an entry for it. The app names this table "TIPS Mkt Data," the title of its TIPS Ref/Mkt popup's "Mkt" tab.*
-- <a id="holdings-file"></a>**Holdings File** = `[ Fidelity Export | Schwab Export | Vanguard Export | Holdings Export | tipsladder.com Format | Plain CUSIP/Quantity Format ]`
-  *A csv file identifying TIPS positions held, in one of these six layouts.*
-- <a id="fidelity-export"></a>**Fidelity Export** = `{ Account_Number + Account_Name + Symbol + Quantity + ( Current_Value ) }`
+- <a id="holdings-file"></a>**Holdings File**
+  *A csv file identifying TIPS positions held, in one of six formats: [Fidelity Export](#fidelity-export), [Schwab Export](#schwab-export), [Vanguard Export](#vanguard-export), [Holdings Export](#holdings-export-format), [tipsladder.com Format](#tipsladdercom-format), [Plain CUSIP/Quantity Format](#plain-format).*
+- <a id="fidelity-export"></a>**Fidelity Export**
   *A Fidelity positions export, one row per holding, account identity in its own `Account number`/`Account name` columns. `Symbol` carries the CUSIP directly. `Quantity` is stated as [Face Value](#face-value). Header row (exact text): `Account number,Account name,Symbol,Description,Quantity,Last price,Last price change,Current value,Today's gain/loss dollar,Today's gain/loss percent,Total gain/loss dollar,Total gain/loss percent,Percent of account,Cost basis total,Average cost basis,Type`. Example row: `257119194,Marcia IRA,912828V49,UNITED STATES TREAS NTS TIPS 0.37500% 01/15/2027,12000,$99.664,-$0.0218,$16532.46,-$3.61,-0.03%,+$153.08,+0.93%,21.26%,$16379.38,--,Cash,`.*
 - <a id="schwab-export"></a>**Schwab Export** = `Account_Row + { Symbol + Quantity + ( Current_Value ) } + Account_Total_Row`, repeated per account
   *A Schwab positions export. Each account's holdings are preceded by a row naming the account (e.g. `"Amy_POD ...387"`) rather than carrying an account column, and followed by an `"Account Total"` row. `Symbol` carries the CUSIP directly. `Quantity` is stated as [Face Value](#face-value), under the header `"Qty (Quantity)"`. Header row (exact text): `"Symbol","Description","Qty (Quantity)","Price","Mkt Val (Market Value)","Gain $ (Gain/Loss $)","Gain % (Gain/Loss %)","Asset Type",`. Example row: `"912810SM1","UST INFL IDX 0.25%02/50INFL INDEX DUE 02/15/50","2,000","49.8789","$1,295.79","-$38.17","-2.86%","Fixed Income",`.*
