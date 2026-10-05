@@ -27,7 +27,7 @@
 
 **H** &nbsp; [Holdings](#holdings) &middot; [Holdings Export](#holdings-export-format) &middot; [Holdings File](#holdings-file)
 
-**I** &nbsp; [Index Ratio](#index-ratio) &middot; [Inflation Compensation](#inflation-compensation) &middot; [inflation factor](#index-ratio) *(see Index Ratio)* &middot; [Intraday archive (S18)](#s18) &middot; [IQR Clip](#iqr-clip)
+**I** &nbsp; [Index Ratio](#index-ratio) &middot; [Inflation Compensation](#inflation-compensation) &middot; [inflation factor](#index-ratio) *(see Index Ratio)* &middot; [Inflation-Adjusted Principal](#inflation-adjusted-principal) &middot; [Intraday archive (S18)](#s18) &middot; [IQR Clip](#iqr-clip)
 
 **L** &nbsp; [Ladder](#ladder) &middot; [ladder eligible tips](#outstanding-tips) *(see Outstanding TIPS)* &middot; [ladder period](#ladder) *(see Ladder)* &middot; [Last-Year Interest](#last-year-interest) &middot; [Live Quotes](#live-quotes) &middot; [LMI](#lmi)
 
@@ -37,7 +37,7 @@
 
 **O** &nbsp; [Outstanding TIPS](#outstanding-tips)
 
-**P** &nbsp; [P+I](#pi) &middot; [P+I per TIPS](#pi-per-tips) &middot; [Par Value (Adjusted)](#par-value-adjusted) &middot; [Par Value (Nominal)](#par-value) &middot; [Par Yield](#par-yield) &middot; [Per-Year DARA](#per-year-dara) &middot; [PIMCO (E9)](#e9) &middot; [Plain CUSIP/Quantity Format](#plain-format) &middot; [pre ladder interest](#pre-ladder-credit) *(see Pre-Ladder Interest (PLI))* &middot; [Pre-Ladder Interest (PLI)](#pre-ladder-credit) &middot; [Price](#price)
+**P** &nbsp; [P+I](#pi) &middot; [P+I per TIPS](#pi-per-tips) &middot; [Par Value (Nominal)](#par-value) &middot; [Par Yield](#par-yield) &middot; [Per-Year DARA](#per-year-dara) &middot; [PIMCO (E9)](#e9) &middot; [Plain CUSIP/Quantity Format](#plain-format) &middot; [pre ladder interest](#pre-ladder-credit) *(see Pre-Ladder Interest (PLI))* &middot; [Pre-Ladder Interest (PLI)](#pre-ladder-credit) &middot; [Price](#price)
 
 **Q** &nbsp; [Quantity](#quantity)
 
@@ -197,7 +197,7 @@
 <a id="par-value"></a>
 <a id="par-value-nominal"></a>
 ### Par Value (Nominal)
-`Par_Value_Nominal` = *Current principal value of a nominal Treasury. Equals Face Value at all times. For inflation-adjusted principal see [Par Value (Adjusted)](#par-value-adjusted).*
+`Par_Value_Nominal` = *Current principal value of a nominal Treasury. Equals Face Value at all times. See [Inflation-Adjusted Principal](#inflation-adjusted-principal) for the TIPS case.*
 
 <a id="price"></a>
 <a id="clean-price"></a>
@@ -364,9 +364,9 @@ For nominal Treasuries, 31 CFR §356.2 applies: *"Dated date means the date from
 
 *Index ratio is the Treasury’s own term and the one used throughout. Brokers name the same quantity differently, so a broker’s name for it is a synonym rather than a second definition: the Fidelity export ([Market quotes (S7)](#s7)) calls it the **inflation factor**.*
 
-<a id="par-value-adjusted"></a>
-### Par Value (Adjusted)
-`Par_Value_Adjusted` = `Face_Value × Index_Ratio` *(inflation-adjusted principal, also called Adjusted Principal)*
+<a id="inflation-adjusted-principal"></a>
+### Inflation-Adjusted Principal
+`Inflation_Adjusted_Principal` = `Face_Value × Index_Ratio`
 
 <a id="annual-interest-real"></a>
 ### Annual Interest (Real)
@@ -374,7 +374,7 @@ For nominal Treasuries, 31 CFR §356.2 applies: *"Dated date means the date from
 
 <a id="annual-interest-nominal"></a>
 ### Annual Interest (Nominal)
-`Annual_Interest_Nominal` = `Par_Value_Adjusted × Coupon_Rate` *(coupon applied to inflation-adjusted principal)*
+`Annual_Interest_Nominal` = `Inflation_Adjusted_Principal × Coupon_Rate` *(coupon applied to inflation-adjusted principal)*
 
 <a id="pi"></a>
 ### P+I
@@ -382,7 +382,7 @@ For nominal Treasuries, 31 CFR §356.2 applies: *"Dated date means the date from
 
 <a id="pi-per-tips"></a>
 ### P+I per TIPS
-`P+I_per_TIPS` = `Par_Value_Adjusted + (Annual_Interest_Nominal × [0.5 | 1.0])` *Total inflation-adjusted cash flow in the maturity year. See TIPS_Basics.md for half-year rule.*
+`P+I_per_TIPS` = `Inflation_Adjusted_Principal + (Annual_Interest_Nominal × [0.5 | 1.0])` *Total inflation-adjusted cash flow in the maturity year. See TIPS_Basics.md for half-year rule.*
 
 <a id="cost-per-tips"></a>
 ### Cost per TIPS
@@ -390,7 +390,7 @@ For nominal Treasuries, 31 CFR §356.2 applies: *"Dated date means the date from
 
 <a id="accrued-interest-adjusted"></a>
 ### Accrued Interest (Adjusted)
-`Accrued_Interest_Adjusted` = `Accrued_Interest_Nominal / 100 × Index_Ratio × 1000` *(index-ratio-adjusted accrued interest per TIPS, real dollars — extends [Accrued Interest (Nominal)](#accrued-interest-nominal) the same way [Par Value (Adjusted)](#par-value-adjusted) extends [Par Value (Nominal)](#par-value-nominal). See TIPS_Basics.md §Accrued Interest.)*
+`Accrued_Interest_Adjusted` = `Accrued_Interest_Nominal / 100 × Index_Ratio × 1000` *(index-ratio-adjusted accrued interest per TIPS, real dollars — extends [Accrued Interest (Nominal)](#accrued-interest-nominal) the same way [Inflation-Adjusted Principal](#inflation-adjusted-principal) extends [Par Value (Nominal)](#par-value-nominal). See TIPS_Basics.md §Accrued Interest.)*
 
 ---
 

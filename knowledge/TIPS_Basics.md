@@ -100,8 +100,8 @@ costPerBond = price/100 × indexRatio × 1,000
 ```
 
 **[Accrued Interest](./DATA_DICTIONARY.md#accrued-interest-adjusted):**
-Extends **1.0 Bond Basics §Accrued Interest** the same way Par Value (Adjusted) extends Par Value
-(Nominal): take the nominal, per-$100-par accrued interest (Actual/Actual day count — same A/E
+Extends **1.0 Bond Basics §Accrued Interest** the same way Inflation-Adjusted Principal extends Par
+Value (Nominal): take the nominal, per-$100-par accrued interest (Actual/Actual day count — same A/E
 convention used by Yield Calculation Conventions and Duration below) and apply the Index Ratio.
 ```
 accruedPerBond = accruedInterestNominal / 100 × indexRatio × 1,000   // real dollars per bond
