@@ -221,7 +221,7 @@ The 94 findings `scripts/check-spec-code.cjs` reported are down to zero, across 
 
 **Prose the checker misread, 5 findings.** `knowledge/DFD_Worklist.md` named the stale identifiers as examples of the problem and illustrated the file-and-symbol form with a placeholder path; both now name live code instead.
 
-**One correction to what §3.0 asked.** `3.2_Multi_Account_Rebalancing.md` does not describe work that was never built. Its own header records that the layer was implemented and then removed on 2026-06-25, which is why the account allocation module it names is absent. No spec among the 94 findings was ahead of its code.
+**One correction to what §3.0 asked.** `TipsLadderManager/research/Multi_Account_Rebalancing.md` (moved out of `knowledge/`, no longer a spec) does not describe work that was never built. Its own header records that the layer was implemented and then removed on 2026-06-25, which is why the account allocation module it names is absent. No spec among the 94 findings was ahead of its code.
 
 **No spec was found naming something the code should have and does not.**
 
