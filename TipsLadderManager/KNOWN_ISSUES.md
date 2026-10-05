@@ -8,6 +8,33 @@ production impact go here.
 
 ## OPEN
 
+### Gap-bracket AMD: design undecided, reverted to the pre-session method
+
+- **Status:** the gap-bracket AMD change (commit 948410f) was reverted by a later commit, so the code
+  and 2.0 §Gap Bracket AMD are back to the method they had before the session. Nothing about this
+  design is settled.
+- **What the reverted change did:** credited each gap bracket's per-year accretion, held to maturity,
+  to the funded years, and subtracted lifetime AMD from the bracket Amount. The reverted code and the
+  wording built on it were confused in several places, which is why it was backed out.
+- **Points established in the session (developer's model, not yet written into the specs):**
+  - Pass 1 (synthetic TIPS plus outstanding TIPS) has only coupon income in LMI. Every maturity exists
+    in pass 1, so nothing accretes there.
+  - Pass 2 (outstanding TIPS only) substitutes AMD for the coupons pass 1 has and pass 2 lacks.
+  - No gap-year income exists in pass 2. Gap DARA sets the synthetic costs, the gap total cost sets the
+    excess cost through the duration weights, and nothing accretes to the excess within the gap years.
+  - An excess holding is sold before maturity. Its sale price is unknown in the model, so duration
+    matching does not guarantee that sale proceeds equal the cost of the TIPS bought with them.
+  - The DD says excess principal applies to duration matching, not to the Amount (Total Cost entry).
+    The reverted code included excess P+I at par in the bracket Amount, which departs from that.
+- **Open decisions for the developer:** whether bracket Amount holds only coupon LMI plus AMD (with no
+  principal and no subtraction), and how the AMD stand-in is attributed to funded years.
+- **Measured before the revert (2036–2040, $100k DARA, settle 2026-10-05):** bracket Amounts summed to
+  $298,559 against $300,000 with the subtraction; $317,480 without it. These figures predate the
+  reverted method's own assumptions and should be re-measured, not reused.
+- **Future 30Y cover choice (same session, separate issue):** modified durations at the same settlement
+  put 2052 at 24.28 and 2056 at 19.90, both above the synthetic 2057 target of 19.01, so the current
+  cover pair cannot duration-match it. The lower-cover choice (2056 with 2049 or 2048) is open.
+
 ### Multi-bracket mode's lower bracket can resolve to a retained year instead of the canonical Active Lower Bracket
 
 - **Found:** 2026-09-30, alongside the gap-coverage-intent fix above: on McNeill Joint WROS
