@@ -1088,6 +1088,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
   const preLadderCouponPool = _sl.preLadderCouponPool;
   const preLadderAmdPool    = _sl.preLadderAmdPool;
   const preLadderRollCouponPool = _sl.preLadderRollCouponPool;
+  const amdLifetimeByBracketYear = _sl.amdLifetimeByBracketYear ?? new Map();  // per-cover Σ AMD (cover-Amount net-out)
   const future30yLMITotal   = _sl.future30yLMITotal ?? 0;                      // intra-block coupon add-back
 
   // Augment gapLaterMaturityInterest with future cover excess LMI before computing gap params
@@ -1385,21 +1386,13 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
     if (gapYears.length > 0 && year === brackets.lowerYear)              return (is3Bracket ? (origLowerWeight ?? 0) : lowerWeight) * (gapParams?.gapLMITotal ?? 0);
     return 0;
   }
-  // Lifetime AMD per excess bond, by CUSIP — the row's own exQty × this is the accretion its excess
-  // delivers to earlier years, netted out of the row's coverage below. Keyed by CUSIP, not year: a
-  // bracket year can hold two different TIPS (an active and a same-year retained), each its own row.
-  const _amdPerBond = new Map();
-  function amdLifetimePerBond(cusip) {
-    if (!_amdPerBond.has(cusip)) {
-      let s = 0;
-      for (const v of excessAmdSchedule({ bond: tipsMarketData.get(cusip), exQty: 1, refCPI, settlementYear }).values()) s += v;
-      _amdPerBond.set(cusip, s);
-    }
-    return _amdPerBond.get(cusip);
-  }
-  function excessCoverageAmt(year, exQty, piPB, cusip) {
+  function excessCoverageAmt(year, exQty, piPB, cusip = null) {
     if (!(exQty > 0)) return 0;
-    return exQty * piPB - exQty * amdLifetimePerBond(cusip) + excessLMIAllocFor(year, cusip);
+    const amdFull = amdLifetimeByBracketYear.get(year) ?? 0;   // lifetime AMD at this cover's TARGET excess
+    const targetExQty = year === future30yUpperYear ? future30yUpperExQty
+                      : year === future30yLowerYear ? future30yLowerExQty : 0;   // own denominator per cover
+    const amdScaled = targetExQty > 0 ? amdFull * exQty / targetExQty : 0;
+    return exQty * piPB - amdScaled + excessLMIAllocFor(year, cusip);
   }
 
   let rebalYearSet = new Set();
@@ -1422,25 +1415,6 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
   if (future30yYears.length > 0) {
     bracketExcessTargetCost[future30yLowerCoverBond.cusip] = (bracketExcessTargetCost[future30yLowerCoverBond.cusip] || 0) + future30yParams.future30yTotalCost * future30yLowerWeight;
     bracketExcessTargetCost[future30yUpperCoverBond.cusip] = (bracketExcessTargetCost[future30yUpperCoverBond.cusip] || 0) + future30yParams.future30yTotalCost * future30yUpperWeight;
-  }
-
-  // Gap-bracket AMD on the target excess (2.0 §Gap Bracket AMD): every gap-bracket CUSIP's solved
-  // excess — active lower, upper, and any retained maturity — sized exactly as the trades below size it,
-  // round(target cost / cost per bond). The covers are already in this ledger. Added only now: the
-  // gap parameters above read the covers-only ledger, the upper bracket's own accretion over the
-  // gap years being credited inside the gap fixpoint instead.
-  const coverCusips = new Set([future30yLowerCoverBond?.cusip, future30yUpperCoverBond?.cusip].filter(Boolean));
-  const costPerBondOf = (bond) => (bond?.price ?? 0) / 100 * calcIndexRatio(refCPI, bond?.datedDateRefCpi ?? refCPI) * 1000;
-  if (gapYears.length > 0) {
-    for (const [cusip, cost] of Object.entries(bracketExcessTargetCost)) {
-      if (coverCusips.has(cusip)) continue;
-      const bond = tipsMarketData.get(cusip);
-      const cpb = costPerBondOf(bond);
-      if (!bond?.maturity || !(cpb > 0)) continue;
-      const exQty = Math.max(0, Math.round(cost / cpb));
-      for (const [y, v] of excessAmdSchedule({ bond, exQty, refCPI, settlementYear }))
-        future30yUpperAnnualAmdByYear.set(y, (future30yUpperAnnualAmdByYear.get(y) ?? 0) + v);
-    }
   }
 
   const buySellTargets = {};
@@ -1806,28 +1780,6 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
     }
     if (!isFinite(rebuildLaterMatInt)) rebuildLaterMatInt = 0; // safety guard against NaN/Infinity cascade
     if (!isFinite(rebuildLaterMatIntRemaining)) rebuildLaterMatIntRemaining = 0;
-  }
-
-  // Gap-bracket AMD on the HELD excess (2.0 §Gap Bracket AMD) — the Before-state counterpart of the
-  // target ledger above. Each gap-bracket year's target CUSIP is split by the same funded-first rule
-  // the Before sweep below applies; a same-maturity-year retained holding contributes whatever it
-  // holds beyond its own funded need.
-  if (gapYears.length > 0) {
-    const heldExcess = [];
-    for (const year of bracketYearSet) {
-      const tCusip = buySellTargets[year]?.targetCUSIP;
-      if (!tCusip || coverCusips.has(tCusip)) continue;
-      const h = yearInfo[year]?.holdings?.find(x => x.cusip === tCusip);
-      if (h) heldExcess.push({ cusip: tCusip, exQty: h.qty - Math.min(bracketTargetFundedYearQtyBefore[year] ?? 0, h.qty) });
-    }
-    for (const [cusip, need] of sameYearRetainedNeed) {
-      const yr = tipsMarketData.get(cusip)?.maturity?.getFullYear();
-      const h = yearInfo[yr]?.holdings?.find(x => x.cusip === cusip);
-      if (h) heldExcess.push({ cusip, exQty: Math.max(0, h.qty - need) });
-    }
-    for (const { cusip, exQty } of heldExcess)
-      for (const [y, v] of excessAmdSchedule({ bond: tipsMarketData.get(cusip), exQty, refCPI, settlementYear }))
-        future30yAmdBeforeByYear.set(y, (future30yAmdBeforeByYear.get(y) ?? 0) + v);
   }
 
   // Before/After ARA calculations (totals + per-component breakdown for drill popup)
