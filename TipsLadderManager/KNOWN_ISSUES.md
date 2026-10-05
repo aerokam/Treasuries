@@ -34,6 +34,10 @@ production impact go here.
 - **Future 30Y cover choice (same session, separate issue):** modified durations at the same settlement
   put 2052 at 24.28 and 2056 at 19.90, both above the synthetic 2057 target of 19.01, so the current
   cover pair cannot duration-match it. The lower-cover choice (2056 with 2049 or 2048) is open.
+- **Potential enhancement (logged 2026-10-05):** changing the lower cover from 2056 means a holder who
+  already owns 2056 Cover Excess would need handling like [Retained Bracket
+  Excess](../knowledge/DATA_DICTIONARY.md#retained-bracket-excess) gives the gap years. No one is known to
+  have used the app for Future 30Y years, so this is deferred.
 
 ### Multi-bracket mode's lower bracket can resolve to a retained year instead of the canonical Active Lower Bracket
 
