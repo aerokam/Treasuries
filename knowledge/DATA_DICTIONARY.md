@@ -37,7 +37,7 @@
 
 **O** &nbsp; [Outstanding TIPS](#outstanding-tips)
 
-**P** &nbsp; [P+I](#pi) &middot; [P+I per TIPS](#pi-per-tips) &middot; [Par Value (Nominal)](#par-value) &middot; [Par Yield](#par-yield) &middot; [Per-Year DARA](#per-year-dara) &middot; [PIMCO (E9)](#e9) &middot; [Plain CUSIP/Quantity Format](#plain-format) &middot; [pre ladder interest](#pre-ladder-credit) *(see Pre-Ladder Interest (PLI))* &middot; [Pre-Ladder Interest (PLI)](#pre-ladder-credit) &middot; [Price](#price)
+**P** &nbsp; [P+I](#pi) &middot; [P+I per TIPS](#pi-per-tips) &middot; [Par Value (Nominal)](#par-value) &middot; [Par Yield](#par-yield) &middot; [Pass 1](#pass-1) &middot; [Pass 2](#pass-2) &middot; [Per-Year DARA](#per-year-dara) &middot; [PIMCO (E9)](#e9) &middot; [Plain CUSIP/Quantity Format](#plain-format) &middot; [pre ladder interest](#pre-ladder-credit) *(see Pre-Ladder Interest (PLI))* &middot; [Pre-Ladder Interest (PLI)](#pre-ladder-credit) &middot; [Price](#price)
 
 **Q** &nbsp; [Quantity](#quantity)
 
@@ -475,6 +475,14 @@ Displayed as **Amount**, and as **Real Amount** where a fuller header fits. The 
 `Synthetic_TIPS` = *A theoretical TIPS constructed for a [Gap Year](#gap-years) or a Future 30Y rung, never purchased. For a gap year the yield is interpolated from the surrounding issued maturities; for a Future 30Y rung it comes from the longest issued 30-year maturity, since there is nothing above it to interpolate between. [Index Ratio](#index-ratio) taken as 1.00000; price computed from its own yield and coupon.*
 
 **The index ratio is an approximation.** A TIPS carries an index ratio of exactly 1.00000 on its [Dated Date](#dated-date), not on its issue date, and the two never coincide for a TIPS. A security modeled as issued today would therefore already be indexed by the days between them. 1.00000 is close enough for a rung that is never bought.
+
+<a id="pass-1"></a>
+### Pass 1
+`Pass_1` = *The first of the two passes that size a ladder with [Gap Years](#gap-years) or Future 30Y years: it sizes the [Synthetic TIPS](#synthetic-tips) that stand in for those years, longest to shortest. Each Synthetic TIPS' quantity is sized from its own [DARA](#dara) less incoming [LMI](#lmi), the same subtraction any [Funded Year](#funded-year) uses. The incoming LMI is the coupon of the actual TIPS above those years together with the coupon of the Synthetic TIPS already sized for longer years in the same pass. Its purpose is the average duration and the total cost of those years, which [Duration Matching](#duration-matching) uses; it sizes no holding. Specified in [2.0 TIPS Ladders](../TipsLadderManager/knowledge/2.0_TIPS_Ladders.md#two-pass-walkthrough). Not the Pass 1 of [3.2 Multi-Account Rebalancing](../TipsLadderManager/knowledge/3.2_Multi_Account_Rebalancing.md), which is a different step.*
+
+<a id="pass-2"></a>
+### Pass 2
+`Pass_2` = *The second pass: the sweep, longest to shortest, that sizes the ladder's holdings once [Pass 1](#pass-1) and [Duration Matching](#duration-matching) have fixed the [Excess TIPS](#excess-tips) quantities. It holds no [Synthetic TIPS](#synthetic-tips). The coupon on the excess takes the place of the Synthetic TIPS' coupon in Pass 1: ordinary interest, credited to the excess's own maturity year and, through [LMI](#lmi), to every shorter-maturity year. Pass 2 determines the [Funded Year](#funded-year) quantities; Pass 1 determines only the excess quantities that Pass 2 holds fixed. Specified in [2.0 TIPS Ladders](../TipsLadderManager/knowledge/2.0_TIPS_Ladders.md#two-pass-walkthrough). Not the Pass 2 of [3.2 Multi-Account Rebalancing](../TipsLadderManager/knowledge/3.2_Multi_Account_Rebalancing.md), which is a different step.*
 
 <a id="bracket-year"></a>
 ### Bracket Year
