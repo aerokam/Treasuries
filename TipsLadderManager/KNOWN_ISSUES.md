@@ -8,36 +8,13 @@ production impact go here.
 
 ## OPEN
 
-### Gap-bracket AMD: design undecided, reverted to the pre-session method
+### Simulated outstanding TIPS replace AMD: specs done for Future 30Y, code and gap years pending
 
-- **Status:** the gap-bracket AMD change (commit 948410f) was reverted by a later commit, so the code
-  and 2.0 §Gap Bracket AMD are back to the method they had before the session. Nothing about this
-  design is settled.
-- **What the reverted change did:** credited each gap bracket's per-year accretion, held to maturity,
-  to the funded years, and subtracted lifetime AMD from the bracket Amount. The reverted code and the
-  wording built on it were confused in several places, which is why it was backed out.
-- **Points established in the session (developer's model, not yet written into the specs):**
-  - Pass 1 (synthetic TIPS plus outstanding TIPS) has only coupon income in LMI. Every maturity exists
-    in pass 1, so nothing accretes there.
-  - Pass 2 (outstanding TIPS only) substitutes AMD for the coupons pass 1 has and pass 2 lacks.
-  - No gap-year income exists in pass 2. Gap DARA sets the synthetic costs, the gap total cost sets the
-    excess cost through the duration weights, and nothing accretes to the excess within the gap years.
-  - An excess holding is sold before maturity. Its sale price is unknown in the model, so duration
-    matching does not guarantee that sale proceeds equal the cost of the TIPS bought with them.
-  - The DD says excess principal applies to duration matching, not to the Amount (Total Cost entry).
-    The reverted code included excess P+I at par in the bracket Amount, which departs from that.
-- **Open decisions for the developer:** whether bracket Amount holds only coupon LMI plus AMD (with no
-  principal and no subtraction), and how the AMD stand-in is attributed to funded years.
-- **Measured before the revert (2036–2040, $100k DARA, settle 2026-10-05):** bracket Amounts summed to
-  $298,559 against $300,000 with the subtraction; $317,480 without it. These figures predate the
-  reverted method's own assumptions and should be re-measured, not reused.
-- **Future 30Y cover choice (same session, separate issue):** modified durations at the same settlement
-  put 2052 at 24.28 and 2056 at 19.90, both above the synthetic 2057 target of 19.01, so the current
-  cover pair cannot duration-match it. The lower-cover choice (2056 with 2049 or 2048) is open.
-- **Potential enhancement (logged 2026-10-05):** changing the lower cover from 2056 means a holder who
-  already owns 2056 Cover Excess would need handling like [Retained Bracket
-  Excess](../knowledge/DATA_DICTIONARY.md#retained-bracket-excess) gives the gap years. No one is known to
-  have used the app for Future 30Y years, so this is deferred.
+- **Status (2026-10-06):** AMD and the cover-roll coupon are removed from the DD, 2.0, 3.0, 4.0 and 5.0. [2.0 §Future 30Y Simulated Outstanding TIPS](./knowledge/2.0_TIPS_Ladders.md#future-30y-simulated-outstanding-tips) replaces them, and 2.0 §Amount of a Gap Year and a Future 30Y Year replaces the Excess Amount. The code still has the old method.
+- **Pending, in order:**
+  1. Code for the Future 30Y sequence in `ladder-core.js`, `gap-math.js`, `rebalance-lib.js`, `build-lib.js`, `drill.js` and `render.js`, with tests: N derived from live data and asserted against DD §5.1; the excess sold at each issue date close to the cost of the Simulated Outstanding Future 30Y TIPS bought (Net Cash near 0, not yet tested); the Amount of each Future 30Y year equal to the Amount Pass 1 gives its Synthetic TIPS; a build → export → import → rebalance round trip with Future 30Y years that has no trades.
+  2. The same approach for the gap years. Open: a DD term for the simulated 10-year TIPS, the issue dates (January and July), how the aging active lower bracket is treated (the static-aged bracket check has not been run), and 2.0 has no gap-year section yet. The DD already says bracket excess is sold as the TIPS it stands in for are issued.
+- **Potential enhancement (logged 2026-10-05):** the lower cover is now chosen by rule (2048 as of 2026-10-06) instead of being the 2056, so a holder who already holds 2056 Cover Excess would need handling like [Retained Bracket Excess](../knowledge/DATA_DICTIONARY.md#retained-bracket-excess) gives the gap years. No one is known to have used the app for Future 30Y years, so this is deferred.
 
 ### Multi-bracket mode's lower bracket can resolve to a retained year instead of the canonical Active Lower Bracket
 
@@ -185,8 +162,6 @@ developer are there.
   point is that the money is still on hand rather than drawn down. The first paragraph opens with a
   purpose a ladder does not have. Both were introduced 2026-08-28; the "spent" wording they replaced
   was the pre-existing text.
-- **Left alone deliberately:** 2.0 §AMD’s "turns the accrued discount into spendable cash", where
-  the word means realizable, not applied toward an Amount.
 - **Status:** open, and the next thing to pick up.
 
 ### Help text is not covered by any test
