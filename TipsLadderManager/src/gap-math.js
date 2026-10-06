@@ -24,7 +24,7 @@ export function syntheticCoupon(yld) {
 // Spec: 4.0 Phase 3c
 // Weights are shares of the block cost, so neither can go negative or above 1. If the target
 // duration falls outside [lowerDuration, upperDuration] — e.g. a deep-discount, near-zero-coupon
-// cover (2052) durations-out past a higher-coupon block average — clamp to the nearer cover
+// cover durations-out past a higher-coupon block average — clamp to the nearer cover
 // (weight 1) rather than solve past it. Accepts a slightly larger duration-match delta in that
 // corner case in exchange for never buying/selling a negative quantity.
 export function bracketWeights(lowerDuration, upperDuration, avgGapDuration) {
@@ -163,10 +163,9 @@ export function laterMatIntContribution(qty, annualInt) {
 //   • build derives it from its prelim funded sweep,
 //   • rebalance derives it from holdings/targets (+ future-cover excess).
 // Everything here — anchors, synthetic construction, qty formula, cost-weighted avg
-// duration, gapLMITotal — is identical for both. Returns { avgDuration, totalCost,
-// breakdown, gapLMITotal }.
-export function gapParamsCore({ gapYears, tipsMarketData, settlementDate, dara, daraByYear = null, lmiAboveByYear = {}, pliCreditByGapYear = {}, amdByYear = null }) {
-  if (!gapYears || gapYears.length === 0) return { avgDuration: 0, totalCost: 0, breakdown: [], gapLMITotal: 0 };
+// duration — is identical for both. Returns { avgDuration, totalCost, breakdown, anchors }.
+export function gapParamsCore({ gapYears, tipsMarketData, settlementDate, dara, daraByYear = null, lmiAboveByYear = {}, pliCreditByGapYear = {} }) {
+  if (!gapYears || gapYears.length === 0) return { avgDuration: 0, totalCost: 0, breakdown: [] };
   const minGapYear = Math.min(...gapYears);
   const maxGapYear = Math.max(...gapYears);
 
@@ -203,9 +202,7 @@ export function gapParamsCore({ gapYears, tipsMarketData, settlementDate, dara, 
 
     const piPerBond = 1000 + 1000 * synCpn * 0.5;
     const yearDara = daraByYear?.get(year) ?? dara;
-    // AMD from excess TIPS is income arriving this year, treated exactly like coupon LMI.
-    const amd = amdByYear?.get(year) ?? 0;
-    const qty = Math.max(0, Math.round((yearDara - laterMatInt - (pliCreditByGapYear[year] ?? 0) - amd) / piPerBond));
+    const qty = Math.max(0, Math.round((yearDara - laterMatInt - (pliCreditByGapYear[year] ?? 0)) / piPerBond));
     // Priced as a security issued today off its own yield and coupon, not assumed to be par:
     // the coupon is the eighth at or below the yield, so the price sits at or just below 100
     // when the real yield is positive, and above 100 when a negative yield meets the 0.125%
@@ -214,13 +211,11 @@ export function gapParamsCore({ gapYears, tipsMarketData, settlementDate, dara, 
     const costPerBond = 1000 * synPrice / 100;
     const cost = qty * costPerBond;
     totalCost += cost;
-    breakdown.push({ year, qty, piPerBond, laterMatInt, pliCredit: pliCreditByGapYear[year] ?? 0, amd, dara: yearDara, dur: synDur, synYld, synCpn, synPrice, costPerBond, cost, durDetail });
+    breakdown.push({ year, qty, piPerBond, laterMatInt, pliCredit: pliCreditByGapYear[year] ?? 0, dara: yearDara, dur: synDur, synYld, synCpn, synPrice, costPerBond, cost, durDetail });
     runningSynLMI += qty * 1000 * synCpn;
     count++;
   }
 
-  // gapLMITotal "adds back" every income source used to size gap quantities down (laterMatInt + pli + amd).
-  const gapLMITotal = breakdown.reduce((s, g) => s + g.laterMatInt + g.pliCredit + g.amd, 0);
   // Cost-weighted average duration (2.0 §Average Block Duration is Cost-Weighted): each synthetic
   // gap-year TIPS is weighted by what it would cost, qty × costPerBond. Not by quantity — the
   // synthetics price near par but not at it, so the two differ, and they differ more as the
@@ -230,7 +225,7 @@ export function gapParamsCore({ gapYears, tipsMarketData, settlementDate, dara, 
   const avgDuration = _costSum > 0
     ? breakdown.reduce((s, g) => s + g.cost * g.dur, 0) / _costSum
     : (count > 0 ? totalDuration / count : 0);
-  return { avgDuration, totalCost, breakdown, gapLMITotal, anchors: { before: anchorBefore, after: anchorAfter } };
+  return { avgDuration, totalCost, breakdown, anchors: { before: anchorBefore, after: anchorAfter } };
 }
 
 // ─── Gap params with upper-bracket excess-coupon feedback (View A fixpoint) ─────
@@ -285,31 +280,31 @@ export function gapParamsWithUpperFeedback(args) {
 }
 
 // ─── Future 30Y parameters core (shared by build and rebalance) ────────────────
-// Spec: 2.0 §Future 30Y Rungs, §Duration Matching. Hypothetical 30Y TIPS sized off the 2056
-// cover bond's yield as a flat-curve anchor (coupon = syntheticCoupon(yield2056)). No actual
-// TIPS exist above these years, so the only LMI is the running synthetic accumulator — there is
-// no build/rebalance input divergence here (cf. gapParamsCore). Returns the same shape build/rebal
-// used: { avgDuration, future30yTotalCost, breakdown, future30ySeedLMI }.
-export function future30yParamsCore({ future30yYears, coverBond2056, settlementDate, dara, daraByYear = null }) {
-  if (!future30yYears?.length || !coverBond2056) return { avgDuration: 0, future30yTotalCost: 0, breakdown: [], future30ySeedLMI: 0 };
-  const yield2056 = coverBond2056.yield ?? 0;
-  const synCoupon = syntheticCoupon(yield2056);
+// Spec: 2.0 §Future 30Y Rungs, §Duration Matching. Pass 1 for the Future 30Y years: Synthetic TIPS
+// sized off the longest-dated issued TIPS (anchorBond) as a flat-curve anchor, coupon =
+// syntheticCoupon(anchor yield). No actual TIPS exist above these years, so the only LMI is the
+// running synthetic accumulator, and build and rebalance supply identical inputs (cf. gapParamsCore).
+// Returns { avgDuration, future30yTotalCost, breakdown, future30ySeedLMI, anchorBond }.
+export function future30yParamsCore({ future30yYears, anchorBond, settlementDate, dara, daraByYear = null }) {
+  if (!future30yYears?.length || !anchorBond) return { avgDuration: 0, future30yTotalCost: 0, breakdown: [], future30ySeedLMI: 0, anchorBond: anchorBond ?? null };
+  const anchorYield = anchorBond.yield ?? 0;
+  const synCoupon = syntheticCoupon(anchorYield);
   const piPerBond = 1000 + 1000 * synCoupon * 0.5;   // Feb maturity → halfOrFull 0.5; IR 1.0 (par)
   let totalDuration = 0, future30yTotalCost = 0, runningLMI = 0;
   const breakdown = [];
   for (const year of [...future30yYears].sort((a, b) => b - a)) {
     const mat = new Date(year, 1, 15); // Feb 15
-    const durDetail = calculateDurationDetail(settlementDate, mat, synCoupon, yield2056);
-    const dur = durDetail ? durDetail.macaulay / (1 + yield2056 / 2) : null;
+    const durDetail = calculateDurationDetail(settlementDate, mat, synCoupon, anchorYield);
+    const dur = durDetail ? durDetail.macaulay / (1 + anchorYield / 2) : null;
     totalDuration += dur;
     const yearDara = daraByYear?.get(year) ?? dara;
     const qty = Math.max(0, Math.round((yearDara - runningLMI) / piPerBond));
     // Priced as a security issued today off the anchor yield and the synthetic coupon, not
     // assumed to be par — same rule as the gap synthetics (2.0 §Future 30Y Rungs).
-    const synPrice = priceFromYield(yield2056, synCoupon, settlementDate, mat) ?? 100;
+    const synPrice = priceFromYield(anchorYield, synCoupon, settlementDate, mat) ?? 100;
     const costPerBond = 1000 * synPrice / 100;
     const cost = qty * costPerBond;
-    breakdown.push({ year, qty, piPerBond, laterMatInt: runningLMI, dara: yearDara, dur, synYld: yield2056, synCpn: synCoupon, synPrice, costPerBond, cost, durDetail });
+    breakdown.push({ year, qty, piPerBond, laterMatInt: runningLMI, dara: yearDara, dur, synYld: anchorYield, synCpn: synCoupon, synPrice, costPerBond, cost, durDetail });
     runningLMI += qty * 1000 * synCoupon;
     future30yTotalCost += cost;
   }
@@ -319,44 +314,5 @@ export function future30yParamsCore({ future30yYears, coverBond2056, settlementD
   const avgDuration = _costSum > 0
     ? breakdown.reduce((s, b) => s + b.cost * b.dur, 0) / _costSum
     : (future30yYears.length > 0 ? totalDuration / future30yYears.length : 0);
-  return { avgDuration, future30yTotalCost, breakdown, future30ySeedLMI: runningLMI, anchorBond: coverBond2056 };
-}
-
-// ─── Excess-holding AMD schedule (Accrued Market Discount as interest) ──────────
-// Spec: 2.0 §Future 30Y Upper Cover AMD. Single source of truth for build AND rebalance.
-// GENERIC over any discount excess holding: pass the bond + its excess qty. Today only the
-// Future-30Y upper cover (2052) is wired in; the 2056 / 2036 / 2040 excess can reuse this same
-// function once specced (see sizeLadder's `amdExcessBonds`) — nothing here is 2052-specific.
-//
-// A deep-discount, low-coupon TIPS (e.g. the 2052: ~2.7% yield vs 0.125% coupon) returns almost all
-// of its yield as price accretion, not coupon. AMD is treated EXACTLY like coupon interest — the only
-// difference is that some bonds must be sold to turn the accrued discount into cash. Like coupon, the
-// income is what the FULL held excess position earns each year, modeled held-to-maturity (settlement →
-// the bond's own maturity), independent of how many bonds are sold to realize it. Under the constant-
-// yield method the per-bond accretion increment IS that interest:
-//   adjPrice(Y) = priceFromYield(yield, coupon, Feb(Y), mat)/100 × IR_settle × 1000   (real $)
-//   a(Y)        = adjPrice(Y) − adjPrice(Y−1)     // accretion increment, per bond (basis steps up)
-//   AMD(Y)      = exQty × a(Y)                     // full undepleted position — same basis as coupon
-// Even (gently back-loaded by convexity), conserving (Σ a(Y) = par − cost). Returns Map<year, amd$>.
-export function excessAmdSchedule({ bond, exQty, refCPI, settlementYear }) {
-  const byYear = new Map();
-  if (!(exQty > 0 && bond?.maturity)) return byYear;
-  const ir          = calcIndexRatio(refCPI, bond.datedDateRefCpi ?? refCPI);
-  const costPerBond = (bond.price ?? 0) / 100 * ir * 1000;
-  const matYear     = bond.maturity.getFullYear();
-  const parPerBond  = ir * 1000;                      // redemption value in settlement-real dollars
-  const adjPrice = (year) => {                        // constant-yield real price at last cal day of Feb
-    const saleDate = new Date(year, 2, 0);
-    if (saleDate >= bond.maturity) return parPerBond;  // at/after maturity → par
-    const p = priceFromYield(bond.yield ?? 0, bond.coupon ?? 0, saleDate, bond.maturity);
-    return p == null ? null : p / 100 * ir * 1000;
-  };
-  let prevAdj = costPerBond;                           // basis starts at settlement cost
-  for (let year = settlementYear + 1; year <= matYear; year++) {
-    const ap = adjPrice(year);
-    if (ap == null) continue;
-    byYear.set(year, exQty * (ap - prevAdj));
-    prevAdj = ap;                                      // basis steps up — next year counts only the next increment
-  }
-  return byYear;
+  return { avgDuration, future30yTotalCost, breakdown, future30ySeedLMI: runningLMI, anchorBond };
 }

@@ -6,7 +6,7 @@ import { readFileSync, readdirSync, existsSync } from 'fs';
 import path from 'path';
 import { buildTipsMarketData, localDate, runRebalance, runFundedRebalance, inferDARAFromCash, inferScaledDARAFromPortfolio, computePortfolioARAByYear, getGapYearBracketCandidates, getGapYears, derivePerYearDara, parseFundedYearDaraBlock, parseParamsBlock, inferFirstYearFromHoldings, inferLastYearFromHoldings } from '../src/rebalance-lib.js';
 import { computeBeforeState, detectBracketFlags, heldYearMedianExcluding } from '../src/before-state-lib.js';
-import { remainingCouponPaymentsThisYear, rmdCappedRemainingCoupons, latestRemainingCouponDate } from '../src/ladder-core.js';
+import { remainingCouponPaymentsThisYear, rmdCappedRemainingCoupons, latestRemainingCouponDate, future30yLimit, selectFuture30yCovers } from '../src/ladder-core.js';
 import { bracketWeights, bracketWeightsN } from '../src/gap-math.js';
 import { findSpikes, smoothCurve } from '../src/shape-math.js';
 import { buildDurationPopupRows, buildBracketWeightDrill, buildFuture30yDurationPopupRows } from '../src/drill.js';
@@ -16,7 +16,7 @@ import { parseBrokerCSV } from '../src/broker-import.js';
 import { loadMarketData, nextBondTradingDay, lookupRefCpi } from '../../shared/src/market-data.js';
 import { installFixtureFetch } from './market-fixture.js';
 import { ladderRoles } from './ladder-fixtures.js';
-import { bondCalcs } from '../../shared/src/bond-math.js';
+import { bondCalcs, calculateMDuration } from '../../shared/src/bond-math.js';
 
 
 // Multi-format holdings parser — mirrors index.html logic for Formats 3, 4, 5.
@@ -265,11 +265,18 @@ function ladderWithExcess(shareByYear, dara = 40000, { hump = 0 } = {}) {
 }
 
 // Structural values the Build tests below are written against, taken from the outstanding TIPS: the
-// structural gap, and the latest real maturity year (the Future 30Y lower cover). They move as TIPS are
-// issued (a 10-year issue fills the gap from the front; a new 30-year issue extends the last year).
+// structural gap, the latest real maturity year, and the ladder's last year at most (longest issued
+// maturity year + N, DD §5.1). They move as TIPS are issued (a 10-year issue fills the gap from the
+// front; a new 30-year issue extends the last year) and, for N, as yields change.
 const GAP = ladderRoles(tipsMarketData, settlementDate).gap;
 const MAX_YEAR = Math.max(...ladderRoles(tipsMarketData, settlementDate).byYear.keys());
 const GAP_YEARS = Array.from({ length: GAP.last - GAP.first + 1 }, (_, i) => GAP.first + i);
+const F30Y_LIMIT = future30yLimit({ tipsMarketData, settlementDate, refCPI, bondHolidays });
+const LAST_MAX = F30Y_LIMIT.lastYearMax;
+// A build's total Amount: every funded year's, plus the Amount on each gap year's and Future 30Y
+// year's row (2.0 §Amount of a Gap Year and a Future 30Y Year). Excess rows carry no Amount.
+const buildTotalAmount = (details, summary) => details.reduce((s, d) => s + (d.fundedYearAmt ?? 0), 0)
+  + Object.values(summary.syntheticYearAmounts ?? {}).reduce((s, a) => s + a.amount, 0);
 
 // ── Run tests on known files and local dev files ──────────────────────────────
 
@@ -853,7 +860,7 @@ console.log('\nBuild — DARA=50000, lastYear=2040');
   assert('lowerYear < upperYear', summary.lowerYear < summary.upperYear, true);
   assert('lowerWeight + upperWeight ≈ 1', summary.lowerWeight + summary.upperWeight, 1, 0.0001);
   const numRungs = lastYear - firstYear + 1;
-  const totalAmt = details.reduce((s, d) => s + (d.fundedYearAmt ?? 0) + (d.excessAmt ?? 0), 0);
+  const totalAmt = buildTotalAmount(details, summary);
   const avgAmt = totalAmt / numRungs;
   // Tolerance is 2% of DARA, stated as a percentage the way 2.0 §Gap Year Coverage Model states the
   // avgAmt ≈ DARA invariant. That section gives ~0.6%, but the residual measured across lastYear x DARA
@@ -948,14 +955,56 @@ console.log("\nRMD Options 'last' mode: pool-wide latest date, not each bond's o
     rmdCappedRemainingCoupons(bondAprOct, settleAug18, new Set(), 'all', tradeAug17), 1);
 }
 
+// ── Test: Future 30Y issuance-dependent values against DD §5.1 ──────────────────────────
+// DD §5.1 protocol: the spec states the rule, the DD table records the value, and a test derives the
+// value from live data and asserts it matches the table, so issuance or yield drift fails here
+// instead of going stale silently. The cover pair is also derived here independently of the engine
+// (longest modified duration, 2.0 §Future 30Y Cover Pair) and compared with selectFuture30yCovers.
+console.log('\nFuture 30Y — N, the ladder’s last year at most, and the cover pair (DD §5.1)');
+{
+  const ddText = readFileSync(new URL('../../knowledge/DATA_DICTIONARY.md', import.meta.url), 'utf8');
+  const ddRow = (prefix) => {
+    const line = ddText.split(/\r?\n/).find(l => l.startsWith('| ' + prefix));
+    if (!line) throw new Error(`DD §5.1 has no row starting "${prefix}"`);
+    return parseInt(line.split('|')[3], 10);   // the "As of" column
+  };
+  const ddN = ddRow('Future 30Y years past the longest issued maturity year, at most (N)');
+  const ddLastYear = ddRow('Ladder’s last year, at most');
+  const ddLower = ddRow('Lower cover');
+  const ddUpper = ddRow('Upper cover');
+
+  // Independent cover derivation: anchor = longest-dated outstanding TIPS; the first Future 30Y
+  // year's Synthetic TIPS matures Feb 15 the year after, with the 1/8% coupon at or below the anchor yield.
+  const outstanding = [...tipsMarketData.values()].filter(b => b.maturity > settlementDate && b.yield != null);
+  const anchor = outstanding.reduce((a, b) => (!a || b.maturity > a.maturity ? b : a), null);
+  const synCpn = Math.max(0.00125, Math.floor(anchor.yield * 800) / 800);
+  const firstDur = calculateMDuration(settlementDate, new Date(anchor.maturity.getFullYear() + 1, 1, 15), synCpn, anchor.yield);
+  const durs = outstanding.map(b => ({ b, d: calculateMDuration(settlementDate, b.maturity, b.coupon ?? 0, b.yield) }));
+  const lower = durs.filter(x => x.d <= firstDur).reduce((a, x) => (!a || x.d > a.d ? x : a), null);
+  const upper = durs.filter(x => x !== lower).reduce((a, x) => (!a || x.d > a.d ? x : a), null);
+  const covers = selectFuture30yCovers({ tipsMarketData, settlementDate });
+  assert('engine lower cover matches the independent derivation', covers.lowerCoverBond?.cusip, lower.b.cusip);
+  assert('engine upper cover matches the independent derivation', covers.upperCoverBond?.cusip, upper.b.cusip);
+
+  assert(`N derived from live data (${F30Y_LIMIT.N}) matches DD §5.1 (${ddN})`, F30Y_LIMIT.N, ddN);
+  assert(`ladder's last year at most (${LAST_MAX}) matches DD §5.1 (${ddLastYear})`, LAST_MAX, ddLastYear);
+  assert(`lower cover (${lower.b.maturity.getFullYear()}) matches DD §5.1 (${ddLower})`, lower.b.maturity.getFullYear(), ddLower);
+  assert(`upper cover (${upper.b.maturity.getFullYear()}) matches DD §5.1 (${ddUpper})`, upper.b.maturity.getFullYear(), ddUpper);
+  console.log(`        anchor ${anchor.maturity.getFullYear()} yield ${(anchor.yield * 100).toFixed(3)}%  first Synthetic TIPS duration ${firstDur.toFixed(3)}`);
+  console.log(`        lower ${lower.b.maturity.getFullYear()} (${lower.d.toFixed(3)})  upper ${upper.b.maturity.getFullYear()} (${upper.d.toFixed(3)})  N ${F30Y_LIMIT.N}`);
+}
+
 // ── Test: Build — Future 30Y years (lastYear > maxRealYear) ───────────────────────
 console.log('\nBuild — DARA=50000, lastYear=2060 (Future 30Y years)');
 {
   const dara = 50000, lastYear = (MAX_YEAR + 4);
   const { summary } = runBuild({ dara, lastYear, tipsMarketData, refCPI, settlementDate });
   assert('future30yYears.length > 0', (summary.future30yYears?.length ?? 0) > 0, true);
-  assert('future30yLowerYear is the 2056 TIPS (2.0: the lower cover is always the 2056)', summary.future30yLowerYear, 2056);
-  assert('future30yUpperYear is earlier than the lower cover', summary.future30yUpperYear < summary.future30yLowerYear, true);
+  // The cover pair is chosen by rule (2.0 §Future 30Y Cover Pair; checked against DD §5.1 above).
+  const _covers = selectFuture30yCovers({ tipsMarketData, settlementDate });
+  assert('future30yLowerYear is the rule\u2019s lower cover', summary.future30yLowerYear, _covers.lowerCoverBond.maturity.getFullYear());
+  assert('future30yUpperYear is the rule\u2019s upper cover', summary.future30yUpperYear, _covers.upperCoverBond.maturity.getFullYear());
+  assert('the upper cover has the longer duration', summary.future30yUpperDuration > summary.future30yLowerDuration, true);
   assert('future30yLowerWeight + future30yUpperWeight ≈ 1',
     (summary.future30yLowerWeight ?? 0) + (summary.future30yUpperWeight ?? 0), 1, 0.0001);
   // Whether the target duration lands between the two covers depends on the yield curve of the day.
@@ -974,20 +1023,19 @@ console.log('\nBuild — DARA=50000, lastYear=2060 (Future 30Y years)');
   }
   assert('totalBuyCost > 0', summary.totalBuyCost > 0, true);
   console.log(`        future30yYears:      ${JSON.stringify(summary.future30yYears)}`);
-  console.log(`        d_lower(2056):       ${summary.future30yLowerDuration?.toFixed(4)}`);
+  console.log(`        d_lower(${summary.future30yLowerYear}):       ${summary.future30yLowerDuration?.toFixed(4)}`);
   console.log(`        d_avg(Future 30Y):   ${summary.future30yParams?.avgDuration?.toFixed(4)}`);
-  console.log(`        d_upper(2052):       ${summary.future30yUpperDuration?.toFixed(4)}`);
-  console.log(`        weights 2056/2052:   ${summary.future30yLowerWeight?.toFixed(4)} / ${summary.future30yUpperWeight?.toFixed(4)}`);
-  console.log(`        exQty  2056/2052:    ${summary.future30yLowerExQty} / ${summary.future30yUpperExQty}`);
+  console.log(`        d_upper(${summary.future30yUpperYear}):       ${summary.future30yUpperDuration?.toFixed(4)}`);
+  console.log(`        weights lower/upper: ${summary.future30yLowerWeight?.toFixed(4)} / ${summary.future30yUpperWeight?.toFixed(4)}`);
+  console.log(`        exQty  lower/upper:  ${summary.future30yLowerExQty} / ${summary.future30yUpperExQty}`);
   console.log(`        totalBuyCost:        ${Math.round(summary.totalBuyCost).toLocaleString()}`);
 }
 
 // ── Test: Build — Future 30Y single-year block below the lower cover's own duration ──
-// Regression: with only 2057 in the block, its duration can land BELOW the 2056 lower cover's
-// own duration (deep-discount 2052 upper cover has an unusually long duration for its maturity,
-// while 2057's higher coupon keeps its duration short) — bracketWeights must clamp to
-// lowerWeight=1/upperWeight=0 rather than solve past the lower cover into negative territory.
-console.log('\nBuild — DARA=20000, lastYear=2057 (single Future-30Y year, avgDuration < lower cover)');
+// Regression: with only the first Future 30Y year in the block, its duration can land at or near the
+// lower cover's own duration — bracketWeights must clamp to lowerWeight=1/upperWeight=0 rather than
+// solve past the lower cover into negative territory.
+console.log(`\nBuild — DARA=20000, lastYear=${MAX_YEAR + 1} (single Future 30Y year)`);
 {
   const dara = 20000, lastYear = (MAX_YEAR + 1);
   const { summary } = runBuild({ dara, lastYear, tipsMarketData, refCPI, settlementDate });
@@ -997,11 +1045,11 @@ console.log('\nBuild — DARA=20000, lastYear=2057 (single Future-30Y year, avgD
   assert('future30yLowerWeight + future30yUpperWeight ≈ 1',
     (summary.future30yLowerWeight ?? 0) + (summary.future30yUpperWeight ?? 0), 1, 0.0001);
   assert('no excess quantity is negative', Math.min(summary.future30yLowerExQty, summary.future30yUpperExQty) >= 0, true);
-  console.log(`        d_lower(2056):       ${summary.future30yLowerDuration?.toFixed(4)}`);
+  console.log(`        d_lower(${summary.future30yLowerYear}):       ${summary.future30yLowerDuration?.toFixed(4)}`);
   console.log(`        d_avg(Future 30Y):   ${summary.future30yParams?.avgDuration?.toFixed(4)}`);
-  console.log(`        d_upper(2052):       ${summary.future30yUpperDuration?.toFixed(4)}`);
-  console.log(`        weights 2056/2052:   ${summary.future30yLowerWeight?.toFixed(4)} / ${summary.future30yUpperWeight?.toFixed(4)}`);
-  console.log(`        exQty  2056/2052:    ${summary.future30yLowerExQty} / ${summary.future30yUpperExQty}`);
+  console.log(`        d_upper(${summary.future30yUpperYear}):       ${summary.future30yUpperDuration?.toFixed(4)}`);
+  console.log(`        weights lower/upper: ${summary.future30yLowerWeight?.toFixed(4)} / ${summary.future30yUpperWeight?.toFixed(4)}`);
+  console.log(`        exQty  lower/upper:  ${summary.future30yLowerExQty} / ${summary.future30yUpperExQty}`);
 }
 
 // ── Test: Rebalance — same single-year Future 30Y corner case as build above ─────
@@ -1021,8 +1069,8 @@ console.log('\nRebalance — same DARA=20000, lastYear=2057 corner case, via bui
   assert('rebal: no weight is negative', Math.min(summary.future30yLowerWeight, summary.future30yUpperWeight) >= 0, true);
   assert('rebal: no weight exceeds 1', Math.max(summary.future30yLowerWeight, summary.future30yUpperWeight) <= 1, true);
   assert('rebal: no excess quantity is negative', Math.min(summary.future30yLowerExQty, summary.future30yUpperExQty) >= 0, true);
-  console.log(`        weights 2056/2052:   ${summary.future30yLowerWeight?.toFixed(4)} / ${summary.future30yUpperWeight?.toFixed(4)}`);
-  console.log(`        exQty  2056/2052:    ${summary.future30yLowerExQty} / ${summary.future30yUpperExQty}`);
+  console.log(`        weights lower/upper: ${summary.future30yLowerWeight?.toFixed(4)} / ${summary.future30yUpperWeight?.toFixed(4)}`);
+  console.log(`        exQty  lower/upper:  ${summary.future30yLowerExQty} / ${summary.future30yUpperExQty}`);
 }
 
 // ── Test: Rebalance — lastYear defaults to the latest maturity year held, not the last
@@ -1058,49 +1106,83 @@ console.log('\nRebalance — an unheld year above 2040 (e.g. 2048) no longer tru
   assert('rebalance infers lastYear === 2049, not truncated to 2047 by the 2048 hole', summary.lastYear, 2049);
 }
 
-// ── Test: Rev 6 — cover Amount = N×DARA, AMD net-out, roll coupon hand-off ─────────
-console.log('\nBuild — Rev 6 cover Amount + roll coupon, DARA=40000, lastYear=2066');
-{
-  const dara = 40000, lastYear = (MAX_YEAR + 10), firstYear = settlementDate.getFullYear();
-  const { summary, details } = runBuild({ dara, lastYear, tipsMarketData, refCPI, settlementDate });
-  const U = summary.future30yUpperYear, L = summary.future30yLowerYear; // the cover pair (2.0: lower is always the 2056 TIPS)
-  assert('future30yLowerYear is the 2056 TIPS (2.0: the lower cover is always the 2056)', L, 2056);
-  const cover = details.filter(d => d.isFuture30yCover);
-  const coverAmt = cover.reduce((s, d) => s + (d.excessAmt ?? 0), 0);
-  const nFuture = summary.future30yYears.length;
-  // 6a: the cover pair is sized by COST against the Future-30Y block, and each synthetic rung  // delivers DARA at maturity, so cover Amount tracks numFuture30yYears × DARA scaled by what  // those rungs actually cost. They price below par (2.0 §Future 30Y Rungs), so the expectation  // carries that discount rather than assuming par. Still catches the bug this was written for,  // where cover Amount came out ≈ 1.3× the block. Within 2%.  const f30bd = summary.future30yParams.breakdown;  const avgSynPrice = f30bd.reduce((s, g) => s + (g.synPrice ?? 100), 0) / f30bd.length;  const expectedCoverAmt = nFuture * dara * avgSynPrice / 100;  assert("cover Amount ≈ numFuture30yYears × DARA at the block price", coverAmt, expectedCoverAmt, expectedCoverAmt * 0.02);
-  // 6a: the 2052 cover nets its lifetime AMD out of P+I — Amount strictly below raw par P+I.
-  const c2052 = cover.find(d => d.fundedYear === U);
-  assert('2052 cover Amount < raw par P+I (AMD netted out)',
-    c2052.excessAmt < c2052.excessQty * c2052.fundedYearPi, true);
-  assert('2052 excessAmdLifetime > 0', c2052.excessAmdLifetime > 0, true);
-  // 6a: the 2056 lower cover also nets its lifetime AMD out (deep-discount cover, flipped on Rev 7).
-  // Its Amount can sit ABOVE raw par (large LMI add-back, weight ≈0.76, exceeds its AMD) — so assert
-  // the net-out is actually applied via the formula identity rather than a raw-par inequality.
-  const c2056 = cover.find(d => d.fundedYear === L);
-  assert('2056 excessAmdLifetime > 0', c2056.excessAmdLifetime > 0, true);
-  assert('2056 cover Amount = par − AMD + LMI add-back (net-out applied)',
-    c2056.excessAmt,
-    c2056.excessQty * c2056.fundedYearPi - c2056.excessAmdLifetime + (c2056.future30yLMIAlloc ?? 0), 1);
-  // 6b: roll coupon credited to each of 2053–2056; AMD now runs through 2056 (2052 + 2056 covers,
-  // both held-to-maturity), so 2053–56 carry BOTH the 2052 roll coupon and the 2056-cover AMD.
-  const roll = y => details.find(d => d.fundedYear === y)?.future30yRollCoupon ?? 0;
-  const amd  = y => details.find(d => d.fundedYear === y)?.future30yUpperAnnualAmd ?? 0;
-  // The roll coupon runs from the upper cover's maturity to the last real maturity year (the first Future 30Y year follows it).
-  for (let y = U + 1; y <= MAX_YEAR; y++) assert(`roll coupon credited @${y}`, roll(y) > 0, true);
-  assert('no roll coupon @2052', roll(U), 0);
-  assert('no roll coupon after the last real maturity year', roll(MAX_YEAR + 1), 0);
-  assert('AMD present @2052', amd(U) > 0, true);
-  assert('AMD present @2053 (from 2056 cover)', amd((U + 1)) > 0, true);
-  assert('no AMD @2057 (covers matured by 2056)', amd((L + 1)), 0);
-  // Every funded year in 2050–2056 still lands on DARA after the credits.
-  for (const y of [U - 2, U, U + 1, L]) {
-    const d = details.find(x => x.fundedYear === y);
-    assert(`amount ≈ DARA @${y}`, d.fundedYearAmt, dara, 700);
+/// ── Test: Future 30Y Simulated Outstanding TIPS — interest, Amount, excess rows ─────────
+// 2.0 §Future 30Y Simulated Outstanding TIPS and §Amount of a Gap Year and a Future 30Y Year. The
+// expected figures are worked out here from Pass 1's quantities and coupon, not read back from the
+// engine's own per-year maps.
+for (const dara of [20000, 100000, 400000]) {
+  console.log(`\nBuild — Future 30Y sequence and Amount, DARA=${dara}, lastYear=${LAST_MAX}`);
+  const firstYear = settlementDate.getFullYear(), lastYear = LAST_MAX;
+  const { summary, details } = runBuild({ dara, firstYear, lastYear, tipsMarketData, refCPI, settlementDate, bondHolidays });
+  const bd = [...summary.future30yParams.breakdown].sort((a, b) => a.year - b.year);
+  const firstF30 = bd[0].year, lastF30 = bd[bd.length - 1].year;
+  const synCpn = bd[0].synCpn;
+
+  // Simulated Outstanding Future 30Y TIPS interest: one coupon in its issue year, two in each later
+  // year, issued 30 years before its maturity year. Years after the settlement year only (the
+  // settlement year counts unpaid coupons alone).
+  const expectedSim = (t) => bd.reduce((s, r) => {
+    const issueYear = r.year - 30;
+    return s + (t < issueYear ? 0 : t === issueYear ? r.qty * 1000 * synCpn / 2 : r.qty * 1000 * synCpn);
+  }, 0);
+  let worstSim = 0;
+  for (let t = firstYear + 1; t < firstF30; t++) {
+    worstSim = Math.max(worstSim, Math.abs((summary.future30ySimulatedInterestByYear.get(t) ?? 0) - expectedSim(t)));
   }
-  console.log(`        cover Amount total:  ${Math.round(coverAmt).toLocaleString()} vs ${nFuture}×DARA = ${(nFuture*dara).toLocaleString()}`);
-  console.log(`        2052 cover: amt ${Math.round(c2052.excessAmt).toLocaleString()}  rawPI ${Math.round(c2052.excessQty*c2052.fundedYearPi).toLocaleString()}  amdLifetime ${Math.round(c2052.excessAmdLifetime).toLocaleString()}`);
-  console.log(`        roll ${U + 1}–${MAX_YEAR}: ${Array.from({ length: MAX_YEAR - U }, (_, i) => roll(U + 1 + i)).map(v=>Math.round(v)).join(' / ')}`);
+  assert('simulated TIPS interest per funded year matches the coupon count (worst $' + Math.round(worstSim) + ')', worstSim < 0.01, true);
+  assert('no Cover Excess interest after the last issue year',
+    [...summary.future30yCoverInterestByYear.entries()].every(([y, v]) => y <= lastF30 - 30 || v === 0), true);
+  assert('Cover Excess interest in the first issue year', (summary.future30yCoverInterestByYear.get(firstF30 - 30) ?? 0) > 0, true);
+  const conv = summary.future30ySequence.conversions;
+  assert('one conversion per Future 30Y year, earliest issue date first',
+    conv.map(c => c.year).join(','), bd.map(r => r.year).join(','));
+  assert('Cover Excess is 0 after the last conversion',
+    conv[conv.length - 1].lowerQtyAfter + conv[conv.length - 1].upperQtyAfter, 0);
+  const _iso = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  const isLastTradingDayOfFeb = (d) => {
+    if (d.getMonth() !== 1 || d.getDay() === 0 || d.getDay() === 6 || bondHolidays.has(_iso(d))) return false;
+    for (const x = new Date(d); ;) {
+      x.setDate(x.getDate() + 1);
+      if (x.getMonth() !== 1) return true;
+      if (x.getDay() !== 0 && x.getDay() !== 6 && !bondHolidays.has(_iso(x))) return false;
+    }
+  };
+  assert('every issue date is the last trading day of February, 30 years before the maturity year',
+    conv.every(c => c.issueDate.getFullYear() === c.year - 30 && isLastTradingDayOfFeb(c.issueDate)), true);
+
+  // Each Future 30Y year's Amount = Pass 1's Amount for its Synthetic TIPS: its own P+I plus the full
+  // annual coupons of the later Future 30Y years' TIPS.
+  let worstF30 = 0;
+  for (const r of bd) {
+    const later = bd.filter(x => x.year > r.year).reduce((s, x) => s + x.qty * 1000 * synCpn, 0);
+    const pass1Amount = r.qty * (1000 + 1000 * synCpn / 2) + later;
+    worstF30 = Math.max(worstF30, Math.abs(summary.syntheticYearAmounts[r.year].amount - pass1Amount));
+    assert(`${r.year}: Amount within half a P+I per TIPS of its DARA (whole-TIPS rounding)`,
+      Math.abs(summary.syntheticYearAmounts[r.year].amount - r.dara) <= r.piPerBond / 2 + 0.01, true);
+  }
+  assert('each Future 30Y year Amount equals Pass 1’s Amount for its Synthetic TIPS (worst $' + worstF30.toFixed(2) + ')', worstF30 < 0.01, true);
+
+  // Excess rows carry no Amount; a cover year's Same-Maturity Excess Interest is 0.
+  const coverRows = details.filter(d => d.isFuture30yCover);
+  assert('cover rows exist', coverRows.length > 0, true);
+  assert('cover rows carry no excess Amount', coverRows.every(d => d.excessAmt === undefined), true);
+  assert('cover years: Same-Maturity Excess Interest is 0', coverRows.every(d => (d.excessLMI_After ?? 0) === 0), true);
+
+  // Every funded year before the first Future 30Y year lands on its DARA within half a P+I per TIPS of
+  // its own TIPS (whole-TIPS rounding), the Future 30Y interest included.
+  let worstFunded = 0, worstFundedY = null;
+  for (const d of details) {
+    if (d.fundedYearAmt == null || d.fundedYear <= firstYear || d.fundedYear > lastYear) continue;
+    if (summary.zeroedFundedYears?.includes(d.fundedYear)) continue;
+    const off = Math.abs(d.fundedYearAmt - d.dara) - d.fundedYearPi / 2;
+    if (off > worstFunded) { worstFunded = off; worstFundedY = d.fundedYear; }
+  }
+  assert(`funded years land on DARA within half a P+I per TIPS${worstFundedY ? ' (worst @' + worstFundedY + ')' : ''}`, worstFunded <= 1, true);
+
+  // Diagnostic only, not asserted: 2.0 §What happens on each issue date step 4 expects the Net Cash of
+  // each conversion to be close to zero, an assumption that has not been confirmed (see report).
+  console.log('        Net Cash per issue date, % of the Simulated Outstanding Future 30Y TIPS cost: '
+    + conv.map(c => `${c.year} ${(100 * c.netCash / c.simulatedCost).toFixed(1)}%`).join(', '));
 }
 
 // ── Test: Build — firstYear=2036, lastYear=2056, preLadderInterest=true ───────
@@ -1120,7 +1202,7 @@ console.log('\nBuild — firstYear=2036, lastYear=2056, preLadderInterest=true')
   assert('lower bracket total qty > 0', lowerTotalQty > 0, true);
   assert('upper bracket total qty > 0', upperTotalQty > 0, true);
   const numRungs = lastYear - firstYear + 1;
-  const totalAmt = details.reduce((s, d) => s + (d.fundedYearAmt ?? 0) + (d.excessAmt ?? 0), 0);
+  const totalAmt = buildTotalAmount(details, summary);
   const avgAmt = totalAmt / numRungs;
   assert('avgAmt ≈ DARA with PLI (gap LMI included), within 2% of DARA', avgAmt, dara, dara * 0.02); // see note above
   console.log(`        lowerYear: ${summary.lowerYear}, upperYear: ${summary.upperYear}`);
@@ -1141,9 +1223,9 @@ console.log('\nBuild — firstYear=2036, lastYear=2056, preLadderInterest=true')
 // Uses 2-bracket mode to expose any remaining algorithm differences. 3-bracket
 // "freeze orig lower" would mask mismatches by pinning 2036 excess at its
 // current holdings value regardless of gap-params accuracy.
-console.log('\nBuild→Rebalance symmetry — firstYear=2036, lastYear=2065, PLI=true, DARA=40000');
+console.log(`\nBuild→Rebalance symmetry — firstYear=${GAP.first - 1}, lastYear=${LAST_MAX - 1}, PLI=true, DARA=40000`);
 {
-  const DARA = 40000, firstYear = (GAP.first - 1), lastYear = (MAX_YEAR + 9);
+  const DARA = 40000, firstYear = (GAP.first - 1), lastYear = (LAST_MAX - 1);
 
   // 1. Build
   const { details: buildDetails, summary: buildSummary } = runBuild({
@@ -1172,7 +1254,7 @@ console.log('\nBuild→Rebalance symmetry — firstYear=2036, lastYear=2065, PLI
   // 4. Assert: no qty changes on any rung.
   // Tolerance: ±2 bonds across all bracket years. Root cause is a pre-existing LMI
   // computation difference between calcGapParams (build) and calculateGapParameters
-  // (rebalance). AMD's larger PLI pool can expose the asymmetry at both the lower
+  // (rebalance). A larger PLI pool can expose the asymmetry at both the lower
   // bracket (2036) and upper bracket (2040), hence the 2-bond / $4000 tolerance.
   const totalAbsQtyDelta = rebalResults.reduce((s, r) => s + Math.abs(r[9] ?? 0), 0);
   assert('Build→Rebalance: zero total |qtyDelta|', totalAbsQtyDelta <= 2, true);
@@ -1190,12 +1272,12 @@ console.log('\nBuild→Rebalance symmetry — firstYear=2036, lastYear=2065, PLI
 }
 
 // ── Test: Build→Rebalance round-trip with NO year overrides — Future-30Y excess ──
-// Regression: build 2026–2066 (default DARA), export CUSIP/Qty/excess, import, rebalance
+// Regression: build to the ladder's last year at most (default DARA), export CUSIP/Qty/excess, import, rebalance
 // WITHOUT setting first/last year. lastYear must be INFERRED from the 2052/2056 cover excess
 // (inferLastYearFromHoldings) so the round-trip preserves it instead of selling to DARA.
-console.log('\nBuild→Rebalance NO-override round-trip — firstYear=2026, lastYear=2066, DARA=40000');
+console.log(`\nBuild→Rebalance NO-override round-trip — firstYear=${settlementDate.getFullYear()}, lastYear=${LAST_MAX}, DARA=40000`);
 {
-  const DARA = 40000, firstYear = settlementDate.getFullYear(), lastYear = (MAX_YEAR + 10);
+  const DARA = 40000, firstYear = settlementDate.getFullYear(), lastYear = LAST_MAX;
   const { details: bD, summary: bS } = runBuild({ dara: DARA, firstYear, lastYear, tipsMarketData, refCPI, settlementDate });
   const holdings = bD
     .map(d => ({ cusip: d.cusip, qty: d.fundedYearQty + d.excessQty, excessQty: d.excessQty }))
@@ -1203,15 +1285,15 @@ console.log('\nBuild→Rebalance NO-override round-trip — firstYear=2026, last
 
   // Direct inference check
   const inferredLast = inferLastYearFromHoldings({ holdings, tipsMarketData, refCPI, settlementDate });
-  assert('inferLastYear from build holdings === 2066', inferredLast, (MAX_YEAR + 10));
+  assert(`inferLastYear from build holdings === ${LAST_MAX}`, inferredLast, LAST_MAX);
 
   // Rebalance with NO firstYearOverride / NO lastYearOverride — must self-infer.
   const { summary: rS, results: rR } = runRebalance({
     dara: DARA, bracketMode: '2bracket', holdings, tipsMarketData, refCPI, settlementDate,
   });
-  assert('NO-override rebal infers lastYear 2066', rS.lastYear, (MAX_YEAR + 10));
-  assert('NO-override rebal preserves 2052 upper cover excess', rS.future30yUpperExQty, bS.future30yUpperExQty);
-  assert('NO-override rebal preserves 2056 lower cover excess', rS.future30yLowerExQty, bS.future30yLowerExQty);
+  assert(`NO-override rebal infers lastYear ${LAST_MAX}`, rS.lastYear, LAST_MAX);
+  assert('NO-override rebal preserves the upper Cover Excess', rS.future30yUpperExQty, bS.future30yUpperExQty);
+  assert('NO-override rebal preserves the lower Cover Excess', rS.future30yLowerExQty, bS.future30yLowerExQty);
   const totalAbsQtyDelta = rR.reduce((s, r) => s + Math.abs(r[9] ?? 0), 0);
   assert('NO-override round-trip: zero total |qtyDelta|', totalAbsQtyDelta <= 2, true);
   assert('NO-override round-trip: zero net cash', Math.abs(Math.round(rS.costDeltaSum)) <= 4000, true);
@@ -1222,9 +1304,9 @@ console.log('\nBuild→Rebalance NO-override round-trip — firstYear=2026, last
 // Regression for the Future-30Y import bug: mirrors the app's "Export CUSIP/Qty" → import path
 // exactly (serialize to cusip,qty,excess; re-parse via parseHoldingsCSV), with PLI on. The last
 // funded year must be recovered from the 2052/2056 cover excess so the round-trip is flat.
-console.log('\nBuild→Rebalance export-string round-trip — firstYear=2036, lastYear=2066, PLI, DARA=40000');
+console.log(`\nBuild→Rebalance export-string round-trip — firstYear=${GAP.first - 1}, lastYear=${LAST_MAX}, PLI, DARA=40000`);
 {
-  const DARA = 40000, firstYear = (GAP.first - 1), lastYear = (MAX_YEAR + 10);
+  const DARA = 40000, firstYear = (GAP.first - 1), lastYear = LAST_MAX;
   const { details: bD, summary: bS } = runBuild({ dara: DARA, firstYear, lastYear, tipsMarketData, refCPI, settlementDate, preLadderInterest: true });
   const zeroed = new Set(bS.zeroedFundedYears ?? []);
 
@@ -1238,7 +1320,7 @@ console.log('\nBuild→Rebalance export-string round-trip — firstYear=2036, la
   const holdings = parseHoldingsCSV(rows.join('\n'), tipsMarketData);   // same parser the app uses (Format 5)
 
   const infLast = inferLastYearFromHoldings({ holdings, tipsMarketData, refCPI, settlementDate });
-  assert('PLI round-trip: last year recovered as 2066', infLast, (MAX_YEAR + 10));
+  assert(`PLI round-trip: last year recovered as ${LAST_MAX}`, infLast, LAST_MAX);
 
   // Rebalance the way the (fixed) UI would: recovered last year, PLI on, no first-year override.
   const { summary: rS, results: rR } = runRebalance({
@@ -1262,13 +1344,13 @@ console.log('\nBuild→Rebalance export-string round-trip — firstYear=2036, la
   const SY = settlementDate.getFullYear();
   for (const tc of [
     { label: '2026–2056 flat',     firstYear: SY,   lastYear: MAX_YEAR, pli: false, vary: false },
-    { label: '2026–2066 flat',     firstYear: SY,   lastYear: (MAX_YEAR + 10), pli: false, vary: false },
-    { label: '2036–2066 +PLI',     firstYear: (GAP.first - 1), lastYear: (MAX_YEAR + 10), pli: true,  vary: false },
+    { label: `${SY}–${LAST_MAX} flat`,     firstYear: SY,   lastYear: LAST_MAX, pli: false, vary: false },
+    { label: `${GAP.first - 1}–${LAST_MAX} +PLI`,     firstYear: (GAP.first - 1), lastYear: LAST_MAX, pli: true,  vary: false },
     { label: '2026–2056 variable', firstYear: SY,   lastYear: MAX_YEAR, pli: false, vary: true  },
-    { label: '2034–2066 variable+PLI', firstYear: (GAP.first - 3), lastYear: (MAX_YEAR + 10), pli: true, vary: true },
+    { label: `${GAP.first - 3}–${LAST_MAX} variable+PLI`, firstYear: (GAP.first - 3), lastYear: LAST_MAX, pli: true, vary: true },
     // User repro: 40k base, RAISED later years (2040/41/42 = 50/60/70k), PLI, 2066. This drives the
     // gap-bracket excess toward 0 and exercises the "Before == build" + 0-excess bracket render fixes.
-    { label: '2036–2066 high-mid+PLI', firstYear: (GAP.first - 1), lastYear: (MAX_YEAR + 10), pli: true, vary: false,
+    { label: `${GAP.first - 1}–${LAST_MAX} high-mid+PLI`, firstYear: (GAP.first - 1), lastYear: LAST_MAX, pli: true, vary: false,
       daraOverrides: { [GAP.last + 1]: 50000, [GAP.last + 2]: 60000, [GAP.last + 3]: 70000 } },
   ]) {
     const { label, firstYear, lastYear, pli, vary, daraOverrides } = tc;
@@ -1340,9 +1422,9 @@ console.log('\nBuild→Rebalance export-string round-trip — firstYear=2036, la
 
       // "Amount Before" is the current-holdings valuation. For our own no-trade round-trip the held
       // ladder IS the target, so Before must also equal build per year — via the SAME shared rule
-      // (fundedYearAmount): bracket excess coupon, zeroed-year pre-ladder credit, and excess-only AMD
+      // (fundedYearAmount): bracket excess coupon, zeroed-year pre-ladder credit, and the Future 30Y interest
       // all included. Locks the unified Before sweep against drift (was: missing those → 20k+ deficits
-      // at zeroed/bracket years and ~$500 AMD drift on every middle year).
+      // at zeroed/bracket years and drift on every middle year).
       const rebalBeforeByYear = new Map();
       for (const d of rD) if (d.fundedYear != null && d.araBeforeTotal != null) rebalBeforeByYear.set(d.fundedYear, d.araBeforeTotal);
       let worstBef = 0, worstBefY = null;
@@ -1366,6 +1448,70 @@ console.log('\nBuild→Rebalance export-string round-trip — firstYear=2036, la
     }
     console.log(`        med=${med}  yrs=${yrs[0]}–${yrs[yrs.length - 1]}  |qtyDelta|=${totalAbsQtyDelta}  netCash=${Math.round(rS.costDeltaSum).toLocaleString()}`);
   }
+}
+
+// ── Test: Future 30Y round trip across magnitudes (build → export → import → rebalance) ──
+// 3.0 §Build ≡ Rebalance "Before" and "After": with Future 30Y years, a round trip of this app's own
+// file produces no trades, and Before equals After equals build for every funded year and for every
+// Future 30Y year. Checked across DARA magnitudes, last years from the longest issued maturity year to
+// the ladder's last year at most, flat and variable DARA, with and without Pre-Ladder Interest.
+{
+  const SY = settlementDate.getFullYear();
+  const lastYears = [...new Set([MAX_YEAR, MAX_YEAR + 1, Math.min(MAX_YEAR + 4, LAST_MAX), LAST_MAX])];
+  let cases = 0, failures = [];
+  for (const DARA of [20000, 100000, 400000]) {
+    for (const lastYear of lastYears) {
+      for (const vary of [false, true]) {
+        for (const pli of [false, true]) {
+          const firstYear = pli ? SY + 2 : SY;
+          const label = `DARA ${DARA / 1000}K ${firstYear}–${lastYear}${vary ? ' variable' : ' flat'}${pli ? ' +PLI' : ''}`;
+          const buildDaraByYear = vary
+            ? new Map([[firstYear, DARA * 0.6], [firstYear + 1, DARA * 0.8], [MAX_YEAR - 3, DARA * 1.25], ...(lastYear > MAX_YEAR ? [[lastYear, DARA * 1.5]] : [])])
+            : null;
+          const { details: bD, summary: bS } = runBuild({ dara: DARA, firstYear, lastYear, tipsMarketData, refCPI, settlementDate, preLadderInterest: pli, daraByYear: buildDaraByYear, bondHolidays });
+          const zeroed = new Set(bS.zeroedFundedYears ?? []);
+          const rows = ['cusip,qty,excess'];
+          for (const d of bD) {
+            const f = d.fundedYearQty, e = d.excessQty;
+            if (f + e > 0) rows.push(`${d.cusip},${f},${e}`);
+            else if (zeroed.has(d.fundedYear)) rows.push(`${d.cusip},0,0`);
+          }
+          rows.push('#fundedYear,dara');
+          for (const y of [...bS.daraByYearResolved.keys()].sort((a, b) => a - b)) rows.push(`${y},${Math.round(bS.daraByYearResolved.get(y))}`);
+          const csv = rows.join('\n');
+          const holdings = parseHoldingsCSV(csv, tipsMarketData);
+          const importedDara = parseFundedYearDaraBlock(csv.split('\n'));
+          const yrs = [...importedDara.keys()].sort((a, b) => a - b);
+          const vals = [...importedDara.values()].sort((a, b) => a - b);
+          const { summary: rS, results: rR, details: rD } = runRebalance({
+            dara: Math.round(vals[Math.floor(vals.length / 2)]), bracketMode: '3bracket', holdings, tipsMarketData, refCPI, settlementDate,
+            daraByYear: importedDara, lastYearOverride: yrs[yrs.length - 1], firstYearOverride: yrs[0], preLadderInterest: pli, bondHolidays,
+          });
+          cases++;
+          const problems = [];
+          const qtyMoved = rR.reduce((s, r) => s + Math.abs(r[9] ?? 0), 0);
+          if (qtyMoved !== 0) problems.push(`|qtyDelta| ${qtyMoved}`);
+          if (Math.round(rS.costDeltaSum) !== 0) problems.push(`net cash ${Math.round(rS.costDeltaSum)}`);
+          const buildAmt = new Map(bD.filter(d => d.fundedYearAmt != null).map(d => [d.fundedYear, d.fundedYearAmt]));
+          for (const [y, amt] of buildAmt) {
+            const r = rD.find(d => d.fundedYear === y && d.araAfterTotal != null);
+            if (!r) { problems.push(`${y} missing`); continue; }
+            if (Math.abs(r.araAfterTotal - amt) >= 2) problems.push(`${y} After ${Math.round(r.araAfterTotal)} vs build ${Math.round(amt)}`);
+            if (Math.abs(r.araBeforeTotal - r.araAfterTotal) >= 2) problems.push(`${y} Before ${Math.round(r.araBeforeTotal)} vs After ${Math.round(r.araAfterTotal)}`);
+          }
+          for (const y of bS.future30yYears) {
+            const b = bS.syntheticYearAmounts[y]?.amount, a = rS.syntheticYearAmounts?.[y]?.amount, be = rS.syntheticYearAmountsBefore?.[y]?.amount;
+            if (!(Math.abs(b - a) < 0.01 && Math.abs(a - be) < 0.01)) problems.push(`${y} Future 30Y Amount build ${b} After ${a} Before ${be}`);
+          }
+          if (pli && bS.future30yYears.length && !(bS.preLadderFuture30yPool > 0)) problems.push('Pre-Ladder Interest pool lacks the Future 30Y interest');
+          if (problems.length) failures.push(`${label}: ${problems.slice(0, 4).join('; ')}`);
+        }
+      }
+    }
+  }
+  console.log(`\nFuture 30Y round trip across magnitudes — ${cases} cases`);
+  for (const f of failures) console.error('        ' + f);
+  assert(`every case: no trades, Before == After == build per funded year and per Future 30Y year (${failures.length} failing)`, failures.length, 0);
 }
 
 // ── Test: parseParamsBlock — construction params (#params line) ──────────────
@@ -1420,9 +1566,9 @@ console.log('\nparseParamsBlock — #params line');
 // Same scenario as the Gap-method test above, but with method='Full'.
 // 3-bracket is equivalent to 2-bracket here (firstYear=2036 = anchorBefore),
 // but this test covers the Full-mode estimation path in calculateGapParameters.
-console.log('\nBuild→Rebalance symmetry — firstYear=2036, lastYear=2065, PLI=true, DARA=40000, method=Full');
+console.log(`\nBuild→Rebalance symmetry — firstYear=${GAP.first - 1}, lastYear=${LAST_MAX - 1}, PLI=true, DARA=40000, method=Full`);
 {
-  const DARA = 40000, firstYear = (GAP.first - 1), lastYear = (MAX_YEAR + 9);
+  const DARA = 40000, firstYear = (GAP.first - 1), lastYear = (LAST_MAX - 1);
 
   // 1. Build
   const { details: buildDetailsFull, summary: buildSummaryFull } = runBuild({
@@ -1477,7 +1623,7 @@ console.log('\nBuild→Rebalance symmetry — firstYear=2036, lastYear=2065, PLI
 // → Rebalance (firstYear=2036, lastYear=2065, PLI=true, dara=null).
 // inferredDARA should land close to the build DARA (within ±500).
 // If this fails it means the inference formula is broken, not the rebalance itself.
-console.log('\nBuild→Rebalance DARA inference — firstYear=2035→2036, lastYear=2064→2065, PLI=true');
+console.log(`\nBuild→Rebalance DARA inference — firstYear=${GAP.first - 2}→${GAP.first - 1}, lastYear=${LAST_MAX - 2}→${LAST_MAX - 1}, PLI=true`);
 {
   const BUILD_DARA = 40000;
 
@@ -1485,7 +1631,7 @@ console.log('\nBuild→Rebalance DARA inference — firstYear=2035→2036, lastY
   const { details: inferBuildDetails } = runBuild({
     dara: BUILD_DARA,
     firstYear: (GAP.first - 2),
-    lastYear: (MAX_YEAR + 8),
+    lastYear: (LAST_MAX - 2),
     tipsMarketData, refCPI, settlementDate,
     preLadderInterest: true,
   });
@@ -1502,7 +1648,7 @@ console.log('\nBuild→Rebalance DARA inference — firstYear=2035→2036, lastY
     tipsMarketData, refCPI, settlementDate,
     preLadderInterest: true,
     firstYearOverride: (GAP.first - 1),
-    lastYearOverride: (MAX_YEAR + 9),
+    lastYearOverride: (LAST_MAX - 1),
   });
 
   const inferred = inferRebalSummary.inferredDARA;
