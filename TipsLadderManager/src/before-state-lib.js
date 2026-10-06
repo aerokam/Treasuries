@@ -17,11 +17,18 @@
 import { bondCalcs } from '../../shared/src/bond-math.js';
 import { fmtDate } from './date-util.js';
 import { computePortfolioARAByYear, getGapYears } from './rebalance-lib.js';
+import { selectFuture30yCovers } from './ladder-core.js';
 import { findSpikes, evenSpread, MIN_SHAPE_POINTS } from './shape-math.js';
 
 export const LOWEST_LOWER_BRACKET_YEAR = 2032;
 export const UPPER_BRACKET_YEAR = 2040;
-export const FUTURE30Y_COVER_YEARS = [2052, 2056];
+
+// The maturity years of the Future 30Y cover pair, chosen by rule from market data (2.0 §Future 30Y
+// Cover Pair; DD §5.1). A market-data lookup, not the duration-match engine.
+export function future30yCoverYears(tipsMarketData, settlementDate = new Date()) {
+  const c = selectFuture30yCovers({ tipsMarketData, settlementDate });
+  return [c?.lowerCoverBond, c?.upperCoverBond].filter(Boolean).map(b => b.maturity.getFullYear());
+}
 
 // Same "middle of the sorted array" median convention used elsewhere in this app
 // (rebalance-lib.js `derivePerYearDara`) — not an average-of-two-middles median.
@@ -93,7 +100,7 @@ export function getLowerBracketCandidateYears(tipsMarketData) {
 // years only). `lastYear` gates lower/upper candidates the same way
 // rebalance-lib.js's getGapYearBracketCandidates does — a ladder that hasn't reached the
 // structural gap yet has no candidates at all.
-export function detectBracketFlags({ heldARAByYear, tipsMarketData, lastYear }) {
+export function detectBracketFlags({ heldARAByYear, tipsMarketData, lastYear, settlementDate = new Date() }) {
   const flags = new Map();
   const heldYears = new Set(Object.keys(heldARAByYear).map(Number));
   const gapYears = getGapYears(tipsMarketData);
@@ -151,13 +158,13 @@ export function detectBracketFlags({ heldARAByYear, tipsMarketData, lastYear }) 
   }
 
   // Active Lower Bracket year itself (e.g. 2036), Upper bracket (2040), and each Future 30Y cover
-  // (2052, 2056) — each evaluated independently of the lower-candidate pool above and of each
+  // (future30yCoverYears) — each evaluated independently of the lower-candidate pool above and of each
   // other; each may flag on its own. The active bracket year is INTENTIONALLY handled here rather
   // than folded into the lower-candidate pool's "highest excess wins" competition: unlike an older
   // retained leg, it's expected to legitimately carry both real funded income and gap-coverage
   // excess, so it must be able to flag alongside a genuine retained-leg flag, not compete with it
   // for a single slot (3.0 §Before-State Preview and Bracket-Year Excess Detection).
-  for (const y of [activeYear, UPPER_BRACKET_YEAR, ...FUTURE30Y_COVER_YEARS]) {
+  for (const y of [activeYear, UPPER_BRACKET_YEAR, ...future30yCoverYears(tipsMarketData, settlementDate)]) {
     if (y == null || !heldYears.has(y)) continue;
     if ((y === UPPER_BRACKET_YEAR || y === activeYear) && (minGap == null || lastYear < minGap)) continue;
     if (spikeByYear.has(y)) flags.set(y, spikeByYear.get(y));
@@ -201,7 +208,7 @@ function heldQtyCostByYear(holdings, tipsMarketData, refCPI) {
 // year the user has already edited recalculates its excess against the entered value instead of
 // the median (3.0: "If the user edits a flagged year's DARA input ... the excess recalculates
 // immediately — raw ARA − entered DARA").
-export function computeBeforeState({ holdings, tipsMarketData, refCPI, firstYear, lastYear, daraByYear = null }) {
+export function computeBeforeState({ holdings, tipsMarketData, refCPI, firstYear, lastYear, daraByYear = null, settlementDate = new Date() }) {
   const heldARAByYear = computePortfolioARAByYear(holdings, tipsMarketData, refCPI);
   const rangeARAByYear = computePortfolioARAByYear(holdings, tipsMarketData, refCPI, { firstYear, lastYear });
   const qtyCostByYear = heldQtyCostByYear(holdings, tipsMarketData, refCPI);
@@ -211,7 +218,7 @@ export function computeBeforeState({ holdings, tipsMarketData, refCPI, firstYear
   const future30yYears = [];
   for (let y = maxTipsYear + 1; y <= lastYear; y++) future30yYears.push(y);
 
-  const flags = detectBracketFlags({ heldARAByYear, tipsMarketData, lastYear });
+  const flags = detectBracketFlags({ heldARAByYear, tipsMarketData, lastYear, settlementDate });
 
   // Group held CUSIPs by funded year (consolidated qty across accounts/rows sharing a CUSIP).
   const byYearCusip = new Map(); // year -> Map(cusip -> qty)
@@ -257,7 +264,7 @@ export function computeBeforeState({ holdings, tipsMarketData, refCPI, firstYear
     // (it only returns indexRatio/principalPerBond/costPerBond/nPeriods/couponPerPeriod/ownRungInt/
     // piPerBond/annualInt) — destructuring `coupon` off its return value silently yields `undefined`,
     // which drill.js's popups (bondVarRows' "Coupon per period", buildPIPerBondDrill's coupon
-    // interest, the bracketAmtBefore/costBefore P+I-per-TIPS lines) then do arithmetic on, producing
+    // interest, the costBefore P+I-per-TIPS lines) then do arithmetic on, producing
     // NaN throughout those popups even though the OTHER bondCalcs-derived fields (price, indexRatio,
     // costPerBond, principalPerBond) were correct. `coupon` (and `yield`, which bondCalcs never
     // touches at all — drill.js's bondVarRows reads it too) must come from the bond record itself.

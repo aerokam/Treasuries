@@ -34,19 +34,6 @@ function costPerTipsRow(d) {
   return row('Cost per TIPS', '<span class="formula-var" data-source="price">price/100</span> \xd7 <span class="formula-var" data-source="ir">index ratio</span> \xd7 1,000', fm2(d.costPerBond), false, undefined, 'cpb');
 }
 
-// Bracket/cover Amount breakdown (Rev 6): Excess P+I − AMD credited earlier + block-coupon add-back
-// = coverage delivered. `lmiAdd` is the cover's block-LMI allocation; AMD net-out is derived to reconcile.
-function coverageAmtRows(label, grossPI, lmiAdd, finalAmt) {
-  const amdNet = Math.max(0, grossPI + (lmiAdd || 0) - finalAmt);
-  let fmla = '<span class="formula-var" data-source="expi">Excess P+I</span>';
-  if (amdNet > 0.5) fmla += ' − <span class="formula-var" data-source="amdn">AMD credited earlier</span>';
-  if (lmiAdd  > 0.5) fmla += ' + <span class="formula-var" data-source="lmiadd">coupon add-back</span>';
-  return row('Excess P+I', '<span class="formula-var" data-source="pipb">P+I per TIPS</span> \xd7 <span class="formula-var" data-source="qty">Excess Quantity</span>', fm(grossPI), false, undefined, 'expi')
-    + (amdNet > 0.5 ? row('AMD credited to earlier years', 'this cover’s market discount is delivered to the years it accrues in (AMD line items), not coverage here', '−' + fm(amdNet), false, undefined, 'amdn') : '')
-    + (lmiAdd  > 0.5 ? row('+ synthetic coupon add-back', 'this cover’s share of the coupon on the synthetic rungs, which sized them down', fm(lmiAdd), false, undefined, 'lmiadd') : '')
-    + sep()
-    + row(label, fmla, fm(finalAmt), true);
-}
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
@@ -128,29 +115,65 @@ function gapBreakdownRows(gapParams, dara, opts) {
   return rows;
 }
 
-// Level-3 drill: composition of the pre-ladder pool (coupon interest + pre-ladder AMD).
-// Spec: 2.0 §Future 30Y Upper Cover AMD §Pre-Ladder Interest, 6.0 §Pre-ladder pool drill.
+/// Level-3 drill: composition of the pre-ladder pool — the coupon interest of the holdings and the
+// interest of the Simulated Outstanding Future 30Y TIPS and the Cover Excess for the years before the
+// first funded year (2.0 §Future 30Y Simulated Outstanding TIPS §Interest credited to a funded year;
+// 4.0 §build-lib.js / rebalance-lib.js — Future 30Y Simulated Outstanding TIPS).
 export function buildPreLadderPoolDrill(summary, plCreditForYear) {
-  const couponPool = summary?.preLadderCouponPool ?? 0;
-  const amdPool    = summary?.preLadderAmdPool ?? 0;
-  const rollPool   = summary?.preLadderRollCouponPool ?? 0;
-  const total      = summary?.preLadderPool ?? (couponPool + amdPool + rollPool);
-  const years      = summary?.preLadderYears ?? 0;
+  const couponPool   = summary?.preLadderCouponPool ?? 0;
+  const future30yPool = summary?.preLadderFuture30yPool ?? 0;
+  const total        = summary?.preLadderPool ?? (couponPool + future30yPool);
+  const years        = summary?.preLadderYears ?? 0;
   const rows = [
     { label: 'Pre-ladder coupon interest', note: years + ' yr \xd7 annual ladder coupon income', value: fm(couponPool) },
   ];
-  if (amdPool > 0) {
-    rows.push({ label: 'Pre-ladder AMD from excess TIPS', note: 'discount from sales of excess TIPS before the ladder starts', value: fm(amdPool) });
-  }
-  if (rollPool > 0) {
-    rows.push({ label: 'Pre-ladder Future-30Y coupon', note: 'coupon on the 2052-roll Future-30Y TIPS for pre-ladder years 2053–56', value: fm(rollPool) });
+  if (future30yPool > 0) {
+    rows.push({ label: 'Pre-ladder interest from the simulated TIPS and the Cover Excess', note: 'coupons of the Simulated Outstanding Future 30Y TIPS and of the Cover Excess paid before the ladder starts', value: fm(future30yPool) });
   }
   rows.push({ sep: true });
-  rows.push({ label: 'Total pre-ladder pool', note: 'coupon interest + AMD + Future-30Y roll coupon', value: fm(total), total: true });
+  rows.push({ label: 'Total pre-ladder pool', note: future30yPool > 0 ? 'coupon interest + simulated TIPS and Cover Excess interest' : 'coupon interest', value: fm(total), total: true });
   if (plCreditForYear > 0) {
     rows.push({ sep: true });
     rows.push({ label: 'Applied to this year', note: 'slice of the pool credited here', value: fm(plCreditForYear) });
   }
+  return rows;
+}
+
+// Interest of the Simulated Outstanding Future 30Y TIPS and of the Cover Excess credited to a funded
+// year (2.0 §Future 30Y Simulated Outstanding TIPS §Interest credited to a funded year), as popup
+// rows. `sign` prefixes the value ('−' where the popup subtracts it from DARA).
+function future30yInterestRows(year, sim, cov, sign = '') {
+  return (sim > 0 ? row('Simulated Future 30Y TIPS interest', 'coupons paid in ' + year + ' by the Simulated Outstanding Future 30Y TIPS issued by then', sign + fm(sim), false, undefined, 'sim') : '')
+    + (cov > 0 ? row('Cover Excess interest', 'coupons paid in ' + year + ' by the Cover Excess', sign + fm(cov), false, undefined, 'cov') : '');
+}
+function future30yInterestFmla(sim, cov, op = '+') {
+  return (sim > 0 ? ' ' + op + ' <span class="formula-var" data-source="sim">Simulated Future 30Y TIPS interest</span>' : '')
+    + (cov > 0 ? ' ' + op + ' <span class="formula-var" data-source="cov">Cover Excess interest</span>' : '');
+}
+
+// Amount of a gap year or a Future 30Y year, on that year's group header row (2.0 §Amount of a Gap
+// Year and a Future 30Y Year; 5.0 §Popup Routing). `a` is one entry of summary.syntheticYearAmounts.
+function syntheticYearAmountRows(a) {
+  const isGap = a.kind === 'gap';
+  const tips  = isGap ? 'Synthetic TIPS' : 'Simulated Outstanding Future 30Y TIPS';
+  const pi    = a.qty * a.piPerBond;
+  let rows = row('Quantity', 'quantity of its ' + tips + ' sized in Pass 1', a.qty, false, undefined, 'qty')
+    + row('P+I per TIPS', '$1,000 \xd7 (1 + coupon ' + fd(a.synCpn * 100, 3) + '% \xf7 2), index ratio 1.00000', fm2(a.piPerBond), false, undefined, 'pipb')
+    + row('P+I', '<span class="formula-var" data-source="pipb">P+I per TIPS</span> \xd7 <span class="formula-var" data-source="qty">Quantity</span>', fm(pi), false, undefined, 'pi')
+    + row('Later maturity interest (LMI)', isGap
+        ? 'from the TIPS maturing after ' + a.year + ' and the Synthetic TIPS of the later gap years'
+        : 'full annual coupons of the Simulated Outstanding Future 30Y TIPS of the later Future 30Y years', fm(a.laterMatInt), false, undefined, 'lmi');
+  let fmla = '<span class="formula-var" data-source="pi">P+I</span> + <span class="formula-var" data-source="lmi">LMI</span>';
+  if (isGap && a.pliCredit > 0) {
+    rows += row('Pre-ladder credit', 'pre-ladder pool applied to this gap year', fm(a.pliCredit), false, 'plcpool:' + Math.round(a.pliCredit), 'plc');
+    fmla += ' + <span class="formula-var" data-source="plc">Pre-ladder credit</span>';
+  }
+  rows += sep()
+    + row('Amount', fmla, fm(a.amount), true, undefined, 'total')
+    + sep()
+    + row('DARA', '', fm(a.dara), false, undefined, 'dara')
+    + row('Surplus / Deficit', '<span class="formula-var" data-source="total">Amount</span> − <span class="formula-var" data-source="dara">DARA</span>',
+          (a.amount - a.dara >= 0 ? '+' : '') + Math.round(a.amount - a.dara).toLocaleString('en-US'));
   return rows;
 }
 
@@ -167,8 +190,8 @@ export function buildDrillHTML(d, colKey, summary) {
     const _plCredit  = d.preLadderCreditForYear || 0;
     const sameYearExInt = d.excessLMI_After || 0;
     const longerDatedInt = d.longerDatedLMI ?? d.fundedYearLaterMatInt; // use separated if available, else combined legacy
-    const _amd = d.future30yUpperAnnualAmd || 0;
-    const _roll = d.future30yRollCoupon || 0;
+    const _sim = d.future30ySimulatedInterest || 0;
+    const _cov = d.future30yCoverExcessInterest || 0;
     // The credit pass applies Available Cash first, so a year's credit and its cash are the same
     // dollars — shown as two lines that split the credit, never added on top of it
     // (2.0 §Available Cash).
@@ -193,8 +216,7 @@ export function buildDrillHTML(d, colKey, summary) {
       : 'Principal + Coupons + <span class="formula-var" data-source="lmi">LMI</span>';
     if (sameYearExInt > 0) totalFmla += ' + <span class="formula-var" data-source="exlmi">Same-maturity excess int</span>';
     if (_plCredit - _cashCredit > 0) totalFmla += ' + Pre-ladder credit';
-    if (_amd > 0) totalFmla += ' + <span class="formula-var" data-source="amd">AMD</span>';
-    if (_roll > 0) totalFmla += ' + <span class="formula-var" data-source="roll">Cover-roll coupon</span>';
+    totalFmla += future30yInterestFmla(_sim, _cov);
     if (_cashCredit > 0) totalFmla += ' + Available cash';
 
     if (_rungs) {
@@ -214,8 +236,7 @@ export function buildDrillHTML(d, colKey, summary) {
         row(_lmiLabel, _lmiDesc, fm(longerDatedInt), false, undefined, 'lmi') +
         (sameYearExInt > 0 ? row('Same-maturity excess interest', 'from excess TIPS maturing in ' + d.fundedYear, fm(sameYearExInt), false, undefined, 'exlmi') : '') +
         (_plCredit - _cashCredit > 0 ? row('Pre-ladder credit', 'pre-ladder pool applied to this year', fm(_plCredit - _cashCredit), false, 'plcpool') : '') +
-        (_amd > 0 ? row('Accrued market discount (AMD)', 'accrued market discount from sales of excess TIPS', fm(_amd), false, undefined, 'amd') : '') +
-        (_roll > 0 ? row('Cover-roll coupon (2052)', 'coupon on the Future 30Y TIPS bought when the 2052 upper cover matures and its proceeds are reinvested; the share attributed to the upper cover', fm(_roll), false, undefined, 'roll') : '') +
+        future30yInterestRows(d.fundedYear, _sim, _cov) +
         (_cashCredit > 0 ? row('Available cash', 'cash on hand applied to this year', fm(_cashCredit)) : '') +
         sep() +
         row('Funded Year Amount', totalFmla, fm(d.fundedYearAmt), true, undefined, 'total') +
@@ -235,8 +256,7 @@ export function buildDrillHTML(d, colKey, summary) {
       row(_lmiLabel, _lmiDesc, fm(longerDatedInt), false, undefined, 'lmi') +
       (sameYearExInt > 0 ? row('Same-maturity excess interest', 'from excess TIPS maturing in ' + d.fundedYear, fm(sameYearExInt), false, undefined, 'exlmi') : '') +
       (_plCredit - _cashCredit > 0 ? row('Pre-ladder credit', 'pre-ladder pool applied to this year', fm(_plCredit - _cashCredit), false, 'plcpool') : '') +
-      (_amd > 0 ? row('Accrued market discount (AMD)', 'accrued market discount from sales of excess TIPS', fm(_amd), false, undefined, 'amd') : '') +
-      (_roll > 0 ? row('Cover-roll coupon (2052)', 'coupon on the Future 30Y TIPS bought when the 2052 upper cover matures and its proceeds are reinvested; the share attributed to the upper cover', fm(_roll), false, undefined, 'roll') : '') +
+      future30yInterestRows(d.fundedYear, _sim, _cov) +
       (_cashCredit > 0 ? row('Available cash', 'cash on hand applied to this year', fm(_cashCredit)) : '') +
       sep() +
       row('Funded Year Amount', totalFmla, fm(d.fundedYearAmt), true, undefined, 'total') +
@@ -257,81 +277,52 @@ export function buildDrillHTML(d, colKey, summary) {
       sep() +
       row('Funded Year Cost', '<span class="formula-var" data-source="cpb">Cost per TIPS</span> \xd7 <span class="formula-var" data-source="qty">Quantity</span>', fm(d.fundedYearCost), true);
 
-  // ── Build: Bracket Amount / Bracket Cost ───────────────────────────────────────
-  } else if (colKey === 'bracketAmount' || colKey === 'bracketCost') {
+  // ── Build: Bracket Cost ───────────────────────────────────────────────────────
+  } else if (colKey === 'bracketCost') {
     const s = summary;
-    const isAmt = colKey === 'bracketAmount';
     if (s) {
       const isLower = d.fundedYear === s.lowerYear;
       const weight  = isLower ? s.lowerWeight  : s.upperWeight;
       const wLabel  = isLower ? 'Lower bracket weight' : 'Upper bracket weight';
       const exCost  = s.gapParams.totalCost * weight;
-      rows = row(wLabel, 'see Duration Calcs \u2197', fd(weight, 4), false, undefined, 'wt')
+      rows = row(wLabel, 'see Duration Calcs ↗', fd(weight, 4), false, undefined, 'wt')
         + sep()
         + gapBreakdownRows(s.gapParams, s.DARA)
         + row('Gap total cost', 'Sum of gap year theoretical costs', fm(s.gapParams.totalCost), true, undefined, 'gtc')
         + row('Target excess cost', '<span class="formula-var" data-source="gtc">Gap total cost</span> \xd7 <span class="formula-var" data-source="wt">' + wLabel.toLowerCase() + '</span>', fm(exCost), false, undefined, 'tec')
         + sep()
-        + (isAmt ? '' : indexRatioRows(d))
+        + indexRatioRows(d)
         + priceRow(d)
         + costPerTipsRow(d)
-        + row('Excess Quantity', 'round(<span class="formula-var" data-source="tec">target cost</span> \xf7 <span class="formula-var" data-source="cpb">Cost per TIPS</span>)', d.excessQty, false, undefined, 'qty');
-      if (isAmt) {
-        const bracketLMIAlloc = d.gapLMIAlloc ?? 0;
-        rows += sep()
-          + bondVarRows(d, nPeriods, principalPerBond, couponPct)
-          + sep()
-          + row('P+I per TIPS', '<span class="formula-var" data-source="ppb">Par Value/TIPS</span> \xd7 (1 + <span class="formula-var" data-source="cpp">coupon/period</span> \xd7 <span class="formula-var" data-source="cp">periods</span>)', fm2(d.fundedYearPi), false, undefined, 'pipb')
-          + sep()
-          + row('P+I from excess TIPS', '<span class="formula-var" data-source="pipb">P+I/TIPS</span> \xd7 <span class="formula-var" data-source="qty">Excess Qty</span>', fm(d.excessQty * d.fundedYearPi), false, undefined, 'pix')
-          + (bracketLMIAlloc > 0 ? row('Bracket LMI credit', 'Bracket weight \xd7 the LMI the gap years receive, from the actual TIPS maturing above them and from the synthetic TIPS for the longer gap years', fm(bracketLMIAlloc), false, undefined, 'glmi') : '')
-          + sep()
-          + row('Bracket Amount', '<span class="formula-var" data-source="pix">P+I from excess</span>' + (bracketLMIAlloc > 0 ? ' + <span class="formula-var" data-source="glmi">Bracket LMI credit</span>' : ''), fm(d.excessAmt), true);
-      } else {
-        rows += row('Bracket Cost', '<span class="formula-var" data-source="cpb">Cost per TIPS</span> \xd7 <span class="formula-var" data-source="qty">Excess Quantity</span>', fm(d.excessCost), true);
-      }
+        + row('Excess Quantity', 'round(<span class="formula-var" data-source="tec">target cost</span> \xf7 <span class="formula-var" data-source="cpb">Cost per TIPS</span>)', d.excessQty, false, undefined, 'qty')
+        + row('Bracket Cost', '<span class="formula-var" data-source="cpb">Cost per TIPS</span> \xd7 <span class="formula-var" data-source="qty">Excess Quantity</span>', fm(d.excessCost), true);
     }
 
-  // ── Build: Future 30Y Amount / Future 30Y Cost ────────────────────────────────
-  } else if (colKey === 'future30yAmt' || colKey === 'future30yCost') {
+  // ── Build: Future 30Y Cost ────────────────────────────────────────────────────
+  } else if (colKey === 'future30yCost') {
     const s = summary;
-    const isAmt = colKey === 'future30yAmt';
     if (s) {
       const isLower = d.fundedYear === s.future30yLowerYear;
       const weight  = isLower ? s.future30yLowerWeight : s.future30yUpperWeight;
       const wLabel  = isLower ? 'Lower cover weight' : 'Upper cover weight';
       const exCost  = (s.future30yParams?.future30yTotalCost ?? 0) * weight;
-      rows = row(wLabel, 'see Future 30Y Duration Calcs \u2197', fd(weight, 4), false, undefined, 'wt')
+      rows = row(wLabel, 'see Future 30Y Duration Calcs ↗', fd(weight, 4), false, undefined, 'wt')
         + sep()
         + future30yBreakdownRows(s.future30yParams)
         + row('Future 30Y total cost', 'Sum of the synthetic Future 30Y year costs', fm(s.future30yParams?.future30yTotalCost ?? 0), true, undefined, 'ftc')
         + row('Target excess cost', '<span class="formula-var" data-source="ftc">Future 30Y total cost</span> \xd7 <span class="formula-var" data-source="wt">' + wLabel.toLowerCase() + '</span>', fm(exCost), false, undefined, 'tec')
         + sep()
-        + (isAmt ? '' : indexRatioRows(d))
+        + indexRatioRows(d)
         + priceRow(d)
         + costPerTipsRow(d)
-        + row('Excess Quantity', 'round(<span class="formula-var" data-source="tec">target cost</span> \xf7 <span class="formula-var" data-source="cpb">Cost per TIPS</span>)', d.excessQty, false, undefined, 'qty');
-      if (isAmt) {
-        const grossPI = d.excessQty * d.fundedYearPi;
-        const amdNet  = d.excessAmdLifetime || 0;     // accretion delivered to earlier years as AMD
-        const lmiAdd  = d.future30yLMIAlloc || 0;      // intra-block coupon add-back (this cover's share)
-        let amtFmla = '<span class="formula-var" data-source="expi">Excess P+I</span>';
-        if (amdNet > 0) amtFmla += ' − <span class="formula-var" data-source="amdn">AMD credited earlier</span>';
-        if (lmiAdd > 0) amtFmla += ' + <span class="formula-var" data-source="lmiadd">coupon add-back</span>';
-        rows += sep()
-          + bondVarRows(d, nPeriods, principalPerBond, couponPct)
-          + sep()
-          + row('P+I per TIPS', '<span class="formula-var" data-source="ppb">Par Value/TIPS</span> \xd7 (1 + <span class="formula-var" data-source="cpp">coupon/period</span> \xd7 <span class="formula-var" data-source="cp">periods</span>)', fm2(d.fundedYearPi), false, undefined, 'pipb')
-          + row('Excess P+I', '<span class="formula-var" data-source="pipb">P+I/TIPS</span> \xd7 <span class="formula-var" data-source="qty">Excess Quantity</span>', fm(grossPI), false, undefined, 'expi')
-          + (amdNet > 0 ? row('AMD credited to earlier years', 'this cover’s market discount is delivered to the funded years it accrues in (AMD line items), not as coverage here — netted out to avoid double-counting', '−' + fm(amdNet), false, undefined, 'amdn') : '')
-          + (lmiAdd > 0 ? row('+ Future-30Y coupon add-back', 'this cover’s share of the coupon on the synthetic Future-30Y rungs, which sized them down (the same add-back the bracket years get)', fm(lmiAdd), false, undefined, 'lmiadd') : '')
-          + sep()
-          + row('Future 30Y Cover Amount', amtFmla, fm(d.excessAmt), true);
-      } else {
-        rows += sep()
-          + row('Future 30Y Cover Cost', '<span class="formula-var" data-source="cpb">Cost per TIPS</span> \xd7 <span class="formula-var" data-source="qty">Excess Quantity</span>', fm(d.excessCost), true);
-      }
+        + row('Excess Quantity', 'round(<span class="formula-var" data-source="tec">target cost</span> \xf7 <span class="formula-var" data-source="cpb">Cost per TIPS</span>)', d.excessQty, false, undefined, 'qty')
+        + sep()
+        + row('Future 30Y Cover Cost', '<span class="formula-var" data-source="cpb">Cost per TIPS</span> \xd7 <span class="formula-var" data-source="qty">Excess Quantity</span>', fm(d.excessCost), true);
     }
+
+  // ── Amount of a gap year or a Future 30Y year (group header row) ─────────────
+  } else if (colKey === 'yearAmount' || colKey === 'yearAmountBefore' || colKey === 'yearAmountAfter') {
+    rows = d?.kind ? syntheticYearAmountRows(d) : '';
 
   } else if (colKey === 'amtBefore' || colKey === 'amtAfter') {
     const isBef       = colKey === 'amtBefore';
@@ -340,8 +331,8 @@ export function buildDrillHTML(d, colKey, summary) {
     const araTotal    = isBef ? d.araBeforeTotal       : d.araAfterTotal;
     const DARA        = d.DARA ?? summary?.DARA;
     const _plCredit   = isBef ? (d.preLadderCreditForYearBefore || 0) : (d.preLadderCreditForYear || 0);
-    const _amd        = isBef ? (d.future30yUpperAnnualAmdBefore || 0) : (d.future30yUpperAnnualAmd || 0);
-    const _roll       = isBef ? (d.future30yRollCouponBefore || 0)     : (d.future30yRollCoupon || 0);
+    const _sim        = isBef ? (d.future30ySimulatedInterestBefore || 0) : (d.future30ySimulatedInterest || 0);
+    const _cov        = isBef ? (d.future30yCoverExcessInterestBefore || 0) : (d.future30yCoverExcessInterest || 0);
     // After: cash is part of the credit, so it splits it. Before: no rung was sized down, so the
     // cash the holder actually has is a plain addition (2.0 §Available Cash).
     const _cashRaw    = isBef ? (d.availableCashCreditBefore || 0) : (d.availableCashCredit || 0);
@@ -379,20 +370,13 @@ export function buildDrillHTML(d, colKey, summary) {
       + row(_lmiLabel, _lmiDesc, fm(laterMatInt), false, undefined, 'lmi');
     const excessLMI = isBef ? d.excessLMI_Before : d.excessLMI_After;
     if (excessLMI > 0) {
-      const _exDesc = d.isFuture30yCover
-        ? 'from the cover excess held in ' + d.fundedYear + ', covering the Future 30Y rungs'
-        : 'from the excess TIPS held in ' + d.fundedYear + ', covering the gap years, where 10-year TIPS have not yet been issued';
+      const _exDesc = 'from the excess TIPS held in ' + d.fundedYear + ', covering the gap years, where 10-year TIPS have not yet been issued';
       rows += row('Same-maturity excess interest', _exDesc, fm(excessLMI), false, undefined, 'exlmi');
     }
     if (_plShown > 0) {
       rows += row('Pre-ladder credit', 'pre-ladder pool applied to this year', fm(_plShown), false, 'plcpool', 'plc');
     }
-    if (_amd > 0) {
-      rows += row('Accrued market discount (AMD)', 'accrued market discount from sales of excess TIPS', fm(_amd), false, undefined, 'amd');
-    }
-    if (_roll > 0) {
-      rows += row('Cover-roll coupon (2052)', 'coupon on the Future 30Y TIPS bought when the 2052 upper cover matures and its proceeds are reinvested; the share attributed to the upper cover', fm(_roll), false, undefined, 'roll');
-    }
+    rows += future30yInterestRows(d.fundedYear, _sim, _cov);
     if (_cashCredit > 0) {
       rows += row('Available cash', 'cash on hand applied to this year', fm(_cashCredit));
     }
@@ -401,8 +385,7 @@ export function buildDrillHTML(d, colKey, summary) {
       : 'Funded year TIPS + <span class="formula-var" data-source="lmi">LMI</span>';
     if (!_pliZeroed && excessLMI > 0) totalFmla += ' + <span class="formula-var" data-source="exlmi">Same-maturity excess int</span>';
     if (!_pliZeroed && _plShown > 0) totalFmla += ' + <span class="formula-var" data-source="plc">Pre-ladder credit</span>';
-    if (!_pliZeroed && _amd > 0) totalFmla += ' + <span class="formula-var" data-source="amd">AMD</span>';
-    if (!_pliZeroed && _roll > 0) totalFmla += ' + <span class="formula-var" data-source="roll">Cover-roll coupon</span>';
+    if (!_pliZeroed) totalFmla += future30yInterestFmla(_sim, _cov);
     if (!_pliZeroed && _cashCredit > 0) totalFmla += ' + Available cash';
     rows += sep()
       + row(isBef ? 'Amount Before' : 'Amount After', totalFmla, fm(_displayAmt), true)
@@ -426,18 +409,17 @@ export function buildDrillHTML(d, colKey, summary) {
       const laterMatInt = d.araAfterLaterMatInt ?? 0;
       const sameYearExInt = d.excessLMI_After || 0;
       const plCredit = d.preLadderCreditForYear || 0;
-      const amd = d.future30yUpperAnnualAmd || 0;
-      const roll = d.future30yRollCoupon || 0;
+      const sim = d.future30ySimulatedInterest || 0;
+      const cov = d.future30yCoverExcessInterest || 0;
       const cashCredit = Math.min(d.availableCashCredit || 0, plCredit);
       const piPerBond = principalPerBond * (1 + d.coupon / 2 * nPeriods);
       const dara = d.DARA ?? 0;
-      const needed = dara - laterMatInt - sameYearExInt - plCredit - amd - roll;
+      const needed = dara - laterMatInt - sameYearExInt - plCredit - sim - cov;
 
       let neededFmla = 'DARA − <span class="formula-var" data-source="lmi">LMI</span>';
       if (sameYearExInt > 0) neededFmla += ' − <span class="formula-var" data-source="exlmi">Same-maturity excess int</span>';
       if (plCredit > 0) neededFmla += ' − <span class="formula-var" data-source="plc">Pre-ladder credit</span>';
-      if (amd > 0) neededFmla += ' − <span class="formula-var" data-source="amd">AMD</span>';
-      if (roll > 0) neededFmla += ' − <span class="formula-var" data-source="roll">Cover-roll coupon</span>';
+      neededFmla += future30yInterestFmla(sim, cov, '−');
 
 
       // P+I needed is the funded YEAR's total requirement; it equals this row's own quantity only
@@ -455,8 +437,7 @@ export function buildDrillHTML(d, colKey, summary) {
         row(lmiLabel, lmiDesc, '−' + fm(laterMatInt), false, undefined, 'lmi') +
         (sameYearExInt > 0 ? row('Same-maturity excess interest', 'from excess TIPS maturing in ' + d.fundedYear, '−' + fm(sameYearExInt), false, undefined, 'exlmi') : '') +
         (plCredit > 0 ? row('Pre-ladder credit', 'pre-ladder pool applied to this year', '−' + fm(plCredit), false, undefined, 'plc') : '') +
-        (amd > 0 ? row('Accrued market discount (AMD)', 'accrued market discount from sales of excess TIPS', '−' + fm(amd), false, undefined, 'amd') : '') +
-        (roll > 0 ? row('Cover-roll coupon (2052)', 'coupon on the Future 30Y TIPS bought when the 2052 upper cover matures and its proceeds are reinvested; the share attributed to the upper cover', '−' + fm(roll), false, undefined, 'roll') : '') +
+        future30yInterestRows(d.fundedYear, sim, cov, '−') +
         (cashCredit > 0 ? row('↳ of which Available cash', 'cash on hand applied to this year', fm(cashCredit)) : '') +
         sep() +
         row('P+I needed', neededFmla, fm(needed), true, undefined, 'needed') +
@@ -471,6 +452,18 @@ export function buildDrillHTML(d, colKey, summary) {
   // ── Rebalance: Excess Quantity After (bracket/cover excess sub-row only) ──────
   } else if (colKey === 'excessQtyAfter') {
     const exQty = d.excessQtyAfter ?? d.excessQty;
+    if (d.isFuture30yCover) {
+      // Cover Excess: the Future 30Y duration match at settlement (2.0 §Future 30Y Cover Pair).
+      const isLower = d.cusip === summary.future30yLowerCoverCUSIP;
+      const weight  = isLower ? summary.future30yLowerWeight : summary.future30yUpperWeight;
+      const totalCost = summary.future30yParams?.future30yTotalCost ?? 0;
+      rows = future30yBreakdownRows(summary.future30yParams)
+        + row('Future 30Y total cost', 'Sum of the synthetic Future 30Y year costs', fm(totalCost), true, undefined, 'ftc')
+        + row(isLower ? 'Lower cover weight' : 'Upper cover weight', 'from <a class="info-link" data-popup="future30yDuration" style="border-bottom:1px dotted #94a3b8;color:inherit;text-decoration:none;">Future 30Y Duration Calcs</a>', (weight ?? 0).toFixed(4), false, undefined, 'bw')
+        + row('Target excess cost', '<span class="formula-var" data-source="ftc">Future 30Y total cost</span> × <span class="formula-var" data-source="bw">Cover Weight</span>', fm(totalCost * (weight ?? 0)), false, undefined, 'tec')
+        + row('Cost per TIPS', 'price/100 × index ratio × 1,000', fm2(d.costPerBond), false, undefined, 'cpbn')
+        + row('Excess Quantity', 'round(<span class="formula-var" data-source="tec">Target cost</span> ÷ <span class="formula-var" data-source="cpbn">Cost per TIPS</span>)', exQty, true, undefined, 'qty');
+    } else {
     const is3B = summary.bracketMode === '3bracket';
     // Keyed by CUSIP, not year: the retained and active lower brackets can mature in the SAME
     // calendar year (3.0 §Bracket Identification Rules), and `summary.lowerYear` was never a real
@@ -484,7 +477,6 @@ export function buildDrillHTML(d, colKey, summary) {
          : summary.upperWeight3)
       : (d.cusip === summary.brackets?.lowerCUSIP ? summary.lowerWeight : summary.upperWeight);
     const targetExCost = (summary.gapParams?.totalCost ?? 0) * (weight ?? 0);
-    const piPerBond = principalPerBond * (1 + d.coupon / 2 * nPeriods);
 
     rows =
       gapBreakdownRows(summary.gapParams, summary.DARA)
@@ -492,12 +484,8 @@ export function buildDrillHTML(d, colKey, summary) {
       + row('Bracket weight', 'from <a class="info-link" data-popup="duration" style="border-bottom:1px dotted #94a3b8;color:inherit;text-decoration:none;">Duration Calcs</a>', (weight ?? 0).toFixed(4), false, undefined, 'bw')
       + row('Target excess cost', '<span class="formula-var" data-source="gtc">Gap total cost</span> × <span class="formula-var" data-source="bw">Bracket weight</span>', fm(targetExCost), false, undefined, 'tec')
       + row('Cost per TIPS', 'price/100 × index ratio × 1,000', fm2(d.costPerBond), false, undefined, 'cpbn')
-      + row('Excess Quantity', 'round(<span class="formula-var" data-source="tec">Target cost</span> ÷ <span class="formula-var" data-source="cpbn">Cost per TIPS</span>)', exQty, true, undefined, 'qty')
-      + sep()
-      + bondVarRows(d, nPeriods, principalPerBond, couponPct)
-      + sep()
-      + row('P+I per TIPS', '<span class="formula-var" data-source="ppb">Par Value/TIPS</span> × (1 + <span class="formula-var" data-source="cpp">coupon/period</span> × <span class="formula-var" data-source="cp">periods</span>)', fm2(piPerBond), false, undefined, 'pipb')
-      + row('Excess Amount After', '<span class="formula-var" data-source="qty">Excess Quantity</span> × <span class="formula-var" data-source="pipb">P+I per TIPS</span>', fm(exQty * piPerBond), true);
+      + row('Excess Quantity', 'round(<span class="formula-var" data-source="tec">Target cost</span> ÷ <span class="formula-var" data-source="cpbn">Cost per TIPS</span>)', exQty, true, undefined, 'qty');
+    }
 
   // ── Rebalance: Cash Delta ─────────────────────────────────────────────────────
   } else if (colKey === 'cashDelta') {
@@ -536,26 +524,18 @@ export function buildDrillHTML(d, colKey, summary) {
       sep() +
       row(isBef ? 'Cost Before' : 'Cost After', '<span class="formula-var" data-source="qty">Quantity</span> \xd7 <span class="formula-var" data-source="cpb">Cost per TIPS</span>', fm(cost), true);
 
-  // ── Rebalance: Bracket Amt/Cost Before/After ───────────────────────────────────
-  } else if (colKey === 'bracketAmtBefore' || colKey === 'bracketAmtAfter' || colKey === 'bracketCostBefore' || colKey === 'bracketCostAfter') {
+  // ── Rebalance: Bracket Cost Before/After ──────────────────────────────────────
+  } else if (colKey === 'bracketCostBefore' || colKey === 'bracketCostAfter') {
     const s       = summary;
-    const isAfter = colKey === 'bracketAmtAfter' || colKey === 'bracketCostAfter';
-    const isAmt   = colKey === 'bracketAmtBefore' || colKey === 'bracketAmtAfter';
-    const piPerBond = principalPerBond * (1 + d.coupon / 2 * nPeriods);
+    const isAfter = colKey === 'bracketCostAfter';
     if (!isAfter) {
       const exQty = d.excessQtyBefore;
       rows = row('Excess Quantity', '', exQty, false, undefined, 'qty')
         + sep()
-        + bondVarRows(d, nPeriods, principalPerBond, couponPct) + sep();
-      if (isAmt) {
-        rows += row('P+I per TIPS', '<span class="formula-var" data-source="ppb">Par Value/TIPS</span> \xd7 (1 + <span class="formula-var" data-source="cpp">coupon/period</span> \xd7 <span class="formula-var" data-source="cp">periods</span>)', fm2(piPerBond), false, undefined, 'pipb')
-          + sep()
-          + coverageAmtRows('Excess Amount Before', exQty * piPerBond, d.excessLMIAlloc ?? 0, d.excessAmtBefore ?? exQty * piPerBond);
-      } else {
-        rows += priceRow(d) + costPerTipsRow(d)
-          + sep()
-          + row('Excess Cost Before', '<span class="formula-var" data-source="cpb">Cost per TIPS</span> \xd7 <span class="formula-var" data-source="qty">Excess Quantity</span>', fm(exQty * d.costPerBond), true);
-      }
+        + bondVarRows(d, nPeriods, principalPerBond, couponPct) + sep()
+        + priceRow(d) + costPerTipsRow(d)
+        + sep()
+        + row('Excess Cost Before', '<span class="formula-var" data-source="cpb">Cost per TIPS</span> \xd7 <span class="formula-var" data-source="qty">Excess Quantity</span>', fm(exQty * d.costPerBond), true);
     } else if (s && s.brackets) {
       const isLower = d.cusip === s.brackets.lowerCUSIP;
       const isNewLower = s.bracketMode === '3bracket' && d.cusip === s.newLowerCUSIP;
@@ -567,44 +547,29 @@ export function buildDrillHTML(d, colKey, summary) {
       const exQty   = d.excessQtyAfter;
       rows = row('Excess Quantity', 'round(<span class="formula-var" data-source="tec">target cost</span> \xf7 <span class="formula-var" data-source="cpb">Cost per TIPS</span>)', exQty, false, undefined, 'qty')
         + sep()
-        + row(wLabel, 'see Duration Calcs \u2197', fd(weight, 4), false, undefined, 'wt')
+        + row(wLabel, 'see Duration Calcs ↗', fd(weight, 4), false, undefined, 'wt')
         + sep()
         + row('Gap total cost', '', fm(s.gapParams.totalCost), false, undefined, 'gtc')
         + row('Target excess cost', '<span class="formula-var" data-source="gtc">Gap total cost</span> \xd7 <span class="formula-var" data-source="wt">' + wLabel.toLowerCase() + '</span>', fm(exCost), false, undefined, 'tec')
         + sep()
-        + (isAmt ? '' : indexRatioRows(d))
+        + indexRatioRows(d)
         + priceRow(d)
         + costPerTipsRow(d)
-        + sep();
-      if (isAmt) {
-        rows += bondVarRows(d, nPeriods, principalPerBond, couponPct) + sep()
-          + row('P+I per TIPS', '<span class="formula-var" data-source="ppb">Par Value/TIPS</span> \xd7 (1 + <span class="formula-var" data-source="cpp">coupon/period</span> \xd7 <span class="formula-var" data-source="cp">periods</span>)', fm2(piPerBond), false, undefined, 'pipb')
-          + sep()
-          + coverageAmtRows('Excess Amount After', exQty * piPerBond, d.excessLMIAlloc ?? 0, d.excessAmtAfter ?? exQty * piPerBond);
-      } else {
-        rows += row('Excess Cost After', '<span class="formula-var" data-source="cpb">Cost per TIPS</span> \xd7 <span class="formula-var" data-source="qty">Excess Quantity</span>', fm(exQty * d.costPerBond), true);
-      }
+        + sep()
+        + row('Excess Cost After', '<span class="formula-var" data-source="cpb">Cost per TIPS</span> \xd7 <span class="formula-var" data-source="qty">Excess Quantity</span>', fm(exQty * d.costPerBond), true);
     }
-  // ── Rebalance: Future 30Y Amt/Cost Before/After ───────────────────────────────
-  } else if (colKey === 'future30yAmtBefore' || colKey === 'future30yAmtAfter' || colKey === 'future30yCostBefore' || colKey === 'future30yCostAfter') {
+  // ── Rebalance: Future 30Y Cost Before/After ───────────────────────────────────
+  } else if (colKey === 'future30yCostBefore' || colKey === 'future30yCostAfter') {
     const s       = summary;
-    const isAfter = colKey === 'future30yAmtAfter' || colKey === 'future30yCostAfter';
-    const isAmt   = colKey === 'future30yAmtBefore' || colKey === 'future30yAmtAfter';
-    const piPerBond = principalPerBond * (1 + d.coupon / 2 * nPeriods);
+    const isAfter = colKey === 'future30yCostAfter';
     if (!isAfter) {
       const exQty = d.excessQtyBefore;
       rows = row('Excess Quantity', '', exQty, false, undefined, 'qty')
         + sep()
-        + bondVarRows(d, nPeriods, principalPerBond, couponPct) + sep();
-      if (isAmt) {
-        rows += row('P+I per TIPS', '<span class="formula-var" data-source="ppb">Par Value/TIPS</span> \xd7 (1 + <span class="formula-var" data-source="cpp">coupon/period</span> \xd7 <span class="formula-var" data-source="cp">periods</span>)', fm2(piPerBond), false, undefined, 'pipb')
-          + sep()
-          + coverageAmtRows('Future 30Y Cover Amount Before', exQty * piPerBond, d.excessLMIAlloc ?? 0, d.excessAmtBefore ?? exQty * piPerBond);
-      } else {
-        rows += priceRow(d) + costPerTipsRow(d)
-          + sep()
-          + row('Future 30Y Cover Cost Before', '<span class="formula-var" data-source="cpb">Cost per TIPS</span> \xd7 <span class="formula-var" data-source="qty">Excess Quantity</span>', fm(exQty * d.costPerBond), true);
-      }
+        + bondVarRows(d, nPeriods, principalPerBond, couponPct) + sep()
+        + priceRow(d) + costPerTipsRow(d)
+        + sep()
+        + row('Future 30Y Cover Cost Before', '<span class="formula-var" data-source="cpb">Cost per TIPS</span> \xd7 <span class="formula-var" data-source="qty">Excess Quantity</span>', fm(exQty * d.costPerBond), true);
     } else if (s) {
       const isLower = d.cusip === s.future30yLowerCoverCUSIP;
       const weight  = isLower ? s.future30yLowerWeight : s.future30yUpperWeight;
@@ -613,25 +578,16 @@ export function buildDrillHTML(d, colKey, summary) {
       const exQty   = d.excessQtyAfter;
       rows = row('Excess Quantity', 'round(<span class="formula-var" data-source="tec">target cost</span> \xf7 <span class="formula-var" data-source="cpb">Cost per TIPS</span>)', exQty, false, undefined, 'qty')
         + sep()
-        + (isAmt ? '' : indexRatioRows(d))
+        + indexRatioRows(d)
         + priceRow(d)
         + costPerTipsRow(d)
         + sep()
         + row(wLabel, 'see Future 30Y Duration Calcs ↗', fd(weight, 4), false, undefined, 'wt')
         + future30yBreakdownRows(s.future30yParams)
         + row('Future 30Y total cost', 'Sum of the synthetic Future 30Y year costs', fm(s.future30yParams?.future30yTotalCost ?? 0), true, undefined, 'ftc')
-        + row('Target excess cost', '<span class="formula-var" data-source="ftc">Future 30Y total cost</span> \xd7 <span class="formula-var" data-source="wt">' + wLabel.toLowerCase() + '</span>', fm(exCost), false, undefined, 'tec');
-      if (isAmt) {
-        rows += sep()
-          + bondVarRows(d, nPeriods, principalPerBond, couponPct)
-          + sep()
-          + row('P+I per TIPS', '<span class="formula-var" data-source="ppb">Par Value/TIPS</span> \xd7 (1 + <span class="formula-var" data-source="cpp">coupon/period</span> \xd7 <span class="formula-var" data-source="cp">periods</span>)', fm2(piPerBond), false, undefined, 'pipb')
-          + sep()
-          + coverageAmtRows('Future 30Y Cover Amount After', exQty * piPerBond, d.excessLMIAlloc ?? 0, d.excessAmtAfter ?? exQty * piPerBond);
-      } else {
-        rows += sep()
-          + row('Future 30Y Cover Cost After', '<span class="formula-var" data-source="cpb">Cost per TIPS</span> \xd7 <span class="formula-var" data-source="qty">Excess Quantity</span>', fm(exQty * d.costPerBond), true);
-      }
+        + row('Target excess cost', '<span class="formula-var" data-source="ftc">Future 30Y total cost</span> \xd7 <span class="formula-var" data-source="wt">' + wLabel.toLowerCase() + '</span>', fm(exCost), false, undefined, 'tec')
+        + sep()
+        + row('Future 30Y Cover Cost After', '<span class="formula-var" data-source="cpb">Cost per TIPS</span> \xd7 <span class="formula-var" data-source="qty">Excess Quantity</span>', fm(exQty * d.costPerBond), true);
     }
 
   // ── Rebalance: Excess Cash Delta (bracket/cover excess row) ──────────────────

@@ -290,7 +290,7 @@
     <ul style="margin:0 0 10px 20px;padding:0">
       <li><a href="../knowledge/viewer.html#/md/TipsLadderManager/knowledge/5.0_UI_Schema.md#trade-ticket" target="_blank" style="color:#2563eb;text-decoration:none;"><b>Trade Ticket</b></a> lists the buys and sells the rebalance recommends, with cost and accrued interest per CUSIP.</li>
       <li><a href="../knowledge/viewer.html#/md/TipsLadderManager/knowledge/5.0_UI_Schema.md#cash-flow-calendar" target="_blank" style="color:#2563eb;text-decoration:none;"><b>Cash Flow</b></a> shows when your held TIPS actually pay you, and how much, by date.</li>
-      <li><b>Gap Dur</b> (and <b>Future 30Y Dur</b>, once the ladder extends past 2056) shows the duration match with your ladder's own numbers.</li>
+      <li><b>Gap Dur</b> (and <b>Future 30Y Dur</b>, once the ladder extends past the longest issued maturity year) shows the duration match with your ladder's own numbers.</li>
       <li><b>Avg Mod Dur</b>, <b>Avg Yld</b>, and <b>Avg SA Yld</b> each show the market-value-weighted breakdown behind the portfolio figure: every holding's own value and market value, and the total.</li>
       <li><b>Export → Ladder CSV / Holdings</b> become available (the latter is re-importable for your next rebalance).</li>
     </ul>
@@ -335,7 +335,7 @@
 
     <p><b>4. Click Build Ladder.</b> The app runs the build calculations and populates the table with each year's Quantity, Cost, and Amount, plus <b>Total Cost</b> for the full ladder.</p>
     <ul style="margin:0 0 10px 20px;padding:0">
-      <li><b>Gap Dur</b> (and <b>Future 30Y Dur</b>, once the ladder extends past 2056) shows the duration match with your ladder's own numbers.</li>
+      <li><b>Gap Dur</b> (and <b>Future 30Y Dur</b>, once the ladder extends past the longest issued maturity year) shows the duration match with your ladder's own numbers.</li>
       <li><b>Avg Mod Dur</b>, <b>Avg Yld</b>, and <b>Avg SA Yld</b> each show the market-value-weighted breakdown behind the portfolio figure: every holding's own value and market value, and the total.</li>
       <li><b>Export → Ladder CSV / Holdings</b> become available (the latter is re-importable into Rebalance).</li>
     </ul>
@@ -702,7 +702,7 @@ import { buildTipsMarketData, localDate, runFundedRebalance, inferScaledDARAFrom
 // Standalone Before-state preview (3.0 §Before-State Preview and Bracket-Year Excess Detection) —
 // a holdings-valuation computation, architecturally decoupled from the runRebalance/
 // runFundedRebalance engine imported above. Never calls into it.
-import { computeBeforeState, detectBracketFlags, UPPER_BRACKET_YEAR, FUTURE30Y_COVER_YEARS } from './src/before-state-lib.js';
+import { computeBeforeState, detectBracketFlags, UPPER_BRACKET_YEAR, future30yCoverYears } from './src/before-state-lib.js';
 import { evenSpread, inferShapeValue } from './src/shape-math.js';
 import { runBuild } from './src/build-lib.js';
 import { maxLastYear } from './src/ladder-core.js';
@@ -956,13 +956,14 @@ async function loadData() {
 
     const lastYearSel = document.getElementById('last-year');
     while (lastYearSel.options.length > 1) lastYearSel.remove(1);
-    for (let y = _bfsMinY, _maxLY = maxLastYear(_bfsMaxY); y <= _maxLY; y++) {
+    // The ladder's last year at most: the longest issued maturity year + N (DD §5.1).
+    for (let y = _bfsMinY, _maxLY = maxLastYear({ tipsMarketData, settlementDate, bondHolidays: _bondHolidays }); y <= _maxLY; y++) {
       const opt = document.createElement('option'); opt.value = y;
       opt.textContent = _bfsGapYears.has(y) ? `${y} (gap)` : y > _bfsMaxY ? `${y} (Future 30Y)` : String(y);
       lastYearSel.appendChild(opt);
     }
     // The longest-dated issued TIPS maturity: the last year the ladder can hold a real bond in,
-    // and the same anchor the Future 30Y lower cover uses (ladder-core.js/rebalance-lib.js).
+    // and the anchor of the Future 30Y Synthetic TIPS (2.0 §Future 30Y Rungs).
     lastYearSel.value = _bfsMaxY;
 
     const firstYearSel = document.getElementById('first-year');
@@ -1312,8 +1313,7 @@ function _exportLadderCsv() {
 
     if (isBT) {
       const subCells = cols.map(col => q(col.subValue ? fmtRaw(col.subValue(d, ri, details), col.fmt) : ''));
-      const subLMI = (d.gapLMIAlloc != null && d.gapLMIAlloc > 0) ? d.gapLMIAlloc : null;
-      const subExtra = ['', xv(principal), xv(principal * d.coupon * hof), xv(subLMI), '', '', '', ''];
+      const subExtra = ['', xv(principal), xv(principal * d.coupon * hof), '', '', '', '', ''];
       csvData.push([...subCells, ...subExtra.map(q)].join(','));
     }
   }
@@ -2717,21 +2717,21 @@ function updateRebalLastYearDropdown() {
   const _gapSet = new Set(_gapYears);
 
   // Default last year is the latest maturity year held, extended if the file carries EXCESS at the
-  // 2052/2056 Future-30Y covers (symmetric to first-year inference from gap-bracket excess) so
-  // import preserves the future cover excess instead of selling it to DARA.
+  // Future 30Y cover pair (symmetric to first-year inference from gap-bracket excess) so
+  // import preserves the Cover Excess instead of selling it to DARA.
   let _defaultLY = _derivedLY;
   {
     const _refCPI = refCpiRows && (_defaultRefCpiDateStr)
       ? lookupRefCpi(refCpiRows, _defaultRefCpiDateStr) : 0;
     if (_refCPI > 0 && settlementDate) {
-      const _inferredLast = inferLastYearFromHoldings({ holdings: currentHoldingsArray, tipsMarketData, refCPI: _refCPI, settlementDate });
+      const _inferredLast = inferLastYearFromHoldings({ holdings: currentHoldingsArray, tipsMarketData, refCPI: _refCPI, settlementDate, bondHolidays: _bondHolidays });
       if (_inferredLast != null && _inferredLast > _defaultLY) _defaultLY = _inferredLast;
     }
   }
 
   // Preserve current selection if valid, else use inferred default
   const _curVal = sel.value ? parseInt(sel.value, 10) : NaN;
-  const _maxDropY = maxLastYear(_maxTipsY);
+  const _maxDropY = settlementDate ? maxLastYear({ tipsMarketData, settlementDate, bondHolidays: _bondHolidays }) : _maxTipsY;
   const _selVal = (!isNaN(_curVal) && _curVal >= _firstY && _curVal <= _maxDropY) ? _curVal : _defaultLY;
 
   for (let y = _firstY; y <= _maxDropY; y++) {
@@ -2825,7 +2825,7 @@ function _initRebalDaraFromPortfolio() {
   // flagged year's store entry is immediately filled with its own held-year median (the same
   // "best guess" shown in the DARA input) rather than left unset, so Rebalance Ladder — which reads
   // whatever is on the form — picks up the guess by default until the user edits it.
-  const flags = detectBracketFlags({ heldARAByYear: heldARA, tipsMarketData, lastYear });
+  const flags = detectBracketFlags({ heldARAByYear: heldARA, tipsMarketData, lastYear, settlementDate });
   _bracketAutoCapYears = new Set(flags.keys());
 
   const fullARA = computePortfolioARAByYear(currentHoldingsArray, tipsMarketData, rc, { firstYear, lastYear });
@@ -2870,7 +2870,7 @@ function _initRebalDaraFromPortfolio() {
   // curve value where they have no other source (3.0 §Before-State Preview, final bullet).
   const tipsYearsAll = [...tipsMarketData.values()].filter(b => b.maturity).map(b => b.maturity.getFullYear());
   const maxTipsYear = tipsYearsAll.length ? Math.max(...tipsYearsAll) : 0;
-  for (const cover of FUTURE30Y_COVER_YEARS) {
+  for (const cover of future30yCoverYears(tipsMarketData, settlementDate)) {
     const f = flags.get(cover);
     if (!f) continue;
     for (let y = maxTipsYear + 1; y <= lastYear; y++) {
@@ -2912,7 +2912,7 @@ function _renderBeforeStatePreview() {
   if (rebalanceRendered) return;
 
   const { rows, gapYears, future30yYears } = computeBeforeState({
-    holdings: currentHoldingsArray, tipsMarketData, refCPI: rc, firstYear, lastYear, daraByYear: _daraByYearStore,
+    holdings: currentHoldingsArray, tipsMarketData, refCPI: rc, firstYear, lastYear, daraByYear: _daraByYearStore, settlementDate,
   });
 
   const summary = { firstYear, lastYear, gapYears, future30yYears, brackets: {}, bracketMode: document.getElementById('bracket-mode')?.value ?? '2bracket',
@@ -4221,10 +4221,16 @@ document.addEventListener('click', e => {
     const colKey = drill.dataset.col;
     const details = currentMode === 'build' ? buildDetails : rebalDetails;
     const summary = currentMode === 'build' ? buildSummary : rebalSummary;
-    const d = details[ri];
+    // A gap year's or Future 30Y year's Amount sits on a group header row with no TIPS row behind it;
+    // its popup reads the year's entry from the summary (5.0 §Popup Routing).
+    const drillYear = drill.dataset.year != null ? parseInt(drill.dataset.year, 10) : null;
+    const d = drillYear != null
+      ? (colKey === 'yearAmountBefore' ? summary?.syntheticYearAmountsBefore : summary?.syntheticYearAmounts)?.[drillYear]
+      : details[ri];
+    if (!d) return;
     _currentDrillData = d; _currentDrillColKey = colKey;
     const html = buildDrillHTML(d, colKey, summary);
-    document.getElementById('drill-title').textContent = (d.maturityStr || d.fundedYear) + ' — ' + colKey;
+    document.getElementById('drill-title').textContent = drillYear != null ? drillYear + ' — Amount' : (d.maturityStr || d.fundedYear) + ' — ' + colKey;
     document.getElementById('drill-content').innerHTML = html;
     document.getElementById('drill-modal').style.width = '';   // a drag pins the width; size to the new content
     document.getElementById('drill-overlay').style.display = 'block';

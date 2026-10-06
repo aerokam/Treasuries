@@ -2011,8 +2011,10 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
     const bForLMI = tipsMarketData.get(h.cusip);
     const irForLMI = calcIndexRatio(refCPI, bForLMI?.datedDateRefCpi ?? refCPI);
     const annIntPerBond = 1000 * irForLMI * (bForLMI?.coupon ?? 0);
-    const excessLMI_B = exB * annIntPerBond;
-    const excessLMI_A = exA * annIntPerBond;
+    // Same-Maturity Excess Interest: 0 for a cover year (DD §Same-Maturity Excess Interest).
+    const isCoverYear = future30yCoverYearSet.has(h.year);
+    const excessLMI_B = isCoverYear ? 0 : exB * annIntPerBond;
+    const excessLMI_A = isCoverYear ? 0 : exA * annIntPerBond;
 
     const piPB = calculatePIPerBond(h.cusip, h.maturity, refCPI, tipsMarketData);
     const mDuration = (b?.yield != null) ? calculateMDuration(settlementDate, h.maturity, b.coupon ?? 0, b.yield) : 0;
@@ -2098,7 +2100,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
     const exA = bst.targetQty - bst.targetFundedYearQty;
     const bondForSyn = tipsMarketData.get(bst.targetCUSIP);
     const irForSyn = calcIndexRatio(refCPI, bondForSyn?.datedDateRefCpi ?? refCPI);
-    const excessLMI = exA * 1000 * irForSyn * (bondForSyn?.coupon ?? 0);
+    const excessLMI = future30yCoverYearSet.has(bYear) ? 0 : exA * 1000 * irForSyn * (bondForSyn?.coupon ?? 0);
     
     const holdingsAfterSyn = [{ 
       cusip: bst.targetCUSIP, maturityMonth: m - 1, maturityYear: tb.maturity.getFullYear(), 

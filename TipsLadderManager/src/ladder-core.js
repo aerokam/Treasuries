@@ -781,7 +781,8 @@ export function sizeLadder({
     const yearsBeforeGap = rangeYears.filter(y => y < minGapYear);
     lowerYear = Math.max(...yearsBeforeGap);
 
-    // Augment effectivePrelim with future 30Y cover excess interest (2052/2056 are above gap years).
+    // Augment effectivePrelim with the Cover Excess interest at settlement quantities (the covers mature
+    // above the gap years). The gap years are left on this until their own sequence is specified.
     let augmentedPrelim = effectivePrelim;
     if (future30yYears.length > 0) {
       augmentedPrelim = { ...effectivePrelim };

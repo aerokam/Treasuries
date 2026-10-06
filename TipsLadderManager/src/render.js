@@ -21,8 +21,6 @@ function fmtCls(v, fmt) {
   return (fmt === 'sgn' && typeof v === 'number' && v !== 0) ? (v > 0 ? 'pos' : 'neg') : '';
 }
 
-function pi(d) { return d.principalPerBond * (1 + d.coupon / 2 * (d.nPeriods || 2)); }
-
 // COLS schema -- single source for all table rendering (6.0_UI_Schema.md)
 export const COLS = [
   // Shared (both modes)
@@ -39,21 +37,21 @@ export const COLS = [
     value: d => d.saYield, subValue: d => d.saYield,
     headerHTML: '<span style="visibility:hidden">.</span><br><span style="font-weight:normal;opacity:0.7">SA Yield</span>' },
   // Rebalance-only
-  // Excess sub-row = coverage delivered (≈ missing-years × DARA): excessAmt{Before,After} from
-  // rebalance-lib (P+I − AMD net-out + block-LMI add-back), same rule as build's Amount column.
+  // Excess sub-rows show no Amount (5.0 §Sub-Row Logic): the Amount of a gap year or a Future 30Y
+  // year is on that year's group header row (summary.syntheticYearAmounts, renderGroupHeader). The
+  // pre-Run Before-State Preview alone still sets excessAmtBefore on a flagged bracket candidate's
+  // row (3.0 §Before-State Preview and Bracket-Year Excess Detection), and its sub-row shows that.
   { label: 'Amount Before', key: 'amtBefore', fmt: 'amt', rebalOnly: true, fyLevel: true,
     value:          d => d.araBeforeTotal ?? null,
-    subValue:       d => d.excessAmtBefore ?? (d.excessQtyBefore != null ? d.excessQtyBefore * pi(d) : null),
-    subDrillKeyFn:  d => d.isFuture30yCover ? 'future30yAmtBefore' : 'bracketAmtBefore',
-    total: true, totalFn: d => (d.araBeforeTotal ?? 0) + ((d.excessAmtBefore ?? (d.excessQtyBefore != null ? d.excessQtyBefore * pi(d) : 0)) || 0),
+    subValue:       d => d.excessAmtBefore ?? null,
+    total: true, totalFn: d => (d.araBeforeTotal ?? 0) + (d.excessAmtBefore ?? 0),
     drill: true, drillCond: (_v, d) => d.araBeforeTotal != null,
     headerHTML: 'Amt Before<br><span style="visibility:hidden">.</span>' },
 
   { label: 'Amount After',  key: 'amtAfter',  fmt: 'amt', rebalOnly: true, fyLevel: true,
     value:          d => d.araAfterTotal ?? null,
-    subValue:       d => d.excessAmtAfter ?? (d.excessQtyAfter != null ? d.excessQtyAfter * pi(d) : null),
-    subDrillKeyFn:  d => d.isFuture30yCover ? 'future30yAmtAfter' : 'bracketAmtAfter',
-    total: true, totalFn: d => (d.araAfterTotal ?? 0) + ((d.excessAmtAfter ?? (d.excessQtyAfter != null ? d.excessQtyAfter * pi(d) : 0)) || 0),
+    subValue:       () => null,
+    total: true, totalFn: d => d.araAfterTotal ?? 0,
     drill: true, drillCond: (_v, d) => d.araAfterTotal != null,
     headerHTML: 'Amt After<br><span style="visibility:hidden">.</span>' },
 
@@ -112,9 +110,8 @@ export const COLS = [
   // Build-only
   { label: 'Amount', key: 'amount', fmt: 'amt', buildOnly: true, fyLevel: true,
     value:          d => d.fundedYearAmt,
-    subValue:       d => d.excessAmt,
-    subDrillKeyFn:  d => d.isFuture30yCover ? 'future30yAmt' : 'bracketAmount',
-    total: true, totalFn: d => (d.fundedYearAmt ?? 0) + (d.excessAmt ?? 0),
+    subValue:       () => null,
+    total: true, totalFn: d => d.fundedYearAmt ?? 0,
     drill: true, drillCond: () => true,
     headerHTML: 'Amount<br><span style="visibility:hidden">.</span>' },
 
@@ -134,7 +131,7 @@ export const COLS = [
 ];
 
 function isBracket(d, mode) {
-  // Designated gap brackets stay rendered as brackets even at 0 excess (gap covered by PLI/LMI/AMD)
+  // Designated gap brackets stay rendered as brackets even at 0 excess (gap covered by PLI/LMI)
   // — the "*" + qty-0 excess sub-row remains, its drill explains the 0. Same rule for build and
   // rebalance, so a 0-excess bracket (e.g. 2036/2040 under high later-year DARA) shows in both.
   if (mode === 'rebal') return d.excessQtyBefore > 0 || d.excessQtyAfter > 0 || d.isGapBracket;
@@ -265,6 +262,14 @@ function rmdOptionsLinkHTML(fy, settlementYear, rmdCouponMode, mode) {
     + `data-tip-html="${encodeURIComponent(rmdOptionsTipHTML())}">Coupons${isDefault ? '' : '*'}</a>`;
 }
 
+// The Amount column → the summary map its gap year and Future 30Y year Amounts come from, and the
+// drill key their popups route on.
+const SYNTHETIC_DRILL_KEY = { amount: 'yearAmount', amtAfter: 'yearAmountAfter', amtBefore: 'yearAmountBefore' };
+function syntheticYearAmountFor(summary, colKey, fy) {
+  const map = colKey === 'amtBefore' ? summary?.syntheticYearAmountsBefore : summary?.syntheticYearAmounts;
+  return SYNTHETIC_DRILL_KEY[colKey] && map ? (map[fy] ?? null) : null;
+}
+
 function renderGroupHeader(cols, fy, rows, isBracketGroup, mode, summary, daraByYear, flaggedYears) {
   const groupRows  = rows.map(r => r.d);
   const labelCount = cols.filter(c => c.fmt === 'str' || c.fmt === 'yld').length;
@@ -285,6 +290,13 @@ function renderGroupHeader(cols, fy, rows, isBracketGroup, mode, summary, daraBy
   html += labelTd;
   for (const col of valueCols) {
     let agg = null, drillKey = null, drillRi = null;
+    // A gap year or a Future 30Y year holds no TIPS row; its Amount comes from the summary and its
+    // drill is keyed by year (2.0 §Amount of a Gap Year and a Future 30Y Year; 5.0 §Popup Routing).
+    const synthetic = col.fyLevel && rows.length === 0 ? syntheticYearAmountFor(summary, col.key, fy) : null;
+    if (synthetic) {
+      html += `<td class="drillable" data-year="${fy}" data-col="${SYNTHETIC_DRILL_KEY[col.key]}" style="text-align:right">${esc(fmtCell(synthetic.amount, col.fmt))}</td>`;
+      continue;
+    }
     if (col.fyLevel) {
       // fyLevel: find first non-null/non-undefined row's value (not sum); track its ri for drill.
       // `!= null` (not `!== null`) so a field the row simply never set (undefined — e.g. an
@@ -419,7 +431,11 @@ export function renderTable({ details, mode, summary, daraByYear = null, flagged
       s = 'Total';
     } else if (col.total) {
       const fn = col.totalFn ?? (d => { const v = col.value(d, 0, details); return typeof v === 'number' ? v : 0; });
-      const sum = details.reduce((acc, d) => acc + fn(d), 0);
+      let sum = details.reduce((acc, d) => acc + fn(d), 0);
+      // The Amount total includes the Amount on each gap year's and Future 30Y year's row.
+      if (SYNTHETIC_DRILL_KEY[col.key] && summary?.firstYear != null) {
+        for (let y = summary.firstYear; y <= summary.lastYear; y++) sum += syntheticYearAmountFor(summary, col.key, y)?.amount ?? 0;
+      }
       s = col.fmt === 'sgn'
         ? (Math.round(sum) > 0 ? '+' : '') + Math.round(sum).toLocaleString('en-US')
         : Math.round(sum).toLocaleString('en-US');
