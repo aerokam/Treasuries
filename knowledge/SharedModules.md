@@ -68,7 +68,7 @@ caller's spec.
 
 ## <a id="m5"></a>ladder-core.js (M5)
 **File**: `TipsLadderManager/src/ladder-core.js`
-**Purpose**: The single authoritative implementation of "size the target ladder from a DARA." Unlike M1-M4, this module's algorithm is too large for a registry entry — it is specified in full at [2.0 TIPS Ladders](../TipsLadderManager/knowledge/2.0_TIPS_Ladders.md) (§Algorithm and the duration-matching/PLI/AMD sections it covers), not here. This entry only names the exports and their callers.
+**Purpose**: The single authoritative implementation of "size the target ladder from a DARA." Unlike M1-M4, this module's algorithm is too large for a registry entry — it is specified in full at [2.0 TIPS Ladders](../TipsLadderManager/knowledge/2.0_TIPS_Ladders.md) (§Algorithm and the duration-matching/PLI/Future 30Y sections it covers), not here. This entry only names the exports and their callers.
 **Exports**: `selectLadderBonds`, `sizeLadder`, `sizeFuture30yCover`, `sizeYearRungs`/`aggregateRungs` — see 2.0 for what each does.
 
 **Called by**: [Build the ladder (4.3.2)](../TipsLadderManager/knowledge/4.3_Build_Ladder.md#build-the-ladder) and [Rebalance the ladder (4.4.3)](../TipsLadderManager/knowledge/4.4_Rebalance_Ladder.md#rebalance-the-ladder).

@@ -86,13 +86,7 @@ its actual cause, and a loosened assertion that still holds is not proof the loo
 fix. `2.0 TIPS Ladders §Gap Year Coverage Model`'s `avgAmt ≈ DARA` residual went through two rounds:
 it was first stated as a fixed "~0.6%" bound, which real runs showed was wrong — the residual was
 actually a one-directional overfunding bias (0.3-1.7% of `DARA`, never below it), so the assertion
-was loosened to test the direction instead of a magnitude. That direction turned out to be the
-symptom of a real, fixable bug: gap-bracket excess bought at a discount was reporting its full P+I
-as coverage instead of accruing AMD the way the Future-30Y covers already did (`948410f`, §Gap
-Bracket AMD). With that modeled, the residual has no direction at all — it lands between −0.36% and
-+0.60% across the same 18 test cases, under in 8 and over in 10. The lesson isn't "assert the
-direction" or "assert the magnitude" in the abstract — it's that an assertion loose enough to pass
-despite a real bug is itself a signal to keep looking, not a stopping point.
+was loosened to test the direction instead of a magnitude. The direction was itself the signal: a one-directional residual has a cause, and an assertion loose enough to pass despite it is a reason to keep looking, not a stopping point.
 
 ## Silent-skip guards fail loudly instead
 
