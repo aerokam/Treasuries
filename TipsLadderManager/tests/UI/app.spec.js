@@ -480,7 +480,7 @@ test('drill popup: clicking Index Ratio in Level 2 opens Level 3 Index Ratio pop
   await expect(l3Popup).not.toBeVisible();
 });
 
-test('drill popup: clicking Pre-ladder credit opens Level 3 pool composition with AMD breakout', async ({ page }) => {
+test('drill popup: clicking Pre-ladder credit opens Level 3 pool composition with the Future 30Y interest line', async ({ page }) => {
   // Regression guard: the L3 handler must read `summary` in its own scope (it was previously
   // block-scoped to the `if (drill)` branch, so clicking Pre-ladder credit threw and did nothing).
   await page.locator('.tab-btn[data-mode="build"]').click();
@@ -490,7 +490,7 @@ test('drill popup: clicking Pre-ladder credit opens Level 3 pool composition wit
   await firstYearSel.selectOption({ index: Math.min(5, fyCount - 1) }); // ~2032 → real pre-ladder window
   const lastYearSel = page.locator('#last-year');
   const lyCount = await lastYearSel.locator('option').count();
-  await lastYearSel.selectOption({ index: lyCount - 1 });               // 2066 → future-30Y cover exists
+  await lastYearSel.selectOption({ index: lyCount - 1 });               // the ladder's last year at most → Future 30Y years
 
   await page.locator('#dara').fill('100000');
   await page.locator('#pre-ladder-interest').check();
@@ -513,7 +513,7 @@ test('drill popup: clicking Pre-ladder credit opens Level 3 pool composition wit
       await expect(l3).toBeVisible();                                   // was failing: nothing happened
       await expect(l3).toContainText('Pre-ladder pool composition');
       await expect(l3).toContainText('Pre-ladder coupon interest');
-      await expect(l3).toContainText('Pre-ladder AMD');                 // the AMD breakout line
+      await expect(l3).toContainText('Pre-ladder interest from the simulated TIPS and the Cover Excess');
       await l3.locator('#sp-close').click();
       found = true;
       break;
@@ -525,37 +525,34 @@ test('drill popup: clicking Pre-ladder credit opens Level 3 pool composition wit
 });
 
 test('drill popup: gap-year PLI credit drills into pool composition', async ({ page }) => {
-  // The Bracket Amount popup lists each gap year's "↳ PLI credit"; each must drill into the shared
-  // pool composition (slice encoded in the data-l3 key as plcpool:<slice>).
+  // A gap year's Amount, on its group header row, lists its Pre-ladder credit; it must drill into the
+  // shared pool composition (slice encoded in the data-l3 key as plcpool:<slice>).
   await page.locator('.tab-btn[data-mode="build"]').click();
   const gap = await gapYears(page);
   await page.locator('#first-year').selectOption({ label: String(gap[0] - 1) });    // the gap years get PLI credit
   const lastYearSel = page.locator('#last-year');
   const lyCount = await lastYearSel.locator('option').count();
-  await lastYearSel.selectOption({ index: lyCount - 1 });               // 2066 → future-30Y cover → AMD in pool
+  await lastYearSel.selectOption({ index: lyCount - 1 });               // Future 30Y years → their interest in the pool
 
   await page.locator('#dara').fill('80000');
   await page.locator('#pre-ladder-interest').check();
   await page.locator('#run-btn').click();
   await expect(page.locator('#build-output')).toHaveCSS('display', 'block', { timeout: 4_000 });
 
-  // Expand all groups so bracket sub-rows (bracketAmount cells) become visible.
-  const expandAllBtn = page.locator('#expand-collapse-all-btn');
-  if ((await expandAllBtn.textContent())?.trim() === 'Expand All') await expandAllBtn.click();
-
-  const gapCell = page.locator('#build-table td.drillable[data-col="bracketAmount"]').first();
+  // The first gap year's group header row carries its Amount (2.0 §Amount of a Gap Year and a Future 30Y Year).
+  const gapCell = page.locator(`#build-table tr.fy-group-header[data-fy="${gap[0]}"] td.drillable[data-col="yearAmount"]`);
   await expect(gapCell).toBeVisible();
   await gapCell.click();
   await expect(page.locator('#drill-overlay')).toBeVisible({ timeout: 4_000 });
 
   const gapPli = page.locator('.drill-l3[data-l3^="plcpool:"]').first();
-  await expect(gapPli).toBeVisible();                                    // the "↳ PLI credit" line
+  await expect(gapPli).toBeVisible();                                    // the Pre-ladder credit line
   await gapPli.click();
 
   const l3 = page.locator('#shared-popup');
   await expect(l3).toBeVisible();
   await expect(l3).toContainText('Pre-ladder pool composition');
-  await expect(l3).toContainText('Pre-ladder AMD');
+  await expect(l3).toContainText('Pre-ladder interest from the simulated TIPS and the Cover Excess');
   await expect(l3).toContainText('Applied to this year');
   await l3.locator('#sp-close').click();
   await expect(l3).not.toBeVisible();
@@ -1266,15 +1263,19 @@ test('build variable DARA then rebalance: per-year panel round-trips exactly', a
 });
 
 // ── Full UI round-trip: build → export → import → rebalance (Future-30Y cover excess) ──
-// Regression for the bug where importing a built 2026–2066 ladder defaulted the rebalance
-// last-year to 2056 (longest actual TIPS), so the 2052/2056 Future-30Y cover excess was sold
-// to DARA. The last-year must be recovered (2066) from the cover excess so the round-trip is flat.
+// Regression for the bug where importing a built ladder reaching into the Future 30Y years defaulted
+// the rebalance last-year to the longest issued maturity year, so the Cover Excess was sold to DARA.
+// The last-year must be recovered from the Cover Excess so the round-trip is flat.
 test('round-trip: build to the last Future 30Y year → export CUSIP/Qty → import → last-year recovered, ~0 net cash', async ({ page }) => {
   test.setTimeout(20_000);
 
-  // 1. Build 2026–2066 @ DARA 40k
+  // 1. Build to the ladder's last year at most (the last Last Year option, DD §5.1) @ DARA 40k
   await page.locator('.tab-btn[data-mode="build"]').click();
-  await page.locator('#last-year').selectOption({ value: '2066' });
+  const lastYearSel = page.locator('#last-year');
+  const lastOption = lastYearSel.locator('option').last();
+  const lastYear = await lastOption.getAttribute('value');
+  await expect(lastOption, 'the last Last Year option is a Future 30Y year').toContainText('Future 30Y');
+  await lastYearSel.selectOption({ value: lastYear });
   await page.locator('#dara').fill('40000');
   await page.locator('#run-btn').click();
   await expect(page.locator('#build-output')).toHaveCSS('display', 'block', { timeout: 4_000 });
@@ -1290,9 +1291,9 @@ test('round-trip: build to the last Future 30Y year → export CUSIP/Qty → imp
   await page.locator('.tab-btn[data-mode="rebalance"]').click();
   await page.locator('#holdings-file').setInputFiles(csvPath);
 
-  // 4. The crux: last-year must default to 2066 (recovered from the 2052/2056 cover excess),
-  //    NOT 2056 — else the covers are sold and the round-trip is full of trades.
-  await expect(page.locator('#rebal-last-year')).toHaveValue('2066', { timeout: 4_000 });
+  // 4. The crux: last-year must default to the built last year (recovered from the Cover Excess),
+  //    NOT the longest issued maturity year — else the covers are sold and the round-trip is full of trades.
+  await expect(page.locator('#rebal-last-year')).toHaveValue(lastYear, { timeout: 4_000 });
 
   // 5. Rebalance at the same DARA → near-zero net cash (build↔rebalance are internally consistent).
   await page.locator('#dara').fill('40000');
@@ -1300,6 +1301,46 @@ test('round-trip: build to the last Future 30Y year → export CUSIP/Qty → imp
   await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 6_000 });
   const netCash = parseFloat((await page.locator('#net-cash-val').textContent()).replace(/[^0-9.-]/g, ''));
   expect(Math.abs(netCash), 'round-trip net cash must be ~0').toBeLessThan(2000);
+});
+
+// ── Amount of a gap year and a Future 30Y year (2.0 §Amount of a Gap Year and a Future 30Y Year) ──
+// The group header row of each gap year and Future 30Y year carries the Amount, drillable; the excess
+// sub-rows carry none (5.0 §Sub-Row Logic).
+test('build: gap year and Future 30Y year rows show a drillable Amount; excess rows show none', async ({ page }) => {
+  test.setTimeout(20_000);
+  await page.locator('.tab-btn[data-mode="build"]').click();
+  const gap = await gapYears(page);
+  await page.locator('#first-year').selectOption({ label: String(gap[0] - 1) });
+  const lastYearSel = page.locator('#last-year');
+  const lastYear = await lastYearSel.locator('option').last().getAttribute('value');
+  await lastYearSel.selectOption({ value: lastYear });
+  await page.locator('#dara').fill('40000');
+  await page.locator('#run-btn').click();
+  await expect(page.locator('#build-output')).toHaveCSS('display', 'block', { timeout: 4_000 });
+  const expandAllBtn = page.locator('#expand-collapse-all-btn');
+  if ((await expandAllBtn.textContent())?.trim() === 'Expand All') await expandAllBtn.click();
+
+  for (const y of [gap[0], Number(lastYear)]) {
+    const cell = page.locator(`#build-table tr.fy-group-header[data-fy="${y}"] td.drillable[data-col="yearAmount"]`);
+    await expect(cell, `${y} carries an Amount`).toBeVisible();
+    const amount = parseFloat(((await cell.textContent()) ?? '').replace(/[^0-9.-]/g, ''));
+    expect(Math.abs(amount - 40000), `${y} Amount (${amount}) lands near its DARA`).toBeLessThan(1100);
+    await cell.click();
+    await expect(page.locator('#drill-overlay')).toBeVisible({ timeout: 4_000 });
+    await expect(page.locator('#drill-content')).toContainText(y === gap[0] ? 'Synthetic TIPS' : 'Simulated Outstanding Future 30Y TIPS');
+    await expect(page.locator('#drill-content')).toContainText('DARA');
+    await page.locator('#drill-close').click();
+    await expect(page.locator('#drill-overlay')).not.toBeVisible();
+  }
+
+  // Excess sub-rows: the Amount column is blank.
+  const headers = await page.locator('#build-table thead th').evaluateAll(ths => ths.map(th => th.dataset.col));
+  const amountIdx = headers.indexOf('amount');
+  const subRows = page.locator('#build-table tr.excess-subrow');
+  expect(await subRows.count(), 'the ladder has excess sub-rows').toBeGreaterThan(0);
+  for (const r of await subRows.all()) {
+    expect(((await r.locator('td').nth(amountIdx).textContent()) ?? '').trim()).toBe('');
+  }
 });
 
 // ── Per-rung DARA selection: select a range on the ladder table, then Set DARA / Infer DARA ──
