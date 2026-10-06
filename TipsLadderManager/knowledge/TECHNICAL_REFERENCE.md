@@ -10,7 +10,7 @@ This document maps conceptual definitions from the [Master Glossary](../../knowl
 |---|---|---|
 | REFCPI_CUSIP | `scripts/fetchRefCpi.js#CUSIP` | `912810FD5` (used for fetching daily Ref CPI) |
 | MIN_BRACKET_YEAR | `LOWEST_LOWER_BRACKET_YEAR` | `2032` (defines the search range for the lower bracket) |
-| MAX_LAST_YEAR | `src/ladder-core.js#maxLastYear` | Longest-dated issued TIPS maturity year + 10, which is `2066` today. It is the upper bound of the Last Year selector; 2057–2066 are Future 30Y Rungs covered by the 2056 bracket. |
+| MAX_LAST_YEAR | `src/ladder-core.js#maxLastYear` | Longest-dated issued TIPS maturity year + N (DD §5.1), which is `2063` as of 2026-10-06. It is the upper bound of the Last Year selector; the years after the longest issued maturity year are Future 30Y Rungs covered by the Cover Excess. |
 
 ---
 
@@ -48,7 +48,7 @@ stretch of years whose TIPS have not yet been issued; each is duration-covered b
 |---|---|---|
 | First / Last Funded Year (ladder endpoints) | `firstYear` / `lastYear` | endpoints of the ladder, not bracket years |
 | Gap lower bracket / upper bracket (gap **bracket pair**) | `lowerYear`/`lowerCUSIP`, `upperYear`/`upperCUSIP` | most recently issued 10-year TIPS below the gap / 2040 |
-| Future-30Y lower cover / upper cover (Future-30Y **cover pair**) | `future30yLowerCoverBond` (2056) / `future30yUpperCoverBond` (2052) | longest actual TIPS / longest duration excl. 2056 |
+| Future-30Y lower cover / upper cover (Future-30Y **cover pair**) | `future30yLowerCoverBond` / `future30yUpperCoverBond` | the rule in 2.0 §Future 30Y Cover Pair |
 | Imported excess (cover/bracket excess from the file's excess column) | `h.excessQty` (Format 4/5 import) | a calculated field, only ever written by this app's export; records build intent, not user-edited |
 | First-funded-year recovery (reverse-engineer gap duration match) | `inferFirstYearFromHoldings` | gap side may use the excess→DARA ratio shortcut |
 | Last-funded-year recovery (reverse-engineer Future-30Y duration match) | `inferLastYearFromHoldings` | matches the imported cover split; user-overridable |

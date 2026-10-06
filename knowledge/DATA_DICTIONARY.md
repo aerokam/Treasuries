@@ -666,7 +666,7 @@ Some values are true only until Treasury issues more TIPS. Left inline as approx
 | Longest issued maturity year | Maturity year of the longest-dated issued TIPS | 2056 | A new 30-year TIPS is issued |
 | Future 30Y years past the longest issued maturity year, at most (N) | The largest number of Future 30Y years for which, on the issue date of every [Simulated Outstanding Future 30Y TIPS](#simulated-outstanding-future-30y-tips), the average duration of the Synthetic TIPS not yet converted lies between the modified durations of the lower and upper cover (2.0 §Limit on the ladder’s last year) | 7, as of 2026-10-06 | Yields change, a new 30-year TIPS is issued, or the upper cover’s duration falls with age |
 | Ladder’s last year, at most | Longest issued maturity year + N | 2063, as of 2026-10-06 | N changes, or a new 30-year TIPS is issued |
-| Lower cover | The lower [Cover Year TIPS](#cover-year-tips): the outstanding TIPS with the longest modified duration at or below that of the Synthetic TIPS of the first Future 30Y year alone | 2048, as of 2026-10-06 | Yields change, or a new 30-year TIPS is issued |
+| Lower cover | The lower [Cover Year TIPS](#cover-year-tips): the outstanding TIPS with the longest modified duration at or below that of the Synthetic TIPS of the first Future 30Y year alone | 2049, as of 2026-10-06 | Yields change, or a new 30-year TIPS is issued |
 | Upper cover | The upper Cover Year TIPS: the outstanding TIPS with the longest modified duration, excluding the lower cover | 2052, as of 2026-10-06 | Yields change, or a new 30-year TIPS is issued |
 | Active lower bracket | [Active Lower Bracket](#active-lower-bracket) — latest outstanding maturity before the first gap year | Jul 2036 | The next pre-gap maturity is issued |
 
