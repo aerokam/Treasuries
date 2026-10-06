@@ -10,7 +10,7 @@
 // regresses: actualPaymentDate is "on or after" (returns d unchanged if d already IS a trading
 // day), not "strictly after" like nextBusinessDay.
 
-import { localDate, toIsoDate, nextBusinessDay, parseHolidaySet, actualPaymentDate } from '../src/settlement.js';
+import { localDate, toIsoDate, nextBusinessDay, parseHolidaySet, actualPaymentDate, lastBusinessDayOfMonth } from '../src/settlement.js';
 import { parseCsv } from '../src/csv.js';
 
 const R2 = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev';
@@ -51,6 +51,11 @@ async function main() {
   ok(toIsoDate(actualPaymentDate(sat)) === '2026-04-06', 'actualPaymentDate weekend-only rolling works with default empty holiday set');
   const wed = localDate('2026-04-01'); // ordinary Wednesday
   ok(toIsoDate(actualPaymentDate(wed)) === '2026-04-01', 'actualPaymentDate leaves an ordinary weekday unchanged');
+
+  // ── lastBusinessDayOfMonth: the last weekday that is not a bond holiday ──
+  ok(toIsoDate(lastBusinessDayOfMonth(2027, 1)) === '2027-02-26', 'lastBusinessDayOfMonth(Feb 2027) is Fri Feb 26 (Feb 28 is a Sunday)');
+  ok(toIsoDate(lastBusinessDayOfMonth(2028, 1)) === '2028-02-29', 'lastBusinessDayOfMonth(Feb 2028) is Tue Feb 29 (leap year)');
+  ok(toIsoDate(lastBusinessDayOfMonth(2027, 1, new Set(['2027-02-26']))) === '2027-02-25', 'lastBusinessDayOfMonth skips a holiday on the last weekday');
 
   console.log(`\n${fail === 0 ? 'PASS' : 'FAIL'} — ${pass} passed, ${fail} failed`);
   process.exit(fail === 0 ? 0 : 1);

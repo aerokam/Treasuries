@@ -55,6 +55,15 @@ export function parseHolidaySet(rows) {
   return holidaySet;
 }
 
+// The last bond trading day of a month: the last day that is not a weekend or a SIFMA bond-market
+// holiday. `monthIndex` is 0-based, as Date uses. A TIPS is issued on the last trading day of the
+// month in which it is auctioned (DD §Outstanding TIPS).
+export function lastBusinessDayOfMonth(year, monthIndex, holidaySet = new Set()) {
+  const d = new Date(year, monthIndex + 1, 0);
+  while (d.getDay() === 0 || d.getDay() === 6 || holidaySet.has(toIsoDate(d))) d.setDate(d.getDate() - 1);
+  return d;
+}
+
 // A coupon/principal dated on a weekend or bond holiday is actually paid the next bond trading
 // day — the cash isn't in hand until then. Returns `d` unchanged when it is already a trading day
 // (on-or-after semantics); this is NOT the same as nextBusinessDay(d, holidaySet), which always
