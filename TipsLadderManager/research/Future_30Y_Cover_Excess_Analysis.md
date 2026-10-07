@@ -1,4 +1,4 @@
-# Future 30Y: Net Cash, Duration Drift and Yield Sensitivity
+# Future 30Y Cover Excess: Net Cash, Duration Drift, Yield Sensitivity and the Choice of Covers
 
 Research behind [2.0 §Future 30Y Simulated Outstanding TIPS](../knowledge/2.0_TIPS_Ladders.md#future-30y-simulated-outstanding-tips). Where a newer analysis overrides a result here, the result is replaced, not appended to.
 
@@ -58,7 +58,7 @@ Measured just before each rebalance, the Cover Excess held since the last one ag
 | 2032-02-27 | 18.34 | 18.88 | −0.54 | $196,761 | $36,088 | $36,224 |
 | 2033-02-28 | 18.13 | 18.70 | −0.57 | $100,420 | $18,210 | $18,216 |
 
-The covers lose duration about 0.4 years a year against 0.17 for the Future 30Y TIPS. Their value has grown by the accretion, which offsets the shorter duration, so the two falls differ by $6 to $197, under 0.2%. Matching on a midpoint of today's and next year's duration would buy almost nothing under a static curve.
+The durations of the covers and of the Future 30Y TIPS both decline, at slightly different rates (about 0.4 years a year for the covers against 0.17). Part of the difference is offset by the accrued market discount realized at each rebalance, which has raised the value of the covers. The remaining difference is tiny, $6 to $197 for a 100 bp move, under 0.2%, so it is not worth correcting. Matching on a midpoint of today's and next year's duration would buy almost nothing under a static curve.
 
 ## 5. A parallel yield shift moves the Net Cash little but can break the duration match
 
@@ -70,3 +70,18 @@ A parallel shift of every yield from the first issue date.
 | Duration match reached at every issue date | no | no | yes | yes | yes |
 
 After a fall the target duration of the Future 30Y TIPS not yet issued rises above the Upper cover's duration, which shortens with age: at −50 bp in 2032 (target 19.69 against 19.34), at −100 bp in 2031 and 2032. A ladder to 2063 (N = 7) sits at the edge of what the covers can reach.
+
+## 6. A margin for the Lower cover
+
+The rule picks the longest modified duration at or below that of the first Synthetic TIPS (2057). That duration depends on the market yield: 18.98 on 2026-10-06 and 18.77 on 2026-10-08, with the Lower cover moving from the 2049 (18.94, then 18.92) to the 2048 (18.23). The covers' own durations barely move with yield: for a +100 bp parallel shift the 2047 falls from 17.77 to about 17.41, while the first Synthetic TIPS falls from 18.77 to 16.57.
+
+Measuring the first Synthetic TIPS at a fixed yield of 4% instead of the market yield gives 17.35, which fixes the target and leaves only the covers' durations to move. The Lower cover is then the 2046 (16.80), with a margin of 0.55 years. It would change only if the 2047's duration fell below 17.35 or the 2046's rose above it, which takes yield moves of more than 100 bp.
+
+The choice costs nothing. For a Lower cover of 2048, 2047 or 2046 with the 2052 as Upper cover, N is 7 in every case (the match is reached to a last year of 2063 and missed from 2064), the Net Cash total to 2063 is $56K, $58K and $58K, and the credit with Net Cash is 99% to 100% of the full annual coupons of every Future 30Y TIPS over the years of the rebalances, for a last year of 2059 or later.
+
+| First Synthetic TIPS yield | Duration | Lower cover | Margin in years |
+|---|---|---|---|
+| Market, 3.407% | 18.77 | 2048 | 0.54 |
+| 3.907% | 17.62 | 2046 | 0.82 |
+| 4.032% | 17.35 | 2046 | 0.54 |
+| 4.407% | 16.57 | 2045 | 0.09 |
