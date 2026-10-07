@@ -109,7 +109,7 @@ export function sizeFuture30yCover({
   };
 }
 
-// ─── Future 30Y Simulated Outstanding TIPS: the sequence of issue dates ─────────
+// ─── Future 30Y Simulated Outstanding TIPS: the rebalances at the issue dates ───
 // Spec: 2.0 §Future 30Y Simulated Outstanding TIPS. Each Future 30Y year's TIPS is issued on the
 // last trading day of February, 30 years before its maturity year; the conversions are taken in
 // order, earliest issue date first. Each conversion is a rebalance measured on the issue date:
@@ -130,7 +130,7 @@ export function future30yIssueDate(future30yYear, bondHolidays = new Set()) {
   return lastBusinessDayOfMonth(future30yYear - 30, 1, bondHolidays);
 }
 
-export function future30ySequence({ future30yParams, lowerCoverBond, upperCoverBond, refCPI, bondHolidays = new Set(), lowerQty0 = 0, upperQty0 = 0 }) {
+export function future30yRebalances({ future30yParams, lowerCoverBond, upperCoverBond, refCPI, bondHolidays = new Set(), lowerQty0 = 0, upperQty0 = 0 }) {
   const breakdown = [...(future30yParams?.breakdown ?? [])].sort((a, b) => a.year - b.year);
   if (!breakdown.length || !lowerCoverBond || !upperCoverBond) return { conversions: [], lowerQty0, upperQty0 };
   const irL = calcIndexRatio(refCPI, lowerCoverBond.datedDateRefCpi ?? refCPI);
@@ -190,12 +190,12 @@ export function future30ySequence({ future30yParams, lowerCoverBond, upperCoverB
 // carried in the running LMI: the coupon count differs from year to year.
 // Returns { simulated: Map<year, $>, cover: Map<year, $> }.
 export function future30yInterestByYear({
-  sequence, lowerCoverBond, upperCoverBond, refCPI, settlementDate, firstFuture30yYear,
-  lowerQty0 = sequence?.lowerQty0 ?? 0, upperQty0 = sequence?.upperQty0 ?? 0,
+  rebalances, lowerCoverBond, upperCoverBond, refCPI, settlementDate, firstFuture30yYear,
+  lowerQty0 = rebalances?.lowerQty0 ?? 0, upperQty0 = rebalances?.upperQty0 ?? 0,
   bondHolidays = new Set(), rmdCouponMode = 'all', tradeDate = settlementDate, rmdLastDate = null,
 }) {
   const simulated = new Map(), cover = new Map();
-  const conversions = sequence?.conversions ?? [];
+  const conversions = rebalances?.conversions ?? [];
   if (!conversions.length || firstFuture30yYear == null) return { simulated, cover };
   const settlementYear = settlementDate.getFullYear();
   const counts = (date) => {
@@ -238,28 +238,28 @@ export function future30yInterestByYear({
 
 // ─── The ladder's last year, at most ────────────────────────────────────────────
 // Spec: 2.0 §Future 30Y Simulated Outstanding TIPS §Limit on the ladder's last year; DD §5.1.
-// N is the largest number of Future 30Y years for which, on the issue date of every Simulated
+// The Maximum Future 30Y Rungs is the largest number of Future 30Y years for which, on the issue date of every Simulated
 // Outstanding Future 30Y TIPS, the cost-weighted average duration of the Synthetic TIPS not yet
 // issued lies between the modified durations of the lower and upper cover measured that day.
 // Pass 1 is run at a flat nominal DARA: the average duration is a cost-weighted mean over a flat
 // ladder, so it does not depend on the DARA beyond rounding. `nMax` bounds the search.
 export function future30yLimit({ tipsMarketData, settlementDate, refCPI = 1, bondHolidays = new Set(), nMax = 30 }) {
   const covers = selectFuture30yCovers({ tipsMarketData, settlementDate });
-  if (!covers?.lowerCoverBond || !covers?.upperCoverBond) return { N: 0, lastYearMax: covers?.maxTipsYear ?? 0, covers };
+  if (!covers?.lowerCoverBond || !covers?.upperCoverBond) return { maxFuture30yRungs: 0, lastYearMax: covers?.maxTipsYear ?? 0, covers };
   const NOMINAL_DARA = 100000;
-  let N = 0;
+  let maxFuture30yRungs = 0;
   for (let n = 1; n <= nMax; n++) {
     const years = [];
     for (let y = covers.maxTipsYear + 1; y <= covers.maxTipsYear + n; y++) years.push(y);
     const future30yParams = future30yParamsCore({ future30yYears: years, anchorBond: covers.anchorBond, settlementDate, dara: NOMINAL_DARA });
-    const { conversions } = future30ySequence({ future30yParams, lowerCoverBond: covers.lowerCoverBond, upperCoverBond: covers.upperCoverBond, refCPI, bondHolidays });
+    const { conversions } = future30yRebalances({ future30yParams, lowerCoverBond: covers.lowerCoverBond, upperCoverBond: covers.upperCoverBond, refCPI, bondHolidays });
     if (!conversions.every(c => c.withinCovers)) break;
-    N = n;
+    maxFuture30yRungs = n;
   }
-  return { N, lastYearMax: covers.maxTipsYear + N, covers };
+  return { maxFuture30yRungs, lastYearMax: covers.maxTipsYear + maxFuture30yRungs, covers };
 }
 
-// The ladder's last year, at most: the longest issued maturity year + N (DD §5.1). The upper bound
+// The ladder's last year, at most: the longest issued maturity year + the Maximum Future 30Y Rungs (DD §5.1). The upper bound
 // of the Last Year selector.
 export function maxLastYear({ tipsMarketData, settlementDate, refCPI = 1, bondHolidays = new Set() }) {
   return future30yLimit({ tipsMarketData, settlementDate, refCPI, bondHolidays }).lastYearMax;
@@ -653,23 +653,23 @@ export function sizeLadder({
     future30yFellBack, future30yCoverReason, future30yTotalExcessCost, future30yLowerMonth, future30yUpperMonth,
   } = sizeFuture30yCover({ future30yYears, future30yLowerCoverBond, future30yUpperCoverBond, future30yAnchorBond, settlementDate, dara, daraByYear, refCPI });
 
-  // 4a'. The Future 30Y sequence (2.0 §Future 30Y Simulated Outstanding TIPS): the conversion on
+  // 4a'. The Future 30Y rebalances (2.0 §Future 30Y Simulated Outstanding TIPS): the conversion on
   // each issue date, and the interest of the Simulated Outstanding Future 30Y TIPS and of the Cover
   // Excess credited to each funded year before the first Future 30Y year. The settlement year's
   // 'last' Coupon Counting date is the same pool-wide date the corrected sweep uses (below).
   const firstFuture30yYear = future30yYears.length ? Math.min(...future30yYears) : null;
-  const future30ySeq = future30yYears.length
-    ? future30ySequence({ future30yParams, lowerCoverBond: future30yLowerCoverBond, upperCoverBond: future30yUpperCoverBond, refCPI, bondHolidays, lowerQty0: future30yLowerExQty, upperQty0: future30yUpperExQty })
+  const future30yRebal = future30yYears.length
+    ? future30yRebalances({ future30yParams, lowerCoverBond: future30yLowerCoverBond, upperCoverBond: future30yUpperCoverBond, refCPI, bondHolidays, lowerQty0: future30yLowerExQty, upperQty0: future30yUpperExQty })
     : { conversions: [], lowerQty0: 0, upperQty0: 0 };
-  const _seqLastDate = rmdCouponMode === 'last'
+  const _lastCouponDate = rmdCouponMode === 'last'
     ? latestRemainingCouponDate(
         rangeYears.filter(y => y > settlementYear).flatMap(y => tipsList(y).map(b => b.maturity)),
         settlementDate, bondHolidays, tradeDate,
       )
     : null;
   const { simulated: future30ySimulatedInterestByYear, cover: future30yCoverInterestByYear } = future30yInterestByYear({
-    sequence: future30ySeq, lowerCoverBond: future30yLowerCoverBond, upperCoverBond: future30yUpperCoverBond,
-    refCPI, settlementDate, firstFuture30yYear, bondHolidays, rmdCouponMode, tradeDate, rmdLastDate: _seqLastDate,
+    rebalances: future30yRebal, lowerCoverBond: future30yLowerCoverBond, upperCoverBond: future30yUpperCoverBond,
+    refCPI, settlementDate, firstFuture30yYear, bondHolidays, rmdCouponMode, tradeDate, rmdLastDate: _lastCouponDate,
   });
   const future30yInterest = (year) => (future30ySimulatedInterestByYear.get(year) ?? 0) + (future30yCoverInterestByYear.get(year) ?? 0);
 
@@ -703,7 +703,7 @@ export function sizeLadder({
     // The settlement year is measured against its REMAINING coupons, not a full year's: coupons
     // already paid this year are in hand, not still-forthcoming income for that rung. Charging the
     // pool against a full-year figure would understate the rung and spill cash up the ladder early.
-    const passLastDate = _seqLastDate;
+    const passLastDate = _lastCouponDate;
     const laterMatIntForCreditPass = (year) => {
       if (year !== settlementYear) return prelim[year].laterMatInt;
       let sum = 0;
@@ -784,7 +784,7 @@ export function sizeLadder({
     lowerYear = Math.max(...yearsBeforeGap);
 
     // Augment effectivePrelim with the Cover Excess interest at settlement quantities (the covers mature
-    // above the gap years). The gap years are left on this until their own sequence is specified.
+    // above the gap years). The gap years are left on this until their own rebalances are specified.
     let augmentedPrelim = effectivePrelim;
     if (future30yYears.length > 0) {
       augmentedPrelim = { ...effectivePrelim };
@@ -836,7 +836,7 @@ export function sizeLadder({
     // policy picked it — same set the sweep below draws its LMI from). Computed once, before the
     // sweep runs, since 'last' needs the pool's shared answer at the moment the sweep first reaches
     // it (the settlement year, near the end of the long→short walk).
-    const rmdLastDate = _seqLastDate;
+    const rmdLastDate = _lastCouponDate;
 
     let runningLMI = 0;             // full-annual convention — correct for every year but the settlement year
     let runningLMIRemaining = 0;    // same pool, but each holding's coupon capped to dates not yet paid this year
@@ -886,7 +886,7 @@ export function sizeLadder({
     future30yLowerDuration, future30yUpperDuration, future30yUpperWeight, future30yLowerWeight,
     future30yLowerExQty, future30yUpperExQty, future30yFellBack, future30yCoverReason, future30yTotalExcessCost,
     future30yLowerMonth, future30yUpperMonth,
-    future30ySequence: future30ySeq, future30ySimulatedInterestByYear, future30yCoverInterestByYear,
+    future30yRebalances: future30yRebal, future30ySimulatedInterestByYear, future30yCoverInterestByYear,
     preLadderYears, preLadderPool, preLadderCouponPool, preLadderFuture30yPool,
   };
 }

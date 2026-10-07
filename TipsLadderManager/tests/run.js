@@ -266,8 +266,9 @@ function ladderWithExcess(shareByYear, dara = 40000, { hump = 0 } = {}) {
 
 // Structural values the Build tests below are written against, taken from the outstanding TIPS: the
 // structural gap, the latest real maturity year, and the ladder's last year at most (longest issued
-// maturity year + N, DD §5.1). They move as TIPS are issued (a 10-year issue fills the gap from the
-// front; a new 30-year issue extends the last year) and, for N, as yields change.
+// maturity year + the Maximum Future 30Y Rungs, DD §5.1). They move as TIPS are issued (a 10-year issue
+// fills the gap from the front; a new 30-year issue extends the last year) and, for the Maximum Future
+// 30Y Rungs, as yields change.
 const GAP = ladderRoles(tipsMarketData, settlementDate).gap;
 const MAX_YEAR = Math.max(...ladderRoles(tipsMarketData, settlementDate).byYear.keys());
 const GAP_YEARS = Array.from({ length: GAP.last - GAP.first + 1 }, (_, i) => GAP.first + i);
@@ -978,7 +979,7 @@ console.log('\nsyntheticCoupon — every eighth from 0.125% to 10%');
 // value from live data and asserts it matches the table, so issuance or yield drift fails here
 // instead of going stale silently. The cover pair is also derived here independently of the engine
 // (longest modified duration, 2.0 §Future 30Y Cover Pair) and compared with selectFuture30yCovers.
-console.log('\nFuture 30Y — N, the ladder’s last year at most, and the cover pair (DD §5.1)');
+console.log('\nFuture 30Y — the Maximum Future 30Y Rungs, the ladder’s last year at most, and the cover pair (DD §5.1)');
 {
   const ddText = readFileSync(new URL('../../knowledge/DATA_DICTIONARY.md', import.meta.url), 'utf8');
   const ddRow = (prefix) => {
@@ -986,7 +987,7 @@ console.log('\nFuture 30Y — N, the ladder’s last year at most, and the cover
     if (!line) throw new Error(`DD §5.1 has no row starting "${prefix}"`);
     return parseInt(line.split('|')[3], 10);   // the "As of" column
   };
-  const ddN = ddRow('Maximum Future 30Y Rungs');
+  const ddMaxRungs = ddRow('Maximum Future 30Y Rungs');
   const ddLastYear = ddRow('Ladder’s last year, at most');
   const ddLower = ddRow('Lower cover');
   const ddUpper = ddRow('Upper cover');
@@ -1012,12 +1013,12 @@ console.log('\nFuture 30Y — N, the ladder’s last year at most, and the cover
   assert('engine lower cover matches the independent derivation', covers.lowerCoverBond?.cusip, lower.b.cusip);
   assert('engine upper cover matches the independent derivation', covers.upperCoverBond?.cusip, upper.b.cusip);
 
-  assert(`N derived from live data (${F30Y_LIMIT.N}) matches DD §5.1 (${ddN})`, F30Y_LIMIT.N, ddN);
+  assert(`Maximum Future 30Y Rungs derived from live data (${F30Y_LIMIT.maxFuture30yRungs}) matches DD §5.1 (${ddMaxRungs})`, F30Y_LIMIT.maxFuture30yRungs, ddMaxRungs);
   assert(`ladder's last year at most (${LAST_MAX}) matches DD §5.1 (${ddLastYear})`, LAST_MAX, ddLastYear);
   assert(`lower cover (${lower.b.maturity.getFullYear()}) matches DD §5.1 (${ddLower})`, lower.b.maturity.getFullYear(), ddLower);
   assert(`upper cover (${upper.b.maturity.getFullYear()}) matches DD §5.1 (${ddUpper})`, upper.b.maturity.getFullYear(), ddUpper);
   console.log(`        anchor ${anchor.maturity.getFullYear()} yield ${(anchor.yield * 100).toFixed(3)}%  first Synthetic TIPS duration at ${(ddLowerCoverYield * 100).toFixed(3)}% (coupon ${(synCpn * 100).toFixed(3)}%): ${firstDur.toFixed(3)}`);
-  console.log(`        lower ${lower.b.maturity.getFullYear()} (${lower.d.toFixed(3)})  upper ${upper.b.maturity.getFullYear()} (${upper.d.toFixed(3)})  N ${F30Y_LIMIT.N}`);
+  console.log(`        lower ${lower.b.maturity.getFullYear()} (${lower.d.toFixed(3)})  upper ${upper.b.maturity.getFullYear()} (${upper.d.toFixed(3)})  Maximum Future 30Y Rungs ${F30Y_LIMIT.maxFuture30yRungs}`);
 }
 
 // ── Test: Build — Future 30Y years (lastYear > maxRealYear) ───────────────────────
@@ -1137,7 +1138,7 @@ console.log('\nRebalance — an unheld year above 2040 (e.g. 2048) no longer tru
 // expected figures are worked out here from Pass 1's quantities and coupon, not read back from the
 // engine's own per-year maps.
 for (const dara of [20000, 100000, 400000]) {
-  console.log(`\nBuild — Future 30Y sequence and Amount, DARA=${dara}, lastYear=${LAST_MAX}`);
+  console.log(`\nBuild — Future 30Y rebalances and Amount, DARA=${dara}, lastYear=${LAST_MAX}`);
   const firstYear = settlementDate.getFullYear(), lastYear = LAST_MAX;
   const { summary, details } = runBuild({ dara, firstYear, lastYear, tipsMarketData, refCPI, settlementDate, bondHolidays });
   const bd = [...summary.future30yParams.breakdown].sort((a, b) => a.year - b.year);
@@ -1159,7 +1160,7 @@ for (const dara of [20000, 100000, 400000]) {
   assert('no Cover Excess interest after the last issue year',
     [...summary.future30yCoverInterestByYear.entries()].every(([y, v]) => y <= lastF30 - 30 || v === 0), true);
   assert('Cover Excess interest in the first issue year', (summary.future30yCoverInterestByYear.get(firstF30 - 30) ?? 0) > 0, true);
-  const conv = summary.future30ySequence.conversions;
+  const conv = summary.future30yRebalances.conversions;
   assert('one conversion per Future 30Y year, earliest issue date first',
     conv.map(c => c.year).join(','), bd.map(r => r.year).join(','));
   assert('Cover Excess is 0 after the last conversion',

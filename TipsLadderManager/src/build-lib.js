@@ -35,7 +35,7 @@ export function runBuild({ dara, firstYear: firstYearOpt, lastYear, tipsMarketDa
 
   if (!rangeYears.length) throw new Error('No TIPS bonds found in the specified year range');
 
-  // 2-5. Shared sizing pipeline — prelim, Future 30Y sequence, PLI, gap/excess, corrected sweep.
+  // 2-5. Shared sizing pipeline — prelim, Future 30Y rebalances, PLI, gap/excess, corrected sweep.
   //        Lives in ladder-core.js: the IDENTICAL code path build and rebalance both run.
   const {
     prelim, corrFYQty, corrLMI, corrRungs,
@@ -46,7 +46,7 @@ export function runBuild({ dara, firstYear: firstYearOpt, lastYear, tipsMarketDa
     future30yLowerDuration, future30yUpperDuration, future30yUpperWeight, future30yLowerWeight,
     future30yLowerExQty, future30yUpperExQty, future30yFellBack, future30yCoverReason, future30yTotalExcessCost,
     future30yLowerMonth, future30yUpperMonth,
-    future30ySequence, future30ySimulatedInterestByYear, future30yCoverInterestByYear,
+    future30yRebalances, future30ySimulatedInterestByYear, future30yCoverInterestByYear,
     preLadderYears, preLadderPool, preLadderCouponPool, preLadderFuture30yPool,
   } = sizeLadder({
     dara, daraByYear, firstYear, lastYear,
@@ -208,7 +208,7 @@ export function runBuild({ dara, firstYear: firstYearOpt, lastYear, tipsMarketDa
     future30yLowerExQty, future30yUpperExQty, future30yFellBack, future30yCoverReason, future30yTotalExcessCost,
     future30yLowerMonth, future30yUpperMonth,
     future30yParams,
-    future30yAnchorBond, future30ySequence, future30ySimulatedInterestByYear, future30yCoverInterestByYear,
+    future30yAnchorBond, future30yRebalances, future30ySimulatedInterestByYear, future30yCoverInterestByYear,
     syntheticYearAmounts: syntheticYearAmounts({ gapParams, future30yParams }),
     totalBuyCost,
     weightedAvgDuration,

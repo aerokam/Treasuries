@@ -956,7 +956,7 @@ async function loadData() {
 
     const lastYearSel = document.getElementById('last-year');
     while (lastYearSel.options.length > 1) lastYearSel.remove(1);
-    // The ladder's last year at most: the longest issued maturity year + N (DD §5.1).
+    // The ladder's last year at most: the longest issued maturity year + the Maximum Future 30Y Rungs (DD §5.1).
     for (let y = _bfsMinY, _maxLY = maxLastYear({ tipsMarketData, settlementDate, bondHolidays: _bondHolidays }); y <= _maxLY; y++) {
       const opt = document.createElement('option'); opt.value = y;
       opt.textContent = _bfsGapYears.has(y) ? `${y} (gap)` : y > _bfsMaxY ? `${y} (Future 30Y)` : String(y);
