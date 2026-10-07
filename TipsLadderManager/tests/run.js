@@ -6,7 +6,7 @@ import { readFileSync, readdirSync, existsSync } from 'fs';
 import path from 'path';
 import { buildTipsMarketData, localDate, runRebalance, runFundedRebalance, inferDARAFromCash, inferScaledDARAFromPortfolio, computePortfolioARAByYear, getGapYearBracketCandidates, getGapYears, derivePerYearDara, parseFundedYearDaraBlock, parseParamsBlock, inferFirstYearFromHoldings, inferLastYearFromHoldings } from '../src/rebalance-lib.js';
 import { computeBeforeState, detectBracketFlags, heldYearMedianExcluding } from '../src/before-state-lib.js';
-import { remainingCouponPaymentsThisYear, rmdCappedRemainingCoupons, latestRemainingCouponDate, future30yLimit, selectFuture30yCovers } from '../src/ladder-core.js';
+import { remainingCouponPaymentsThisYear, rmdCappedRemainingCoupons, latestRemainingCouponDate, future30yLimit, selectFuture30yCovers, LOWER_COVER_YIELD } from '../src/ladder-core.js';
 import { bracketWeights, bracketWeightsN, syntheticCoupon } from '../src/gap-math.js';
 import { findSpikes, smoothCurve } from '../src/shape-math.js';
 import { buildDurationPopupRows, buildBracketWeightDrill, buildFuture30yDurationPopupRows } from '../src/drill.js';
@@ -986,17 +986,25 @@ console.log('\nFuture 30Y — N, the ladder’s last year at most, and the cover
     if (!line) throw new Error(`DD §5.1 has no row starting "${prefix}"`);
     return parseInt(line.split('|')[3], 10);   // the "As of" column
   };
-  const ddN = ddRow('Future 30Y years past the longest issued maturity year, at most (N)');
+  const ddN = ddRow('Maximum Future 30Y Rungs');
   const ddLastYear = ddRow('Ladder’s last year, at most');
   const ddLower = ddRow('Lower cover');
   const ddUpper = ddRow('Upper cover');
+  // DD §5.0: LOWER_COVER_YIELD, read from the DD text so the engine constant is checked against it.
+  const ddLowerCoverYield = (() => {
+    const m = ddText.match(/`LOWER_COVER_YIELD` = ([\d.]+)%/);
+    if (!m) throw new Error('DD §5.0 has no LOWER_COVER_YIELD entry');
+    return parseFloat(m[1]) / 100;
+  })();
+  assert(`LOWER_COVER_YIELD (${LOWER_COVER_YIELD * 100}%) matches DD §5.0 (${ddLowerCoverYield * 100}%)`, LOWER_COVER_YIELD, ddLowerCoverYield, 1e-12);
 
   // Independent cover derivation: anchor = longest-dated outstanding TIPS; the first Future 30Y
-  // year's Synthetic TIPS matures Feb 15 the year after, with the 1/8% coupon at or below the anchor yield.
+  // year's Synthetic TIPS matures Feb 15 the year after and, for choosing the lower cover, is measured
+  // at LOWER_COVER_YIELD with the 1/8% coupon at or below it (DD §5.1 Lower cover).
   const outstanding = [...tipsMarketData.values()].filter(b => b.maturity > settlementDate && b.yield != null);
   const anchor = outstanding.reduce((a, b) => (!a || b.maturity > a.maturity ? b : a), null);
-  const synCpn = syntheticCoupon(anchor.yield);
-  const firstDur = calculateMDuration(settlementDate, new Date(anchor.maturity.getFullYear() + 1, 1, 15), synCpn, anchor.yield);
+  const synCpn = syntheticCoupon(ddLowerCoverYield);
+  const firstDur = calculateMDuration(settlementDate, new Date(anchor.maturity.getFullYear() + 1, 1, 15), synCpn, ddLowerCoverYield);
   const durs = outstanding.map(b => ({ b, d: calculateMDuration(settlementDate, b.maturity, b.coupon ?? 0, b.yield) }));
   const lower = durs.filter(x => x.d <= firstDur).reduce((a, x) => (!a || x.d > a.d ? x : a), null);
   const upper = durs.filter(x => x !== lower).reduce((a, x) => (!a || x.d > a.d ? x : a), null);
@@ -1008,7 +1016,7 @@ console.log('\nFuture 30Y — N, the ladder’s last year at most, and the cover
   assert(`ladder's last year at most (${LAST_MAX}) matches DD §5.1 (${ddLastYear})`, LAST_MAX, ddLastYear);
   assert(`lower cover (${lower.b.maturity.getFullYear()}) matches DD §5.1 (${ddLower})`, lower.b.maturity.getFullYear(), ddLower);
   assert(`upper cover (${upper.b.maturity.getFullYear()}) matches DD §5.1 (${ddUpper})`, upper.b.maturity.getFullYear(), ddUpper);
-  console.log(`        anchor ${anchor.maturity.getFullYear()} yield ${(anchor.yield * 100).toFixed(3)}%  first Synthetic TIPS duration ${firstDur.toFixed(3)}`);
+  console.log(`        anchor ${anchor.maturity.getFullYear()} yield ${(anchor.yield * 100).toFixed(3)}%  first Synthetic TIPS duration at ${(ddLowerCoverYield * 100).toFixed(3)}% (coupon ${(synCpn * 100).toFixed(3)}%): ${firstDur.toFixed(3)}`);
   console.log(`        lower ${lower.b.maturity.getFullYear()} (${lower.d.toFixed(3)})  upper ${upper.b.maturity.getFullYear()} (${upper.d.toFixed(3)})  N ${F30Y_LIMIT.N}`);
 }
 

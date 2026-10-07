@@ -25,12 +25,16 @@ function calcGapParams(gapYears, tipsMarketData, settlementDate, refCPI, dara, p
 
 // ─── Future 30Y anchor and cover pair ───────────────────────────────────────────
 // Spec: 2.0 §Future 30Y Rungs (the anchor is the longest-dated issued TIPS), §Future 30Y Cover
-// Pair; DD §5.1 (Lower cover, Upper cover). Measured at settlement, from market data alone:
+// Pair; DD §5.0 (LOWER_COVER_YIELD), §5.1 (Lower cover, Upper cover). Measured at settlement, from
+// market data alone:
 //   lower cover = the outstanding TIPS with the longest modified duration at or below that of the
-//                 Synthetic TIPS of the first Future 30Y year alone;
+//                 Synthetic TIPS of the first Future 30Y year alone, that Synthetic TIPS measured at
+//                 LOWER_COVER_YIELD (its coupon the eighth at or below that yield, syntheticCoupon);
 //   upper cover = the outstanding TIPS with the longest modified duration, excluding the lower cover.
-// Longest duration, not longest maturity: a deep-discount, low-coupon TIPS can carry a longer
-// duration than a later maturity. Returns null when the market has no outstanding TIPS.
+// Each outstanding TIPS is measured at its own market yield. Longest duration, not longest maturity:
+// a deep-discount, low-coupon TIPS can carry a longer duration than a later maturity. Returns null
+// when the market has no outstanding TIPS.
+export const LOWER_COVER_YIELD = 0.04;
 export function selectFuture30yCovers({ tipsMarketData, settlementDate }) {
   let anchorBond = null;
   const outstanding = [];
@@ -41,9 +45,7 @@ export function selectFuture30yCovers({ tipsMarketData, settlementDate }) {
   }
   if (!anchorBond) return null;
   const maxTipsYear = anchorBond.maturity.getFullYear();
-  const synYld = anchorBond.yield;
-  const synCpn = syntheticCoupon(synYld);
-  const firstSyntheticDuration = calculateMDuration(settlementDate, new Date(maxTipsYear + 1, 1, 15), synCpn, synYld);
+  const firstSyntheticDuration = calculateMDuration(settlementDate, new Date(maxTipsYear + 1, 1, 15), syntheticCoupon(LOWER_COVER_YIELD), LOWER_COVER_YIELD);
   const withDur = outstanding
     .map(bond => ({ bond, dur: calculateMDuration(settlementDate, bond.maturity, bond.coupon ?? 0, bond.yield) }))
     .filter(x => x.dur != null);
