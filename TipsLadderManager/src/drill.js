@@ -115,14 +115,15 @@ function gapBreakdownRows(gapParams, dara, opts) {
   return rows;
 }
 
-/// Level-3 drill: composition of the pre-ladder pool — the coupon interest of the holdings and the
-// interest of the Simulated Outstanding Future 30Y TIPS and the Cover Excess for the years before the
-// first funded year (2.0 §Future 30Y Simulated Outstanding TIPS §Interest credited to a funded year;
-// 4.0 §build-lib.js / rebalance-lib.js — Future 30Y Simulated Outstanding TIPS).
+/// Level-3 drill: composition of the pre-ladder pool — the coupon interest of the holdings, the
+// interest of the Simulated Outstanding Future 30Y TIPS and the Cover Excess, and the Net Cash, for
+// the years before the first funded year (2.0 §Future 30Y Simulated Outstanding TIPS §Interest credited
+// to a funded year; 4.0 §build-lib.js / rebalance-lib.js — Future 30Y Simulated Outstanding TIPS).
 export function buildPreLadderPoolDrill(summary, plCreditForYear) {
   const couponPool   = summary?.preLadderCouponPool ?? 0;
   const future30yPool = summary?.preLadderFuture30yPool ?? 0;
-  const total        = summary?.preLadderPool ?? (couponPool + future30yPool);
+  const netCashPool  = summary?.preLadderNetCashPool ?? 0;
+  const total        = summary?.preLadderPool ?? (couponPool + future30yPool + netCashPool);
   const years        = summary?.preLadderYears ?? 0;
   const rows = [
     { label: 'Pre-ladder coupon interest', note: years + ' yr \xd7 annual ladder coupon income', value: fm(couponPool) },
@@ -130,8 +131,13 @@ export function buildPreLadderPoolDrill(summary, plCreditForYear) {
   if (future30yPool > 0) {
     rows.push({ label: 'Pre-ladder interest from the simulated TIPS and the Cover Excess', note: 'coupons of the Simulated Outstanding Future 30Y TIPS and of the Cover Excess paid before the ladder starts', value: fm(future30yPool) });
   }
+  const showNet = Math.abs(netCashPool) >= 0.5;
+  if (showNet) {
+    rows.push({ label: 'Net Cash', note: 'cash from selling Cover Excess before the ladder starts, beyond the cost of the Simulated Outstanding Future 30Y TIPS bought', value: (netCashPool < 0 ? '−' + fm(-netCashPool) : fm(netCashPool)) });
+  }
   rows.push({ sep: true });
-  rows.push({ label: 'Total pre-ladder pool', note: future30yPool > 0 ? 'coupon interest + simulated TIPS and Cover Excess interest' : 'coupon interest', value: fm(total), total: true });
+  const totalNote = ['coupon interest', future30yPool > 0 ? 'simulated TIPS and Cover Excess interest' : null, showNet ? 'Net Cash' : null].filter(Boolean).join(' + ');
+  rows.push({ label: 'Total pre-ladder pool', note: totalNote, value: fm(total), total: true });
   if (plCreditForYear > 0) {
     rows.push({ sep: true });
     rows.push({ label: 'Applied to this year', note: 'slice of the pool credited here', value: fm(plCreditForYear) });
@@ -139,16 +145,21 @@ export function buildPreLadderPoolDrill(summary, plCreditForYear) {
   return rows;
 }
 
-// Interest of the Simulated Outstanding Future 30Y TIPS and of the Cover Excess credited to a funded
-// year (2.0 §Future 30Y Simulated Outstanding TIPS §Interest credited to a funded year), as popup
-// rows. `sign` prefixes the value ('−' where the popup subtracts it from DARA).
-function future30yInterestRows(year, sim, cov, sign = '') {
+// The three Future 30Y amounts credited to a funded year (2.0 §Future 30Y Simulated Outstanding TIPS
+// §Interest credited to a funded year) as popup rows: the interest of the Simulated Outstanding Future
+// 30Y TIPS, the interest of the Cover Excess and the Net Cash. `sign` prefixes the value ('−' where
+// the popup subtracts it from DARA). The Net Cash row shows whenever it is not 0: in Before it can be
+// negative, when less Cover Excess is held before the first issue date than the duration match sets.
+const hasNetCash = (net) => Math.abs(net) >= 0.5;
+function future30yInterestRows(year, sim, cov, net = 0, sign = '') {
   return (sim > 0 ? row('Simulated Future 30Y TIPS interest', 'coupons paid in ' + year + ' by the Simulated Outstanding Future 30Y TIPS issued by then', sign + fm(sim), false, undefined, 'sim') : '')
-    + (cov > 0 ? row('Cover Excess interest', 'coupons paid in ' + year + ' by the Cover Excess', sign + fm(cov), false, undefined, 'cov') : '');
+    + (cov > 0 ? row('Cover Excess interest', 'coupons paid in ' + year + ' by the Cover Excess', sign + fm(cov), false, undefined, 'cov') : '')
+    + (hasNetCash(net) ? row('Net Cash', 'cash from selling Cover Excess in this year, beyond the cost of the Simulated Outstanding Future 30Y TIPS bought', (net < 0 ? (sign ? '+' : '−') + fm(-net) : sign + fm(net)), false, undefined, 'net') : '');
 }
-function future30yInterestFmla(sim, cov, op = '+') {
+function future30yInterestFmla(sim, cov, net = 0, op = '+') {
   return (sim > 0 ? ' ' + op + ' <span class="formula-var" data-source="sim">Simulated Future 30Y TIPS interest</span>' : '')
-    + (cov > 0 ? ' ' + op + ' <span class="formula-var" data-source="cov">Cover Excess interest</span>' : '');
+    + (cov > 0 ? ' ' + op + ' <span class="formula-var" data-source="cov">Cover Excess interest</span>' : '')
+    + (hasNetCash(net) ? ' ' + op + ' <span class="formula-var" data-source="net">Net Cash</span>' : '');
 }
 
 // Amount of a gap year or a Future 30Y year, on that year's group header row (2.0 §Amount of a Gap
@@ -192,6 +203,7 @@ export function buildDrillHTML(d, colKey, summary) {
     const longerDatedInt = d.longerDatedLMI ?? d.fundedYearLaterMatInt; // use separated if available, else combined legacy
     const _sim = d.future30ySimulatedInterest || 0;
     const _cov = d.future30yCoverExcessInterest || 0;
+    const _net = d.future30yNetCash || 0;
     // The credit pass applies Available Cash first, so a year's credit and its cash are the same
     // dollars — shown as two lines that split the credit, never added on top of it
     // (2.0 §Available Cash).
@@ -216,7 +228,7 @@ export function buildDrillHTML(d, colKey, summary) {
       : 'Principal + Coupons + <span class="formula-var" data-source="lmi">LMI</span>';
     if (sameYearExInt > 0) totalFmla += ' + <span class="formula-var" data-source="exlmi">Same-maturity excess int</span>';
     if (_plCredit - _cashCredit > 0) totalFmla += ' + Pre-ladder credit';
-    totalFmla += future30yInterestFmla(_sim, _cov);
+    totalFmla += future30yInterestFmla(_sim, _cov, _net);
     if (_cashCredit > 0) totalFmla += ' + Available cash';
 
     if (_rungs) {
@@ -236,7 +248,7 @@ export function buildDrillHTML(d, colKey, summary) {
         row(_lmiLabel, _lmiDesc, fm(longerDatedInt), false, undefined, 'lmi') +
         (sameYearExInt > 0 ? row('Same-maturity excess interest', 'from excess TIPS maturing in ' + d.fundedYear, fm(sameYearExInt), false, undefined, 'exlmi') : '') +
         (_plCredit - _cashCredit > 0 ? row('Pre-ladder credit', 'pre-ladder pool applied to this year', fm(_plCredit - _cashCredit), false, 'plcpool') : '') +
-        future30yInterestRows(d.fundedYear, _sim, _cov) +
+        future30yInterestRows(d.fundedYear, _sim, _cov, _net) +
         (_cashCredit > 0 ? row('Available cash', 'cash on hand applied to this year', fm(_cashCredit)) : '') +
         sep() +
         row('Funded Year Amount', totalFmla, fm(d.fundedYearAmt), true, undefined, 'total') +
@@ -256,7 +268,7 @@ export function buildDrillHTML(d, colKey, summary) {
       row(_lmiLabel, _lmiDesc, fm(longerDatedInt), false, undefined, 'lmi') +
       (sameYearExInt > 0 ? row('Same-maturity excess interest', 'from excess TIPS maturing in ' + d.fundedYear, fm(sameYearExInt), false, undefined, 'exlmi') : '') +
       (_plCredit - _cashCredit > 0 ? row('Pre-ladder credit', 'pre-ladder pool applied to this year', fm(_plCredit - _cashCredit), false, 'plcpool') : '') +
-      future30yInterestRows(d.fundedYear, _sim, _cov) +
+      future30yInterestRows(d.fundedYear, _sim, _cov, _net) +
       (_cashCredit > 0 ? row('Available cash', 'cash on hand applied to this year', fm(_cashCredit)) : '') +
       sep() +
       row('Funded Year Amount', totalFmla, fm(d.fundedYearAmt), true, undefined, 'total') +
@@ -333,6 +345,7 @@ export function buildDrillHTML(d, colKey, summary) {
     const _plCredit   = isBef ? (d.preLadderCreditForYearBefore || 0) : (d.preLadderCreditForYear || 0);
     const _sim        = isBef ? (d.future30ySimulatedInterestBefore || 0) : (d.future30ySimulatedInterest || 0);
     const _cov        = isBef ? (d.future30yCoverExcessInterestBefore || 0) : (d.future30yCoverExcessInterest || 0);
+    const _net        = isBef ? (d.future30yNetCashBefore || 0) : (d.future30yNetCash || 0);
     // After: cash is part of the credit, so it splits it. Before: no rung was sized down, so the
     // cash the holder actually has is a plain addition (2.0 §Available Cash).
     const _cashRaw    = isBef ? (d.availableCashCreditBefore || 0) : (d.availableCashCredit || 0);
@@ -376,7 +389,7 @@ export function buildDrillHTML(d, colKey, summary) {
     if (_plShown > 0) {
       rows += row('Pre-ladder credit', 'pre-ladder pool applied to this year', fm(_plShown), false, 'plcpool', 'plc');
     }
-    rows += future30yInterestRows(d.fundedYear, _sim, _cov);
+    rows += future30yInterestRows(d.fundedYear, _sim, _cov, _net);
     if (_cashCredit > 0) {
       rows += row('Available cash', 'cash on hand applied to this year', fm(_cashCredit));
     }
@@ -385,7 +398,7 @@ export function buildDrillHTML(d, colKey, summary) {
       : 'Funded year TIPS + <span class="formula-var" data-source="lmi">LMI</span>';
     if (!_pliZeroed && excessLMI > 0) totalFmla += ' + <span class="formula-var" data-source="exlmi">Same-maturity excess int</span>';
     if (!_pliZeroed && _plShown > 0) totalFmla += ' + <span class="formula-var" data-source="plc">Pre-ladder credit</span>';
-    if (!_pliZeroed) totalFmla += future30yInterestFmla(_sim, _cov);
+    if (!_pliZeroed) totalFmla += future30yInterestFmla(_sim, _cov, _net);
     if (!_pliZeroed && _cashCredit > 0) totalFmla += ' + Available cash';
     rows += sep()
       + row(isBef ? 'Amount Before' : 'Amount After', totalFmla, fm(_displayAmt), true)
@@ -411,15 +424,16 @@ export function buildDrillHTML(d, colKey, summary) {
       const plCredit = d.preLadderCreditForYear || 0;
       const sim = d.future30ySimulatedInterest || 0;
       const cov = d.future30yCoverExcessInterest || 0;
+      const net = d.future30yNetCash || 0;
       const cashCredit = Math.min(d.availableCashCredit || 0, plCredit);
       const piPerBond = principalPerBond * (1 + d.coupon / 2 * nPeriods);
       const dara = d.DARA ?? 0;
-      const needed = dara - laterMatInt - sameYearExInt - plCredit - sim - cov;
+      const needed = dara - laterMatInt - sameYearExInt - plCredit - sim - cov - net;
 
       let neededFmla = 'DARA − <span class="formula-var" data-source="lmi">LMI</span>';
       if (sameYearExInt > 0) neededFmla += ' − <span class="formula-var" data-source="exlmi">Same-maturity excess int</span>';
       if (plCredit > 0) neededFmla += ' − <span class="formula-var" data-source="plc">Pre-ladder credit</span>';
-      neededFmla += future30yInterestFmla(sim, cov, '−');
+      neededFmla += future30yInterestFmla(sim, cov, net, '−');
 
 
       // P+I needed is the funded YEAR's total requirement; it equals this row's own quantity only
@@ -437,7 +451,7 @@ export function buildDrillHTML(d, colKey, summary) {
         row(lmiLabel, lmiDesc, '−' + fm(laterMatInt), false, undefined, 'lmi') +
         (sameYearExInt > 0 ? row('Same-maturity excess interest', 'from excess TIPS maturing in ' + d.fundedYear, '−' + fm(sameYearExInt), false, undefined, 'exlmi') : '') +
         (plCredit > 0 ? row('Pre-ladder credit', 'pre-ladder pool applied to this year', '−' + fm(plCredit), false, undefined, 'plc') : '') +
-        future30yInterestRows(d.fundedYear, sim, cov, '−') +
+        future30yInterestRows(d.fundedYear, sim, cov, net, '−') +
         (cashCredit > 0 ? row('↳ of which Available cash', 'cash on hand applied to this year', fm(cashCredit)) : '') +
         sep() +
         row('P+I needed', neededFmla, fm(needed), true, undefined, 'needed') +

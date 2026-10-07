@@ -316,14 +316,14 @@ export function inferLastYearFromHoldings({ holdings, tipsMarketData, refCPI, se
   return best ? best.L : null;
 }
 
-// The Simulated Outstanding Future 30Y TIPS and Cover Excess interest implied by holdings alone, for
+// The Simulated Outstanding Future 30Y TIPS and Cover Excess interest and the Net Cash implied by holdings alone, for
 // a holder whose DARA is inferred (3.0 §DARA inference with Future 30Y years). No holdings include
 // Simulated Outstanding Future 30Y TIPS, so their quantities are implied by the held Cover Excess:
 // the one flat DARA that sizes the Synthetic TIPS of the Future 30Y years (through `lastYear`) to the
 // cost of the held Cover Excess gives their quantities. Only Cover Excess the file states
 // (`excessQty`) counts; a holder with none has no Future 30Y years and no simulated coupons.
 // Returns null when there is nothing to imply, else { impliedDara, future30yParams, rebalances,
-// simulated, cover, lowerQty0, upperQty0, covers }.
+// simulated, cover, netCash, lowerQty0, upperQty0, covers }.
 export function impliedFuture30yInterest({ holdings, tipsMarketData, refCPI, settlementDate, lastYear, bondHolidays = new Set(), rmdCouponMode = 'all', tradeDate = settlementDate, rmdLastDate = null }) {
   const covers = selectFuture30yCovers({ tipsMarketData, settlementDate });
   const lower = covers?.lowerCoverBond, upper = covers?.upperCoverBond;
@@ -346,11 +346,11 @@ export function impliedFuture30yInterest({ holdings, tipsMarketData, refCPI, set
   const impliedDara = Math.abs(pass1(lo).future30yTotalCost - heldCost) <= Math.abs(pass1(hi).future30yTotalCost - heldCost) ? lo : hi;
   const future30yParams = pass1(impliedDara);
   const rebalances = future30yRebalances({ future30yParams, lowerCoverBond: lower, upperCoverBond: upper, refCPI, bondHolidays, lowerQty0, upperQty0 });
-  const { simulated, cover } = future30yInterestByYear({
+  const { simulated, cover, netCash } = future30yInterestByYear({
     rebalances, lowerCoverBond: lower, upperCoverBond: upper, refCPI, settlementDate, firstFuture30yYear: covers.maxTipsYear + 1,
     bondHolidays, rmdCouponMode, tradeDate, rmdLastDate,
   });
-  return { impliedDara, future30yParams, rebalances, simulated, cover, lowerQty0, upperQty0, covers };
+  return { impliedDara, future30yParams, rebalances, simulated, cover, netCash, lowerQty0, upperQty0, covers };
 }
 
 export function inferDARAFromCash({ bracketMode = '2bracket', holdings: holdingsRaw, tipsMarketData, refCPI, settlementDate, lastYearOverride = null, preLadderInterest = false, firstYearOverride = null, bondHolidays = new Set(), availableCash = 0, rmdCouponMode = 'all', tradeDate = settlementDate }) {
@@ -646,11 +646,11 @@ export function inferScaledDARAFromPortfolio({ daraMap, median: _median, holding
   // than one recovered from holdings — `correctCoverIncome: false`; the plan states each year's
   // true DARA, so adding these terms to it would count that income twice):
   // build's per-year DARA identity is
-  //   DARA_y = (P+I)_y + LMI_y + sameMaturityExcessInterest_y + simulated_y + coverExcess_y
+  //   DARA_y = (P+I)_y + LMI_y + sameMaturityExcessInterest_y + simulated_y + coverExcess_y + netCash_y
   // but computePortfolioARAByYear recovers only (P+I)+LMI, and its LMI carries the held Cover
   // Excess coupon down to every earlier year at a full year's coupon. Take that out, and add back the
   // gap bracket excess's own coupon (a cover year's Same-Maturity Excess Interest is 0) and the
-  // interest of the Simulated Outstanding Future 30Y TIPS and the Cover Excess the holdings imply
+  // interest of the Simulated Outstanding Future 30Y TIPS and the Cover Excess and the Net Cash the holdings imply
   // (impliedFuture30yInterest; 3.0 §DARA inference with Future 30Y years).
   let maxTipsYear = 0;
   for (const bond of tipsMarketData.values()) if (bond.maturity) maxTipsYear = Math.max(maxTipsYear, bond.maturity.getFullYear());
@@ -676,7 +676,7 @@ export function inferScaledDARAFromPortfolio({ daraMap, median: _median, holding
     : null;
   const _correction = (y) => (ownExcessCoupon[y] ?? 0)
     - coverExcessCoupon.reduce((s, c) => c.year > y ? s + c.annual : s, 0)
-    + (_implied?.simulated.get(y) ?? 0) + (_implied?.cover.get(y) ?? 0);
+    + (_implied?.simulated.get(y) ?? 0) + (_implied?.cover.get(y) ?? 0) + (_implied?.netCash.get(y) ?? 0);
 
   if (correctCoverIncome) daraMap = new Map([...daraMap.entries()].map(([y, v]) => [y, v + _correction(y)]));
   const inScope = scopeYears ? (y => scopeYears.has(y)) : (() => true);
@@ -978,7 +978,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
   // The provisional median is P+I + LMI from the holdings, and that LMI carries the held Cover Excess
   // coupon into every earlier year at a full year's coupon. A funded year's Amount instead takes the
   // Cover Excess coupons as the Future 30Y rebalances pay them, plus the coupons of the Simulated
-  // Outstanding Future 30Y TIPS, whose quantities the held Cover Excess implies. Only the dara===null
+  // Outstanding Future 30Y TIPS, whose quantities the held Cover Excess implies, and the Net Cash. Only the dara===null
   // path; a holder with no stated Cover Excess has no Future 30Y years to imply.
   const heldImplied = future30yYears.length > 0
     ? impliedFuture30yInterest({ holdings: holdingsRaw, tipsMarketData, refCPI, settlementDate, lastYear, bondHolidays, rmdCouponMode, tradeDate, rmdLastDate: _rmdLastDateBefore })
@@ -994,7 +994,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
     const amounts = [];
     for (let year = firstYear; year <= lastYear; year++) {
       if (araByYear[year] === undefined) continue;
-      amounts.push(araByYear[year] - cascaded(year) + (heldImplied.simulated.get(year) ?? 0) + (heldImplied.cover.get(year) ?? 0));
+      amounts.push(araByYear[year] - cascaded(year) + (heldImplied.simulated.get(year) ?? 0) + (heldImplied.cover.get(year) ?? 0) + (heldImplied.netCash.get(year) ?? 0));
     }
     if (amounts.length) { inferredDARA = _medianOf(amounts); DARA = inferredDARA; }
   }
@@ -1025,17 +1025,19 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
   const preLadderPool       = _sl.preLadderPool;
   const preLadderCouponPool = _sl.preLadderCouponPool;
   const preLadderFuture30yPool = _sl.preLadderFuture30yPool;
+  const preLadderNetCashPool = _sl.preLadderNetCashPool;
   const {
     future30yParams, future30yLowerDuration, future30yUpperDuration,
     future30yLowerWeight, future30yUpperWeight, future30yLowerExQty, future30yUpperExQty,
     future30yFellBack, future30yCoverReason, future30yLowerMonth, future30yUpperMonth,
   } = _sl;
-  // The interest of the Simulated Outstanding Future 30Y TIPS and of the Cover Excess credited to
-  // each funded year in the After state (the same figures a build credits).
+  // The interest of the Simulated Outstanding Future 30Y TIPS and of the Cover Excess, and the Net
+  // Cash, credited to each funded year in the After state (the same figures a build credits).
   const future30ySimulatedInterestByYear = _sl.future30ySimulatedInterestByYear ?? new Map();
   const future30yCoverInterestByYear = _sl.future30yCoverInterestByYear ?? new Map();
-  const future30yInterestAfter = (year) => (year >= firstYear && year <= lastYear)
-    ? (future30ySimulatedInterestByYear.get(year) ?? 0) + (future30yCoverInterestByYear.get(year) ?? 0) : 0;
+  const future30yNetCashByYear = _sl.future30yNetCashByYear ?? new Map();
+  const future30yCreditAfter = (year) => (year >= firstYear && year <= lastYear)
+    ? (future30ySimulatedInterestByYear.get(year) ?? 0) + (future30yCoverInterestByYear.get(year) ?? 0) + (future30yNetCashByYear.get(year) ?? 0) : 0;
 
   // Augment gapLaterMaturityInterest with future cover excess LMI before computing gap params
   const future30yExtraLMI = {};
@@ -1147,7 +1149,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
     let nonPI = 0;
     for (const h of yh) { if (h.cusip !== bCUSIP) nonPI += h.qty * calculatePIPerBond(h.cusip, h.maturity, refCPI, tipsMarketData); }
     const bDara = (bYear > lastYear || (future30yCoverYearSet.has(bYear) && bYear < firstYear)) ? 0 : (daraByYear?.get(bYear) ?? DARA);
-    bracketTargetFundedYearQtyBefore[bYear] = piB > 0 ? Math.max(0, Math.round((bDara - laterMatIntBefore - nonPI - future30yInterestAfter(bYear)) / piB)) : 0;
+    bracketTargetFundedYearQtyBefore[bYear] = piB > 0 ? Math.max(0, Math.round((bDara - laterMatIntBefore - nonPI - future30yCreditAfter(bYear)) / piB)) : 0;
   }
 
   // When excessQty is provided by the import (Formats 4 or 5), it encodes the funded/excess split
@@ -1312,9 +1314,9 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
     if (!bracketYearSet.has(y) && !gapYearSet.has(y)) rebalYearSet.add(y);
   }
   // Every funded year credited with the interest of the Simulated Outstanding Future 30Y TIPS or of
-  // the Cover Excess is rebalanced, so the credit reduces its funded-year quantity and an Amount After
+  // the Cover Excess, or with Net Cash, is rebalanced, so the credit reduces its funded-year quantity and an Amount After
   // above DARA is sold down (4.0 §build-lib.js / rebalance-lib.js — Future 30Y Simulated Outstanding TIPS).
-  for (const y of [...future30ySimulatedInterestByYear.keys(), ...future30yCoverInterestByYear.keys()]) {
+  for (const y of [...future30ySimulatedInterestByYear.keys(), ...future30yCoverInterestByYear.keys(), ...future30yNetCashByYear.keys()]) {
     if (y >= firstYear && y <= lastYear && !bracketYearSet.has(y) && !gapYearSet.has(y) && !future30yYearSet.has(y))
       rebalYearSet.add(y);
   }
@@ -1476,7 +1478,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
 
       // 3. Calculate needed P+I, subtracting both incoming LMI and current year excess LMI
       const effectivePartialCredit = (year === partialCreditYear) ? partialCredit : 0;
-      const future30yExtra = future30yInterestAfter(year);   // simulated TIPS + Cover Excess interest
+      const future30yExtra = future30yCreditAfter(year);   // simulated TIPS + Cover Excess interest + Net Cash
       const needed = yearDara - (isSettlementYear ? rebuildLaterMatIntRemaining : rebuildLaterMatInt) - excessLMI - effectivePartialCredit - future30yExtra;
 
       if (zeroedFundedYears.has(year)) {
@@ -1689,7 +1691,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
       }
     }
     // The Cover Excess is not carried in the running LMI: its interest is credited to each funded
-    // year directly (future30yInterestAfter), so take the target Cover Excess back out.
+    // year directly (future30yCreditAfter), so take the target Cover Excess back out.
     if (future30yCoverYearSet.has(year) && buySellTargets[year]) {
       const _cb = tipsMarketData.get(buySellTargets[year].targetCUSIP);
       const _cex = buySellTargets[year].targetQty - buySellTargets[year].targetFundedYearQty;
@@ -1708,7 +1710,8 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
   // matters only before the first issue date: from each issue date on, the Cover Excess goes to the
   // quantity the duration match gives, as in a build. The Simulated Outstanding Future 30Y TIPS are
   // sized as in a build (Pass 1 at this run's DARA); with the DARA inferred, their quantities are the
-  // ones the held Cover Excess implies (impliedFuture30yInterest). The held Cover Excess coupon is
+  // ones the held Cover Excess implies (impliedFuture30yInterest). The Net Cash of the first issue date
+  // is worked out from the Cover Excess held before it. The held Cover Excess coupon is
   // taken out of the running LMI the same way the After state takes the target Cover Excess out.
   const heldCoverExcessByYear = {};
   for (const cy of future30yCoverYearSet) {
@@ -1719,7 +1722,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
   const _beforeUsesImplied = dara === null && !daraByYear && heldImplied != null;
   const future30yParamsBefore = _beforeUsesImplied ? heldImplied.future30yParams : future30yParams;
   const future30yRebalancesBefore = _beforeUsesImplied ? heldImplied.rebalances : _sl.future30yRebalances;
-  const { simulated: future30ySimulatedInterestBefore, cover: future30yCoverInterestBefore } = future30yInterestByYear({
+  const { simulated: future30ySimulatedInterestBefore, cover: future30yCoverInterestBefore, netCash: future30yNetCashBefore } = future30yInterestByYear({
     rebalances: future30yRebalancesBefore, lowerCoverBond: future30yLowerCoverBond, upperCoverBond: future30yUpperCoverBond,
     refCPI, settlementDate, firstFuture30yYear: future30yYears.length ? Math.min(...future30yYears) : null,
     lowerQty0: heldCoverExcessByYear[future30yLowerYear] ?? 0, upperQty0: heldCoverExcessByYear[future30yUpperYear] ?? 0,
@@ -1766,6 +1769,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
     const inLadder = year >= firstYear && year <= lastYear;
     const simBefore   = inLadder ? (future30ySimulatedInterestBefore.get(year) ?? 0) : 0;
     const coverBefore = inLadder ? (future30yCoverInterestBefore.get(year) ?? 0) : 0;
+    const netCashBefore = inLadder ? (future30yNetCashBefore.get(year) ?? 0) : 0;
     // "Before" = annual real amount from CURRENT holdings, via the SAME shared rule build/After use
     // (one computation, before-qtys), so a no-trade round-trip lands Before ≡ build per year. The
     // zeroed-year pre-ladder credit is applied only for OUR files (explicit per-year DARA block);
@@ -1774,7 +1778,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
     const hasExplicitDara = daraByYear != null;
     const yearDaraBefore = daraByYear?.get(year) ?? DARA;
     const { credit: pliCreditBefore, amount: beforeAmt } = fundedYearAmount({
-      principal: pB, ownCoupon: cB, laterMatInt: lBefore, ownExcessCoupon: exIntB, simulatedInterest: simBefore, coverExcessInterest: coverBefore,
+      principal: pB, ownCoupon: cB, laterMatInt: lBefore, ownExcessCoupon: exIntB, simulatedInterest: simBefore, coverExcessInterest: coverBefore, netCash: netCashBefore,
       dara: yearDaraBefore,
       isZeroed: hasExplicitDara && zeroedFundedYears.has(year),
       partialCredit: hasExplicitDara ? (pliCreditByFundedYear[year] ?? 0) : 0,
@@ -1784,7 +1788,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
     // reconciled into a rung that was never sized down.
     const cashCreditBefore = availableCashCreditBefore[year] ?? 0;
     beforeARAByYear[year] = beforeAmt + cashCreditBefore;
-    beforeARABreakdown[year] = { principal: pB, ownCoupon: cB, laterMatInt: lBefore, ownExcessCoupon: exIntB, pliCredit: pliCreditBefore, holdings: holdingsBefore, future30ySimulatedInterest: simBefore, future30yCoverExcessInterest: coverBefore, availableCashCredit: cashCreditBefore };
+    beforeARABreakdown[year] = { principal: pB, ownCoupon: cB, laterMatInt: lBefore, ownExcessCoupon: exIntB, pliCredit: pliCreditBefore, holdings: holdingsBefore, future30ySimulatedInterest: simBefore, future30yCoverExcessInterest: coverBefore, future30yNetCash: netCashBefore, availableCashCredit: cashCreditBefore };
 
     // Years outside [firstYear, lastYear] are not ladder rungs; their "Amount After" is 0.
     // LMI from later bonds flows to firstYear (the shortest rung), not to dropped years.
@@ -1851,14 +1855,15 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
     }
     const simAfter   = (year >= firstYear && year <= lastYear) ? (future30ySimulatedInterestByYear.get(year) ?? 0) : 0;
     const coverAfter = (year >= firstYear && year <= lastYear) ? (future30yCoverInterestByYear.get(year) ?? 0) : 0;
+    const netCashAfter = (year >= firstYear && year <= lastYear) ? (future30yNetCashByYear.get(year) ?? 0) : 0;
     // "After" ARA via the SAME shared rule build uses (ladder-core.fundedYearAmount), so After ≡
     // build by construction (locked by the "rebal After == build amount per year" test). sizeLadder
     // sizes the PLI pool against the PRELIMINARY later-mat interest (the approximation that decides
     // which years zero), but a row's ARA is built from the CORRECTED components (lAfter + own-year
-    // excess coupon exIntA + Future 30Y interest); for a zeroed year the shared rule reconciles the credit to those.
+    // excess coupon exIntA + Future 30Y interest and Net Cash); for a zeroed year the shared rule reconciles the credit to those.
     const yearDaraDisp = daraByYear?.get(year) ?? DARA;
     const { credit: pliCredit, amount: _postAmt } = fundedYearAmount({
-      principal: pA, ownCoupon: cA, laterMatInt: lAfter, ownExcessCoupon: exIntA, simulatedInterest: simAfter, coverExcessInterest: coverAfter,
+      principal: pA, ownCoupon: cA, laterMatInt: lAfter, ownExcessCoupon: exIntA, simulatedInterest: simAfter, coverExcessInterest: coverAfter, netCash: netCashAfter,
       dara: yearDaraDisp, isZeroed: zeroedFundedYears.has(year),
       // The WHOLE credit the year took, cash and pre-ladder interest alike. A year the pool
       // covers in full is zeroed and topped up to DARA above, which carries its cash implicitly;
@@ -1870,7 +1875,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
       partialCredit: creditByFundedYear[year] ?? 0,
     });
     postARAByYear[year] = _postAmt;
-    postARABreakdown[year] = { principal: pA, ownCoupon: cA, laterMatInt: lAfter, holdings: holdingsAfter, pliCredit, future30ySimulatedInterest: simAfter, future30yCoverExcessInterest: coverAfter, availableCashCredit: cashCreditByFundedYear[year] ?? 0 };
+    postARABreakdown[year] = { principal: pA, ownCoupon: cA, laterMatInt: lAfter, holdings: holdingsAfter, pliCredit, future30ySimulatedInterest: simAfter, future30yCoverExcessInterest: coverAfter, future30yNetCash: netCashAfter, availableCashCredit: cashCreditByFundedYear[year] ?? 0 };
   }
 
   // Summary Metrics
@@ -1930,7 +1935,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
         cFY += oh.qty * (b.price / 100 * ir * 1000);
       }
       iFY += lmi; aFY = pFY + iFY; aB = beforeARAByYear[h.year]; aA = postARAByYear[h.year];
-      aFY += (beforeARABreakdown[h.year]?.future30ySimulatedInterest ?? 0) + (beforeARABreakdown[h.year]?.future30yCoverExcessInterest ?? 0);
+      aFY += (beforeARABreakdown[h.year]?.future30ySimulatedInterest ?? 0) + (beforeARABreakdown[h.year]?.future30yCoverExcessInterest ?? 0) + (beforeARABreakdown[h.year]?.future30yNetCash ?? 0);
     }
 
     const b = tipsMarketData.get(h.cusip);
@@ -2055,6 +2060,8 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
       future30ySimulatedInterestBefore: isLast ? (beforeARABreakdown[h.year]?.future30ySimulatedInterest ?? 0) : null,
       future30yCoverExcessInterest:       isLast ? (postARABreakdown[h.year]?.future30yCoverExcessInterest ?? 0) : null,
       future30yCoverExcessInterestBefore: isLast ? (beforeARABreakdown[h.year]?.future30yCoverExcessInterest ?? 0) : null,
+      future30yNetCash:       isLast ? (postARABreakdown[h.year]?.future30yNetCash ?? 0) : null,
+      future30yNetCashBefore: isLast ? (beforeARABreakdown[h.year]?.future30yNetCash ?? 0) : null,
       availableCashCredit:       isLast ? (postARABreakdown[h.year]?.availableCashCredit ?? 0) : null,
       availableCashCreditBefore: isLast ? (beforeARABreakdown[h.year]?.availableCashCredit ?? 0) : null,
       nPeriods: (h.maturity.getMonth() + 1 < 7 ? 1 : 2),
@@ -2133,6 +2140,8 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
       future30ySimulatedInterestBefore: beforeARABreakdown[bYear]?.future30ySimulatedInterest ?? 0,
       future30yCoverExcessInterest:       postARABreakdown[bYear]?.future30yCoverExcessInterest ?? 0,
       future30yCoverExcessInterestBefore: beforeARABreakdown[bYear]?.future30yCoverExcessInterest ?? 0,
+      future30yNetCash:       postARABreakdown[bYear]?.future30yNetCash ?? 0,
+      future30yNetCashBefore: beforeARABreakdown[bYear]?.future30yNetCash ?? 0,
       availableCashCredit:       postARABreakdown[bYear]?.availableCashCredit ?? 0,
       availableCashCreditBefore: beforeARABreakdown[bYear]?.availableCashCredit ?? 0,
       nPeriods: m < 7 ? 1 : 2,
@@ -2206,6 +2215,8 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
       future30ySimulatedInterestBefore: beforeARABreakdown[bYear]?.future30ySimulatedInterest ?? 0,
       future30yCoverExcessInterest:       postARABreakdown[bYear]?.future30yCoverExcessInterest ?? 0,
       future30yCoverExcessInterestBefore: beforeARABreakdown[bYear]?.future30yCoverExcessInterest ?? 0,
+      future30yNetCash:       postARABreakdown[bYear]?.future30yNetCash ?? 0,
+      future30yNetCashBefore: beforeARABreakdown[bYear]?.future30yNetCash ?? 0,
       availableCashCredit:       postARABreakdown[bYear]?.availableCashCredit ?? 0,
       availableCashCreditBefore: beforeARABreakdown[bYear]?.availableCashCredit ?? 0,
       nPeriods: m < 7 ? 1 : 2,
@@ -2269,6 +2280,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
         preLadderCreditForYear: null, preLadderCreditForYearBefore: null,
         future30ySimulatedInterest: null, future30ySimulatedInterestBefore: null,
         future30yCoverExcessInterest: null, future30yCoverExcessInterestBefore: null,
+        future30yNetCash: null, future30yNetCashBefore: null,
         availableCashCredit: null, availableCashCreditBefore: null,
         nPeriods: m < 7 ? 1 : 2,
         mDuration: (nlBond?.yield != null) ? calculateMDuration(settlementDate, nlBond.maturity, nlBond.coupon ?? 0, nlBond.yield) : 0,
@@ -2330,6 +2342,8 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
         future30ySimulatedInterestBefore: bbd.future30ySimulatedInterest ?? 0,
         future30yCoverExcessInterest: bd.future30yCoverExcessInterest ?? 0,
         future30yCoverExcessInterestBefore: bbd.future30yCoverExcessInterest ?? 0,
+        future30yNetCash: bd.future30yNetCash ?? 0,
+        future30yNetCashBefore: bbd.future30yNetCash ?? 0,
         availableCashCredit: bd.availableCashCredit ?? 0,
         availableCashCreditBefore: bbd.availableCashCredit ?? 0,
         nPeriods: m < 7 ? 1 : 2,
@@ -2365,7 +2379,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
   const daraByYearResolved = new Map();
   for (let y = firstYear; y <= lastYear; y++) daraByYearResolved.set(y, daraByYear?.get(y) ?? DARA);
 
-  return { results, HDR, summary: { settleDateDisp, refCPI, DARA, daraByYearResolved, inferredDARA, daraIsInferred: dara === null, settlementYear, availableCash, rmdCouponMode, firstYear, lastYear, derivedFirstYear, rungCount, gapYears, future30yYears, brackets, lowerWeight, upperWeight, costDeltaSum, costForNewRungs, gapCoverageSurplus, gapParams, bracketMode, lowerDuration, upperDuration, newLowerYear, newLowerCUSIP, newLowerMaturity, newLowerDuration, newLowerWeight3, origLowerWeight, retainedLegs, bracketFellBack3to2, bracketSolveReason, retainedExcessCostBefore, retainedBracketSold, beforeLowerWeight, beforeUpperWeight, beforeNewLowerWeight, afterLowerWeight, afterUpperWeight, afterNewLowerWeight, totalPreviousExcessCost, totalExcessCost, araByYear, future30yLowerYear, future30yUpperYear, future30yLowerCoverCUSIP: future30yLowerCoverBond?.cusip, future30yUpperCoverCUSIP: future30yUpperCoverBond?.cusip, future30yParams, future30yLowerDuration, future30yUpperDuration, future30yUpperWeight, future30yLowerWeight, future30yUpperExQty, future30yLowerExQty, future30yFellBack, future30yCoverReason, future30yLowerMonth, future30yUpperMonth, future30ySimulatedInterestByYear, future30yCoverInterestByYear, future30yRebalances: _sl.future30yRebalances, future30yRebalancesBefore, future30ySimulatedInterestBefore, future30yCoverInterestBefore, heldCoverExcessByYear, future30yAnchorBond: _canon.future30yAnchorBond, syntheticYearAmounts: syntheticYearAmounts({ gapParams, future30yParams }), syntheticYearAmountsBefore: syntheticYearAmounts({ gapParams, future30yParams: future30yParamsBefore }), preLadderInterest, maturityPref, preLadderPool, preLadderCouponPool, preLadderFuture30yPool, zeroedFundedYears: [...zeroedFundedYears].sort((a, b) => a - b), weightedAvgDuration, weightedAvgYield, weightedAvgSaYield }, details };
+  return { results, HDR, summary: { settleDateDisp, refCPI, DARA, daraByYearResolved, inferredDARA, daraIsInferred: dara === null, settlementYear, availableCash, rmdCouponMode, firstYear, lastYear, derivedFirstYear, rungCount, gapYears, future30yYears, brackets, lowerWeight, upperWeight, costDeltaSum, costForNewRungs, gapCoverageSurplus, gapParams, bracketMode, lowerDuration, upperDuration, newLowerYear, newLowerCUSIP, newLowerMaturity, newLowerDuration, newLowerWeight3, origLowerWeight, retainedLegs, bracketFellBack3to2, bracketSolveReason, retainedExcessCostBefore, retainedBracketSold, beforeLowerWeight, beforeUpperWeight, beforeNewLowerWeight, afterLowerWeight, afterUpperWeight, afterNewLowerWeight, totalPreviousExcessCost, totalExcessCost, araByYear, future30yLowerYear, future30yUpperYear, future30yLowerCoverCUSIP: future30yLowerCoverBond?.cusip, future30yUpperCoverCUSIP: future30yUpperCoverBond?.cusip, future30yParams, future30yLowerDuration, future30yUpperDuration, future30yUpperWeight, future30yLowerWeight, future30yUpperExQty, future30yLowerExQty, future30yFellBack, future30yCoverReason, future30yLowerMonth, future30yUpperMonth, future30ySimulatedInterestByYear, future30yCoverInterestByYear, future30yNetCashByYear, future30yRebalances: _sl.future30yRebalances, future30yRebalancesBefore, future30ySimulatedInterestBefore, future30yCoverInterestBefore, future30yNetCashBefore, heldCoverExcessByYear, future30yAnchorBond: _canon.future30yAnchorBond, syntheticYearAmounts: syntheticYearAmounts({ gapParams, future30yParams }), syntheticYearAmountsBefore: syntheticYearAmounts({ gapParams, future30yParams: future30yParamsBefore }), preLadderInterest, maturityPref, preLadderPool, preLadderCouponPool, preLadderFuture30yPool, preLadderNetCashPool, zeroedFundedYears: [...zeroedFundedYears].sort((a, b) => a - b), weightedAvgDuration, weightedAvgYield, weightedAvgSaYield }, details };
 }
 
 // Execute a rebalance with shape-preserving self-financing FUNDING (3.0 §Funding the rebalance).
