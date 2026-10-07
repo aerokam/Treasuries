@@ -514,6 +514,7 @@ test('drill popup: clicking Pre-ladder credit opens Level 3 pool composition wit
       await expect(l3).toContainText('Pre-ladder pool composition');
       await expect(l3).toContainText('Pre-ladder coupon interest');
       await expect(l3).toContainText('Pre-ladder interest from the simulated TIPS and the Cover Excess');
+      await expect(l3).toContainText('Net Cash');                      // the issue dates before the ladder starts
       await l3.locator('#sp-close').click();
       found = true;
       break;
@@ -1341,6 +1342,62 @@ test('build: gap year and Future 30Y year rows show a drillable Amount; excess r
   for (const r of await subRows.all()) {
     expect(((await r.locator('td').nth(amountIdx).textContent()) ?? '').trim()).toBe('');
   }
+});
+
+// ── Expand glyph only where there is something to expand (5.0 §Funded Year Group Header Row) ──
+// A gap year and a Future 30Y year hold no TIPS rows, so their group header rows show no ▼/▶; a year
+// with TIPS rows keeps it.
+test('build: gap year and Future 30Y year rows show no expand glyph; years with TIPS rows keep it', async ({ page }) => {
+  test.setTimeout(20_000);
+  await page.locator('.tab-btn[data-mode="build"]').click();
+  const gap = await gapYears(page);
+  await page.locator('#first-year').selectOption({ label: String(gap[0] - 1) });
+  const lastYearSel = page.locator('#last-year');
+  const lastYear = await lastYearSel.locator('option').last().getAttribute('value');
+  await lastYearSel.selectOption({ value: lastYear });
+  await page.locator('#dara').fill('40000');
+  await page.locator('#run-btn').click();
+  await expect(page.locator('#build-output')).toHaveCSS('display', 'block', { timeout: 4_000 });
+
+  const glyph = (y) => page.locator(`#build-table tr.fy-group-header[data-fy="${y}"] td`).first()
+    .evaluate(td => { const s = getComputedStyle(td, '::before'); return { content: s.content, visibility: s.visibility }; });
+  for (const y of [gap[0], Number(lastYear)]) {
+    const g = await glyph(y);
+    expect(g.visibility, `${y} has no TIPS rows, so no expand glyph`).toBe('hidden');
+  }
+  const withRows = gap[0] - 1;
+  expect(await page.locator(`#build-table tr.fy-child[data-fy="${withRows}"]`).count(), `${withRows} has TIPS rows`).toBeGreaterThan(0);
+  const g = await glyph(withRows);
+  expect(g.visibility, `${withRows} has TIPS rows, so it keeps the expand glyph`).toBe('visible');
+  expect(g.content, `${withRows} shows ▼ while expanded`).toContain('▼');
+});
+
+// ── Net Cash in a funded year's Amount (2.0 §Interest credited to a funded year) ──
+// A funded year before the first Future 30Y year whose calendar year holds an issue date is credited
+// with that date's Net Cash, shown as its own line in the Amount popup.
+test('build: a funded year with an issue date shows a Net Cash line in its Amount popup', async ({ page }) => {
+  test.setTimeout(20_000);
+  await page.locator('.tab-btn[data-mode="build"]').click();
+  await page.locator('#first-year').selectOption({ label: String(SY) });
+  const lastYearSel = page.locator('#last-year');
+  const lastYear = await lastYearSel.locator('option').last().getAttribute('value');
+  await lastYearSel.selectOption({ value: lastYear });
+  await page.locator('#dara').fill('100000');
+  await page.locator('#run-btn').click();
+  await expect(page.locator('#build-output')).toHaveCSS('display', 'block', { timeout: 4_000 });
+  const expandAllBtn = page.locator('#expand-collapse-all-btn');
+  if ((await expandAllBtn.textContent())?.trim() === 'Expand All') await expandAllBtn.click();
+
+  // The issue dates fall in consecutive years from the first February after settlement (2.0 §Issue
+  // dates), so with more than one Future 30Y year the year after the settlement year holds one.
+  const year = SY + 1;
+  const cell = page.locator(`#build-table tr.fy-group-header[data-fy="${year}"] td.drillable[data-col="amount"]`);
+  await expect(cell, `${year} carries a drillable Amount`).toBeVisible();
+  await cell.click();
+  await expect(page.locator('#drill-overlay')).toBeVisible({ timeout: 4_000 });
+  await expect(page.locator('#drill-content')).toContainText('Net Cash');
+  await expect(page.locator('#drill-content')).toContainText('cash from selling Cover Excess in this year, beyond the cost of the Simulated Outstanding Future 30Y TIPS bought');
+  await page.locator('#drill-close').click();
 });
 
 // ── Per-rung DARA selection: select a range on the ladder table, then Set DARA / Infer DARA ──

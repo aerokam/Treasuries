@@ -274,7 +274,8 @@ function renderGroupHeader(cols, fy, rows, isBracketGroup, mode, summary, daraBy
   const groupRows  = rows.map(r => r.d);
   const labelCount = cols.filter(c => c.fmt === 'str' || c.fmt === 'yld').length;
   const valueCols  = cols.filter(c => c.fmt !== 'str' && c.fmt !== 'yld');
-  const cls = 'fy-group-header' + (isBracketGroup ? ' bracket' : '');
+  // A year with no TIPS rows has nothing to expand, so its header carries no expand glyph (no-children).
+  const cls = 'fy-group-header' + (isBracketGroup ? ' bracket' : '') + (rows.length === 0 ? ' no-children' : '');
   const gapSet = new Set(summary?.gapYears || []);
   const future30ySet = new Set(summary?.future30yYears || []);
   const suffix = gapSet.has(fy) ? ' <span style="opacity:0.6;font-style:italic;font-size:10px">(gap)</span>'
