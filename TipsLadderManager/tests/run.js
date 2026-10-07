@@ -1206,10 +1206,54 @@ for (const dara of [20000, 100000, 400000]) {
   }
   assert(`funded years land on DARA within half a P+I per TIPS${worstFundedY ? ' (worst @' + worstFundedY + ')' : ''}`, worstFunded <= 1, true);
 
-  // Diagnostic only, not asserted: 2.0 §What happens on each issue date step 4 expects the Net Cash of
-  // each conversion to be close to zero, an assumption that has not been confirmed (see report).
+  // Net Cash is positive at every issue date (2.0 §What happens on each issue date step 4): the Cover
+  // Excess sold brings in more than the Simulated Outstanding Future 30Y TIPS bought cost. The Cover
+  // Excess is held in whole TIPS, before and after each issue date, so the Net Cash of one date can
+  // move by up to one Cost per TIPS of each cover from rounding alone; a small ladder's accretion can be
+  // less than that (a single Future 30Y year at DARA $30,000 measured −$75 on 2026-10-07). The
+  // direction is asserted beyond that rounding at each date, and strictly for the total.
+  const roundingBound = (c) => c.lowerCostPerBond + c.upperCostPerBond;
+  const notPositive = conv.filter(c => !(c.netCash > -roundingBound(c)));
+  assert(`Net Cash is positive at every issue date, apart from whole-TIPS rounding of the Cover Excess (${notPositive.length} not${notPositive.length ? ': ' + notPositive.map(c => c.year).join(', ') : ''})`, notPositive.length, 0);
+  assert(`Net Cash is positive at ${conv.filter(c => c.netCash > 0).length} of ${conv.length} issue dates, and in total`, conv.reduce((s, c) => s + c.netCash, 0) > 0, true);
+  let worstNetCredit = 0;
+  for (const c of conv) worstNetCredit = Math.max(worstNetCredit, Math.abs((summary.future30yNetCashByYear.get(c.issueYear) ?? 0) - c.netCash));
+  assert('each issue date’s Net Cash is credited to the funded year of its year (worst $' + worstNetCredit.toFixed(2) + ')', worstNetCredit < 0.01, true);
   console.log('        Net Cash per issue date, % of the Simulated Outstanding Future 30Y TIPS cost: '
     + conv.map(c => `${c.year} ${(100 * c.netCash / c.simulatedCost).toFixed(1)}%`).join(', '));
+}
+
+// ── Test: the three amounts credited against the full annual coupons of every Future 30Y TIPS ──
+// 2.0 §Interest credited to a funded year: over the years of the rebalances, the simulated TIPS
+// interest, the Cover Excess interest and the Net Cash come to about the full annual coupons of every
+// Future 30Y TIPS as if all had been issued today (research/Future_30Y_Cover_Excess_Analysis.md §3).
+// Two independent derivations: the left side is the engine's three maps; the right side is worked out
+// here from Pass 1's quantities and coupon, each coupon dated February 15 and August 15 and counted
+// when it falls after settlement. The years run from the settlement year through the year of the last
+// issue date. The first issue year's credit is short and later years' are over, so the totals are
+// compared, not each year, within 2% of the full-coupon total.
+console.log('\nFuture 30Y — the three amounts credited against the full annual coupons, over the years of the rebalances');
+for (const lastYear of [...new Set([Math.min(MAX_YEAR + 4, LAST_MAX), LAST_MAX])]) {
+  for (const dara of [20000, 100000, 400000]) {
+    const firstYear = settlementDate.getFullYear();
+    const { summary } = runBuild({ dara, firstYear, lastYear, tipsMarketData, refCPI, settlementDate, bondHolidays });
+    const bd = summary.future30yParams.breakdown;
+    const lastIssueYear = Math.max(...summary.future30yRebalances.conversions.map(c => c.issueYear));
+    const fullCouponHalf = bd.reduce((s, r) => s + r.qty * 1000 * r.synCpn / 2, 0);
+    let credited = 0, fullCoupons = 0;
+    const parts = { sim: 0, cov: 0, net: 0 };
+    for (let t = firstYear; t <= lastIssueYear; t++) {
+      parts.sim += summary.future30ySimulatedInterestByYear.get(t) ?? 0;
+      parts.cov += summary.future30yCoverInterestByYear.get(t) ?? 0;
+      parts.net += summary.future30yNetCashByYear.get(t) ?? 0;
+      for (const d of [new Date(t, 1, 15), new Date(t, 7, 15)]) if (d > settlementDate) fullCoupons += fullCouponHalf;
+    }
+    credited = parts.sim + parts.cov + parts.net;
+    const pct = 100 * (credited - fullCoupons) / fullCoupons;
+    assert(`DARA ${dara / 1000}K to ${lastYear}: three amounts within 2% of the full annual coupons, ${firstYear}–${lastIssueYear} (${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%)`,
+      Math.abs(credited - fullCoupons) <= 0.02 * fullCoupons, true);
+    console.log(`        simulated $${Math.round(parts.sim).toLocaleString()} + Cover Excess $${Math.round(parts.cov).toLocaleString()} + Net Cash $${Math.round(parts.net).toLocaleString()} = $${Math.round(credited).toLocaleString()}  vs full coupons $${Math.round(fullCoupons).toLocaleString()}`);
+  }
 }
 
 // ── Test: Build — firstYear=2036, lastYear=2056, preLadderInterest=true ───────
@@ -1531,6 +1575,18 @@ console.log(`\nBuild→Rebalance export-string round-trip — firstYear=${GAP.fi
             if (!(Math.abs(b - a) < 0.01 && Math.abs(a - be) < 0.01)) problems.push(`${y} Future 30Y Amount build ${b} After ${a} Before ${be}`);
           }
           if (pli && bS.future30yYears.length && !(bS.preLadderFuture30yPool > 0)) problems.push('Pre-Ladder Interest pool lacks the Future 30Y interest');
+          // The Net Cash credit is part of every figure compared above: it is credited, and Before,
+          // After and build credit the same Net Cash to each year.
+          if (bS.future30yYears.length) {
+            const netYears = [...bS.future30yNetCashByYear.keys()];
+            if (!netYears.length) problems.push('no Net Cash credited');
+            for (const y of netYears) {
+              const b = bS.future30yNetCashByYear.get(y), a = rS.future30yNetCashByYear?.get(y), be = rS.future30yNetCashBefore?.get(y);
+              if (!(Math.abs(b - a) < 0.01 && Math.abs(a - be) < 0.01)) problems.push(`${y} Net Cash build ${b} After ${a} Before ${be}`);
+            }
+            const preYearsNet = netYears.filter(y => y < firstYear).reduce((s, y) => s + bS.future30yNetCashByYear.get(y), 0);
+            if (pli && Math.abs((bS.preLadderNetCashPool ?? 0) - preYearsNet) >= 0.01) problems.push(`Pre-Ladder Interest pool Net Cash ${bS.preLadderNetCashPool} vs ${preYearsNet}`);
+          }
           if (problems.length) failures.push(`${label}: ${problems.slice(0, 4).join('; ')}`);
         }
       }
