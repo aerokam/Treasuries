@@ -69,7 +69,9 @@ A parallel shift of every yield from the first issue date.
 | Net Cash total | $55,746 | $56,779 | $55,544 | $52,653 | $48,611 |
 | Duration match reached at every issue date | no | no | yes | yes | yes |
 
-After a fall the target duration of the Future 30Y TIPS not yet issued rises above the Upper cover's duration, which shortens with age: at −50 bp in 2032 (target 19.69 against 19.34), at −100 bp in 2031 and 2032. A ladder to 2063 (N = 7) sits at the edge of what the covers can reach.
+After a fall the target duration of the Future 30Y TIPS not yet issued rises above the Upper cover's duration, which shortens with age: at −50 bp in 2032 (target 19.69 against 19.34), at −100 bp in 2031 and 2032. A ladder to 2063 (the Maximum Future 30Y Rungs of 7) sits at the edge of what the covers can reach after a fall in yields.
+
+A rise of the anchor yield to 4% (+59 bp) does not break the Maximum Future 30Y Rungs of 7: the match is reached at every issue date to 2033. A holder who matched today at today's weights is then slightly mismatched until the next rebalance: the held covers are 3.2% more sensitive to yield than the Future 30Y TIPS (dollar duration 1.032 times the Future 30Y TIPS'), about $3,300 for each further 100 bp on $551,000. After a fall of 60 bp the ratio is 0.967 and the match is missed in 2032. These figures use the 2046 as Lower cover.
 
 ## 6. A margin for the Lower cover
 
@@ -77,7 +79,7 @@ The rule picks the longest modified duration at or below that of the first Synth
 
 Measuring the first Synthetic TIPS at a fixed yield of 4% instead of the market yield gives 17.35, which fixes the target and leaves only the covers' durations to move. The Lower cover is then the 2046 (16.80), with a margin of 0.55 years. It would change only if the 2047's duration fell below 17.35 or the 2046's rose above it, which takes yield moves of more than 100 bp.
 
-The choice costs nothing. For a Lower cover of 2048, 2047 or 2046 with the 2052 as Upper cover, N is 7 in every case (the match is reached to a last year of 2063 and missed from 2064), the Net Cash total to 2063 is $56K, $58K and $58K, and the credit with Net Cash is 99% to 100% of the full annual coupons of every Future 30Y TIPS over the years of the rebalances, for a last year of 2059 or later.
+The choice costs nothing. For a Lower cover of 2048, 2047 or 2046 with the 2052 as Upper cover, the Maximum Future 30Y Rungs is 7 in every case (the match is reached to a last year of 2063 and missed from 2064), the Net Cash total to 2063 is $56K, $58K and $58K, and the credit with Net Cash is 99% to 100% of the full annual coupons of every Future 30Y TIPS over the years of the rebalances, for a last year of 2059 or later.
 
 | First Synthetic TIPS yield | Duration | Lower cover | Margin in years |
 |---|---|---|---|
