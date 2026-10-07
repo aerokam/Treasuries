@@ -7,7 +7,7 @@ import path from 'path';
 import { buildTipsMarketData, localDate, runRebalance, runFundedRebalance, inferDARAFromCash, inferScaledDARAFromPortfolio, computePortfolioARAByYear, getGapYearBracketCandidates, getGapYears, derivePerYearDara, parseFundedYearDaraBlock, parseParamsBlock, inferFirstYearFromHoldings, inferLastYearFromHoldings } from '../src/rebalance-lib.js';
 import { computeBeforeState, detectBracketFlags, heldYearMedianExcluding } from '../src/before-state-lib.js';
 import { remainingCouponPaymentsThisYear, rmdCappedRemainingCoupons, latestRemainingCouponDate, future30yLimit, selectFuture30yCovers } from '../src/ladder-core.js';
-import { bracketWeights, bracketWeightsN } from '../src/gap-math.js';
+import { bracketWeights, bracketWeightsN, syntheticCoupon } from '../src/gap-math.js';
 import { findSpikes, smoothCurve } from '../src/shape-math.js';
 import { buildDurationPopupRows, buildBracketWeightDrill, buildFuture30yDurationPopupRows } from '../src/drill.js';
 import { rankForYear, levelValues } from '../src/allocation-policy.js';
@@ -955,6 +955,24 @@ console.log("\nRMD Options 'last' mode: pool-wide latest date, not each bond's o
     rmdCappedRemainingCoupons(bondAprOct, settleAug18, new Set(), 'all', tradeAug17), 1);
 }
 
+// ── Test: synthetic coupon — the eighth at or below the yield (2.0 §Gap Years step 3) ──────
+// Every eighth from 0.125% to 10%: a yield exactly on the eighth gets that eighth, and a yield just
+// under it gets the eighth below (0.125% at the floor). The yield is formed as a quoted percent ÷ 100,
+// the way market yields arrive; floating point once dropped an eighth at 3.625% and 7.25%.
+console.log('\nsyntheticCoupon — every eighth from 0.125% to 10%');
+{
+  const misses = [];
+  for (let k = 1; k <= 80; k++) {
+    const pct = k * 0.125;                       // exact in binary
+    const eighth = pct / 100;
+    const below = Math.max(1, k - 1) * 0.125 / 100;
+    if (syntheticCoupon(eighth) !== eighth) misses.push(`${pct}% → ${syntheticCoupon(eighth) * 100}%`);
+    if (syntheticCoupon(eighth - 1e-7) !== below) misses.push(`just under ${pct}% → ${syntheticCoupon(eighth - 1e-7) * 100}%`);
+  }
+  assert(`synthetic coupon is the eighth at or below the yield at all 80 eighths (${misses.length} miss${misses.length === 1 ? '' : 'es'}${misses.length ? ': ' + misses.slice(0, 4).join(', ') : ''})`, misses.length, 0);
+  assert('synthetic coupon floor is 0.125% for a negative yield', syntheticCoupon(-0.005), 0.00125);
+}
+
 // ── Test: Future 30Y issuance-dependent values against DD §5.1 ──────────────────────────
 // DD §5.1 protocol: the spec states the rule, the DD table records the value, and a test derives the
 // value from live data and asserts it matches the table, so issuance or yield drift fails here
@@ -977,7 +995,7 @@ console.log('\nFuture 30Y — N, the ladder’s last year at most, and the cover
   // year's Synthetic TIPS matures Feb 15 the year after, with the 1/8% coupon at or below the anchor yield.
   const outstanding = [...tipsMarketData.values()].filter(b => b.maturity > settlementDate && b.yield != null);
   const anchor = outstanding.reduce((a, b) => (!a || b.maturity > a.maturity ? b : a), null);
-  const synCpn = Math.max(0.00125, Math.floor(anchor.yield * 800) / 800);
+  const synCpn = syntheticCoupon(anchor.yield);
   const firstDur = calculateMDuration(settlementDate, new Date(anchor.maturity.getFullYear() + 1, 1, 15), synCpn, anchor.yield);
   const durs = outstanding.map(b => ({ b, d: calculateMDuration(settlementDate, b.maturity, b.coupon ?? 0, b.yield) }));
   const lower = durs.filter(x => x.d <= firstDur).reduce((a, x) => (!a || x.d > a.d ? x : a), null);

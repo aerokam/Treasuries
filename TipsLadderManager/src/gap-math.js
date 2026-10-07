@@ -15,9 +15,14 @@ export function interpolateYield(anchorBefore, anchorAfter, targetDate) {
 }
 
 // ─── Synthetic coupon ─────────────────────────────────────────────────────────
-// Spec: 4.0 Phase 2, 3.0 Synthetic TIPS Construction
+// Spec: 4.0 Phase 2, 3.0 Synthetic TIPS Construction. MAX(0.125%, the eighth at or below the yield).
+// Counted in whole eighths (yield × 800) with a tolerance far below any quoted yield's precision:
+// in floating point 0.03625 × 100 / 0.125 is 28.999999999999996, so a plain FLOOR dropped one eighth
+// at exactly 3.625% and 7.25%. Dividing the whole count by 800 gives the double nearest the eighth.
+const EIGHTHS_PER_UNIT = 800;
+const EIGHTH_COUNT_TOLERANCE = 1e-9;
 export function syntheticCoupon(yld) {
-  return Math.max(0.00125, Math.floor(yld * 100 / 0.125) * 0.00125);
+  return Math.max(1, Math.floor(yld * EIGHTHS_PER_UNIT + EIGHTH_COUNT_TOLERANCE)) / EIGHTHS_PER_UNIT;
 }
 
 // ─── Bracket weights ──────────────────────────────────────────────────────────
