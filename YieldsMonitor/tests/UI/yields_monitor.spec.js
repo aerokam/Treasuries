@@ -54,6 +54,31 @@ test.describe('Yields Monitor Regression Tests', () => {
     }
   });
 
+  test('Hide non-trading hours draws only 08:00-17:05 ET points on 10D and has no effect on 1Y', async ({ page }) => {
+    const group = page.locator('.yield-toggle-group', { has: page.locator('#syncXAxis') });
+    await expect(group.locator('#lockRight')).toBeVisible();
+    await expect(group.locator('#hideNonTrading')).toBeVisible();
+
+    const state = () => page.locator('canvas#chart-US10Y').evaluate((canvas) => {
+      const chart = Chart.getChart(canvas);
+      const hm = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hourCycle: 'h23', hour: 'numeric', minute: 'numeric' });
+      const mins = chart.data.datasets[0].data.map(p => { const q = hm.formatToParts(new Date(p.x)).reduce((a, t) => ({ ...a, [t.type]: +t.value }), {}); return q.hour * 60 + q.minute; });
+      return { compact: chart.scales.x.options.compact, n: mins.length, outside: mins.filter(m => m < 480 || m > 1025).length };
+    });
+
+    await page.locator('.range-btn[data-range="10D"]').click();
+    await expect(page.locator('#fetchStatus')).toContainText('TIPS latest:');
+    await group.locator('#hideNonTrading').check();
+    const on = await state();
+    expect(on.compact).toBe(true);
+    expect(on.n).toBeGreaterThan(0);
+    expect(on.outside).toBe(0);
+
+    await page.locator('.range-btn[data-range="1Y"]').click();
+    await expect(page.locator('#fetchStatus')).toContainText('TIPS latest:');
+    expect((await state()).compact).toBe(false);
+  });
+
   test('10D range should show at least 5 days of data', async ({ page }) => {
     const chartCanvas = page.locator('canvas#chart-US10Y');
     const btn = page.locator('.range-btn[data-range="10D"]');

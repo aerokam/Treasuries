@@ -24,17 +24,25 @@ Every chart, on every tab, supports the same navigation, from `shared/src/chart-
 
 Every Time Series chart draws each of its series' points as a marker, radius 2.5 px, while adjacent visible points are at least 8 px apart across the plot area, and draws only the line otherwise. The decision is made again on every update, so a zoom or pan that spreads the points apart shows the markers and one that bunches them hides them. A series may draw 8 px past the plot area's right edge, so the marker of a point at that edge is drawn whole. Implemented by `YieldsMonitor/src/custom-series.js#showMarkers`.
 
-## Sync Zoom & Pan
+## Time Series chart options
 
-A sidebar toggle, on by default, for the Time Series tab's own charts only — the Yield Curves and Breakeven Inflation tabs each hold a single chart, so there is nothing to synchronize there.
+Sync Zoom & Pan, Lock Right and Hide non-trading hours are three checkboxes in one sidebar group, in that order, for the Time Series tab's own charts only.
+
+### Sync Zoom & Pan
+
+On by default. The Yield Curves and Breakeven Inflation tabs each hold a single chart, so there is nothing to synchronize there.
 
 - When on, zooming or panning any one Time Series chart applies the same X-axis (time) window to every other active Time Series chart, so a movement on one is a movement on all of them.
 - The Y-axis is never synchronized: each chart keeps its own scale, since two symbols' Yields rarely span the same range.
 - A pan additionally carries each other chart's own Y-axis by the same offset the source chart's Y-axis moved by, when that chart has been independently zoomed on Y before — so a synchronized pan does not snap a manually adjusted chart back to its auto-fit bounds.
 
-## Lock Right
+### Lock Right
 
-A sidebar toggle, off by default, for the Time Series tab. When on, every zoom re-anchors the chart's right edge to the most recent data point, so narrowing the visible window never loses sight of the latest reading.
+Off by default. When on, every zoom re-anchors the chart's right edge to the most recent data point, so narrowing the visible window never loses sight of the latest reading.
+
+### Hide non-trading hours
+
+Off by default; applies to the 2D and 10D ranges only, and has no effect on any other range. See [Render time series (2.5)](./2.5_Render_Time_Series.md#hide-non-trading-hours-2d-and-10d-ranges-only).
 
 ## Y-axis auto-rescale
 
