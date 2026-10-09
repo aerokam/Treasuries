@@ -159,9 +159,8 @@ export async function updateBondbloxxHoldings(tickers) {
     const { expenseRatio, secYield } = parseExpenseRatioAndSecYield(html);
 
     const csv = toCsv(rows, asOf);
-    const filename = path.join(DATA_DIR, `Holdings-${ticker}.csv`);
+    const filename = path.join(DATA_DIR, `${ticker}-Raw.csv`);
     fs.writeFileSync(filename, csv, "utf8");
-    await upload(filename, "FundHoldings");
 
     saveFundMeta(ticker, { fundName: FUND_NAMES[ticker] || "", expenseRatio, secYield });
   }

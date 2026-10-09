@@ -164,9 +164,8 @@ export async function updateIsharesHoldings(tickers) {
     const { expenseRatio, secYield } = await fetchExpenseRatioAndSecYield(ticker);
 
     const csv = toCsv(body, colIndex, asOf);
-    const filename = path.join(DATA_DIR, `Holdings-${ticker}.csv`);
+    const filename = path.join(DATA_DIR, `${ticker}-Raw.csv`);
     fs.writeFileSync(filename, csv, "utf8");
-    await upload(filename, "FundHoldings");
 
     saveFundMeta(ticker, { fundName, portfolioId, expenseRatio, secYield });
   }
