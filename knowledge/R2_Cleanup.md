@@ -168,3 +168,9 @@ pattern), which reports `node`'s real exit code. This removes the failure mode f
 `console.error` call in the chain, not just the two found so far — the 2026-06-01 workaround is no
 longer load-bearing but was left in place (moving progress logging to `console.log` is still correct
 practice; `console.error` is for real failures).
+
+---
+
+## Pending — FundHoldings rename (2026-10-09, not yet executed)
+
+`FundHoldings/updateAllHoldings.js`/`enrichHoldings.js` are being changed to write `data/<TICKER>-Raw.csv` (local only, not uploaded) and upload `FundHoldings/<TICKER>.csv` in place of the current `FundHoldings/Holdings-<TICKER>.csv` and `FundHoldings/Holdings-<TICKER>-Enriched.csv` pair — see [FundHoldings 1.0](../FundHoldings/knowledge/1.0_FundHoldings.md). No code has changed yet. Once `index.html` reads the new `<TICKER>.csv` objects, the sixteen old objects (one `Holdings-<TICKER>.csv`/`Holdings-<TICKER>-Enriched.csv` pair per ticker: VBIL, VTIP, VTP, RBIL, LTPZ, SCHP, XHLF, ICPI) become orphaned and should be deleted, each verified by a post-delete 404 fetch per this document's established practice.
