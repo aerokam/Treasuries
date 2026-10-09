@@ -758,14 +758,15 @@ Some values are true only until Treasury issues more TIPS. Left inline as approx
 - <a id="holdings-file"></a>**Holdings File**
   *A csv file identifying TIPS positions held, in one of six formats: [Fidelity Export](#fidelity-export), [Schwab Export](#schwab-export), [Vanguard Export](#vanguard-export), [Holdings Export](#holdings-export-format), [tipsladder.com Format](#tipsladdercom-format), [Plain CUSIP/Quantity Format](#plain-format).*
 - <a id="fidelity-export"></a>**Fidelity Export**
-  `Account number,Account name,Symbol,Description,Quantity,Last price,Last price change,Current value,Today's gain/loss dollar,Today's gain/loss percent,Total gain/loss dollar,Total gain/loss percent,Percent of account,Cost basis total,Average cost basis,Type`
-  *Columns read: `Account number`, `Account name`, `Symbol` (a CUSIP), `Quantity` (states [Face Value](#face-value)), `Current value`.*
+  Column headers: `Account number,Account name,Symbol,Description,Quantity,Last price,Last price change,Current value,Today's gain/loss dollar,Today's gain/loss percent,Total gain/loss dollar,Total gain/loss percent,Percent of account,Cost basis total,Average cost basis,Type`
+  Columns read: `Account number`, `Account name`, `Symbol` (a CUSIP), `Quantity` (states [Face Value](#face-value)), `Current value`.
 - <a id="schwab-export"></a>**Schwab Export**
-  `"Symbol","Description","Qty (Quantity)","Price","Mkt Val (Market Value)","Gain $ (Gain/Loss $)","Gain % (Gain/Loss %)","Asset Type",`
-  *Columns read: `Symbol` (a CUSIP), `Qty (Quantity)` (states [Face Value](#face-value)), `Mkt Val (Market Value)`. Each account's rows are preceded by a row naming the account rather than a column, format `"Name ...LastFourDigits"`, e.g. `"Amy_POD ...387"`, and followed by an `"Account Total"` row.*
+  Column headers: `"Symbol","Description","Qty (Quantity)","Price","Mkt Val (Market Value)","Gain $ (Gain/Loss $)","Gain % (Gain/Loss %)","Asset Type",`
+  Columns read: `Symbol` (a CUSIP), `Qty (Quantity)` (states [Face Value](#face-value)), `Mkt Val (Market Value)`.
+  *Each account's rows are preceded by a row naming the account rather than a column, format `"Name ...LastFourDigits"`, e.g. `"Amy_POD ...387"`, and followed by an `"Account Total"` row.*
 - <a id="vanguard-export"></a>**Vanguard Export**
-  `Account Number,Investment Name,Symbol,Shares,Share Price,Total Value,`
-  *Columns read: `Account Number`, `Investment Name`, `Symbol` (a CUSIP, when present), `Shares` (states [Face Value](#face-value)), `Total Value`.*
+  Column headers: `Account Number,Investment Name,Symbol,Shares,Share Price,Total Value,`
+  Columns read: `Account Number`, `Investment Name`, `Symbol` (a CUSIP, when present), `Shares` (states [Face Value](#face-value)), `Total Value`.
 - <a id="holdings-export-format"></a>**Holdings Export** = `{ @CUSIP + Qty + Excess_Qty }`
   *This app's prior export of a build or rebalance result. Header row (exact text): `cusip,qty,excess`. Example row: `912810RQ3,5,0`. May carry a trailing [DARA Plan](#dara-plan)'s `#fundedYear,dara` row and [Construction Parameters](#construction-parameters)' `#params` row.*
 - <a id="tipsladdercom-format"></a>**tipsladder.com Format** = `{ CUSIP + Qty + Year }` per row, no header row, one or more rows per CUSIP
