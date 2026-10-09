@@ -46,14 +46,12 @@
 
 <script type="module">
 import { parseCsv } from "../shared/src/csv.js";
-import { calcMktWtdAvg } from "../shared/src/bond-math.js";
 
-// One entry per fund whose enriched CSV lives in data/. Add a ticker here
+// One entry per fund whose <TICKER>.csv is on R2. Add a ticker here
 // once the fund's scraper (vanguard/, fminvest/, pimco/, schwab/, or
 // bondbloxx/) + enrichHoldings.js have been run for it. Ordered nominal
 // fund(s) first, then TIPS funds by increasing weighted-average duration.
 const FUNDS = ["VBIL", "XHLF", "ICPI", "RBIL", "VTIP", "SCHP", "VTP", "LTPZ"];
-const WEEKS_PER_YEAR = 365.25 / 7;
 const R2_BASE = "https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/FundHoldings";
 
 const tabGroup = document.getElementById("tabGroup");
@@ -93,12 +91,6 @@ function displayName(name) {
   return String(name ?? "").replace(NAME_SUFFIX_RE, "");
 }
 
-let fundMeta = {};
-try {
-  const res = await fetch(`${R2_BASE}/FundMeta.json`, { cache: "no-store" });
-  if (res.ok) fundMeta = await res.json();
-} catch { /* meta is optional display sugar; page works without it */ }
-
 // State for the currently displayed fund, re-rendered on header-click sort
 // without refetching.
 let state = null;
@@ -114,12 +106,9 @@ function fmt(col, val, termUnit) {
   const n = Number(val);
   if (col === "Market Value") return n.toLocaleString(undefined, { maximumFractionDigits: 0 });
   if (col === "% of Fund") return n.toFixed(2) + "%";
-  if (PCT_COLS.includes(col) && col !== "Coupon") return (n * 100).toFixed(2) + "%";
+  if (PCT_COLS.includes(col) && col !== "Coupon") return n.toFixed(2) + "%";
   if (col === "Coupon") return n.toFixed(3) + "%";
-  if (col === "Duration") return n.toFixed(2);
-  if (col === "Term") {
-    return termUnit === "w" ? (n * WEEKS_PER_YEAR).toFixed(2) : n.toFixed(2);
-  }
+  if (col === "Duration" || col === "Term") return n.toFixed(2);
   return val;
 }
 
@@ -165,12 +154,9 @@ function renderTable() {
   ).join("")}</tbody>`;
 
   const tfoot = `<tfoot><tr>${cols.map(c => {
-    if (c === "CUSIP") return `<td>Wtd Avg</td>`;
+    if (c === "CUSIP") return `<td>${wtdAvg[c]}</td>`;
     if (c === "Holding Name" || c === "Maturity Date") return `<td></td>`;
-    if (c === "% of Fund") return `<td>${rows.reduce((s, r) => s + (r["% of Fund"] ?? 0), 0).toFixed(2)}%</td>`;
-    if (c === "Market Value") return `<td>${rows.reduce((s, r) => s + (r["Market Value"] ?? 0), 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>`;
-    if (c in wtdAvg) return `<td>${fmt(c, wtdAvg[c], termUnit)}</td>`;
-    return `<td></td>`;
+    return `<td>${fmt(c, wtdAvg[c], termUnit)}</td>`;
   }).join("")}</tr></tfoot>`;
 
   content.innerHTML = `<table>${colgroup}${thead}${tbody}${tfoot}</table>`;
@@ -212,45 +198,38 @@ function renderTable() {
 
 async function loadFund(ticker) {
   content.innerHTML = '<div class="status">Loading…</div>';
-  const res = await fetch(`${R2_BASE}/Holdings-${ticker}-Enriched.csv`, { cache: "no-store" });
+  const res = await fetch(`${R2_BASE}/${ticker}.csv`, { cache: "no-store" });
   if (!res.ok) {
-    content.innerHTML = `<div class="status">No enriched data for ${ticker} yet — run the fund's scraper then enrichHoldings.js.</div>`;
+    content.innerHTML = `<div class="status">No data for ${ticker} yet — run the fund's scraper then enrichHoldings.js.</div>`;
     return;
   }
-  const rows = parseCsv(await res.text());
-  if (rows.length === 0) {
+  // File Layout (knowledge/1.0_FundHoldings.md): metadata header + row, table
+  // header, holdings rows, then the Total / Wtg Avg row, all computed by enrichHoldings.js.
+  const lines = parseCsv(await res.text(), false);
+  if (lines.length < 5) {
     content.innerHTML = `<div class="status">${ticker}: no holdings rows.</div>`;
     return;
   }
+  const [metaHead, metaRow, tableHead, ...body] = lines;
+  const totalLine = body.pop();
+  const m = Object.fromEntries(metaHead.map((h, i) => [h, metaRow[i]]));
 
-  for (const col of NUMERIC_COLS) {
-    for (const r of rows) r[col] = r[col] === "" ? null : Number(r[col]);
-  }
+  const termHeader = tableHead.find(h => h.startsWith("Term"));
+  const termUnit = termHeader.includes("(w)") ? "w" : "y";
+  const cols = tableHead.map(h => h.replace(/ \([wy]\)$/, ""));
 
-  const hasSaSao = rows.some(r => r["SA Yield"] != null);
-  const cols = hasSaSao ? DISPLAY_COLS : DISPLAY_COLS.filter(c => c !== "SA Yield" && c !== "SAO Yield");
+  const parseCell = (col, v) => {
+    if (!NUMERIC_COLS.includes(col) || v === "" || v == null) return v === "" ? null : v;
+    return Number(v.replace("%", ""));
+  };
+  const toObj = line => Object.fromEntries(cols.map((c, i) => [c, parseCell(c, line[i])]));
+  const rows = body.map(toObj);
+  const wtdAvg = toObj(totalLine);
 
-  // Cash/sweep lines (no CUSIP match in either yield source, so Ask Yield is
-  // null) are excluded from the weighted averages entirely — not just
-  // zero-weighted — since a cash line can carry a negative market value
-  // (e.g. "US Dollar") that would distort the weighted sum if included.
-  const bondRows = rows.filter(r => r["Ask Yield"] != null);
-  const bondWeights = bondRows.map(r => r["Market Value"] ?? 0);
-  const wtdAvg = {};
-  for (const col of ["Coupon", "Ask Yield", "SA Yield", "SAO Yield", "Term", "Duration"]) {
-    wtdAvg[col] = calcMktWtdAvg(bondRows.map(r => r[col]), bondWeights);
-  }
-
-  // Whole-fund short-duration funds (e.g. VBIL: every holding under a year)
-  // read better in weeks than as a fraction of a year.
-  const bondTerms = bondRows.map(r => r.Term).filter(t => t != null);
-  const termUnit = bondTerms.length > 0 && bondTerms.every(t => t < 1) ? "w" : "y";
-
-  const fm = fundMeta[ticker] || {};
-  const metaParts = [`${ticker}${fm.fundName ? " — " + fm.fundName : ""}`];
-  if (fm.expenseRatio != null) metaParts.push(`Expense Ratio ${fm.expenseRatio.toFixed(2)}%`);
-  if (fm.secYield != null) metaParts.push(`30-Day SEC Yield ${fm.secYield.toFixed(2)}%`);
-  metaParts.push(`${rows.length} holdings, as of ${rows[0]["As of"]}`);
+  const metaParts = [`${m.Ticker}${m["Fund Name"] ? " — " + m["Fund Name"] : ""}`];
+  if (m["Expense Ratio"]) metaParts.push(`Expense Ratio ${Number(m["Expense Ratio"].replace("%", "")).toFixed(2)}%`);
+  if (m["30-Day SEC Yield"]) metaParts.push(`30-Day SEC Yield ${Number(m["30-Day SEC Yield"].replace("%", "")).toFixed(2)}%`);
+  metaParts.push(`${m.Holdings} holdings, as of ${m["As of"]}`);
   meta.textContent = metaParts.join(" — ");
 
   state = { rows, cols, wtdAvg, termUnit };

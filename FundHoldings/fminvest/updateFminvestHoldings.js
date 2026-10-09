@@ -139,9 +139,8 @@ export async function updateFminvestHoldings(tickers) {
     const { expenseRatio, secYield } = await fetchExpenseRatioAndSecYield(ticker);
 
     const csv = toCsv(data);
-    const filename = path.join(DATA_DIR, `Holdings-${ticker}.csv`);
+    const filename = path.join(DATA_DIR, `${ticker}-Raw.csv`);
     fs.writeFileSync(filename, csv, "utf8");
-    await upload(filename, "FundHoldings");
 
     saveFundMeta(ticker, { fundName: FUND_NAMES[ticker] || "", etfId, expenseRatio, secYield });
   }
