@@ -138,7 +138,7 @@ function buildFundCsv(ticker, enriched, meta) {
   const weeks = terms.length > 0 && terms.every(t => t < 1);
   const termHeader = weeks ? "Term (w)" : "Term (y)";
   const termOut = n => (n == null ? "" : plain(weeks ? n * WEEKS_PER_YEAR : n));
-  const header = cols.map(c => (c === "Term" ? termHeader : c === "Duration" ? "Duration (y)" : c));
+  const header = cols.map(c => (c === "Term" ? termHeader : c === "Duration" ? "Duration (y)" : c === "Holding Name" ? "Description" : c));
 
   const cell = (c, r) => {
     switch (c) {
@@ -157,7 +157,7 @@ function buildFundCsv(ticker, enriched, meta) {
   for (const r of enriched) lines.push(cols.map(c => cell(c, r)).join(","));
 
   const total = {
-    CUSIP: text("Total / Wtg Avg"),
+    "Holding Name": text("Total / Wtd Avg"),
     Coupon: pct(avg(yieldRows, "Coupon")),
     "% of Fund": pct(Math.round(sum("% of Fund") * 1e8) / 1e8),
     "Market Value": plain(sum("Market Value")),
