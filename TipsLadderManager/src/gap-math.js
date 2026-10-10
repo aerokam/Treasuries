@@ -207,7 +207,10 @@ export function gapParamsCore({ gapYears, tipsMarketData, settlementDate, dara, 
 
     const piPerBond = 1000 + 1000 * synCpn * 0.5;
     const yearDara = daraByYear?.get(year) ?? dara;
-    const qty = Math.max(0, Math.round((yearDara - laterMatInt - (pliCreditByGapYear[year] ?? 0)) / piPerBond));
+    // qtyExact is the quotient before rounding and before the floor at 0, kept so the Gap Year
+    // Duration drill shows the same number the rounding acted on (5.0 §Quantity, cost and duration in one section).
+    const qtyExact = (yearDara - laterMatInt - (pliCreditByGapYear[year] ?? 0)) / piPerBond;
+    const qty = Math.max(0, Math.round(qtyExact));
     // Priced as a security issued today off its own yield and coupon, not assumed to be par:
     // the coupon is the eighth at or below the yield, so the price sits at or just below 100
     // when the real yield is positive, and above 100 when a negative yield meets the 0.125%
@@ -216,8 +219,10 @@ export function gapParamsCore({ gapYears, tipsMarketData, settlementDate, dara, 
     const costPerBond = 1000 * synPrice / 100;
     const cost = qty * costPerBond;
     totalCost += cost;
-    breakdown.push({ year, qty, piPerBond, laterMatInt, pliCredit: pliCreditByGapYear[year] ?? 0, dara: yearDara, dur: synDur, synYld, synCpn, synPrice, costPerBond, cost, durDetail });
-    runningSynLMI += qty * 1000 * synCpn;
+    // annualInt: the annual interest of this year's Synthetic TIPS, which every shorter year's LMI includes.
+    const annualInt = qty * 1000 * synCpn;
+    breakdown.push({ year, qty, qtyExact, piPerBond, laterMatInt, pliCredit: pliCreditByGapYear[year] ?? 0, dara: yearDara, dur: synDur, synYld, synCpn, synPrice, costPerBond, cost, annualInt, durDetail });
+    runningSynLMI += annualInt;
     count++;
   }
 
@@ -303,14 +308,16 @@ export function future30yParamsCore({ future30yYears, anchorBond, settlementDate
     const dur = durDetail ? durDetail.macaulay / (1 + anchorYield / 2) : null;
     totalDuration += dur;
     const yearDara = daraByYear?.get(year) ?? dara;
-    const qty = Math.max(0, Math.round((yearDara - runningLMI) / piPerBond));
+    const qtyExact = (yearDara - runningLMI) / piPerBond;   // before rounding and the floor at 0, as in gapParamsCore
+    const qty = Math.max(0, Math.round(qtyExact));
     // Priced as a security issued today off the anchor yield and the synthetic coupon, not
     // assumed to be par — same rule as the gap synthetics (2.0 §Future 30Y Rungs).
     const synPrice = priceFromYield(anchorYield, synCoupon, settlementDate, mat) ?? 100;
     const costPerBond = 1000 * synPrice / 100;
     const cost = qty * costPerBond;
-    breakdown.push({ year, qty, piPerBond, laterMatInt: runningLMI, dara: yearDara, dur, synYld: anchorYield, synCpn: synCoupon, synPrice, costPerBond, cost, durDetail });
-    runningLMI += qty * 1000 * synCoupon;
+    const annualInt = qty * 1000 * synCoupon;   // annual interest of this year's Synthetic TIPS, part of every shorter year's LMI
+    breakdown.push({ year, qty, qtyExact, piPerBond, laterMatInt: runningLMI, dara: yearDara, dur, synYld: anchorYield, synCpn: synCoupon, synPrice, costPerBond, cost, annualInt, durDetail });
+    runningLMI += annualInt;
     future30yTotalCost += cost;
   }
   // Cost-weighted average duration, the same rule as the gap years (2.0 §Average Gap Year
