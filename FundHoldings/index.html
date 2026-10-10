@@ -60,24 +60,24 @@ const content = document.getElementById("content");
 
 const NUMERIC_COLS = ["Quantity", "Coupon", "% of Fund", "Market Value", "Ask Yield", "SA Yield", "SAO Yield", "Term", "Duration"];
 const PCT_COLS = ["Coupon", "Ask Yield", "SA Yield", "SAO Yield"];
-const DISPLAY_COLS = ["CUSIP", "Holding Name", "Maturity Date", "Coupon", "% of Fund", "Market Value", "Ask Yield", "SA Yield", "SAO Yield", "Term", "Duration"];
-const UNSORTABLE_COLS = new Set(["CUSIP", "Holding Name"]);
+const DISPLAY_COLS = ["CUSIP", "Description", "Maturity Date", "Coupon", "% of Fund", "Market Value", "Ask Yield", "SA Yield", "SAO Yield", "Term", "Duration"];
+const UNSORTABLE_COLS = new Set(["CUSIP", "Description"]);
 
 // Default column widths (px), used to build the <colgroup>. Users can drag
 // the resizer handle on each header to override these; overrides persist in
 // colWidths across sorts and fund-switches for the session.
 const COL_WIDTHS = {
   CUSIP: 100,
-  "Holding Name": 220,
-  "Maturity Date": 100,
-  Coupon: 70,
-  "% of Fund": 80,
-  "Market Value": 110,
-  "Ask Yield": 80,
-  "SA Yield": 80,
-  "SAO Yield": 80,
-  Term: 70,
-  Duration: 80
+  "Description": 150,
+  "Maturity Date": 125,
+  Coupon: 80,
+  "% of Fund": 95,
+  "Market Value": 120,
+  "Ask Yield": 90,
+  "SA Yield": 90,
+  "SAO Yield": 95,
+  Term: 85,
+  Duration: 115
 };
 const colWidths = { ...COL_WIDTHS };
 
@@ -85,7 +85,7 @@ const colWidths = { ...COL_WIDTHS };
 // (e.g. "United States Treasury Inflation Indexed Bonds 0.125% 10/15/2026"),
 // duplicating the Coupon/Maturity Date columns and bloating the description
 // column. Strip that suffix for display; a no-op for sources (Vanguard) whose
-// Holding Name never carries it.
+// Description never carries it.
 const NAME_SUFFIX_RE = /\s+\d+(?:\.\d+)?%\s+\d{2}\/\d{2}\/\d{4}\s*$/;
 function displayName(name) {
   return String(name ?? "").replace(NAME_SUFFIX_RE, "");
@@ -147,15 +147,15 @@ function renderTable() {
 
   const tbody = `<tbody>${displayRows.map(r =>
     `<tr>${cols.map(c => {
-      if (c === "Holding Name") return `<td>${displayName(r[c])}</td>`;
+      if (c === "Description") return `<td>${displayName(r[c])}</td>`;
       if (c === "CUSIP" || c === "Maturity Date") return `<td>${r[c] ?? ""}</td>`;
       return `<td>${fmt(c, r[c], termUnit)}</td>`;
     }).join("")}</tr>`
   ).join("")}</tbody>`;
 
   const tfoot = `<tfoot><tr>${cols.map(c => {
-    if (c === "CUSIP") return `<td>${wtdAvg[c]}</td>`;
-    if (c === "Holding Name" || c === "Maturity Date") return `<td></td>`;
+    if (c === "Description") return `<td>${wtdAvg[c]}</td>`;
+    if (c === "CUSIP" || c === "Maturity Date") return `<td></td>`;
     return `<td>${fmt(c, wtdAvg[c], termUnit)}</td>`;
   }).join("")}</tr></tfoot>`;
 
