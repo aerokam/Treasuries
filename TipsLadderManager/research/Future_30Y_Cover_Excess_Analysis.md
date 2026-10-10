@@ -25,24 +25,25 @@ Net Cash equals the first column less the second, apart from whole-TIPS rounding
 
 At the Pass 1 quantities (531 of the 2048 and 304 of the 2052) the discount to maturity is $464,889 ($262,246 and $202,642). The sales end in 2033, so only $55,236 is realized. The earlier AMD credited the lifetime figure, held to maturity, to funded years up to 2048 and 2052.
 
-## 3. The credit with Net Cash equals the credit as if all the Future 30Y TIPS had been issued today
+## 3. The three amounts against the full annual coupons of every Future 30Y TIPS
 
-Each funded year before the first Future 30Y year is credited with the simulated TIPS coupons, the Cover Excess coupons and the Net Cash. The comparison figure is the full annual coupon of every Future 30Y TIPS, $21,026 a year.
+**Basis of this section:** market data of 2026-10-10, settlement 2026-10-13, Lower cover 2046 (yield 3.309%), Upper cover 2052 (3.333%), anchor 2056 (3.323%), static yields, index ratios at their settlement values. The worked figures are for DARA $100,000 flat, ladder 2026 to 2062 (the Maximum Future 30Y Rungs of 6 that day), over 2026 to 2032, the years from settlement to the last issue date. Each percentage is of one year's full coupons, the Annual Interest (Real) of every Future 30Y TIPS: $17,680 for this ladder.
 
-| Year | Simulated TIPS coupons | Cover Excess coupons | Net Cash | Total credit | Ratio to $21,026 |
-|---|---|---|---|---|---|
-| 2027 | $1,350 | $6,915 | $5,945 | $14,210 | 68% |
-| 2028 | $4,101 | $5,347 | $11,559 | $21,007 | 100% |
-| 2029 | $6,953 | $3,785 | $11,762 | $22,499 | 107% |
-| 2030 | $9,906 | $2,446 | $9,454 | $21,806 | 104% |
-| 2031 | $12,960 | $1,368 | $8,822 | $23,150 | 110% |
-| 2032 | $16,116 | $586 | $4,995 | $21,697 | 103% |
-| 2033 | $19,373 | $138 | $3,007 | $22,517 | 107% |
-| 2034 on | $21,026 | $0 | $0 | $21,026 | 100% |
+Over those years the three amounts (the simulated TIPS coupons, the Cover Excess coupons and the Net Cash) come to $1,561 (8.8%) less than the full annual coupons counted on each February 15 and August 15 after settlement. The difference is exactly the sum of four amounts, each worked out from prices from yield and accrued interest:
 
-Over 2027 to 2033 the total credit is $146.9K against $147.2K, within 0.2%. 2027 is low because the first sale comes about four months after settlement, and the accretion since is realized in 2028.
+| Amount | What causes it | 2062 ladder |
+|---|---|---|
+| 1. Cover Excess at settlement less the cost of the Synthetic TIPS | Whole-TIPS rounding of the Cover Excess, and its quoted price against the price from its yield | −1.5% |
+| 2. Return of the Cover Excess less the return of each Future 30Y TIPS from settlement to its issue date (change in dirty price plus coupons paid) | The covers' yields against the anchor yield, and the coupons the Future 30Y TIPS pay out where the Cover Excess grows in price | +1.5% |
+| 3. Accrued interest at settlement: Cover Excess less every Future 30Y TIPS | The full annual coupons count the whole first coupon (August 15, 2026 to February 15, 2027), while interest from settlement is only the 125 of its 184 days after settlement. Every Cost per TIPS is a clean price, so no accrued interest is paid at purchase | −11.2% |
+| 4. Accrued interest on the issue dates: Simulated Outstanding Future 30Y TIPS bought less Cover Excess sold | Each is bought 11 to 14 days after February 15 at a clean price, and its first coupon is credited whole | +2.4% |
+| Total | | −8.8% |
 
-Conclusion the spec relies on: the excess stands in for holding the Future 30Y TIPS as if all had been issued today. Its return, delivered as accretion at each sale, takes the place of the coupons those TIPS would pay. Crediting the Net Cash to the funded year of the year it is delivered removes the overfunding.
+Amount 3 is the one-sided shortfall. Its Future 30Y TIPS part is 59/184 of a half-year coupon, 16.0% of one year's full coupons, less 4.8% for the Cover Excess. It depends on the settlement date alone (none just after February 15 or August 15, up to half a year's coupons just before), not on the number of Future 30Y years, and it falls on the first year. For last years 2057 to 2062 it is −10.5% to −11.2%, while the total is −3.0% to −9.1% for DARA $100,000 flat and −6.3% to −9.0% for $400,000 flat: amount 4 adds 2.0% to 2.5%, and amount 1, the rounding, moves the total either way by up to about 5% at DARA $100,000.
+
+Amount 2 depends on the yields. With the covers' yields within 1.5 bp of the anchor yield, as on this day and with every yield shifted by −50 bp or +50 bp, it stays within 2.5% of one year's full coupons. With every yield moved 5 bp per year of maturity from 2050 (covers 51 bp and 19 bp below the anchor), it reaches −32% at a last year of 2063; moved the other way (covers 49 bp and 21 bp above), +31% at 2062. The Cover Excess earns the yields of the covers, so the three amounts come to about the full annual coupons only while the covers' yields are close to the anchor yield.
+
+**Invariant tested** (tests/run.js, DARA $20,000, $100,000 and $400,000, flat and variable, every last year from the first Future 30Y year to the ladder's last year at most, on the market yields and on every yield shifted by −50 bp and +50 bp): the three amounts less the full annual coupons equal amounts 1 to 4 within $0.01; amount 1 lies within half a Cost per TIPS of each cover plus the quoted price against the price from yield; amount 2 lies within a bound from the mechanism, worked out for each period between issue dates from the growth of a dirty price at the covers' and the anchor yields. In these runs amount 2 reached at most 64% of that bound.
 
 ## 4. The duration match drifts in years but not in dollars
 
