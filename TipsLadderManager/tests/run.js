@@ -6,7 +6,7 @@ import { readFileSync, readdirSync, existsSync } from 'fs';
 import path from 'path';
 import { buildTipsMarketData, localDate, runRebalance, runFundedRebalance, inferDARAFromCash, inferScaledDARAFromPortfolio, computePortfolioARAByYear, getGapYearBracketCandidates, getGapYears, derivePerYearDara, parseFundedYearDaraBlock, parseParamsBlock, inferFirstYearFromHoldings, inferLastYearFromHoldings } from '../src/rebalance-lib.js';
 import { computeBeforeState, detectBracketFlags, heldYearMedianExcluding } from '../src/before-state-lib.js';
-import { remainingCouponPaymentsThisYear, rmdCappedRemainingCoupons, latestRemainingCouponDate, future30yLimit, selectFuture30yCovers, LOWER_COVER_YIELD } from '../src/ladder-core.js';
+import { remainingCouponPaymentsThisYear, rmdCappedRemainingCoupons, latestRemainingCouponDate, future30yLimit, maxLastYear, selectFuture30yCovers, LOWER_COVER_YIELD } from '../src/ladder-core.js';
 import { bracketWeights, bracketWeightsN, syntheticCoupon } from '../src/gap-math.js';
 import { findSpikes, smoothCurve } from '../src/shape-math.js';
 import { buildDurationPopupRows, buildBracketWeightDrill, buildFuture30yDurationPopupRows } from '../src/drill.js';
@@ -16,7 +16,9 @@ import { parseBrokerCSV } from '../src/broker-import.js';
 import { loadMarketData, nextBondTradingDay, lookupRefCpi } from '../../shared/src/market-data.js';
 import { installFixtureFetch } from './market-fixture.js';
 import { ladderRoles } from './ladder-fixtures.js';
-import { bondCalcs, calculateMDuration } from '../../shared/src/bond-math.js';
+import { bondCalcs, calculateMDuration, priceFromYield, accruedInterest, couponSchedule, daysBetween } from '../../shared/src/bond-math.js';
+import { indexRatio } from '../../shared/src/ref-cpi.js';
+import { actualPaymentDate } from '../../shared/src/settlement.js';
 
 
 // Multi-format holdings parser — mirrors index.html logic for Formats 3, 4, 5.
@@ -974,24 +976,20 @@ console.log('\nsyntheticCoupon — every eighth from 0.125% to 10%');
   assert('synthetic coupon floor is 0.125% for a negative yield', syntheticCoupon(-0.005), 0.00125);
 }
 
-// ── Test: Future 30Y issuance-dependent values against DD §5.1 ──────────────────────────
-// DD §5.1 protocol: the spec states the rule, the DD table records the value, and a test derives the
-// value from live data and asserts it matches the table, so issuance or yield drift fails here
-// instead of going stale silently. The cover pair is also derived here independently of the engine
-// (longest modified duration, 2.0 §Future 30Y Cover Pair) and compared with selectFuture30yCovers.
-console.log('\nFuture 30Y — the Maximum Future 30Y Rungs, the ladder’s last year at most, and the cover pair (DD §5.1)');
+// ── Test: Future 30Y: the cover pair, the Maximum Future 30Y Rungs and the ladder’s last year at most ──
+// DD §5.1 states the rule for each of these and records no value: each is derived from market data
+// each run (TESTING.md §Structure comes from the market). This test derives each a second way, from
+// the market data with the bond-math.js primitives and the rules in DD §5.1 and 2.0 §Future 30Y Cover
+// Pair, §Future 30Y Rungs and §Limit on the ladder's last year, and asserts that the engine's value
+// equals it. LOWER_COVER_YIELD is a rule constant stated in DD §5.0, not a market value, so it is read
+// from the DD.
+// Shared with the engine: syntheticCoupon (the 1/8% at or below a yield, checked at all 80 eighths
+// above) and the bond-math.js primitives calculateMDuration and priceFromYield, which every app uses
+// and shared/tests checks. Worked out here and not taken from the engine: the anchor, both covers, the
+// Pass 1 quantities of the Synthetic TIPS, the issue dates, and the duration check on each issue date.
+console.log('\nFuture 30Y: the cover pair, the Maximum Future 30Y Rungs and the ladder’s last year at most, derived a second way');
 {
   const ddText = readFileSync(new URL('../../knowledge/DATA_DICTIONARY.md', import.meta.url), 'utf8');
-  const ddRow = (prefix) => {
-    const line = ddText.split(/\r?\n/).find(l => l.startsWith('| ' + prefix));
-    if (!line) throw new Error(`DD §5.1 has no row starting "${prefix}"`);
-    return parseInt(line.split('|')[3], 10);   // the "As of" column
-  };
-  const ddMaxRungs = ddRow('Maximum Future 30Y Rungs');
-  const ddLastYear = ddRow('Ladder’s last year, at most');
-  const ddLower = ddRow('Lower cover');
-  const ddUpper = ddRow('Upper cover');
-  // DD §5.0: LOWER_COVER_YIELD, read from the DD text so the engine constant is checked against it.
   const ddLowerCoverYield = (() => {
     const m = ddText.match(/`LOWER_COVER_YIELD` = ([\d.]+)%/);
     if (!m) throw new Error('DD §5.0 has no LOWER_COVER_YIELD entry');
@@ -999,35 +997,80 @@ console.log('\nFuture 30Y — the Maximum Future 30Y Rungs, the ladder’s last 
   })();
   assert(`LOWER_COVER_YIELD (${LOWER_COVER_YIELD * 100}%) matches DD §5.0 (${ddLowerCoverYield * 100}%)`, LOWER_COVER_YIELD, ddLowerCoverYield, 1e-12);
 
-  // Independent cover derivation: anchor = longest-dated outstanding TIPS; the first Future 30Y
-  // year's Synthetic TIPS matures Feb 15 the year after and, for choosing the lower cover, is measured
-  // at LOWER_COVER_YIELD with the 1/8% coupon at or below it (DD §5.1 Lower cover).
+  // The anchor is the longest-dated outstanding TIPS (2.0 §Future 30Y Rungs). Lower cover: the
+  // outstanding TIPS with the longest modified duration at or below that of the Synthetic TIPS of the
+  // first Future 30Y year alone, measured at LOWER_COVER_YIELD with the 1/8% coupon at or below it.
+  // Upper cover: the outstanding TIPS with the longest modified duration, excluding the lower cover.
   const outstanding = [...tipsMarketData.values()].filter(b => b.maturity > settlementDate && b.yield != null);
   const anchor = outstanding.reduce((a, b) => (!a || b.maturity > a.maturity ? b : a), null);
-  const synCpn = syntheticCoupon(ddLowerCoverYield);
-  const firstDur = calculateMDuration(settlementDate, new Date(anchor.maturity.getFullYear() + 1, 1, 15), synCpn, ddLowerCoverYield);
+  const maxTipsYear = anchor.maturity.getFullYear();
+  const firstDur = calculateMDuration(settlementDate, new Date(maxTipsYear + 1, 1, 15), syntheticCoupon(ddLowerCoverYield), ddLowerCoverYield);
   const durs = outstanding.map(b => ({ b, d: calculateMDuration(settlementDate, b.maturity, b.coupon ?? 0, b.yield) }));
   const lower = durs.filter(x => x.d <= firstDur).reduce((a, x) => (!a || x.d > a.d ? x : a), null);
   const upper = durs.filter(x => x !== lower).reduce((a, x) => (!a || x.d > a.d ? x : a), null);
   const covers = selectFuture30yCovers({ tipsMarketData, settlementDate });
-  assert('engine lower cover matches the independent derivation', covers.lowerCoverBond?.cusip, lower.b.cusip);
-  assert('engine upper cover matches the independent derivation', covers.upperCoverBond?.cusip, upper.b.cusip);
+  assert(`lower cover: engine ${covers.lowerCoverBond?.maturity.getFullYear()}, derived here ${lower.b.maturity.getFullYear()}`, covers.lowerCoverBond?.cusip, lower.b.cusip);
+  assert(`upper cover: engine ${covers.upperCoverBond?.maturity.getFullYear()}, derived here ${upper.b.maturity.getFullYear()}`, covers.upperCoverBond?.cusip, upper.b.cusip);
 
-  assert(`Maximum Future 30Y Rungs derived from live data (${F30Y_LIMIT.maxFuture30yRungs}) matches DD §5.1 (${ddMaxRungs})`, F30Y_LIMIT.maxFuture30yRungs, ddMaxRungs);
-  assert(`ladder's last year at most (${LAST_MAX}) matches DD §5.1 (${ddLastYear})`, LAST_MAX, ddLastYear);
-  assert(`lower cover (${lower.b.maturity.getFullYear()}) matches DD §5.1 (${ddLower})`, lower.b.maturity.getFullYear(), ddLower);
-  assert(`upper cover (${upper.b.maturity.getFullYear()}) matches DD §5.1 (${ddUpper})`, upper.b.maturity.getFullYear(), ddUpper);
-  console.log(`        anchor ${anchor.maturity.getFullYear()} yield ${(anchor.yield * 100).toFixed(3)}%  first Synthetic TIPS duration at ${(ddLowerCoverYield * 100).toFixed(3)}% (coupon ${(synCpn * 100).toFixed(3)}%): ${firstDur.toFixed(3)}`);
-  console.log(`        lower ${lower.b.maturity.getFullYear()} (${lower.d.toFixed(3)})  upper ${upper.b.maturity.getFullYear()} (${upper.d.toFixed(3)})  Maximum Future 30Y Rungs ${F30Y_LIMIT.maxFuture30yRungs}`);
+  // The Maximum Future 30Y Rungs: the largest number of Future 30Y years for which, on the issue date
+  // of every Simulated Outstanding Future 30Y TIPS (the last trading day of February, 30 years before
+  // its maturity year), the cost-weighted average modified duration of the Synthetic TIPS not yet
+  // issued lies between the modified durations of the two covers measured that day. Each Synthetic TIPS
+  // keeps the anchor yield and the 1/8% coupon at or below it, matures February 15, and is priced from
+  // that yield on the issue date. Pass 1 sizes them longest to shortest at a flat DARA of $100,000, the
+  // incoming LMI being the coupons of the longer ones: the average duration is a cost-weighted mean over
+  // a flat ladder, so the DARA enters only through whole-TIPS rounding.
+  const iso = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  const issueDateOf = (maturityYear) => {
+    for (const d = new Date(maturityYear - 30, 2, 0); ; d.setDate(d.getDate() - 1)) {
+      if (d.getDay() !== 0 && d.getDay() !== 6 && !bondHolidays.has(iso(d))) return new Date(d);
+    }
+  };
+  const ya = anchor.yield, cpn = syntheticCoupon(ya), piPerTips = 1000 + 1000 * cpn / 2, flatDara = 100000;
+  const durationsBetweenCovers = (n) => {
+    const years = Array.from({ length: n }, (_, i) => maxTipsYear + 1 + i);
+    const qty = new Map();
+    let lmi = 0;
+    for (const y of [...years].reverse()) {
+      const q = Math.max(0, Math.round((flatDara - lmi) / piPerTips));
+      qty.set(y, q);
+      lmi += q * 1000 * cpn;
+    }
+    for (const y of years) {
+      const date = issueDateOf(y);
+      const later = years.filter(x => x > y);
+      if (!later.length) continue;
+      let cost = 0, costDur = 0;
+      for (const x of later) {
+        const mat = new Date(x, 1, 15);
+        const c = qty.get(x) * 10 * priceFromYield(ya, cpn, date, mat);
+        cost += c;
+        costDur += c * calculateMDuration(date, mat, cpn, ya);
+      }
+      const avg = costDur / cost;
+      const dL = calculateMDuration(date, lower.b.maturity, lower.b.coupon ?? 0, lower.b.yield);
+      const dU = calculateMDuration(date, upper.b.maturity, upper.b.coupon ?? 0, upper.b.yield);
+      if (dL == null || dU == null || !(avg >= Math.min(dL, dU) && avg <= Math.max(dL, dU))) return false;
+    }
+    return true;
+  };
+  const passing = [];
+  for (let n = 1; n <= 30; n++) if (durationsBetweenCovers(n)) passing.push(n);
+  const derivedMax = passing.length ? Math.max(...passing) : 0;
+  assert(`Maximum Future 30Y Rungs: engine ${F30Y_LIMIT.maxFuture30yRungs}, derived here ${derivedMax}`, F30Y_LIMIT.maxFuture30yRungs, derivedMax);
+  assert(`ladder’s last year at most: engine ${LAST_MAX}, longest issued maturity year ${maxTipsYear} plus the ${derivedMax} derived here`, LAST_MAX, maxTipsYear + derivedMax);
+  assert('the Last Year selector’s upper bound (maxLastYear) equals it', maxLastYear({ tipsMarketData, settlementDate, refCPI, bondHolidays }), maxTipsYear + derivedMax);
+  console.log(`        anchor ${maxTipsYear} yield ${(ya * 100).toFixed(3)}%  first Synthetic TIPS duration at ${(ddLowerCoverYield * 100).toFixed(3)}%: ${firstDur.toFixed(3)}`);
+  console.log(`        lower ${lower.b.maturity.getFullYear()} (${lower.d.toFixed(3)})  upper ${upper.b.maturity.getFullYear()} (${upper.d.toFixed(3)})  counts that pass: ${passing.join(', ')}`);
 }
 
 // ── Test: Build — Future 30Y years (lastYear > maxRealYear) ───────────────────────
-console.log('\nBuild — DARA=50000, lastYear=2060 (Future 30Y years)');
+console.log(`\nBuild: DARA=50000, lastYear=${MAX_YEAR + 4} (Future 30Y years)`);
 {
   const dara = 50000, lastYear = (MAX_YEAR + 4);
   const { summary } = runBuild({ dara, lastYear, tipsMarketData, refCPI, settlementDate });
   assert('future30yYears.length > 0', (summary.future30yYears?.length ?? 0) > 0, true);
-  // The cover pair is chosen by rule (2.0 §Future 30Y Cover Pair; checked against DD §5.1 above).
+  // The cover pair is chosen by rule (2.0 §Future 30Y Cover Pair; derived a second way above).
   const _covers = selectFuture30yCovers({ tipsMarketData, settlementDate });
   assert('future30yLowerYear is the rule\u2019s lower cover', summary.future30yLowerYear, _covers.lowerCoverBond.maturity.getFullYear());
   assert('future30yUpperYear is the rule\u2019s upper cover', summary.future30yUpperYear, _covers.upperCoverBond.maturity.getFullYear());
@@ -1082,9 +1125,9 @@ console.log(`\nBuild — DARA=20000, lastYear=${MAX_YEAR + 1} (single Future 30Y
 // ── Test: Rebalance — same single-year Future 30Y corner case as build above ─────
 // Regression: rebalance-lib.js used to compute Future 30Y weights with its own inline
 // duplicate of bracketWeights' formula, missing the [0,1] clamp. It now calls the shared
-// sizeFuture30yCover (ladder-core.js), same as build. Round-trip a build 2057 ladder straight
+// sizeFuture30yCover (ladder-core.js), same as build. Round-trip a build to the first Future 30Y year straight
 // back through rebalance (no overrides) and check the clamp held there too.
-console.log('\nRebalance — same DARA=20000, lastYear=2057 corner case, via build round-trip');
+console.log(`\nRebalance: same DARA=20000, lastYear=${MAX_YEAR + 1} corner case, via build round-trip`);
 {
   const dara = 20000, lastYear = (MAX_YEAR + 1);
   const { details: bD } = runBuild({ dara, lastYear, tipsMarketData, refCPI, settlementDate });
@@ -1224,35 +1267,146 @@ for (const dara of [20000, 100000, 400000]) {
 }
 
 // ── Test: the three amounts credited against the full annual coupons of every Future 30Y TIPS ──
-// 2.0 §Interest credited to a funded year: over the years of the rebalances, the simulated TIPS
-// interest, the Cover Excess interest and the Net Cash come to about the full annual coupons of every
-// Future 30Y TIPS as if all had been issued today (research/Future_30Y_Cover_Excess_Analysis.md §3).
-// Two independent derivations: the left side is the engine's three maps; the right side is worked out
-// here from Pass 1's quantities and coupon, each coupon dated February 15 and August 15 and counted
-// when it falls after settlement. The years run from the settlement year through the year of the last
-// issue date. The first issue year's credit is short and later years' are over, so the totals are
-// compared, not each year, within 2% of the full-coupon total.
-console.log('\nFuture 30Y — the three amounts credited against the full annual coupons, over the years of the rebalances');
-for (const lastYear of [...new Set([Math.min(MAX_YEAR + 4, LAST_MAX), LAST_MAX])]) {
-  for (const dara of [20000, 100000, 400000]) {
-    const firstYear = settlementDate.getFullYear();
-    const { summary } = runBuild({ dara, firstYear, lastYear, tipsMarketData, refCPI, settlementDate, bondHolidays });
-    const bd = summary.future30yParams.breakdown;
-    const lastIssueYear = Math.max(...summary.future30yRebalances.conversions.map(c => c.issueYear));
-    const fullCouponHalf = bd.reduce((s, r) => s + r.qty * 1000 * r.synCpn / 2, 0);
-    let credited = 0, fullCoupons = 0;
-    const parts = { sim: 0, cov: 0, net: 0 };
-    for (let t = firstYear; t <= lastIssueYear; t++) {
-      parts.sim += summary.future30ySimulatedInterestByYear.get(t) ?? 0;
-      parts.cov += summary.future30yCoverInterestByYear.get(t) ?? 0;
-      parts.net += summary.future30yNetCashByYear.get(t) ?? 0;
-      for (const d of [new Date(t, 1, 15), new Date(t, 7, 15)]) if (d > settlementDate) fullCoupons += fullCouponHalf;
+// 2.0 §Interest credited to a funded year; research/Future_30Y_Cover_Excess_Analysis.md §3.
+// Over the years from settlement to the last issue date, the three amounts credited (the interest of
+// the Simulated Outstanding Future 30Y TIPS, the interest of the Cover Excess and the Net Cash) differ
+// from the full annual coupons of every Future 30Y TIPS, counted on each February 15 and August 15
+// after settlement, by exactly the sum of four amounts. Each is worked out here with the bond-math.js
+// primitives, at prices from yield, from the Pass 1 quantities and the Cover Excess quantities of each
+// conversion; none is read from the engine's three maps or its Net Cash:
+//   1. the Cover Excess at settlement less the cost of the Synthetic TIPS: whole-TIPS rounding of the
+//      Cover Excess, and its quoted price against the price from its yield;
+//   2. the return of the Cover Excess held less the return of each Future 30Y TIPS from settlement to
+//      its issue date, a return being the change in dirty price plus the coupons paid;
+//   3. at settlement, the accrued interest of the Cover Excess (with a coupon dated before settlement
+//      and paid on or after it) less the accrued interest of every Future 30Y TIPS: the full annual
+//      coupons count the whole first coupon, of which the interest from settlement on is only the part
+//      after settlement;
+//   4. on the issue dates, the accrued interest of the Simulated Outstanding Future 30Y TIPS bought,
+//      whose first coupon is credited whole, less the accrued interest of the Cover Excess sold.
+// The identity holds whatever the market does. Terms 1, 3 and 4 depend on dates, coupons and whole-TIPS
+// rounding; term 1 is bounded by half a Cost per TIPS of each cover plus the quoted price against the
+// price from yield. Term 2 depends on the yields. Within a period between issue dates (settlement
+// first) a dirty price at yield y grows by G(y) = (1 + y/2)^(days/181) − 1 apart from the coupons it
+// pays (181 days is the shortest coupon period, so this is the most periods the days can span), so
+// term 2 is bounded, period by period, by
+//   Cover Excess dirty value × the largest |G(cover yield) − G(anchor yield)|
+//   + |Cover Excess dirty value − dirty value of the Synthetic TIPS not yet issued| × G(largest yield)
+//   + the coupons both pay in the period × G(largest yield).
+// Run on the market yields and on every yield shifted by −50 bp and +50 bp, for DARA $20,000, $100,000
+// and $400,000, flat and variable, and every last year from the first Future 30Y year to the ladder's
+// last year at most of that market.
+console.log('\nFuture 30Y: the three amounts credited against the full annual coupons, over the years of the rebalances');
+{
+  const S = settlementDate, SY = S.getFullYear();
+  const aiPerTips = (b, ir, date) => {
+    const { accrued, nextCoupon } = accruedInterest(b.coupon ?? 0, date, b.maturity);
+    return nextCoupon && +nextCoupon === +date ? 0 : accrued / 100 * ir * 1000;   // on a coupon date the buyer takes none of that coupon
+  };
+  const cleanPerTips = (b, ir, date) => priceFromYield(b.yield, b.coupon ?? 0, date, b.maturity) / 100 * ir * 1000;
+  const couponsPaid = (b, ir, a, z) => couponSchedule(a, b.maturity).filter(d => d > a && d <= z && d < b.maturity).length * 1000 * ir * (b.coupon ?? 0) / 2;
+  const G = (y, days) => Math.pow(1 + y / 2, days / 181) - 1;
+  const shiftMarket = (bp) => {
+    if (!bp) return tipsMarketData;
+    const m = new Map();
+    for (const [k, b] of tipsMarketData) {
+      if (b.yield == null || !b.maturity || b.maturity <= S) { m.set(k, b); continue; }
+      const y = b.yield + bp;
+      m.set(k, { ...b, yield: y, price: priceFromYield(y, b.coupon ?? 0, S, b.maturity), saYield: b.saYield == null ? null : b.saYield + bp });
     }
-    credited = parts.sim + parts.cov + parts.net;
-    const pct = 100 * (credited - fullCoupons) / fullCoupons;
-    assert(`DARA ${dara / 1000}K to ${lastYear}: three amounts within 2% of the full annual coupons, ${firstYear}–${lastIssueYear} (${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%)`,
-      Math.abs(credited - fullCoupons) <= 0.02 * fullCoupons, true);
-    console.log(`        simulated $${Math.round(parts.sim).toLocaleString()} + Cover Excess $${Math.round(parts.cov).toLocaleString()} + Net Cash $${Math.round(parts.net).toLocaleString()} = $${Math.round(credited).toLocaleString()}  vs full coupons $${Math.round(fullCoupons).toLocaleString()}`);
+    return m;
+  };
+  const pct = (x, base) => `${x >= 0 ? '+' : ''}${(100 * x / base).toFixed(1)}%`;
+
+  for (const bp of [-0.005, 0, 0.005]) {
+    const market = shiftMarket(bp);
+    const shiftLabel = bp ? `yields ${bp > 0 ? '+' : '−'}50 bp` : 'market yields';
+    const limit = future30yLimit({ tipsMarketData: market, settlementDate: S, refCPI, bondHolidays });
+    const { lowerCoverBond: L, upperCoverBond: U, maxTipsYear } = limit.covers;
+    const irL = indexRatio(refCPI, L.datedDateRefCpi ?? refCPI), irU = indexRatio(refCPI, U.datedDateRefCpi ?? refCPI);
+    const coverPair = [[L, irL], [U, irU]];
+    let cases = 0, worstIdentity = 0, worstShareOfBound = 0;
+    const identityMiss = [], roundingMiss = [], returnMiss = [];
+    console.log(`        ${shiftLabel}: lower cover ${L.maturity.getFullYear()}, upper cover ${U.maturity.getFullYear()}, ladder’s last year at most ${limit.lastYearMax}; DARA $100,000 flat, as % of one year’s full coupons:`);
+    for (let lastYear = maxTipsYear + 1; lastYear <= limit.lastYearMax; lastYear++) {
+      for (const dara of [20000, 100000, 400000]) {
+        for (const variable of [false, true]) {
+          const label = `${lastYear} DARA ${dara / 1000}K ${variable ? 'variable' : 'flat'}`;
+          const daraByYear = variable ? new Map(Array.from({ length: lastYear - SY + 1 }, (_, i) => [SY + i, dara * (i % 2 ? 0.7 : 1.3)])) : null;
+          const { summary } = runBuild({ dara, firstYear: SY, lastYear, tipsMarketData: market, refCPI, settlementDate: S, bondHolidays, daraByYear });
+          const conv = summary.future30yRebalances.conversions;
+          const bd = summary.future30yParams.breakdown;
+          const row = new Map(bd.map(r => [r.year, r]));
+          const syn = (year) => ({ yield: row.get(year).synYld, coupon: row.get(year).synCpn, maturity: new Date(year, 1, 15) });
+          const ya = bd[0].synYld;
+          const lastIssueYear = Math.max(...conv.map(c => c.issueYear));
+          const oneYear = bd.reduce((s, r) => s + r.qty * 1000 * r.synCpn, 0);   // one year's full coupons of every Future 30Y TIPS
+
+          let credited = 0, full = 0;
+          for (let t = SY; t <= lastIssueYear; t++) {
+            credited += (summary.future30ySimulatedInterestByYear.get(t) ?? 0) + (summary.future30yCoverInterestByYear.get(t) ?? 0) + (summary.future30yNetCashByYear.get(t) ?? 0);
+            for (const d of [new Date(t, 1, 15), new Date(t, 7, 15)]) if (d > S) full += oneYear / 2;
+          }
+
+          const dates = [S, ...conv.map(c => c.issueDate)];
+          const held = [[summary.future30yLowerExQty, summary.future30yUpperExQty], ...conv.map(c => [c.lowerQtyAfter, c.upperQtyAfter])];
+          // 1. Cover Excess at settlement less the cost of the Synthetic TIPS.
+          const synCost = bd.reduce((s, r) => s + r.qty * cleanPerTips(syn(r.year), 1, S), 0);
+          const t1 = coverPair.reduce((s, [b, ir], i) => s + held[0][i] * cleanPerTips(b, ir, S), 0) - synCost;
+          const t1Bound = coverPair.reduce((s, [b, ir], i) => {
+            const quoted = (b.price ?? 0) / 100 * ir * 1000;
+            return s + quoted / 2 + held[0][i] * Math.abs(cleanPerTips(b, ir, S) - quoted);
+          }, 0);
+          // 2. Return of the Cover Excess less the return of the Future 30Y TIPS, period by period, and its bound.
+          let t2 = 0, t2Bound = 0;
+          const yMax = Math.max(L.yield, U.yield, ya);
+          for (let p = 0; p < conv.length; p++) {
+            const a = dates[p], z = dates[p + 1], days = daysBetween(a, z);
+            let wCov = 0, rCov = 0, cCov = 0, gapMax = 0;
+            coverPair.forEach(([b, ir], i) => {
+              const q = held[p][i], dA = cleanPerTips(b, ir, a) + aiPerTips(b, ir, a), dZ = cleanPerTips(b, ir, z) + aiPerTips(b, ir, z), c = couponsPaid(b, ir, a, z);
+              wCov += q * dA; rCov += q * (dZ - dA + c); cCov += q * c;
+              gapMax = Math.max(gapMax, Math.abs(G(b.yield, days) - G(ya, days)));
+            });
+            let wSyn = 0, rSyn = 0, cSyn = 0;
+            for (const c of conv.slice(p)) {
+              const b = syn(c.year), q = row.get(c.year).qty;
+              const dA = cleanPerTips(b, 1, a) + aiPerTips(b, 1, a), dZ = cleanPerTips(b, 1, z) + aiPerTips(b, 1, z), cp = couponsPaid(b, 1, a, z);
+              wSyn += q * dA; rSyn += q * (dZ - dA + cp); cSyn += q * cp;
+            }
+            t2 += rCov - rSyn;
+            t2Bound += wCov * gapMax + Math.abs(wCov - wSyn) * G(yMax, days) + (cCov + cSyn) * G(yMax, days);
+          }
+          // 3. At settlement: accrued interest of the Cover Excess, with a coupon dated before settlement
+          //    and paid on or after it, less the accrued interest of every Future 30Y TIPS.
+          const settlementYearCoupon = (b, ir) => couponSchedule(new Date(SY, 0, 1), b.maturity)
+            .filter(d => d <= S && d.getFullYear() === SY && d < b.maturity && actualPaymentDate(d, bondHolidays) >= S).length * 1000 * ir * (b.coupon ?? 0) / 2;
+          const t3 = coverPair.reduce((s, [b, ir], i) => s + held[0][i] * (aiPerTips(b, ir, S) + settlementYearCoupon(b, ir)), 0)
+            - bd.reduce((s, r) => s + r.qty * aiPerTips(syn(r.year), 1, S), 0);
+          // 4. On the issue dates: accrued interest of the Simulated Outstanding Future 30Y TIPS bought less that of the Cover Excess sold.
+          let t4 = 0;
+          conv.forEach((c, j) => {
+            t4 += row.get(c.year).qty * aiPerTips(syn(c.year), 1, c.issueDate);
+            coverPair.forEach(([b, ir], i) => { t4 -= (held[j][i] - held[j + 1][i]) * aiPerTips(b, ir, c.issueDate); });
+          });
+
+          const delta = credited - full;
+          const residual = Math.abs(delta - (t1 + t2 + t3 + t4));
+          cases++;
+          worstIdentity = Math.max(worstIdentity, residual);
+          if (!(residual <= 0.01)) identityMiss.push(`${label} $${residual.toFixed(2)}`);
+          if (!(Math.abs(t1) <= t1Bound)) roundingMiss.push(`${label} $${t1.toFixed(0)} > $${t1Bound.toFixed(0)}`);
+          if (!(Math.abs(t2) <= t2Bound)) returnMiss.push(`${label} $${t2.toFixed(0)} > $${t2Bound.toFixed(0)}`);
+          if (t2Bound > 0) worstShareOfBound = Math.max(worstShareOfBound, Math.abs(t2) / t2Bound);
+          if (dara === 100000 && !variable) {
+            console.log(`          ${lastYear}: three amounts less full coupons ${pct(delta, oneYear)} = term 1 ${pct(t1, oneYear)} + term 2 ${pct(t2, oneYear)} (bound ${(100 * t2Bound / oneYear).toFixed(1)}%) + term 3 ${pct(t3, oneYear)} + term 4 ${pct(t4, oneYear)}`);
+          }
+        }
+      }
+    }
+    assert(`${shiftLabel}: in ${cases} ladders, the three amounts less the full annual coupons equal the four amounts worked out here (worst $${worstIdentity.toFixed(4)}${identityMiss.length ? '; ' + identityMiss.slice(0, 3).join(', ') : ''})`, identityMiss.length, 0);
+    assert(`${shiftLabel}: term 1 lies within half a Cost per TIPS of each cover, plus the quoted price against the price from yield (${roundingMiss.length} outside${roundingMiss.length ? ': ' + roundingMiss.slice(0, 3).join(', ') : ''})`, roundingMiss.length, 0);
+    assert(`${shiftLabel}: term 2 lies within its bound from the yields of the covers and the anchor (largest ${(100 * worstShareOfBound).toFixed(0)}% of the bound${returnMiss.length ? '; ' + returnMiss.slice(0, 3).join(', ') : ''})`, returnMiss.length, 0);
   }
 }
 
