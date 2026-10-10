@@ -102,8 +102,9 @@ A test does not hardcode which year is the structural gap, which TIPS is the act
 or where the ladder ends — those shift as Treasury issues. `tests/ladder-fixtures.js`'s `ladderRoles`
 derives the gap, the active lower bracket (the latest-maturing TIPS before the gap), the upper
 bracket, and the last maturity year from the outstanding TIPS themselves, each run; Build/Rebalance
-tests read those derived roles rather than a written-in year. The Future 30Y cover pair, the Maximum Future 30Y Rungs and the ladder's last year are derived from the market too, and a
-test asserts each against DD §5.1.
+tests read those derived roles rather than a written-in year. The Future 30Y cover pair, the Maximum Future 30Y Rungs and the ladder's last year are derived from the market too: a
+test derives each a second way, independently of the code under test, and asserts the two agree. No market-derived value is
+written into a spec or compared with a literal in a test, so a change in the market never fails a test by itself.
 
 Two Treasury issue dates change this structure and are worth knowing about when a test starts
 failing for no apparent reason: the January 2027 auction of the Jan 2037 10-year narrows the

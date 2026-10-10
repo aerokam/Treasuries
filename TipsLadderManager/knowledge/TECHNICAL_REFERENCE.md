@@ -11,7 +11,7 @@ This document maps conceptual definitions from the [Master Glossary](../../knowl
 | REFCPI_CUSIP | `scripts/fetchRefCpi.js#CUSIP` | `912810FD5` (used for fetching daily Ref CPI) |
 | MIN_BRACKET_YEAR | `LOWEST_LOWER_BRACKET_YEAR` | `2032` (defines the search range for the lower bracket) |
 | LOWER_COVER_YIELD | `src/ladder-core.js#LOWER_COVER_YIELD` | `0.04`, the yield at which the Synthetic TIPS of the first Future 30Y year is measured when the Lower cover is chosen (DD §5.0) |
-| MAX_LAST_YEAR | `src/ladder-core.js#maxLastYear` | Longest-dated issued TIPS maturity year + the Maximum Future 30Y Rungs (DD §5.1), which is `2063` as of 2026-10-06. It is the upper bound of the Last Year selector; the years after the longest issued maturity year are Future 30Y Rungs covered by the Cover Excess. |
+| MAX_LAST_YEAR | `src/ladder-core.js#maxLastYear` | Longest-dated issued TIPS maturity year + the Maximum Future 30Y Rungs (DD §5.1). It is the upper bound of the Last Year selector; the years after the longest issued maturity year are Future 30Y Rungs covered by the Cover Excess. |
 
 ---
 
