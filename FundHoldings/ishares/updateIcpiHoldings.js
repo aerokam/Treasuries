@@ -2,7 +2,6 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { parseCsv } from "../../shared/src/csv.js";
-import { upload } from "../../shared/upload.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.join(__dirname, "..", "data");
@@ -170,7 +169,6 @@ export async function updateIsharesHoldings(tickers) {
     saveFundMeta(ticker, { fundName, portfolioId, expenseRatio, secYield });
   }
 
-  await upload(FUND_META_PATH, "FundHoldings", "application/json");
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
