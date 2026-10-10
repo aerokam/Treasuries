@@ -171,6 +171,6 @@ practice; `console.error` is for real failures).
 
 ---
 
-## Pending — FundHoldings rename (2026-10-09, not yet executed)
+## Correction (2026-10-10) — FundHoldings rename
 
-`FundHoldings/updateAllHoldings.js`/`enrichHoldings.js` are being changed to write `data/<TICKER>-Raw.csv` (local only, not uploaded) and upload `FundHoldings/<TICKER>.csv` in place of the current `FundHoldings/Holdings-<TICKER>.csv` and `FundHoldings/Holdings-<TICKER>-Enriched.csv` pair — see [FundHoldings 1.0](../FundHoldings/knowledge/1.0_FundHoldings.md). No code has changed yet. Once `index.html` reads the new `<TICKER>.csv` objects, the sixteen old objects (one `Holdings-<TICKER>.csv`/`Holdings-<TICKER>-Enriched.csv` pair per ticker: VBIL, VTIP, VTP, RBIL, LTPZ, SCHP, XHLF, ICPI) become orphaned and should be deleted, each verified by a post-delete 404 fetch per this document's established practice.
+`FundHoldings/enrichHoldings.js` now writes and uploads one `FundHoldings/<TICKER>.csv` per fund; the raw per-provider fetch stays local as `data/<TICKER>-Raw.csv`, and the fetchers no longer upload `FundMeta.json` — see [FundHoldings 1.0](../FundHoldings/knowledge/1.0_FundHoldings.md). `index.html` reads only `<TICKER>.csv`. Deleted from R2 on 2026-10-10, each verified by a post-delete 404 fetch: the sixteen `Holdings-<TICKER>.csv`/`Holdings-<TICKER>-Enriched.csv` objects (one pair per ticker: VBIL, VTIP, VTP, RBIL, LTPZ, SCHP, XHLF, ICPI) and `FundHoldings/FundMeta.json`.
