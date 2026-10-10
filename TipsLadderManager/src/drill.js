@@ -166,9 +166,9 @@ function future30yInterestFmla(sim, cov, net = 0, op = '+') {
 // Year and a Future 30Y Year; 5.0 §Popup Routing). `a` is one entry of summary.syntheticYearAmounts.
 function syntheticYearAmountRows(a) {
   const isGap = a.kind === 'gap';
-  const tips  = isGap ? 'Synthetic TIPS' : 'Simulated Outstanding Future 30Y TIPS';
   const pi    = a.qty * a.piPerBond;
-  let rows = row('Quantity', 'quantity of its ' + tips + ' sized in Pass 1', a.qty, false, undefined, 'qty')
+  const durLink = '<a class="info-link" data-popup="' + (isGap ? 'duration' : 'future30yDuration') + '" style="border-bottom:1px dotted #94a3b8;color:inherit;text-decoration:none;">' + (isGap ? 'Gap Dur' : 'Future 30Y Dur') + '</a>';
+  let rows = row('Quantity', 'From duration match calculations: see ' + durLink, a.qty, false, undefined, 'qty')
     + row('P+I per TIPS', '$1,000 \xd7 (1 + coupon ' + fd(a.synCpn * 100, 3) + '% \xf7 2), index ratio 1.00000', fm2(a.piPerBond), false, undefined, 'pipb')
     + row('P+I', '<span class="formula-var" data-source="pipb">P+I per TIPS</span> \xd7 <span class="formula-var" data-source="qty">Quantity</span>', fm(pi), false, undefined, 'pi')
     + row('Later maturity interest (LMI)', isGap

@@ -1330,7 +1330,17 @@ test('build: gap year and Future 30Y year rows show a drillable Amount; excess r
     await expect(page.locator('#drill-overlay')).toBeVisible({ timeout: 4_000 });
     await expect(page.locator('#drill-content')).toContainText(y === gap[0] ? 'Synthetic TIPS' : 'Simulated Outstanding Future 30Y TIPS');
     await expect(page.locator('#drill-content')).toContainText('DARA');
-    await page.locator('#drill-close').click();
+    // The Quantity line points to the duration match popup and names no pass (5.0 §Popup Routing).
+    const popupName = y === gap[0] ? 'duration' : 'future30yDuration';
+    const popupTitle = y === gap[0] ? 'Gap Dur' : 'Future 30Y Dur';
+    const qtyLine = page.locator('#drill-content tr', { hasText: 'Quantity' }).first();
+    await expect(qtyLine).toContainText('From duration match calculations: see ' + popupTitle);
+    await expect(qtyLine.locator(`a.info-link[data-popup="${popupName}"]`)).toHaveText(popupTitle);
+    const drillText = (await page.locator('#drill-content').textContent()) ?? '';
+    expect(drillText, `${y} Amount popup names no pass`).not.toMatch(/Pass [12]/);
+    await qtyLine.locator('a.info-link').click();
+    await expect(page.locator('#shared-popup'), `the ${popupTitle} link opens its popup`).toBeVisible();
+    await page.keyboard.press('Escape');                                    // closes the popup and the drill overlay
     await expect(page.locator('#drill-overlay')).not.toBeVisible();
   }
 
