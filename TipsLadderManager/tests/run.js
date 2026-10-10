@@ -9,7 +9,7 @@ import { computeBeforeState, detectBracketFlags, heldYearMedianExcluding } from 
 import { remainingCouponPaymentsThisYear, rmdCappedRemainingCoupons, latestRemainingCouponDate, future30yLimit, maxLastYear, selectFuture30yCovers, LOWER_COVER_YIELD } from '../src/ladder-core.js';
 import { bracketWeights, bracketWeightsN, syntheticCoupon } from '../src/gap-math.js';
 import { findSpikes, smoothCurve } from '../src/shape-math.js';
-import { buildDurationPopupRows, buildBracketWeightDrill, buildFuture30yDurationPopupRows } from '../src/drill.js';
+import { buildDurationPopupRows, buildBracketWeightDrill, buildFuture30yDurationPopupRows, buildGapYearDurationDrill, buildFuture30yYearDurationDrill, buildFuture30yLMIDrill, buildSyntheticPIDrill } from '../src/drill.js';
 import { rankForYear, levelValues } from '../src/allocation-policy.js';
 import { runBuild } from '../src/build-lib.js';
 import { parseBrokerCSV } from '../src/broker-import.js';
@@ -3230,6 +3230,55 @@ console.log('\nFuture 30Y Dur popup — cost-weighted average, computed match, c
     hit.excess < ara[Y_SPIKE] - medianBaseline, true);
   assert('and the gap between the two baselines is material, not rounding',
     hit.curve - medianBaseline > 0.05 * 40000, true);
+}
+
+// The year section of the Gap Dur and Future 30Y Dur popups (5.0 §Quantity, cost and duration in one
+// section). Every number it shows comes from the year's breakdown entry, and each is checked here against
+// a second derivation that does not use the code under test: the Quantity from the quotient before
+// rounding, the Cost from the quoted price per 100, the LMI of a Future 30Y year from the annual interest
+// of the later years, and the Quantity against the Amount popup's source (syntheticYearAmounts).
+{
+  console.log('');
+  console.log('Gap Dur and Future 30Y Dur popups — the year section calculates Quantity, Cost and Cost per TIPS');
+  const { summary: s } = runBuild({ dara: 20000, firstYear: GAP.first - 1, lastYear: MAX_YEAR + 4, tipsMarketData, refCPI, settlementDate, preLadderInterest: true });
+  const text = rows => rows.map(r => (r.label ?? '') + ' ' + (r.html ?? '') + ' ' + (r.value ?? '')).join(' | ');
+  const stripTags = h => h.replace(/<[^>]*>/g, '');
+  for (const [kind, params, drillFn] of [['gap', s.gapParams, buildGapYearDurationDrill], ['future30y', s.future30yParams, buildFuture30yYearDurationDrill]]) {
+    const bd = params.breakdown;
+    assert(kind + ': the run has years to check', bd.length > 0, true);
+    for (const b of bd) {
+      const tag = kind + ' ' + b.year;
+      assert(tag + ': Quantity is the quotient before rounding, rounded, not below 0', b.qty, Math.max(0, Math.round(b.qtyExact)));
+      assert(tag + ': the quotient times P+I per TIPS is DARA less LMI and the pre-ladder credit', b.qtyExact * b.piPerBond, b.dara - b.laterMatInt - (b.pliCredit ?? 0), 1e-6);
+      assert(tag + ': Cost per TIPS is price per 100 times 1,000 over 100', b.costPerBond, b.synPrice * 1000 / 100, 1e-9);
+      assert(tag + ': Cost is Quantity times Cost per TIPS', b.cost, b.qty * b.costPerBond, 1e-9);
+      assert(tag + ': the Amount popup reads the same Quantity', s.syntheticYearAmounts[b.year].qty, b.qty);
+
+      const rows = drillFn(s, b.year);
+      const html = rows.find(r => r.html)?.html ?? '';
+      assert(tag + ': the section opens with the Quantity, Cost and Cost per TIPS formulas', rows[0].heading, 'Quantity, Cost and Cost per TIPS');
+      const shown = stripTags(html);
+      assert(tag + ': the section shows the Quantity', shown.includes(String(b.qty)), true);
+      assert(tag + ': the section shows the quotient before rounding', shown.includes(b.qtyExact.toFixed(2)) || b.qtyExact < 0, true);
+      assert(tag + ': variable names come before the numbers', html.indexOf('(DARA') >= 0 && html.indexOf('(DARA') < html.indexOf('$'), true);
+      const pre = kind === 'gap' ? 'gap' : 'f30';
+      assert(tag + ': P+I per TIPS is a link', html.includes('data-l3="' + pre + 'pi-' + b.year + '"'), true);
+      assert(tag + ': LMI is a link', html.includes('data-l3="' + pre + 'lmi-' + b.year + '"'), true);
+      assert(tag + ': the pre-ladder credit is a link exactly when there is one', html.includes('data-l3="plcpool:'), (b.pliCredit ?? 0) > 0);
+      assert(tag + ': the Modified Duration follows the three formulas', text(rows).indexOf('Modified duration') > text(rows).indexOf('Cost per TIPS'), true);
+    }
+  }
+
+  // Future 30Y LMI: the annual interest of the Synthetic TIPS of the later years, a second derivation.
+  const f = s.future30yParams.breakdown;
+  for (const b of f) {
+    const fromLater = f.filter(x => x.year > b.year).reduce((a, x) => a + x.qty * 1000 * x.synCpn, 0);
+    assert('future30y ' + b.year + ': LMI is the annual interest of the later years\' Synthetic TIPS', b.laterMatInt, fromLater, 1e-6);
+    const rows = buildFuture30yLMIDrill(s, b.year);
+    const listed = rows.filter(r => r.label !== 'Later Maturity Interest (LMI)' && r.value).reduce((a, r) => a + Number(String(r.value).replace(/[^0-9.-]/g, '')), 0);
+    assert('future30y ' + b.year + ': the LMI drill lists the later years and totals to the LMI', Math.abs(listed - Math.round(b.laterMatInt)) <= f.length, true);
+    assert('future30y ' + b.year + ': the P+I drill returns the P+I per TIPS', buildSyntheticPIDrill(s, b.year, 'future30y').at(-1).value, '$' + b.piPerBond.toFixed(2));
+  }
 }
 
 console.log(`\n${passed + failed} tests: ${passed} passed, ${failed} failed`);

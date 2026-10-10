@@ -141,6 +141,7 @@
   .drill-l3:hover { background: #e8f5f5 !important; }
   .formula-var { cursor: help; border-bottom: 1px dashed #94a3b8; }
   .formula-var:hover { color: #1a56db; border-bottom-style: solid; }
+  [data-hl-side="sec"] { cursor: help; }
 
   /* ── Bracket/cover year hover explainer ── */
   #bracket-tooltip { position: fixed; z-index: 500; max-width: 380px; background: #1e293b; color: #f1f5f9;
@@ -710,7 +711,7 @@ import { evenSpread, inferShapeValue } from './src/shape-math.js';
 import { runBuild } from './src/build-lib.js';
 import { maxLastYear } from './src/ladder-core.js';
 import { renderTable, COLS } from './src/render.js';
-import { buildDrillHTML, buildDurationPopupRows, buildWeightedDurationPopupRows, buildWeightedYieldPopupRows, buildWeightedSaYieldPopupRows, buildFuture30yDurationPopupRows, buildIndexRatioDrill, buildRefCpiDrill, buildPIPerBondDrill, buildPreLadderPoolDrill, buildTradeTicketCostDrill, buildTradeTicketAccruedDrill, buildTradeTicketTotalDrill, buildCashFlowDateDrill, buildCashFlowEventDrill, buildGapYearDurationDrill, buildFuture30yYearDurationDrill, buildBracketWeightDrill, buildSyntheticPIDrill, buildSyntheticLMIDrill } from './src/drill.js';
+import { buildDrillHTML, buildDurationPopupRows, buildWeightedDurationPopupRows, buildWeightedYieldPopupRows, buildWeightedSaYieldPopupRows, buildFuture30yDurationPopupRows, buildIndexRatioDrill, buildRefCpiDrill, buildPIPerBondDrill, buildPreLadderPoolDrill, buildTradeTicketCostDrill, buildTradeTicketAccruedDrill, buildTradeTicketTotalDrill, buildCashFlowDateDrill, buildCashFlowEventDrill, buildGapYearDurationDrill, buildFuture30yYearDurationDrill, buildBracketWeightDrill, buildSyntheticPIDrill, buildSyntheticLMIDrill, buildFuture30yLMIDrill } from './src/drill.js';
 import { showPopup, hidePopup } from './src/popup.js';
 import { makeDraggableResizable } from './src/modal.js';
 import { rankForYear } from './src/allocation-policy.js';
@@ -4203,7 +4204,7 @@ document.addEventListener('mouseover', e => {
   const target = e.target.closest('.formula-var');
   if (!target) return;
   const sourceId = target.dataset.source;
-  const container = target.closest('#drill-content, #shared-popup, #shared-popup-l3');
+  const container = target.closest('#drill-content, #shared-popup, #shared-popup-l3, #shared-popup-l4');
   if (!sourceId || !container) return;
   const sourceRow = container.querySelector('[data-row-id="' + sourceId + '"]')?.closest('tr');
   if (!sourceRow) return;
@@ -4211,8 +4212,20 @@ document.addEventListener('mouseover', e => {
   sourceRow.lastElementChild.classList.add('source-highlight');
 });
 document.addEventListener('mouseout', e => {
-  if (!e.target.closest('.formula-var')) return;
+  if (!e.target.closest('.formula-var, [data-hl]')) return;
   document.querySelectorAll('.source-highlight').forEach(el => el.classList.remove('source-highlight'));
+});
+
+// A number in the list of years in the Gap Dur and Future 30Y Dur popups and the formula in the year's
+// section that calculates it share a data-hl key; hovering one side highlights the other side, across
+// the two popups (5.0 §Quantity, cost and duration in one section).
+document.addEventListener('mouseover', e => {
+  const target = e.target.closest('[data-hl]');
+  if (!target) return;
+  const popups = '#shared-popup, #shared-popup-l3, #shared-popup-l4';
+  if (!target.closest(popups)) return;
+  document.querySelectorAll(popups.split(', ').map(p => p + ' [data-hl="' + target.dataset.hl + '"]').join(', '))
+    .forEach(el => { if (el.dataset.hlSide !== target.dataset.hlSide) el.classList.add('source-highlight'); });
 });
 
 let _currentDrillData = null, _currentDrillColKey = null;
@@ -4285,6 +4298,14 @@ document.addEventListener('click', e => {
       const year = parseInt(key.slice(7), 10);
       const summary = currentMode === 'build' ? buildSummary : rebalSummary;
       showPopup(drillL3, 'Later Maturity Interest (LMI) · ' + year, buildSyntheticLMIDrill(summary, year), 'LMI');
+    } else if (key.startsWith('f30pi-')) {
+      const year = parseInt(key.slice(6), 10);
+      const summary = currentMode === 'build' ? buildSummary : rebalSummary;
+      showPopup(drillL3, 'P+I per Synthetic TIPS · ' + year, buildSyntheticPIDrill(summary, year, 'future30y'), 'P+I');
+    } else if (key.startsWith('f30lmi-')) {
+      const year = parseInt(key.slice(7), 10);
+      const summary = currentMode === 'build' ? buildSummary : rebalSummary;
+      showPopup(drillL3, 'Later Maturity Interest (LMI) · ' + year, buildFuture30yLMIDrill(summary, year), 'LMI');
     } else if (key.startsWith('f30dur-')) {
       const year = parseInt(key.slice(7), 10);
       const summary = currentMode === 'build' ? buildSummary : rebalSummary;

@@ -44,6 +44,22 @@ function wtLink(which, inner) {
   return '<span class="drill-l3" data-l3="bracketwt-' + which + '" style="cursor:pointer;text-decoration:underline dotted #94a3b8;">' + inner + '</span>';
 }
 
+// A link to the calculation of a number (a nested drill, 5.0 §Nested (Level-3) drills).
+function l3Link(key, text) {
+  return '<span class="drill-l3" data-l3="' + key + '" style="cursor:pointer;text-decoration:underline dotted #94a3b8;">' + text + '</span>';
+}
+
+// Hover pairs between the list of years in the Gap Dur and Future 30Y Dur popups and a year's section
+// (5.0 §Quantity, cost and duration in one section). A number in the list and the formula that
+// calculates it share a key; hovering either one highlights the other (index.html, the data-hl
+// listener, which reuses the source-highlight class of the formula-var mechanism).
+function listNum(key, text) {
+  return '<span class="formula-var" data-hl="' + key + '" data-hl-side="list">' + text + '</span>';
+}
+function secNum(key, text) {
+  return '<span data-hl="' + key + '" data-hl-side="sec">' + text + '</span>';
+}
+
 function bondVarRows(d, nPeriods, principalPerBond, couponPct) {
   const matMonthName = d.maturityStr.split(' ')[0];
   const matMonthIdx = MONTHS.indexOf(matMonthName);
@@ -93,11 +109,11 @@ function gapBreakdownRows(gapParams, dara, opts) {
     const yearDara = g.dara ?? dara;
     let fmla;
     if (compact) {
-      const lmiSpan = '<span class="drill-l3" data-l3="gaplmi-' + g.year + '" style="cursor:pointer;text-decoration:underline dotted #94a3b8;">' + fm(g.laterMatInt) + '</span>';
-      const piSpan = '<span class="drill-l3" data-l3="gappi-' + g.year + '" style="cursor:pointer;text-decoration:underline dotted #94a3b8;">' + fm2(g.piPerBond) + '</span>';
+      const lmiSpan = l3Link('gaplmi-' + g.year, fm(g.laterMatInt));
+      const piSpan = l3Link('gappi-' + g.year, fm2(g.piPerBond));
       fmla = 'round((' + fm(yearDara) + ' \u2212 ' + lmiSpan;
       if (pliCredit > 0) {
-        const pliSpan = '<span class="drill-l3" data-l3="plcpool:' + Math.round(pliCredit) + '" style="cursor:pointer;text-decoration:underline dotted #94a3b8;">' + fm(pliCredit) + '</span>';
+        const pliSpan = l3Link('plcpool:' + Math.round(pliCredit), fm(pliCredit));
         fmla += ' \u2212 ' + pliSpan;
       }
       fmla += ') \u00f7 ' + piSpan + ')';
@@ -1083,9 +1099,10 @@ export function buildDurationPopupRows(summary, mode) {
         ? '<span class="drill-l3" data-l3="gapdur-' + b.year + '" style="cursor:pointer;text-decoration:underline dotted #94a3b8;">' + yr + '</span>'
         : yr;
       const note = b.qty != null && b.costPerBond != null
-        ? b.qty.toLocaleString() + ' \u00d7 ' + fd(b.costPerBond, 2) + ' = ' + fd(b.cost, 0) + ' cost'
+        ? 'Quantity ' + listNum('qty-' + b.year, b.qty.toLocaleString()) + ' \u00d7 Cost per TIPS ' + listNum('cpt-' + b.year, fd(b.costPerBond, 2))
+          + ' = Cost ' + listNum('cost-' + b.year, Math.round(b.cost).toLocaleString())
         : undefined;
-      rows.push({ label, note, value: b.dur != null ? b.dur.toFixed(2) : '\u2014' });
+      rows.push({ label, note, value: b.dur != null ? listNum('dur-' + b.year, b.dur.toFixed(2)) : '\u2014' });
     });
     rows.push({
       label: 'Weighted by cost',
@@ -1224,9 +1241,10 @@ export function buildFuture30yDurationPopupRows(summary) {
         ? '<span class="drill-l3" data-l3="f30dur-' + b.year + '" style="cursor:pointer;text-decoration:underline dotted #94a3b8;">' + yr + '</span>'
         : yr;
       const note = b.qty != null && b.costPerBond != null
-        ? b.qty.toLocaleString() + ' × ' + fd(b.costPerBond, 2) + ' = ' + fd(b.cost, 0) + ' cost'
+        ? 'Quantity ' + listNum('qty-' + b.year, b.qty.toLocaleString()) + ' × Cost per TIPS ' + listNum('cpt-' + b.year, fd(b.costPerBond, 2))
+          + ' = Cost ' + listNum('cost-' + b.year, Math.round(b.cost).toLocaleString())
         : 'mod. duration';
-      rows.push({ label, note, value: b.dur != null ? f2(b.dur) : '—' });
+      rows.push({ label, note, value: b.dur != null ? listNum('dur-' + b.year, f2(b.dur)) : '—' });
     });
     rows.push({
       label: 'Weighted by cost',
@@ -1293,7 +1311,7 @@ export function buildFuture30yDurationPopupRows(summary) {
   if (future30yParams.breakdown?.length) {
     rows.push({ sep: true }, { heading: 'Future 30Y Year Breakdown (theoretical qty)' });
     future30yParams.breakdown.forEach(b => {
-      rows.push({ label: b.year + ' qty', note: 'round((' + fm(b.dara) + ' − ' + Math.round(b.laterMatInt) + ') ÷ ' + b.piPerBond.toFixed(2) + ')', value: String(b.qty) });
+      rows.push({ label: b.year + ' qty', note: 'round((' + fm(b.dara) + ' − ' + l3Link('f30lmi-' + b.year, fm(b.laterMatInt)) + ') ÷ ' + l3Link('f30pi-' + b.year, fm2(b.piPerBond)) + ')', value: String(b.qty) });
     });
     rows.push({ label: 'Total Future 30Y cost', value: '$' + Math.round(future30yParams.future30yTotalCost).toLocaleString(), total: true });
   }
@@ -1309,7 +1327,7 @@ function fmtDate(d) {
 // schedule, day-count fractions (E/DSC/w), per-period cash flows/PVs, Macaulay sum, then
 // Modified duration. `durDetail`/`dur` come straight from gap-math.js's breakdown entry
 // (calculateDurationDetail, shared/src/bond-math.js) — never recomputed here.
-function macaulayWalkRows(durDetail, dur) {
+function macaulayWalkRows(durDetail, dur, hlKey) {
   const rows = [
     { heading: 'Macaulay Duration' },
     { label: 'Next coupon date', value: fmtDate(durDetail.nextCpn) },
@@ -1326,23 +1344,67 @@ function macaulayWalkRows(durDetail, dur) {
     { label: 'Macaulay duration', note: 'Σ(t × PV) ÷ Σ(PV) ÷ 2', value: fd(durDetail.macaulay, 4) + ' yr', total: true },
     { sep: true },
     { heading: 'Modified Duration' },
-    { label: 'Modified duration', note: 'Macaulay ÷ (1 + yield ÷ 2)', value: fd(dur, 4), total: true }
+    { label: secNum(hlKey, 'Modified duration'), note: secNum(hlKey, 'Macaulay ÷ (1 + yield ÷ 2)'), value: secNum(hlKey, fd(dur, 4)), total: true }
   );
   return rows;
+}
+
+// The Quantity, the Cost and the Cost per TIPS of one year's Synthetic TIPS, ahead of its Modified
+// Duration in the year's section (5.0 §Quantity, cost and duration in one section). Each formula
+// shows its variable names first, then the numbers. P+I per TIPS, LMI and the pre-ladder credit are
+// links to their calculations (gappi, gaplmi and plcpool for a gap year; f30pi and f30lmi for a Future
+// 30Y year, which has no pre-ladder credit). Every number is read from the year's entry in the
+// breakdown of gapParams or future30yParams (gap-math.js), the entry the Amount popup of the same
+// year reads; nothing is calculated here.
+function yearCalcRows(kind, b) {
+  const isGap = kind === 'gap';
+  const y = b.year;
+  const pli = isGap ? (b.pliCredit ?? 0) : 0;
+  const fv = (src, text) => '<span class="formula-var" data-source="' + src + '">' + text + '</span>';
+  const calcRow = (id, key, label, names, numbers, note, value) => {
+    const hl = ' data-hl="' + key + '" data-hl-side="sec"';
+    return '<tr>'
+      + '<td data-row-id="' + id + '" style="padding:3px 16px 3px 0;white-space:nowrap;vertical-align:top;font-weight:600;">' + label + '</td>'
+      + '<td' + hl + ' style="padding:3px 14px;font-size:11px;color:#334155;vertical-align:top;white-space:normal;">'
+        + '<div>' + names + '</div><div style="margin-top:2px;">' + numbers + '</div>'
+        + (note ? '<div style="font-size:10px;margin-top:2px;">' + note + '</div>' : '') + '</td>'
+      + '<td' + hl + ' style="padding:3px 0 3px 14px;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;vertical-align:top;font-weight:700;">' + value + '</td>'
+      + '</tr>';
+  };
+  const qtyNames = '(DARA \u2212 ' + 'LMI' + (pli > 0 ? ' \u2212 Pre-ladder credit' : '') + ') \xf7 P+I per TIPS';
+  const qtyNumbers = '(' + fm(b.dara) + ' \u2212 ' + l3Link((isGap ? 'gaplmi-' : 'f30lmi-') + y, fm(b.laterMatInt))
+    + (pli > 0 ? ' \u2212 ' + l3Link('plcpool:' + Math.round(pli), fm(pli)) : '')
+    + ') \xf7 ' + l3Link((isGap ? 'gappi-' : 'f30pi-') + y, fm2(b.piPerBond))
+    + (b.qtyExact == null ? ' = ' + b.qty
+      : ' = ' + fd(b.qtyExact, 2) + (b.qtyExact < 0 ? ', minimum 0' : ', rounded to ' + b.qty));
+  const rows = calcRow('yqty', 'qty-' + y, 'Quantity', qtyNames, qtyNumbers, '', String(b.qty))
+    + calcRow('ycost', 'cost-' + y, 'Cost', fv('yqty', 'Quantity') + ' \xd7 ' + fv('ycpt', 'Cost per TIPS'),
+        b.qty + ' \xd7 ' + fm2(b.costPerBond) + ' = ' + fm(b.cost), '', fm(b.cost))
+    + calcRow('ycpt', 'cpt-' + y, 'Cost per TIPS', 'price per 100 \xd7 1,000 \xf7 100',
+        fd(b.synPrice, 4) + ' \xd7 1,000 \xf7 100 = ' + fm2(b.costPerBond),
+        'price per 100 computed from the yield (' + fd(b.synYld * 100, 3) + '%) and coupon (' + fd(b.synCpn * 100, 3) + '%) of the Synthetic TIPS', fm2(b.costPerBond));
+  return [
+    { heading: 'Quantity, Cost and Cost per TIPS' },
+    { html: '<table style="border-collapse:collapse;width:100%">' + rows + '</table>' },
+  ];
 }
 
 // Level-3 drill for the P+I of one synthetic Gap-year TIPS (5.0 §Nested (Level-3) drills,
 // key `gappi-<year>`). Gap-year synthetic TIPS always carry a Feb maturity, which falls in the
 // Jan–Jun bucket and so receives exactly one coupon payment in the maturity year (TIPS_Basics.md
 // §Last-Year Interest) — half the annual synthetic coupon rate shown in the Gap Year Duration drill.
-export function buildSyntheticPIDrill(summary, year) {
-  const g = summary?.gapParams?.breakdown?.find(b => b.year === year);
+// kind is 'gap' (key gappi-<year>, Synthetic TIPS maturing Jan 15) or 'future30y' (key f30pi-<year>,
+// maturing Feb 15); both fall in the Jan–Jun bucket.
+export function buildSyntheticPIDrill(summary, year, kind = 'gap') {
+  const isGap = kind === 'gap';
+  const g = (isGap ? summary?.gapParams : summary?.future30yParams)?.breakdown?.find(b => b.year === year);
   if (!g) return [{ label: 'No data', total: true }];
   const couponInterest = 1000 * g.synCpn / 2;
+  const mo = isGap ? 'Jan' : 'Feb';
   return [
     { label: 'Principal', note: 'synthetic TIPS auctioned at par — par value used as the approximation for principal at auction', value: '$1,000.00' },
-    { label: 'Synthetic coupon (annual rate)', note: 'see Gap Year Duration ↗', value: fd(g.synCpn * 100, 3) + '%' },
-    { label: 'Interest: from Feb coupon', note: '$1,000 × ' + fd(g.synCpn * 100, 3) + '% ÷ 2 — Feb maturity falls in the Jan–Jun bucket, which gets one coupon payment in the maturity year', value: '$' + fd(couponInterest, 2) },
+    { label: 'Synthetic coupon (annual rate)', note: isGap ? 'see Gap Year Duration ↗' : 'see Future 30Y Duration ↗', value: fd(g.synCpn * 100, 3) + '%' },
+    { label: 'Interest: from ' + mo + ' coupon', note: '$1,000 × ' + fd(g.synCpn * 100, 3) + '% ÷ 2 — ' + mo + ' maturity falls in the Jan–Jun bucket, which gets one coupon payment in the maturity year', value: '$' + fd(couponInterest, 2) },
     { sep: true },
     { label: 'P+I per synthetic TIPS', value: '$' + fd(g.piPerBond, 2), total: true }
   ];
@@ -1359,19 +1421,39 @@ export function buildSyntheticLMIDrill(summary, year) {
   const g = gapParams?.breakdown?.find(b => b.year === year);
   if (!g) return [{ label: 'No data', total: true }];
   const longerYears = gapParams.breakdown.filter(gy => gy.year > year).sort((a, b) => b.year - a.year);
-  const fromSynthetic = longerYears.reduce((s, gy) => s + gy.qty * 1000 * gy.synCpn, 0);
+  const fromSynthetic = longerYears.reduce((s, gy) => s + gy.annualInt, 0);
   const fromActual = Math.max(0, g.laterMatInt - fromSynthetic);
   const rows = [];
   if (longerYears.length) {
     rows.push({ heading: 'Synthetic interest from longer gap years' });
     longerYears.forEach(gy => {
-      rows.push({ label: gy.year + ' synthetic coupon', note: gy.qty + ' × $1,000 × ' + fd(gy.synCpn * 100, 3) + '%', value: '$' + Math.round(gy.qty * 1000 * gy.synCpn).toLocaleString() });
+      rows.push({ label: gy.year + ' synthetic coupon', note: gy.qty + ' × $1,000 × ' + fd(gy.synCpn * 100, 3) + '%', value: '$' + Math.round(gy.annualInt).toLocaleString() });
     });
     rows.push({ label: 'Subtotal', value: '$' + Math.round(fromSynthetic).toLocaleString(), total: true });
     rows.push({ sep: true });
   }
   rows.push({ label: 'Coupon interest from TIPS maturing after 2039', value: '$' + Math.round(fromActual).toLocaleString() });
   rows.push({ sep: true });
+  rows.push({ label: 'Later Maturity Interest (LMI)', value: '$' + Math.round(g.laterMatInt).toLocaleString(), total: true });
+  return rows;
+}
+
+// Level-3 drill for the LMI of one Future 30Y year (key f30lmi-<year>): the annual interest of the
+// Synthetic TIPS of each later Future 30Y year, which are the only source of LMI past the longest issued
+// TIPS (2.0 §Future 30Y Simulated Outstanding TIPS; gap-math.js future30yParamsCore).
+export function buildFuture30yLMIDrill(summary, year) {
+  const params = summary?.future30yParams;
+  const g = params?.breakdown?.find(b => b.year === year);
+  if (!g) return [{ label: 'No data', total: true }];
+  const longerYears = params.breakdown.filter(fy => fy.year > year).sort((a, b) => b.year - a.year);
+  const rows = [];
+  if (longerYears.length) {
+    rows.push({ heading: 'Annual interest of the later Future 30Y years' });
+    longerYears.forEach(fy => {
+      rows.push({ label: fy.year + ' Synthetic TIPS', note: fy.qty + ' × $1,000 × ' + fd(fy.synCpn * 100, 3) + '%', value: '$' + Math.round(fy.annualInt).toLocaleString() });
+    });
+    rows.push({ sep: true });
+  }
   rows.push({ label: 'Later Maturity Interest (LMI)', value: '$' + Math.round(g.laterMatInt).toLocaleString(), total: true });
   return rows;
 }
@@ -1387,6 +1469,8 @@ export function buildGapYearDurationDrill(summary, year) {
   if (!b || !anchors || !b.durDetail) return [{ label: 'No data', total: true }];
   const synMat = new Date(year, 0, 15);
   return [
+    ...yearCalcRows('gap', b),
+    { sep: true },
     { heading: 'Yield Interpolation' },
     { label: 'Most recently issued 10-year TIPS', note: fmtDate(anchors.before.maturity), value: fd(anchors.before.yield * 100, 3) + '%' },
     { label: 'Feb 2040 TIPS', note: fmtDate(anchors.after.maturity), value: fd(anchors.after.yield * 100, 3) + '%' },
@@ -1397,7 +1481,7 @@ export function buildGapYearDurationDrill(summary, year) {
     { heading: 'Synthetic Coupon' },
     { label: 'Synthetic coupon', note: 'MAX(0.125%, FLOOR(yield × 100 ÷ 0.125) × 0.125%)', value: fd(b.synCpn * 100, 3) + '%', total: true },
     { sep: true },
-    ...macaulayWalkRows(b.durDetail, b.dur),
+    ...macaulayWalkRows(b.durDetail, b.dur, 'dur-' + year),
   ];
 }
 
@@ -1411,6 +1495,8 @@ export function buildFuture30yYearDurationDrill(summary, year) {
   if (!b || !anchorBond || !b.durDetail) return [{ label: 'No data', total: true }];
   const synMat = new Date(year, 1, 15);
   return [
+    ...yearCalcRows('future30y', b),
+    { sep: true },
     { heading: 'Anchor Yield' },
     { label: 'Most recently issued 30-year TIPS', note: fmtDate(anchorBond.maturity) + ' — used directly (flat-curve assumption, no second anchor)', value: fd(b.synYld * 100, 3) + '%', total: true },
     { label: 'Target date', value: fmtDate(synMat) },
@@ -1418,6 +1504,6 @@ export function buildFuture30yYearDurationDrill(summary, year) {
     { heading: 'Synthetic Coupon' },
     { label: 'Synthetic coupon', note: 'MAX(0.125%, FLOOR(yield × 100 ÷ 0.125) × 0.125%)', value: fd(b.synCpn * 100, 3) + '%', total: true },
     { sep: true },
-    ...macaulayWalkRows(b.durDetail, b.dur),
+    ...macaulayWalkRows(b.durDetail, b.dur, 'dur-' + year),
   ];
 }
