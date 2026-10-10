@@ -80,7 +80,7 @@ The rule picks the longest modified duration at or below that of the first Synth
 
 Measuring the first Synthetic TIPS at a fixed yield of 4% instead of the market yield gives 17.35, which fixes the target and leaves only the covers' durations to move. The Lower cover is then the 2046 (16.80), with a margin of 0.55 years. It would change only if the 2047's duration fell below 17.35 or the 2046's rose above it, which takes yield moves of more than 100 bp.
 
-The choice costs nothing. For a Lower cover of 2048, 2047 or 2046 with the 2052 as Upper cover, the Maximum Future 30Y Rungs is 7 in every case (the match is reached to a last year of 2063 and missed from 2064), the Net Cash total to 2063 is $56K, $58K and $58K, and the credit with Net Cash is 99% to 100% of the full annual coupons of every Future 30Y TIPS over the years of the rebalances, for a last year of 2059 or later.
+The choice costs nothing. For a Lower cover of 2048, 2047 or 2046 with the 2052 as Upper cover, the Maximum Future 30Y Rungs is 7 in every case (the match is reached to a last year of 2063 and missed from 2064), the Net Cash total to 2063 is $56K, $58K and $58K, and the credit with Net Cash differs from the full annual coupons of every Future 30Y TIPS by the amounts in section 3 in every case.
 
 | First Synthetic TIPS yield | Duration | Lower cover | Margin in years |
 |---|---|---|---|

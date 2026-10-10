@@ -349,6 +349,10 @@ per-CUSIP prices for a past date (3.1 §4.0).
   anchor yield — 2.0 §Future 30Y Rungs) appears in no popup. The only way to recover it is to back
   it out of the displayed P+I: 1,014.38 implies 2 × 14.38 = 2.876%, against an actual 2.875%.
 - **Status:** open.
+### Accrued interest on a coupon date: shared function returns a full coupon (to verify)
+
+- **Found 2026-10-10** while testing the Future 30Y credits. `accruedInterest` in `shared/src/bond-math.js` takes the next coupon on or after the settlement date, so on a coupon date the elapsed days equal the days in the period and it returns a full half-year coupon, where the convention is 0 on the coupon date. The Future 30Y test works around it. Not yet checked whether any caller settles on a coupon date, or whether the app intends the full coupon.
+
 ## FIXED
 
 ### inferFirstYearFromHoldings required the pre-gap anchor to be a January maturity
