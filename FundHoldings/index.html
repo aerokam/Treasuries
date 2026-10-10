@@ -204,7 +204,7 @@ async function loadFund(ticker) {
     return;
   }
   // File Layout (knowledge/1.0_FundHoldings.md): metadata header + row, table
-  // header, holdings rows, then the Total / Wtg Avg row, all computed by enrichHoldings.js.
+  // header, holdings rows, then the Total / Wtd Avg row, all computed by enrichHoldings.js.
   const lines = parseCsv(await res.text(), false);
   if (lines.length < 5) {
     content.innerHTML = `<div class="status">${ticker}: no holdings rows.</div>`;

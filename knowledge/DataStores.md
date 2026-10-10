@@ -266,13 +266,11 @@ The old `Treasuries/TipsRef.csv` key was consolidated away (see `R2_Cleanup.md`)
 **Update Frequency**: Daily, Local Windows Task `FundHoldings`, via `FundHoldings/updateAllHoldings.js` then `FundHoldings/enrichHoldings.js`.
 **R2 Key**: `FundHoldings/<TICKER>.csv` (its own top-level prefix, since a fund's holdings mix TIPS and nominal rows and so belong under neither `TIPS/` nor `Treasuries/`)
 
-**CSV columns** (exact header names, holdings table): `CUSIP, Holding Name, Maturity Date, Coupon, % of Fund, Market Value, Ask Yield, Term, Duration` — plus `SA Yield, SAO Yield` for a fund with TIPS holdings. These are the file's own headers; the [Vanguard Advisors (E7)](./DATA_DICTIONARY.md#e7)–[BlackRock iShares (E12)](./DATA_DICTIONARY.md#e12) entries name the same fields in the Data Dictionary's normalized form.
+**CSV columns** (exact header names, holdings table): `CUSIP, Description, Maturity Date, Coupon, % of Fund, Market Value, Ask Yield, Term, Duration` — plus `SA Yield, SAO Yield` for a fund with TIPS holdings. These are the file's own headers; the [Vanguard Advisors (E7)](./DATA_DICTIONARY.md#e7)–[BlackRock iShares (E12)](./DATA_DICTIONARY.md#e12) entries name the same fields in the Data Dictionary's normalized form.
 
-**Companion file**: `FundHoldings/FundMeta.json` = `{ @Ticker: { fundName, portId | etfId | cusip | portfolioId, expenseRatio, secYield } }`. `expenseRatio` and `secYield` are percent-scale numbers (`0.09` for 0.09%), each the provider's reported figure rather than an independently computed one. No longer read by the app, superseded by `<TICKER>.csv`'s metadata row; still written by each fetcher and not deleted.
+**Local companion file** (not uploaded): `FundHoldings/data/FundMeta.json` = `{ @Ticker: { fundName, portId | etfId | cusip | portfolioId, expenseRatio, secYield } }`. `expenseRatio` and `secYield` are percent-scale numbers (`0.09` for 0.09%), each the provider's reported figure rather than an independently computed one. Written by each fetcher and read by `enrichHoldings.js`, which writes its values into `<TICKER>.csv`'s metadata row.
 
 **Sources**: [Vanguard Advisors (E7)](./DATA_DICTIONARY.md#e7) Vanguard, [fminvest.com (E8)](./DATA_DICTIONARY.md#e8) fminvest.com, [PIMCO (E9)](./DATA_DICTIONARY.md#e9) PIMCO, [Schwab Asset Management holdings export (E10)](./DATA_DICTIONARY.md#e10) Schwab, [BondBloxx product-page holdings table (E11)](./DATA_DICTIONARY.md#e11) BondBloxx, [BlackRock iShares (E12)](./DATA_DICTIONARY.md#e12) BlackRock iShares. Per-fund detail: [FundHoldings 1.0](../FundHoldings/knowledge/1.0_FundHoldings.md).
-
-**Live Data**: [View FundMeta.json](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/FundHoldings/FundMeta.json)
 
 ---
 
