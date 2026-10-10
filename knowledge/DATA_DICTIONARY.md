@@ -504,7 +504,7 @@ Displayed as **Amount**, and as **Real Amount** where a fuller header fits. The 
 
 <a id="excess-tips"></a>
 ### Excess TIPS
-`Excess_TIPS` = *The TIPS a [Bracket Year](#bracket-year) holds for duration matching. The quantity follows from that bracket year’s [Bracket Weight](#bracket-weight), which the duration match determines. Named for the bracket year they serve: **excess lower bracket year TIPS**, **excess 2036 TIPS**.*
+`Excess_TIPS` = *The TIPS a [Bracket Year](#bracket-year) holds for duration matching. The quantity follows from that bracket year’s [Bracket Weight](#bracket-weight), which the duration match determines. Named for the bracket year they serve: **excess lower bracket year TIPS**, **excess 2040 TIPS**.*
 
 <a id="cover-year"></a>
 ### Cover Year
@@ -674,7 +674,7 @@ Some values are true only until Treasury issues more TIPS. Left inline as approx
 | Ladder’s last year, at most | Longest issued maturity year + Maximum Future 30Y Rungs | derived from market data each run | The Maximum Future 30Y Rungs changes, or a new 30-year TIPS is issued |
 | Lower cover | The lower [Cover Year TIPS](#cover-year-tips): the outstanding TIPS with the longest modified duration at or below that of the Synthetic TIPS of the first Future 30Y year alone, measured at `LOWER_COVER_YIELD` | derived from market data each run | Another outstanding TIPS comes within reach of the duration at `LOWER_COVER_YIELD`, or a new 30-year TIPS is issued |
 | Upper cover | The upper Cover Year TIPS: the outstanding TIPS with the longest modified duration, excluding the lower cover | derived from market data each run | Yields change, or a new 30-year TIPS is issued |
-| Active lower bracket | [Active Lower Bracket](#active-lower-bracket) — latest outstanding maturity before the first gap year | Jul 2036 | The next pre-gap maturity is issued |
+| Active lower bracket | [Active Lower Bracket](#active-lower-bracket) — latest outstanding maturity before the first gap year | derived from market data each run | The next pre-gap maturity is issued |
 
 `LOWEST_LOWER_BRACKET_YEAR` = 2032 *(floor of the holdings search range for [retained bracket excess](#retained-bracket-excess): only maturity years in `[LOWEST_LOWER_BRACKET_YEAR, minGapYear)` are considered. Matches `rebalance-lib.js`.)*
 `LOWER_COVER_YIELD` = 4% *(the yield at which the Synthetic TIPS of the first Future 30Y year is measured when the Lower cover (§5.1) is chosen. A fixed yield above the market yield keeps the choice from changing with each day's yield; the durations of the covers barely move with yield, while the duration of that Synthetic TIPS moves with it. [Research](../TipsLadderManager/research/Future_30Y_Cover_Excess_Analysis.md).)*
