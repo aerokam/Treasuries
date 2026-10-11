@@ -19,6 +19,10 @@ export function interpolateYield(anchorBefore, anchorAfter, targetDate) {
 // Counted in whole eighths (yield × 800) with a tolerance far below any quoted yield's precision:
 // in floating point 0.03625 × 100 / 0.125 is 28.999999999999996, so a plain FLOOR dropped one eighth
 // at exactly 3.625% and 7.25%. Dividing the whole count by 800 gives the double nearest the eighth.
+// DD §Synthetic TIPS: the Index Ratio of a Synthetic TIPS is taken as 1.00000. Carried on each breakdown
+// entry so the popups show the figure the cost used.
+export const SYNTHETIC_INDEX_RATIO = 1;
+
 const EIGHTHS_PER_UNIT = 800;
 const EIGHTH_COUNT_TOLERANCE = 1e-9;
 export function syntheticCoupon(yld) {
@@ -216,12 +220,12 @@ export function gapParamsCore({ gapYears, tipsMarketData, settlementDate, dara, 
     // when the real yield is positive, and above 100 when a negative yield meets the 0.125%
     // coupon floor. 2.0 §Synthetic TIPS for Gap Years.
     const synPrice = priceFromYield(synYld, synCpn, settlementDate, synMat) ?? 100;
-    const costPerBond = 1000 * synPrice / 100;
+    const costPerBond = 1000 * synPrice * SYNTHETIC_INDEX_RATIO / 100;
     const cost = qty * costPerBond;
     totalCost += cost;
     // annualInt: the annual interest of this year's Synthetic TIPS, which every shorter year's LMI includes.
     const annualInt = qty * 1000 * synCpn;
-    breakdown.push({ year, qty, qtyExact, piPerBond, laterMatInt, pliCredit: pliCreditByGapYear[year] ?? 0, dara: yearDara, dur: synDur, synYld, synCpn, synPrice, costPerBond, cost, annualInt, durDetail });
+    breakdown.push({ year, qty, qtyExact, piPerBond, laterMatInt, pliCredit: pliCreditByGapYear[year] ?? 0, dara: yearDara, dur: synDur, synYld, synCpn, synPrice, indexRatio: SYNTHETIC_INDEX_RATIO, costPerBond, cost, annualInt, durDetail });
     runningSynLMI += annualInt;
     count++;
   }
@@ -313,10 +317,10 @@ export function future30yParamsCore({ future30yYears, anchorBond, settlementDate
     // Priced as a security issued today off the anchor yield and the synthetic coupon, not
     // assumed to be par — same rule as the gap synthetics (2.0 §Future 30Y Rungs).
     const synPrice = priceFromYield(anchorYield, synCoupon, settlementDate, mat) ?? 100;
-    const costPerBond = 1000 * synPrice / 100;
+    const costPerBond = 1000 * synPrice * SYNTHETIC_INDEX_RATIO / 100;
     const cost = qty * costPerBond;
     const annualInt = qty * 1000 * synCoupon;   // annual interest of this year's Synthetic TIPS, part of every shorter year's LMI
-    breakdown.push({ year, qty, qtyExact, piPerBond, laterMatInt: runningLMI, dara: yearDara, dur, synYld: anchorYield, synCpn: synCoupon, synPrice, costPerBond, cost, annualInt, durDetail });
+    breakdown.push({ year, qty, qtyExact, piPerBond, laterMatInt: runningLMI, dara: yearDara, dur, synYld: anchorYield, synCpn: synCoupon, synPrice, indexRatio: SYNTHETIC_INDEX_RATIO, costPerBond, cost, annualInt, durDetail });
     runningLMI += annualInt;
     future30yTotalCost += cost;
   }
