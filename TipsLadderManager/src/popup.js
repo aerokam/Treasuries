@@ -10,13 +10,11 @@
 //   { prose: string }                  — a paragraph of explanatory text, wrapped to a readable
 //                                        measure rather than the popup's full width
 //
-// Three instances, all draggable/resizable per the app-wide standard (modal.js):
+// Two instances, both draggable/resizable per the app-wide standard (modal.js):
 // `primary` opens from table cells / info-links; `secondary` opens when the triggering
 // anchor is itself inside the primary popup (a nested "Level 3" drill, e.g. clicking a gap
 // year inside the Gap Duration popup) — so drilling into one item doesn't close the popup
-// you drilled down from, and you can click through several nested items in a row. `tertiary`
-// opens when the anchor is inside the secondary popup (a link in a year's section, e.g. its LMI),
-// so following that link leaves the section it came from open.
+// you drilled down from, and you can click through several nested items in a row.
 
 import { makeDraggableResizable } from './modal.js';
 
@@ -149,38 +147,23 @@ function _makeInstance(id, zIndex) {
       el.querySelector('.sp-body').innerHTML = _renderTable(rows);
       el.style.display = 'flex';
 
-      // Position: a nested popup opens beside the popup it drilled from, so the numbers there stay
-      // visible (the list of years and its hover pairs, 5.0 §Quantity, cost and duration in one
-      // section); otherwise below the anchor. Clamped to the viewport.
+      // Position: below anchor, clamped to viewport
       const ar = anchorEl.getBoundingClientRect();
       const pw = el.offsetWidth, ph = el.offsetHeight;
       let left = ar.left;
       let top  = ar.bottom + 6;
-      const parent = inst.parentEl && inst.parentEl.style.display !== 'none' ? inst.parentEl.getBoundingClientRect() : null;
-      if (parent) {
-        if (parent.right + 8 + pw <= window.innerWidth - 8) { left = parent.right + 8; top = parent.top; }
-        else if (parent.left - 8 - pw >= 8) { left = parent.left - 8 - pw; top = parent.top; }
-        else if (parent.width + 8 + pw <= window.innerWidth - 16) {
-          // no room on either side of it: the popup it drilled from moves to the left edge, and this one opens to its right
-          inst.parentEl.style.left = '8px';
-          left = 8 + parent.width + 8; top = parent.top;
-        }
-      }
-      if (top + ph > window.innerHeight - 8) top = Math.max(8, parent ? window.innerHeight - ph - 8 : ar.top - ph - 6);
+      if (top + ph > window.innerHeight - 8) top = Math.max(8, ar.top - ph - 6);
       left = Math.min(left, window.innerWidth - pw - 8);
       left = Math.max(8, left);
       el.style.left = left + 'px';
       el.style.top  = top  + 'px';
     },
-    parentEl: null,   // the popup this one drilled from, set by showPopup
   };
   return inst;
 }
 
 const primary   = _makeInstance('shared-popup', 400);
 const secondary = _makeInstance('shared-popup-l3', 401); // renders above primary when both are open
-const tertiary  = _makeInstance('shared-popup-l4', 402); // renders above secondary when both are open
-const _instances = [primary, secondary, tertiary];
 
 // A drag or resize that starts on a popup and ends past its edge still fires a click, and that
 // click’s target is the nearest common ancestor of press and release — the document body. That
@@ -188,33 +171,29 @@ const _instances = [primary, secondary, tertiary];
 // what decides, not where it ended.
 let _pressStartedInside = false;
 document.addEventListener('mousedown', e => {
-  _pressStartedInside = _instances.some(i => i.el.contains(e.target));
+  _pressStartedInside = primary.el.contains(e.target) || secondary.el.contains(e.target);
 }, true);
 
-// Outside-click closes an instance, but a click landing in *another* instance never counts
-// as "outside" — so clicking inside a nested popup never closes the one it drilled down from,
-// and vice versa.
+// Outside-click closes an instance, but a click landing in the *other* instance never counts
+// as "outside" — so clicking inside the nested (secondary) popup never closes the primary one
+// it drilled down from, and vice versa.
 document.addEventListener('click', e => {
   if (_pressStartedInside) { _pressStartedInside = false; return; }
-  if (_instances.some(i => i.el.contains(e.target))) return;
-  for (const i of [tertiary, secondary]) {
-    if (i.el.style.display !== 'none' && e.target !== i.openAnchor) i.hide();
-  }
-  if (primary.el.style.display !== 'none' && e.target !== primary.openAnchor) hidePopup();
+  if (secondary.el.style.display !== 'none' && !secondary.el.contains(e.target)
+      && !primary.el.contains(e.target) && e.target !== secondary.openAnchor) secondary.hide();
+  if (primary.el.style.display !== 'none' && !primary.el.contains(e.target)
+      && !secondary.el.contains(e.target) && e.target !== primary.openAnchor) hidePopup();
 }, true);
 
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') hidePopup();
 });
 
-export function hidePopup() { tertiary.hide(); secondary.hide(); primary.hide(); }
+export function hidePopup() { secondary.hide(); primary.hide(); }
 
 export function showPopup(anchorEl, title, rowsOrBuilder, breadcrumb, initialToggleVal) {
-  // The anchor's level is the instance it sits in; the popup opens one level deeper (the deepest
-  // instance reuses itself), and any deeper popup drilled from the old content is closed.
-  const anchorLevel = anchorEl ? _instances.findIndex(i => i.el.contains(anchorEl)) : -1;
-  const level = Math.min(anchorLevel + 1, _instances.length - 1);
-  for (let k = level + 1; k < _instances.length; k++) _instances[k].hide();
-  _instances[level].parentEl = level > 0 ? _instances[level - 1].el : null;
-  _instances[level].show(anchorEl, title, rowsOrBuilder, breadcrumb, initialToggleVal);
+  const nested = !!(anchorEl && primary.el.contains(anchorEl));
+  if (!nested) secondary.hide(); // a fresh primary popup invalidates any nested popup drilled from the old one
+  const inst = nested ? secondary : primary;
+  inst.show(anchorEl, title, rowsOrBuilder, breadcrumb, initialToggleVal);
 }
