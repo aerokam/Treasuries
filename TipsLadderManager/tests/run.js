@@ -3265,7 +3265,8 @@ console.log('\nFuture 30Y Dur popup — cost-weighted average, computed match, c
       const trOf = id => html.split('<tr').find(seg => seg.includes('data-row-id="' + id + '"')) ?? '';
       const yearRow = trOf('ydur-' + b.year), priceRow = trOf('ycpt-' + b.year);
       const derivation = 'data-l3="' + pre + 'dur-' + b.year + '"';
-      assert(tag + ': the Price links to the derivation', priceRow.includes(derivation), true);
+      assert(tag + ': the Price is plain text, the Cost per TIPS row has no link', priceRow.includes('drill-l3'), false);
+      assert(tag + ': the Price is displayed in the Cost per TIPS row', stripTags(priceRow).includes('(' + b.synPrice.toFixed(4) + ' ÷ 100)'), true);
       // The year row carries the Modified Duration: year label, the words, then the number, in that order and in one row.
       const yearRowText = stripTags(yearRow);
       assert(tag + ': the year row reads year, Modified Duration, number', yearRowText.replace(/^[^>]*>/, '').trim(),

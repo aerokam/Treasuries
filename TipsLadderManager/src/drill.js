@@ -1271,8 +1271,8 @@ function macaulayWalkRows(durDetail, dur) {
 // The year rows of the list in the Gap Dur and Future 30Y Dur popups (5.0 §Duration Disclosure
 // Standards). Each year shows its Modified Duration in the row of the year, then its Quantity, Cost per
 // TIPS and Cost, every formula with its variable names first and then the numbers. LMI, P+I per TIPS and
-// the pre-ladder credit are links to their calculations; Price, the Modified Duration and the row of the
-// year link to the derivation of the yield and coupon the Price is computed from. The total cost and the Weighted by cost row
+// the pre-ladder credit are links to their calculations; the Modified Duration and the row of the year
+// link to the derivation of the duration (the Price is plain text, explained by the note under its equation). The total cost and the Weighted by cost row
 // follow, and their numbers pair on hover with the Cost and Modified Duration of each year. Every number
 // is read from the year's entry in the breakdown of gapParams or future30yParams (gap-math.js), the
 // entry the Amount popup of the same year reads; nothing is calculated here.
@@ -1314,7 +1314,7 @@ function synthYearListRows(kind, params, heading) {
     return head
       + calcRow('yqty-' + y, 'Quantity', qtyNames, qtyNumbers, '', String(b.qty))
       + calcRow('ycpt-' + y, 'Cost per TIPS', '(Price \xf7 100) \xd7 Index Ratio \xd7 1,000',
-          '(' + (b.durDetail ? l3Link(drillKey, price) : price) + ' \xf7 100) \xd7 ' + fd(b.indexRatio, 5) + ' \xd7 1,000 = ' + fm2(b.costPerBond),
+          '(' + price + ' \xf7 100) \xd7 ' + fd(b.indexRatio, 5) + ' \xd7 1,000 = ' + fm2(b.costPerBond),
           'Price computed from the Yield (' + fd(b.synYld * 100, 3) + '%) and the Coupon Rate (' + fd(b.synCpn * 100, 3) + '%) of the Synthetic TIPS, whose Index Ratio is taken as ' + fd(b.indexRatio, 5),
           fm2(b.costPerBond))
       + calcRow('ycost-' + y, 'Cost', fv('yqty-' + y, 'Quantity') + ' \xd7 ' + fv('ycpt-' + y, 'Cost per TIPS'),

@@ -2596,7 +2596,7 @@ for (const { kind, dara, pli } of [{ kind: 'gap', dara: '80000', pli: true }, { 
     await expect(list.locator('[data-row-id="yqty-' + years[0] + '"]')).toHaveClass(/source-highlight/);
     await page.mouse.move(0, 0);
 
-    // Links to the calculations: LMI, P+I per TIPS, the Pre-ladder credit, and the Price to the derivation of the yield and coupon.
+    // Links to the calculations: LMI, P+I per TIPS, the Pre-ladder credit, and the Modified Duration to the derivation of the yield, coupon and duration.
     const nested = page.locator('#shared-popup-l3');
     const year = isGap ? gap[0] : years[0];
     const qrow = rowOf('yqty-' + year);
@@ -2613,8 +2613,11 @@ for (const { kind, dara, pli } of [{ kind: 'gap', dara: '80000', pli: true }, { 
       await expect(nested).toContainText('Pre-ladder pool composition');
       expect(moneyOf((await nested.innerText()).match(/Applied to this year[\s\S]*?(\$[\d,]+)\s*$/m)[1])).toBe(amounts[2]);
     }
-    await rowOf('ycpt-' + year).locator('.drill-l3[data-l3="' + pre + 'dur-' + year + '"]').click();
-    await expect(nested, 'the Price opens the derivation of the yield and coupon').toContainText(isGap ? 'Yield Interpolation' : 'Anchor Yield');
+    expect(await rowOf('ycpt-' + year).locator('.drill-l3').count(), 'the Price is plain text: the Cost per TIPS row has no link').toBe(0);
+    await nested.locator('#sp-close').click();
+    await expect(nested).toBeHidden();
+    await rowOf('ydur-' + year).locator('span.drill-l3').click();
+    await expect(nested, 'the Modified Duration opens the derivation of the yield, coupon and duration').toContainText(isGap ? 'Yield Interpolation' : 'Anchor Yield');
     await expect(nested).toContainText('Synthetic Coupon');
     const derivation = await nested.innerText();
     expect(derivation, 'the derivation shows the duration only, as before').not.toMatch(/Cost per TIPS|Quantity/);
@@ -2638,7 +2641,7 @@ for (const { kind, dara, pli } of [{ kind: 'gap', dara: '80000', pli: true }, { 
       const before = await opens();
       await target.click();
       await expect(nested, what + ' opens the derivation').toContainText(isGap ? 'Yield Interpolation' : 'Anchor Yield');
-      expect(await nested.innerText(), what + ' opens the same derivation as the Price').toBe(derivation);
+      expect(await nested.innerText(), what + ' opens the same derivation as the Modified Duration number').toBe(derivation);
       await expect(list, 'the list stays open under the derivation').toBeVisible();
       await page.waitForTimeout(150);
       expect((await opens()) - before, what + ' opens the derivation once').toBe(1);
