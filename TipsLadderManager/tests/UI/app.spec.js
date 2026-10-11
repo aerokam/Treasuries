@@ -2428,8 +2428,8 @@ test('build: gap-years-only ladder lists funded years in ascending order, bracke
 });
 
 // ── Year rows of the Gap Dur and Future 30Y Dur popups (5.0 §Duration Disclosure Standards) ──
-// The list of years calculates each year's Quantity, Cost per TIPS and Cost in the list itself, with the Modified Duration
-// beside them; there is no separate breakdown section. Every year is checked against a recomputation from the numbers the
+// The list of years shows each year's Modified Duration in the row of the year and calculates its Quantity, Cost per TIPS and Cost in the list itself;
+// there is no separate breakdown section. Every year is checked against a recomputation from the numbers the
 // rows display, never against a literal, and its Quantity against the Amount popup of the same year.
 const dollarAmounts = s => [...s.matchAll(/\$([\d,]+(?:\.\d+)?)/g)].map(m => Number(m[1].replace(/,/g, '')));
 const moneyOf = s => Number(s.replace(/[^0-9.-]/g, ''));
@@ -2479,10 +2479,19 @@ for (const { kind, dara, pli } of [{ kind: 'gap', dara: '80000', pli: true }, { 
       const why = (s) => kind + ' ' + year + ': ' + s;
       const q = await cells('yqty-' + year), c = await cells('ycpt-' + year), k = await cells('ycost-' + year), d = await cells('ydur-' + year);
 
-      // Order: Quantity, Cost per TIPS, Cost, Modified Duration.
+      // Order: the year row (with the Modified Duration), Quantity, Cost per TIPS, Cost.
       const ys = [];
-      for (const id of ['yqty-', 'ycpt-', 'ycost-', 'ydur-']) ys.push((await rowOf(id + year).boundingBox()).y);
-      expect(ys, why('Quantity, Cost per TIPS, Cost, Modified Duration run top to bottom')).toEqual([...ys].sort((x, y) => x - y));
+      for (const id of ['ydur-', 'yqty-', 'ycpt-', 'ycost-']) ys.push((await rowOf(id + year).boundingBox()).y);
+      expect(ys, why('the year row, Quantity, Cost per TIPS, Cost run top to bottom')).toEqual([...ys].sort((x, y) => x - y));
+      expect(await list.locator('td', { hasText: /^Modified Duration$/ }).count(), why('Modified Duration is not a row of its own')).toBe(years.length);
+
+      // The Modified Duration is in the row of the year: year label, the words, the number.
+      const yearTds = rowOf('ydur-' + year).locator('td');
+      expect(await yearTds.count(), why('the year row has the three columns of the other rows')).toBe(3);
+      expect((await yearTds.nth(0).innerText()).trim(), why('the year label')).toBe(year + (isGap ? ' (Jan 15)' : ' (Feb 15)'));
+      expect((await yearTds.nth(1).innerText()).trim(), why('the words Modified Duration are in the middle column')).toBe('Modified Duration');
+      expect(d.value.trim(), why('the Modified Duration is a number to 2 decimals in the value column')).toMatch(/^\d+\.\d{2}$/);
+      expect(await yearTds.nth(2).evaluate(el => getComputedStyle(el).textAlign), why('the number is right-aligned')).toBe('right');
 
       // Variable names first, then the numbers.
       expect(q.names).toContain('DARA');
@@ -2530,9 +2539,12 @@ for (const { kind, dara, pli } of [{ kind: 'gap', dara: '80000', pli: true }, { 
       costs.push(costVal);
       durs.push(moneyOf(d.value));
 
-      // The year label opens the duration derivation, and nothing else is added behind it.
-      const label = list.locator('.drill-l3[data-l3="' + pre + 'dur-' + year + '"]').first();
-      await expect(label).toBeVisible();
+      // The number is the link to the duration derivation, the year label is not, and the row is clickable.
+      const numberLink = rowOf('ydur-' + year).locator('span.drill-l3[data-l3="' + pre + 'dur-' + year + '"]');
+      await expect(numberLink, why('one link in the year row, the Modified Duration')).toHaveCount(1);
+      expect((await numberLink.innerText()).trim(), why('the link is the Modified Duration number')).toBe(d.value.trim());
+      expect(await yearTds.nth(0).locator('.drill-l3').count(), why('the year label is not a link')).toBe(0);
+      await expect(rowOf('ydur-' + year), why('the row is a clickable row')).toHaveCSS('cursor', 'pointer');
     }
 
     // The total cost and the Weighted by cost row, from the displayed costs and durations.
@@ -2605,9 +2617,37 @@ for (const { kind, dara, pli } of [{ kind: 'gap', dara: '80000', pli: true }, { 
     await expect(nested, 'the Price opens the derivation of the yield and coupon').toContainText(isGap ? 'Yield Interpolation' : 'Anchor Yield');
     await expect(nested).toContainText('Synthetic Coupon');
     const derivation = await nested.innerText();
-    await list.locator('.drill-l3[data-l3="' + pre + 'dur-' + year + '"]').first().click();
-    expect(await nested.innerText(), 'the year label opens the same derivation').toBe(derivation);
     expect(derivation, 'the derivation shows the duration only, as before').not.toMatch(/Cost per TIPS|Quantity/);
+
+    // The Modified Duration number and the rest of its row open that same derivation, each once. The derivation is closed first, so
+    // that a click that did nothing could not pass for one that opened it.
+    await page.evaluate(() => {
+      window.__l3Opens = 0;
+      new MutationObserver(recs => { window.__l3Opens += recs.length; })
+        .observe(document.querySelector('#shared-popup-l3 .sp-title'), { childList: true });
+    });
+    const yrow = rowOf('ydur-' + year);
+    const opens = () => page.evaluate(() => window.__l3Opens);
+    for (const [what, target] of [
+      ['the Modified Duration number', yrow.locator('span.drill-l3')],
+      ['the year label', yrow.locator('td').nth(0)],
+      ['the words Modified Duration', yrow.locator('td').nth(1)],
+    ]) {
+      await nested.locator('#sp-close').click();
+      await expect(nested).toBeHidden();
+      const before = await opens();
+      await target.click();
+      await expect(nested, what + ' opens the derivation').toContainText(isGap ? 'Yield Interpolation' : 'Anchor Yield');
+      expect(await nested.innerText(), what + ' opens the same derivation as the Price').toBe(derivation);
+      await expect(list, 'the list stays open under the derivation').toBeVisible();
+      await page.waitForTimeout(150);
+      expect((await opens()) - before, what + ' opens the derivation once').toBe(1);
+    }
+    await nested.locator('#sp-close').click();
+    await expect(nested).toBeHidden();
+    await page.mouse.move(0, 0);
+    await yrow.locator('td').nth(0).hover();
+    await expect(yrow, 'hovering the row gives the hover feedback of the other clickable rows').toHaveCSS('background-color', 'rgb(232, 245, 245)');
 
     // The Amount popup of each year shows the same Quantity.
     await page.keyboard.press('Escape');

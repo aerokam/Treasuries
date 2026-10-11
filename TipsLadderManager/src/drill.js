@@ -53,7 +53,12 @@ function l3Link(key, text) {
 // place the Weighted by cost row and the total cost use it share a key; hovering either side
 // highlights the other (index.html, the data-hl listener, which reuses the source-highlight class of
 // the formula-var mechanism). side 'y' marks the number where it is calculated, 'w' where it is used.
-function hlNum(key, side, text) {
+// With a drillKey the number is also a link to that calculation (l3Link look, no dashed underline).
+function hlNum(key, side, text, drillKey) {
+  if (drillKey) {
+    return '<span class="drill-l3" data-l3="' + drillKey + '" data-hl="' + key + '" data-hl-side="' + side
+      + '" style="cursor:pointer;text-decoration:underline dotted #94a3b8;border-bottom:none;">' + text + '</span>';
+  }
   return '<span data-hl="' + key + '" data-hl-side="' + side + '">' + text + '</span>';
 }
 
@@ -1264,10 +1269,10 @@ function macaulayWalkRows(durDetail, dur) {
 }
 
 // The year rows of the list in the Gap Dur and Future 30Y Dur popups (5.0 §Duration Disclosure
-// Standards). Each year shows its Quantity, Cost per TIPS, Cost and Modified Duration, every formula
-// with its variable names first and then the numbers. LMI, P+I per TIPS and the pre-ladder credit are
-// links to their calculations, Price links to the derivation of the yield and coupon it is computed
-// from, and the year label opens that same derivation. The total cost and the Weighted by cost row
+// Standards). Each year shows its Modified Duration in the row of the year, then its Quantity, Cost per
+// TIPS and Cost, every formula with its variable names first and then the numbers. LMI, P+I per TIPS and
+// the pre-ladder credit are links to their calculations; Price, the Modified Duration and the row of the
+// year link to the derivation of the yield and coupon the Price is computed from. The total cost and the Weighted by cost row
 // follow, and their numbers pair on hover with the Cost and Modified Duration of each year. Every number
 // is read from the year's entry in the breakdown of gapParams or future30yParams (gap-math.js), the
 // entry the Amount popup of the same year reads; nothing is calculated here.
@@ -1292,7 +1297,13 @@ function synthYearListRows(kind, params, heading) {
     const pli = isGap ? (b.pliCredit ?? 0) : 0;
     const drillKey = (isGap ? 'gapdur-' : 'f30dur-') + y;
     const yr = y + (isGap ? ' (Jan 15)' : ' (Feb 15)');
-    const head = '<tr><td colspan="3" style="padding:8px 0 2px;font-weight:700;border-top:1px solid #e2e8f0;">' + (b.durDetail ? l3Link(drillKey, yr) : yr) + '</td></tr>';
+    // The year row carries the Modified Duration. The row opens the derivation of the duration, and so does the number in it.
+    const head = '<tr' + (b.durDetail ? ' class="drill-l3" data-l3="' + drillKey + '" style="cursor:pointer;"' : '') + '>'
+      + '<td data-row-id="ydur-' + y + '" style="padding:8px 16px 2px 0;white-space:nowrap;vertical-align:top;font-weight:700;border-top:1px solid #e2e8f0;">' + yr + '</td>'
+      + '<td style="padding:8px 14px 2px;font-size:11px;color:#334155;vertical-align:top;white-space:normal;border-top:1px solid #e2e8f0;">Modified Duration</td>'
+      + '<td style="padding:8px 0 2px 14px;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;vertical-align:top;font-weight:700;border-top:1px solid #e2e8f0;">'
+      + hlNum('dur-' + y, 'y', b.dur.toFixed(2), b.durDetail ? drillKey : undefined) + '</td>'
+      + '</tr>';
     const qtyNames = '(DARA − LMI' + (pli > 0 ? ' − Pre-ladder credit' : '') + ') \xf7 P+I per TIPS';
     const qtyNumbers = '(' + fm(b.dara) + ' − ' + l3Link((isGap ? 'gaplmi-' : 'f30lmi-') + y, fm(b.laterMatInt))
       + (pli > 0 ? ' − ' + l3Link('plcpool:' + Math.round(pli), fm(pli)) : '')
@@ -1307,8 +1318,7 @@ function synthYearListRows(kind, params, heading) {
           'Price computed from the Yield (' + fd(b.synYld * 100, 3) + '%) and the Coupon Rate (' + fd(b.synCpn * 100, 3) + '%) of the Synthetic TIPS, whose Index Ratio is taken as ' + fd(b.indexRatio, 5),
           fm2(b.costPerBond))
       + calcRow('ycost-' + y, 'Cost', fv('yqty-' + y, 'Quantity') + ' \xd7 ' + fv('ycpt-' + y, 'Cost per TIPS'),
-          b.qty + ' \xd7 ' + fm2(b.costPerBond) + ' = ' + fm(b.cost), '', hlNum('cost-' + y, 'y', fm(b.cost)))
-      + calcRow('ydur-' + y, 'Modified Duration', '', '', '', hlNum('dur-' + y, 'y', b.dur.toFixed(2)));
+          b.qty + ' \xd7 ' + fm2(b.costPerBond) + ' = ' + fm(b.cost), '', hlNum('cost-' + y, 'y', fm(b.cost)));
   };
   const costTerms = bd.map(b => hlNum('cost-' + b.year, 'w', fm(b.cost))).join(' + ');
   const table = '<table style="border-collapse:collapse;width:100%">'

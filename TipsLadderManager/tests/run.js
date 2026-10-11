@@ -3262,7 +3262,20 @@ console.log('\nFuture 30Y Dur popup — cost-weighted average, computed match, c
       assert(tag + ': the Amount popup reads the same Quantity', s.syntheticYearAmounts[b.year].qty, b.qty);
       assert(tag + ': LMI is a link', html.includes('data-l3="' + pre + 'lmi-' + b.year + '"'), true);
       assert(tag + ': P+I per TIPS is a link', html.includes('data-l3="' + pre + 'pi-' + b.year + '"'), true);
-      assert(tag + ': the Price links to the derivation', html.includes('data-l3="' + pre + 'dur-' + b.year + '"'), true);
+      const trOf = id => html.split('<tr').find(seg => seg.includes('data-row-id="' + id + '"')) ?? '';
+      const yearRow = trOf('ydur-' + b.year), priceRow = trOf('ycpt-' + b.year);
+      const derivation = 'data-l3="' + pre + 'dur-' + b.year + '"';
+      assert(tag + ': the Price links to the derivation', priceRow.includes(derivation), true);
+      // The year row carries the Modified Duration: year label, the words, then the number, in that order and in one row.
+      const yearRowText = stripTags(yearRow);
+      assert(tag + ': the year row reads year, Modified Duration, number', yearRowText.replace(/^[^>]*>/, '').trim(),
+        b.year + (kind === 'gap' ? ' (Jan 15)' : ' (Feb 15)') + 'Modified Duration' + b.dur.toFixed(2));
+      assert(tag + ': the number in the year row is a link to the derivation and a hover pair',
+        new RegExp('<span class="drill-l3" ' + derivation + ' data-hl="dur-' + b.year + '" data-hl-side="y"[^>]*>' + b.dur.toFixed(2).replace('.', '\\.') + '</span>').test(yearRow), true);
+      assert(tag + ': the year row is itself the link to the derivation', /^[^>]*class="drill-l3"/.test(yearRow) && yearRow.slice(0, yearRow.indexOf('>')).includes(derivation), true);
+      assert(tag + ': the year row is the only place the Modified Duration is a row', (html.match(/Modified Duration<\/td>/g) ?? []).length, bd.length);
+      const at = id => html.indexOf('data-row-id="' + id + '-' + b.year + '"');
+      assert(tag + ': row order is the year row, Quantity, Cost per TIPS, Cost', at('ydur') < at('yqty') && at('yqty') < at('ycpt') && at('ycpt') < at('ycost'), true);
     }
     const shown = stripTags(html);
     assert(kind + ': variable names come before the numbers in the Quantity row', shown.indexOf('(DARA') >= 0 && shown.indexOf('(DARA') < shown.indexOf('$'), true);
