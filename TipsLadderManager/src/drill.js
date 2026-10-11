@@ -50,7 +50,7 @@ function l3Link(key, text) {
 }
 
 // Hover pairs in the Gap Dur and Future 30Y Dur popups: a year's Cost or Modified Duration and the
-// place the Weighted by cost row and the total cost use it share a key; hovering either side
+// place the average duration row and the total cost use it share a key; hovering either side
 // highlights the other (index.html, the data-hl listener, which reuses the source-highlight class of
 // the formula-var mechanism). side 'y' marks the number where it is calculated, 'w' where it is used.
 // With a drillKey the number is also a link to that calculation (l3Link look, no dashed underline).
@@ -1272,7 +1272,7 @@ function macaulayWalkRows(durDetail, dur) {
 // Standards). Each year shows its Modified Duration in the row of the year, then its Quantity, Cost per
 // TIPS and Cost, every formula with its variable names first and then the numbers. LMI, P+I per TIPS and
 // the pre-ladder credit are links to their calculations; the Modified Duration and the row of the year
-// link to the derivation of the duration (the Price is plain text, explained by the note under its equation). The total cost and the Weighted by cost row
+// link to the derivation of the duration (the Price is plain text, explained by the note under its equation). The total cost and the average duration row
 // follow, and their numbers pair on hover with the Cost and Modified Duration of each year. Every number
 // is read from the year's entry in the breakdown of gapParams or future30yParams (gap-math.js), the
 // entry the Amount popup of the same year reads; nothing is calculated here.
@@ -1280,7 +1280,7 @@ function synthYearListRows(kind, params, heading) {
   const isGap = kind === 'gap';
   const bd = params.breakdown;
   const total = isGap ? params.totalCost : params.future30yTotalCost;
-  const totalLabel = isGap ? 'Gap total cost' : 'Total Future 30Y cost';
+  const totalLabel = isGap ? 'Gap total cost' : 'Future 30Y total cost';
   const avg = params.avgDuration;
   const fv = (src, text) => '<span class="formula-var" data-source="' + src + '">' + text + '</span>';
   const calcRow = (id, label, names, numbers, note, value) => {
@@ -1326,16 +1326,16 @@ function synthYearListRows(kind, params, heading) {
     + '<tr><td colspan="3" style="padding:8px 0 0;border-top:1px solid #e2e8f0;"></td></tr>'
     + calcRow('ytotal', totalLabel, 'Σ Cost', costTerms + ' = ' + fm(total), '', hlNum('total', 'y', fm(total)))
     + '</table>';
-  // The Weighted by cost row. With no cost to weight by, the mean of the durations stands in for it (gap-math.js).
+  // The average duration row. With a total cost of $0 it falls back to the simple mean of the durations (gap-math.js, 2.0 §Average Gap Year Duration is Cost-Weighted).
   const weighted = total > 0
     ? { names: 'Σ(Cost \xd7 Modified Duration) \xf7 ' + totalLabel,
         numbers: '(' + bd.map(b => hlNum('cost-' + b.year, 'w', fm(b.cost)) + ' \xd7 ' + hlNum('dur-' + b.year, 'w', b.dur.toFixed(2))).join(' + ') + ') \xf7 ' + hlNum('total', 'w', fm(total)) + ' = ' + avg.toFixed(2) }
-    : { names: 'Σ Modified Duration \xf7 number of years (' + totalLabel + ' is $0, so there is no cost to weight by)',
+    : { names: 'Σ Modified Duration \xf7 number of years (' + totalLabel + ' is $0, so the simple mean is used)',
         numbers: '(' + bd.map(b => hlNum('dur-' + b.year, 'w', b.dur.toFixed(2))).join(' + ') + ') \xf7 ' + bd.length + ' = ' + avg.toFixed(2) };
   return [
     { heading },
     { html: table },
-    { label: 'Weighted by cost', note: weighted.names + '<br>' + weighted.numbers, value: avg.toFixed(2), total: true },
+    { label: isGap ? 'Average duration of the gap years' : 'Average duration of the Future 30Y years', note: weighted.names + '<br>' + weighted.numbers, value: avg.toFixed(2), total: true },
   ];
 }
 

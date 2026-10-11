@@ -3129,7 +3129,7 @@ console.log('\nFuture 30Y Dur popup — cost-weighted average, computed match, c
   const txt = r => (r.label ?? '') + ' ' + (r.note ?? '') + ' ' + (r.prose ?? '');
   const all = rows.map(txt).join(' | ');
   assert('the total row no longer claims a simple mean', /Avg \(/.test(all), false);
-  assert('the total row names cost weighting', all.includes('Weighted by cost'), true);
+  assert('the total row names cost weighting', all.includes('Average duration of the Future 30Y years'), true);
 
   // The duration match row computes its mean rather than restating the average.
   const match = rows.find(r => typeof r.label === 'string'
@@ -3237,7 +3237,7 @@ console.log('\nFuture 30Y Dur popup — cost-weighted average, computed match, c
 // entry, and each is checked here against a second derivation that does not use the code under test: the Quantity
 // from the quotient before rounding, the Cost per TIPS from the Price, the Index Ratio and the DD formula, the
 // LMI of a Future 30Y year from the annual interest of the later years, the Quantity against the Amount popup's
-// source (syntheticYearAmounts), and the Weighted by cost row from the costs and durations it displays.
+// source (syntheticYearAmounts), and the average duration row from the costs and durations it displays.
 {
   console.log('');
   console.log('Gap Dur and Future 30Y Dur popups — the list of years calculates Quantity, Cost per TIPS and Cost');
@@ -3283,15 +3283,15 @@ console.log('\nFuture 30Y Dur popup — cost-weighted average, computed match, c
     assert(kind + ': a Pre-ladder credit link exists only where the year has one',
       (html.match(/data-l3="plcpool:/g) ?? []).length, bd.filter(b => (b.pliCredit ?? 0) > 0).length);
 
-    // Weighted by cost: recomputed from the costs and durations the row displays.
-    const w = popup.find(r => r.label === 'Weighted by cost');
-    assert(kind + ': the Weighted by cost row is kept', !!w, true);
+    // Average duration row: recomputed from the costs and durations the row displays.
+    const w = popup.find(r => r.label === (kind === 'gap' ? 'Average duration of the gap years' : 'Average duration of the Future 30Y years'));
+    assert(kind + ': the average duration row is kept', !!w, true);
     const total = kind === 'gap' ? params.totalCost : params.future30yTotalCost;
     const costs = bd.map(b => b.cost), durs = bd.map(b => Number(b.dur.toFixed(2)));
     const expected = total > 0 ? costs.reduce((a, c, i) => a + Math.round(c) * durs[i], 0) / Math.round(total) : durs.reduce((a, d) => a + d, 0) / durs.length;
-    assert(kind + ': the Weighted by cost value agrees with the displayed costs and durations', Number(w.value), expected, 0.011);
+    assert(kind + ': the average duration value agrees with the displayed costs and durations', Number(w.value), expected, 0.011);
     for (const b of bd) {
-      assert(kind + ' ' + b.year + ': its cost and duration are hover pairs in the Weighted by cost row',
+      assert(kind + ' ' + b.year + ': its cost and duration are hover pairs in the average duration row',
         w.note.includes('data-hl="dur-' + b.year + '"') && (total <= 0 || w.note.includes('data-hl="cost-' + b.year + '"')), true);
       assert(kind + ' ' + b.year + ': its cost and duration are hover pairs in the year rows',
         html.includes('data-hl="dur-' + b.year + '" data-hl-side="y"') && html.includes('data-hl="cost-' + b.year + '" data-hl-side="y"'), true);

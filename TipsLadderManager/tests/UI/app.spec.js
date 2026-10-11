@@ -2547,21 +2547,26 @@ for (const { kind, dara, pli } of [{ kind: 'gap', dara: '80000', pli: true }, { 
       await expect(rowOf('ydur-' + year), why('the row is a clickable row')).toHaveCSS('cursor', 'pointer');
     }
 
-    // The total cost and the Weighted by cost row, from the displayed costs and durations.
+    // The total cost and the average duration row, from the displayed costs and durations.
     const totalRow = await cells('ytotal');
     const totalVal = moneyOf(totalRow.value);
     expect(Math.abs(costs.reduce((x, y) => x + y, 0) - totalVal), 'the total cost is the sum of the displayed costs').toBeLessThanOrEqual(years.length * 0.5 + 0.5);
     if (!pli) expect(totalVal, 'costs to weight by in this case').toBeGreaterThan(0);
-    const weighted = list.locator('tr', { hasText: 'Weighted by cost' }).last();
+    const avgLabel = isGap ? 'Average duration of the gap years' : 'Average duration of the Future 30Y years';
+    const weighted = list.locator('td').filter({ hasText: new RegExp('^' + avgLabel + '\\s*Σ') }).last().locator('xpath=..');
+    expect(await weighted.count(), 'the average duration row is labelled ' + avgLabel).toBe(1);
+    expect(await list.locator('td[data-row-id="ytotal"]').innerText(), 'the total cost carries its DD name').toBe(isGap ? 'Gap total cost' : 'Future 30Y total cost');
     const wText = await weighted.innerText();
     const wShown = Number((await weighted.locator('td').last().innerText()).trim());
     const expectedMean = totalVal > 0
       ? costs.reduce((x, c, i) => x + c * durs[i], 0) / totalVal
       : durs.reduce((x, d) => x + d, 0) / durs.length;
-    expect(Math.abs(wShown - expectedMean), 'the Weighted by cost value agrees with the displayed costs and durations: ' + wText).toBeLessThan(0.011);
+    expect(Math.abs(wShown - expectedMean), 'the average duration value agrees with the displayed costs and durations: ' + wText).toBeLessThan(0.011);
     expect(wText).toContain(totalVal > 0 ? 'Σ(Cost × Modified Duration)' : 'Σ Modified Duration');
+    const totalName = isGap ? 'Gap total cost' : 'Future 30Y total cost';
+    expect(wText, 'the formula names the total cost, or the fallback to the simple mean').toContain(totalVal > 0 ? 'Σ(Cost × Modified Duration) ÷ ' + totalName : 'Σ Modified Duration ÷ number of years (' + totalName + ' is $0, so the simple mean is used)');
 
-    // Hover pairs, both ways: a year's Cost and Modified Duration with where the total cost and the Weighted by cost row use them.
+    // Hover pairs, both ways: a year's Cost and Modified Duration with where the total cost and the average duration row use them.
     const cell = (key, side, scope = list) => scope.locator('[data-hl="' + key + '"][data-hl-side="' + side + '"]');
     for (const year of years) {
       for (const k of ['cost', 'dur']) {
@@ -2585,10 +2590,10 @@ for (const { kind, dara, pli } of [{ kind: 'gap', dara: '80000', pli: true }, { 
     if (totalVal > 0) {
       await cell('total', 'y').scrollIntoViewIfNeeded();
       await cell('total', 'y').hover();
-      await expect(cell('total', 'w'), 'hovering the total cost highlights it in the Weighted by cost row').toHaveClass(/source-highlight/);
+      await expect(cell('total', 'w'), 'hovering the total cost highlights it in the average duration row').toHaveClass(/source-highlight/);
       await page.mouse.move(0, 0);
       await cell('total', 'w').hover();
-      await expect(cell('total', 'y'), 'hovering the total cost in the Weighted by cost row highlights where it is calculated').toHaveClass(/source-highlight/);
+      await expect(cell('total', 'y'), 'hovering the total cost in the average duration row highlights where it is calculated').toHaveClass(/source-highlight/);
       await page.mouse.move(0, 0);
     }
     // Within the rows of a year, the Quantity named in the Cost formula highlights its row.
