@@ -2427,24 +2427,24 @@ test('build: gap-years-only ladder lists funded years in ascending order, bracke
   expect(years).toContain(gap[gap.length - 1] + 1);
 });
 
-// ── Year section of the Gap Dur and Future 30Y Dur popups (5.0 §Quantity, cost and duration in one section) ──
-// Clicking a year in the list opens one section that calculates the Quantity, the Cost and the Cost per TIPS of its
-// Synthetic TIPS ahead of its Modified Duration. Every year in the list is checked against a recomputation from the
-// inputs the section itself displays, never against a literal, and its Quantity against the Amount popup of the same
-// year. Links and hover pairs are checked on one year.
+// ── Year rows of the Gap Dur and Future 30Y Dur popups (5.0 §Duration Disclosure Standards) ──
+// The list of years calculates each year's Quantity, Cost per TIPS and Cost in the list itself, with the Modified Duration
+// beside them; there is no separate breakdown section. Every year is checked against a recomputation from the numbers the
+// rows display, never against a literal, and its Quantity against the Amount popup of the same year.
 const dollarAmounts = s => [...s.matchAll(/\$([\d,]+(?:\.\d+)?)/g)].map(m => Number(m[1].replace(/,/g, '')));
 const moneyOf = s => Number(s.replace(/[^0-9.-]/g, ''));
 
-for (const kind of ['gap', 'future30y']) {
-  test('Dur popup year section (' + kind + '): Quantity, Cost and Cost per TIPS agree with their displayed inputs, with links and hover pairs', async ({ page }) => {
+// The pre-ladder credit takes a gap year's whole Amount at the first DARA (all quantities 0), so the second gap case builds without it, with costs to weight.
+for (const { kind, dara, pli } of [{ kind: 'gap', dara: '80000', pli: true }, { kind: 'gap', dara: '40000', pli: false }, { kind: 'future30y', dara: '80000', pli: true }]) {
+  test('Dur popup year rows (' + kind + ', DARA ' + dara + (pli ? ', with pre-ladder interest' : '') + '): Quantity, Cost per TIPS and Cost agree with their displayed inputs; links; hover pairs', async ({ page }) => {
     test.setTimeout(90_000);
     await page.locator('.tab-btn[data-mode="build"]').click();
     const gap = await gapYears(page);
     await page.locator('#first-year').selectOption({ label: String(gap[0] - 1) });
     const lastYearSel = page.locator('#last-year');
     await lastYearSel.selectOption({ index: (await lastYearSel.locator('option').count()) - 1 });
-    await page.locator('#dara').fill('80000');
-    await page.locator('#pre-ladder-interest').check();
+    await page.locator('#dara').fill(dara);
+    if (pli) await page.locator('#pre-ladder-interest').check(); else await page.locator('#pre-ladder-interest').uncheck();
     await page.locator('#run-btn').click();
     await expect(page.locator('#build-output')).toHaveCSS('display', 'block', { timeout: 4_000 });
 
@@ -2453,44 +2453,36 @@ for (const kind of ['gap', 'future30y']) {
     await page.locator('a.info-link-btn[data-popup="' + (isGap ? 'duration' : 'future30yDuration') + '"]').click();
     const list = page.locator('#shared-popup');
     await expect(list).toBeVisible();
-    const years = (await list.locator('.drill-l3[data-l3^="' + pre + 'dur-"]').evaluateAll(els => els.map(e => Number(e.dataset.l3.split('-')[1]))));
-    expect(years.length, 'the list has years').toBeGreaterThan(0);
+    const listText = await list.innerText();
+    expect(listText, 'one section: no breakdown section of theoretical quantities').not.toMatch(/Breakdown \(theoretical qty\)/);
+    expect(listText).not.toMatch(/price per 100/i);
+    expect(listText).not.toMatch(/Pass [12]/);
 
-    const sec = page.locator('#shared-popup-l3');
-    const l4 = page.locator('#shared-popup-l4');
-    const rowOf = (id) => sec.locator('tr:has(> td[data-row-id="' + id + '"])');
+    const years = await list.locator('.drill-l3[data-l3^="' + pre + 'dur-"]').evaluateAll(els => [...new Set(els.map(e => Number(e.dataset.l3.split('-')[1])))]);
+    expect(years.length, 'the list has years').toBeGreaterThan(0);
+    const rowOf = (id) => list.locator('tr:has(> td[data-row-id="' + id + '"])');
     const cells = async (id) => {
       const r = rowOf(id);
+      const formula = r.locator('td').nth(1);
+      const divs = formula.locator('div');
       return {
-        names: await r.locator('td').nth(1).locator('div').nth(0).innerText(),
-        numbers: await r.locator('td').nth(1).locator('div').nth(1).innerText(),
+        names: (await divs.count()) > 0 ? await divs.nth(0).innerText() : '',
+        numbers: (await divs.count()) > 1 ? await divs.nth(1).innerText() : '',
+        note: (await divs.count()) > 2 ? await divs.nth(2).innerText() : '',
         value: await r.locator('td').nth(2).innerText(),
       };
     };
-    const modDur = sec.locator('tr', { hasText: 'Modified duration' }).last();
 
-    const deepYear = isGap ? gap[0] : years[0];   // links and hover pairs are checked on one year: the first gap year has a Pre-ladder credit
     const qtyByYear = new Map();
+    const costs = [], durs = [];
     for (const year of years) {
       const why = (s) => kind + ' ' + year + ': ' + s;
-      const listNum = (k) => list.locator('[data-hl="' + k + '-' + year + '"][data-hl-side="list"]');
-      const listQty = moneyOf(await listNum('qty').innerText());
-      const listCpt = moneyOf(await listNum('cpt').innerText());
-      const listCost = moneyOf(await listNum('cost').innerText());
-      const listDur = moneyOf(await listNum('dur').innerText());
+      const q = await cells('yqty-' + year), c = await cells('ycpt-' + year), k = await cells('ycost-' + year), d = await cells('ydur-' + year);
 
-      await list.locator('.drill-l3[data-l3="' + pre + 'dur-' + year + '"]').click();
-      await expect(sec).toBeVisible();
-      await expect(list, 'the list stays open beside the section').toBeVisible();
-      const lb = await list.boundingBox(), sb = await sec.boundingBox();
-      expect(sb.x >= lb.x + lb.width - 1 || sb.x + sb.width <= lb.x + 1, why('the section does not cover the list')).toBe(true);
-
-      const q = await cells('yqty'), c = await cells('ycost'), p = await cells('ycpt');
-
-      // Order: Quantity, Cost, Cost per TIPS, then the Modified Duration derivation.
+      // Order: Quantity, Cost per TIPS, Cost, Modified Duration.
       const ys = [];
-      for (const loc of [rowOf('yqty'), rowOf('ycost'), rowOf('ycpt'), modDur]) ys.push((await loc.boundingBox()).y);
-      expect(ys, why('Quantity, Cost, Cost per TIPS, Modified duration run top to bottom')).toEqual([...ys].sort((a, b) => a - b));
+      for (const id of ['yqty-', 'ycpt-', 'ycost-', 'ydur-']) ys.push((await rowOf(id + year).boundingBox()).y);
+      expect(ys, why('Quantity, Cost per TIPS, Cost, Modified Duration run top to bottom')).toEqual([...ys].sort((x, y) => x - y));
 
       // Variable names first, then the numbers.
       expect(q.names).toContain('DARA');
@@ -2498,103 +2490,132 @@ for (const kind of ['gap', 'future30y']) {
       expect(q.names).toContain('P+I per TIPS');
       expect(q.names).not.toContain('$');
       expect(q.numbers).toContain('$');
-      expect(c.names).toMatch(/Quantity\s*×\s*Cost per TIPS/);
-      expect(p.names).toContain('price per 100');
+      expect(c.names).toContain('(Price ÷ 100) × Index Ratio × 1,000');
+      expect(k.names).toMatch(/Quantity\s*×\s*Cost per TIPS/);
 
       // Quantity: the quotient recomputed from the displayed DARA, LMI, pre-ladder credit and P+I per TIPS.
       const amounts = dollarAmounts(q.numbers);
-      const hasPli = (await sec.locator('.drill-l3[data-l3^="plcpool:"]').count()) > 0;
+      const hasPli = (await rowOf('yqty-' + year).locator('.drill-l3[data-l3^="plcpool:"]').count()) > 0;
       expect(amounts.length, why('DARA, LMI, P+I per TIPS, and the Pre-ladder credit where there is one')).toBe(hasPli ? 4 : 3);
-      expect(hasPli, why('only a gap year has a Pre-ladder credit')).toBe(isGap && hasPli);
-      if (isGap && year === gap[0]) expect(hasPli, why('the first gap year has a Pre-ladder credit, as its Amount popup shows')).toBe(true);
+      expect(q.names.includes('Pre-ladder credit'), why('the names carry the Pre-ladder credit exactly when the numbers do')).toBe(hasPli);
+      if (!isGap) expect(hasPli, why('a Future 30Y year has no Pre-ladder credit')).toBe(false);
+      if (!pli) expect(hasPli, why('no Pre-ladder credit without pre-ladder interest')).toBe(false);
+      if (isGap && pli && year === gap[0]) expect(hasPli, why('the first gap year has a Pre-ladder credit, as its Amount popup shows')).toBe(true);
       const pi = amounts[amounts.length - 1];
-      const quotient = (amounts[0] - amounts.slice(1, -1).reduce((a, b) => a + b, 0)) / pi;
+      const quotient = (amounts[0] - amounts.slice(1, -1).reduce((x, y) => x + y, 0)) / pi;
       const shown = q.numbers.match(/=\s*(-?[\d.]+),\s*(?:rounded to (\d+)|minimum 0)/);
       expect(shown, why('the numbers end with the quotient and the Quantity: ' + q.numbers)).not.toBeNull();
       expect(Math.abs(quotient - Number(shown[1])), why('the quotient agrees with the displayed inputs')).toBeLessThan(0.01);
       const qtyVal = moneyOf(q.value);
       expect(qtyVal, why('Quantity is the rounded quotient, not below 0')).toBe(Math.max(0, Math.round(Number(shown[1]))));
-
-      // Cost = Quantity x Cost per TIPS; Cost per TIPS = price per 100 x 1,000 / 100.
-      const cNums = c.numbers.match(/(\d+)\s*×\s*\$([\d,.]+)\s*=\s*\$([\d,]+)/);
-      expect(cNums, why('the Cost numbers read Quantity x Cost per TIPS = Cost: ' + c.numbers)).not.toBeNull();
-      const cptVal = moneyOf(p.value), costVal = moneyOf(c.value);
-      expect(Number(cNums[1]), why('the Cost uses the Quantity above')).toBe(qtyVal);
-      expect(moneyOf(cNums[2]), why('the Cost uses the Cost per TIPS below')).toBe(cptVal);
-      expect(moneyOf(cNums[3])).toBe(costVal);
-      expect(Math.abs(costVal - qtyVal * cptVal), why('Cost is Quantity x Cost per TIPS')).toBeLessThanOrEqual(qtyVal * 0.005 + 0.5);
-      const pNums = p.numbers.match(/([\d.]+)\s*×\s*1,000\s*÷\s*100\s*=\s*\$([\d,.]+)/);
-      expect(pNums, why('the Cost per TIPS numbers read price per 100 x 1,000 / 100: ' + p.numbers)).not.toBeNull();
-      expect(Math.abs(Number(pNums[1]) * 1000 / 100 - cptVal), why('Cost per TIPS is the price per 100 x 1,000 / 100')).toBeLessThan(0.01);
-
-      // The list line shows the same figures as the section; the Modified Duration agrees to the list's two decimals.
-      expect(listQty, why('list Quantity')).toBe(qtyVal);
-      expect(listCpt, why('list Cost per TIPS')).toBe(cptVal);
-      expect(listCost, why('list Cost')).toBe(costVal);
-      const secDur = moneyOf(await modDur.locator('td').last().innerText());
-      expect(Math.abs(secDur - listDur), why('list Modified Duration')).toBeLessThanOrEqual(0.0051);
-
-      // No pass named, no em dash in the new wording.
-      const calcText = await sec.locator('table:has(> tbody > tr > td[data-row-id="yqty"])').innerText();
-      expect(calcText).not.toMatch(/Pass [12]/);
-      expect(calcText).not.toContain('—');
-
-      // P+I per TIPS and LMI (and the pre-ladder credit of a gap year) are links to their calculations.
-      const piLink = sec.locator('.drill-l3[data-l3="' + pre + 'pi-' + year + '"]');
-      const lmiLink = sec.locator('.drill-l3[data-l3="' + pre + 'lmi-' + year + '"]');
-      await expect(piLink).toHaveText(/^\$[\d,]+\.\d\d$/);
-      await expect(lmiLink).toBeVisible();
-      if (year === deepYear) {
-        const pliLink = sec.locator('.drill-l3[data-l3^="plcpool:"]');
-        await lmiLink.click();
-        await expect(l4).toBeVisible();
-        await expect(sec, 'following a link leaves the section open').toBeVisible();
-        await expect(l4).toContainText('Later Maturity Interest (LMI)');
-        expect(moneyOf((await l4.innerText()).match(/Later Maturity Interest \(LMI\)\s+(\$[\d,]+)\s*$/m)[1]), 'the LMI drill reaches the LMI in the section').toBe(amounts[1]);
-        await l4.locator('#sp-close').click();
-        await piLink.click();
-        await expect(l4).toContainText('P+I per synthetic TIPS');
-        expect(moneyOf((await l4.innerText()).match(/P\+I per synthetic TIPS\s+(\$[\d,.]+)\s*$/m)[1]), 'the P+I drill reaches the P+I per TIPS in the section').toBe(pi);
-        await l4.locator('#sp-close').click();
-        if (hasPli) {
-          await pliLink.click();
-          await expect(l4).toContainText('Pre-ladder pool composition');
-          await expect(l4).toContainText('Applied to this year');
-          expect(moneyOf((await l4.innerText()).match(/Applied to this year[\s\S]*?(\$[\d,]+)\s*$/m)[1])).toBe(amounts[2]);
-          await l4.locator('#sp-close').click();
-        }
-
-        // Hover pairs, both ways, between the list line and the formula that calculates each number.
-        for (const k of ['qty', 'cost', 'cpt', 'dur']) {
-          const inList = listNum(k).first();
-          const inSection = sec.locator('[data-hl="' + k + '-' + year + '"][data-hl-side="sec"]');
-          expect(await inSection.count(), k + ' has a formula in the section').toBeGreaterThan(0);
-          await page.mouse.move(0, 0);
-          await inList.hover();
-          for (const el of await inSection.all()) await expect(el, 'hovering ' + k + ' in the list highlights its formula').toHaveClass(/source-highlight/);
-          await page.mouse.move(0, 0);
-          await expect(inSection.first()).not.toHaveClass(/source-highlight/);
-          await inSection.last().hover();
-          await expect(inList, 'hovering the ' + k + ' result in the section highlights it in the list').toHaveClass(/source-highlight/);
-          await page.mouse.move(0, 0);
-          await expect(inList).not.toHaveClass(/source-highlight/);
-        }
-        // Within the section, the Quantity named in the Cost formula highlights its row.
-        await rowOf('ycost').locator('.formula-var[data-source="yqty"]').hover();
-        await expect(sec.locator('[data-row-id="yqty"]')).toHaveClass(/source-highlight/);
-        await page.mouse.move(0, 0);
-      }
-
       qtyByYear.set(year, qtyVal);
+
+      // Cost per TIPS = (Price / 100) x Index Ratio x 1,000, from the displayed Price and Index Ratio.
+      const pNums = c.numbers.match(/\(([\d.]+)\s*÷\s*100\)\s*×\s*([\d.]+)\s*×\s*1,000\s*=\s*\$([\d,.]+)/);
+      expect(pNums, why('the Cost per TIPS numbers read (Price ÷ 100) × Index Ratio × 1,000 = Cost per TIPS: ' + c.numbers)).not.toBeNull();
+      const cptVal = moneyOf(c.value);
+      expect(pNums[2], why('the Index Ratio of a Synthetic TIPS reads 1.00000')).toBe('1.00000');
+      expect(moneyOf(pNums[3])).toBe(cptVal);
+      expect(Math.abs(Number(pNums[1]) / 100 * Number(pNums[2]) * 1000 - cptVal), why('Cost per TIPS agrees with the displayed Price and Index Ratio')).toBeLessThan(0.011);
+      expect(c.note, why('the Price is explained from the Yield and Coupon Rate of the Synthetic TIPS')).toMatch(/Price computed from the Yield \([\d.]+%\) and the Coupon Rate \([\d.]+%\) of the Synthetic TIPS/);
+
+      // Cost = Quantity x Cost per TIPS, from the displayed Quantity and Cost per TIPS.
+      const cNums = k.numbers.match(/(\d+)\s*×\s*\$([\d,.]+)\s*=\s*\$([\d,]+)/);
+      expect(cNums, why('the Cost numbers read Quantity × Cost per TIPS = Cost: ' + k.numbers)).not.toBeNull();
+      const costVal = moneyOf(k.value);
+      expect(Number(cNums[1]), why('the Cost uses the Quantity above')).toBe(qtyVal);
+      expect(moneyOf(cNums[2]), why('the Cost uses the Cost per TIPS above')).toBe(cptVal);
+      expect(moneyOf(cNums[3])).toBe(costVal);
+      expect(Math.abs(costVal - qtyVal * cptVal), why('Cost is Quantity × Cost per TIPS')).toBeLessThanOrEqual(qtyVal * 0.005 + 0.5);
+      costs.push(costVal);
+      durs.push(moneyOf(d.value));
+
+      // The year label opens the duration derivation, and nothing else is added behind it.
+      const label = list.locator('.drill-l3[data-l3="' + pre + 'dur-' + year + '"]').first();
+      await expect(label).toBeVisible();
     }
 
-    // The Amount popup of each year shows the same Quantity as its section.
+    // The total cost and the Weighted by cost row, from the displayed costs and durations.
+    const totalRow = await cells('ytotal');
+    const totalVal = moneyOf(totalRow.value);
+    expect(Math.abs(costs.reduce((x, y) => x + y, 0) - totalVal), 'the total cost is the sum of the displayed costs').toBeLessThanOrEqual(years.length * 0.5 + 0.5);
+    if (!pli) expect(totalVal, 'costs to weight by in this case').toBeGreaterThan(0);
+    const weighted = list.locator('tr', { hasText: 'Weighted by cost' }).last();
+    const wText = await weighted.innerText();
+    const wShown = Number((await weighted.locator('td').last().innerText()).trim());
+    const expectedMean = totalVal > 0
+      ? costs.reduce((x, c, i) => x + c * durs[i], 0) / totalVal
+      : durs.reduce((x, d) => x + d, 0) / durs.length;
+    expect(Math.abs(wShown - expectedMean), 'the Weighted by cost value agrees with the displayed costs and durations: ' + wText).toBeLessThan(0.011);
+    expect(wText).toContain(totalVal > 0 ? 'Σ(Cost × Modified Duration)' : 'Σ Modified Duration');
+
+    // Hover pairs, both ways: a year's Cost and Modified Duration with where the total cost and the Weighted by cost row use them.
+    const cell = (key, side, scope = list) => scope.locator('[data-hl="' + key + '"][data-hl-side="' + side + '"]');
+    for (const year of years) {
+      for (const k of ['cost', 'dur']) {
+        const own = cell(k + '-' + year, 'y');
+        const used = cell(k + '-' + year, 'w');
+        const usedCount = await used.count();
+        expect(usedCount, kind + ' ' + year + ': ' + k + ' is used in the rows below').toBeGreaterThan(totalVal > 0 || k === 'dur' ? 0 : -1);
+        if (usedCount === 0) continue;
+        await page.mouse.move(0, 0);
+        await own.scrollIntoViewIfNeeded();
+        await own.hover();
+        for (const el of await used.all()) await expect(el, 'hovering the ' + k + ' of ' + year + ' highlights where it is used').toHaveClass(/source-highlight/);
+        await page.mouse.move(0, 0);
+        await expect(used.first()).not.toHaveClass(/source-highlight/);
+        await used.last().scrollIntoViewIfNeeded();
+        await used.last().hover();
+        await expect(own, 'hovering the ' + k + ' of ' + year + ' where it is used highlights where it is calculated').toHaveClass(/source-highlight/);
+        await page.mouse.move(0, 0);
+      }
+    }
+    if (totalVal > 0) {
+      await cell('total', 'y').scrollIntoViewIfNeeded();
+      await cell('total', 'y').hover();
+      await expect(cell('total', 'w'), 'hovering the total cost highlights it in the Weighted by cost row').toHaveClass(/source-highlight/);
+      await page.mouse.move(0, 0);
+      await cell('total', 'w').hover();
+      await expect(cell('total', 'y'), 'hovering the total cost in the Weighted by cost row highlights where it is calculated').toHaveClass(/source-highlight/);
+      await page.mouse.move(0, 0);
+    }
+    // Within the rows of a year, the Quantity named in the Cost formula highlights its row.
+    await rowOf('ycost-' + years[0]).locator('.formula-var[data-source="yqty-' + years[0] + '"]').hover();
+    await expect(list.locator('[data-row-id="yqty-' + years[0] + '"]')).toHaveClass(/source-highlight/);
+    await page.mouse.move(0, 0);
+
+    // Links to the calculations: LMI, P+I per TIPS, the Pre-ladder credit, and the Price to the derivation of the yield and coupon.
+    const nested = page.locator('#shared-popup-l3');
+    const year = isGap ? gap[0] : years[0];
+    const qrow = rowOf('yqty-' + year);
+    const amounts = dollarAmounts(await qrow.locator('td').nth(1).locator('div').nth(1).innerText());
+    await qrow.locator('.drill-l3[data-l3="' + pre + 'lmi-' + year + '"]').click();
+    await expect(nested).toBeVisible();
+    await expect(nested).toContainText('Later Maturity Interest (LMI)');
+    expect(moneyOf((await nested.innerText()).match(/Later Maturity Interest \(LMI\)\s+(\$[\d,]+)\s*$/m)[1]), 'the LMI drill reaches the LMI in the Quantity row').toBe(amounts[1]);
+    await qrow.locator('.drill-l3[data-l3="' + pre + 'pi-' + year + '"]').click();
+    await expect(nested).toContainText('P+I per synthetic TIPS');
+    expect(moneyOf((await nested.innerText()).match(/P\+I per synthetic TIPS\s+(\$[\d,.]+)\s*$/m)[1]), 'the P+I drill reaches the P+I per TIPS in the Quantity row').toBe(amounts[amounts.length - 1]);
+    if (isGap && pli) {
+      await qrow.locator('.drill-l3[data-l3^="plcpool:"]').click();
+      await expect(nested).toContainText('Pre-ladder pool composition');
+      expect(moneyOf((await nested.innerText()).match(/Applied to this year[\s\S]*?(\$[\d,]+)\s*$/m)[1])).toBe(amounts[2]);
+    }
+    await rowOf('ycpt-' + year).locator('.drill-l3[data-l3="' + pre + 'dur-' + year + '"]').click();
+    await expect(nested, 'the Price opens the derivation of the yield and coupon').toContainText(isGap ? 'Yield Interpolation' : 'Anchor Yield');
+    await expect(nested).toContainText('Synthetic Coupon');
+    const derivation = await nested.innerText();
+    await list.locator('.drill-l3[data-l3="' + pre + 'dur-' + year + '"]').first().click();
+    expect(await nested.innerText(), 'the year label opens the same derivation').toBe(derivation);
+    expect(derivation, 'the derivation shows the duration only, as before').not.toMatch(/Cost per TIPS|Quantity/);
+
+    // The Amount popup of each year shows the same Quantity.
     await page.keyboard.press('Escape');
-    for (const [year, qtyVal] of qtyByYear) {
-      await page.locator('#build-table tr.fy-group-header[data-fy="' + year + '"] td.drillable[data-col="yearAmount"]').click();
+    for (const [y, qtyVal] of qtyByYear) {
+      await page.locator('#build-table tr.fy-group-header[data-fy="' + y + '"] td.drillable[data-col="yearAmount"]').click();
       await expect(page.locator('#drill-overlay')).toBeVisible({ timeout: 4_000 });
       const amountQty = moneyOf(await page.locator('#drill-content tr', { hasText: 'Quantity' }).first().locator('td').last().innerText());
-      expect(amountQty, kind + ' ' + year + ': the Amount popup and the section show the same Quantity').toBe(qtyVal);
+      expect(amountQty, kind + ' ' + y + ': the Amount popup and the list show the same Quantity').toBe(qtyVal);
       await page.locator('#drill-close').click();
     }
   });

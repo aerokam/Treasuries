@@ -141,7 +141,8 @@
   .drill-l3:hover { background: #e8f5f5 !important; }
   .formula-var { cursor: help; border-bottom: 1px dashed #94a3b8; }
   .formula-var:hover { color: #1a56db; border-bottom-style: solid; }
-  [data-hl-side="sec"] { cursor: help; }
+  [data-hl] { cursor: help; border-bottom: 1px dashed #94a3b8; }
+  [data-hl]:hover { color: #1a56db; border-bottom-style: solid; }
 
   /* ── Bracket/cover year hover explainer ── */
   #bracket-tooltip { position: fixed; z-index: 500; max-width: 380px; background: #1e293b; color: #f1f5f9;
@@ -4204,7 +4205,7 @@ document.addEventListener('mouseover', e => {
   const target = e.target.closest('.formula-var');
   if (!target) return;
   const sourceId = target.dataset.source;
-  const container = target.closest('#drill-content, #shared-popup, #shared-popup-l3, #shared-popup-l4');
+  const container = target.closest('#drill-content, #shared-popup, #shared-popup-l3');
   if (!sourceId || !container) return;
   const sourceRow = container.querySelector('[data-row-id="' + sourceId + '"]')?.closest('tr');
   if (!sourceRow) return;
@@ -4216,13 +4217,13 @@ document.addEventListener('mouseout', e => {
   document.querySelectorAll('.source-highlight').forEach(el => el.classList.remove('source-highlight'));
 });
 
-// A number in the list of years in the Gap Dur and Future 30Y Dur popups and the formula in the year's
-// section that calculates it share a data-hl key; hovering one side highlights the other side, across
-// the two popups (5.0 §Quantity, cost and duration in one section).
+// In the Gap Dur and Future 30Y Dur popups, a year's Cost or Modified Duration and the places the total
+// cost and the Weighted by cost row use it share a data-hl key (drill.js, hlNum); hovering one side
+// highlights the other side.
 document.addEventListener('mouseover', e => {
   const target = e.target.closest('[data-hl]');
   if (!target) return;
-  const popups = '#shared-popup, #shared-popup-l3, #shared-popup-l4';
+  const popups = '#shared-popup, #shared-popup-l3';
   if (!target.closest(popups)) return;
   document.querySelectorAll(popups.split(', ').map(p => p + ' [data-hl="' + target.dataset.hl + '"]').join(', '))
     .forEach(el => { if (el.dataset.hlSide !== target.dataset.hlSide) el.classList.add('source-highlight'); });
