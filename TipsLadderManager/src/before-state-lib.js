@@ -16,11 +16,10 @@
 
 import { bondCalcs } from '../../shared/src/bond-math.js';
 import { fmtDate } from './date-util.js';
-import { computePortfolioARAByYear, getGapYears } from './rebalance-lib.js';
+import { computePortfolioARAByYear, getGapYears, LOWEST_LOWER_BRACKET_YEAR } from './rebalance-lib.js';
 import { selectFuture30yCovers } from './ladder-core.js';
 import { findSpikes, evenSpread, MIN_SHAPE_POINTS } from './shape-math.js';
 
-export const LOWEST_LOWER_BRACKET_YEAR = 2032;
 export const UPPER_BRACKET_YEAR = 2040;
 
 // The maturity years of the Future 30Y cover pair, chosen by rule from market data (2.0 §Future 30Y
@@ -71,7 +70,7 @@ export function getActiveLowerBracketYear(tipsMarketData) {
 }
 
 // Lower-bracket CANDIDATE years for excess-flagging: every TIPS maturity year in
-// [LOWEST_LOWER_BRACKET_YEAR, activeLowerBracketYear) — 2032-2035 today. EXCLUDES the Active Lower
+// [LOWEST_LOWER_BRACKET_YEAR, activeLowerBracketYear): from LOWEST_LOWER_BRACKET_YEAR up to the year before the active lower bracket year. EXCLUDES the Active Lower
 // Bracket year itself (2036) from this specific pool only — 2036 is still detected, just
 // independently below (see detectBracketFlags), so it can flag alongside a genuine retained-leg
 // flag instead of always winning this pool's "highest excess" tie-break by virtue of usually
