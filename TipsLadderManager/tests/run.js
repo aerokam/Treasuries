@@ -6,7 +6,7 @@ import { readFileSync, readdirSync, existsSync } from 'fs';
 import path from 'path';
 import { buildTipsMarketData, localDate, runRebalance, runFundedRebalance, inferDARAFromCash, inferScaledDARAFromPortfolio, computePortfolioARAByYear, getGapYearBracketCandidates, getGapYears, derivePerYearDara, parseFundedYearDaraBlock, parseParamsBlock, inferFirstYearFromHoldings, inferLastYearFromHoldings } from '../src/rebalance-lib.js';
 import { computeBeforeState, detectBracketFlags, heldYearMedianExcluding } from '../src/before-state-lib.js';
-import { remainingCouponPaymentsThisYear, rmdCappedRemainingCoupons, latestRemainingCouponDate, future30yLimit, maxLastYear, selectFuture30yCovers, LOWER_COVER_YIELD } from '../src/ladder-core.js';
+import { remainingCouponPaymentsThisYear, rmdCappedRemainingCoupons, latestRemainingCouponDate, future30yLimit, maxLastYear, selectFuture30yCovers, LOWER_COVER_YIELD, gapRebalances } from '../src/ladder-core.js';
 import { bracketWeights, bracketWeightsN, syntheticCoupon } from '../src/gap-math.js';
 import { findSpikes, smoothCurve } from '../src/shape-math.js';
 import { buildDurationPopupRows, buildBracketWeightDrill, buildFuture30yDurationPopupRows, buildFuture30yLMIDrill, buildSyntheticPIDrill } from '../src/drill.js';
@@ -205,6 +205,25 @@ function assertReconciles(details, label) {
   }
 }
 
+// ── Helper: the gap year conversions only sell the Excess TIPS (2.0 §Gap Year Simulated Outstanding TIPS) ──
+// On every issue date each bracket keeps what it holds or goes down to the duration match; none is bought, the
+// active lower bracket included. Retained Bracket Excess is sold before the active lower bracket loses any, and
+// after the last conversion nothing is left.
+function assertGapConversionsSellOnly(conversions, label) {
+  let ok = true, retainedFirst = true, endsEmpty = true;
+  conversions.forEach((c, k) => {
+    const legsBefore = [c.lowerQtyBefore, c.upperQtyBefore, ...(c.retainedQtyBefore ?? [])];
+    const legsAfter = [c.lowerQtyAfter, c.upperQtyAfter, ...(c.retainedQtyAfter ?? [])];
+    if (legsAfter.some((q, i) => q > legsBefore[i])) ok = false;
+    if ((c.retainedQtyBefore ?? []).length && c.lowerQtyAfter < c.lowerQtyBefore && (c.retainedQtyAfter ?? []).some(q => q > 0)) retainedFirst = false;
+    if (k > 0 && legsBefore.some((q, i) => q !== [conversions[k - 1].lowerQtyAfter, conversions[k - 1].upperQtyAfter, ...(conversions[k - 1].retainedQtyAfter ?? [])][i])) ok = false;
+    if (k === conversions.length - 1 && legsAfter.some(q => q !== 0)) endsEmpty = false;
+  });
+  assert(label + ': no Excess TIPS is bought on a gap year issue date, each conversion starts from the one before', ok, true);
+  assert(label + ': Retained Bracket Excess is sold before the active lower bracket loses any', retainedFirst, true);
+  assert(label + ': the last gap year conversion leaves no Excess TIPS', endsEmpty, true);
+}
+
 // ── Helper: Run Full Rebalance on a holdings file (per-year ARA path) ────────
 function runFullRebalanceTest(name, filePath) {
   const fullPath = path.resolve(filePath);
@@ -237,7 +256,10 @@ function runFullRebalanceTest(name, filePath) {
     console.error(`        actual:   ${netCash}`);
     failed++;
   }
-  assertNoBuySell(details, name);
+  // A funded year holding four maturities can land on a one-TIPS swap between two of them when the resolved
+  // DARA moves by a few dollars (the rank tie-break the LIVE_DATA_CROSS_SWAP_TOLERANCE note below describes);
+  // one unit is that case, not a same-maturity wash.
+  assertNoBuySell(details, name, { crossSwapUnitTolerance: 1 });
   assertReconciles(details, name);
   console.log(`        scaled DARA:   ${Math.round(scaledMedian).toLocaleString()}`);
   console.log(`        net cash:      ${Math.round(netCash).toLocaleString()}`);
@@ -380,6 +402,9 @@ runFullRebalanceTest('SampleHoldings (richest IRA)', './data/SampleHoldings.csv'
     // Run rebalance — excessQtyBefore uses funded-first rule (LMI formula), not h.excessQty
     const dara = 20000;
     const { summary, details } = runRebalance({ dara, bracketMode: '3bracket', holdings, tipsMarketData, refCPI, settlementDate });
+    assertGapConversionsSellOnly(summary.gapRebalancesBefore.conversions, 'F4 Before');
+    assertGapConversionsSellOnly(summary.gapRebalances.conversions, 'F4 After');
+    assert('F4: a held bond older than the Active Lower Bracket is a retained leg of the conversions, and only then', summary.gapRebalancesBefore.conversions[0].retainedQtyBefore.length, heldLower.cusip === roles.activeLower.cusip ? 0 : 1);
 
     // summary.brackets.lowerCUSIP is identifyBrackets' raw excess-ARA pick, which the file fixes at the held
     // lower bracket. The canonical Active Lower Bracket (newLowerCUSIP) comes from the market data alone: the
@@ -868,8 +893,8 @@ console.log('\nBuild — DARA=50000, lastYear=2040');
   // Tolerance is 2% of DARA, stated as a percentage the way 2.0 §Gap Year Coverage Model states the
   // avgAmt ≈ DARA invariant. That section gives ~0.6%, but the residual measured across lastYear x DARA
   // combinations is consistently positive (overfunded) at about 0.3%-1.7%, so 0.6% is not a bound.
-  // Whole-bond rounding and the upper-excess-coupon fixpoint (gap-math gapParamsWithUpperFeedback)
-  // both feed it. A one-directional bias is worth a separate look; this bound must not hide it.
+  // Whole-bond rounding of each gap year's Synthetic TIPS and of the Excess TIPS feeds it. A
+  // one-directional bias is worth a separate look; this bound must not hide it.
   assert('avgAmt ≈ DARA (gap LMI included), within 2% of DARA', avgAmt, dara, dara * 0.02);
   console.log(`        totalBuyCost:  ${Math.round(summary.totalBuyCost).toLocaleString()}`);
   console.log(`        lowerYear:     ${summary.lowerYear}, upperYear: ${summary.upperYear}`);
@@ -1573,6 +1598,10 @@ console.log(`\nBuild→Rebalance export-string round-trip — firstYear=${GAP.fi
     { label: `${GAP.first - 1}–${LAST_MAX} +PLI`,     firstYear: (GAP.first - 1), lastYear: LAST_MAX, pli: true,  vary: false },
     { label: '2026–2056 variable', firstYear: SY,   lastYear: MAX_YEAR, pli: false, vary: true  },
     { label: `${GAP.first - 3}–${LAST_MAX} variable+PLI`, firstYear: (GAP.first - 3), lastYear: LAST_MAX, pli: true, vary: true },
+    // First Year inside the gap: the gap years before it are not in the ladder, and the lower bracket year holds Excess TIPS alone.
+    { label: `${GAP.first + 1}–${MAX_YEAR} First Year inside the gap`, firstYear: GAP.first + 1, lastYear: MAX_YEAR, pli: false, vary: false },
+    { label: `${GAP.first + 1}–${MAX_YEAR} First Year inside the gap +PLI`, firstYear: GAP.first + 1, lastYear: MAX_YEAR, pli: true, vary: false },
+    { label: `${GAP.first + 1}–${LAST_MAX} First Year inside the gap, Future 30Y years too`, firstYear: GAP.first + 1, lastYear: LAST_MAX, pli: false, vary: false },
     // User repro: 40k base, RAISED later years (2040/41/42 = 50/60/70k), PLI, 2066. This drives the
     // gap-bracket excess toward 0 and exercises the "Before == build" + 0-excess bracket render fixes.
     { label: `${GAP.first - 1}–${LAST_MAX} high-mid+PLI`, firstYear: (GAP.first - 1), lastYear: LAST_MAX, pli: true, vary: false,
@@ -1655,6 +1684,7 @@ console.log(`\nBuild→Rebalance export-string round-trip — firstYear=${GAP.fi
       let worstBef = 0, worstBefY = null;
       for (const [y, amt] of buildAmtByYear) {
         if (!rebalBeforeByYear.has(y)) continue; // render coverage already asserted above
+        if (y < firstYear || y > lastYear) continue; // a bracket year outside the ladder holds Excess TIPS alone; it is no rung of the build
         const diff = Math.abs(rebalBeforeByYear.get(y) - amt);
         if (diff > worstBef) { worstBef = diff; worstBefY = y; }
       }
@@ -1728,6 +1758,23 @@ console.log(`\nBuild→Rebalance export-string round-trip — firstYear=${GAP.fi
             const b = bS.syntheticYearAmounts[y]?.amount, a = rS.syntheticYearAmounts?.[y]?.amount, be = rS.syntheticYearAmountsBefore?.[y]?.amount;
             if (!(Math.abs(b - a) < 0.01 && Math.abs(a - be) < 0.01)) problems.push(`${y} Future 30Y Amount build ${b} After ${a} Before ${be}`);
           }
+          // The same three amounts for the gap years: build, After and Before credit the same figures to each year.
+          if (bS.gapYears.length) {
+            for (const [name, bm, am, bem] of [
+              ['Simulated Outstanding Future 10Y TIPS interest', bS.gapSimulatedInterestByYear, rS.gapSimulatedInterestByYear, rS.gapSimulatedInterestBefore],
+              ['Excess TIPS interest', bS.gapExcessInterestByYear, rS.gapExcessInterestByYear, rS.gapExcessInterestBefore],
+              ['gap Net Cash', bS.gapNetCashByYear, rS.gapNetCashByYear, rS.gapNetCashBefore],
+            ]) {
+              for (const y of new Set([...bm.keys(), ...am.keys(), ...bem.keys()])) {
+                if (!(Math.abs((bm.get(y) ?? 0) - (am.get(y) ?? 0)) < 0.01 && Math.abs((am.get(y) ?? 0) - (bem.get(y) ?? 0)) < 0.01)) problems.push(`${y} ${name} build ${bm.get(y)} After ${am.get(y)} Before ${bem.get(y)}`);
+              }
+            }
+            for (const y of bS.gapYears) {
+              const b = bS.syntheticYearAmounts[y]?.amount, a = rS.syntheticYearAmounts?.[y]?.amount, be = rS.syntheticYearAmountsBefore?.[y]?.amount;
+              if (!(Math.abs(b - a) < 0.01 && Math.abs(a - be) < 0.01)) problems.push(`${y} gap Amount build ${b} After ${a} Before ${be}`);
+            }
+            if (pli && !(bS.preLadderGapPool > 0)) problems.push('Pre-Ladder Interest pool lacks the gap year interest');
+          }
           if (pli && bS.future30yYears.length && !(bS.preLadderFuture30yPool > 0)) problems.push('Pre-Ladder Interest pool lacks the Future 30Y interest');
           // The Net Cash credit is part of every figure compared above: it is credited, and Before,
           // After and build credit the same Net Cash to each year.
@@ -1738,7 +1785,7 @@ console.log(`\nBuild→Rebalance export-string round-trip — firstYear=${GAP.fi
               const b = bS.future30yNetCashByYear.get(y), a = rS.future30yNetCashByYear?.get(y), be = rS.future30yNetCashBefore?.get(y);
               if (!(Math.abs(b - a) < 0.01 && Math.abs(a - be) < 0.01)) problems.push(`${y} Net Cash build ${b} After ${a} Before ${be}`);
             }
-            const preYearsNet = netYears.filter(y => y < firstYear).reduce((s, y) => s + bS.future30yNetCashByYear.get(y), 0);
+            const preYearsNet = [...bS.future30yNetCashByYear.entries(), ...bS.gapNetCashByYear.entries()].filter(([y]) => y < firstYear).reduce((s, [, v]) => s + v, 0);
             if (pli && Math.abs((bS.preLadderNetCashPool ?? 0) - preYearsNet) >= 0.01) problems.push(`Pre-Ladder Interest pool Net Cash ${bS.preLadderNetCashPool} vs ${preYearsNet}`);
           }
           if (problems.length) failures.push(`${label}: ${problems.slice(0, 4).join('; ')}`);
@@ -3309,6 +3356,221 @@ console.log('\nFuture 30Y Dur popup — cost-weighted average, computed match, c
     assert('future30y ' + b.year + ': the P+I drill returns the P+I per TIPS', buildSyntheticPIDrill(s, b.year, 'future30y').at(-1).value, '$' + b.piPerBond.toFixed(2));
   }
 }
+
+// ── Test: gap years — Simulated Outstanding Future 10Y TIPS (2.0 §Gap Year Simulated Outstanding TIPS) ──
+// Each gap year's TIPS is issued on the last trading day of January, 10 years before its maturity year, and
+// the Synthetic TIPS of the gap years are converted in order. Every figure below is derived a second time from
+// the live market data and the displayed Pass 1 breakdown (price, duration, weights and quantities from the
+// spec's formulas), never read back from the conversion it checks.
+{
+  console.log('');
+  console.log('Gap year Simulated Outstanding Future 10Y TIPS — issue dates, conversions, credited amounts');
+  const SY = settlementDate.getFullYear();
+  const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const lastTradingDayOfJanuary = (y) => {
+    const d = new Date(y, 0, 31);
+    while (d.getDay() === 0 || d.getDay() === 6 || bondHolidays.has(iso(d))) d.setDate(d.getDate() - 1);
+    return d;
+  };
+  const cases = [
+    { label: 'flat, First Year 2026', dara: 40000, firstYear: SY, lastYear: MAX_YEAR },
+    { label: 'flat, Future 30Y years too', dara: 40000, firstYear: SY, lastYear: LAST_MAX },
+    { label: 'DARA 100,000, Future 30Y years too', dara: 100000, firstYear: SY, lastYear: LAST_MAX },
+    { label: 'First Year the lower bracket year, Pre-Ladder Interest', dara: 40000, firstYear: GAP.first - 1, lastYear: MAX_YEAR, pli: true },
+    { label: 'First Year inside the gap', dara: 40000, firstYear: GAP.first + 1, lastYear: MAX_YEAR },
+    { label: 'First Year inside the gap, Pre-Ladder Interest', dara: 40000, firstYear: GAP.first + 1, lastYear: MAX_YEAR, pli: true },
+    { label: 'First Year 2027 with Pre-Ladder Interest, DARA 100,000', dara: 100000, firstYear: SY + 1, lastYear: MAX_YEAR, pli: true },
+  ];
+  for (const tc of cases) {
+    const tag = 'gap ' + tc.label;
+    const { summary: s, details } = runBuild({ dara: tc.dara, firstYear: tc.firstYear, lastYear: tc.lastYear, tipsMarketData, refCPI, settlementDate, preLadderInterest: !!tc.pli, bondHolidays });
+    const breakdown = [...s.gapParams.breakdown].sort((a, b) => a.year - b.year);
+    const conv = s.gapRebalances.conversions;
+    const firstGap = Math.min(...s.gapYears);
+    assert(tag + ': one conversion per gap year, earliest issue date first', conv.map(c => c.year).join(), breakdown.map(b => b.year).join());
+
+    // Issue dates: the last trading day of January, 10 years before the maturity year, after settlement.
+    for (const c of conv) {
+      assert(tag + ' ' + c.year + ': issue date is the last trading day of January ' + (c.year - 10), +c.issueDate, +lastTradingDayOfJanuary(c.year - 10));
+      assert(tag + ' ' + c.year + ': issued after settlement', c.issueDate > settlementDate, true);
+    }
+
+    const bracketBond = (year) => tipsMarketData.get(details.find(d => d.fundedYear === year && d.isGapBracket).cusip);
+    const lowerBond = bracketBond(s.lowerYear), upperBond = bracketBond(s.upperYear);
+    const irOf = b => indexRatio(refCPI, b.datedDateRefCpi ?? refCPI);
+    const cpbOn = (b, date) => priceFromYield(b.yield, b.coupon, date, b.maturity) / 100 * irOf(b) * 1000;
+
+    conv.forEach((c, k) => {
+      const later = breakdown.slice(k + 1);
+      const rows = later.map(r => {
+        const mat = new Date(r.year, 0, 15);
+        return { dur: calculateMDuration(c.issueDate, mat, r.synCpn, r.synYld), cost: r.qty * 1000 * priceFromYield(r.synYld, r.synCpn, c.issueDate, mat) / 100 };
+      });
+      const cost = rows.reduce((a, r) => a + r.cost, 0);
+      const t = tag + ' ' + c.year;
+      if (!rows.length) {
+        assert(t + ': the last conversion leaves no Excess TIPS', c.lowerQtyAfter === 0 && c.upperQtyAfter === 0, true);
+      } else {
+        const avg = cost > 0 ? rows.reduce((a, r) => a + r.cost * r.dur, 0) / cost : rows.reduce((a, r) => a + r.dur, 0) / rows.length;
+        assert(t + ': average duration of the Synthetic TIPS not yet issued, cost-weighted', c.avgDuration, avg, 1e-9);
+        const dL = calculateMDuration(c.issueDate, lowerBond.maturity, lowerBond.coupon, lowerBond.yield);
+        const dU = calculateMDuration(c.issueDate, upperBond.maturity, upperBond.coupon, upperBond.yield);
+        const wL = Math.abs(dU - dL) < 1e-4 ? 0.5 : Math.min(1, Math.max(0, (dU - avg) / (dU - dL)));
+        assert(t + ': lower Bracket Weight within 0 to 1 and re-solved on the issue date', c.lowerWeight, wL, 1e-9);
+        assert(t + ': Bracket Weights within 0 to 1', c.lowerWeight >= 0 && c.upperWeight >= 0 && Math.abs(c.lowerWeight + c.upperWeight - 1) < 1e-9, true);
+        // The Excess TIPS is only sold: the lesser of the quantity held and the duration match (2.0 §Gap Year Simulated Outstanding TIPS).
+        assert(t + ': lower Excess TIPS = the lesser of the quantity held and ROUND(cost not yet issued x weight / cost per TIPS)', c.lowerQtyAfter, Math.min(c.lowerQtyBefore, Math.round(cost * wL / cpbOn(lowerBond, c.issueDate))));
+        assert(t + ': upper Excess TIPS = the lesser of the quantity held and ROUND(cost not yet issued x weight / cost per TIPS)', c.upperQtyAfter, Math.min(c.upperQtyBefore, Math.round(cost * (1 - wL) / cpbOn(upperBond, c.issueDate))));
+        assert(t + ': no Excess TIPS is bought', c.lowerQtyAfter <= c.lowerQtyBefore && c.upperQtyAfter <= c.upperQtyBefore, true);
+      }
+      const simCost = breakdown[k].qty * 1000 * priceFromYield(breakdown[k].synYld, breakdown[k].synCpn, c.issueDate, new Date(c.year, 0, 15)) / 100;
+      const sold = (c.lowerQtyBefore - c.lowerQtyAfter) * cpbOn(lowerBond, c.issueDate) + (c.upperQtyBefore - c.upperQtyAfter) * cpbOn(upperBond, c.issueDate);
+      assert(t + ': Net Cash = Excess TIPS sold less the cost of the Simulated Outstanding Future 10Y TIPS', c.netCash, sold - simCost, 1e-6);
+      // Small next to the cost of the Simulated Outstanding Future 10Y TIPS, apart from the rounding of each bracket to whole TIPS (one TIPS of the dearer bracket).
+      if (simCost > 0) assert(t + ': Net Cash is small next to the cost of the Simulated Outstanding Future 10Y TIPS', Math.abs(c.netCash) <= 0.1 * simCost + Math.max(cpbOn(lowerBond, c.issueDate), cpbOn(upperBond, c.issueDate)), true);
+    });
+    if (conv.length) {
+      assert(tag + ': the first conversion starts from the Excess TIPS Pass 1 sized at settlement', conv[0].lowerQtyBefore === s.lowerExQty && conv[0].upperQtyBefore === s.upperExQty, true);
+      assert(tag + ': settlement precedes the first issue date', conv[0].issueYear > SY, true);
+    }
+
+    // The three amounts credited to each year before the first gap year, recomputed from the conversions' quantities.
+    const netOf = (c, before) => (before.lower - c.lowerQtyAfter) * cpbOn(lowerBond, c.issueDate) + (before.upper - c.upperQtyAfter) * cpbOn(upperBond, c.issueDate)
+      - breakdown.find(b => b.year === c.year).qty * 1000 * priceFromYield(breakdown.find(b => b.year === c.year).synYld, breakdown.find(b => b.year === c.year).synCpn, c.issueDate, new Date(c.year, 0, 15)) / 100;
+    for (let y = SY; y < firstGap; y++) {
+      const t = tag + ' ' + y;
+      let sim = 0;
+      for (const [k, c] of conv.entries()) {
+        const half = breakdown[k].qty * 1000 * breakdown[k].synCpn / 2;
+        if (c.issueYear < y) sim += 2 * half; else if (c.issueYear === y) sim += half;   // issued after January 15: one coupon (July 15) in the issue year
+      }
+      assert(t + ': interest of the Simulated Outstanding Future 10Y TIPS', s.gapSimulatedInterestByYear.get(y) ?? 0, sim, 1e-6);
+      let exc = 0;
+      for (const [bond, key, q0] of [[lowerBond, 'lower', s.lowerExQty], [upperBond, 'upper', s.upperExQty]]) {
+        const m1 = bond.maturity.getMonth();
+        for (const mo of [m1, (m1 + 6) % 12]) {
+          const date = new Date(y, mo, 15);
+          if (date >= bond.maturity) continue;
+          if (y === SY && actualPaymentDate(date, bondHolidays) < settlementDate) continue;   // the settlement year counts only a coupon not yet paid
+          let q = q0;
+          for (const c of conv) if (c.issueDate < date) q = key === 'lower' ? c.lowerQtyAfter : c.upperQtyAfter;
+          exc += q * 1000 * irOf(bond) * bond.coupon / 2;
+        }
+      }
+      assert(t + ': interest of the Excess TIPS, each coupon on the quantity held on its date', s.gapExcessInterestByYear.get(y) ?? 0, exc, 1e-6);
+      let net = 0, held = { lower: s.lowerExQty, upper: s.upperExQty };
+      for (const c of conv) { if (c.issueYear === y) net += netOf(c, held); held = { lower: c.lowerQtyAfter, upper: c.upperQtyAfter }; }
+      assert(t + ': Net Cash credited to the year of its issue date', s.gapNetCashByYear.get(y) ?? 0, net, 1e-6);
+    }
+
+    // No Excess TIPS interest in a gap year or in its own maturity year (DD Same-Maturity Excess Interest is 0).
+    assert(tag + ': no credited interest from a gap year onward', [...s.gapSimulatedInterestByYear.keys(), ...s.gapExcessInterestByYear.keys(), ...s.gapNetCashByYear.keys()].every(y => y < firstGap), true);
+    for (const d of details) if (d.isGapBracket) assert(tag + ' ' + d.fundedYear + ': bracket year has no Same-Maturity Excess Interest', d.excessLMI_After ?? 0, 0);
+
+    // The Amount of a gap year: P+I of its Simulated Outstanding Future 10Y TIPS plus the full annual coupons of the later gap years
+    // and of the actual TIPS above, which is the same actual-TIPS figure for every gap year.
+    const actualAbove = breakdown.map((b, i) => b.laterMatInt - breakdown.slice(i + 1).reduce((a, r) => a + r.annualInt, 0));
+    assert(tag + ': every gap year sees the same actual TIPS interest above the gap', Math.max(...actualAbove) - Math.min(...actualAbove) < 1e-6 && actualAbove.every(v => v >= -1e-6), true);
+
+    // Funded years: quantity = ROUND((DARA less running LMI less every credited amount) / P+I per TIPS), and the Amount lands on the DARA.
+    const zeroedSet = new Set(s.zeroedFundedYears);
+    for (const d of details) {
+      if (d.fundedYearAmt == null || d.dara == null || d.fundedYear < tc.firstYear || d.fundedYear > tc.lastYear) continue;
+      const credited = (d.future30ySimulatedInterest || 0) + (d.future30yCoverExcessInterest || 0) + (d.future30yNetCash || 0)
+        + (d.gapSimulatedInterest || 0) + (d.gapExcessInterest || 0) + (d.gapNetCash || 0);
+      if (zeroedSet.has(d.fundedYear) || (d.preLadderCreditForYear || 0) > 0 || d.fundedRungs?.length > 1) continue;
+      const expected = Math.max(0, Math.round((d.dara - d.longerDatedLMI - credited) / d.fundedYearPi));
+      assert(tag + ' ' + d.fundedYear + ': funded-year quantity from DARA less LMI less the credited amounts', d.fundedYearQty, expected);
+      assert(tag + ' ' + d.fundedYear + ': Amount lands within a TIPS of the DARA', Math.abs(d.fundedYearAmt - d.dara) <= d.fundedYearPi / 2 + 1, true);
+    }
+    if (tc.firstYear < firstGap && !tc.pli) {
+      const credited = details.filter(d => d.fundedYear < firstGap && d.fundedYear >= tc.firstYear).some(d => (d.gapSimulatedInterest || 0) > 0);
+      assert(tag + ': funded years before the first gap year are credited the interest of the Simulated Outstanding Future 10Y TIPS', credited, true);
+    }
+  }
+}
+
+
+// ── Test: gap years — Before with less Excess TIPS held than the duration match, and with Retained Bracket Excess ──
+// 2.0 §Gap Year Simulated Outstanding TIPS: on each issue date the Excess TIPS above the duration match is sold and none is
+// bought, so a holder with less Excess TIPS than the match keeps what is held until the match falls to it.
+{
+  console.log('');
+  console.log('Gap year conversions — Before with less Excess TIPS held, and Retained Bracket Excess');
+  const SY = settlementDate.getFullYear();
+  const DARA = 40000;
+  const { details: bD, summary: bS } = runBuild({ dara: DARA, firstYear: SY, lastYear: MAX_YEAR, tipsMarketData, refCPI, settlementDate, bondHolidays });
+  // Halve the Excess TIPS the build sized at both brackets.
+  const heldLowerExcess = Math.floor(bS.lowerExQty / 2), heldUpperExcess = Math.floor(bS.upperExQty / 2);
+  const holdings = bD.map(d => {
+    const ex = d.fundedYear === bS.lowerYear ? heldLowerExcess : d.fundedYear === bS.upperYear ? heldUpperExcess : d.excessQty;
+    return { cusip: d.cusip, qty: d.fundedYearQty + ex, excessQty: ex };
+  }).filter(h => h.qty > 0);
+  const { summary: rS } = runRebalance({
+    dara: DARA, bracketMode: '3bracket', holdings, tipsMarketData, refCPI, settlementDate, bondHolidays,
+    daraByYear: new Map(bS.daraByYearResolved), firstYearOverride: SY, lastYearOverride: MAX_YEAR,
+  });
+  const before = rS.gapRebalancesBefore.conversions, build = bS.gapRebalances.conversions;
+  assertGapConversionsSellOnly(before, 'less Excess TIPS held, Before');
+  assert('less Excess TIPS held: Before starts from the held quantities', before[0].lowerQtyBefore === heldLowerExcess && before[0].upperQtyBefore === heldUpperExcess, true);
+  assert('less Excess TIPS held: each conversion keeps the lesser of the quantity held and the build\'s quantity',
+    before.every((c, k) => c.lowerQtyAfter === Math.min(heldLowerExcess, build[k].lowerQtyAfter) && c.upperQtyAfter === Math.min(heldUpperExcess, build[k].upperQtyAfter)), true);
+  const sumOf = (m) => [...m.values()].reduce((a, v) => a + v, 0);
+  assert('less Excess TIPS held: Before credits less Excess TIPS interest than After', sumOf(rS.gapExcessInterestBefore) < sumOf(rS.gapExcessInterestByYear), true);
+  assert('less Excess TIPS held: After credits what a build credits', Math.abs(sumOf(rS.gapExcessInterestByYear) - sumOf(bS.gapExcessInterestByYear)) < 0.01, true);
+
+  // Retained Bracket Excess: an older lower bracket held beside the lower bracket and the upper bracket, converted by the engine.
+  const roles = ladderRoles(tipsMarketData, settlementDate);
+  const bracketBond = (year) => tipsMarketData.get(bD.find(d => d.fundedYear === year && d.isGapBracket).cusip);
+  const lowerBond = bracketBond(bS.lowerYear), upperBond = bracketBond(bS.upperYear);
+  const olderBond = tipsMarketData.get(roles.latestIn(roles.ordinaryYears[roles.ordinaryYears.length - 2]).cusip);
+  for (const retainedQty of [3, 25, 400]) {
+    const label = 'retained ' + retainedQty;
+    const { conversions } = gapRebalances({
+      gapParams: bS.gapParams, lowerBracketBond: lowerBond, upperBracketBond: upperBond, retained: [{ bond: olderBond, qty0: retainedQty }],
+      refCPI, bondHolidays, lowerQty0: bS.lowerExQty, upperQty0: bS.upperExQty,
+    });
+    assertGapConversionsSellOnly(conversions, label);
+    conversions.forEach(c => {
+      if (c.avgDuration == null) return;
+      assert(label + ' ' + c.year + ': the weights of the retained, active lower and upper brackets sum to 1', Math.abs(c.retainedWeights.reduce((a, w) => a + w, 0) + c.lowerWeight + c.upperWeight - 1) < 1e-9, true);
+      const dOlder = calculateMDuration(c.issueDate, olderBond.maturity, olderBond.coupon, olderBond.yield);
+      const blend = c.retainedWeights[0] * dOlder + c.lowerWeight * c.lowerDuration + c.upperWeight * c.upperDuration;
+      const inside = [c.lowerWeight, c.upperWeight, ...c.retainedWeights].every(w => w >= -1e-9 && w <= 1 + 1e-9);
+      if (inside) assert(label + ' ' + c.year + ': the blend of the three durations is the average duration of the Synthetic TIPS not yet issued', blend, c.avgDuration, 1e-6);
+      assert(label + ' ' + c.year + ': the retained maturity is held no higher than it was', c.retainedQtyAfter[0] <= Math.min(c.retainedQtyBefore[0], retainedQty), true);
+    });
+  }
+}
+
+// ── Test: DARA inferred from holdings with gap years (3.0 §DARA inference with Future 30Y years, the gap years inferred the same way) ──
+// A holder's file that states the Excess TIPS but no DARA: the DARA is the median of each funded year's Amount calculated from the
+// holdings, with the Simulated Outstanding Future 10Y TIPS and Excess TIPS interest and the Net Cash the held Excess TIPS imply.
+// It recovers the DARA the ladder was built at, to within the whole-TIPS rounding of the held excess.
+{
+  console.log('');
+  console.log('Gap years — the DARA inferred from the held Excess TIPS');
+  const SY = settlementDate.getFullYear();
+  for (const tc of [
+    { dara: 40000, firstYear: SY, lastYear: MAX_YEAR, pli: false },
+    { dara: 100000, firstYear: SY, lastYear: MAX_YEAR, pli: false },
+    { dara: 40000, firstYear: SY, lastYear: LAST_MAX, pli: false },
+    { dara: 40000, firstYear: SY + 1, lastYear: LAST_MAX, pli: true },
+    { dara: 40000, firstYear: GAP.first - 1, lastYear: LAST_MAX, pli: true },
+  ]) {
+    const label = `DARA ${tc.dara} ${tc.firstYear}–${tc.lastYear}${tc.pli ? ' +PLI' : ''}`;
+    const { details: bD } = runBuild({ dara: tc.dara, firstYear: tc.firstYear, lastYear: tc.lastYear, tipsMarketData, refCPI, settlementDate, preLadderInterest: tc.pli, bondHolidays });
+    const holdings = bD.map(d => ({ cusip: d.cusip, qty: d.fundedYearQty + d.excessQty, excessQty: d.excessQty })).filter(h => h.qty > 0);
+    for (const mode of ['2bracket', '3bracket']) {
+      const { summary } = runRebalance({
+        dara: null, bracketMode: mode, holdings, tipsMarketData, refCPI, settlementDate, bondHolidays,
+        preLadderInterest: tc.pli, firstYearOverride: tc.firstYear, lastYearOverride: tc.lastYear,
+      });
+      assert(`${label} (${mode}): the inferred DARA is within 1% of the DARA the ladder was built at`, Math.abs(summary.inferredDARA - tc.dara) <= tc.dara * 0.01, true);
+    }
+  }
+}
+
 
 console.log(`\n${passed + failed} tests: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

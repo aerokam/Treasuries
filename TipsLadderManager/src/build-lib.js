@@ -47,7 +47,8 @@ export function runBuild({ dara, firstYear: firstYearOpt, lastYear, tipsMarketDa
     future30yLowerExQty, future30yUpperExQty, future30yFellBack, future30yCoverReason, future30yTotalExcessCost,
     future30yLowerMonth, future30yUpperMonth,
     future30yRebalances, future30ySimulatedInterestByYear, future30yCoverInterestByYear, future30yNetCashByYear,
-    preLadderYears, preLadderPool, preLadderCouponPool, preLadderFuture30yPool, preLadderNetCashPool,
+    gapRebalances, gapSimulatedInterestByYear, gapExcessInterestByYear, gapNetCashByYear,
+    preLadderYears, preLadderPool, preLadderCouponPool, preLadderFuture30yPool, preLadderGapPool, preLadderNetCashPool,
   } = sizeLadder({
     dara, daraByYear, firstYear, lastYear,
     rangeYears, gapYears, future30yYears,
@@ -72,14 +73,18 @@ export function runBuild({ dara, firstYear: firstYearOpt, lastYear, tipsMarketDa
     const future30yExQty = year === future30yLowerYear ? future30yLowerExQty : year === future30yUpperYear ? future30yUpperExQty : 0;
     const excessQty   = gapExQty + future30yExQty;
     const { indexRatio: irRep, costPerBond: cpbRep } = bondCalcs(repBond, refCPI);
-    // Same-Maturity Excess Interest: the gap bracket excess only. The Cover Excess is sold before it
-    // matures, so a cover year's is 0 (DD §Same-Maturity Excess Interest).
-    const excessLMI   = gapExQty * 1000 * irRep * (repBond.coupon ?? 0);
+    // Same-Maturity Excess Interest is 0: the Excess TIPS and the Cover Excess are sold before they
+    // mature (DD §Same-Maturity Excess Interest). Their interest is credited to the funded years below.
+    const excessLMI   = 0;
     // Interest of the Simulated Outstanding Future 30Y TIPS and of the Cover Excess, and the Net Cash,
     // credited to this year (2.0 §Future 30Y Simulated Outstanding TIPS §Interest credited to a funded year).
     const simulatedInterest   = (year >= firstYear && year <= lastYear) ? (future30ySimulatedInterestByYear.get(year) ?? 0) : 0;
     const coverExcessInterest = (year >= firstYear && year <= lastYear) ? (future30yCoverInterestByYear.get(year) ?? 0) : 0;
     const future30yNetCash    = (year >= firstYear && year <= lastYear) ? (future30yNetCashByYear.get(year) ?? 0) : 0;
+    // The same three amounts for the gap years (2.0 §Gap Year Simulated Outstanding TIPS §Interest credited to a funded year).
+    const gapSimulatedInterest = (year >= firstYear && year <= lastYear) ? (gapSimulatedInterestByYear.get(year) ?? 0) : 0;
+    const gapExcessInterest    = (year >= firstYear && year <= lastYear) ? (gapExcessInterestByYear.get(year) ?? 0) : 0;
+    const gapNetCash           = (year >= firstYear && year <= lastYear) ? (gapNetCashByYear.get(year) ?? 0) : 0;
     const isBracket    = excessQty > 0;
     const isFuture30yCover = future30yExQty > 0;
 
@@ -107,7 +112,7 @@ export function runBuild({ dara, firstYear: firstYearOpt, lastYear, tipsMarketDa
     const rowAvailableCashCredit = cashCreditByFundedYear[year] ?? 0;
     const { credit: preLadderCreditForYear, amount: _fundedAmt } = fundedYearAmount({
       principal: fundedYearPITotal, laterMatInt: corr_lmi, ownExcessCoupon: excessLMI,
-      simulatedInterest, coverExcessInterest, netCash: future30yNetCash, dara: yearDara, isZeroed,
+      simulatedInterest, coverExcessInterest, netCash: future30yNetCash, gapSimulatedInterest, gapExcessInterest, gapNetCash, dara: yearDara, isZeroed,
       partialCredit: year === partialCreditYear ? partialCredit : 0,
     });
     const fundedYearAmt = (year > lastYear || year < firstYear) ? 0 : _fundedAmt;
@@ -162,6 +167,9 @@ export function runBuild({ dara, firstYear: firstYearOpt, lastYear, tipsMarketDa
         future30ySimulatedInterest: first ? simulatedInterest : 0,
         future30yCoverExcessInterest: first ? coverExcessInterest : 0,
         future30yNetCash: first ? future30yNetCash : 0,
+        gapSimulatedInterest: first ? gapSimulatedInterest : 0,
+        gapExcessInterest: first ? gapExcessInterest : 0,
+        gapNetCash: first ? gapNetCash : 0,
         availableCashCredit: first ? rowAvailableCashCredit : 0,
         fundedYearPi: r.pi,
         // Multi-TIPS Amount drill iterates fundedRungs (each TIPS's own P+I); single-TIPS uses the
@@ -211,12 +219,13 @@ export function runBuild({ dara, firstYear: firstYearOpt, lastYear, tipsMarketDa
     future30yLowerMonth, future30yUpperMonth,
     future30yParams,
     future30yAnchorBond, future30yRebalances, future30ySimulatedInterestByYear, future30yCoverInterestByYear, future30yNetCashByYear,
+    gapRebalances, gapSimulatedInterestByYear, gapExcessInterestByYear, gapNetCashByYear,
     syntheticYearAmounts: syntheticYearAmounts({ gapParams, future30yParams }),
     totalBuyCost,
     weightedAvgDuration,
     weightedAvgYield,
     weightedAvgSaYield,
-    preLadderInterest, maturityPref, couponPref, preLadderYears, preLadderPool, preLadderCouponPool, preLadderFuture30yPool, preLadderNetCashPool,
+    preLadderInterest, maturityPref, couponPref, preLadderYears, preLadderPool, preLadderCouponPool, preLadderFuture30yPool, preLadderGapPool, preLadderNetCashPool,
     zeroedFundedYears: [...zeroedFundedYears].sort((a, b) => a - b),
   };
 

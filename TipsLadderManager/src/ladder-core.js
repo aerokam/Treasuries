@@ -12,15 +12,15 @@
 import { bondCalcs, calculateMDuration, couponSchedule, priceFromYield } from '../../shared/src/bond-math.js';
 import { actualPaymentDate, lastBusinessDayOfMonth } from '../../shared/src/settlement.js';
 import { indexRatio as calcIndexRatio } from '../../shared/src/ref-cpi.js';
-import { bracketWeights, bracketExcessQtys, fyQty as _fyQty, gapParamsWithUpperFeedback, future30yParamsCore, syntheticCoupon } from './gap-math.js';
+import { bracketWeights, bracketWeightsN, bracketExcessQtys, fyQty as _fyQty, gapParamsCore, future30yParamsCore, syntheticCoupon } from './gap-math.js';
 
 // ─── Gap parameters adapter ─────────────────────────────────────────────────────
 // Build's "LMI above the gap" = prelim funded-year coupon (effective prelim: zeroed years = 0).
-// Sizing (incl. the 2040 upper-excess-coupon fixpoint) lives in the shared gapParamsWithUpperFeedback.
+// Sizing lives in the shared gapParamsCore; the Excess TIPS pays no interest in a gap year (2.0 §Gap Year Simulated Outstanding TIPS).
 function calcGapParams(gapYears, tipsMarketData, settlementDate, refCPI, dara, prelim, pliCreditByGapYear = {}, daraByYear = null) {
   const lmiAboveByYear = {};
   for (const [y, p] of Object.entries(prelim)) lmiAboveByYear[y] = p.annualInterest;
-  return gapParamsWithUpperFeedback({ gapYears, tipsMarketData, settlementDate, refCPI, dara, daraByYear, lmiAboveByYear, pliCreditByGapYear });
+  return gapParamsCore({ gapYears, tipsMarketData, settlementDate, dara, daraByYear, lmiAboveByYear, pliCreditByGapYear });
 }
 
 // ─── Future 30Y anchor and cover pair ───────────────────────────────────────────
@@ -109,41 +109,69 @@ export function sizeFuture30yCover({
   };
 }
 
-// ─── Future 30Y Simulated Outstanding TIPS: the rebalances at the issue dates ───
-// Spec: 2.0 §Future 30Y Simulated Outstanding TIPS. Each Future 30Y year's TIPS is issued on the
-// last trading day of February, 30 years before its maturity year; the conversions are taken in
-// order, earliest issue date first. Each conversion is a rebalance measured on the issue date:
-// the Synthetic TIPS keep the yield and coupon Pass 1 gave them and each cover keeps its yield and
-// coupon, so only the dates move. Index ratios stay at their settlement values (Synthetic TIPS
-// 1.00000), so every dollar figure here is in the same Ref CPI basis as the rest of the ladder.
-//   1. The Synthetic TIPS not yet issued are the Future 30Y years later than the one being issued;
-//      their average duration is cost-weighted.
-//   2. Both covers are re-measured; the Cover Weights are solved again (held within 0 to 1).
-//   3. Cover Excess = ROUND(total cost of the Synthetic TIPS not yet issued × weight ÷ cost per TIPS).
-//   4. The Cover Excess that falls is sold, and the Simulated Outstanding Future 30Y TIPS is bought
-//      at the quantity Pass 1 sized. netCash = excess sold − that TIPS' cost.
-// After the last conversion no Synthetic TIPS are left, so the Cover Excess is 0.
-// The quantities after each conversion come from the duration match alone, so they do not depend
-// on lowerQty0/upperQty0 (the Cover Excess held before the first issue date); only the first
-// conversion's netCash does.
-export function future30yIssueDate(future30yYear, bondHolidays = new Set()) {
-  return lastBusinessDayOfMonth(future30yYear - 30, 1, bondHolidays);
+// ─── Simulated Outstanding TIPS: the rebalances at the issue dates ──────────────
+// Spec: 2.0 §Future 30Y Simulated Outstanding TIPS and §Gap Year Simulated Outstanding TIPS, one
+// rule with two parameter sets (4.0 §build-lib.js / rebalance-lib.js). Each Future 30Y year's TIPS is
+// issued on the last trading day of February, 30 years before its maturity year; each gap year's on
+// the last trading day of January, 10 years before. The conversions are taken in order, earliest
+// issue date first. Each conversion is a rebalance measured on the issue date: the Synthetic TIPS
+// keep the yield and coupon Pass 1 gave them and each bracket TIPS (cover, for the Future 30Y years)
+// keeps its yield and coupon, so only the dates move. Index ratios stay at their settlement values
+// (Synthetic TIPS 1.00000), so every dollar figure here is in the same Ref CPI basis as the rest of
+// the ladder.
+//   1. The Synthetic TIPS not yet issued are the years later than the one being issued; their
+//      average duration is cost-weighted.
+//   2. Both bracket TIPS are re-measured; the Bracket Weights are solved again (held within 0 to 1).
+//   3. The Excess TIPS each bracket should hold = ROUND(total cost of the Synthetic TIPS not yet
+//      issued × weight ÷ cost per TIPS).
+//   4. Future 30Y years: the Cover Excess goes to that quantity. Gap years: the Excess TIPS above it is
+//      sold and none is bought (a bracket that holds no more keeps what it holds), the active lower
+//      bracket included. With Retained Bracket Excess the retained maturities are frozen at what they
+//      hold and sold earliest first only as far as the match requires (bracketWeightsN, 2.0 §Retained
+//      Bracket Excess); the active lower bracket is never sold to make room for them.
+//      The Simulated Outstanding TIPS is bought at the quantity Pass 1 sized. netCash = excess sold − that TIPS' cost.
+// After the last conversion no Synthetic TIPS are left, so the Excess TIPS is 0.
+// The Future 30Y quantities after each conversion come from the duration match alone, so they do not
+// depend on lowerQty0/upperQty0 (the Cover Excess held before the first issue date); only the first
+// conversion's netCash does. The gap year quantities after a conversion are the lesser of the quantity held
+// and the duration match, so they do depend on them.
+// `monthIndex` is the month (0-based) of the issue date and of the Synthetic TIPS' maturity, January 15
+// or February 15; the TIPS pays coupons on that day and six months later.
+const SIMULATED_TIPS = {
+  future30y: { yearsBefore: 30, monthIndex: 1, onlySell: false },
+  gap:       { yearsBefore: 10, monthIndex: 0, onlySell: true },
+};
+
+function simulatedIssueDate(kind, year, bondHolidays) {
+  const { yearsBefore, monthIndex } = SIMULATED_TIPS[kind];
+  return lastBusinessDayOfMonth(year - yearsBefore, monthIndex, bondHolidays);
 }
 
-export function future30yRebalances({ future30yParams, lowerCoverBond, upperCoverBond, refCPI, bondHolidays = new Set(), lowerQty0 = 0, upperQty0 = 0 }) {
-  const breakdown = [...(future30yParams?.breakdown ?? [])].sort((a, b) => a.year - b.year);
-  if (!breakdown.length || !lowerCoverBond || !upperCoverBond) return { conversions: [], lowerQty0, upperQty0 };
-  const irL = calcIndexRatio(refCPI, lowerCoverBond.datedDateRefCpi ?? refCPI);
-  const irU = calcIndexRatio(refCPI, upperCoverBond.datedDateRefCpi ?? refCPI);
+export function future30yIssueDate(future30yYear, bondHolidays = new Set()) {
+  return simulatedIssueDate('future30y', future30yYear, bondHolidays);
+}
+export function gapIssueDate(gapYear, bondHolidays = new Set()) {
+  return simulatedIssueDate('gap', gapYear, bondHolidays);
+}
+
+// `retained`: [{ bond, qty0 }], oldest first — the retained lower bracket maturities, each with the Excess
+// TIPS it holds before the first conversion (gap years only).
+function simulatedRebalances({ kind, breakdown: rows, lowerBond, upperBond, retained = [], refCPI, bondHolidays = new Set(), lowerQty0 = 0, upperQty0 = 0 }) {
+  const { monthIndex, onlySell } = SIMULATED_TIPS[kind];
+  const breakdown = [...(rows ?? [])].sort((a, b) => a.year - b.year);
+  const retainedQty0 = retained.map(r => r.qty0 ?? 0);
+  if (!breakdown.length || !lowerBond || !upperBond) return { conversions: [], lowerQty0, upperQty0, retainedQty0 };
+  const irOfBond = (bond) => calcIndexRatio(refCPI, bond.datedDateRefCpi ?? refCPI);
+  const irL = irOfBond(lowerBond), irU = irOfBond(upperBond);
   const cpbOn = (bond, ir, date) => (priceFromYield(bond.yield ?? 0, bond.coupon ?? 0, date, bond.maturity) ?? 0) / 100 * ir * 1000;
   const durOn = (bond, date) => calculateMDuration(date, bond.maturity, bond.coupon ?? 0, bond.yield ?? 0);
   const conversions = [];
-  let lowerQty = lowerQty0, upperQty = upperQty0;
+  let lowerQty = lowerQty0, upperQty = upperQty0, retainedQty = [...retainedQty0];
   for (let k = 0; k < breakdown.length; k++) {
     const entry = breakdown[k];
-    const issueDate = future30yIssueDate(entry.year, bondHolidays);
+    const issueDate = simulatedIssueDate(kind, entry.year, bondHolidays);
     const notYetIssued = breakdown.slice(k + 1).map(r => {
-      const mat = new Date(r.year, 1, 15);
+      const mat = new Date(r.year, monthIndex, 15);
       const price = priceFromYield(r.synYld, r.synCpn, issueDate, mat) ?? 100;
       return { year: r.year, dur: calculateMDuration(issueDate, mat, r.synCpn, r.synYld), cost: r.qty * 1000 * price / 100 };
     });
@@ -151,59 +179,94 @@ export function future30yRebalances({ future30yParams, lowerCoverBond, upperCove
     const avgDuration = notYetIssued.length === 0 ? null
       : notYetIssuedCost > 0 ? notYetIssued.reduce((s, r) => s + r.cost * r.dur, 0) / notYetIssuedCost
       : notYetIssued.reduce((s, r) => s + r.dur, 0) / notYetIssued.length;
-    const lowerDuration = durOn(lowerCoverBond, issueDate), upperDuration = durOn(upperCoverBond, issueDate);
-    const lowerCostPerBond = cpbOn(lowerCoverBond, irL, issueDate), upperCostPerBond = cpbOn(upperCoverBond, irU, issueDate);
-    let lowerWeight = 0, upperWeight = 0, lowerQtyAfter = 0, upperQtyAfter = 0, withinCovers = true;
+    const lowerDuration = durOn(lowerBond, issueDate), upperDuration = durOn(upperBond, issueDate);
+    const lowerCostPerBond = cpbOn(lowerBond, irL, issueDate), upperCostPerBond = cpbOn(upperBond, irU, issueDate);
+    const retainedCostPerBond = retained.map(r => cpbOn(r.bond, irOfBond(r.bond), issueDate));
+    let lowerWeight = 0, upperWeight = 0, withinCovers = true;
+    let lowerTarget = 0, upperTarget = 0;
+    let retainedTarget = retained.map(() => 0), retainedWeights = retained.map(() => 0);
     if (avgDuration != null) {
-      ({ lowerWeight, upperWeight } = bracketWeights(lowerDuration, upperDuration, avgDuration));
-      ({ lowerExQty: lowerQtyAfter, upperExQty: upperQtyAfter } = bracketExcessQtys(notYetIssuedCost, lowerWeight, upperWeight, lowerCostPerBond, upperCostPerBond));
+      if (!retained.length) {
+        ({ lowerWeight, upperWeight } = bracketWeights(lowerDuration, upperDuration, avgDuration));
+        ({ lowerExQty: lowerTarget, upperExQty: upperTarget } = bracketExcessQtys(notYetIssuedCost, lowerWeight, upperWeight, lowerCostPerBond, upperCostPerBond));
+      } else {
+        const wN = bracketWeightsN({
+          retained: retained.map((r, i) => ({ excessCost: retainedQty[i] * retainedCostPerBond[i], duration: durOn(r.bond, issueDate) })),
+          dActive: lowerDuration, dUpper: upperDuration, dGap: avgDuration, totalBlockCost: notYetIssuedCost,
+          activeFloorWeight: notYetIssuedCost > 0 ? lowerQty * lowerCostPerBond / notYetIssuedCost : 0,
+        });
+        lowerWeight = wN.activeWeight; upperWeight = wN.upperWeight; retainedWeights = wN.retainedWeights;
+        const qtyOf = (weight, cpb) => cpb > 0 ? Math.max(0, Math.round(notYetIssuedCost * weight / cpb)) : 0;
+        lowerTarget = qtyOf(lowerWeight, lowerCostPerBond); upperTarget = qtyOf(upperWeight, upperCostPerBond);
+        retainedTarget = retained.map((r, i) => qtyOf(retainedWeights[i], retainedCostPerBond[i]));
+      }
       withinCovers = avgDuration >= Math.min(lowerDuration, upperDuration) && avgDuration <= Math.max(lowerDuration, upperDuration);
     }
-    const simPrice = priceFromYield(entry.synYld, entry.synCpn, issueDate, new Date(entry.year, 1, 15)) ?? 100;
+    // Gap years: the Excess TIPS is only sold, never bought. Future 30Y years: it goes to the match.
+    const after = (held, target) => onlySell ? Math.min(held, target) : target;
+    const lowerQtyAfter = after(lowerQty, lowerTarget), upperQtyAfter = after(upperQty, upperTarget);
+    const retainedQtyAfter = retainedQty.map((q, i) => after(q, retainedTarget[i]));
+    const simPrice = priceFromYield(entry.synYld, entry.synCpn, issueDate, new Date(entry.year, monthIndex, 15)) ?? 100;
     const simulatedCost = entry.qty * 1000 * simPrice / 100;
-    const excessSold = (lowerQty - lowerQtyAfter) * lowerCostPerBond + (upperQty - upperQtyAfter) * upperCostPerBond;
+    const excessSold = (lowerQty - lowerQtyAfter) * lowerCostPerBond + (upperQty - upperQtyAfter) * upperCostPerBond
+      + retainedQty.reduce((s, q, i) => s + (q - retainedQtyAfter[i]) * retainedCostPerBond[i], 0);
     conversions.push({
       year: entry.year, issueDate, issueYear: issueDate.getFullYear(),
       simulatedQty: entry.qty, simulatedCoupon: entry.synCpn, simulatedCost,
       notYetIssued, notYetIssuedCost, avgDuration, lowerDuration, upperDuration, withinCovers,
-      lowerWeight, upperWeight, lowerCostPerBond, upperCostPerBond,
+      lowerWeight, upperWeight, retainedWeights, lowerCostPerBond, upperCostPerBond, retainedCostPerBond,
       lowerQtyBefore: lowerQty, upperQtyBefore: upperQty, lowerQtyAfter, upperQtyAfter,
+      retainedQtyBefore: [...retainedQty], retainedQtyAfter,
       excessSold, netCash: excessSold - simulatedCost,
     });
-    lowerQty = lowerQtyAfter; upperQty = upperQtyAfter;
+    lowerQty = lowerQtyAfter; upperQty = upperQtyAfter; retainedQty = retainedQtyAfter;
   }
-  return { conversions, lowerQty0, upperQty0 };
+  return { conversions, lowerQty0, upperQty0, retainedQty0 };
 }
 
-// ─── Interest credited to the funded years before the first Future 30Y year ─────
-// Spec: 2.0 §Future 30Y Simulated Outstanding TIPS §Interest credited to a funded year.
-// For each year from settlement to the year before the first Future 30Y year, three amounts:
-//   simulated — the coupons of every Simulated Outstanding Future 30Y TIPS issued by that year: one
-//               coupon (August 15) in its issue year, two in each later year (half the annual
+export function future30yRebalances({ future30yParams, lowerCoverBond, upperCoverBond, refCPI, bondHolidays = new Set(), lowerQty0 = 0, upperQty0 = 0 }) {
+  return simulatedRebalances({ kind: 'future30y', breakdown: future30yParams?.breakdown, lowerBond: lowerCoverBond, upperBond: upperCoverBond, refCPI, bondHolidays, lowerQty0, upperQty0 });
+}
+
+// The gap year conversions (2.0 §Gap Year Simulated Outstanding TIPS): the bracket pair is the lower
+// bracket TIPS and the upper bracket TIPS, the Excess TIPS the quantity held at each; `retained` holds
+// the retained lower bracket maturities, if any ([{ bond, qty0 }], oldest first).
+export function gapRebalances({ gapParams, lowerBracketBond, upperBracketBond, retained = [], refCPI, bondHolidays = new Set(), lowerQty0 = 0, upperQty0 = 0 }) {
+  return simulatedRebalances({ kind: 'gap', breakdown: gapParams?.breakdown, lowerBond: lowerBracketBond, upperBond: upperBracketBond, retained, refCPI, bondHolidays, lowerQty0, upperQty0 });
+}
+
+// ─── Interest credited to the funded years before the first simulated year ──────
+// Spec: 2.0 §Future 30Y Simulated Outstanding TIPS and §Gap Year Simulated Outstanding TIPS, each
+// §Interest credited to a funded year.
+// For each year from settlement to the year before the first Future 30Y year (gap year), three amounts:
+//   simulated — the coupons of every Simulated Outstanding TIPS issued by that year: one coupon (the
+//               one after the issue date) in its issue year, two in each later year (half the annual
 //               coupon each: quantity × 1,000 × synthetic coupon ÷ 2);
-//   cover     — the coupons of the Cover Excess: each coupon date's quantity is the one held on
-//               that date (before that year's conversion for the February coupon, after it for the
-//               August coupon); `lowerQty0`/`upperQty0` before the first conversion;
-//   netCash   — the Net Cash of each issue date in that year: the Cover Excess sold less the cost of
-//               the Simulated Outstanding Future 30Y TIPS bought, both on the issue date. Cash
-//               delivered in a year counts toward that year.
+//   excess    — the coupons of the Excess TIPS (Cover Excess): each coupon date's quantity is the one
+//               held on that date (before that year's conversion for a coupon dated earlier in the year
+//               than the issue date, after it for a later coupon); `lowerQty0`/`upperQty0` before the
+//               first conversion;
+//   netCash   — the Net Cash of each issue date in that year: the Excess TIPS sold less the cost of
+//               the Simulated Outstanding TIPS bought, both on the issue date. Cash delivered in a year
+//               counts toward that year.
 // A coupon counts toward the year it is paid in. In the settlement year only a coupon not yet paid
 // as of tradeDate counts, filtered by the Coupon Counting choice the same way rmdCappedRemainingCoupons
 // filters an actual holding (2.0 §Settlement-year LMI is remaining coupons only). The Net Cash is not
 // a coupon, and every issue date falls after settlement, so it is not filtered. None of the three is
 // carried in the running LMI: the amounts differ from year to year.
-// The Net Cash of the first issue date depends on the Cover Excess held before it, so it is worked
+// The Net Cash of the first issue date depends on the Excess TIPS held before it, so it is worked
 // out here from `lowerQty0`/`upperQty0` (the Before state passes the held quantities) rather than read
 // from the conversion, whose own figure assumes the quantities Pass 1 sized.
-// Returns { simulated: Map<year, $>, cover: Map<year, $>, netCash: Map<year, $> }.
-export function future30yInterestByYear({
-  rebalances, lowerCoverBond, upperCoverBond, refCPI, settlementDate, firstFuture30yYear,
+// Returns { simulated: Map<year, $>, excess: Map<year, $>, netCash: Map<year, $> }.
+function simulatedInterestByYear({
+  kind, rebalances, lowerBond, upperBond, retained = [], refCPI, settlementDate, firstYear,
   lowerQty0 = rebalances?.lowerQty0 ?? 0, upperQty0 = rebalances?.upperQty0 ?? 0,
   bondHolidays = new Set(), rmdCouponMode = 'all', tradeDate = settlementDate, rmdLastDate = null,
 }) {
-  const simulated = new Map(), cover = new Map(), netCash = new Map();
+  const { monthIndex } = SIMULATED_TIPS[kind];
+  const simulated = new Map(), excess = new Map(), netCash = new Map();
   const conversions = rebalances?.conversions ?? [];
-  if (!conversions.length || firstFuture30yYear == null) return { simulated, cover, netCash };
+  if (!conversions.length || firstYear == null) return { simulated, excess, netCash };
   const settlementYear = settlementDate.getFullYear();
   const counts = (date) => {
     const paid = actualPaymentDate(date, bondHolidays);
@@ -214,40 +277,74 @@ export function future30yInterestByYear({
     return true;
   };
   const add = (map, year, v) => { if (v) map.set(year, (map.get(year) ?? 0) + v); };
+  // The Excess TIPS legs: the lower bracket, the upper bracket and any retained maturity, each with the
+  // quantity held before the first conversion and the quantity after each conversion.
+  const legs = [
+    { bond: lowerBond, qty0: lowerQty0, after: c => c.lowerQtyAfter },
+    { bond: upperBond, qty0: upperQty0, after: c => c.upperQtyAfter },
+    ...retained.map((r, i) => ({ bond: r.bond, qty0: rebalances.retainedQty0?.[i] ?? r.qty0 ?? 0, after: c => c.retainedQtyAfter?.[i] ?? 0 })),
+  ];
 
-  for (let year = settlementYear; year < firstFuture30yYear; year++) {
-    // Simulated Outstanding Future 30Y TIPS: every TIPS whose maturity is February 15, so its
-    // coupon dates are February 15 and August 15; a coupon dated before the issue date is not paid.
+  for (let year = settlementYear; year < firstYear; year++) {
+    // Simulated Outstanding TIPS: every TIPS matures on the 15th of the issue month, so its coupon
+    // dates are that day and six months later; a coupon dated before the issue date is not paid.
     for (const c of conversions) {
       if (c.issueYear > year) continue;
       const half = c.simulatedQty * 1000 * c.simulatedCoupon / 2;
-      for (const date of [new Date(year, 1, 15), new Date(year, 7, 15)]) {
+      for (const date of [new Date(year, monthIndex, 15), new Date(year, monthIndex + 6, 15)]) {
         if (date > c.issueDate && counts(date)) add(simulated, year, half);
       }
     }
-    // Cover Excess, on each cover's own coupon dates in this year.
-    for (const [bond, qty0, key] of [[lowerCoverBond, lowerQty0, 'lower'], [upperCoverBond, upperQty0, 'upper']]) {
+    // Excess TIPS, on each bracket TIPS' own coupon dates in this year.
+    for (const { bond, qty0, after } of legs) {
       if (!bond?.maturity) continue;
       const ir = calcIndexRatio(refCPI, bond.datedDateRefCpi ?? refCPI);
       const halfPerBond = 1000 * ir * (bond.coupon ?? 0) / 2;
       const from = new Date(year, 0, 1);
       for (const date of couponSchedule(from, bond.maturity)) {
         if (date.getFullYear() !== year) continue;
-        if (date >= bond.maturity) continue;   // the Cover Excess is sold before it matures
+        if (date >= bond.maturity) continue;   // the Excess TIPS is sold before it matures
         let qty = qty0;
-        for (const c of conversions) if (c.issueDate < date) qty = key === 'lower' ? c.lowerQtyAfter : c.upperQtyAfter;
-        if (qty > 0 && counts(date)) add(cover, year, qty * halfPerBond);
+        for (const c of conversions) if (c.issueDate < date) qty = after(c);
+        if (qty > 0 && counts(date)) add(excess, year, qty * halfPerBond);
       }
     }
   }
   // Net Cash, credited to the funded year of the year of its issue date.
-  let lowerHeld = lowerQty0, upperHeld = upperQty0;
+  const held = legs.map(l => l.qty0);
   for (const c of conversions) {
-    const net = (lowerHeld - c.lowerQtyAfter) * c.lowerCostPerBond + (upperHeld - c.upperQtyAfter) * c.upperCostPerBond - c.simulatedCost;
-    if (c.issueYear >= settlementYear && c.issueYear < firstFuture30yYear) add(netCash, c.issueYear, net);
-    lowerHeld = c.lowerQtyAfter; upperHeld = c.upperQtyAfter;
+    const costs = [c.lowerCostPerBond, c.upperCostPerBond, ...(c.retainedCostPerBond ?? [])];
+    let net = -c.simulatedCost;
+    legs.forEach((l, i) => { net += (held[i] - l.after(c)) * costs[i]; held[i] = l.after(c); });
+    if (c.issueYear >= settlementYear && c.issueYear < firstYear) add(netCash, c.issueYear, net);
   }
-  return { simulated, cover, netCash };
+  return { simulated, excess, netCash };
+}
+
+export function future30yInterestByYear({
+  rebalances, lowerCoverBond, upperCoverBond, refCPI, settlementDate, firstFuture30yYear,
+  lowerQty0 = rebalances?.lowerQty0 ?? 0, upperQty0 = rebalances?.upperQty0 ?? 0,
+  bondHolidays = new Set(), rmdCouponMode = 'all', tradeDate = settlementDate, rmdLastDate = null,
+}) {
+  const { simulated, excess, netCash } = simulatedInterestByYear({
+    kind: 'future30y', rebalances, lowerBond: lowerCoverBond, upperBond: upperCoverBond, refCPI, settlementDate, firstYear: firstFuture30yYear,
+    lowerQty0, upperQty0, bondHolidays, rmdCouponMode, tradeDate, rmdLastDate,
+  });
+  return { simulated, cover: excess, netCash };
+}
+
+// The gap year amounts: the interest of the Simulated Outstanding Future 10Y TIPS, the interest of the
+// Excess TIPS and the Net Cash, credited to the funded years before the first gap year. The Excess TIPS held
+// before the first conversion are those the conversions were calculated from (`rebalances`).
+export function gapInterestByYear({
+  rebalances, lowerBracketBond, upperBracketBond, retained = [], refCPI, settlementDate, firstGapYear,
+  bondHolidays = new Set(), rmdCouponMode = 'all', tradeDate = settlementDate, rmdLastDate = null,
+}) {
+  const { simulated, excess, netCash } = simulatedInterestByYear({
+    kind: 'gap', rebalances, lowerBond: lowerBracketBond, upperBond: upperBracketBond, retained, refCPI, settlementDate, firstYear: firstGapYear,
+    bondHolidays, rmdCouponMode, tradeDate, rmdLastDate,
+  });
+  return { simulated, excess, netCash };
 }
 
 // ─── The ladder's last year, at most ────────────────────────────────────────────
@@ -282,8 +379,10 @@ export function maxLastYear({ tipsMarketData, settlementDate, refCPI = 1, bondHo
 // ─── Amount of a gap year and a Future 30Y year ─────────────────────────────────
 // Spec: 2.0 §Amount of a Gap Year and a Future 30Y Year. Shown on the year's group header row,
 // in Build and in Rebalance, before and after (5.0 §Sub-Row Logic).
-//   gap year       — P+I of its Synthetic TIPS + the LMI that sized its quantity down (the
-//                    later-maturity interest and the pre-ladder credit), from gapParams.breakdown;
+//   gap year       — P+I of its Simulated Outstanding Future 10Y TIPS (same quantity, coupon and
+//                    maturity as its Synthetic TIPS) + the LMI that sized its quantity down (the full
+//                    annual coupons of the later gap years, the actual TIPS above and the pre-ladder
+//                    credit), from gapParams.breakdown; the Amount equals the one Pass 1 gives its Synthetic TIPS;
 //   Future 30Y year — P+I of its Simulated Outstanding Future 30Y TIPS (same quantity, coupon and
 //                    maturity as its Synthetic TIPS) + the full annual coupons of the Simulated
 //                    Outstanding Future 30Y TIPS of the later Future 30Y years, which is the LMI Pass 1
@@ -305,8 +404,9 @@ export function syntheticYearAmounts({ gapParams = null, future30yParams = null 
 
 // ─── Shared per-year funded Amount (single source of truth for build & rebalance "After") ───
 // A funded year's annual Amount = own principal + own coupon + later-maturity interest (LMI)
-// + own-year excess coupon + the interest of the Simulated Outstanding Future 30Y TIPS and of the
-// Cover Excess and the Net Cash credited to the year, plus a pre-ladder credit. For a PLI-zeroed year (funded
+// + own-year excess coupon (0 for a bracket or cover year: the excess is sold before it matures) + the interest of the
+// Simulated Outstanding Future 10Y and Future 30Y TIPS and of the Excess TIPS and the Cover Excess and the
+// Net Cash credited to the year, plus a pre-ladder credit. For a PLI-zeroed year (funded
 // entirely from the pre-ladder pool, qty 0) the credit is reconciled so the row lands exactly on
 // its DARA against the CORRECTED income components; otherwise it is the year's non-zeroed
 // pre-ladder credit (the partial-credit year's share, else 0). Build and rebalance BOTH call this,
@@ -315,13 +415,15 @@ export function syntheticYearAmounts({ gapParams = null, future30yParams = null 
 // quantities, not this credit. Returns { credit, amount }.
 export function fundedYearAmount({
   principal = 0, ownCoupon = 0, laterMatInt = 0, ownExcessCoupon = 0, simulatedInterest = 0, coverExcessInterest = 0, netCash = 0,
+  gapSimulatedInterest = 0, gapExcessInterest = 0, gapNetCash = 0,
   dara, isZeroed = false, partialCredit = 0,
 }) {
   // Income fixed regardless of the pre-ladder credit. For a zeroed year principal & ownCoupon
   // are 0, so this is the LMI + own-excess-coupon + Future 30Y credit that the credit tops up
   // to DARA. Available Cash needs no term here: the credit pass expresses it as zeroing (credit
   // tops the year up to DARA) or as this year's partialCredit (2.0 §Available Cash).
-  const fixedIncome = principal + ownCoupon + laterMatInt + ownExcessCoupon + simulatedInterest + coverExcessInterest + netCash;
+  const fixedIncome = principal + ownCoupon + laterMatInt + ownExcessCoupon + simulatedInterest + coverExcessInterest + netCash
+    + gapSimulatedInterest + gapExcessInterest + gapNetCash;
   const credit = isZeroed ? Math.max(0, dara - fixedIncome) : partialCredit;
   return { credit, amount: fixedIncome + credit };
 }
@@ -624,6 +726,7 @@ export function sizeLadder({
   availableCash = 0, rmdCouponMode = 'all', tradeDate = settlementDate,
   future30yLowerCoverBond = null, future30yUpperCoverBond = null,
   future30yLowerYear = null, future30yUpperYear = null, future30yAnchorBond = null,
+  gapRetained = null,
 }) {
   let lowerYear = null, upperYear = null;
   // Back-compat: a caller that passes only yearBondMap sizes every year as a single TIPS.
@@ -689,13 +792,74 @@ export function sizeLadder({
   const future30yInterest = (year) => (future30ySimulatedInterestByYear.get(year) ?? 0) + (future30yCoverInterestByYear.get(year) ?? 0);
   const future30yCredit = (year) => future30yInterest(year) + (future30yNetCashByYear.get(year) ?? 0);
 
-  // 3b. Pre-ladder interest pool: coupons received before the ladder starts, plus the three Future
-  // 30Y amounts for those years, kept as named parts for the pool drill: the interest of the
-  // Simulated Outstanding Future 30Y TIPS and the Cover Excess, and the Net Cash.
+  // 4b. The gap years (2.0 §Gap Year Simulated Outstanding TIPS): Pass 1 sizes the Synthetic TIPS and
+  // the Excess TIPS at settlement; the conversion on each issue date and the three amounts credited to
+  // each funded year before the first gap year follow, as for the Future 30Y years above. Two things
+  // that the gap quantities and the pre-ladder pool each need from the other are broken here, not
+  // iterated: the pool is sized from a stage that has no pre-ladder credit for the gap years yet (the
+  // estimate, run only when a pool exists), and the stage the sweep and the Amounts read is sized
+  // again with the credit each gap year then receives. A fully pre-ladder-funded year is reconciled
+  // against its DARA in fundedYearAmount, so the difference between the two stages never reaches an Amount.
+  const firstGapYear = gapYears.length ? Math.min(...gapYears) : null;
+  const gapStage = (prelimForLMI, pliCredits) => {
+    if (!gapYears.length) return null;
+    const upperBracketYear = 2040;
+    const lowerBracketYear = Math.max(...rangeYears.filter(y => y < firstGapYear));
+    const params = calcGapParams(gapYears, tipsMarketData, settlementDate, refCPI, dara, prelimForLMI, pliCredits, daraByYear);
+    const upperBond = yearBondMap[upperBracketYear];
+    const lowerBond = yearBondMap[lowerBracketYear];
+    const upperDur = calculateMDuration(settlementDate, upperBond.maturity, upperBond.coupon ?? 0, upperBond.yield ?? 0);
+    const upperCPB = (upperBond.price ?? 0) / 100 * calcIndexRatio(refCPI, upperBond.datedDateRefCpi ?? refCPI) * 1000;
+    const lowerDur = calculateMDuration(settlementDate, lowerBond.maturity, lowerBond.coupon ?? 0, lowerBond.yield ?? 0);
+    const lowerCPB = (lowerBond.price ?? 0) / 100 * calcIndexRatio(refCPI, lowerBond.datedDateRefCpi ?? refCPI) * 1000;
+    // The Excess TIPS at settlement. A Rebalance with Retained Bracket Excess (gapRetained: the retained
+    // maturities, oldest first, each with the excess it holds, and the excess the active lower bracket holds)
+    // freezes the retained maturities at what they hold and solves the active lower and upper brackets
+    // around them (2.0 §Retained Bracket Excess); otherwise it is the plain two-bracket match.
+    const retainedLegs = gapRetained?.retained ?? [];
+    let wL, wU, exL, exU, retainedQty0 = [];
+    if (!retainedLegs.length) {
+      ({ lowerWeight: wL, upperWeight: wU } = bracketWeights(lowerDur, upperDur, params.avgDuration));
+      ({ lowerExQty: exL, upperExQty: exU } = bracketExcessQtys(params.totalCost, wL, wU, lowerCPB, upperCPB));
+    } else {
+      const cpbOf = (b) => (b.price ?? 0) / 100 * calcIndexRatio(refCPI, b.datedDateRefCpi ?? refCPI) * 1000;
+      const total = params.totalCost;
+      const wN = bracketWeightsN({
+        retained: retainedLegs.map(r => ({ excessCost: r.heldQty * cpbOf(r.bond), duration: calculateMDuration(settlementDate, r.bond.maturity, r.bond.coupon ?? 0, r.bond.yield ?? 0) })),
+        dActive: lowerDur, dUpper: upperDur, dGap: params.avgDuration, totalBlockCost: total,
+        activeFloorWeight: total > 0 ? (gapRetained.activeHeldQty ?? 0) * lowerCPB / total : 0,
+      });
+      const qtyOf = (weight, cpb) => cpb > 0 ? Math.max(0, Math.round(total * weight / cpb)) : 0;
+      wL = wN.activeWeight; wU = wN.upperWeight;
+      exL = qtyOf(wL, lowerCPB); exU = qtyOf(wU, upperCPB);
+      retainedQty0 = retainedLegs.map((r, i) => qtyOf(wN.retainedWeights[i], cpbOf(r.bond)));
+    }
+    const retained = retainedLegs.map((r, i) => ({ bond: r.bond, qty0: retainedQty0[i] }));
+    const rebalances = gapRebalances({ gapParams: params, lowerBracketBond: lowerBond, upperBracketBond: upperBond, retained, refCPI, bondHolidays, lowerQty0: exL, upperQty0: exU });
+    const interest = gapInterestByYear({
+      rebalances, lowerBracketBond: lowerBond, upperBracketBond: upperBond, retained, refCPI, settlementDate, firstGapYear,
+      bondHolidays, rmdCouponMode, tradeDate, rmdLastDate: _lastCouponDate,
+    });
+    return {
+      params, lowerYear: lowerBracketYear, upperYear: upperBracketYear,
+      lowerDuration: lowerDur, upperDuration: upperDur, lowerWeight: wL, upperWeight: wU,
+      lowerMonth: BL_MONTHS[lowerBond.maturity.getMonth()], upperMonth: BL_MONTHS[upperBond.maturity.getMonth()],
+      lowerExQty: exL, upperExQty: exU, retainedQty0, totalExcessCost: exL * lowerCPB + exU * upperCPB,
+      rebalances, simulated: interest.simulated, excess: interest.excess, netCash: interest.netCash,
+    };
+  };
+  const gapCreditOf = (stage, year) => stage
+    ? (stage.simulated.get(year) ?? 0) + (stage.excess.get(year) ?? 0) + (stage.netCash.get(year) ?? 0) : 0;
   const preLadderYears = preLadderInterest ? Math.max(0, firstYear - settlementYear) : 0;
+  const gapEstimate = (preLadderYears > 0 || availableCash > 0) ? gapStage(prelim, {}) : null;
+
+  // 3b. Pre-ladder interest pool: coupons received before the ladder starts, plus the amounts credited to
+  // those years for the gap years and for the Future 30Y years, kept as named parts for the pool
+  // drill: the interest of the Simulated Outstanding TIPS and of the Excess TIPS (Cover Excess), and the Net Cash.
   let preLadderPool = 0;
   let preLadderCouponPool = 0;
   let preLadderFuture30yPool = 0;
+  let preLadderGapPool = 0;
   let preLadderNetCashPool = 0;
   const zeroedFundedYears = new Set();
   const pliCreditByGapYear = {};
@@ -709,9 +873,10 @@ export function sizeLadder({
     preLadderCouponPool = preLadderYears * totalAnnualInt;
     for (let y = settlementYear; y < firstYear; y++) {
       preLadderFuture30yPool += future30yInterest(y);
-      preLadderNetCashPool += future30yNetCashByYear.get(y) ?? 0;
+      preLadderGapPool += (gapEstimate?.simulated.get(y) ?? 0) + (gapEstimate?.excess.get(y) ?? 0);
+      preLadderNetCashPool += (future30yNetCashByYear.get(y) ?? 0) + (gapEstimate?.netCash.get(y) ?? 0);
     }
-    preLadderPool = preLadderCouponPool + preLadderFuture30yPool + preLadderNetCashPool;
+    preLadderPool = preLadderCouponPool + preLadderFuture30yPool + preLadderGapPool + preLadderNetCashPool;
   }
 
   // Available cash and pre-ladder interest are one pool consumed earliest-rung-first
@@ -766,7 +931,7 @@ export function sizeLadder({
         }
       } else {
         const yearDaraForPLI = daraByYear?.get(year) ?? dara;
-        const need = yearDaraForPLI - laterMatIntForCreditPass(year) - future30yCredit(year);
+        const need = yearDaraForPLI - laterMatIntForCreditPass(year) - future30yCredit(year) - gapCreditOf(gapEstimate, year);
         if (need <= 0) { zeroedFundedYears.add(year); takeCredit(year, 0); continue; }
         if (remaining >= need) {
           zeroedFundedYears.add(year);
@@ -792,66 +957,35 @@ export function sizeLadder({
     }
   }
 
-  // 4b. Gap parameters → duration matching → bracket weights/excess.
-  let gapParams = null;
-  let lowerDuration = null, upperDuration = null, lowerWeight = null, upperWeight = null;
-  let lowerMonth = null, upperMonth = null;
-  let lowerExQty = 0, upperExQty = 0, totalExcessCost = 0;
+  // 4c. Gap parameters → duration matching → Bracket Weights and Excess TIPS at settlement, then the
+  // conversions and credited amounts, now with the pre-ladder credit each gap year received. The Excess
+  // TIPS pays no interest in a gap year (2.0 §Gap Year Simulated Outstanding TIPS), and the Cover
+  // Excess is sold before the first gap year too (2.0 §Future 30Y Simulated Outstanding TIPS), so the
+  // interest above the gap years is that of the actual TIPS alone.
+  const gapFinal = gapStage(effectivePrelim, pliCreditByGapYear);
+  const gapParams = gapFinal?.params ?? null;
+  if (gapFinal) ({ lowerYear, upperYear } = gapFinal);
+  const lowerDuration = gapFinal?.lowerDuration ?? null, upperDuration = gapFinal?.upperDuration ?? null;
+  const lowerWeight = gapFinal?.lowerWeight ?? null, upperWeight = gapFinal?.upperWeight ?? null;
+  const lowerMonth = gapFinal?.lowerMonth ?? null, upperMonth = gapFinal?.upperMonth ?? null;
+  const lowerExQty = gapFinal?.lowerExQty ?? 0, upperExQty = gapFinal?.upperExQty ?? 0, totalExcessCost = gapFinal?.totalExcessCost ?? 0;
+  const gapRebal = gapFinal?.rebalances ?? { conversions: [], lowerQty0: 0, upperQty0: 0 };
+  const gapSimulatedInterestByYear = gapFinal?.simulated ?? new Map();
+  const gapExcessInterestByYear = gapFinal?.excess ?? new Map();
+  const gapNetCashByYear = gapFinal?.netCash ?? new Map();
+  const gapCredit = (year) => gapCreditOf(gapFinal, year);
 
-  if (gapYears.length > 0) {
-    const minGapYear = Math.min(...gapYears);
-    upperYear = 2040;
-    const yearsBeforeGap = rangeYears.filter(y => y < minGapYear);
-    lowerYear = Math.max(...yearsBeforeGap);
-
-    // Augment effectivePrelim with the Cover Excess interest at settlement quantities (the covers mature
-    // above the gap years). The gap years are left on this until their own rebalances are specified.
-    let augmentedPrelim = effectivePrelim;
-    if (future30yYears.length > 0) {
-      augmentedPrelim = { ...effectivePrelim };
-      if (future30yUpperExQty > 0) {
-        const { indexRatio: irU } = bondCalcs(future30yUpperCoverBond, refCPI);
-        const extraU = future30yUpperExQty * 1000 * irU * (future30yUpperCoverBond.coupon ?? 0);
-        augmentedPrelim[future30yUpperYear] = { ...effectivePrelim[future30yUpperYear], annualInterest: (effectivePrelim[future30yUpperYear]?.annualInterest ?? 0) + extraU };
-      }
-      if (future30yLowerExQty > 0) {
-        const { indexRatio: irL } = bondCalcs(future30yLowerCoverBond, refCPI);
-        const extraL = future30yLowerExQty * 1000 * irL * (future30yLowerCoverBond.coupon ?? 0);
-        augmentedPrelim[future30yLowerYear] = { ...effectivePrelim[future30yLowerYear], annualInterest: (effectivePrelim[future30yLowerYear]?.annualInterest ?? 0) + extraL };
-      }
-    }
-
-    gapParams = calcGapParams(gapYears, tipsMarketData, settlementDate, refCPI, dara, augmentedPrelim, pliCreditByGapYear, daraByYear);
-
-    const upperBond = yearBondMap[upperYear];
-    upperDuration = calculateMDuration(settlementDate, upperBond.maturity, upperBond.coupon ?? 0, upperBond.yield ?? 0);
-    upperMonth = BL_MONTHS[upperBond.maturity.getMonth()];
-    const upperCPB = (upperBond.price ?? 0) / 100 * calcIndexRatio(refCPI, upperBond.datedDateRefCpi ?? refCPI) * 1000;
-
-    const lowerBond = yearBondMap[lowerYear];
-    lowerDuration = calculateMDuration(settlementDate, lowerBond.maturity, lowerBond.coupon ?? 0, lowerBond.yield ?? 0);
-    lowerMonth = BL_MONTHS[lowerBond.maturity.getMonth()];
-    const lowerCPB = (lowerBond.price ?? 0) / 100 * calcIndexRatio(refCPI, lowerBond.datedDateRefCpi ?? refCPI) * 1000;
-    ({ lowerWeight, upperWeight } = bracketWeights(lowerDuration, upperDuration, gapParams.avgDuration));
-    ({ lowerExQty: lowerExQty, upperExQty: upperExQty } = bracketExcessQtys(gapParams.totalCost, lowerWeight, upperWeight, lowerCPB, upperCPB));
-    totalExcessCost = lowerExQty * lowerCPB + upperExQty * upperCPB;
-  }
-
-  // 5. Corrected long→short sweep over actual funded years (LMI pool includes bracket excess interest).
+  // 5. Corrected long→short sweep over actual funded years.
   //    corrRungs[year] holds the per-sub-rung breakdown (multi-TIPS years); corrFYQty[year] is the
   //    funded-year total (Σ sub-rung qty) — the value every downstream aggregate consumer reads.
-  //    The Cover Excess is not in the running LMI: its interest, that of the Simulated Outstanding
-  //    Future 30Y TIPS, and the Net Cash are credited to each year directly (future30yCredit above), and
-  //    a cover year's Same-Maturity Excess Interest is 0, the Cover Excess being sold before it
-  //    matures (DD §Same-Maturity Excess Interest).
+  //    The Excess TIPS and the Cover Excess are not in the running LMI: their interest, that of the
+  //    Simulated Outstanding Future 10Y and Future 30Y TIPS, and the Net Cash are credited to each year
+  //    directly (gapCredit and future30yCredit above), and a bracket or cover year's Same-Maturity Excess
+  //    Interest is 0, the excess being sold before it matures (DD §Same-Maturity Excess Interest).
   const corrFYQty = {};
   const corrLMI   = {};
   const corrRungs = {};
   {
-    const exByYear = {};
-    if (lowerYear != null) exByYear[lowerYear] = (exByYear[lowerYear] ?? 0) + lowerExQty;
-    if (upperYear != null) exByYear[upperYear] = (exByYear[upperYear] ?? 0) + upperExQty;
-
     // RMD Options 'last' mode: the pool-wide latest remaining coupon date, over every bond in a
     // year above the settlement year (the funded-year sizing target for that year, whichever rung
     // policy picked it — same set the sweep below draws its LMI from). Computed once, before the
@@ -862,8 +996,6 @@ export function sizeLadder({
     let runningLMI = 0;             // full-annual convention — correct for every year but the settlement year
     let runningLMIRemaining = 0;    // same pool, but each holding's coupon capped to dates not yet paid this year
     for (const year of [...rangeYears].sort((a, b) => b - a)) {
-      const bond    = yearBondMap[year];                        // representative (excess coupon keys off this)
-      const { indexRatio: ir } = bondCalcs(bond, refCPI);
       const yearDara = daraByYear?.get(year) ?? dara;
       const isZrd   = zeroedFundedYears.has(year);
       // The funded year containing settlementDate is already partway through its calendar
@@ -875,24 +1007,18 @@ export function sizeLadder({
       const incomingLMI = isSettlementYear ? runningLMIRemaining : runningLMI;
       corrLMI[year] = incomingLMI;
 
-      const exQty = exByYear[year] ?? 0;
-      const excessLMIFull = exQty * 1000 * ir * (bond.coupon ?? 0);
-      const excessLMI = isSettlementYear
-        ? exQty * 1000 * ir * (bond.coupon ?? 0) / 2 * rmdCappedRemainingCoupons(bond.maturity, settlementDate, bondHolidays, rmdCouponMode, tradeDate, rmdLastDate)
-        : excessLMIFull;
-      const future30yExtra = future30yCredit(year);   // simulated TIPS + Cover Excess interest + Net Cash
+      const credited = future30yCredit(year) + gapCredit(year);   // simulated TIPS + Excess TIPS (Cover Excess) interest + Net Cash
 
       // Funded-year real P+I need after the year-level income offsets, split across the year's TIPS.
       const need = (isZrd || year > lastYear || year < firstYear) ? 0
-        : Math.max(0, yearDara - incomingLMI - excessLMI - future30yExtra - (year === partialCreditYear ? partialCredit : 0));
+        : Math.max(0, yearDara - incomingLMI - credited - (year === partialCreditYear ? partialCredit : 0));
       const rungs = sizeYearRungs(tipsList(year), need, refCPI);
       const { qty: fyQty, annualInterest: fundedCoupon } = aggregateRungs(rungs);
 
       corrRungs[year] = rungs;
       corrFYQty[year] = fyQty;
-      runningLMI += fundedCoupon + excessLMIFull;
-      runningLMIRemaining += rungs.reduce((s, r) => s + r.qty * r.ir * 1000 * r.coupon / 2 * rmdCappedRemainingCoupons(r.bond.maturity, settlementDate, bondHolidays, rmdCouponMode, tradeDate, rmdLastDate), 0)
-        + exQty * 1000 * ir * (bond.coupon ?? 0) / 2 * rmdCappedRemainingCoupons(bond.maturity, settlementDate, bondHolidays, rmdCouponMode, tradeDate, rmdLastDate);
+      runningLMI += fundedCoupon;
+      runningLMIRemaining += rungs.reduce((s, r) => s + r.qty * r.ir * 1000 * r.coupon / 2 * rmdCappedRemainingCoupons(r.bond.maturity, settlementDate, bondHolidays, rmdCouponMode, tradeDate, rmdLastDate), 0);
     }
   }
 
@@ -908,6 +1034,7 @@ export function sizeLadder({
     future30yLowerExQty, future30yUpperExQty, future30yFellBack, future30yCoverReason, future30yTotalExcessCost,
     future30yLowerMonth, future30yUpperMonth,
     future30yRebalances: future30yRebal, future30ySimulatedInterestByYear, future30yCoverInterestByYear, future30yNetCashByYear,
-    preLadderYears, preLadderPool, preLadderCouponPool, preLadderFuture30yPool, preLadderNetCashPool,
+    gapRebalances: gapRebal, gapRetainedQty0: gapFinal?.retainedQty0 ?? [], gapSimulatedInterestByYear, gapExcessInterestByYear, gapNetCashByYear,
+    preLadderYears, preLadderPool, preLadderCouponPool, preLadderFuture30yPool, preLadderGapPool, preLadderNetCashPool,
   };
 }
