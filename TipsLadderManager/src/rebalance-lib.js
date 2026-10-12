@@ -14,6 +14,10 @@ import { parseCSVLine } from './broker-import.js';
 // Re-export date helpers so existing importers (index.html, tests) keep working.
 export { localDate, fmtDate, fmtDateLong };
 
+// The floor of the holdings search range for the lower bracket. A design choice, not derived from market data
+// (DATA_DICTIONARY §5.1). Defined here once; before-state-lib.js imports it.
+export const LOWEST_LOWER_BRACKET_YEAR = 2032;
+
 export function calculatePIPerBond(cusip, maturity, refCPI, tipsMarketData) {
   const bond = tipsMarketData.get(cusip);
   if (!bond) return 0;
@@ -48,8 +52,6 @@ function identifyBrackets(gapYears, holdings, yearInfo, tipsMarketData, araByYea
   const upperH = yearInfo[upperYear]?.holdings?.find(h => h.maturity.getMonth() + 1 === 2);
   const upperCUSIP = upperH?.cusip || '912810QF8';
   const upperMaturity = tipsMarketData.get(upperCUSIP)?.maturity || localDate(`${upperYear}-02-15`);
-
-  const LOWEST_LOWER_BRACKET_YEAR = 2032;
 
   // Only consider holdings in years >= firstYear as potential lower brackets.
   // Holdings below firstYear are being sold and must not influence bracket selection.
