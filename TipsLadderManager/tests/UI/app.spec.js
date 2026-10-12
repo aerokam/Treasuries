@@ -1304,6 +1304,44 @@ test('round-trip: build to the last Future 30Y year → export CUSIP/Qty → imp
   expect(Math.abs(netCash), 'round-trip net cash must be ~0').toBeLessThan(2000);
 });
 
+// ── The gap year amounts in a funded year's Amount (2.0 §Gap Year Simulated Outstanding TIPS §Interest credited to a funded year) ──
+// A funded year before the first gap year is credited with the interest of the Simulated Outstanding Future 10Y TIPS, the
+// interest of the Excess TIPS and the Net Cash of the issue dates in its year, each its own line in the Amount popup; the lines
+// the popup shows add up to the Amount it shows.
+test('build: a funded year before the first gap year shows the gap year amounts in its Amount popup, and the lines add up to the Amount', async ({ page }) => {
+  test.setTimeout(30_000);
+  await page.locator('.tab-btn[data-mode="build"]').click();
+  const gap = await gapYears(page);
+  await page.locator('#first-year').selectOption({ label: String(SY) });
+  await page.locator('#last-year').selectOption({ value: String(gap[gap.length - 1] + 1) });
+  await page.locator('#dara').fill('40000');
+  await page.locator('#run-btn').click();
+  await expect(page.locator('#build-output')).toHaveCSS('display', 'block', { timeout: 4_000 });
+  const expandAllBtn = page.locator('#expand-collapse-all-btn');
+  if ((await expandAllBtn.textContent())?.trim() === 'Expand All') await expandAllBtn.click();
+  const signed = (s) => (s.trim().startsWith('−') ? -1 : 1) * Number(s.replace(/[^0-9.]/g, ''));
+  const components = /^(Principal|Last coupon|Last 2 coupons|Later maturity interest|Remaining later maturity|Same-maturity excess|Pre-ladder credit|Simulated Outstanding Future 10Y TIPS interest|Excess TIPS interest|Simulated Future 30Y TIPS interest|Cover Excess interest|Net Cash|Available cash)/;
+  for (const year of [SY + 1, SY + 2, gap[0] - 1]) {
+    const cell = page.locator(`#build-table tr.fy-group-header[data-fy="${year}"] td.drillable[data-col="amount"]`);
+    await expect(cell, `${year} carries a drillable Amount`).toBeVisible();
+    await cell.click();
+    await expect(page.locator('#drill-overlay')).toBeVisible({ timeout: 4_000 });
+    const rows = await page.locator('#drill-content tr').evaluateAll(trs => trs.map(tr => { const td = tr.querySelectorAll('td'); return { label: td[0]?.innerText.trim() ?? '', value: td[td.length - 1]?.innerText.trim() ?? '' }; }));
+    const labels = rows.map(r => r.label);
+    expect(labels, `${year}: the interest of the Simulated Outstanding Future 10Y TIPS is credited`).toContain('Simulated Outstanding Future 10Y TIPS interest');
+    // The last conversion falls in January of the last gap year less 10, after which the Excess TIPS is 0.
+    const lastConversionYear = gap[gap.length - 1] - 10;
+    if (year <= lastConversionYear) expect(labels, `${year}: the interest of the Excess TIPS is credited`).toContain('Excess TIPS interest');
+    else expect(labels, `${year}: no Excess TIPS is left to pay interest`).not.toContain('Excess TIPS interest');
+    expect(labels.some(l => /^Same-maturity excess/.test(l)), `${year}: the Excess TIPS pays no Same-Maturity Excess Interest`).toBe(false);
+    const amount = signed(rows.find(r => r.label === 'Funded Year Amount').value);
+    const sum = rows.filter(r => components.test(r.label)).reduce((s, r) => s + signed(r.value), 0);
+    expect(Math.abs(sum - amount), `${year}: the lines add up to the Amount (${sum} vs ${amount})`).toBeLessThanOrEqual(3);
+    expect(Math.abs(amount - 40000), `${year}: the Amount lands within a TIPS of the DARA`).toBeLessThan(1200);
+    await page.locator('#drill-close').click();
+  }
+});
+
 // ── Amount of a gap year and a Future 30Y year (2.0 §Amount of a Gap Year and a Future 30Y Year) ──
 // The group header row of each gap year and Future 30Y year carries the Amount, drillable; the excess
 // sub-rows carry none (5.0 §Sub-Row Logic).
@@ -1328,7 +1366,8 @@ test('build: gap year and Future 30Y year rows show a drillable Amount; excess r
     expect(Math.abs(amount - 40000), `${y} Amount (${amount}) lands near its DARA`).toBeLessThan(1100);
     await cell.click();
     await expect(page.locator('#drill-overlay')).toBeVisible({ timeout: 4_000 });
-    await expect(page.locator('#drill-content')).toContainText(y === gap[0] ? 'Synthetic TIPS' : 'Simulated Outstanding Future 30Y TIPS');
+    await expect(page.locator('#drill-content')).toContainText(y === gap[0] ? 'Simulated Outstanding Future 10Y TIPS' : 'Simulated Outstanding Future 30Y TIPS');
+    if (y === gap[0]) await expect(page.locator('#drill-content'), 'the Amount of a gap year reads its Simulated Outstanding Future 10Y TIPS, not a Synthetic TIPS').not.toContainText('Synthetic');
     await expect(page.locator('#drill-content')).toContainText('DARA');
     // The Quantity line points to the duration match popup and names no pass (5.0 §Popup Routing).
     const popupName = y === gap[0] ? 'duration' : 'future30yDuration';
@@ -1406,7 +1445,8 @@ test('build: a funded year with an issue date shows a Net Cash line in its Amoun
   await cell.click();
   await expect(page.locator('#drill-overlay')).toBeVisible({ timeout: 4_000 });
   await expect(page.locator('#drill-content')).toContainText('Net Cash');
-  await expect(page.locator('#drill-content')).toContainText('cash from selling Cover Excess in this year, beyond the cost of the Simulated Outstanding Future 30Y TIPS bought');
+  // The year holds a January issue date (a gap year) and a February one (a Future 30Y year): one Net Cash line names both.
+  await expect(page.locator('#drill-content')).toContainText('cash from selling Excess TIPS and Cover Excess in this year, beyond the cost of the Simulated Outstanding Future 10Y TIPS and Simulated Outstanding Future 30Y TIPS bought');
   await page.locator('#drill-close').click();
 });
 
