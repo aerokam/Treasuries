@@ -41,8 +41,43 @@ function Get-LatestCodeMessageText {
   return $null
 }
 
+# A minimized Phone Link window does not refresh its message list (the 5:05 AM run on
+# 2026-10-13 never saw a code that had arrived). Restore it for the read, then put it back.
+function Get-PhoneLinkWindow {
+  $root = [System.Windows.Automation.AutomationElement]::RootElement
+  $cond = New-Object System.Windows.Automation.PropertyCondition(
+    [System.Windows.Automation.AutomationElement]::NameProperty, 'Phone Link')
+  return $root.FindFirst([System.Windows.Automation.TreeScope]::Children, $cond)
+}
+
+function Restore-PhoneLinkIfMinimized {
+  $w = Get-PhoneLinkWindow
+  if (-not $w) { return $false }
+  try {
+    $p = $w.GetCurrentPattern([System.Windows.Automation.WindowPattern]::Pattern)
+    if ($p.Current.WindowVisualState -eq [System.Windows.Automation.WindowVisualState]::Minimized) {
+      $p.SetWindowVisualState([System.Windows.Automation.WindowVisualState]::Normal)
+      Start-Sleep -Seconds 2
+      return $true
+    }
+  } catch {}
+  return $false
+}
+
+function Minimize-PhoneLink {
+  $w = Get-PhoneLinkWindow
+  if (-not $w) { return }
+  try {
+    $w.GetCurrentPattern([System.Windows.Automation.WindowPattern]::Pattern).SetWindowVisualState(
+      [System.Windows.Automation.WindowVisualState]::Minimized)
+  } catch {}
+}
+
+$restored = Restore-PhoneLinkIfMinimized
+
 if ($Mode -eq 'baseline') {
   Write-Output (Get-LatestCodeMessageText)
+  if ($restored) { Minimize-PhoneLink }
   exit 0
 }
 
@@ -50,11 +85,13 @@ $deadline = (Get-Date).AddSeconds($TimeoutSec)
 while ((Get-Date) -lt $deadline) {
   $text = Get-LatestCodeMessageText
   if ($text -and $text -ne $Baseline -and $text -match 'Code is:\s*(\d{6})') {
+    if ($restored) { Minimize-PhoneLink }
     Write-Output $Matches[1]
     exit 0
   }
   Start-Sleep -Seconds $PollIntervalSec
 }
+if ($restored) { Minimize-PhoneLink }
 
 # Timed out: say why on stderr (surfaces in fidelity.log), so the next failure is diagnosable.
 $root = [System.Windows.Automation.AutomationElement]::RootElement
