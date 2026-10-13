@@ -50,7 +50,7 @@ stretch of years whose TIPS have not yet been issued; each is duration-covered b
 | First / Last Funded Year (ladder endpoints) | `firstYear` / `lastYear` | endpoints of the ladder, not bracket years |
 | Gap lower bracket / upper bracket (gap **bracket pair**) | `lowerYear`/`lowerCUSIP`, `upperYear`/`upperCUSIP` | most recently issued 10-year TIPS below the gap / 2040 |
 | Future-30Y lower cover / upper cover (Future-30Y **cover pair**) | `future30yLowerCoverBond` / `future30yUpperCoverBond` | the rule in 2.0 §Future 30Y Cover Pair |
-| Imported excess (cover/bracket excess from the file's excess column) | `h.excessQty` (Format 4/5 import) | a calculated field, only ever written by this app's export; records build intent, not user-edited |
+| Imported excess (cover/bracket excess from the file's excess column) | `h.excessQty` (Holdings Export or tipsladder.com format import) | a calculated field, only ever written by this app's export; records build intent, not user-edited |
 | First-funded-year recovery (reverse-engineer gap duration match) | `inferFirstYearFromHoldings` | gap side may use the excess→DARA ratio shortcut |
 | Last-funded-year recovery (reverse-engineer Future-30Y duration match) | `inferLastYearFromHoldings` | matches the imported cover split; user-overridable |
 | Upper-bracket coupon feedback (gap fixpoint) | `gapParamsWithUpperFeedback` | shared by build + rebalance; see 2.0 §Gap Year Coverage Model |
