@@ -658,6 +658,7 @@ coverExcessCost_c = Future 30Y total cost × coverWeight_c
 
 ## 5.0 Global Constants
 
+<a id="5.1-issuance-dependent-values"></a>
 ### 5.1 Issuance-Dependent Values
 
 Some values are true only until Treasury issues more TIPS. Left inline as approximations across specs, they go stale silently — "Jan/Jul ≤~2035" was accurate when written and gave no signal when a Jul 2036 was auctioned.
@@ -679,8 +680,10 @@ Some values are true only until Treasury issues more TIPS. Left inline as approx
 | Lower cover | The lower [Cover Year TIPS](#cover-year-tips): the outstanding TIPS with the longest modified duration at or below that of the Synthetic TIPS of the first Future 30Y year alone, measured at `LOWER_COVER_YIELD` | derived from market data each run | Another outstanding TIPS comes within reach of the duration at `LOWER_COVER_YIELD`, or a new 30-year TIPS is issued |
 | Upper cover | The upper Cover Year TIPS: the outstanding TIPS with the longest modified duration, excluding the lower cover | derived from market data each run | Yields change, or a new 30-year TIPS is issued |
 | Active lower bracket | [Active Lower Bracket](#active-lower-bracket) — latest outstanding maturity before the first gap year | derived from market data each run | The next pre-gap maturity is issued |
+| Default First Year | The earliest [Maturity Year](#maturity-year) with at least one TIPS maturing more than `FIRST_YEAR_BUFFER_MONTHS` months after the [Settlement Date](#settlement-date) | derived from market data each run | A TIPS comes within `FIRST_YEAR_BUFFER_MONTHS` months of its maturity |
 
 `LOWEST_LOWER_BRACKET_YEAR` = 2032 *(a design choice, not derived from market data: the floor of the holdings search range for [retained bracket excess](#retained-bracket-excess): only maturity years in `[LOWEST_LOWER_BRACKET_YEAR, minGapYear)` are considered. Matches `rebalance-lib.js`.)*
+`FIRST_YEAR_BUFFER_MONTHS` = 3 *(a design choice, not derived from market data: a [TIPS](#tips) maturing no more than this many months after the [Settlement Date](#settlement-date) does not count toward the years of the [Ladder](#ladder) in Build, so the Default First Year (§5.1) is the earliest maturity year with a TIPS maturing later than that. [Market Quotes](#market-quotes) omit a Treasury maturing within about a week, and the buffer is longer than that. Matches `ladder-core.js`.)*
 `LOWER_COVER_YIELD` = 4% *(the yield at which the Synthetic TIPS of the first Future 30Y year is measured when the Lower cover (§5.1) is chosen. A fixed yield above the market yield keeps the choice from changing with each day's yield; the durations of the covers barely move with yield, while the duration of that Synthetic TIPS moves with it. [Research](../TipsLadderManager/research/Future_30Y_Cover_Excess_Analysis.md).)*
 `REFCPI_CUSIP` = "912810FD5" *(3.625% TIPS, issued 1998, matures 2028-04-15)* — CUSIP used to pull the authoritative daily Ref CPI from TreasuryDirect ([TreasuryDirect SecIndex (E2)](#e2)).
   **Selection principle (the rule, not the value):** Ref CPI is *market-wide* — identical across all TIPS on a given date — so the CUSIP only determines how far back history reaches. Use the **oldest TIPS not yet matured** to maximize available history. `912810FD5` fits today; **when it matures (2028-04-15), rotate to the next-oldest un-matured TIPS** and update `scripts/fetchRefCpi.js`. *(The stale value `912828V98` previously recorded here does not correspond to any TIPS.)*
