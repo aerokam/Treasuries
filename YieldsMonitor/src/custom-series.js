@@ -50,6 +50,10 @@ export function customBounds(points) {
   return first === last ? { min: first - ONE_INTERVAL_MS, max: last + ONE_INTERVAL_MS } : { min: first, max: last + ONE_INTERVAL_MS };
 }
 
+// Ranges whose points are CNBC's daily bars, which carry a date and no time of day (cnbc.com shows
+// only the date for them too). Their tooltips state the date alone.
+export const DATE_ONLY_RANGES = new Set(['1Y', '2Y', '3Y', '10Y', 'ALL']);
+
 // Whether markers are drawn: `visibleCount` points fall in a plot area `widthPx` wide.
 export function showMarkers(visibleCount, widthPx) {
   return visibleCount > 1 && widthPx / visibleCount >= MIN_POINT_SPACING_PX;

@@ -1,6 +1,6 @@
 // customSeries.test.js — Run: node YieldsMonitor/tests/customSeries.test.js
 import assert from 'node:assert/strict';
-import { layerCustomSeries, archiveDatesToRead, customBounds, showMarkers, countVisible, MAX_ARCHIVE_DAYS } from '../src/custom-series.js';
+import { layerCustomSeries, archiveDatesToRead, customBounds, showMarkers, countVisible, MAX_ARCHIVE_DAYS, DATE_ONLY_RANGES } from '../src/custom-series.js';
 
 const ymd = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' });
 const wd = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', weekday: 'short' });
@@ -59,4 +59,7 @@ const pts = [1, 2, 3, 4, 5].map(n => ({ x: n }));
 assert.equal(countVisible(pts, 2, 4), 3);
 assert.equal(countVisible(pts, 6, 9), 0);
 assert.equal(countVisible(pts, 0, 1), 1);
+// daily-bar ranges state a date only in the tooltip; 2D, 10D and Custom keep the time
+assert.deepEqual([...DATE_ONLY_RANGES].sort(), ['10Y', '1Y', '2Y', '3Y', 'ALL']);
+
 console.log('customSeries: all assertions passed');
