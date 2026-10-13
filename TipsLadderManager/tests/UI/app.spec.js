@@ -14,8 +14,14 @@ import { fileURLToPath } from 'url';
 import { nextBondTradingDay, R2_ROOT } from '../../../shared/src/market-data.js';
 import { parseHolidaySet } from '../../../shared/src/settlement.js';
 import { parseCsv as parseCsvRows } from '../../../shared/src/csv.js';
+import { defaultFirstYear } from '../../src/ladder-core.js';
+import { localDate } from '../../src/date-util.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+
+// The Coupons link is on the settlement year's row only (5.0 §Coupon Counting link). With no TIPS maturing in the settlement year
+// in today's quotes, the Rebalance ladder has no such row, and the tests of that link have nothing to act on.
+const NO_SETTLEMENT_YEAR_ROW = 'no TIPS in the quotes matures in the settlement year, so the ladder has no settlement-year row to carry the Coupons link';
 
 // Series the monthly jobs keep current are read from R2, once per run, not mirrored in tests/e2e.
 const liveR2 = new Map();
@@ -58,9 +64,18 @@ async function fidelityWithTodayDownloadDate() {
 
 // Holdings CSV for rebalance tests (Format 3: cusip,qty) — single canonical copy in data/
 const HOLDINGS_PATH = path.join(ROOT, 'data', 'SampleHoldings.csv');
-// The settlement year, set before each test: the ladder's first year, so years in these tests are written relative
-// to it (SY + 1 is the second year) and do not go stale when the calendar turns.
+// The Build tab's default First Year (DD §5.1 Default First Year), set before each test, so years in these tests
+// are written relative to it (SY + 1 is the second year) and do not go stale when the calendar turns.
 let SY = 0;
+
+// The default First Year derived from today's quotes with the helper the app itself uses.
+async function defaultFirstYearFromQuotes() {
+  const tips = new Map();
+  for (const f of parseCsvRows(await r2Text('Treasuries/FidelityTreasuriesTips.csv'), false)) {
+    if (f[0] === 'TIPS') tips.set(f[2], { maturity: localDate(f[6]) });
+  }
+  return defaultFirstYear(tips, localDate(await computeSettleDateStr()));
+}
 
 // cusip -> maturity year for every TIPS in today's quotes, to tell which year a bond in an exported file belongs to.
 // The structural gap, read from the First Year dropdown (the gap years are labelled): Build tab only.
@@ -120,7 +135,7 @@ async function chooseMenu(page, menu, choice) {
 
 test.beforeEach(async ({ page }) => {
   const yieldsBody = await yieldsWithTodaySettlement();
-  SY = Number((await computeSettleDateStr()).slice(0, 4));
+  SY = await defaultFirstYearFromQuotes();
   await page.route('**/Treasuries/YieldsFromFedInvestPrices.csv', r =>
     r.fulfill({ body: yieldsBody, contentType: 'text/csv' }));
   await page.route('**/Treasuries/FidelityTreasuriesTips.csv', async r =>
@@ -137,6 +152,19 @@ test.beforeEach(async ({ page }) => {
   await page.goto('./');
   // Wait for data load: run button must be enabled
   await expect(page.locator('#run-btn')).not.toBeDisabled({ timeout: 4_000 });
+});
+
+// A TIPS within the First Year buffer of its maturity is not counted: the First Year choices and the default start at
+// the Default First Year (DD §5.1), and a default build runs from it.
+test('Build First Year: the choices and the default start at the Default First Year, and the default build runs', async ({ page }) => {
+  await page.locator('.tab-btn[data-mode="build"]').click();
+  const values = await page.locator('#first-year option').evaluateAll(os => os.map(o => o.value).filter(v => v !== ''));
+  expect(Number(values[0]), 'the first choice is the Default First Year').toBe(SY);
+  await expect(page.locator('#first-year')).toHaveValue(String(SY));
+  await page.locator('#dara').fill('40000');
+  await page.locator('#run-btn').click();
+  await expect(page.locator('#build-output')).toHaveCSS('display', 'block', { timeout: 4_000 });
+  await expect(page.locator('#val-range')).toContainText(String(SY) + '–');
 });
 
 // ── 1. Data load ──────────────────────────────────────────────────────────────
@@ -1203,7 +1231,7 @@ test('build variable DARA then rebalance: per-year panel round-trips exactly', a
   // and the per-year values must reproduce exactly, not just preserve ordering.
   await page.locator('.tab-btn[data-mode="build"]').click();
 
-  // Select last year 2029 and default first year (settlement year ≈ 2026)
+  // Select last year 2029 and the default first year
   await page.locator('#last-year').selectOption(String(SY + 3));
   await page.locator('#dara').fill('40000');
 
@@ -1759,6 +1787,7 @@ test('Available Cash follows the Coupons setting, and stops once the holder sets
   await expect(mark).toBeVisible();
 
   const firstYear = await page.locator('#simple-table .fy-dara-input[data-year]').first().getAttribute('data-year');
+  test.skip(firstYear !== (await computeSettleDateStr()).slice(0, 4), NO_SETTLEMENT_YEAR_ROW);
   const link = page.locator(`#simple-table tr.fy-group-header[data-fy="${firstYear}"] .fy-rmd-link`);
   const pop = page.locator('#rmd-options-popover');
 
@@ -1805,7 +1834,7 @@ test('Available Cash counts maturity proceeds from rungs that have already matur
   const maturedBonds = [];
   for (const line of (await r2Text('TIPS/TipsRef.csv')).split(/\r?\n/)) {
     const f = line.split(',');
-    if (/^[A-Z0-9]{9}$/.test(f[0]) && f[1] && f[1] < settle && f[1].slice(0, 4) === String(SY)) maturedBonds.push({ cusip: f[0], maturity: f[1] });
+    if (/^[A-Z0-9]{9}$/.test(f[0]) && f[1] && f[1] < settle && f[1].slice(0, 4) === settle.slice(0, 4)) maturedBonds.push({ cusip: f[0], maturity: f[1] });
   }
   test.skip(maturedBonds.length === 0, 'no TIPS has matured yet this settlement year');
   const rungs = [...new Map(maturedBonds.map(m => [m.maturity, m])).values()]; // one bond per maturity date
@@ -2093,6 +2122,7 @@ test('Coupon Counting: link appears only on the settlement year row, in Rebalanc
   await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 4_000 });
 
   const firstYear = await page.locator('#simple-table .fy-dara-input[data-year]').first().getAttribute('data-year');
+  test.skip(firstYear !== (await computeSettleDateStr()).slice(0, 4), NO_SETTLEMENT_YEAR_ROW);
   const otherYear = await page.locator('#simple-table .fy-dara-input[data-year]').nth(1).getAttribute('data-year');
   await expect(page.locator(`#simple-table tr.fy-group-header[data-fy="${firstYear}"] .fy-rmd-link`)).toBeVisible();
   await expect(page.locator(`#simple-table tr.fy-group-header[data-fy="${otherYear}"] .fy-rmd-link`)).toHaveCount(0);
@@ -2135,6 +2165,7 @@ test('Coupon Counting: hovering the link shows an explainer without opening the 
   await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 4_000 });
 
   const firstYear = await page.locator('#simple-table .fy-dara-input[data-year]').first().getAttribute('data-year');
+  test.skip(firstYear !== (await computeSettleDateStr()).slice(0, 4), NO_SETTLEMENT_YEAR_ROW);
   const link = page.locator(`#simple-table tr.fy-group-header[data-fy="${firstYear}"] .fy-rmd-link`);
   const tooltip = page.locator('#bracket-tooltip');
   await expect(tooltip).toBeHidden();
@@ -2167,6 +2198,7 @@ test('Available Cash and coupon mode round-trip through the DARA-plan file', asy
   await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 4_000 });
 
   const firstYear = await page.locator('#simple-table .fy-dara-input[data-year]').first().getAttribute('data-year');
+  test.skip(firstYear !== (await computeSettleDateStr()).slice(0, 4), NO_SETTLEMENT_YEAR_ROW);
   const link = page.locator(`#simple-table tr.fy-group-header[data-fy="${firstYear}"] .fy-rmd-link`);
   await expect(page.locator('#field-available-cash')).toBeVisible();
   await page.locator('#available-cash').click();
