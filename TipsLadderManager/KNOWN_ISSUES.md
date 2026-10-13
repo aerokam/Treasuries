@@ -796,7 +796,7 @@ per-CUSIP prices for a past date (3.1 §4.0).
   on, each labelled with the amount it produces, each **exclusive** of the date it names. A file’s
   own recorded Ref CPI date maps onto one of them, and is the earliest offered.
 - **And the two dates were separated.** One entry had served both the Ref CPI basis and the cash
-  window, so a position file — which carries no per-year amounts to restate — was told its amounts
+  window, so a broker positions export — which carries no per-year amounts to restate — was told its amounts
   would be restated. The Ref CPI entry is now offered only where the file carries amounts.
 
 ### Available Cash and the payments behind it were two controls
