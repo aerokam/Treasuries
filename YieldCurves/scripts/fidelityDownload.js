@@ -85,9 +85,16 @@ async function completeSmsChallenge(page) {
   const codeInput = page.getByLabel('Security code');
   await codeInput.fill(code);
 
-  const rememberCheckbox = page.getByRole('checkbox', { name: 'Remember this device' });
-  if (await rememberCheckbox.isVisible().catch(() => false) && !(await rememberCheckbox.isChecked())) {
-    await rememberCheckbox.check();
+  // The checkbox input sits under its styled label, which intercepts the pointer, so a
+  // direct check() times out (2026-10-13 9:35 run). Click the label; never let this
+  // optional step block Submit.
+  try {
+    const rememberCheckbox = page.getByRole('checkbox', { name: 'Remember this device' });
+    if (await rememberCheckbox.isVisible().catch(() => false) && !(await rememberCheckbox.isChecked())) {
+      await page.locator('label[for="dom-trust-device-checkbox"]').click({ timeout: 5_000 });
+    }
+  } catch (e) {
+    console.error('Could not tick "Remember this device", submitting anyway:', e.message.split('\n')[0]);
   }
 
   await page.getByText('Submit', { exact: true }).click();

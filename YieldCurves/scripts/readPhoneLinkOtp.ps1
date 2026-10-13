@@ -55,4 +55,29 @@ while ((Get-Date) -lt $deadline) {
   }
   Start-Sleep -Seconds $PollIntervalSec
 }
+
+# Timed out: say why on stderr (surfaces in fidelity.log), so the next failure is diagnosable.
+$root = [System.Windows.Automation.AutomationElement]::RootElement
+$winCond = New-Object System.Windows.Automation.PropertyCondition(
+  [System.Windows.Automation.AutomationElement]::NameProperty, 'Phone Link')
+$win = $root.FindFirst([System.Windows.Automation.TreeScope]::Children, $winCond)
+if (-not $win) {
+  [Console]::Error.WriteLine('Phone Link window not found (app closed or not exposed to UI Automation).')
+} else {
+  $state = 'unknown'
+  try { $state = $win.GetCurrentPattern([System.Windows.Automation.WindowPattern]::Pattern).Current.WindowVisualState } catch {}
+  $msgListCond = New-Object System.Windows.Automation.AndCondition(
+    (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ControlTypeProperty, [System.Windows.Automation.ControlType]::List)),
+    (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::NameProperty, 'Messages'))
+  )
+  $msgList = $win.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $msgListCond)
+  if (-not $msgList) {
+    [Console]::Error.WriteLine("Phone Link window found (state: $state) but no 'Messages' list (another view open?).")
+  } else {
+    $itemCond = New-Object System.Windows.Automation.PropertyCondition(
+      [System.Windows.Automation.AutomationElement]::ControlTypeProperty, [System.Windows.Automation.ControlType]::ListItem)
+    $n = $msgList.FindAll([System.Windows.Automation.TreeScope]::Children, $itemCond).Count
+    [Console]::Error.WriteLine("Phone Link window state: $state; Messages list has $n items; newest code message unchanged from baseline.")
+  }
+}
 exit 1
