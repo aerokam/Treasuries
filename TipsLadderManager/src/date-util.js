@@ -18,6 +18,14 @@ export function localDate(str) {
   return dt;
 }
 
+// The date `months` calendar months after `d`, local time. A day of month the target month lacks
+// is held to that month's last day (Nov 30 + 3 months is Feb 28).
+export function addMonths(d, months) {
+  const t = new Date(d.getFullYear(), d.getMonth() + months, 1);
+  const last = new Date(t.getFullYear(), t.getMonth() + 1, 0).getDate();
+  return new Date(t.getFullYear(), t.getMonth(), Math.min(d.getDate(), last));
+}
+
 export function toDateStr(d) { return d.toISOString().split('T')[0]; }
 
 export function fmtDate(d) {

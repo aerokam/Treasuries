@@ -5,7 +5,7 @@
 
 import { fmtDate } from './date-util.js';
 import { bondCalcs, calculateMDuration, rungAmount, calcMktWtdAvg } from '../../shared/src/bond-math.js';
-import { sizeLadder, selectLadderBonds, fundedYearAmount, syntheticYearAmounts } from './ladder-core.js';
+import { sizeLadder, selectLadderBonds, fundedYearAmount, syntheticYearAmounts, defaultFirstYear } from './ladder-core.js';
 
 // ─── Main entry point ──────────────────────────────────────────────────────────
 // Inputs:
@@ -13,7 +13,8 @@ import { sizeLadder, selectLadderBonds, fundedYearAmount, syntheticYearAmounts }
 //   lastYear       — number (last fiscal year to fund)
 //   tipsMarketData        — Map from buildTipsMarketData()
 //   refCPI         — number
-//   settlementDate — Date (firstYear is derived as settlementDate.getFullYear())
+//   settlementDate — Date
+//   firstYear      — number (optional; kept when supplied, else defaultFirstYear: DD §5.1 Default First Year)
 //
 // Bond selection: latest-to-mature TIPS within each fiscal year.
 // Lower bracket: latest TIPS bond maturing before the first gap year.
@@ -23,7 +24,8 @@ import { sizeLadder, selectLadderBonds, fundedYearAmount, syntheticYearAmounts }
 // Spec: knowledge/3.0_TIPS_Ladders.md and knowledge/4.0_TIPS_Ladder_Rebalancing.md §Full Rebalance
 // Variable naming note: fundedYearQty, excessQty, costPerBond (harmonized) — see §Code Variable Mapping
 export function runBuild({ dara, firstYear: firstYearOpt, lastYear, tipsMarketData, refCPI, settlementDate, maturityPref = 'last', couponPref = 'higher', preLadderInterest = false, daraByYear = null, yearOverrides = null, bondHolidays = new Set(), availableCash = 0, rmdCouponMode = 'all', tradeDate = settlementDate }) {
-  const firstYear      = firstYearOpt ?? settlementDate.getFullYear();
+  const firstYear      = firstYearOpt ?? defaultFirstYear(tipsMarketData, settlementDate);
+  if (firstYear == null) throw new Error('No TIPS bonds found in the specified year range');
   const settleDateDisp = fmtDate(settlementDate);
   const settlementYear = settlementDate.getFullYear();
 

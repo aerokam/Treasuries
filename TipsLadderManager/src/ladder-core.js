@@ -13,6 +13,26 @@ import { bondCalcs, calculateMDuration, couponSchedule, priceFromYield } from '.
 import { actualPaymentDate, lastBusinessDayOfMonth } from '../../shared/src/settlement.js';
 import { indexRatio as calcIndexRatio } from '../../shared/src/ref-cpi.js';
 import { bracketWeights, bracketWeightsN, bracketExcessQtys, fyQty as _fyQty, gapParamsCore, future30yParamsCore, syntheticCoupon } from './gap-math.js';
+import { addMonths } from './date-util.js';
+
+// ─── Default First Year ─────────────────────────────────────────────────────────
+// Spec: DD §5.1 (FIRST_YEAR_BUFFER_MONTHS, Default First Year). A TIPS maturing no later than this many
+// months after the Settlement Date no longer counts toward the ladder's years in Build: the market quotes
+// omit a Treasury within about a week of maturity, so its year would otherwise read as a gap year. One
+// definition; the Build tab and runBuild both read it here.
+export const FIRST_YEAR_BUFFER_MONTHS = 3;
+
+// The TIPS maturing more than `bufferMonths` months after the Settlement Date.
+export function tipsBeyondFirstYearBuffer(tipsMarketData, settlementDate, bufferMonths = FIRST_YEAR_BUFFER_MONTHS) {
+  const cutoff = addMonths(settlementDate, bufferMonths);
+  return [...tipsMarketData.values()].filter(b => b.maturity && b.maturity > cutoff);
+}
+
+// The Build tab's default First Year: the earliest maturity year with a TIPS beyond the buffer; null when none.
+export function defaultFirstYear(tipsMarketData, settlementDate, bufferMonths = FIRST_YEAR_BUFFER_MONTHS) {
+  const years = tipsBeyondFirstYearBuffer(tipsMarketData, settlementDate, bufferMonths).map(b => b.maturity.getFullYear());
+  return years.length ? Math.min(...years) : null;
+}
 
 // ─── Gap parameters adapter ─────────────────────────────────────────────────────
 // Build's "LMI above the gap" = prelim funded-year coupon (effective prelim: zeroed years = 0).
