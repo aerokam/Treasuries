@@ -769,7 +769,9 @@ Some values are true only until Treasury issues more TIPS. Left inline as approx
 - <a id="tips-market-data"></a>**TIPS Market Data** = `{ @CUSIP + Maturity_Date + Coupon_Rate + Ref_CPI_dated + Price + Yield + ( SA_Yield ) }`
   *Every TIPS Market quotes (S7) states, keyed by CUSIP, its [SA Yield](#sa-yield) attached where [SA and SAO yields (S10)](#s10) has an entry for it. The app names this table "TIPS Mkt Data," the title of its TIPS Ref/Mkt popup's "Mkt" tab.*
 - <a id="holdings-file"></a>**Holdings File**
-  *A csv file identifying TIPS positions held, in one of six formats: [Fidelity Export](#fidelity-export), [Schwab Export](#schwab-export), [Vanguard Export](#vanguard-export), [Holdings Export](#holdings-export-format), [tipsladder.com Format](#tipsladdercom-format), [Plain CUSIP/Quantity Format](#plain-format).*
+  *A csv file identifying the TIPS held, in one of six formats: [Fidelity Export](#fidelity-export), [Schwab Export](#schwab-export), [Vanguard Export](#vanguard-export), [Holdings Export](#holdings-export-format), [tipsladder.com Format](#tipsladdercom-format), [Plain CUSIP/Quantity Format](#plain-format).*
+- <a id="broker-positions-export"></a>**Broker Positions Export**
+  *A csv file a broker produces from its positions view, listing every position in the account, the TIPS [Holdings](#holdings) among them. The app reads the TIPS rows only. A [Fidelity Export](#fidelity-export), a [Schwab Export](#schwab-export) and a [Vanguard Export](#vanguard-export) are each one.*
 - <a id="fidelity-export"></a>**Fidelity Export**
   Column headers: `Account number,Account name,Symbol,Description,Quantity,Last price,Last price change,Current value,Today's gain/loss dollar,Today's gain/loss percent,Total gain/loss dollar,Total gain/loss percent,Percent of account,Cost basis total,Average cost basis,Type`
   Columns read: `Account number`, `Account name`, `Symbol` (a CUSIP), `Quantity` (states [Face Value](#face-value)), `Current value`.
