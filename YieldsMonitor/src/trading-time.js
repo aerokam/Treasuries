@@ -1,4 +1,4 @@
-// Trading-hours X-axis for the 2D and 10D Time Series charts: every weekday's session, 08:00 to
+// Trading-hours X-axis for the 2D, 10D and Custom Time Series charts: every weekday's session, 08:00 to
 // 17:05 ET, is laid end to end with a narrow gap between sessions, and the hours and weekends in
 // between take no width. Data and axis bounds stay in real timestamps; only the mapping from a
 // timestamp to a position on the axis is changed (see createTradingTimeScale).

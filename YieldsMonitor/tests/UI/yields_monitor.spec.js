@@ -79,6 +79,29 @@ test.describe('Yields Monitor Regression Tests', () => {
     expect((await state()).compact).toBe(false);
   });
 
+  test('Hide non-trading hours applies to the Custom range and keeps its daily-only points', async ({ page }) => {
+    await page.locator('.range-btn[data-range="Custom"]').click();
+    const iso = ms => new Date(ms).toISOString().slice(0, 10);
+    await page.fill('#customStart', iso(Date.now() - 31 * 86400000));
+    await page.fill('#customEnd', iso(Date.now()));
+    await page.click('#applyCustomRange');
+    await expect(page.locator('#fetchStatus')).toContainText('TIPS latest:', { timeout: 45000 });
+    const read = () => page.locator('canvas#chart-US10Y').evaluate((canvas) => {
+      const chart = Chart.getChart(canvas);
+      const hm = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hourCycle: 'h23', hour: 'numeric', minute: 'numeric' });
+      const mins = chart.data.datasets[0].data.map(p => { const q = hm.formatToParts(new Date(p.x)).reduce((a, t) => ({ ...a, [t.type]: +t.value }), {}); return q.hour * 60 + q.minute; });
+      return { compact: chart.scales.x.options.compact, n: mins.length, outside: mins.filter(m => m < 480 || m > 1025).length };
+    });
+    const off = await read();
+    expect(off.compact).toBe(false);
+    expect(off.outside).toBeGreaterThan(0);
+    await page.locator('#hideNonTrading').check();
+    const on = await read();
+    expect(on.compact).toBe(true);
+    expect(on.outside).toBe(0);
+    expect(on.n).toBeGreaterThan(10); // days with daily bars only are kept
+  });
+
   test('10D range should show at least 5 days of data', async ({ page }) => {
     const chartCanvas = page.locator('canvas#chart-US10Y');
     const btn = page.locator('.range-btn[data-range="10D"]');

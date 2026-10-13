@@ -92,8 +92,9 @@ let activeTab = 'timeseries';
 let syncXAxis = true;
 let lockRight = false;
 let hideNonTrading = false;
-// Hide non-trading hours applies to the 2D and 10D ranges only.
-function compactOn() { return hideNonTrading && (activeRange === '2D' || activeRange === '10D'); }
+// The intraday visual standards and Hide non-trading hours apply to the 2D, 10D and Custom ranges.
+function intradayRange() { return activeRange === '2D' || activeRange === '10D' || activeRange === 'Custom'; }
+function compactOn() { return hideNonTrading && intradayRange(); }
 function plotSeries(series) { return compactOn() && series ? series.filter(p => inTradingSession(+p.x)) : series; }
 let customStartDate = null; // Date (ET midnight of start day) | null — exclusive lower bound for Custom range
 let customEndDate = null;   // Date (ET midnight of day after end day) | null — exclusive upper bound for Custom range
@@ -438,7 +439,7 @@ function createChartInstance(sym) {
   charts[sym] = new Chart(ctx, {
     type: 'line',
     plugins: [pointMarkerPlugin, tradingGapPlugin],
-    data: { datasets: [{ label: sym, data: [], borderColor: color, backgroundColor: color + '1A', pointBackgroundColor: color, borderWidth: 1.5, pointRadius: markerRadius, clip: MARKER_CLIP, pointHoverRadius: 4, fill: false, tension: 0.1, segment: { borderColor: ctx => { if (activeRange !== '2D' && activeRange !== '10D') return color; const mid = (ctx.p0.parsed.x + ctx.p1.parsed.x) / 2; return (isAfterHoursEt(mid) || isWeekendEt(new Date(mid))) ? color + '55' : color; } } }, ...saDataset] },
+    data: { datasets: [{ label: sym, data: [], borderColor: color, backgroundColor: color + '1A', pointBackgroundColor: color, borderWidth: 1.5, pointRadius: markerRadius, clip: MARKER_CLIP, pointHoverRadius: 4, fill: false, tension: 0.1, segment: { borderColor: ctx => { if (!intradayRange()) return color; const mid = (ctx.p0.parsed.x + ctx.p1.parsed.x) / 2; return (isAfterHoursEt(mid) || isWeekendEt(new Date(mid))) ? color + '55' : color; } } }, ...saDataset] },
     options: {
       animation: false, responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, layout: { padding: { right: MARKER_CLIP_PX } },
       scales: {
@@ -1129,16 +1130,16 @@ function updateDynamicTicks(chart, data, sym) {
   if (!data || data.length === 0) return;
   const bounds = snapYBounds(Math.min(...data.map(p=>p.y)), Math.max(...data.map(p=>p.y)));
   chart.options.scales.y.min = bounds.min; chart.options.scales.y.max = bounds.max; chart.options.scales.y.ticks.stepSize = bounds.step;
-  if (activeRange === '2D' || activeRange === '10D') {
-    const annotations = {}, nowTs = Date.now(), [fm, fd, fy] = getEtDateStr(data[0].x).split('/').map(Number);
+  if (intradayRange()) {
+    const annotations = {}, nowTs = Date.now(), shadeTo = activeRange === 'Custom' ? +data[data.length - 1].x : nowTs, [fm, fd, fy] = getEtDateStr(data[0].x).split('/').map(Number);
     let current = makeEtMoment(fy, fm - 1, fd, 0), dayIdx = 0, AH_BG = 'rgba(148, 163, 184, 0.13)';
-    while (!compactOn() && current.getTime() <= nowTs) {
+    while (!compactOn() && current.getTime() <= shadeTo) {
       const etStr = getEtDateStr(current), [m, d, y] = etStr.split('/').map(Number), mid = makeEtMoment(y, m - 1, d, 0), am8 = makeEtMoment(y, m - 1, d, 8), pm5 = makeEtMoment(y, m - 1, d, 17), next = makeEtMoment(y, m - 1, d + 1, 0);
       if (isWeekendEt(current)) { annotations[`weekend-${dayIdx}`] = { type: 'box', xMin: mid, xMax: next, backgroundColor: AH_BG, borderWidth: 0, drawTime: 'beforeDatasetsDraw' }; }
       else { annotations[`pre-${dayIdx}`] = { type: 'box', xMin: mid, xMax: am8, backgroundColor: AH_BG, borderWidth: 0, drawTime: 'beforeDatasetsDraw' }; annotations[`aft-${dayIdx}`] = { type: 'box', xMin: pm5, xMax: next, backgroundColor: AH_BG, borderWidth: 0, drawTime: 'beforeDatasetsDraw' }; const dayD = data.filter(p => getEtDateStr(p.x) === etStr); if (dayD.length > 0) { const dMin = dayD[0].x, dMax = dayD[dayD.length-1].x; if (am8 >= dMin && am8 <= dMax) annotations[`am8-${dayIdx}`] = { type: 'line', xMin: am8, xMax: am8, borderColor: 'rgba(15,23,42,0.4)', borderWidth: 1.5, borderDash: [4,4] }; if (pm5 >= dMin && pm5 <= dMax) annotations[`pm5-${dayIdx}`] = { type: 'line', xMin: pm5, xMax: pm5, borderColor: 'rgba(15,23,42,0.4)', borderWidth: 1.5, borderDash: [4,4] }; } }
       current = next; dayIdx++;
     }
-    const quoteTime = sym ? staleQuoteTime(sym, data) : null;
+    const quoteTime = sym && activeRange !== 'Custom' ? staleQuoteTime(sym, data) : null;
     if (quoteTime) {
       const lastPoint = data[data.length - 1];
       annotations['stale-bridge'] = { type: 'line', xMin: lastPoint.x, xMax: nowTs, yMin: lastPoint.y, yMax: lastPoint.y, borderColor: chart.data.datasets[0].borderColor, borderWidth: 1.5, borderDash: [3, 3], drawTime: 'afterDatasetsDraw' };
