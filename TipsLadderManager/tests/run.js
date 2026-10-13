@@ -6,7 +6,7 @@ import { readFileSync, readdirSync, existsSync } from 'fs';
 import path from 'path';
 import { buildTipsMarketData, localDate, runRebalance, runFundedRebalance, inferDARAFromCash, inferScaledDARAFromPortfolio, computePortfolioARAByYear, getGapYearBracketCandidates, getGapYears, derivePerYearDara, parseFundedYearDaraBlock, parseParamsBlock, inferFirstYearFromHoldings, inferLastYearFromHoldings } from '../src/rebalance-lib.js';
 import { computeBeforeState, detectBracketFlags, heldYearMedianExcluding } from '../src/before-state-lib.js';
-import { remainingCouponPaymentsThisYear, rmdCappedRemainingCoupons, latestRemainingCouponDate, future30yLimit, maxLastYear, selectFuture30yCovers, LOWER_COVER_YIELD, gapRebalances } from '../src/ladder-core.js';
+import { FIRST_YEAR_BUFFER_MONTHS, defaultFirstYear, tipsBeyondFirstYearBuffer, remainingCouponPaymentsThisYear, rmdCappedRemainingCoupons, latestRemainingCouponDate, future30yLimit, maxLastYear, selectFuture30yCovers, LOWER_COVER_YIELD, gapRebalances } from '../src/ladder-core.js';
 import { bracketWeights, bracketWeightsN, syntheticCoupon } from '../src/gap-math.js';
 import { findSpikes, smoothCurve } from '../src/shape-math.js';
 import { buildDurationPopupRows, buildBracketWeightDrill, buildFuture30yDurationPopupRows, buildFuture30yLMIDrill, buildSyntheticPIDrill } from '../src/drill.js';
@@ -103,6 +103,8 @@ const settlementDate = localDate(settleDateStr);
 console.log(`[Test Setup] Settlement:    ${settleDateStr} (T+1 from today ${_todayISO})`);
 const tipsMarketData = buildTipsMarketData(yieldsRows, saYieldByCusip);
 const refCPI = lookupRefCpi(refCpiRows, settleDateStr);
+// The Build tab's default First Year, from the same helper the app uses (DD §5.1 Default First Year).
+const FIRST_YEAR = defaultFirstYear(tipsMarketData, settlementDate);
 if (refCPI == null) {
   const last = refCpiRows.length ? refCpiRows[refCpiRows.length - 1].date : '(none)';
   throw new Error(
@@ -896,7 +898,7 @@ const parseMkt = buildTipsMarketData([
 console.log('\nBuild — DARA=50000, lastYear=2040');
 {
   const dara = 50000, lastYear = 2040;
-  const firstYear = settlementDate.getFullYear();
+  const firstYear = FIRST_YEAR;
   const { summary, results, details } = runBuild({ dara, lastYear, tipsMarketData, refCPI, settlementDate });
   assert('totalBuyCost > 0', summary.totalBuyCost > 0, true);
   assert('result rows > 0', results.length > 0, true);
@@ -917,6 +919,50 @@ console.log('\nBuild — DARA=50000, lastYear=2040');
   console.log(`        avgAmt/rung:   ${Math.round(avgAmt).toLocaleString()} (DARA=${dara.toLocaleString()}, rungs=${numRungs})`);
 }
 
+// ── Test: Default First Year (DD §5.1) ───────────────────────────────────────────
+// The default is derived here from the market fixture by plain date arithmetic, independent of the
+// helper, and must equal the helper's answer, runBuild's default, and the rule the DD table states:
+// the first year with a TIPS maturing more than FIRST_YEAR_BUFFER_MONTHS months after settlement.
+console.log('\nDefault First Year — derived from the market fixture');
+{
+  assert('FIRST_YEAR_BUFFER_MONTHS matches the DD value (3)', FIRST_YEAR_BUFFER_MONTHS, 3);
+  const cutoff = new Date(settlementDate.getFullYear(), settlementDate.getMonth() + FIRST_YEAR_BUFFER_MONTHS, settlementDate.getDate());
+  const beyond = [...tipsMarketData.values()].filter(b => b.maturity && b.maturity > cutoff);
+  const expectedYear = Math.min(...beyond.map(b => b.maturity.getFullYear()));
+  assert('default First Year = first year with a TIPS beyond the buffer', FIRST_YEAR, expectedYear);
+  assert('tipsBeyondFirstYearBuffer returns exactly the TIPS beyond the buffer', tipsBeyondFirstYearBuffer(tipsMarketData, settlementDate).length, beyond.length);
+  assert('no TIPS within the buffer is counted', tipsBeyondFirstYearBuffer(tipsMarketData, settlementDate).every(b => b.maturity > cutoff), true);
+  assert('runBuild without a First Year starts at the default', runBuild({ dara: 40000, lastYear: MAX_YEAR, tipsMarketData, refCPI, settlementDate }).summary.firstYear, FIRST_YEAR);
+  assert('runBuild keeps a First Year it is given', runBuild({ dara: 40000, firstYear: FIRST_YEAR + 1, lastYear: MAX_YEAR, tipsMarketData, refCPI, settlementDate }).summary.firstYear, FIRST_YEAR + 1);
+  const firstYearOptions = [...new Set(tipsBeyondFirstYearBuffer(tipsMarketData, settlementDate).map(b => b.maturity.getFullYear()))].sort((a, b) => a - b);
+  assert('the First Year choices start at the default', firstYearOptions[0], FIRST_YEAR);
+  console.log(`        settlement ${settleDateStr}, default First Year ${FIRST_YEAR}`);
+}
+
+console.log('\nDefault First Year — the buffer length changes the default');
+{
+  const S = localDate('2026-10-14');
+  const m = new Map([['A', { maturity: localDate('2026-12-15') }], ['B', { maturity: localDate('2027-04-15') }], ['C', { maturity: localDate('2028-01-15') }]]);
+  assert('0 months: a TIPS maturing in two months counts, default 2026', defaultFirstYear(m, S, 0), 2026);
+  assert('3 months: the 2026 TIPS is within the buffer, default 2027', defaultFirstYear(m, S, 3), 2027);
+  assert('6 months: April 15 2027 is beyond Apr 14 2027, default 2027', defaultFirstYear(m, S, 6), 2027);
+  assert('7 months: April 15 2027 is within the buffer, default 2028', defaultFirstYear(m, S, 7), 2028);
+  assert('omitting the length uses FIRST_YEAR_BUFFER_MONTHS', defaultFirstYear(m, S), defaultFirstYear(m, S, FIRST_YEAR_BUFFER_MONTHS));
+  assert('no TIPS beyond the buffer: null', defaultFirstYear(new Map([['A', { maturity: localDate('2026-12-15') }]]), S, 3), null);
+}
+
+console.log('\nDefault First Year — boundary at exactly the buffer length');
+{
+  const later = { maturity: localDate('2028-01-15') };
+  const S = localDate('2026-10-14');
+  assert('TIPS maturing exactly 3 months after settlement is within the buffer', defaultFirstYear(new Map([['A', { maturity: localDate('2027-01-14') }], ['B', later]]), S, 3), 2028);
+  assert('TIPS maturing 3 months and a day after settlement is beyond the buffer', defaultFirstYear(new Map([['A', { maturity: localDate('2027-01-15') }], ['B', later]]), S, 3), 2027);
+  assert('TIPS maturing 3 months less a day after settlement is within the buffer', defaultFirstYear(new Map([['A', { maturity: localDate('2027-01-13') }], ['B', later]]), S, 3), 2028);
+  const S2 = localDate('2026-11-30');
+  assert('month end: Nov 30 + 3 months is Feb 28, and Feb 28 is within the buffer', defaultFirstYear(new Map([['A', { maturity: localDate('2027-02-28') }], ['B', later]]), S2, 3), 2028);
+  assert('month end: Mar 1 is beyond the buffer', defaultFirstYear(new Map([['A', { maturity: localDate('2027-03-01') }], ['B', later]]), S2, 3), 2027);
+}
+
 // ── Test: RMD Options — settlement-year remaining-coupon LMI choice (2.0 §RMD Options) ──
 // Settle on Jan 1 of the same year as the real settlementDate (not the real settlementDate
 // itself) so EVERY settlement-year bond still has both its semiannual coupons ahead of it —
@@ -925,7 +971,7 @@ console.log('\nBuild — DARA=50000, lastYear=2040');
 console.log('\nBuild — RMD Options (settlement-year remaining-coupon LMI)');
 {
   const dara = 50000, lastYear = 2040;
-  const earlySettle = localDate(`${settlementDate.getFullYear()}-01-01`);
+  const earlySettle = localDate(`${FIRST_YEAR}-01-01`);
   const fy = earlySettle.getFullYear();
   const fundedQtyAt = (availableCash, rmdCouponMode) => {
     const { details } = runBuild({ dara, lastYear, tipsMarketData, refCPI, settlementDate: earlySettle, availableCash, rmdCouponMode });
@@ -1222,7 +1268,7 @@ console.log('\nRebalance — an unheld year above 2040 (e.g. 2048) no longer tru
 // engine's own per-year maps.
 for (const dara of [20000, 100000, 400000]) {
   console.log(`\nBuild — Future 30Y rebalances and Amount, DARA=${dara}, lastYear=${LAST_MAX}`);
-  const firstYear = settlementDate.getFullYear(), lastYear = LAST_MAX;
+  const firstYear = FIRST_YEAR, lastYear = LAST_MAX;
   const { summary, details } = runBuild({ dara, firstYear, lastYear, tipsMarketData, refCPI, settlementDate, bondHolidays });
   const bd = [...summary.future30yParams.breakdown].sort((a, b) => a.year - b.year);
   const firstF30 = bd[0].year, lastF30 = bd[bd.length - 1].year;
@@ -1372,8 +1418,8 @@ console.log('\nFuture 30Y: the three amounts credited against the full annual co
       for (const dara of [20000, 100000, 400000]) {
         for (const variable of [false, true]) {
           const label = `${lastYear} DARA ${dara / 1000}K ${variable ? 'variable' : 'flat'}`;
-          const daraByYear = variable ? new Map(Array.from({ length: lastYear - SY + 1 }, (_, i) => [SY + i, dara * (i % 2 ? 0.7 : 1.3)])) : null;
-          const { summary } = runBuild({ dara, firstYear: SY, lastYear, tipsMarketData: market, refCPI, settlementDate: S, bondHolidays, daraByYear });
+          const daraByYear = variable ? new Map(Array.from({ length: lastYear - FIRST_YEAR + 1 }, (_, i) => [FIRST_YEAR + i, dara * (i % 2 ? 0.7 : 1.3)])) : null;
+          const { summary } = runBuild({ dara, firstYear: FIRST_YEAR, lastYear, tipsMarketData: market, refCPI, settlementDate: S, bondHolidays, daraByYear });
           const conv = summary.future30yRebalances.conversions;
           const bd = summary.future30yParams.breakdown;
           const row = new Map(bd.map(r => [r.year, r]));
@@ -1540,9 +1586,9 @@ console.log(`\nBuild→Rebalance symmetry — firstYear=${GAP.first - 1}, lastYe
 // Regression: build to the ladder's last year at most (default DARA), export CUSIP/Qty/excess, import, rebalance
 // WITHOUT setting first/last year. lastYear must be INFERRED from the 2052/2056 cover excess
 // (inferLastYearFromHoldings) so the round-trip preserves it instead of selling to DARA.
-console.log(`\nBuild→Rebalance NO-override round-trip — firstYear=${settlementDate.getFullYear()}, lastYear=${LAST_MAX}, DARA=40000`);
+console.log(`\nBuild→Rebalance NO-override round-trip — firstYear=${FIRST_YEAR}, lastYear=${LAST_MAX}, DARA=40000`);
 {
-  const DARA = 40000, firstYear = settlementDate.getFullYear(), lastYear = LAST_MAX;
+  const DARA = 40000, firstYear = FIRST_YEAR, lastYear = LAST_MAX;
   const { details: bD, summary: bS } = runBuild({ dara: DARA, firstYear, lastYear, tipsMarketData, refCPI, settlementDate });
   const holdings = bD
     .map(d => ({ cusip: d.cusip, qty: d.fundedYearQty + d.excessQty, excessQty: d.excessQty }))
@@ -1606,12 +1652,12 @@ console.log(`\nBuild→Rebalance export-string round-trip — firstYear=${GAP.fi
 // The best-effort inference path (computePortfolioARAByYear → inferScaledDARAFromPortfolio) is
 // retained for broker/legacy files but is NOT exercised here.
 {
-  const SY = settlementDate.getFullYear();
+  const SY = FIRST_YEAR;
   for (const tc of [
-    { label: '2026–2056 flat',     firstYear: SY,   lastYear: MAX_YEAR, pli: false, vary: false },
+    { label: `${SY}–${MAX_YEAR} flat`,     firstYear: SY,   lastYear: MAX_YEAR, pli: false, vary: false },
     { label: `${SY}–${LAST_MAX} flat`,     firstYear: SY,   lastYear: LAST_MAX, pli: false, vary: false },
     { label: `${GAP.first - 1}–${LAST_MAX} +PLI`,     firstYear: (GAP.first - 1), lastYear: LAST_MAX, pli: true,  vary: false },
-    { label: '2026–2056 variable', firstYear: SY,   lastYear: MAX_YEAR, pli: false, vary: true  },
+    { label: `${SY}–${MAX_YEAR} variable`, firstYear: SY,   lastYear: MAX_YEAR, pli: false, vary: true  },
     { label: `${GAP.first - 3}–${LAST_MAX} variable+PLI`, firstYear: (GAP.first - 3), lastYear: LAST_MAX, pli: true, vary: true },
     // First Year inside the gap: the gap years before it are not in the ladder, and the lower bracket year holds Excess TIPS alone.
     { label: `${GAP.first + 1}–${MAX_YEAR} First Year inside the gap`, firstYear: GAP.first + 1, lastYear: MAX_YEAR, pli: false, vary: false },
@@ -1726,7 +1772,7 @@ console.log(`\nBuild→Rebalance export-string round-trip — firstYear=${GAP.fi
 // Future 30Y year. Checked across DARA magnitudes, last years from the longest issued maturity year to
 // the ladder's last year at most, flat and variable DARA, with and without Pre-Ladder Interest.
 {
-  const SY = settlementDate.getFullYear();
+  const SY = FIRST_YEAR;
   const lastYears = [...new Set([MAX_YEAR, MAX_YEAR + 1, Math.min(MAX_YEAR + 4, LAST_MAX), LAST_MAX])];
   let cases = 0, failures = [];
   for (const DARA of [20000, 100000, 400000]) {
@@ -2166,7 +2212,7 @@ for (const gapFirstYear of GAP_YEARS) {
 // fund itself is the correct, expected report (the holder funds the difference), not a defect to
 // scale away.
 {
-  const lastYear = GAP.last + 1, dara = 100000, SYR = settlementDate.getFullYear();
+  const lastYear = GAP.last + 1, dara = 100000, SYR = FIRST_YEAR;
   const b = runBuild({ dara, firstYear: SYR, lastYear, tipsMarketData, refCPI, settlementDate });
   const holdings = b.details
     .map(d => ({ cusip: d.cusip, qty: (d.fundedYearQty || 0) + (d.excessQty || 0), excessQty: d.excessQty || 0 }))
@@ -3082,7 +3128,7 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
 console.log('\nGap average duration — cost-weighted');
 {
   const _d = new Map();
-  for (let y = settlementDate.getFullYear(); y <= 2047; y++) _d.set(y, 40000);
+  for (let y = FIRST_YEAR; y <= 2047; y++) _d.set(y, 40000);
   _d.set(GAP.first, 15000); _d.set(GAP.last, 90000);
   const { summary: _s } = runBuild({ dara: 40000, lastYear: 2047, tipsMarketData, refCPI, settlementDate, daraByYear: _d });
   const _bd = _s.gapParams.breakdown;
@@ -3388,13 +3434,13 @@ console.log('\nFuture 30Y Dur popup — cost-weighted average, computed match, c
     return d;
   };
   const cases = [
-    { label: 'flat, First Year 2026', dara: 40000, firstYear: SY, lastYear: MAX_YEAR },
-    { label: 'flat, Future 30Y years too', dara: 40000, firstYear: SY, lastYear: LAST_MAX },
-    { label: 'DARA 100,000, Future 30Y years too', dara: 100000, firstYear: SY, lastYear: LAST_MAX },
+    { label: `flat, First Year ${FIRST_YEAR}`, dara: 40000, firstYear: FIRST_YEAR, lastYear: MAX_YEAR },
+    { label: 'flat, Future 30Y years too', dara: 40000, firstYear: FIRST_YEAR, lastYear: LAST_MAX },
+    { label: 'DARA 100,000, Future 30Y years too', dara: 100000, firstYear: FIRST_YEAR, lastYear: LAST_MAX },
     { label: 'First Year the lower bracket year, Pre-Ladder Interest', dara: 40000, firstYear: GAP.first - 1, lastYear: MAX_YEAR, pli: true },
     { label: 'First Year inside the gap', dara: 40000, firstYear: GAP.first + 1, lastYear: MAX_YEAR },
     { label: 'First Year inside the gap, Pre-Ladder Interest', dara: 40000, firstYear: GAP.first + 1, lastYear: MAX_YEAR, pli: true },
-    { label: 'First Year 2027 with Pre-Ladder Interest, DARA 100,000', dara: 100000, firstYear: SY + 1, lastYear: MAX_YEAR, pli: true },
+    { label: `First Year ${FIRST_YEAR + 1} with Pre-Ladder Interest, DARA 100,000`, dara: 100000, firstYear: FIRST_YEAR + 1, lastYear: MAX_YEAR, pli: true },
   ];
   for (const tc of cases) {
     const tag = 'gap ' + tc.label;
@@ -3451,7 +3497,7 @@ console.log('\nFuture 30Y Dur popup — cost-weighted average, computed match, c
     // The three amounts credited to each year before the first gap year, recomputed from the conversions' quantities.
     const netOf = (c, before) => (before.lower - c.lowerQtyAfter) * cpbOn(lowerBond, c.issueDate) + (before.upper - c.upperQtyAfter) * cpbOn(upperBond, c.issueDate)
       - breakdown.find(b => b.year === c.year).qty * 1000 * priceFromYield(breakdown.find(b => b.year === c.year).synYld, breakdown.find(b => b.year === c.year).synCpn, c.issueDate, new Date(c.year, 0, 15)) / 100;
-    for (let y = SY; y < firstGap; y++) {
+    for (let y = FIRST_YEAR; y < firstGap; y++) {
       const t = tag + ' ' + y;
       let sim = 0;
       for (const [k, c] of conv.entries()) {
@@ -3511,7 +3557,7 @@ console.log('\nFuture 30Y Dur popup — cost-weighted average, computed match, c
 {
   console.log('');
   console.log('Gap year conversions — Before with less Excess TIPS held, and Retained Bracket Excess');
-  const SY = settlementDate.getFullYear();
+  const SY = FIRST_YEAR;
   const DARA = 40000;
   const { details: bD, summary: bS } = runBuild({ dara: DARA, firstYear: SY, lastYear: MAX_YEAR, tipsMarketData, refCPI, settlementDate, bondHolidays });
   // Halve the Excess TIPS the build sized at both brackets.
@@ -3568,7 +3614,7 @@ console.log('\nFuture 30Y Dur popup — cost-weighted average, computed match, c
 {
   console.log('');
   console.log('Gap years — the DARA inferred from the held Excess TIPS');
-  const SY = settlementDate.getFullYear();
+  const SY = FIRST_YEAR;
   for (const tc of [
     { dara: 40000, firstYear: SY, lastYear: MAX_YEAR, pli: false },
     { dara: 100000, firstYear: SY, lastYear: MAX_YEAR, pli: false },

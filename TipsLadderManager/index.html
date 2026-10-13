@@ -320,7 +320,7 @@
     <div id="help-mode-build">
     <p>Build a TIPS ladder from scratch, with no existing holdings: it calculates which TIPS to buy so that each funded year produces its <b><a href="../knowledge/viewer.html#/md/knowledge/DATA_DICTIONARY.md#ara" target="_blank" style="color:#2563eb;text-decoration:none;">ARA</a></b> (Annual Real Amount — the actual cash flow the ladder produces for that year, which may differ from DARA due to rounding), targeting the <b><a href="../knowledge/viewer.html#/md/knowledge/DATA_DICTIONARY.md#dara" target="_blank" style="color:#2563eb;text-decoration:none;">DARA</a></b> (Desired Annual Real Amount) you specify for it. It also calculates which excess TIPS the ladder needs to hold to duration-match the gap years (2037–2039, where no TIPS have been issued yet) or, for a ladder extending past the last issued 30-year TIPS, the Future 30Y rungs. See <a href="../knowledge/viewer.html#/md/TipsLadderManager/knowledge/2.0_TIPS_Ladders.md#duration-matching-brackets" target="_blank" style="color:#2563eb;text-decoration:none;">Duration Matching</a> for more details.</p>
 
-    <p><b>1. Choose First Year and Last Year.</b> First Year defaults to the current calendar year.</p>
+    <p><b>1. Choose First Year and Last Year.</b> First Year defaults to the <a href="../knowledge/viewer.html#/md/knowledge/DATA_DICTIONARY.md#5.1-issuance-dependent-values" target="_blank" style="color:#2563eb;text-decoration:none;">Default First Year</a>.</p>
 
     <p><b>2. Set DARA (Desired Annual Real Amount).</b></p>
     <ul style="margin:0 0 10px 20px;padding:0">
@@ -710,7 +710,7 @@ import { buildTipsMarketData, localDate, runFundedRebalance, inferScaledDARAFrom
 import { computeBeforeState, detectBracketFlags, UPPER_BRACKET_YEAR, future30yCoverYears } from './src/before-state-lib.js';
 import { evenSpread, inferShapeValue } from './src/shape-math.js';
 import { runBuild } from './src/build-lib.js';
-import { maxLastYear } from './src/ladder-core.js';
+import { maxLastYear, tipsBeyondFirstYearBuffer, defaultFirstYear } from './src/ladder-core.js';
 import { renderTable, COLS } from './src/render.js';
 import { buildDrillHTML, buildDurationPopupRows, buildWeightedDurationPopupRows, buildWeightedYieldPopupRows, buildWeightedSaYieldPopupRows, buildFuture30yDurationPopupRows, buildIndexRatioDrill, buildRefCpiDrill, buildPIPerBondDrill, buildPreLadderPoolDrill, buildTradeTicketCostDrill, buildTradeTicketAccruedDrill, buildTradeTicketTotalDrill, buildCashFlowDateDrill, buildCashFlowEventDrill, buildGapYearDurationDrill, buildFuture30yYearDurationDrill, buildBracketWeightDrill, buildSyntheticPIDrill, buildSyntheticLMIDrill, buildFuture30yLMIDrill } from './src/drill.js';
 import { showPopup, hidePopup } from './src/popup.js';
@@ -953,7 +953,8 @@ async function loadData() {
     _bondHolidays = bondHolidays;
     tipsMarketData = buildTipsMarketData(yieldsRows, saYieldByCusip);
 
-    const bfsYears = [...new Set([...tipsMarketData.values()].filter(b => b.maturity && b.maturity > settlementDate).map(b => b.maturity.getFullYear()))].sort((a, b) => a - b);
+    // The ladder's years start at the first year with a TIPS beyond the First Year buffer (DD §5.1 Default First Year).
+    const bfsYears = [...new Set(tipsBeyondFirstYearBuffer(tipsMarketData, settlementDate).map(b => b.maturity.getFullYear()))].sort((a, b) => a - b);
     const _bfsYearSet = new Set(bfsYears);
     const _bfsMinY = bfsYears[0], _bfsMaxY = bfsYears[bfsYears.length - 1];
     const _bfsGapYears = new Set();
@@ -980,7 +981,7 @@ async function loadData() {
       opt.textContent = _bfsGapYears.has(y) ? `${y} (gap)` : String(y);
       firstYearSel.appendChild(opt);
     });
-    firstYearSel.value = bfsYears[0] || '';
+    firstYearSel.value = defaultFirstYear(tipsMarketData, settlementDate) ?? '';
 
     _staticInfoSuffix = yieldsRows.length + ' TIPS: <a class="info-link tips-ref-link">Ref</a> <a class="info-link tips-mkt-link">Mkt</a>';
     _buildRows();
@@ -1590,7 +1591,7 @@ function _effectiveYearRange() {
   const isRebal = currentMode === 'rebalance';
   const fyEl = document.getElementById(isRebal ? 'rebal-first-year' : 'first-year');
   const lyEl = document.getElementById(isRebal ? 'rebal-last-year' : 'last-year');
-  return { firstYear: parseInt(fyEl.value) || settlementDate.getFullYear(), lastYear: parseInt(lyEl.value) };
+  return { firstYear: parseInt(fyEl.value) || (isRebal ? settlementDate.getFullYear() : defaultFirstYear(tipsMarketData, settlementDate)), lastYear: parseInt(lyEl.value) };
 }
 
 // Every funded year currently in range (mirrors the year gathering in selectLadderBonds). Reads
@@ -3689,7 +3690,7 @@ function renderDaraByYearPanel() {
       yearEntries.push({ year: y, suffix });
     }
   } else {
-    const fy = picked ? picked.firstYear : (parseInt(document.getElementById('first-year').value) || settlementDate.getFullYear());
+    const fy = picked ? picked.firstYear : (parseInt(document.getElementById('first-year').value) || defaultFirstYear(tipsMarketData, settlementDate));
     const ly = picked ? picked.lastYear : parseInt(document.getElementById('last-year').value);
     if (!ly) return;
     for (let y = fy; y <= ly; y++) {
