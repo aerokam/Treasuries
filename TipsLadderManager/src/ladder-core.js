@@ -124,22 +124,24 @@ export function sizeFuture30yCover({
 //   2. Both bracket TIPS are re-measured; the Bracket Weights are solved again (held within 0 to 1).
 //   3. The Excess TIPS each bracket should hold = ROUND(total cost of the Synthetic TIPS not yet
 //      issued × weight ÷ cost per TIPS).
-//   4. Future 30Y years: the Cover Excess goes to that quantity. Gap years: the Excess TIPS above it is
-//      sold and none is bought (a bracket that holds no more keeps what it holds), the active lower
-//      bracket included. With Retained Bracket Excess the retained maturities are frozen at what they
-//      hold and sold earliest first only as far as the match requires (bracketWeightsN, 2.0 §Retained
-//      Bracket Excess); the active lower bracket is never sold to make room for them.
+//   4. The Excess TIPS goes to that quantity: the Cover Excess for the Future 30Y years, the active lower
+//      bracket and the upper bracket for the gap years. Sales are expected, and a bracket that holds less
+//      buys the difference. With Retained Bracket Excess the retained maturities are never bought: they
+//      are frozen at what they hold and sold earliest first only as far as the match requires
+//      (bracketWeightsN, 2.0 §Retained Bracket Excess); the active lower bracket is never sold to make
+//      room for them.
 //      The Simulated Outstanding TIPS is bought at the quantity Pass 1 sized. netCash = excess sold − that TIPS' cost.
 // After the last conversion no Synthetic TIPS are left, so the Excess TIPS is 0.
 // The Future 30Y quantities after each conversion come from the duration match alone, so they do not
 // depend on lowerQty0/upperQty0 (the Cover Excess held before the first issue date); only the first
-// conversion's netCash does. The gap year quantities after a conversion are the lesser of the quantity held
-// and the duration match, so they do depend on them.
+// conversion's netCash does. The gap year quantities after a conversion also come from the duration
+// match, except that a retained maturity keeps the lesser of the quantity held and the match (never bought),
+// so those depend on them.
 // `monthIndex` is the month (0-based) of the issue date and of the Synthetic TIPS' maturity, January 15
 // or February 15; the TIPS pays coupons on that day and six months later.
 const SIMULATED_TIPS = {
-  future30y: { yearsBefore: 30, monthIndex: 1, onlySell: false },
-  gap:       { yearsBefore: 10, monthIndex: 0, onlySell: true },
+  future30y: { yearsBefore: 30, monthIndex: 1 },
+  gap:       { yearsBefore: 10, monthIndex: 0 },
 };
 
 function simulatedIssueDate(kind, year, bondHolidays) {
@@ -157,7 +159,7 @@ export function gapIssueDate(gapYear, bondHolidays = new Set()) {
 // `retained`: [{ bond, qty0 }], oldest first — the retained lower bracket maturities, each with the Excess
 // TIPS it holds before the first conversion (gap years only).
 function simulatedRebalances({ kind, breakdown: rows, lowerBond, upperBond, retained = [], refCPI, bondHolidays = new Set(), lowerQty0 = 0, upperQty0 = 0 }) {
-  const { monthIndex, onlySell } = SIMULATED_TIPS[kind];
+  const { monthIndex } = SIMULATED_TIPS[kind];
   const breakdown = [...(rows ?? [])].sort((a, b) => a.year - b.year);
   const retainedQty0 = retained.map(r => r.qty0 ?? 0);
   if (!breakdown.length || !lowerBond || !upperBond) return { conversions: [], lowerQty0, upperQty0, retainedQty0 };
@@ -202,10 +204,10 @@ function simulatedRebalances({ kind, breakdown: rows, lowerBond, upperBond, reta
       }
       withinCovers = avgDuration >= Math.min(lowerDuration, upperDuration) && avgDuration <= Math.max(lowerDuration, upperDuration);
     }
-    // Gap years: the Excess TIPS is only sold, never bought. Future 30Y years: it goes to the match.
-    const after = (held, target) => onlySell ? Math.min(held, target) : target;
-    const lowerQtyAfter = after(lowerQty, lowerTarget), upperQtyAfter = after(upperQty, upperTarget);
-    const retainedQtyAfter = retainedQty.map((q, i) => after(q, retainedTarget[i]));
+    // The lower and upper bracket (cover) Excess TIPS goes to the match, bought if short and sold if over.
+    // A retained maturity is never bought: it keeps the lesser of the quantity held and the match.
+    const lowerQtyAfter = lowerTarget, upperQtyAfter = upperTarget;
+    const retainedQtyAfter = retainedQty.map((q, i) => Math.min(q, retainedTarget[i]));
     const simPrice = priceFromYield(entry.synYld, entry.synCpn, issueDate, new Date(entry.year, monthIndex, 15)) ?? 100;
     const simulatedCost = entry.qty * 1000 * simPrice / 100;
     const excessSold = (lowerQty - lowerQtyAfter) * lowerCostPerBond + (upperQty - upperQtyAfter) * upperCostPerBond

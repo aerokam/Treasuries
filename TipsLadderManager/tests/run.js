@@ -205,23 +205,27 @@ function assertReconciles(details, label) {
   }
 }
 
-// ── Helper: the gap year conversions only sell the Excess TIPS (2.0 §Gap Year Simulated Outstanding TIPS) ──
-// On every issue date each bracket keeps what it holds or goes down to the duration match; none is bought, the
-// active lower bracket included. Retained Bracket Excess is sold before the active lower bracket loses any, and
-// after the last conversion nothing is left.
-function assertGapConversionsSellOnly(conversions, label) {
-  let ok = true, retainedFirst = true, endsEmpty = true;
+// ── Helper: the gap year conversions take the Excess TIPS to the duration match (2.0 §Gap Year Simulated Outstanding TIPS) ──
+// On every issue date the active lower bracket and the upper bracket go to the quantity the duration match gives: sold if
+// they hold more, bought if they hold less. Retained Bracket Excess is never bought, and is sold before the active lower
+// bracket loses any. Each conversion starts from the one before, and after the last conversion nothing is left.
+function assertGapConversionsMatch(conversions, label) {
+  let chained = true, retainedNeverBought = true, retainedFirst = true, endsEmpty = true, atMatch = true;
   conversions.forEach((c, k) => {
     const legsBefore = [c.lowerQtyBefore, c.upperQtyBefore, ...(c.retainedQtyBefore ?? [])];
     const legsAfter = [c.lowerQtyAfter, c.upperQtyAfter, ...(c.retainedQtyAfter ?? [])];
-    if (legsAfter.some((q, i) => q > legsBefore[i])) ok = false;
+    if ((c.retainedQtyAfter ?? []).some((q, i) => q > c.retainedQtyBefore[i])) retainedNeverBought = false;
     if ((c.retainedQtyBefore ?? []).length && c.lowerQtyAfter < c.lowerQtyBefore && (c.retainedQtyAfter ?? []).some(q => q > 0)) retainedFirst = false;
-    if (k > 0 && legsBefore.some((q, i) => q !== [conversions[k - 1].lowerQtyAfter, conversions[k - 1].upperQtyAfter, ...(conversions[k - 1].retainedQtyAfter ?? [])][i])) ok = false;
+    if (k > 0 && legsBefore.some((q, i) => q !== [conversions[k - 1].lowerQtyAfter, conversions[k - 1].upperQtyAfter, ...(conversions[k - 1].retainedQtyAfter ?? [])][i])) chained = false;
     if (k === conversions.length - 1 && legsAfter.some(q => q !== 0)) endsEmpty = false;
+    const matchOf = (weight, cpb) => c.avgDuration == null || !(cpb > 0) ? 0 : Math.max(0, Math.round(c.notYetIssuedCost * weight / cpb));
+    if (c.lowerQtyAfter !== matchOf(c.lowerWeight, c.lowerCostPerBond) || c.upperQtyAfter !== matchOf(c.upperWeight, c.upperCostPerBond)) atMatch = false;
   });
-  assert(label + ': no Excess TIPS is bought on a gap year issue date, each conversion starts from the one before', ok, true);
+  assert(label + ': each gap year conversion starts from the one before', chained, true);
+  assert(label + ': Retained Bracket Excess is never bought on a gap year issue date', retainedNeverBought, true);
   assert(label + ': Retained Bracket Excess is sold before the active lower bracket loses any', retainedFirst, true);
   assert(label + ': the last gap year conversion leaves no Excess TIPS', endsEmpty, true);
+  assert(label + ': the active lower bracket and the upper bracket go to the duration match on every issue date', atMatch, true);
 }
 
 // ── Helper: Run Full Rebalance on a holdings file (per-year ARA path) ────────
@@ -402,8 +406,8 @@ runFullRebalanceTest('SampleHoldings (richest IRA)', './data/SampleHoldings.csv'
     // Run rebalance — excessQtyBefore uses funded-first rule (LMI formula), not h.excessQty
     const dara = 20000;
     const { summary, details } = runRebalance({ dara, bracketMode: '3bracket', holdings, tipsMarketData, refCPI, settlementDate });
-    assertGapConversionsSellOnly(summary.gapRebalancesBefore.conversions, 'F4 Before');
-    assertGapConversionsSellOnly(summary.gapRebalances.conversions, 'F4 After');
+    assertGapConversionsMatch(summary.gapRebalancesBefore.conversions, 'F4 Before');
+    assertGapConversionsMatch(summary.gapRebalances.conversions, 'F4 After');
     assert('F4: a held bond older than the Active Lower Bracket is a retained leg of the conversions, and only then', summary.gapRebalancesBefore.conversions[0].retainedQtyBefore.length, heldLower.cusip === roles.activeLower.cusip ? 0 : 1);
 
     // summary.brackets.lowerCUSIP is identifyBrackets' raw excess-ARA pick, which the file fixes at the held
@@ -3418,10 +3422,9 @@ console.log('\nFuture 30Y Dur popup — cost-weighted average, computed match, c
         const wL = Math.abs(dU - dL) < 1e-4 ? 0.5 : Math.min(1, Math.max(0, (dU - avg) / (dU - dL)));
         assert(t + ': lower Bracket Weight within 0 to 1 and re-solved on the issue date', c.lowerWeight, wL, 1e-9);
         assert(t + ': Bracket Weights within 0 to 1', c.lowerWeight >= 0 && c.upperWeight >= 0 && Math.abs(c.lowerWeight + c.upperWeight - 1) < 1e-9, true);
-        // The Excess TIPS is only sold: the lesser of the quantity held and the duration match (2.0 §Gap Year Simulated Outstanding TIPS).
-        assert(t + ': lower Excess TIPS = the lesser of the quantity held and ROUND(cost not yet issued x weight / cost per TIPS)', c.lowerQtyAfter, Math.min(c.lowerQtyBefore, Math.round(cost * wL / cpbOn(lowerBond, c.issueDate))));
-        assert(t + ': upper Excess TIPS = the lesser of the quantity held and ROUND(cost not yet issued x weight / cost per TIPS)', c.upperQtyAfter, Math.min(c.upperQtyBefore, Math.round(cost * (1 - wL) / cpbOn(upperBond, c.issueDate))));
-        assert(t + ': no Excess TIPS is bought', c.lowerQtyAfter <= c.lowerQtyBefore && c.upperQtyAfter <= c.upperQtyBefore, true);
+        // The Excess TIPS goes to the duration match, sold if held above it and bought if held below it (2.0 §Gap Year Simulated Outstanding TIPS).
+        assert(t + ': lower Excess TIPS = ROUND(cost not yet issued x weight / cost per TIPS)', c.lowerQtyAfter, Math.round(cost * wL / cpbOn(lowerBond, c.issueDate)));
+        assert(t + ': upper Excess TIPS = ROUND(cost not yet issued x weight / cost per TIPS)', c.upperQtyAfter, Math.round(cost * (1 - wL) / cpbOn(upperBond, c.issueDate)));
       }
       const simCost = breakdown[k].qty * 1000 * priceFromYield(breakdown[k].synYld, breakdown[k].synCpn, c.issueDate, new Date(c.year, 0, 15)) / 100;
       const sold = (c.lowerQtyBefore - c.lowerQtyAfter) * cpbOn(lowerBond, c.issueDate) + (c.upperQtyBefore - c.upperQtyAfter) * cpbOn(upperBond, c.issueDate);
@@ -3492,8 +3495,8 @@ console.log('\nFuture 30Y Dur popup — cost-weighted average, computed match, c
 
 
 // ── Test: gap years — Before with less Excess TIPS held than the duration match, and with Retained Bracket Excess ──
-// 2.0 §Gap Year Simulated Outstanding TIPS: on each issue date the Excess TIPS above the duration match is sold and none is
-// bought, so a holder with less Excess TIPS than the match keeps what is held until the match falls to it.
+// 2.0 §Gap Year Simulated Outstanding TIPS: on each issue date the Excess TIPS goes to the duration match, so a holder with
+// less Excess TIPS than the match buys the difference at the first issue date and every later conversion is the same as a build.
 {
   console.log('');
   console.log('Gap year conversions — Before with less Excess TIPS held, and Retained Bracket Excess');
@@ -3511,10 +3514,14 @@ console.log('\nFuture 30Y Dur popup — cost-weighted average, computed match, c
     daraByYear: new Map(bS.daraByYearResolved), firstYearOverride: SY, lastYearOverride: MAX_YEAR,
   });
   const before = rS.gapRebalancesBefore.conversions, build = bS.gapRebalances.conversions;
-  assertGapConversionsSellOnly(before, 'less Excess TIPS held, Before');
+  assertGapConversionsMatch(before, 'less Excess TIPS held, Before');
   assert('less Excess TIPS held: Before starts from the held quantities', before[0].lowerQtyBefore === heldLowerExcess && before[0].upperQtyBefore === heldUpperExcess, true);
-  assert('less Excess TIPS held: each conversion keeps the lesser of the quantity held and the build\'s quantity',
-    before.every((c, k) => c.lowerQtyAfter === Math.min(heldLowerExcess, build[k].lowerQtyAfter) && c.upperQtyAfter === Math.min(heldUpperExcess, build[k].upperQtyAfter)), true);
+  assert('less Excess TIPS held: each conversion goes to the quantity a build gives',
+    before.every((c, k) => c.lowerQtyAfter === build[k].lowerQtyAfter && c.upperQtyAfter === build[k].upperQtyAfter), true);
+  // Only the first conversion differs from a build, by the Excess TIPS not held: its Net Cash is lower by the cost of buying them.
+  assert('less Excess TIPS held: the Net Cash of the first conversion is that of a build less the cost of the Excess TIPS not held',
+    before[0].netCash, build[0].netCash - (bS.lowerExQty - heldLowerExcess) * before[0].lowerCostPerBond - (bS.upperExQty - heldUpperExcess) * before[0].upperCostPerBond, 1e-6);
+  assert('less Excess TIPS held: the Net Cash of every later conversion is that of a build', before.slice(1).every((c, k) => Math.abs(c.netCash - build[k + 1].netCash) < 1e-6), true);
   const sumOf = (m) => [...m.values()].reduce((a, v) => a + v, 0);
   assert('less Excess TIPS held: Before credits less Excess TIPS interest than After', sumOf(rS.gapExcessInterestBefore) < sumOf(rS.gapExcessInterestByYear), true);
   assert('less Excess TIPS held: After credits what a build credits', Math.abs(sumOf(rS.gapExcessInterestByYear) - sumOf(bS.gapExcessInterestByYear)) < 0.01, true);
@@ -3530,7 +3537,7 @@ console.log('\nFuture 30Y Dur popup — cost-weighted average, computed match, c
       gapParams: bS.gapParams, lowerBracketBond: lowerBond, upperBracketBond: upperBond, retained: [{ bond: olderBond, qty0: retainedQty }],
       refCPI, bondHolidays, lowerQty0: bS.lowerExQty, upperQty0: bS.upperExQty,
     });
-    assertGapConversionsSellOnly(conversions, label);
+    assertGapConversionsMatch(conversions, label);
     conversions.forEach(c => {
       if (c.avgDuration == null) return;
       assert(label + ' ' + c.year + ': the weights of the retained, active lower and upper brackets sum to 1', Math.abs(c.retainedWeights.reduce((a, w) => a + w, 0) + c.lowerWeight + c.upperWeight - 1) < 1e-9, true);
