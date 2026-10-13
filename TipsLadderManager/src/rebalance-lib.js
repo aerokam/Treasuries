@@ -1629,6 +1629,12 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
           .map(r => yi.holdings.find(h => h.cusip === r.cusip));
         let curPI = yi.holdings.reduce((s, h) => s + h.qty * piMap[h.cusip], 0)
                   - targetExcessHeld * piMap[targetCUSIP];
+        // The year's total P+I is what the DARA sets (3.0 §Named Quantities): its net change decides the
+        // direction of every trade in the year. A year whose total must fall only sells, a year whose total
+        // must rise only buys, and a year whose total is unchanged does not trade. The allocation policy
+        // chooses WHICH maturity trades, never both directions (2.0 §Within-Year Allocation Policy).
+        const yearPIHeld = curPI;
+        const yearFalls = needed < yearPIHeld, yearRises = needed > yearPIHeld;
         const isEqualLevel = !isBracket && allocationPolicy === 'equal' && nonTarget.length > 0;
         if (isEqualLevel) {
           // Equal split levels rather than drains in fixed order -- see levelValues (3.0 §Within-
@@ -1638,7 +1644,9 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
             ...nonTarget.map(h => [h.cusip, h.qty * piMap[h.cusip]])]);
           const leveled = levelValues(poolValues, needed);
           for (const h of nonTarget) {
-            const newQty = Math.max(0, Math.round(leveled.get(h.cusip) / piMap[h.cusip]));
+            let newQty = Math.max(0, Math.round(leveled.get(h.cusip) / piMap[h.cusip]));
+            // Rounding each maturity to whole TIPS must not turn the leveling into a trade against the year's direction.
+            if (yearFalls) newQty = Math.min(newQty, h.qty); else if (yearRises) newQty = Math.max(newQty, h.qty); else newQty = h.qty;
             curPI -= (h.qty - newQty) * piMap[h.cusip];
             postRebalQtyMap[h.cusip] = newQty;
           }
@@ -1674,11 +1682,14 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
         // one CUSIP above. A real reduction in need (diff <= 0) is not this case: it drains via the
         // ordinary nonTarget mechanism above and/or shrinks targetCUSIP directly, same as 'last'.
         const wantsRedirect = !fundedIsTarget && diff > 0;
+        // The residual after the other maturities have been sized lands on targetCUSIP, in the year's direction only.
+        let targetFundedDelta = Math.round(diff / piMap[targetCUSIP]);
+        if (yearFalls) targetFundedDelta = Math.min(0, targetFundedDelta); else if (yearRises) targetFundedDelta = Math.max(0, targetFundedDelta); else targetFundedDelta = 0;
         tFundedYearQty = (diff < 0 && nonTargetStillHeld)
           ? targetFundedHeld
           : wantsRedirect
             ? targetFundedHeld  // frozen at its existing funded coverage; the shortfall goes to fundedCUSIP below
-            : Math.max(0, targetFundedHeld + Math.round(diff / piMap[targetCUSIP]));
+            : Math.max(0, targetFundedHeld + targetFundedDelta);
         for (const h of nonTarget) {
           if (postRebalQtyMap[h.cusip] !== h.qty) {
             const b = tipsMarketData.get(h.cusip);
