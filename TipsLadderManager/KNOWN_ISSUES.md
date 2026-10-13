@@ -359,8 +359,8 @@ per-CUSIP prices for a past date (3.1 §4.0).
 
 - **Found:** 2026-09-30 (jobs session, handed off), while fixing the broker-download fixture
   pipeline: Build now buys Jul 2036 (91282CRE3) as the Active Lower Bracket (latest-maturing TIPS
-  below the structural gap, DD #active-lower-bracket) rather than a January bond. A Format 4/5
-  holdings file with no explicit `#fundedYear,dara` block, for a ladder whose true first year is
+  below the structural gap, DD #active-lower-bracket) rather than a January bond. A Holdings Export or tipsladder.com
+  format file with no explicit `#fundedYear,dara` block, for a ladder whose true first year is
   inside the structural gap (2037-2039), relies on `inferFirstYearFromHoldings`
   (`src/rebalance-lib.js`) to recover that true first year from the retained lower-bracket excess —
   and that function hardcoded "the anchor bond must mature in January," so it returned `null` for
@@ -375,7 +375,7 @@ per-CUSIP prices for a past date (3.1 §4.0).
 - **Verified:** all 454 unit + 87 e2e tests pass unchanged (the committed test fixture still predates
   Jul 2036, so this path isn't exercised by `npm test` yet). Reproduced the fix live against current
   market data directly: `inferFirstYearFromHoldings` now correctly recovers firstYear 2037/2038/2039
-  for a ladder built over the gap and round-tripped through a Format 5 holdings file, where it
+  for a ladder built over the gap and round-tripped through a Holdings Export, where it
   previously returned `null` for all three.
 - **Files:** `src/rebalance-lib.js`.
 
