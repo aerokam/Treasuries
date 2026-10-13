@@ -46,9 +46,11 @@ rather than any real holding. The quantities and index ratios on those rows are 
 to fix the ordering the assertions depend on, the same "synthetic market built for the test"
 category as the bond-row holdings above, scoped to exactly the one year this test needs.
 
-**UI-test years are written relative to the settlement year, not as literals** — a gap year is `SY + n`,
-read from the First Year dropdown, never a hardcoded calendar year, for the same reason as the
-derived structural roles above. The Available Cash maturity test names the bonds maturing this year
+**UI-test years are written relative to the Default First Year, not as literals** — `SY` is the
+Default First Year (DD §5.1) derived with `defaultFirstYear` from the quotes, a gap year is read from
+the First Year dropdown, never a hardcoded calendar year, for the same reason as the derived
+structural roles above. The tests of the Coupons link skip, with a stated reason, while no TIPS in
+the quotes matures in the settlement year, since the link is on that year's row alone. The Available Cash maturity test names the bonds maturing this year
 by looking them up in TIPS reference data rather than hardcoding a CUSIP, and skips — with a stated
 reason, not silently — only in the days before the first maturity of the year, when there is
 genuinely nothing yet to test.
