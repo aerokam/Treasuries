@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { toTradingTime, fromTradingTime, inTradingSession } from '../src/trading-time.js';
+import { toTradingTime, fromTradingTime, inTradingSession, isWeekendMoment } from '../src/trading-time.js';
 
 const ms = iso => new Date(iso).getTime();
 
@@ -30,3 +30,9 @@ test('moments outside a session take the nearest edge of their own day', () => {
   assert.equal(toTradingTime(ms('2026-10-08T23:00:00Z')), toTradingTime(ms('2026-10-08T21:05:00Z')));
   assert.equal(toTradingTime(ms('2026-10-10T15:00:00Z')), toTradingTime(ms('2026-10-09T21:05:00Z')));
 });
+
+// weekend days have no width, so their day ticks are dropped
+assert.equal(isWeekendMoment(ms('2026-10-10T16:00:00Z')), true);  // Saturday noon ET
+assert.equal(isWeekendMoment(ms('2026-10-11T03:59:00Z')), true);  // Saturday 23:59 ET
+assert.equal(isWeekendMoment(ms('2026-10-09T16:00:00Z')), false); // Friday
+assert.equal(isWeekendMoment(ms('2026-10-12T04:00:00Z')), false); // Monday 00:00 ET
