@@ -102,6 +102,31 @@ test.describe('Yields Monitor Regression Tests', () => {
     expect(on.n).toBeGreaterThan(10); // days with daily bars only are kept
   });
 
+  test('Checking a symbol or toggling Hide non-trading hours keeps the zoom', async ({ page }) => {
+    await page.locator('.clear-btn').nth(1).click();
+    await expect(page.locator('canvas#chart-US10Y')).toHaveCount(0);
+    const win = () => page.locator('canvas#chart-US30YTIPS').evaluate((canvas) => {
+      const x = Chart.getChart(canvas).scales.x;
+      return { min: x.min, max: x.max };
+    });
+    const start = await win();
+    const box = await page.locator('canvas#chart-US30YTIPS').boundingBox();
+    await page.mouse.move(box.x + box.width * 0.6, box.y + box.height / 2);
+    for (let i = 0; i < 8; i++) { await page.mouse.wheel(0, -300); await page.waitForTimeout(60); }
+    await page.waitForTimeout(600);
+    const zoomed = await win();
+    expect(zoomed.max - zoomed.min).toBeLessThan((start.max - start.min) * 0.8);
+
+    const near = (a, b) => Math.abs(a.min - b.min) < 1000 && Math.abs(a.max - b.max) < 1000;
+    await page.locator('.sym-item-check input[value="US10YTIPS"]').uncheck();
+    await page.waitForTimeout(1500);
+    expect(near(await win(), zoomed)).toBe(true);
+
+    await page.locator('#hideNonTrading').check();
+    await page.waitForTimeout(800);
+    expect(near(await win(), zoomed)).toBe(true);
+  });
+
   test('10D range should show at least 5 days of data', async ({ page }) => {
     const chartCanvas = page.locator('canvas#chart-US10Y');
     const btn = page.locator('.range-btn[data-range="10D"]');
