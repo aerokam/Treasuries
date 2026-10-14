@@ -38,7 +38,7 @@ On by default. The Yield Curves and Breakeven Inflation tabs each hold a single 
 
 ### Lock Right
 
-Off by default. When on, every zoom re-anchors the chart's right edge to the most recent data point, so narrowing the visible window never loses sight of the latest reading.
+Off by default. When on, every zoom re-anchors the chart's right edge to the most recent data point, so narrowing the visible window never loses sight of the latest reading. With Hide non-trading hours on, the latest reading is the latest point drawn, the last one inside trading hours, and the window's width is held as drawn, so a zoom never moves the window onto hours that are not shown.
 
 ### Hide non-trading hours
 

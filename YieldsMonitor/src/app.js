@@ -7,7 +7,7 @@ import { parseCsv } from '../../shared/src/csv.js';
 import { localDate, toIsoDate, nextBusinessDay, parseHolidaySet } from '../../shared/src/settlement.js';
 import { resolveTipsBond } from './cnbc-rollover-log.js';
 import { layerCustomSeries, archiveDatesToRead, customBounds, showMarkers, countVisible, DATE_ONLY_RANGES } from './custom-series.js';
-import { createTradingTimeScale, tradingGapPlugin, inTradingSession } from './trading-time.js';
+import { createTradingTimeScale, tradingGapPlugin, inTradingSession, toTradingTime, fromTradingTime } from './trading-time.js';
 
 Chart.register(createTradingTimeScale(Chart));
 
@@ -95,6 +95,8 @@ let hideNonTrading = false;
 // The intraday visual standards and Hide non-trading hours apply to the 2D, 10D and Custom ranges.
 function intradayRange() { return activeRange === '2D' || activeRange === '10D' || activeRange === 'Custom'; }
 function compactOn() { return hideNonTrading && intradayRange(); }
+// Lock Right keeps a window's width in the drawn (trading-hours) width when the axis is compact.
+function lockRightAxis() { return compactOn() ? { toPos: toTradingTime, fromPos: fromTradingTime } : null; }
 function plotSeries(series) { return compactOn() && series ? series.filter(p => inTradingSession(+p.x)) : series; }
 let customStartDate = null; // Date (ET midnight of start day) | null — exclusive lower bound for Custom range
 let customEndDate = null;   // Date (ET midnight of day after end day) | null — exclusive upper bound for Custom range
@@ -167,6 +169,7 @@ async function init() {
     Object.entries(charts).forEach(([sym, chart]) => handleChartKeydown(e, chart, {
       lockRight,
       xMaxAnchor: lockRight ? xMaxAnchors[sym] : null,
+      axis: lockRightAxis(),
       onAction: ({chart}) => {
         if (syncXAxis) syncAllChartsX(chart);
         else rescaleYToVisible(chart, sym);
@@ -446,11 +449,11 @@ function createChartInstance(sym) {
         x: { type: 'tradingTime', compact: false, time: { tooltipFormat: 'MM/dd/yy HH:mm:ss', displayFormats: { hour: 'MM/dd HH:mm', day: 'MMM dd', month: 'MMM yyyy', year: 'yyyy' } }, grid: { color: '#f1f5f9' }, ticks: { autoSkip: true, font: { size: 9, weight: 'bold' }, color: '#000', callback(value, index, ticks) { const d = new Date(value); if (activeRange === '2D') { const p = ET_HM_FMT.formatToParts(d).reduce((a, pt) => ({...a, [pt.type]: pt.value}), {}); return `${p.month}/${p.day} ${p.hour}:${p.minute}`; } if (activeRange === '10D') return ET_TICK_DAY_FMT.format(d); if ((this.max - this.min) < 3 * 86400000) { const p = ET_HM_FMT.formatToParts(d).reduce((a, pt) => ({...a, [pt.type]: pt.value}), {}); return `${p.month}/${p.day} ${p.hour}:${p.minute}`; } if ((this.max - this.min) < 90 * 86400000) { const label = ET_TICK_DAY_FMT.format(d); if (index > 0 && ET_TICK_DAY_FMT.format(new Date(ticks[index - 1].value)) === label) return ''; return label; } const label = ET_TICK_MON_FMT.format(d); if (index > 0 && ET_TICK_MON_FMT.format(new Date(ticks[index - 1].value)) === label) return ''; return label; } } },
         y: { grid: { color: '#f1f5f9' }, ticks: { font: { size: 9, family: 'monospace', weight: 'bold' }, color: '#000', callback: v => v.toFixed(3) + '%' } }
       },
-      plugins: { legend: { display: false }, zoom: { zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'xy', onZoom: ({chart}) => { if (lockRight) applyLockRight(chart, xMaxAnchors[sym]); if (syncXAxis) syncAllChartsX(chart); }, onZoomComplete: ({chart}) => { if (lockRight) applyLockRight(chart, xMaxAnchors[sym]); if (activeRange !== '2D' && activeRange !== '10D') applyXTimeUnit(chart); rescaleYToVisible(chart, sym); if (syncXAxis) syncAllChartsX(chart); } }, pan: { enabled: true, mode: 'xy', onPanStart: ({chart}) => { Object.entries(charts).forEach(([s, c]) => { panStartY[s] = { min: c.scales.y.min, max: c.scales.y.max }; }); }, onPan: ({chart}) => { if (syncXAxis) syncAllCharts(chart); }, onPanComplete: ({chart}) => { if (activeRange !== '2D' && activeRange !== '10D') applyXTimeUnit(chart); if (!yOverrideSyms.has(sym)) rescaleYToVisible(chart, sym); else chart.update('none'); if (syncXAxis) syncAllCharts(chart); Object.keys(panStartY).forEach(k => delete panStartY[k]); } } }, annotation: { annotations: {} }, tooltip: { backgroundColor: 'rgba(255, 255, 255, 0.95)', titleColor: '#64748b', titleFont: { size: 11, weight: 'bold' }, bodyColor: '#000', borderColor: '#cbd5e1', borderWidth: 1, padding: 8, bodyFont: { size: 12, weight: 'bold' }, cornerRadius: 6, displayColors: false, callbacks: { title: (items) => { if (!items.length) return ''; const date = new Date(items[0].parsed.x); if (DATE_ONLY_RANGES.has(activeRange)) return date.toLocaleDateString('en-US', { timeZone: 'America/New_York', month: '2-digit', day: '2-digit', year: '2-digit' }); return date.toLocaleString('en-US', { timeZone: 'America/New_York', hourCycle: 'h23', month: '2-digit', day: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' ET'; }, label: ctx => `${ctx.datasetIndex === 1 ? 'SA Yield' : 'Yield'}: ${ctx.parsed.y.toFixed(3)}%` } } }
+      plugins: { legend: { display: false }, zoom: { zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'xy', onZoom: ({chart}) => { if (lockRight) applyLockRight(chart, xMaxAnchors[sym], lockRightAxis()); if (syncXAxis) syncAllChartsX(chart); }, onZoomComplete: ({chart}) => { if (lockRight) applyLockRight(chart, xMaxAnchors[sym], lockRightAxis()); if (activeRange !== '2D' && activeRange !== '10D') applyXTimeUnit(chart); rescaleYToVisible(chart, sym); if (syncXAxis) syncAllChartsX(chart); } }, pan: { enabled: true, mode: 'xy', onPanStart: ({chart}) => { Object.entries(charts).forEach(([s, c]) => { panStartY[s] = { min: c.scales.y.min, max: c.scales.y.max }; }); }, onPan: ({chart}) => { if (syncXAxis) syncAllCharts(chart); }, onPanComplete: ({chart}) => { if (activeRange !== '2D' && activeRange !== '10D') applyXTimeUnit(chart); if (!yOverrideSyms.has(sym)) rescaleYToVisible(chart, sym); else chart.update('none'); if (syncXAxis) syncAllCharts(chart); Object.keys(panStartY).forEach(k => delete panStartY[k]); } } }, annotation: { annotations: {} }, tooltip: { backgroundColor: 'rgba(255, 255, 255, 0.95)', titleColor: '#64748b', titleFont: { size: 11, weight: 'bold' }, bodyColor: '#000', borderColor: '#cbd5e1', borderWidth: 1, padding: 8, bodyFont: { size: 12, weight: 'bold' }, cornerRadius: 6, displayColors: false, callbacks: { title: (items) => { if (!items.length) return ''; const date = new Date(items[0].parsed.x); if (DATE_ONLY_RANGES.has(activeRange)) return date.toLocaleDateString('en-US', { timeZone: 'America/New_York', month: '2-digit', day: '2-digit', year: '2-digit' }); return date.toLocaleString('en-US', { timeZone: 'America/New_York', hourCycle: 'h23', month: '2-digit', day: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' ET'; }, label: ctx => `${ctx.datasetIndex === 1 ? 'SA Yield' : 'Yield'}: ${ctx.parsed.y.toFixed(3)}%` } } }
     }
   });
   setupAxisWheelZoom(ctx.canvas, ({chart}) => {
-    if (lockRight) applyLockRight(chart, xMaxAnchors[sym]);
+    if (lockRight) applyLockRight(chart, xMaxAnchors[sym], lockRightAxis());
     if (activeRange !== '2D' && activeRange !== '10D') applyXTimeUnit(chart);
     rescaleYToVisible(chart, sym);
     if (syncXAxis) syncAllChartsX(chart);
@@ -1267,7 +1270,9 @@ function updateCharts() {
       // otherwise the dashed stale-bridge line drawn above wouldn't be visible without the
       // user manually panning/zooming to find it.
       const staleTo = (activeRange === '2D' || activeRange === '10D') && staleQuoteTime(sym, data);
-      xMaxAnchors[sym] = activeRange === 'Custom' ? customBounds(data).max : snapXMax(staleTo ? new Date() : data[data.length - 1].x).getTime();
+      // The anchor is the latest point drawn: with non-trading hours hidden, that is the last point inside trading hours.
+      const drawn = plotSeries(data), anchorData = drawn && drawn.length > 0 ? drawn : data;
+      xMaxAnchors[sym] = activeRange === 'Custom' ? customBounds(anchorData).max : snapXMax(staleTo ? new Date() : anchorData[anchorData.length - 1].x).getTime();
       applyDefaultBounds(sym, chart, data);
     }
 
