@@ -12,6 +12,7 @@ export function handleChartKeydown(e, chart, options = {}) {
     zoomStep = 0.1,  // 10% zoom in/out
     lockRight = false,
     xMaxAnchor = null,
+    axis = null,
     onAction = null
   } = options;
 
@@ -54,7 +55,7 @@ export function handleChartKeydown(e, chart, options = {}) {
 
     if (lockRight && xMaxAnchor != null) {
       chart.options.scales.x.max = xMaxAnchor;
-      chart.options.scales.x.min = xMaxAnchor - xRange * factor;
+      chart.options.scales.x.min = lockedRightMin(xAx.min, xAx.max, xMaxAnchor, axis, factor);
     } else {
       const xMid = (xAx.max + xAx.min) / 2;
       chart.options.scales.x.min = xMid - (xRange * factor) / 2;
@@ -117,14 +118,24 @@ export function snapYAfterZoom(chart, factor) {
 }
 
 /**
+ * The x minimum that keeps the window [xMin, xMax]'s width with its right edge at xMaxAnchor.
+ * `axis` ({ toPos, fromPos }) is for an axis whose drawn width is not its timestamp width (a
+ * compact trading-hours axis): the width is kept in toPos units and fromPos maps back.
+ */
+export function lockedRightMin(xMin, xMax, xMaxAnchor, axis = null, scale = 1) {
+  if (!axis) return xMaxAnchor - (xMax - xMin) * scale;
+  return axis.fromPos(axis.toPos(xMaxAnchor) - (axis.toPos(xMax) - axis.toPos(xMin)) * scale);
+}
+
+/**
  * After any zoom, re-anchors xMax to xMaxAnchor, preserving the new range.
  * Does not call chart.update() — callers handle that.
  */
-export function applyLockRight(chart, xMaxAnchor) {
+export function applyLockRight(chart, xMaxAnchor, axis = null) {
   const xMin = chart.options.scales.x.min ?? chart.scales.x.min;
   const xMax = chart.options.scales.x.max ?? chart.scales.x.max;
   chart.options.scales.x.max = xMaxAnchor;
-  chart.options.scales.x.min = xMaxAnchor - (xMax - xMin);
+  chart.options.scales.x.min = lockedRightMin(xMin, xMax, xMaxAnchor, axis);
 }
 
 /**
