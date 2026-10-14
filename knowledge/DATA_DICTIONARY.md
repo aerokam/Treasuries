@@ -468,7 +468,7 @@ Displayed as **Amount**, and as **Real Amount** where a fuller header fits. The 
 
 <a id="gap-years"></a>
 ### Gap Years
-`Gap_Years` = *Years within the [Ladder](#ladder) for which no 10-year TIPS have yet been issued. The 10-year qualifier carries the definition: a ladder whose last year runs past the longest-dated issued 30-year TIPS also contains years with no issued TIPS, and those are Future 30Y Rungs rather than gap years, covered by different holdings.*
+`Gap_Years` = *The maturity years after the longest-dated issued 10-year TIPS maturity year and before the upper bracket year (2040): the years in which no 10-year TIPS has yet been issued, 2037, 2038 and 2039 today. A year with no TIPS that is not above every issued 10-year TIPS maturity year is not a gap year; in particular a year before the first year that has a TIPS has no rung and is not a gap year. The 10-year qualifier carries the definition: a ladder whose last year runs past the longest-dated issued 30-year TIPS also contains years with no issued TIPS, and those are Future 30Y Rungs rather than gap years, covered by different holdings.*
 
 <a id="synthetic-tips"></a>
 ### Synthetic TIPS
@@ -671,7 +671,7 @@ Some values are true only until Treasury issues more TIPS. Left inline as approx
 
 | Value | Rule | As of 2026-08-25 | Changes when |
 |---|---|---|---|
-| Gap years | The years below the upper bracket year (2040) with no issued 10-year TIPS | derived from market data each run | A 10-year TIPS maturing in a gap year is issued |
+| Gap years | The years after the longest-dated issued 10-year TIPS maturity year and before the upper bracket year (2040) — [Gap Years](#gap-years) | derived from market data each run | A 10-year TIPS maturing in a gap year is issued |
 | Multi-maturity boundary | Years below it may hold more than one maturity month; at/above, 30-year February issues only | 2040 | 10-year issuance extends past the current boundary |
 | Maturity-month pattern | Quarterly at the short end, January/July for 10-year, February for 30-year | quarterly ≤~2030, Jan/Jul ≤~2036, Feb 2040+ | Issuance calendar changes |
 | Longest issued maturity year | Maturity year of the longest-dated issued TIPS | 2056 | A new 30-year TIPS is issued |

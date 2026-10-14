@@ -3666,5 +3666,36 @@ console.log('\nFuture 30Y Dur popup — cost-weighted average, computed match, c
 }
 
 
+// ── Gap years — DD Gap Years: the maturity years above every issued 10-year TIPS maturity year, below the upper bracket year ─
+{
+  console.log('\nGap years — only the years above the longest 10-year TIPS year and below the upper bracket year');
+  const issuedYears = new Set([...tipsMarketData.values()].filter(b => b.maturity).map(b => b.maturity.getFullYear()));
+  const longest10 = Math.max(...[...issuedYears].filter(y => y < 2040));
+  const expected = []; for (let y = longest10 + 1; y < 2040; y++) expected.push(y);
+  assert('fixture: the gap years are exactly the years above the longest 10-year TIPS year and below 2040', getGapYears(tipsMarketData).join(','), expected.join(','));
+  assert('fixture: the gap years are 2037-2039', getGapYears(tipsMarketData).join(','), '2037,2038,2039');
+
+  // A synthetic market with no TIPS before 2032 and no TIPS in 2033 or 2034.
+  const rows = [
+    { cusip: 'TEST32JAN', maturity: '2032-01-15', coupon: 0.01125, datedDateRefCpi: 295.0, price: 95.0,  yield: 0.0215 },
+    { cusip: 'TEST35JUL', maturity: '2035-07-15', coupon: 0.01875, datedDateRefCpi: 321.09758, price: 97.06,  yield: 0.0224 },
+    { cusip: 'TEST36JUL', maturity: '2036-07-15', coupon: 0.02375, datedDateRefCpi: 333.96974, price: 100.44, yield: 0.0233 },
+    { cusip: 'TEST40FEB', maturity: '2040-02-15', coupon: 0.02125, datedDateRefCpi: 216.1395,  price: 94.98,  yield: 0.0257 },
+  ];
+  const map = buildTipsMarketData(rows);
+  assert('synthetic market: the gap years are 2037-2039; 2033 and 2034 (no TIPS, below 2036) are not gap years', getGapYears(map).join(','), '2037,2038,2039');
+  const sel = selectLadderBonds({ tipsMarketData: map, firstYear: 2030, lastYear: 2040, settlementDate, maturityPref: 'last', couponPref: 'higher' });
+  assert('selectLadderBonds: gap years are 2037-2039 for a First Year with no TIPS and a missing mid-ladder year', sel.gapYears.join(','), '2037,2038,2039');
+  assert('selectLadderBonds: no year before the first TIPS year is a rung', Math.min(...sel.rangeYears), 2032);
+  const firstTipsYear = Math.min(...issuedYears);
+  const selFx = selectLadderBonds({ tipsMarketData, firstYear: firstTipsYear - 3, lastYear: 2040, settlementDate, maturityPref: 'last', couponPref: 'higher' });
+  assert('fixture: a First Year before the first TIPS year adds no gap year', selFx.gapYears.join(','), expected.join(','));
+  let built = null, err = null;
+  try { built = runBuild({ dara: 40000, firstYear: 2030, lastYear: 2040, tipsMarketData: map, refCPI, settlementDate }); } catch (e) { err = e; }
+  assert('runBuild: a First Year with no TIPS does not throw', err, null);
+  assert('runBuild: the ladder starts at the first year with a TIPS', built?.summary.firstYear, 2032);
+  assert('runBuild: the gap years are 2037-2039', built?.summary.gapYears.join(','), '2037,2038,2039');
+}
+
 console.log(`\n${passed + failed} tests: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

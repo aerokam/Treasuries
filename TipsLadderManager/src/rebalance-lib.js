@@ -6,7 +6,7 @@ import { indexRatio as calcIndexRatio } from '../../shared/src/ref-cpi.js';
 export { yieldFromPrice };
 import { interpolateYield, syntheticCoupon, bracketWeights, bracketWeightsN, gapParamsCore, future30yParamsCore } from './gap-math.js';
 import { findSpikes, evenSpread, MIN_SHAPE_POINTS, inferShapeValue } from './shape-math.js';
-import { sizeLadder, selectLadderBonds, fundedYearAmount, rmdCappedRemainingCoupons, latestRemainingCouponDate, selectFuture30yCovers, future30yRebalances, future30yInterestByYear, gapRebalances, gapInterestByYear, future30yLimit, syntheticYearAmounts } from './ladder-core.js';
+import { getGapYears, sizeLadder, selectLadderBonds, fundedYearAmount, rmdCappedRemainingCoupons, latestRemainingCouponDate, selectFuture30yCovers, future30yRebalances, future30yInterestByYear, gapRebalances, gapInterestByYear, future30yLimit, syntheticYearAmounts } from './ladder-core.js';
 import { localDate, fmtDate, fmtDateLong, toDateStr } from './date-util.js';
 import { rankForYear, levelValues } from './allocation-policy.js';
 import { parseCSVLine } from './broker-import.js';
@@ -187,16 +187,10 @@ export function inferFirstYearFromHoldings({ holdings, tipsMarketData, refCPI, s
   const firstYearExcess = firstYearH.reduce((s, h) => s + h.excessQty, 0);
   if (firstYearExcess !== firstYearTotal) return null;
 
-  // Build structural gap: consecutive years below 2040 with no TIPS issued.
-  const tipsMapYears = new Set([...tipsMarketData.values()].filter(b => b.maturity).map(b => b.maturity.getFullYear()));
-  const structuralGap = [];
-  for (let y = 2039; y > derivedFirstYear; y--) {
-    if (!tipsMapYears.has(y)) structuralGap.push(y);
-    else break;
-  }
+  // The gap years above the first year (ascending: [2037, 2038, 2039]).
+  const structuralGap = getGapYears(tipsMarketData).filter(y => y > derivedFirstYear);
   if (!structuralGap.length) return null;
-  const minGapYear = structuralGap[structuralGap.length - 1]; // lowest gap year found, before reversing to ascending
-  structuralGap.reverse(); // ascending: [2037, 2038, 2039]
+  const minGapYear = structuralGap[0];
 
   // derivedFirstYear bond must be the canonical Active Lower Bracket -- the latest-maturing TIPS
   // below the structural gap (DATA_DICTIONARY.md #active-lower-bracket; same computation runRebalance's
@@ -493,20 +487,8 @@ export function computePortfolioARAByYear(holdingsArr, tipsMarketData, refCPI, r
   return ara;
 }
 
-// Gap years: the run of years (counting down from 2039) for which NO TIPS
-// have been issued (currently 2037-2039). These rungs cannot be held directly; they are funded
-// by bracket excess at the adjacent years. Single source for "which years are gap years".
-export function getGapYears(tipsMarketData) {
-  if (!tipsMarketData) return [];
-  const tipsYears = new Set();
-  for (const b of tipsMarketData.values()) { if (b.maturity) tipsYears.add(b.maturity.getFullYear()); }
-  const gapYears = [];
-  for (let y = 2039; y >= 2020; y--) {
-    if (!tipsYears.has(y)) gapYears.push(y);
-    else break;
-  }
-  return gapYears;
-}
+// Gap years (currently 2037-2039): defined once in ladder-core.js, re-exported for the app and the tests.
+export { getGapYears };
 
 // Years adjacent to the structural gap (2037-2039) that may carry bracket excess: the
 // 2040 upper bracket and any TIPS maturity year in [2032, minGap) that could have been an old lower
@@ -902,14 +884,8 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
       maxTipsYear = Math.max(maxTipsYear, bond.maturity.getFullYear());
     }
   }
-  // Structural gap: consecutive years immediately before 2040 where no TIPS have been issued.
-  // Walk backward from 2039 until hitting a year that has TIPS in market data.
-  const UPPER_BRACKET_YEAR = 2040;
-  const structuralGapSet = new Set();
-  for (let y = UPPER_BRACKET_YEAR - 1; y >= firstYear; y--) {
-    if (!tipsMapYears.has(y)) structuralGapSet.add(y);
-    else break;
-  }
+  // The gap years from the first year up (getGapYears, DD Gap Years).
+  const structuralGapSet = new Set(getGapYears(tipsMarketData).filter(y => y >= firstYear));
   const gapYears = [], future30yYears = [];
   for (let year = firstYear; year <= lastYear; year++) {
     if (structuralGapSet.has(year) && !yearInfo[year]) {
