@@ -720,7 +720,7 @@ import { accruedInterest, bondCalcs, couponSchedule } from '../shared/src/bond-m
 import { loadMarketData, lookupRefCpi, nextBondTradingDay } from '../shared/src/market-data.js';
 import { actualPaymentDate } from '../shared/src/settlement.js';
 window.lookupRefCpi = lookupRefCpi;
-import { parseBrokerCSV } from './src/broker-import.js';
+import { parseHoldingsFile } from './src/holdings-import.js';
 
 const toIso = d => d ? d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0') : '';
 
@@ -3219,67 +3219,13 @@ document.getElementById('holdings-file').addEventListener('change', async (e) =>
     const rawLines = text.trim().split('\n').filter(l => l.trim());
     if (rawLines.length === 0) { setStatus('Holdings CSV is empty.', true); return; }
 
-    const brokerResult = parseBrokerCSV(text, tipsMarketData);
-    const parsedAccounts = brokerResult.holdings || brokerResult; // Handle both old and new format
+    // Classify the file once and parse it with that format's parser (4.2.1).
+    const parsed = parseHoldingsFile(text, tipsMarketData);
+    const parsedAccounts = parsed.format === 'broker' ? parsed.holdings : {};
     const acctNames = Object.keys(parsedAccounts);
-    if (acctNames.length === 0) {
-      const CUSIP_RE = /^[A-Z0-9]{9}$/i;
-      const firstLineLower = rawLines[0].replace(/\s/g, '').toLowerCase();
-      const arr = [];
-
-      if (firstLineLower === 'cusip,qty,excess') {
-        // Format 5: Build Export — header row; qty=fundedYearQty, excess=excessQty
-        for (let i = 1; i < rawLines.length; i++) {
-          const parts = rawLines[i].split(',').map(s => s.trim());
-          if (parts.length < 2) continue;
-          const [cusip, qtyStr] = parts;
-          if (!CUSIP_RE.test(cusip)) continue;
-          const fundedQty = parseInt(qtyStr, 10);
-          if (isNaN(fundedQty) || fundedQty < 0) continue;
-          const excessQty = parts.length >= 3 ? (parseInt(parts[2], 10) || 0) : 0;
-          arr.push({ cusip, qty: fundedQty + excessQty, excessQty });
-        }
-      } else {
-        // Detect Format 3 vs 4 by first data row
-        const startIdx = CUSIP_RE.test(rawLines[0].split(',')[0].trim()) ? 0 : 1;
-        const sampleParts = (rawLines[startIdx] ?? '').split(',').map(s => s.trim());
-        const isFormat4 = sampleParts.length >= 3 && parseInt(sampleParts[2], 10) >= 2000;
-
-        if (isFormat4) {
-          // Format 4: TipsLadderCom — no header; bracket CUSIPs appear once per funded year covered
-          const cusipMap = new Map(); // cusip → { fundedQty, excessQty }
-          for (const line of rawLines) {
-            const parts = line.split(',').map(s => s.trim());
-            if (parts.length < 3) continue;
-            const [cusip, qtyStr, yearStr] = parts;
-            if (!CUSIP_RE.test(cusip)) continue;
-            const bond = tipsMarketData.get(cusip);
-            if (!bond?.maturity) continue;
-            const qty = parseInt(qtyStr, 10);
-            const year = parseInt(yearStr, 10);
-            if (isNaN(qty) || qty < 0 || isNaN(year)) continue;
-            if (!cusipMap.has(cusip)) cusipMap.set(cusip, { fundedQty: 0, excessQty: 0 });
-            const entry = cusipMap.get(cusip);
-            if (year === bond.maturity.getFullYear()) entry.fundedQty += qty;
-            else entry.excessQty += qty;
-          }
-          for (const [cusip, { fundedQty, excessQty }] of cusipMap) {
-            const total = fundedQty + excessQty;
-            if (total > 0) arr.push({ cusip, qty: total, excessQty });
-          }
-        } else {
-          // Format 3: simple cusip,qty
-          for (let i = startIdx; i < rawLines.length; i++) {
-            const parts = rawLines[i].split(',').map(s => s.trim());
-            if (parts.length < 2) continue;
-            const [cusip, qtyStr] = parts;
-            if (!CUSIP_RE.test(cusip)) continue;
-            const qty = parseInt(qtyStr, 10);
-            if (!isNaN(qty) && qty >= 0) arr.push({ cusip, qty });
-          }
-        }
-      }
-
+    if (parsed.format === 'broker' && acctNames.length === 0) { setStatus('Holdings CSV has no valid data rows.', true); return; }
+    if (parsed.format !== 'broker') {
+      const arr = parsed.holdings;
       if (arr.length === 0) { setStatus('Holdings CSV has no valid data rows.', true); return; }
       currentHoldingsArray = arr;
       // Our own exports append an explicit per-year DARA block — honor it on import (exact round-trip).

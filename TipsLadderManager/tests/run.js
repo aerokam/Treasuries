@@ -13,6 +13,7 @@ import { buildDurationPopupRows, buildBracketWeightDrill, buildFuture30yDuration
 import { rankForYear, levelValues } from '../src/allocation-policy.js';
 import { runBuild } from '../src/build-lib.js';
 import { parseBrokerCSV } from '../src/broker-import.js';
+import { detectHoldingsFormat, parseHoldingsFile } from '../src/holdings-import.js';
 import { loadMarketData, nextBondTradingDay, lookupRefCpi } from '../../shared/src/market-data.js';
 import { installFixtureFetch } from './market-fixture.js';
 import { ladderRoles } from './ladder-fixtures.js';
@@ -21,70 +22,12 @@ import { indexRatio } from '../../shared/src/ref-cpi.js';
 import { actualPaymentDate } from '../../shared/src/settlement.js';
 
 
-// Multi-format holdings parser — mirrors index.html logic for Formats 3, 4, 5.
-// Formats 1/2 (broker CSV) tested separately via parseBrokerCSV below.
+// The app's own Holdings File reader (4.2.1): one classification, one parser per format.
+// For the non-broker formats it returns the Holdings array the app loads.
 function parseHoldingsCSV(text, tipsMarketData) {
-  const CUSIP_RE = /^[A-Z0-9]{9}$/i;
-  const rawLines = text.trim().split('\n').filter(l => l.trim());
-  if (!rawLines.length) return [];
-  const firstLineLower = rawLines[0].replace(/\s/g, '').toLowerCase();
-  const arr = [];
-
-  if (firstLineLower === 'cusip,qty,excess') {
-    // Format 5: header cusip,qty,excess — qty=fundedYearQty, excess=excessQty
-    for (let i = 1; i < rawLines.length; i++) {
-      const parts = rawLines[i].split(',').map(s => s.trim());
-      if (parts.length < 2) continue;
-      const [cusip, qtyStr] = parts;
-      if (!CUSIP_RE.test(cusip)) continue;
-      const fundedQty = parseInt(qtyStr, 10);
-      if (isNaN(fundedQty) || fundedQty < 0) continue;
-      const excessQty = parts.length >= 3 ? (parseInt(parts[2], 10) || 0) : 0;
-      arr.push({ cusip, qty: fundedQty + excessQty, excessQty });
-    }
-  } else {
-    const startIdx = CUSIP_RE.test(rawLines[0].split(',')[0].trim()) ? 0 : 1;
-    const sampleParts = (rawLines[startIdx] ?? '').split(',').map(s => s.trim());
-    const isFormat4 = sampleParts.length >= 3 && parseInt(sampleParts[2], 10) >= 2000;
-
-    if (isFormat4) {
-      // Format 4: no header, multi-row per CUSIP — year field classifies funded vs excess
-      const cusipMap = new Map();
-      for (const line of rawLines) {
-        const parts = line.split(',').map(s => s.trim());
-        if (parts.length < 3) continue;
-        const [cusip, qtyStr, yearStr] = parts;
-        if (!CUSIP_RE.test(cusip)) continue;
-        const bond = tipsMarketData.get(cusip);
-        if (!bond?.maturity) continue;
-        const qty = parseInt(qtyStr, 10);
-        const year = parseInt(yearStr, 10);
-        if (isNaN(qty) || qty < 0 || isNaN(year)) continue;
-        if (!cusipMap.has(cusip)) cusipMap.set(cusip, { fundedQty: 0, excessQty: 0 });
-        const entry = cusipMap.get(cusip);
-        if (year === bond.maturity.getFullYear()) entry.fundedQty += qty;
-        else entry.excessQty += qty;
-      }
-      for (const [cusip, { fundedQty, excessQty }] of cusipMap) {
-        const total = fundedQty + excessQty;
-        if (total > 0) arr.push({ cusip, qty: total, excessQty });
-      }
-    } else {
-      // Format 3: optional header cusip,qty — one row per CUSIP, no excess info
-      for (let i = startIdx; i < rawLines.length; i++) {
-        const parts = rawLines[i].split(',').map(s => s.trim());
-        if (parts.length < 2) continue;
-        const [cusip, qtyStr] = parts;
-        if (!CUSIP_RE.test(cusip)) continue;
-        const qty = parseInt(qtyStr, 10);
-        if (!isNaN(qty) && qty >= 0) arr.push({ cusip, qty });
-      }
-    }
-  }
-  return arr;
+  if (!text.trim()) return [];
+  return parseHoldingsFile(text, tipsMarketData).holdings;
 }
-
-// Keep old name as alias for callers that don't need tipsMarketData (Format 3 files only)
 function parseHoldings(text) { return parseHoldingsCSV(text, tipsMarketData); }
 
 // ── Load shared data ──────────────────────────────────────────────────────────
@@ -890,6 +833,60 @@ const parseMkt = buildTipsMarketData([
   const sg4 = holdings3b['11111111']?.find(h => h.cusip === 'PARSEDDD4');
   assert('F3b: SB5 (1.000% coupon) qty === 50 (name-resolved)', sb5?.qty, 50);
   assert('F3b: SG4 (1.000% coupon) qty === 60 (name-resolved)', sg4?.qty, 60);
+}
+
+// ── Test: Holdings File classification (4.2.1) — each file read by one parser ─
+{
+  console.log('\nHoldings File classification — detectHoldingsFormat / parseHoldingsFile');
+  // Real bug: every file went through the broker parser first. A Holdings Export header
+  // `cusip,qty,excess` passed its header test, a row with qty >= 500 survived as qty round(qty/1000) = 1,
+  // and the file never reached the Holdings Export parser.
+  const hx = ['cusip,qty,excess', 'PARSEAAA1,5,0', 'PARSEBBB2,600,0'].join('\n');
+  assert('classify: cusip,qty,excess is a Holdings Export', detectHoldingsFormat(hx), 'holdings-export');
+  const hxParsed = parseHoldingsFile(hx, parseMkt);
+  assert('Holdings Export: format', hxParsed.format, 'holdings-export');
+  assert('Holdings Export: both rows read', Array.isArray(hxParsed.holdings) ? hxParsed.holdings.length : -1, 2);
+  const hxA = Array.isArray(hxParsed.holdings) ? hxParsed.holdings.find(h => h.cusip === 'PARSEAAA1') : undefined;
+  const hxB = Array.isArray(hxParsed.holdings) ? hxParsed.holdings.find(h => h.cusip === 'PARSEBBB2') : undefined;
+  assert('Holdings Export: PARSEAAA1 qty === 5', hxA?.qty, 5);
+  assert('Holdings Export: PARSEAAA1 excessQty === 0', hxA?.excessQty, 0);
+  assert('Holdings Export: PARSEBBB2 qty === 600 (not divided by 1,000)', hxB?.qty, 600);
+  assert('Holdings Export: PARSEBBB2 excessQty === 0', hxB?.excessQty, 0);
+
+  // Broker exports, from the DD's column lists (Fidelity, Schwab, Vanguard)
+  const fid = ['Account Number,Account Name,Symbol,Description,Quantity,Last Price,Current Value,Type',
+    'X11111111,Owner8 IRA,PARSEAAA1,TIPS,5000,$100.00,$500000,Cash'].join('\n');
+  const sch = ['"Owner8 IRA ...1234"',
+    '"Symbol","Description","Qty (Quantity)","Price","Mkt Val (Market Value)","Asset Type"',
+    '"PARSEAAA1","TIPS","5,000","100.00","$500,000.00","Fixed Income"',
+    '"Account Total","","","","$500,000.00",""'].join('\n');
+  const van = ['Account Number,Investment Name,Symbol,Shares,Share Price,Total Value,',
+    '11111111,U S TREASURY NOTE INFLATION INDEX NOTE 1.875 01/15/98 01/15/68,null,5000,100.00,500000.00,'].join('\n');
+  assert('classify: Fidelity Export is broker', detectHoldingsFormat(fid), 'broker');
+  assert('classify: Schwab Export is broker', detectHoldingsFormat(sch), 'broker');
+  assert('classify: Vanguard Export is broker', detectHoldingsFormat(van), 'broker');
+  assert('Fidelity via parseHoldingsFile: qty 5', parseHoldingsFile(fid, parseMkt).holdings?.['Owner8 IRA']?.[0]?.qty, 5);
+
+  // tipsladder.com Format: no header, third field a year
+  const tlc = ['PARSEAAA1,5,2098', 'PARSEAAA1,2,2099'].join('\n');
+  assert('classify: tipsladder.com Format', detectHoldingsFormat(tlc), 'tipsladder');
+  const tlcH = parseHoldingsFile(tlc, parseMkt).holdings;
+  assert('tipsladder.com: PARSEAAA1 qty 7, excessQty 2', `${tlcH?.[0]?.qty}/${tlcH?.[0]?.excessQty}`, '7/2');
+
+  // Plain CUSIP/Quantity Format with a `cusip,qty` header: no Symbol cell, so not a broker export
+  const plain = ['cusip,qty', 'PARSEAAA1,5', 'PARSEBBB2,600'].join('\n');
+  assert('classify: cusip,qty header is plain, not broker', detectHoldingsFormat(plain), 'plain');
+  const plainH = parseHoldingsFile(plain, parseMkt).holdings;
+  assert('plain: PARSEBBB2 qty === 600 (not divided by 1,000)', Array.isArray(plainH) ? plainH.find(h => h.cusip === 'PARSEBBB2')?.qty : undefined, 600);
+  assert('classify: headerless cusip,qty is plain', detectHoldingsFormat('PARSEAAA1,5\nPARSEBBB2,6'), 'plain');
+
+  // A broker row whose CUSIP resolves is never dropped for its Face Value: $400 face -> Quantity 0
+  const fid400 = ['Account Number,Account Name,Symbol,Description,Quantity,Last Price,Current Value,Type',
+    'X11111111,Owner8 IRA,PARSEAAA1,TIPS,400,$100.00,$400,Cash',
+    'X11111111,Owner8 IRA,PARSEBBB2,TIPS,5000,$100.00,$500000,Cash'].join('\n');
+  const h400 = parseBrokerCSV(fid400, parseMkt).holdings['Owner8 IRA'];
+  assert('broker: $400 face TIPS row kept', h400?.some(h => h.cusip === 'PARSEAAA1'), true);
+  assert('broker: $400 face TIPS row qty === 0', h400?.find(h => h.cusip === 'PARSEAAA1')?.qty, 0);
 }
 
 // ── Test: Build from scratch — deterministic output ───────────────────────────

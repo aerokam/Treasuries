@@ -20,6 +20,16 @@ export function parseCSVLine(str) {
   return arr.map(s => s.replace(/^"|"$/g, '').trim());
 }
 
+// A broker export's header row (4.2.1): a cell `Symbol` and a cell that is `Quantity`, begins
+// with `Qty`, or is `Shares` (case-insensitive). Returns the two column positions, or null when
+// the row is not a header row. Used both to classify a file as a broker export and to parse one.
+export function brokerHeaderColumns(cols) {
+  const lowerCols = cols.map(c => c.toLowerCase());
+  const quantity = lowerCols.findIndex(c => c === 'quantity' || c.startsWith('qty') || c === 'shares');
+  const symbol = lowerCols.findIndex(c => c === 'symbol');
+  return quantity > -1 && symbol > -1 ? { symbol, quantity } : null;
+}
+
 export function parseBrokerCSV(csvText, tipsMarketData) {
   const lines = csvText.split(/\r?\n/).filter(l => l.trim().length > 0);
   let map = { accountNum: -1, accountName: -1, symbol: -1, quantity: -1, investmentName: -1 };
@@ -60,12 +70,11 @@ export function parseBrokerCSV(csvText, tipsMarketData) {
     const cols = parseCSVLine(line);
     const lowerCols = cols.map(c => c.toLowerCase());
 
-    const qIdx = lowerCols.findIndex(c => c === 'quantity' || c.startsWith('qty') || c === 'shares');
-    const sIdx = lowerCols.findIndex(c => c === 'symbol' || c === 'cusip');
+    const header = brokerHeaderColumns(cols);
 
-    if (qIdx > -1 && sIdx > -1) {
-      map.quantity = qIdx;
-      map.symbol = sIdx;
+    if (header) {
+      map.quantity = header.quantity;
+      map.symbol = header.symbol;
       map.accountNum = lowerCols.findIndex(c => c.includes('account number') || c === 'account');
       map.accountName = lowerCols.findIndex(c => c.includes('account name'));
       map.investmentName = lowerCols.findIndex(c => c === 'investment name');
@@ -107,10 +116,9 @@ export function parseBrokerCSV(csvText, tipsMarketData) {
     if (resolvedCusip) {
       const rawQtyStr = cols[map.quantity].replace(/[^0-9.-]/g, '');
       const faceValue = parseFloat(rawQtyStr);
-      if (isNaN(faceValue) || faceValue <= 0) continue;
-
-      const qty = Math.round(faceValue / 1000);
-      if (qty <= 0) continue;
+      // A row with a CUSIP is never dropped for its Face Value or Quantity (4.2.1); an
+      // unreadable Face Value counts as 0.
+      const qty = Math.round((Number.isFinite(faceValue) ? faceValue : 0) / 1000);
 
       if (!accounts[acctKey]) accounts[acctKey] = new Map();
       accounts[acctKey].set(resolvedCusip, (accounts[acctKey].get(resolvedCusip) || 0) + qty);
