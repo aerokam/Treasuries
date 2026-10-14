@@ -2,7 +2,7 @@
 // Orchestration: wires controls → calc → chart; manages state.
 
 import { fetchCpiHistory, fetchRefCpi } from './data.js';
-import { isoDate, filterRows, calcIndex, calcYoY, calcMoM, calcRolling, calcP2P, calcStats } from './calc.js';
+import { isoDate, filterRows, calcIndex, calcYoY, calcMoM, calcRolling, calcP2P } from './calc.js';
 import { createChart, updateChart, resetZoom, getChart, COLORS } from './chart.js';
 import { handleChartKeydown } from '../../shared/src/chart-keys.js';
 import { initDatePicker } from '../../shared/src/date-picker.js';
@@ -96,12 +96,6 @@ function fmt(n, decimals = 2) {
   return n.toFixed(decimals);
 }
 
-function fmtDate(iso) {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', timeZone: 'UTC' });
-}
-
 // ── Render ────────────────────────────────────────────────────────────────────
 
 function render() {
@@ -159,13 +153,6 @@ function render() {
   } else {
     updateChart({ datasets, yLabel: yAxisLabel(), logScale: state.logScale, zeroLine, tooltipFormat });
   }
-
-  // Stats from primary (first) selected source
-  if (datasets.length) {
-    renderStats(datasets[0].labels, datasets[0].values);
-  } else {
-    document.getElementById('statsStrip').style.display = 'none';
-  }
 }
 
 function renderP2PResult(results) {
@@ -187,28 +174,6 @@ function renderP2PResult(results) {
       `</div>`;
   }).join('');
   el.style.display = 'block';
-}
-
-function renderStats(labels, values) {
-  const strip = document.getElementById('statsStrip');
-  if (!labels.length) { strip.style.display = 'none'; return; }
-  const s = calcStats(labels, values, state.displayMode);
-  if (!s) { strip.style.display = 'none'; return; }
-
-  const dec = state.dataSources[0] === 'ref-cpi' ? 5 : 3;
-  const isIndexMode = state.displayMode === 'index';
-  strip.innerHTML = [
-    `<span class="stat"><span class="stat-label">Current</span> <span class="stat-val">${fmt(s.current, dec)}</span></span>`,
-    isIndexMode && s.changePct !== null
-      ? `<span class="stat"><span class="stat-label">Period Chg</span> <span class="stat-val">${fmt(s.changePct)}%</span></span>`
-      : '',
-    isIndexMode && s.annualized !== null
-      ? `<span class="stat"><span class="stat-label">Annualized</span> <span class="stat-val">${fmt(s.annualized)}%</span></span>`
-      : '',
-    `<span class="stat"><span class="stat-label">Peak</span> <span class="stat-val">${fmt(s.peak, dec)} <span class="stat-date">(${fmtDate(s.peakLabel)})</span></span></span>`,
-    `<span class="stat"><span class="stat-label">Trough</span> <span class="stat-val">${fmt(s.trough, dec)} <span class="stat-date">(${fmtDate(s.troughLabel)})</span></span></span>`,
-  ].filter(Boolean).join('');
-  strip.style.display = 'flex';
 }
 
 // ── Date range ────────────────────────────────────────────────────────────────

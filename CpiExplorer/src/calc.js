@@ -193,52 +193,6 @@ export function calcP2P(rows, field, startDate, endDate) {
   };
 }
 
-/**
- * Summary stats for the currently rendered series.
- * @param {string[]} labels
- * @param {number[]} values
- * @param {string} mode - 'index' | 'yoy' | 'mom' | 'rolling' | 'p2p'
- * @returns {{ current: number, start: number, changePct: number|null, annualized: number|null,
- *             peak: number, peakLabel: string, trough: number, troughLabel: string }}
- */
-export function calcStats(labels, values, mode) {
-  if (!values.length) return null;
-
-  const current = values[values.length - 1];
-  const start   = values[0];
-
-  let changePct = null, annualized = null;
-  if (mode === 'index') {
-    changePct = start !== 0 ? (current / start - 1) * 100 : null;
-    // Month count from labels
-    if (labels.length >= 2) {
-      const d0 = new Date(labels[0]);
-      const d1 = new Date(labels[labels.length - 1]);
-      const months = (d1.getFullYear() - d0.getFullYear()) * 12 + (d1.getMonth() - d0.getMonth());
-      if (months > 0 && start !== 0) {
-        annualized = (Math.pow(current / start, 12 / months) - 1) * 100;
-      }
-    }
-  }
-
-  let peakIdx = 0, troughIdx = 0;
-  for (let i = 1; i < values.length; i++) {
-    if (values[i] > values[peakIdx])   peakIdx   = i;
-    if (values[i] < values[troughIdx]) troughIdx = i;
-  }
-
-  return {
-    current,
-    start,
-    changePct,
-    annualized,
-    peak: values[peakIdx],
-    peakLabel: labels[peakIdx],
-    trough: values[troughIdx],
-    troughLabel: labels[troughIdx],
-  };
-}
-
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 /** Binary search: find the value of `field` for the last row with date <= targetDate. */
