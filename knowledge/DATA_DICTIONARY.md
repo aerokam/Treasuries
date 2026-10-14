@@ -773,15 +773,12 @@ Some values are true only until Treasury issues more TIPS. Left inline as approx
 - <a id="broker-positions-export"></a>**Broker Positions Export**
   *A csv file downloaded from a broker's positions view (holdings view, at Vanguard) under a name the user chooses; brokers use positions and holdings interchangeably. It lists every position, of every security type, in each of usually several accounts. From the accounts the user selects, the app extracts the TIPS positions, which it calls [Holdings](#holdings).*
 - <a id="fidelity-export"></a>**Fidelity Export**
-  Column headers: `Account number,Account name,Symbol,Description,Quantity,Last price,Last price change,Current value,Today's gain/loss dollar,Today's gain/loss percent,Total gain/loss dollar,Total gain/loss percent,Percent of account,Cost basis total,Average cost basis,Type`
-  Columns read: `Account number`, `Account name`, `Symbol` (a CUSIP), `Quantity` (states [Face Value](#face-value)), `Current value`.
+  Columns read: `Account number`, `Account name`, `Symbol` (a CUSIP), `Quantity` (states [Face Value](#face-value)).
 - <a id="schwab-export"></a>**Schwab Export**
-  Column headers: `"Symbol","Description","Qty (Quantity)","Price","Mkt Val (Market Value)","Gain $ (Gain/Loss $)","Gain % (Gain/Loss %)","Asset Type",`
-  Columns read: `Symbol` (a CUSIP), `Qty (Quantity)` (states [Face Value](#face-value)), `Mkt Val (Market Value)`.
+  Columns read: `Symbol` (a CUSIP), `Qty (Quantity)` (states [Face Value](#face-value)).
   *Each account's rows are preceded by a row naming the account rather than a column, format `"Name ...LastFourDigits"`, e.g. `"Amy_POD ...387"`, and followed by an `"Account Total"` row.*
 - <a id="vanguard-export"></a>**Vanguard Export**
-  Column headers: `Account Number,Investment Name,Symbol,Shares,Share Price,Total Value,`
-  Columns read: `Account Number`, `Investment Name`, `Symbol` (a CUSIP, when present), `Shares` (states [Face Value](#face-value)), `Total Value`.
+  Columns read: `Account Number`, `Investment Name`, `Symbol` (a CUSIP, when present), `Shares` (states [Face Value](#face-value)).
 - <a id="holdings-export-format"></a>**Holdings Export** = `{ @CUSIP + Qty + Excess_Qty }`
   *This app's prior export of a build or rebalance result. Every row is a TIPS. Header row (exact text): `cusip,qty,excess`. Example row: `912810RQ3,5,0`. May carry a trailing [DARA Plan](#dara-plan)'s `#fundedYear,dara` row and [Construction Parameters](#construction-parameters)' `#params` row.*
 - <a id="tipsladdercom-format"></a>**tipsladder.com Format** = `{ CUSIP + Qty + Year }` per row, no header row, one or more rows per CUSIP
