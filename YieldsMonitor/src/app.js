@@ -439,7 +439,7 @@ function createChartInstance(sym) {
   charts[sym] = new Chart(ctx, {
     type: 'line',
     plugins: [pointMarkerPlugin, tradingGapPlugin],
-    data: { datasets: [{ label: sym, data: [], borderColor: color, backgroundColor: color + '1A', pointBackgroundColor: color, borderWidth: 1.5, pointRadius: markerRadius, clip: MARKER_CLIP, pointHoverRadius: 4, fill: false, tension: 0.1, segment: { borderColor: ctx => { if (!intradayRange()) return color; const mid = (ctx.p0.parsed.x + ctx.p1.parsed.x) / 2; return (isAfterHoursEt(mid) || isWeekendEt(new Date(mid))) ? color + '55' : color; } } }, ...saDataset] },
+    data: { datasets: [{ label: sym, data: [], borderColor: color, backgroundColor: color + '1A', pointBackgroundColor: color, borderWidth: 1.5, pointRadius: markerRadius, clip: MARKER_CLIP, pointHoverRadius: 4, fill: false, tension: 0.1, segment: { borderColor: ctx => { if (!intradayRange()) return color; if (inTradingSession(ctx.p0.parsed.x) && inTradingSession(ctx.p1.parsed.x)) return color; const mid = (ctx.p0.parsed.x + ctx.p1.parsed.x) / 2; return (isAfterHoursEt(mid) || isWeekendEt(new Date(mid))) ? color + '55' : color; } } }, ...saDataset] },
     options: {
       animation: false, responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, layout: { padding: { right: MARKER_CLIP_PX } },
       scales: {
