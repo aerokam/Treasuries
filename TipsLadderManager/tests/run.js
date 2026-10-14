@@ -6,7 +6,7 @@ import { readFileSync, readdirSync, existsSync } from 'fs';
 import path from 'path';
 import { buildTipsMarketData, localDate, runRebalance, runFundedRebalance, inferDARAFromCash, inferScaledDARAFromPortfolio, computePortfolioARAByYear, getGapYearBracketCandidates, getGapYears, derivePerYearDara, parseFundedYearDaraBlock, parseParamsBlock, inferFirstYearFromHoldings, inferLastYearFromHoldings } from '../src/rebalance-lib.js';
 import { computeBeforeState, detectBracketFlags, heldYearMedianExcluding } from '../src/before-state-lib.js';
-import { FIRST_YEAR_BUFFER_MONTHS, defaultFirstYear, tipsBeyondFirstYearBuffer, remainingCouponPaymentsThisYear, rmdCappedRemainingCoupons, latestRemainingCouponDate, future30yLimit, maxLastYear, selectLadderBonds, selectFuture30yCovers, LOWER_COVER_YIELD, gapRebalances } from '../src/ladder-core.js';
+import { EXCLUDE_MATURING_WITHIN_MONTHS, defaultFirstYear, tipsMaturingAfterExclusion, remainingCouponPaymentsThisYear, rmdCappedRemainingCoupons, latestRemainingCouponDate, future30yLimit, maxLastYear, selectLadderBonds, selectFuture30yCovers, LOWER_COVER_YIELD, gapRebalances } from '../src/ladder-core.js';
 import { bracketWeights, bracketWeightsN, syntheticCoupon } from '../src/gap-math.js';
 import { findSpikes, smoothCurve } from '../src/shape-math.js';
 import { buildDurationPopupRows, buildBracketWeightDrill, buildFuture30yDurationPopupRows, buildFuture30yLMIDrill, buildSyntheticPIDrill } from '../src/drill.js';
@@ -922,80 +922,80 @@ console.log('\nBuild — DARA=50000, lastYear=2040');
 // ── Test: Default First Year (DD §5.1) ───────────────────────────────────────────
 // The default is derived here from the market fixture by plain date arithmetic, independent of the
 // helper, and must equal the helper's answer, runBuild's default, and the rule the DD table states:
-// the first year with a TIPS maturing more than FIRST_YEAR_BUFFER_MONTHS months after settlement.
+// the first year with a TIPS maturing more than EXCLUDE_MATURING_WITHIN_MONTHS months after settlement.
 console.log('\nDefault First Year — derived from the market fixture');
 {
-  assert('FIRST_YEAR_BUFFER_MONTHS matches the DD value (3)', FIRST_YEAR_BUFFER_MONTHS, 3);
-  const cutoff = new Date(settlementDate.getFullYear(), settlementDate.getMonth() + FIRST_YEAR_BUFFER_MONTHS, settlementDate.getDate());
+  assert('EXCLUDE_MATURING_WITHIN_MONTHS matches the DD value (3)', EXCLUDE_MATURING_WITHIN_MONTHS, 3);
+  const cutoff = new Date(settlementDate.getFullYear(), settlementDate.getMonth() + EXCLUDE_MATURING_WITHIN_MONTHS, settlementDate.getDate());
   const beyond = [...tipsMarketData.values()].filter(b => b.maturity && b.maturity > cutoff);
   const expectedYear = Math.min(...beyond.map(b => b.maturity.getFullYear()));
-  assert('default First Year = first year with a TIPS beyond the buffer', FIRST_YEAR, expectedYear);
-  assert('tipsBeyondFirstYearBuffer returns exactly the TIPS beyond the buffer', tipsBeyondFirstYearBuffer(tipsMarketData, settlementDate).length, beyond.length);
-  assert('no TIPS within the buffer is counted', tipsBeyondFirstYearBuffer(tipsMarketData, settlementDate).every(b => b.maturity > cutoff), true);
+  assert('default First Year = first year with a TIPS maturing after the excluded months', FIRST_YEAR, expectedYear);
+  assert('tipsMaturingAfterExclusion returns exactly the TIPS maturing after the excluded months', tipsMaturingAfterExclusion(tipsMarketData, settlementDate).length, beyond.length);
+  assert('no TIPS maturing within the excluded months is counted', tipsMaturingAfterExclusion(tipsMarketData, settlementDate).every(b => b.maturity > cutoff), true);
   assert('runBuild without a First Year starts at the default', runBuild({ dara: 40000, lastYear: MAX_YEAR, tipsMarketData, refCPI, settlementDate }).summary.firstYear, FIRST_YEAR);
   assert('runBuild keeps a First Year it is given', runBuild({ dara: 40000, firstYear: FIRST_YEAR + 1, lastYear: MAX_YEAR, tipsMarketData, refCPI, settlementDate }).summary.firstYear, FIRST_YEAR + 1);
-  const firstYearOptions = [...new Set(tipsBeyondFirstYearBuffer(tipsMarketData, settlementDate).map(b => b.maturity.getFullYear()))].sort((a, b) => a - b);
+  const firstYearOptions = [...new Set(tipsMaturingAfterExclusion(tipsMarketData, settlementDate).map(b => b.maturity.getFullYear()))].sort((a, b) => a - b);
   assert('the First Year choices start at the default', firstYearOptions[0], FIRST_YEAR);
   console.log(`        settlement ${settleDateStr}, default First Year ${FIRST_YEAR}`);
 }
 
-console.log('\nDefault First Year — the buffer length changes the default');
+console.log('\nDefault First Year — the number of excluded months changes the default');
 {
   const S = localDate('2026-10-14');
   const m = new Map([['A', { maturity: localDate('2026-12-15') }], ['B', { maturity: localDate('2027-04-15') }], ['C', { maturity: localDate('2028-01-15') }]]);
   assert('0 months: a TIPS maturing in two months counts, default 2026', defaultFirstYear(m, S, 0), 2026);
-  assert('3 months: the 2026 TIPS is within the buffer, default 2027', defaultFirstYear(m, S, 3), 2027);
+  assert('3 months: the 2026 TIPS matures within the excluded months, default 2027', defaultFirstYear(m, S, 3), 2027);
   assert('6 months: April 15 2027 is beyond Apr 14 2027, default 2027', defaultFirstYear(m, S, 6), 2027);
-  assert('7 months: April 15 2027 is within the buffer, default 2028', defaultFirstYear(m, S, 7), 2028);
-  assert('omitting the length uses FIRST_YEAR_BUFFER_MONTHS', defaultFirstYear(m, S), defaultFirstYear(m, S, FIRST_YEAR_BUFFER_MONTHS));
-  assert('no TIPS beyond the buffer: null', defaultFirstYear(new Map([['A', { maturity: localDate('2026-12-15') }]]), S, 3), null);
+  assert('7 months: April 15 2027 matures within the excluded months, default 2028', defaultFirstYear(m, S, 7), 2028);
+  assert('omitting the months uses EXCLUDE_MATURING_WITHIN_MONTHS', defaultFirstYear(m, S), defaultFirstYear(m, S, EXCLUDE_MATURING_WITHIN_MONTHS));
+  assert('no TIPS maturing after the excluded months: null', defaultFirstYear(new Map([['A', { maturity: localDate('2026-12-15') }]]), S, 3), null);
 }
 
-console.log('\nDefault First Year — boundary at exactly the buffer length');
+console.log('\nDefault First Year — boundary at exactly EXCLUDE_MATURING_WITHIN_MONTHS months');
 {
   const later = { maturity: localDate('2028-01-15') };
   const S = localDate('2026-10-14');
-  assert('TIPS maturing exactly 3 months after settlement is within the buffer', defaultFirstYear(new Map([['A', { maturity: localDate('2027-01-14') }], ['B', later]]), S, 3), 2028);
-  assert('TIPS maturing 3 months and a day after settlement is beyond the buffer', defaultFirstYear(new Map([['A', { maturity: localDate('2027-01-15') }], ['B', later]]), S, 3), 2027);
-  assert('TIPS maturing 3 months less a day after settlement is within the buffer', defaultFirstYear(new Map([['A', { maturity: localDate('2027-01-13') }], ['B', later]]), S, 3), 2028);
+  assert('TIPS maturing exactly 3 months after settlement matures within the excluded months', defaultFirstYear(new Map([['A', { maturity: localDate('2027-01-14') }], ['B', later]]), S, 3), 2028);
+  assert('TIPS maturing 3 months and a day after settlement matures after the excluded months', defaultFirstYear(new Map([['A', { maturity: localDate('2027-01-15') }], ['B', later]]), S, 3), 2027);
+  assert('TIPS maturing 3 months less a day after settlement matures within the excluded months', defaultFirstYear(new Map([['A', { maturity: localDate('2027-01-13') }], ['B', later]]), S, 3), 2028);
   const S2 = localDate('2026-11-30');
-  assert('month end: Nov 30 + 3 months is Feb 28, and Feb 28 is within the buffer', defaultFirstYear(new Map([['A', { maturity: localDate('2027-02-28') }], ['B', later]]), S2, 3), 2028);
-  assert('month end: Mar 1 is beyond the buffer', defaultFirstYear(new Map([['A', { maturity: localDate('2027-03-01') }], ['B', later]]), S2, 3), 2027);
+  assert('month end: Nov 30 + 3 months is Feb 28, and Feb 28 matures within the excluded months', defaultFirstYear(new Map([['A', { maturity: localDate('2027-02-28') }], ['B', later]]), S2, 3), 2028);
+  assert('month end: Mar 1 matures after the excluded months', defaultFirstYear(new Map([['A', { maturity: localDate('2027-03-01') }], ['B', later]]), S2, 3), 2027);
 }
 
-// ── Test: Build never chooses a TIPS within the First Year buffer (DD §5.1, 2.0 §Maturity Selection) ──
+// ── Test: Build never chooses a TIPS maturing within EXCLUDE_MATURING_WITHIN_MONTHS months (DD §5.1, 2.0 §Maturity Selection) ──
 // The settlement date is set 20 days before the earliest TIPS of the first maturity year that has two or more
-// TIPS, so that TIPS is within the buffer and the year's later TIPS are beyond it, whatever today's date is.
-console.log('\nBuild — a TIPS within the First Year buffer is never chosen for a funded year');
+// TIPS, so that TIPS matures within the excluded months and the year's later TIPS are beyond it, whatever today's date is.
+console.log('\nBuild — a TIPS maturing within EXCLUDE_MATURING_WITHIN_MONTHS months is never chosen for a funded year');
 {
   const byYr = new Map();
   for (const b of tipsMarketData.values()) if (b.maturity) byYr.set(b.maturity.getFullYear(), [...(byYr.get(b.maturity.getFullYear()) ?? []), b]);
   const Y = Math.min(...[...byYr].filter(([, l]) => l.length >= 2).map(([y]) => y));
   const inYear = byYr.get(Y).sort((a, b) => a.maturity - b.maturity);
   const S = new Date(inYear[0].maturity.getFullYear(), inYear[0].maturity.getMonth(), inYear[0].maturity.getDate() - 20);
-  const within = new Set([...tipsMarketData.values()].filter(b => b.maturity && b.maturity > S && !tipsBeyondFirstYearBuffer(tipsMarketData, S, FIRST_YEAR_BUFFER_MONTHS).includes(b)).map(b => b.cusip));
-  assert('precondition: the earliest TIPS of year ' + Y + ' is within the buffer', within.has(inYear[0].cusip), true);
-  assert('precondition: year ' + Y + ' has another TIPS beyond the buffer', inYear.some(b => !within.has(b.cusip)), true);
-  const firstYear = defaultFirstYear(tipsMarketData, S, FIRST_YEAR_BUFFER_MONTHS);
+  const within = new Set([...tipsMarketData.values()].filter(b => b.maturity && b.maturity > S && !tipsMaturingAfterExclusion(tipsMarketData, S, EXCLUDE_MATURING_WITHIN_MONTHS).includes(b)).map(b => b.cusip));
+  assert('precondition: the earliest TIPS of year ' + Y + ' matures within the excluded months', within.has(inYear[0].cusip), true);
+  assert('precondition: year ' + Y + ' has another TIPS maturing after the excluded months', inYear.some(b => !within.has(b.cusip)), true);
+  const firstYear = defaultFirstYear(tipsMarketData, S, EXCLUDE_MATURING_WITHIN_MONTHS);
   for (const maturityPref of ['first', 'semiannual', 'all', 'last']) {
-    const { details } = runBuild({ dara: 40000, firstYear, lastYear: firstYear + 4, tipsMarketData, refCPI, settlementDate: S, maturityPref, bufferMonths: FIRST_YEAR_BUFFER_MONTHS });
-    assert('buffer on, ' + maturityPref + ': no TIPS within the buffer is chosen', details.filter(d => within.has(d.cusip)).length, 0);
-    assert('buffer on, ' + maturityPref + ': year ' + Y + ' is still funded', details.some(d => d.fundedYear === Y && d.fundedYearQty > 0), true);
+    const { details } = runBuild({ dara: 40000, firstYear, lastYear: firstYear + 4, tipsMarketData, refCPI, settlementDate: S, maturityPref, excludeMaturingWithinMonths: EXCLUDE_MATURING_WITHIN_MONTHS });
+    assert('exclusion on, ' + maturityPref + ': no TIPS maturing within the excluded months is chosen', details.filter(d => within.has(d.cusip)).length, 0);
+    assert('exclusion on, ' + maturityPref + ': year ' + Y + ' is still funded', details.some(d => d.fundedYear === Y && d.fundedYearQty > 0), true);
   }
-  const sel = selectLadderBonds({ tipsMarketData, firstYear: Y, lastYear: Y + 4, settlementDate: S, maturityPref: 'first', bufferMonths: FIRST_YEAR_BUFFER_MONTHS });
-  assert('selectLadderBonds with the buffer: the first-to-mature TIPS of year ' + Y + ' is the first one beyond it', sel.yearTipsListMap[Y][0].cusip, inYear.find(b => !within.has(b.cusip)).cusip);
-  const off = runBuild({ dara: 40000, firstYear: Y, lastYear: Y + 4, tipsMarketData, refCPI, settlementDate: S, maturityPref: 'first', bufferMonths: 0 });
-  assert('buffer 0, first to mature: the TIPS within the buffer is chosen again', off.details.some(d => d.cusip === inYear[0].cusip && d.fundedYearQty > 0), true);
+  const sel = selectLadderBonds({ tipsMarketData, firstYear: Y, lastYear: Y + 4, settlementDate: S, maturityPref: 'first', excludeMaturingWithinMonths: EXCLUDE_MATURING_WITHIN_MONTHS });
+  assert('selectLadderBonds with the exclusion: the first-to-mature TIPS of year ' + Y + ' is the first one beyond it', sel.yearTipsListMap[Y][0].cusip, inYear.find(b => !within.has(b.cusip)).cusip);
+  const off = runBuild({ dara: 40000, firstYear: Y, lastYear: Y + 4, tipsMarketData, refCPI, settlementDate: S, maturityPref: 'first', excludeMaturingWithinMonths: 0 });
+  assert('exclusion 0, first to mature: the TIPS maturing within the excluded months is chosen again', off.details.some(d => d.cusip === inYear[0].cusip && d.fundedYearQty > 0), true);
   const clamped = runBuild({ dara: 40000, firstYear: Y, lastYear: Y + 4, tipsMarketData, refCPI, settlementDate: S, maturityPref: 'last' });
-  assert('runBuild defaults the buffer to FIRST_YEAR_BUFFER_MONTHS', clamped.summary.firstYear, Math.max(Y, firstYear));
+  assert('runBuild defaults the excluded months to EXCLUDE_MATURING_WITHIN_MONTHS', clamped.summary.firstYear, Math.max(Y, firstYear));
 
-  // Rebalance applies no buffer: a file holding the TIPS within the buffer still shows it, held.
+  // Rebalance applies no exclusion: a file holding the TIPS maturing within the excluded months still shows it, held.
   const held = new Map();
   for (const d of off.details) held.set(d.cusip, (held.get(d.cusip) ?? 0) + (d.fundedYearQty || 0) + (d.excessQty || 0));
   const holdings = [...held].filter(([, q]) => q > 0).map(([cusip, q]) => ({ cusip, qty: q }));
-  assert('the holdings include the TIPS within the buffer', holdings.some(h => h.cusip === inYear[0].cusip), true);
+  assert('the holdings include the TIPS maturing within the excluded months', holdings.some(h => h.cusip === inYear[0].cusip), true);
   const rb = runRebalance({ dara: 40000, holdings, tipsMarketData, refCPI, settlementDate: S });
-  assert('Rebalance shows the held TIPS within the buffer', rb.details.some(d => d.cusip === inYear[0].cusip), true);
+  assert('Rebalance shows the held TIPS maturing within the excluded months', rb.details.some(d => d.cusip === inYear[0].cusip), true);
 }
 
 // ── Test: RMD Options — settlement-year remaining-coupon LMI choice (2.0 §RMD Options) ──

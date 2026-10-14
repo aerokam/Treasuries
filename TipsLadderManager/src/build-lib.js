@@ -5,7 +5,7 @@
 
 import { fmtDate } from './date-util.js';
 import { bondCalcs, calculateMDuration, rungAmount, calcMktWtdAvg } from '../../shared/src/bond-math.js';
-import { sizeLadder, selectLadderBonds, fundedYearAmount, syntheticYearAmounts, defaultFirstYear, FIRST_YEAR_BUFFER_MONTHS } from './ladder-core.js';
+import { sizeLadder, selectLadderBonds, fundedYearAmount, syntheticYearAmounts, defaultFirstYear, EXCLUDE_MATURING_WITHIN_MONTHS } from './ladder-core.js';
 
 // ─── Main entry point ──────────────────────────────────────────────────────────
 // Inputs:
@@ -23,10 +23,10 @@ import { sizeLadder, selectLadderBonds, fundedYearAmount, syntheticYearAmounts, 
 // Returns: { results, HDR, summary }
 // Spec: knowledge/3.0_TIPS_Ladders.md and knowledge/4.0_TIPS_Ladder_Rebalancing.md §Full Rebalance
 // Variable naming note: fundedYearQty, excessQty, costPerBond (harmonized) — see §Code Variable Mapping
-export function runBuild({ dara, firstYear: firstYearOpt, lastYear, tipsMarketData, refCPI, settlementDate, maturityPref = 'last', couponPref = 'higher', preLadderInterest = false, daraByYear = null, yearOverrides = null, bondHolidays = new Set(), availableCash = 0, rmdCouponMode = 'all', tradeDate = settlementDate, bufferMonths = FIRST_YEAR_BUFFER_MONTHS }) {
-  // A TIPS within the buffer is never chosen for a funded year (DD §5.1); a First Year inside the buffer
+export function runBuild({ dara, firstYear: firstYearOpt, lastYear, tipsMarketData, refCPI, settlementDate, maturityPref = 'last', couponPref = 'higher', preLadderInterest = false, daraByYear = null, yearOverrides = null, bondHolidays = new Set(), availableCash = 0, rmdCouponMode = 'all', tradeDate = settlementDate, excludeMaturingWithinMonths = EXCLUDE_MATURING_WITHIN_MONTHS }) {
+  // A TIPS maturing within EXCLUDE_MATURING_WITHIN_MONTHS months is never chosen for a funded year (DD §5.1); a First Year with only such TIPS
   // moves to the Default First Year, so that year is not read as a gap year.
-  const defaultFY = defaultFirstYear(tipsMarketData, settlementDate, bufferMonths);
+  const defaultFY = defaultFirstYear(tipsMarketData, settlementDate, excludeMaturingWithinMonths);
   const firstYear      = firstYearOpt == null ? defaultFY : (defaultFY == null ? firstYearOpt : Math.max(firstYearOpt, defaultFY));
   if (firstYear == null) throw new Error('No TIPS bonds found in the specified year range');
   const settleDateDisp = fmtDate(settlementDate);
@@ -36,7 +36,7 @@ export function runBuild({ dara, firstYear: firstYearOpt, lastYear, tipsMarketDa
   const {
     yearBondMap, yearTipsListMap, rangeYears, gapYears, future30yYears,
     future30yLowerYear, future30yUpperYear, future30yLowerCoverBond, future30yUpperCoverBond, future30yAnchorBond,
-  } = selectLadderBonds({ tipsMarketData, firstYear, lastYear, settlementDate, maturityPref, couponPref, yearOverrides, bufferMonths });
+  } = selectLadderBonds({ tipsMarketData, firstYear, lastYear, settlementDate, maturityPref, couponPref, yearOverrides, excludeMaturingWithinMonths });
 
   if (!rangeYears.length) throw new Error('No TIPS bonds found in the specified year range');
 

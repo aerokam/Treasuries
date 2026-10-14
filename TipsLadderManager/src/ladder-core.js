@@ -16,21 +16,21 @@ import { bracketWeights, bracketWeightsN, bracketExcessQtys, fyQty as _fyQty, ga
 import { addMonths } from './date-util.js';
 
 // ─── Default First Year ─────────────────────────────────────────────────────────
-// Spec: DD §5.1 (FIRST_YEAR_BUFFER_MONTHS, Default First Year). A TIPS maturing no later than this many
+// Spec: DD §5.1 (EXCLUDE_MATURING_WITHIN_MONTHS, Default First Year). A TIPS maturing no later than this many
 // months after the Settlement Date is not offered in Build: it is absent from the First Year list and is
 // not chosen for a funded year (2.0 §Maturity Selection Within a Funded Year). One definition; the Build
-// tab, runBuild and selectLadderBonds' `bufferMonths` all read it here. 0 turns the exclusion off.
-export const FIRST_YEAR_BUFFER_MONTHS = 3;
+// tab, runBuild and selectLadderBonds' `excludeMaturingWithinMonths` all read it here. 0 turns the exclusion off.
+export const EXCLUDE_MATURING_WITHIN_MONTHS = 3;
 
-// The TIPS maturing more than `bufferMonths` months after the Settlement Date.
-export function tipsBeyondFirstYearBuffer(tipsMarketData, settlementDate, bufferMonths = FIRST_YEAR_BUFFER_MONTHS) {
-  const cutoff = addMonths(settlementDate, bufferMonths);
+// The TIPS maturing more than `excludeMaturingWithinMonths` months after the Settlement Date.
+export function tipsMaturingAfterExclusion(tipsMarketData, settlementDate, excludeMaturingWithinMonths = EXCLUDE_MATURING_WITHIN_MONTHS) {
+  const cutoff = addMonths(settlementDate, excludeMaturingWithinMonths);
   return [...tipsMarketData.values()].filter(b => b.maturity && b.maturity > cutoff);
 }
 
-// The Build tab's default First Year: the earliest maturity year with a TIPS beyond the buffer; null when none.
-export function defaultFirstYear(tipsMarketData, settlementDate, bufferMonths = FIRST_YEAR_BUFFER_MONTHS) {
-  const years = tipsBeyondFirstYearBuffer(tipsMarketData, settlementDate, bufferMonths).map(b => b.maturity.getFullYear());
+// The Build tab's default First Year: the earliest maturity year with a TIPS maturing after the excluded months; null when none.
+export function defaultFirstYear(tipsMarketData, settlementDate, excludeMaturingWithinMonths = EXCLUDE_MATURING_WITHIN_MONTHS) {
+  const years = tipsMaturingAfterExclusion(tipsMarketData, settlementDate, excludeMaturingWithinMonths).map(b => b.maturity.getFullYear());
   return years.length ? Math.min(...years) : null;
 }
 
@@ -520,15 +520,15 @@ function selectYearTips(cands, pref, couponPref = 'higher') {
 // Map<year, cusip[]> naming an explicit TIPS list for that year, bypassing `maturityPref` for
 // just that year. Every other year keeps following `maturityPref` as usual. An override whose
 // CUSIPs don't resolve to that year's candidates is ignored (falls back to the policy pick).
-// `bufferMonths` (Build only; Rebalance leaves it 0): a TIPS maturing no later than that many months
-// after the settlement date is not a candidate for a funded year (tipsBeyondFirstYearBuffer, DD §5.1).
-export function selectLadderBonds({ tipsMarketData, firstYear, lastYear, settlementDate, maturityPref = 'last', couponPref = 'higher', yearOverrides = null, bufferMonths = 0 }) {
+// `excludeMaturingWithinMonths` (Build only; Rebalance leaves it 0): a TIPS maturing no later than that many months
+// after the settlement date is not a candidate for a funded year (tipsMaturingAfterExclusion, DD §5.1).
+export function selectLadderBonds({ tipsMarketData, firstYear, lastYear, settlementDate, maturityPref = 'last', couponPref = 'higher', yearOverrides = null, excludeMaturingWithinMonths = 0 }) {
   // 1. Gather candidate TIPS per year (maturing after settlement, in range), then apply the policy.
-  const beyondBuffer = bufferMonths > 0 ? new Set(tipsBeyondFirstYearBuffer(tipsMarketData, settlementDate, bufferMonths)) : null;
+  const maturingAfterExclusion = excludeMaturingWithinMonths > 0 ? new Set(tipsMaturingAfterExclusion(tipsMarketData, settlementDate, excludeMaturingWithinMonths)) : null;
   const candsByYear = {};
   for (const bond of tipsMarketData.values()) {
     if (!bond.maturity || bond.maturity <= settlementDate) continue;
-    if (beyondBuffer && !beyondBuffer.has(bond)) continue;
+    if (maturingAfterExclusion && !maturingAfterExclusion.has(bond)) continue;
     const yr = bond.maturity.getFullYear();
     if (yr < firstYear || yr > lastYear) continue;
     (candsByYear[yr] ??= []).push(bond);
