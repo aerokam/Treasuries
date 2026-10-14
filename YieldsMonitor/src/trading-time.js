@@ -67,6 +67,11 @@ export function inTradingSession(ms) {
   return ms >= open && ms <= close;
 }
 
+// True for a Saturday or Sunday moment, ET.
+export function isWeekendMoment(ms) {
+  return mod(etDayNum(ms) + 3, 7) > 4;
+}
+
 // Chart.js scale: a time scale whose axis positions run through toTradingTime when its
 // `compact` option is on, and that behaves as a plain time scale when it is off.
 export function createTradingTimeScale(Chart) {
@@ -91,7 +96,11 @@ export function createTradingTimeScale(Chart) {
     }
     buildTicks() {
       const ticks = super.buildTicks();
-      if (!this.options.compact || this.options.time.unit !== 'hour') return ticks;
+      if (!this.options.compact) return ticks;
+      // A weekend has no width on this axis: its day ticks would sit on the preceding Friday's
+      // close, one on top of the other.
+      if (this.options.time.unit === 'day') return ticks.filter(t => !isWeekendMoment(t.value));
+      if (this.options.time.unit !== 'hour') return ticks;
       return ticks.filter(t => inTradingSession(t.value));
     }
   };
