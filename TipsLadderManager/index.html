@@ -721,7 +721,7 @@ import { accruedInterest, bondCalcs, couponSchedule } from '../shared/src/bond-m
 import { loadMarketData, lookupRefCpi, nextBondTradingDay } from '../shared/src/market-data.js';
 import { actualPaymentDate } from '../shared/src/settlement.js';
 window.lookupRefCpi = lookupRefCpi;
-import { parseHoldingsFile } from './src/holdings-import.js';
+import { parseHoldingsFile, maturedOnOrBefore } from './src/holdings-import.js';
 
 const toIso = d => d ? d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0') : '';
 
@@ -2182,6 +2182,13 @@ function _bondOrMatured(cusip) {
   return { cusip, maturity: localDate(r.maturity), coupon: r.coupon, datedDateRefCpi: r.datedDateRefCpi, price: null, yield: null };
 }
 
+// The maturity of a CUSIP that TIPS Market Data no longer quotes because its rung has matured (TipsRef maturity on
+// or before the settlement date), else null. The Holdings File import keeps such a CUSIP for Available Cash.
+function _maturedMaturity(cusip) {
+  const maturity = _bondOrMatured(cusip)?.maturity;
+  return maturity && settlementDate && maturedOnOrBefore(maturity, settlementDate) ? maturity : null;
+}
+
 // Every settlement-year payment this portfolio has already generated, one entry per payment date,
 // with what arrived on it: coupons, and principal where a rung matured that day. Whether a date is
 // counted toward Available Cash depends on the window and, for the coupon half, on the coupon-
@@ -3217,13 +3224,16 @@ document.getElementById('holdings-file').addEventListener('change', async (e) =>
     if (rawLines.length === 0) { setStatus('Holdings CSV is empty.', true); return; }
 
     // Classify the file once and parse it with that format's parser (4.2.1).
-    const parsed = parseHoldingsFile(text, tipsMarketData);
+    const parsed = parseHoldingsFile(text, tipsMarketData, _maturedMaturity);
+    // 4.2.1: one message lists the CUSIPs a non-broker format dropped for being absent from TIPS Market Data.
+    const skippedMsg = parsed.skipped?.length
+      ? `${parsed.skipped.length} CUSIP(s) not in TIPS Market Data skipped: ${parsed.skipped.join(', ')}` : '';
     const parsedAccounts = parsed.format === 'broker' ? parsed.holdings : {};
     const acctNames = Object.keys(parsedAccounts);
     if (parsed.format === 'broker' && acctNames.length === 0) { setStatus('Holdings CSV has no valid data rows.', true); return; }
     if (parsed.format !== 'broker') {
       const arr = parsed.holdings;
-      if (arr.length === 0) { setStatus('Holdings CSV has no valid data rows.', true); return; }
+      if (arr.length === 0) { setStatus(('Holdings CSV has no valid data rows. ' + skippedMsg).trim(), true); return; }
       currentHoldingsArray = arr;
       // Our own exports append an explicit per-year DARA block — honor it on import (exact round-trip).
       currentImportedDaraByYear = parseFundedYearDaraBlock(rawLines);
@@ -3267,6 +3277,11 @@ document.getElementById('holdings-file').addEventListener('change', async (e) =>
     updateRebalFirstYearDropdown();
     _initRebalDaraFromPortfolio();
     _updateCashFlowBtnVisibility();
+    // Last, so the DARA reference-date notices set above (setStatusHTML replaces the element) cannot displace it.
+    if (skippedMsg) {
+      if (document.getElementById('status').textContent.trim()) appendStatusHTML(esc(skippedMsg));
+      else setStatus(skippedMsg);
+    }
   } catch (err) {
     console.error('Holdings file load failed:', err);
     setStatus('Could not read this file. If the problem continues, reload the page and try again.', true);

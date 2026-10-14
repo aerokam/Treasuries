@@ -13,7 +13,7 @@ import { buildDurationPopupRows, buildBracketWeightDrill, buildFuture30yDuration
 import { rankForYear, levelValues } from '../src/allocation-policy.js';
 import { runBuild } from '../src/build-lib.js';
 import { parseBrokerCSV } from '../src/broker-import.js';
-import { detectHoldingsFormat, parseHoldingsFile } from '../src/holdings-import.js';
+import { detectHoldingsFormat, parseHoldingsFile, maturedOnOrBefore } from '../src/holdings-import.js';
 import { loadMarketData, nextBondTradingDay, lookupRefCpi } from '../../shared/src/market-data.js';
 import { installFixtureFetch } from './market-fixture.js';
 import { ladderRoles } from './ladder-fixtures.js';
@@ -879,6 +879,34 @@ const parseMkt = buildTipsMarketData([
   const plainH = parseHoldingsFile(plain, parseMkt).holdings;
   assert('plain: PARSEBBB2 qty === 600 (not divided by 1,000)', Array.isArray(plainH) ? plainH.find(h => h.cusip === 'PARSEBBB2')?.qty : undefined, 600);
   assert('classify: headerless cusip,qty is plain', detectHoldingsFormat('PARSEAAA1,5\nPARSEBBB2,6'), 'plain');
+
+  // A CUSIP absent from TIPS Market Data is dropped in every non-broker format and listed in skipped
+  const hxU = parseHoldingsFile(['cusip,qty,excess', 'PARSEAAA1,5,0', 'ZZZZZZZZ9,7,1'].join('\n'), parseMkt);
+  assert('Holdings Export: unknown CUSIP dropped', hxU.holdings.map(h => h.cusip).join(','), 'PARSEAAA1');
+  assert('Holdings Export: unknown CUSIP listed in skipped', hxU.skipped.join(','), 'ZZZZZZZZ9');
+  const plU = parseHoldingsFile(['cusip,qty', 'PARSEAAA1,5', 'ZZZZZZZZ9,7', 'YYYYYYYY8,2'].join('\n'), parseMkt);
+  assert('plain: unknown CUSIPs dropped, known kept', plU.holdings.map(h => h.cusip).join(','), 'PARSEAAA1');
+  assert('plain: unknown CUSIPs listed in skipped, in file order', plU.skipped.join(','), 'ZZZZZZZZ9,YYYYYYYY8');
+  const tlU = parseHoldingsFile(['PARSEAAA1,5,2098', 'ZZZZZZZZ9,2,2098', 'ZZZZZZZZ9,1,2099'].join('\n'), parseMkt);
+  assert('tipsladder.com: unknown CUSIP dropped', tlU.holdings.map(h => h.cusip).join(','), 'PARSEAAA1');
+  assert('tipsladder.com: unknown CUSIP listed once in skipped', tlU.skipped.join(','), 'ZZZZZZZZ9');
+  assert('known CUSIPs only: skipped is empty', parseHoldingsFile(plain, parseMkt).skipped.length, 0);
+  assert('broker: no skipped list', parseHoldingsFile(fid, parseMkt).skipped, undefined);
+
+  // A rung matured on or before the settlement date is kept (Available Cash maturity proceeds); every other
+  // CUSIP absent from TIPS Market Data is dropped. The test's TIPS reference data entries:
+  const settleD = new Date(2026, 9, 15);
+  const refMat = new Map([['MATURED01', new Date(2026, 0, 15)], ['MATBOUND1', new Date(2026, 9, 15)], ['OUTSTAND1', new Date(2027, 0, 15)]]);
+  const isMat = c => (refMat.has(c) && maturedOnOrBefore(refMat.get(c), settleD)) ? refMat.get(c) : null;
+  const mrU = parseHoldingsFile(['cusip,qty,excess', 'PARSEAAA1,5,0', 'MATURED01,3,0', 'MATBOUND1,2,0', 'OUTSTAND1,4,0', 'NOTINREF9,6,0'].join('\n'), parseMkt, isMat);
+  assert('matured: kept with outstanding market-data CUSIP', mrU.holdings.map(h => h.cusip).join(','), 'PARSEAAA1,MATURED01,MATBOUND1');
+  assert('matured: kept CUSIPs not in skipped; outstanding-without-quote and not-in-reference dropped and listed', mrU.skipped.join(','), 'OUTSTAND1,NOTINREF9');
+  assert('matured on the settlement date is matured', maturedOnOrBefore(new Date(2026, 9, 15), settleD), true);
+  assert('matured the day after the settlement date is not', maturedOnOrBefore(new Date(2026, 9, 16), settleD), false);
+  const mrT = parseHoldingsFile(['MATURED01,3,2026', 'MATURED01,1,2027', 'OUTSTAND1,4,2027'].join('\n'), parseMkt, isMat);
+  assert('tipsladder.com: matured kept (funded 3, excess 1), outstanding without quote dropped', `${mrT.holdings.map(h => h.cusip + ':' + h.qty + '/' + h.excessQty).join(',')}|${mrT.skipped.join(',')}`, 'MATURED01:4/1|OUTSTAND1');
+  const mrP = parseHoldingsFile(['cusip,qty', 'MATURED01,3', 'OUTSTAND1,4'].join('\n'), parseMkt, isMat);
+  assert('plain: matured kept, outstanding without quote dropped', mrP.holdings.map(h => h.cusip).join(',') + '|' + mrP.skipped.join(','), 'MATURED01|OUTSTAND1');
 
   // A broker row whose CUSIP resolves is never dropped for its Face Value: $400 face -> Quantity 0
   const fid400 = ['Account Number,Account Name,Symbol,Description,Quantity,Last Price,Current Value,Type',

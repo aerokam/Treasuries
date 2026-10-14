@@ -27,8 +27,19 @@ export function detectHoldingsFormat(text) {
   return 'plain';
 }
 
+// A CUSIP absent from TIPS Market Data is dropped (4.2.1) and recorded once in `skipped`, in file order.
+// True when a maturity date falls on or before the settlement date (a rung that has matured).
+export function maturedOnOrBefore(maturity, settlementDate) {
+  const key = d => d.getFullYear() * 10000 + d.getMonth() * 100 + d.getDate();
+  return key(maturity) <= key(settlementDate);
+}
+
+function noteSkipped(skipped, cusip) {
+  if (skipped && !skipped.includes(cusip)) skipped.push(cusip);
+}
+
 // Holdings Export: header `cusip,qty,excess`; qty = funded quantity, excess = excess quantity.
-export function parseHoldingsExport(text) {
+export function parseHoldingsExport(text, tipsMarketData, skipped, maturedMaturity) {
   const rawLines = nonEmptyLines(text);
   const arr = [];
   for (let i = 1; i < rawLines.length; i++) {
@@ -36,6 +47,7 @@ export function parseHoldingsExport(text) {
     if (parts.length < 2) continue;
     const [cusip, qtyStr] = parts;
     if (!CUSIP_RE.test(cusip)) continue;
+    if (!tipsMarketData.get(cusip) && !maturedMaturity?.(cusip)) { noteSkipped(skipped, cusip); continue; }
     const fundedQty = parseInt(qtyStr, 10);
     if (isNaN(fundedQty) || fundedQty < 0) continue;
     const excessQty = parts.length >= 3 ? (parseInt(parts[2], 10) || 0) : 0;
@@ -46,7 +58,7 @@ export function parseHoldingsExport(text) {
 
 // tipsladder.com Format: no header; a CUSIP appears once per year it covers. A row whose year is
 // the CUSIP's maturity year states funded quantity; any other year states excess quantity.
-export function parseTipsladderComFormat(text, tipsMarketData) {
+export function parseTipsladderComFormat(text, tipsMarketData, skipped, maturedMaturity) {
   const rawLines = nonEmptyLines(text);
   const cusipMap = new Map(); // cusip -> { fundedQty, excessQty }
   for (const line of rawLines) {
@@ -55,13 +67,14 @@ export function parseTipsladderComFormat(text, tipsMarketData) {
     const [cusip, qtyStr, yearStr] = parts;
     if (!CUSIP_RE.test(cusip)) continue;
     const bond = tipsMarketData.get(cusip);
-    if (!bond?.maturity) continue;
+    const maturity = bond?.maturity ?? maturedMaturity?.(cusip);
+    if (!maturity) { noteSkipped(skipped, cusip); continue; }
     const qty = parseInt(qtyStr, 10);
     const year = parseInt(yearStr, 10);
     if (isNaN(qty) || qty < 0 || isNaN(year)) continue;
     if (!cusipMap.has(cusip)) cusipMap.set(cusip, { fundedQty: 0, excessQty: 0 });
     const entry = cusipMap.get(cusip);
-    if (year === bond.maturity.getFullYear()) entry.fundedQty += qty;
+    if (year === maturity.getFullYear()) entry.fundedQty += qty;
     else entry.excessQty += qty;
   }
   const arr = [];
@@ -73,7 +86,7 @@ export function parseTipsladderComFormat(text, tipsMarketData) {
 }
 
 // Plain CUSIP/Quantity Format: `cusip,qty` rows, optional header row.
-export function parsePlainFormat(text) {
+export function parsePlainFormat(text, tipsMarketData, skipped, maturedMaturity) {
   const rawLines = nonEmptyLines(text);
   const arr = [];
   for (let i = firstDataRowIndex(rawLines); i < rawLines.length; i++) {
@@ -81,21 +94,26 @@ export function parsePlainFormat(text) {
     if (parts.length < 2) continue;
     const [cusip, qtyStr] = parts;
     if (!CUSIP_RE.test(cusip)) continue;
+    if (!tipsMarketData.get(cusip) && !maturedMaturity?.(cusip)) { noteSkipped(skipped, cusip); continue; }
     const qty = parseInt(qtyStr, 10);
     if (!isNaN(qty) && qty >= 0) arr.push({ cusip, qty });
   }
   return arr;
 }
 
-// Classify once, parse once. Returns { format, holdings }: for 'broker', holdings is
-// parseBrokerCSV's { accountName: [{ cusip, qty }] }; for the other formats, an array of
-// { cusip, qty, excessQty? }.
-export function parseHoldingsFile(text, tipsMarketData) {
+// Classify once, parse once. Returns { format, holdings, skipped }: for 'broker', holdings is
+// parseBrokerCSV's { accountName: [{ cusip, qty }] } and skipped is undefined; for the other formats,
+// holdings is an array of { cusip, qty, excessQty? } and skipped lists each CUSIP dropped for being
+// absent from TIPS Market Data.
+// maturedMaturity(cusip), optional, returns the maturity Date of a CUSIP whose rung has matured (kept for
+// Available Cash although TIPS Market Data no longer quotes it), else a falsy value.
+export function parseHoldingsFile(text, tipsMarketData, maturedMaturity) {
   const format = detectHoldingsFormat(text);
+  const skipped = [];
   switch (format) {
-    case 'holdings-export': return { format, holdings: parseHoldingsExport(text) };
+    case 'holdings-export': return { format, holdings: parseHoldingsExport(text, tipsMarketData, skipped, maturedMaturity), skipped };
     case 'broker':          return { format, holdings: parseBrokerCSV(text, tipsMarketData).holdings };
-    case 'tipsladder':      return { format, holdings: parseTipsladderComFormat(text, tipsMarketData) };
-    default:                return { format, holdings: parsePlainFormat(text) };
+    case 'tipsladder':      return { format, holdings: parseTipsladderComFormat(text, tipsMarketData, skipped, maturedMaturity), skipped };
+    default:                return { format, holdings: parsePlainFormat(text, tipsMarketData, skipped, maturedMaturity), skipped };
   }
 }

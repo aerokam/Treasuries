@@ -2772,3 +2772,13 @@ for (const { kind, dara, pli } of [{ kind: 'gap', dara: '80000', pli: true }, { 
     }
   });
 }
+
+// ── Holdings import: a CUSIP absent from TIPS Market Data is skipped and named in #status (4.2.1) ──
+test('plain file with one unknown CUSIP shows the skipped CUSIP message in #status', async ({ page }) => {
+  const known = readFileSync(HOLDINGS_PATH, 'utf8').split(/\r?\n/)[1].split(',')[0];
+  const csv = `cusip,qty\n${known},5\nZZZZZZZZ9,7\n`;
+  await page.locator('#holdings-file').setInputFiles({ name: 'unknown-cusip.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) });
+  // The DARA / Available Cash notices a plain file also raises stay; the skipped message is its own last row.
+  await expect(page.locator('#status > div').last()).toHaveText('1 CUSIP(s) not in TIPS Market Data skipped: ZZZZZZZZ9', { timeout: 4_000 });
+  await expect(page.locator('#status')).not.toHaveClass(/error/);
+});
