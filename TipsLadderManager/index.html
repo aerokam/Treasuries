@@ -321,6 +321,7 @@
     <p>Build a TIPS ladder from scratch, with no existing holdings: it calculates which TIPS to buy so that each funded year produces its <b><a href="../knowledge/viewer.html#/md/knowledge/DATA_DICTIONARY.md#ara" target="_blank" style="color:#2563eb;text-decoration:none;">ARA</a></b> (Annual Real Amount — the actual cash flow the ladder produces for that year, which may differ from DARA due to rounding), targeting the <b><a href="../knowledge/viewer.html#/md/knowledge/DATA_DICTIONARY.md#dara" target="_blank" style="color:#2563eb;text-decoration:none;">DARA</a></b> (Desired Annual Real Amount) you specify for it. It also calculates which excess TIPS the ladder needs to hold to duration-match the gap years (2037–2039, where no TIPS have been issued yet) or, for a ladder extending past the last issued 30-year TIPS, the Future 30Y rungs. See <a href="../knowledge/viewer.html#/md/TipsLadderManager/knowledge/2.0_TIPS_Ladders.md#duration-matching-brackets" target="_blank" style="color:#2563eb;text-decoration:none;">Duration Matching</a> for more details.</p>
 
     <p><b>1. Choose First Year and Last Year.</b> First Year defaults to the <a href="../knowledge/viewer.html#/md/knowledge/DATA_DICTIONARY.md#5.1-issuance-dependent-values" target="_blank" style="color:#2563eb;text-decoration:none;">Default First Year</a>.</p>
+    <p style="margin-top:0">A TIPS that matures within <a href="../knowledge/viewer.html#/md/knowledge/DATA_DICTIONARY.md#5.1-issuance-dependent-values" target="_blank" style="color:#2563eb;text-decoration:none;">FIRST_YEAR_BUFFER_MONTHS</a> months of the Settlement Date is not offered in Build: it is not in the First Year list and is not chosen for a funded year, whatever the Maturity preference. A TIPS that short gives little protection against unexpected inflation. Rebalance still shows the TIPS your holdings file holds.</p>
 
     <p><b>2. Set DARA (Desired Annual Real Amount).</b></p>
     <ul style="margin:0 0 10px 20px;padding:0">
@@ -1556,8 +1557,11 @@ document.addEventListener('mouseup', () => {
 // selectLadderBonds uses internally, just re-derived here for the modal's checkbox lists.
 function _pickerCandidates(year) {
   const cands = [];
+  // Build offers no TIPS within the First Year buffer (DD §5.1); Rebalance offers every outstanding TIPS.
+  const beyondBuffer = currentMode === 'rebalance' ? null : new Set(tipsBeyondFirstYearBuffer(tipsMarketData, settlementDate));
   for (const bond of tipsMarketData.values()) {
     if (!bond.maturity || bond.maturity <= settlementDate) continue;
+    if (beyondBuffer && !beyondBuffer.has(bond)) continue;
     if (bond.maturity.getFullYear() !== year) continue;
     cands.push(bond);
   }
