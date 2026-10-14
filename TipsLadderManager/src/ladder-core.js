@@ -34,6 +34,27 @@ export function defaultFirstYear(tipsMarketData, settlementDate, excludeMaturing
   return years.length ? Math.min(...years) : null;
 }
 
+// The upper bracket year: the maturity year of the 30-year TIPS above the gap years (DD §5.1 Upper bracket year).
+export const UPPER_BRACKET_YEAR = 2040;
+
+// The gap years (DD Gap Years): the maturity years below the upper bracket year that lie above every issued
+// maturity year, where no 10-year TIPS has yet been issued. Single source; every consumer imports it. A year
+// below the longest-dated issued maturity year with no TIPS is not a gap year, and neither is a year before
+// the first year that has a TIPS (the short end): such a year has no rung and nothing covers it.
+export function getGapYears(tipsMarketData) {
+  if (!tipsMarketData) return [];
+  let longest = null;
+  for (const b of tipsMarketData.values()) {
+    if (!b.maturity) continue;
+    const y = b.maturity.getFullYear();
+    if (y < UPPER_BRACKET_YEAR && (longest == null || y > longest)) longest = y;
+  }
+  const gapYears = [];
+  if (longest == null) return gapYears;
+  for (let y = longest + 1; y < UPPER_BRACKET_YEAR; y++) gapYears.push(y);
+  return gapYears;
+}
+
 // ─── Gap parameters adapter ─────────────────────────────────────────────────────
 // Build's "LMI above the gap" = prelim funded-year coupon (effective prelim: zeroed years = 0).
 // Sizing lives in the shared gapParamsCore; the Excess TIPS pays no interest in a gap year (2.0 §Gap Year Simulated Outstanding TIPS).
@@ -553,12 +574,14 @@ export function selectLadderBonds({ tipsMarketData, firstYear, lastYear, settlem
     if (bond.maturity) maxTipsYear = Math.max(maxTipsYear, bond.maturity.getFullYear());
   }
 
-  // Gap years: within actual TIPS range but no TIPS issued. Future 30Y: beyond maxTipsYear.
+  // Gap years: getGapYears (DD Gap Years) within the ladder's range. Future 30Y: beyond maxTipsYear. Any other
+  // year with no TIPS is not a rung and is neither: the ladder starts at the first year that has a TIPS.
+  const structuralGapYears = new Set(getGapYears(tipsMarketData));
   const gapYears = [], future30yYears = [];
   for (let y = firstYear; y <= lastYear; y++) {
     if (!yearBondMap[y]) {
       if (y > maxTipsYear) future30yYears.push(y);
-      else gapYears.push(y);
+      else if (structuralGapYears.has(y)) gapYears.push(y);
     }
   }
 

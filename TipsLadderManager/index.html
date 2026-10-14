@@ -956,10 +956,8 @@ async function loadData() {
 
     // The ladder's years start at the first year with a TIPS maturing after the excluded months (DD §5.1 Default First Year).
     const bfsYears = [...new Set(tipsMaturingAfterExclusion(tipsMarketData, settlementDate).map(b => b.maturity.getFullYear()))].sort((a, b) => a - b);
-    const _bfsYearSet = new Set(bfsYears);
     const _bfsMinY = bfsYears[0], _bfsMaxY = bfsYears[bfsYears.length - 1];
-    const _bfsGapYears = new Set();
-    for (let y = _bfsMinY; y <= _bfsMaxY; y++) if (!_bfsYearSet.has(y)) _bfsGapYears.add(y);
+    const _bfsGapYears = new Set(getGapYears(tipsMarketData));
 
     const lastYearSel = document.getElementById('last-year');
     while (lastYearSel.options.length > 1) lastYearSel.remove(1);
@@ -2676,9 +2674,8 @@ function updateRebalFirstYearDropdown() {
   const _tipsYears = [...new Set([...tipsMarketData.values()].filter(b => b.maturity).map(b => b.maturity.getFullYear()))].sort((a, b) => a - b);
   const _minTipsY  = _tipsYears[0] ?? _firstY;
   const _maxTipsY  = _tipsYears[_tipsYears.length - 1] ?? _derivedLY;
-  // Gap years: years in [_minTipsY, _maxTipsY] with no TIPS issued
-  const _rebalGapYears = new Set();
-  for (let y = _minTipsY; y <= _maxTipsY; y++) { if (!_tipsYears.includes(y)) _rebalGapYears.add(y); }
+  // Gap years (DD Gap Years): the single definition, getGapYears
+  const _rebalGapYears = new Set(getGapYears(tipsMarketData));
 
   const _curVal = sel.value ? parseInt(sel.value, 10) : NaN;
   let _defaultFirstYear = _firstY;
@@ -2720,11 +2717,7 @@ function updateRebalLastYearDropdown() {
   const _tipsYears = new Set([...tipsMarketData.values()].filter(b => b.maturity).map(b => b.maturity.getFullYear()));
   const _maxTipsY  = Math.max(..._tipsYears);
   const _hYearSet  = new Set(currentHoldingsArray.map(h => tipsMarketData.get(h.cusip)?.maturity?.getFullYear()));
-  const _gapYears  = [];
-  for (let y = _firstY; y <= _derivedLY; y++) {
-    if (!_tipsYears.has(y) && !_hYearSet.has(y)) _gapYears.push(y);
-  }
-  const _gapSet = new Set(_gapYears);
+  const _gapSet = new Set(getGapYears(tipsMarketData).filter(y => !_hYearSet.has(y)));
 
   // Default last year is the latest maturity year held, extended if the file carries EXCESS at the
   // Future 30Y cover pair (symmetric to first-year inference from gap-bracket excess) so
@@ -3662,6 +3655,8 @@ function renderDaraByYearPanel() {
     }
   }
 
+  const gapYearSet = new Set(getGapYears(tipsMarketData));   // DD Gap Years
+
   // Select maturities' pick set overrides the field-derived range here too, once picks exist (2.0
   // §Picking Maturities for a Funded Year) — this is what keeps the per-year DARA panel in sync with a
   // ladder that Select maturities actually shrank/grew, instead of showing stale years the fields
@@ -3690,7 +3685,7 @@ function renderDaraByYearPanel() {
     }
     if (!isFinite(fy) || !ly) return;
     for (let y = fy; y <= ly; y++) {
-      const suffix = (!tipsYearSet.has(y) && y <= maxTipsYear) ? '(gap)' : '';
+      const suffix = gapYearSet.has(y) ? '(gap)' : '';
       yearEntries.push({ year: y, suffix });
     }
   } else {
@@ -3698,7 +3693,7 @@ function renderDaraByYearPanel() {
     const ly = picked ? picked.lastYear : parseInt(document.getElementById('last-year').value);
     if (!ly) return;
     for (let y = fy; y <= ly; y++) {
-      const suffix = !tipsYearSet.has(y) ? (y <= maxTipsYear ? '(gap)' : '(30Y)') : '';
+      const suffix = gapYearSet.has(y) ? '(gap)' : (!tipsYearSet.has(y) && y > maxTipsYear) ? '(30Y)' : '';
       yearEntries.push({ year: y, suffix });
     }
   }

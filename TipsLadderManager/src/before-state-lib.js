@@ -17,10 +17,10 @@
 import { bondCalcs } from '../../shared/src/bond-math.js';
 import { fmtDate } from './date-util.js';
 import { computePortfolioARAByYear, getGapYears, LOWEST_LOWER_BRACKET_YEAR } from './rebalance-lib.js';
-import { selectFuture30yCovers } from './ladder-core.js';
+import { selectFuture30yCovers, UPPER_BRACKET_YEAR } from './ladder-core.js';
 import { findSpikes, evenSpread, MIN_SHAPE_POINTS } from './shape-math.js';
 
-export const UPPER_BRACKET_YEAR = 2040;
+export { UPPER_BRACKET_YEAR };
 
 // The maturity years of the Future 30Y cover pair, chosen by rule from market data (2.0 §Future 30Y
 // Cover Pair; DD §5.1). A market-data lookup, not the duration-match engine.
