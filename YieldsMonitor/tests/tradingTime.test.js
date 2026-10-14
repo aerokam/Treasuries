@@ -49,3 +49,22 @@ assert.equal(
   Math.round(toCalendarScaledTime(ms('2026-10-12T12:00:00Z')) - toCalendarScaledTime(ms('2026-10-09T12:00:00Z'))),
   DAY,
 );
+
+// tick spacing: the smallest round step that leaves at most maxTicks ticks
+import { niceTickStep, alignedTicks } from '../src/trading-time.js';
+const MINUTE = 60000, HOUR = 3600000;
+assert.equal(niceTickStep(3 * HOUR, 6), 30 * MINUTE);   // 3 hours visible: half-hours, not hours
+assert.equal(niceTickStep(2 * HOUR, 10), 15 * MINUTE);
+assert.equal(niceTickStep(20 * MINUTE, 8), 5 * MINUTE);
+assert.equal(niceTickStep(9 * HOUR, 10), HOUR);
+assert.equal(niceTickStep(10 * DAY, 8), 2 * DAY);
+assert.equal(niceTickStep(5000 * DAY, 8), null);         // beyond the steps: a calendar unit is used
+// ticks fall on round ET wall-clock times (EDT, UTC-4 on this date)
+assert.deepEqual(
+  alignedTicks(ms('2026-10-13T14:07:00Z'), ms('2026-10-13T15:03:00Z'), 15 * MINUTE).map(t => new Date(t).toISOString().slice(11, 16)),
+  ['14:15', '14:30', '14:45', '15:00'],
+);
+assert.deepEqual(
+  alignedTicks(ms('2026-10-13T14:07:00Z'), ms('2026-10-13T20:00:00Z'), 3 * HOUR).map(t => new Date(t).toISOString().slice(11, 16)),
+  ['16:00', '19:00'], // 12:00 and 15:00 ET
+);
