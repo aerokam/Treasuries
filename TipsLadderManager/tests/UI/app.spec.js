@@ -149,7 +149,7 @@ test('data loads: info strip shows Trade/Settle, no Ref CPI control in either mo
   await expect(page.locator('#run-btn')).not.toBeDisabled();
 
   // Both modes price at the settlement date, so neither offers a Ref CPI date to change
-  // (3.0 §RefCPI Date Override). A ladder stated at an older date arrives as a file that records
+  // (3.0 §Ref CPI Date). A ladder stated at an older date arrives as a file that records
   // one, not as a control the user sets.
   for (const mode of ['rebalance', 'build']) {
     if (mode === 'build') await page.locator('.tab-btn[data-mode="build"]').click();
