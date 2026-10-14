@@ -78,6 +78,40 @@ export function isWeekendMoment(ms) {
   return mod(etDayNum(ms) + 3, 7) > 4;
 }
 
+// Tick step for a visible span: the smallest step from a short list of round intervals that leaves
+// at most maxTicks ticks, so the count stays near maxTicks at every zoom rather than jumping
+// between units. Returns null when the span is long enough that the calendar unit
+// (month, year) is used instead.
+const MIN_MS = 60000, HOUR_MS = 3600000;
+export const TICK_STEPS_MS = [1, 2, 5, 10, 15, 30].map(m => m * MIN_MS)
+  .concat([1, 2, 3, 6, 12].map(h => h * HOUR_MS))
+  .concat([1, 2, 5, 10, 15, 30].map(d => d * DAY_MS));
+export function niceTickStep(spanMs, maxTicks) {
+  for (const step of TICK_STEPS_MS) if (spanMs / step <= maxTicks) return step;
+  return null;
+}
+
+// ET wall-clock offset from UTC at a moment, in ms (negative).
+function etOffsetMs(ms) {
+  const p = ET_FMT.formatToParts(new Date(ms)).reduce((a, pt) => ({ ...a, [pt.type]: +pt.value }), {});
+  return Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second) - Math.floor(ms / 1000) * 1000;
+}
+
+// Moments in [min, max] at multiples of stepMs of ET wall-clock time (a step of a day or more falls
+// on midnight ET).
+export function alignedTicks(min, max, stepMs) {
+  const out = [];
+  const off0 = etOffsetMs(min);
+  for (let wall = Math.ceil((min + off0) / stepMs) * stepMs; ; wall += stepMs) {
+    let t = wall - off0;
+    t = wall - etOffsetMs(t);
+    if (t > max) break;
+    if (t >= min) out.push(t);
+    if (out.length > 500) break;
+  }
+  return out;
+}
+
 // Chart.js scale: a time scale whose axis positions run through toTradingTime when its
 // `compact` option is on, and that behaves as a plain time scale when it is off.
 export function createTradingTimeScale(Chart) {
@@ -101,13 +135,28 @@ export function createTradingTimeScale(Chart) {
       return fromTradingTime(s.a + pos * (s.b - s.a));
     }
     buildTicks() {
-      const ticks = super.buildTicks();
-      if (!this.options.compact) return ticks;
-      // A weekend has no width on this axis: its day ticks would sit on the preceding Friday's
-      // close, one on top of the other.
-      if (this.options.time.unit === 'day') return ticks.filter(t => !isWeekendMoment(t.value));
-      if (this.options.time.unit !== 'hour' && this.options.time.unit !== 'minute') return ticks;
-      return ticks.filter(t => inTradingSession(t.value));
+      // The parent's pass also sets the scale's offsets, so it always runs; its ticks are used
+      // where the stepping below does not apply (month and year units).
+      const base = super.buildTicks();
+      const { min, max } = this;
+      const compact = this.options.compact;
+      const unitTicks = () => {
+        if (!compact) return base;
+        if (this.options.time.unit === 'day') return base.filter(t => !isWeekendMoment(t.value));
+        if (this.options.time.unit !== 'hour' && this.options.time.unit !== 'minute') return base;
+        return base.filter(t => inTradingSession(t.value));
+      };
+      if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) return unitTicks();
+      const maxTicks = Math.min(10, Math.max(5, Math.floor((this.width || 450) / 70)));
+      // Compact: a visible span of 3 sessions or more is read in days, one per session; a shorter
+      // one is read in the drawn hours, in steps of the round intervals.
+      const days = compact ? toCalendarScaledTime(max) - toCalendarScaledTime(min) : max - min;
+      const span = compact && days < 3 * DAY_MS ? toTradingTime(max) - toTradingTime(min) : days;
+      const step = niceTickStep(span, maxTicks);
+      if (step === null || step > 30 * DAY_MS || days >= 90 * DAY_MS) return unitTicks();
+      let values = alignedTicks(min, max, step);
+      if (compact) values = step >= DAY_MS ? values.filter(v => !isWeekendMoment(v)) : values.filter(inTradingSession);
+      return values.map(value => ({ value }));
     }
   };
 }
