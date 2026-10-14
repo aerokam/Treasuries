@@ -37,7 +37,7 @@ These jobs run on the host machine via Windows Task Scheduler.
 | **FedInvest Download** | Weekdays 1:05pm ET, retries every 10 min up to 2h if not yet posted | `scripts/getYieldsFedInvest.js` (via `YieldCurves/scripts/run-fedinvest.cmd`) | `YieldsFromFedInvestPrices.csv` |
 | **Fidelity Quotes** | 3× Daily | *(Windows Task)* → `fidelityDownload.js` → `uploadFidelityDownload.js`, which chains `updateSaSaoYields.js` on a successful upload | `FidelityTreasuriesTips.csv` ([S7](./DataStores.md#s7), combined Treasury + TIPS), then `TIPS/YieldsSaSao.csv` ([S10](./DataStores.md#s10)) |
 | **TreasuryAuctions** | Weekdays 8:35/10:05am PT | `scripts/getAuctions.js` | `Auctions.csv` |
-| **TIPS Ref Refresh** | Mondays 7am PT | `scripts/fetchTipsRef.js` | `TipsRef.csv` |
+| **TIPS Ref Refresh** | Weekdays 8:35am and 10:05am PT | `scripts/fetchTipsRef.js` | `TipsRef.csv` |
 | **Update Yields History** | Weekdays 2:00pm PT | `YieldsMonitor/scripts/updateYieldsHistory.js` | `yields-history/history.json` ([S6](./DataStores.md#s6)) |
 | **Archive Intraday Yields** | Weekdays 2:05pm PT | `YieldsMonitor/scripts/archiveIntraday.js` | `yields-history/intraday-raw/{symbol}/{date}.json` ([S18](./DataStores.md#s18)) |
 | **Close Probe** | Weekdays 2:05pm PT, +15min ×1h | `YieldsMonitor/scripts/probeClose.js` | `yields-history/close-probe/{symbol}.csv` — diagnostic only, not read by the app; see [Close Price Investigation](../YieldsMonitor/knowledge/Close_Price_Investigation.md) |
