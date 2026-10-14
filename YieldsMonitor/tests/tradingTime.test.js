@@ -36,3 +36,16 @@ assert.equal(isWeekendMoment(ms('2026-10-10T16:00:00Z')), true);  // Saturday no
 assert.equal(isWeekendMoment(ms('2026-10-11T03:59:00Z')), true);  // Saturday 23:59 ET
 assert.equal(isWeekendMoment(ms('2026-10-09T16:00:00Z')), false); // Friday
 assert.equal(isWeekendMoment(ms('2026-10-12T04:00:00Z')), false); // Monday 00:00 ET
+
+// one session with its separator counts as one calendar day when a unit is chosen from drawn width
+import { toCalendarScaledTime } from '../src/trading-time.js';
+const DAY = 86400000;
+assert.equal(
+  Math.round(toCalendarScaledTime(ms('2026-10-09T12:00:00Z')) - toCalendarScaledTime(ms('2026-10-08T12:00:00Z'))),
+  DAY,
+);
+// Friday open to Monday open is one session apart, not three days
+assert.equal(
+  Math.round(toCalendarScaledTime(ms('2026-10-12T12:00:00Z')) - toCalendarScaledTime(ms('2026-10-09T12:00:00Z'))),
+  DAY,
+);

@@ -52,6 +52,12 @@ export function toTradingTime(ms) {
   return (weekNum * 5 + dow) * PERIOD_MS + Math.min(Math.max(ms - open, 0), SESSION_MS);
 }
 
+// Compact-axis position scaled so one session (with its separator) spans one calendar day, for
+// choosing a tick unit by the same thresholds as a plain time axis: n visible sessions read as n days.
+export function toCalendarScaledTime(ms) {
+  return toTradingTime(ms) * (DAY_MS / PERIOD_MS);
+}
+
 // Real timestamp at a compact-axis position; a position in the gap between sessions is the close.
 export function fromTradingTime(t) {
   const w = Math.floor(t / PERIOD_MS), r = Math.min(Math.max(t - w * PERIOD_MS, 0), SESSION_MS);
@@ -100,7 +106,7 @@ export function createTradingTimeScale(Chart) {
       // A weekend has no width on this axis: its day ticks would sit on the preceding Friday's
       // close, one on top of the other.
       if (this.options.time.unit === 'day') return ticks.filter(t => !isWeekendMoment(t.value));
-      if (this.options.time.unit !== 'hour') return ticks;
+      if (this.options.time.unit !== 'hour' && this.options.time.unit !== 'minute') return ticks;
       return ticks.filter(t => inTradingSession(t.value));
     }
   };

@@ -21,9 +21,12 @@ export function getXTimeUnit(spanMs) {
 // Updates chart's x-axis time.unit based on the current visible span.
 // Does NOT call chart.update() — caller is responsible.
 // Safe to call on every zoom/pan complete; no-ops if unit is unchanged.
-export function applyXTimeUnit(chart) {
+// `toPos` maps a timestamp to its drawn position for an axis whose drawn width is not its timestamp
+// width (a compact trading-hours axis), so the unit follows what is drawn.
+export function applyXTimeUnit(chart, toPos = null) {
   const x = chart.scales.x;
-  const spanMs = (chart.options.scales.x.max ?? x.max) - (chart.options.scales.x.min ?? x.min);
+  const max = chart.options.scales.x.max ?? x.max, min = chart.options.scales.x.min ?? x.min;
+  const spanMs = toPos ? toPos(max) - toPos(min) : max - min;
   const unit = getXTimeUnit(spanMs);
   chart.options.scales.x.time.unit = unit;
 }
