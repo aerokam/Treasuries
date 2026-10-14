@@ -22,11 +22,9 @@ export function parseCSVLine(str) {
 
 export function parseBrokerCSV(csvText, tipsMarketData) {
   const lines = csvText.split(/\r?\n/).filter(l => l.trim().length > 0);
-  let map = { accountNum: -1, accountName: -1, symbol: -1, quantity: -1, currentValue: -1, investmentName: -1 };
+  let map = { accountNum: -1, accountName: -1, symbol: -1, quantity: -1, investmentName: -1 };
   let currentSchwabAccount = null;
   const accounts = {}; // Key: AccountName -> Map<cusip, qty>
-  const tipsValues = {}; // Key: AccountName -> sum of current value for TIPS only
-  const totalAccountValues = {}; // Key: AccountName -> total current value (all positions)
 
   // Vanguard reverse lookup: "{couponPct}|{year}-{month}" → cusip
   // tipsMarketData stores coupon as fraction (0.02125); Vanguard names use percentage (2.125)
@@ -70,7 +68,6 @@ export function parseBrokerCSV(csvText, tipsMarketData) {
       map.symbol = sIdx;
       map.accountNum = lowerCols.findIndex(c => c.includes('account number') || c === 'account');
       map.accountName = lowerCols.findIndex(c => c.includes('account name'));
-      map.currentValue = lowerCols.findIndex(c => c.includes('current value') || c.includes('market value') || c.includes('total value'));
       map.investmentName = lowerCols.findIndex(c => c === 'investment name');
       continue;
     }
@@ -81,7 +78,7 @@ export function parseBrokerCSV(csvText, tipsMarketData) {
     const rawSym = cols[map.symbol];
     if (!rawSym || rawSym.includes('Total')) continue;
 
-    // Determine account key first (needed for both TIPS and all positions)
+    // Determine account key
     let acctKey = 'Unknown Account';
     if (currentSchwabAccount) {
       acctKey = currentSchwabAccount;
@@ -90,15 +87,6 @@ export function parseBrokerCSV(csvText, tipsMarketData) {
       if (map.accountName > -1 && cols[map.accountName]) {
         const name = cols[map.accountName];
         if (name && name !== 'nan') acctKey = name;
-      }
-    }
-
-    // Track total account value for ALL positions
-    if (map.currentValue > -1 && cols[map.currentValue]) {
-      const valueStr = cols[map.currentValue].replace(/[^0-9.-]/g, '');
-      const value = parseFloat(valueStr);
-      if (!isNaN(value) && value > 0) {
-        totalAccountValues[acctKey] = (totalAccountValues[acctKey] || 0) + value;
       }
     }
 
@@ -126,14 +114,6 @@ export function parseBrokerCSV(csvText, tipsMarketData) {
 
       if (!accounts[acctKey]) accounts[acctKey] = new Map();
       accounts[acctKey].set(resolvedCusip, (accounts[acctKey].get(resolvedCusip) || 0) + qty);
-
-      if (map.currentValue > -1 && cols[map.currentValue]) {
-        const valueStr = cols[map.currentValue].replace(/[^0-9.-]/g, '');
-        const value = parseFloat(valueStr);
-        if (!isNaN(value) && value > 0) {
-          tipsValues[acctKey] = (tipsValues[acctKey] || 0) + value;
-        }
-      }
     }
   }
 
@@ -141,5 +121,5 @@ export function parseBrokerCSV(csvText, tipsMarketData) {
   for (const [acct, posMap] of Object.entries(accounts)) {
     result[acct] = Array.from(posMap, ([cusip, qty]) => ({ cusip, qty }));
   }
-  return { holdings: result, tipsValues, totalAccountValues };
+  return { holdings: result };
 }

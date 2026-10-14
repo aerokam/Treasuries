@@ -802,7 +802,7 @@ const parseMkt = buildTipsMarketData([
     'X22222222,Owner2 IRA,PARSEAAA1,TIPS 0.125% 01/15/2031,3000,$100.00,$300000,Cash',
     'X22222222,Owner2 IRA,VTI,VANGUARD TOTAL STOCK,50,$200.00,$10000,Cash',
   ].join('\n');
-  const { holdings, tipsValues, totalAccountValues } = parseBrokerCSV(csv1, parseMkt);
+  const { holdings } = parseBrokerCSV(csv1, parseMkt);
   const accounts = holdings;
 
   assert('F1: Owner8 IRA has 2 TIPS', accounts['Owner8 IRA']?.length, 2);
@@ -834,7 +834,7 @@ const parseMkt = buildTipsMarketData([
     '"PARSEAAA1","TIPS 0.125% 01/15/2031","3,000","100.00","$300,000.00","Fixed Income"',
     '"Account Total","","","","$300,000.00",""',
   ].join('\n');
-  const { holdings, tipsValues, totalAccountValues } = parseBrokerCSV(csv2, parseMkt);
+  const { holdings } = parseBrokerCSV(csv2, parseMkt);
   const accounts = holdings;
 
   assert('F2: Owner8 IRA has 2 TIPS', accounts['Owner8 IRA']?.length, 2);
@@ -859,7 +859,7 @@ const parseMkt = buildTipsMarketData([
     '22222222,U S TREASURY NOTE INFLATION INDEX NOTE 1.875 01/15/98 01/15/68,null,3000,100.00,300000.00,',
     '22222222,VANGUARD TOTAL STOCK MARKET ETF,VTI,50,200.00,10000.00,',
   ].join('\n');
-  const { holdings, tipsValues, totalAccountValues } = parseBrokerCSV(csv3, parseMkt);
+  const { holdings } = parseBrokerCSV(csv3, parseMkt);
   const accounts = holdings;
 
   assert('F3: acct 11111111 has 2 TIPS', accounts['11111111']?.length, 2);
@@ -870,8 +870,6 @@ const parseMkt = buildTipsMarketData([
   assert('F3: VMFXX filtered out', accounts['11111111']?.find(h => h.cusip === 'VMFXX'), undefined);
   assert('F3: acct 22222222 CPU9 qty === 3', accounts['22222222']?.find(h => h.cusip === 'PARSEAAA1')?.qty, 3);
   assert('F3: VTI filtered out', accounts['22222222']?.find(h => h.cusip === 'VTI'), undefined);
-  assert('F3: tipsValues 11111111 ≈ 1300000', Math.abs((tipsValues['11111111'] || 0) - 1300000) < 1, true);
-  assert('F3: totalAccountValues 11111111 > tipsValues', totalAccountValues['11111111'] > tipsValues['11111111'], true);
   console.log(`        accounts: ${Object.keys(accounts).join(', ')}`);
 }
 
