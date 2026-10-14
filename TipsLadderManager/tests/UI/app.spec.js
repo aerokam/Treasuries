@@ -1014,7 +1014,7 @@ test('rebalance: net cash is non-negative and small (self-financing scale)', { t
   // is a reliable "this upload's handler has finished" signal.
   await expect(page.locator('#rebal-last-year')).not.toHaveValue('', { timeout: 3_000 });
 
-  // Default mirror shape — run without any manual override. The Run-time shape-preserving
+  // Default derived shape — run without any manual override. The Run-time shape-preserving
   // self-financing scale (3.0 §Funding the rebalance) must drive net cash to small, ≥ 0:
   // the funded rungs sell down proportionally to fund the duration-match bracket excess.
   await page.locator('#run-btn').click();
@@ -1032,7 +1032,7 @@ test('rebalance: net cash is non-negative and small (self-financing scale)', { t
 // Regression: a broker portfolio whose TIPS span 2027–2033 but hold NONE in 2029/2032
 // (intentional interior holes — 2032 is a nominal note, dropped). There are no gap years
 // (2037–39) or Future-30Y years in range, so the self-financing scale must NOT run: the
-// load mirror already nets to ≈0. The old bug fed a held-years-only map to the scale, which
+// derived Per-Year DARA already nets to ≈0. The old bug fed a held-years-only map to the scale, which
 // sized the empty interior years to the scalar DARA (phantom BUYs) and then sold every rung
 // ~30% to "fund" them — small net cash but huge trades. Assert the Qty Delta column is ~0.
 // (3.0 §Funding the rebalance — the scale is gated on gap/Future-30Y years existing.)
@@ -1059,8 +1059,8 @@ test('rebalance: gap-free portfolio with interior holes makes no large trades', 
     const val = parseFloat((cellText ?? '').replace(/[^0-9.-]/g, ''));
     if (!isNaN(val)) maxAbsDelta = Math.max(maxAbsDelta, Math.abs(val));
   }
-  // Honoring the by-year mirror is a no-op; allow ±3 bonds for integer rounding only.
-  expect(maxAbsDelta, `Largest |Qty Delta| was ${maxAbsDelta} bonds — the gap-free mirror must not trade`).toBeLessThanOrEqual(3);
+  // Honoring the derived by-year DARA is a no-op; allow ±3 bonds for integer rounding only.
+  expect(maxAbsDelta, `Largest |Qty Delta| was ${maxAbsDelta} bonds — the gap-free derived Per-Year DARA must not trade`).toBeLessThanOrEqual(3);
 
   const netCash = parseNetCash(await page.locator('#net-cash-val').textContent());
   expect(Math.abs(netCash), `Net cash ${netCash} should be ≈0 for a gap-free no-op`).toBeLessThanOrEqual(3000);
@@ -1630,13 +1630,13 @@ test('per-year DARA: standalone plan file exports and re-imports per-year values
   const planPath = test.info().outputPath('dara-plan.csv');
   await download.saveAs(planPath);
 
-  // Fresh re-upload wipes the edit back to the plain mirror. (Clear the input's value first —
+  // Fresh re-upload wipes the edit back to the plain derived Per-Year DARA. (Clear the input's value first —
   // same-file re-selection otherwise doesn't reliably re-fire 'change', mirroring the production
   // Browse-button handler's own workaround for this browser quirk.)
   await page.evaluate(() => { document.getElementById('holdings-file').value = ''; });
   await page.locator('#holdings-file').setInputFiles(HOLDINGS_PATH);
   await expect(page.locator('.fy-dara-input[data-year]').first()).toBeVisible({ timeout: 4_000 });
-  expect(await rung.inputValue(), 'fresh reload is the plain mirror again').not.toBe('33000');
+  expect(await rung.inputValue(), 'fresh reload is the plain derived Per-Year DARA again').not.toBe('33000');
 
   await chooseMenu(page, 'import-menu', 'dara-plan');
   await page.locator('#dara-plan-import-file').setInputFiles(planPath);
@@ -1994,13 +1994,13 @@ test('DARA plan with no Ref CPI date: used as written, then scaled once a date i
 // never set currentImportedDaraByYear, so an imported plan on a ladder with a gap/Future-30Y block to
 // fund (SampleHoldings has the structural 2037-39 gap) was silently discarded at Run and replaced
 // with a freshly self-financing-scaled map derived from the portfolio's own natural ARA shape --
-// Amt After tracked the untouched mirror, not the imported target, with no error or indication.
+// Amt After tracked the derived Per-Year DARA not edited, not the imported target, with no error or indication.
 test('per-year DARA: an imported plan is honored exactly at Run on a ladder with a gap block, not silently overwritten by the self-financing scale', { tag: '@SampleHoldings' }, async ({ page }) => {
   test.setTimeout(20_000);
   await page.locator('#holdings-file').setInputFiles(HOLDINGS_PATH);
   await expect(page.locator('.fy-dara-input[data-year]').first()).toBeVisible({ timeout: 4_000 });
 
-  // Re-export the as-loaded natural mirror as a #fundedYear,dara plan file, with ONE year spiked to
+  // Re-export the as-loaded natural derived Per-Year DARA as a #fundedYear,dara plan file, with ONE year spiked to
   // a value clearly different from its natural ARA.
   const rungs = await page.locator('.fy-dara-input[data-year]').evaluateAll(
     els => els.map(el => [el.dataset.year, el.value])
@@ -2022,7 +2022,7 @@ test('per-year DARA: an imported plan is honored exactly at Run on a ladder with
   const amtAfterCell = page.locator(`#simple-table tr.fy-group-header[data-fy="${spikeYear}"] td[data-col="amtAfter"]`);
   await expect(amtAfterCell).toBeVisible();
   const amtAfter = parseFloat((await amtAfterCell.textContent() ?? '').replace(/[^0-9.-]/g, ''));
-  expect(amtAfter, `Amt After (${amtAfter}) for the imported spike year must track the imported DARA (${spikedVal}), not fall back near the natural portfolio mirror (${naturalVal})`)
+  expect(amtAfter, `Amt After (${amtAfter}) for the imported spike year must track the imported DARA (${spikedVal}), not fall back near the natural derived Per-Year DARA (${naturalVal})`)
     .toBeGreaterThan((naturalVal + spikedVal) / 2);
 });
 

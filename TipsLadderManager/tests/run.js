@@ -2151,12 +2151,12 @@ for (const gapFirstYear of GAP_YEARS) {
   }
 }
 
-// ── Test: runFundedRebalance — gap-free pristine mirror is a no-op (no scale) ──────────────────
+// ── Test: runFundedRebalance — gap-free derived Per-Year DARA, not edited, is a no-op (no scale) ──────────────────
 // A portfolio with no gap years (2037-39) / Future-30Y block has nothing to duration-match, so the
-// self-financing scale must NOT run: the load mirror already nets to ≈0. Guards the 3.0 §Funding gate
+// self-financing scale must NOT run: the derived Per-Year DARA already nets to ≈0. Guards the 3.0 §Funding gate
 // (previously only e2e-covered). A ladder with two interior holes (intentional empties).
 {
-  console.log('\nrunFundedRebalance — gap-free pristine mirror makes no large trades');
+  console.log('\nrunFundedRebalance — gap-free derived Per-Year DARA, not edited, makes no large trades');
   // A built ladder over the years before the gap, then two years removed so the interior holes the
   // heading describes exist. Built from the outstanding TIPS, so no particular bond has to be held.
   const roles = ladderRoles(tipsMarketData, settlementDate);
@@ -2168,26 +2168,26 @@ for (const gapFirstYear of GAP_YEARS) {
     .filter(h => h.qty > 0);
   assert('gap-free: the built ladder is non-trivial (five or more years held)', new Set(rawHoldings.map(h => tipsMarketData.get(h.cusip).maturity.getFullYear())).size >= 5, true);
 
-  // Build the load mirror exactly as the UI does at file load (range form fills empty years w/ LMI).
+  // Build the derived Per-Year DARA exactly as the UI does at file load (range form fills empty years w/ LMI).
   const heldARA = computePortfolioARAByYear(rawHoldings, tipsMarketData, refCPI);
   const heldYears = Object.keys(heldARA).map(Number);
   const firstYear = Math.min(...heldYears), lastYear = Math.max(...heldYears);
   const fullARA = computePortfolioARAByYear(rawHoldings, tipsMarketData, refCPI, { firstYear, lastYear });
   const { median, daraMap } = derivePerYearDara(heldARA, getGapYearBracketCandidates(tipsMarketData));
   const gapSet = new Set(getGapYears(tipsMarketData));
-  const mirror = new Map();
+  const derived = new Map();
   for (let y = firstYear; y <= lastYear; y++) {
-    mirror.set(y, daraMap.has(y) ? daraMap.get(y) : (gapSet.has(y) ? median : Math.round(fullARA[y] ?? 0)));
+    derived.set(y, daraMap.has(y) ? daraMap.get(y) : (gapSet.has(y) ? median : Math.round(fullARA[y] ?? 0)));
   }
 
   const res = runFundedRebalance({
     dara: median, holdings: rawHoldings, tipsMarketData, refCPI, settlementDate,
-    daraByYear: mirror, daraPlanUnedited: true,
+    daraByYear: derived, daraPlanUnedited: true,
   });
   assert('gap-free: engine reports no gap years', res.summary.gapYears.length, 0);
   const maxAbsDelta = Math.max(0, ...res.details.map(d => Math.abs((d.qtyAfter ?? 0) - (d.qtyBefore ?? 0))));
-  assert('gap-free pristine mirror: max |qtyDelta| <= 3 bonds (scale skipped, no sell-down)', maxAbsDelta <= 3, true);
-  assert('gap-free pristine mirror: net cash ~0', Math.abs(res.summary.costDeltaSum) <= 3000, true);
+  assert('gap-free derived Per-Year DARA, not edited: max |qtyDelta| <= 3 bonds (scale skipped, no sell-down)', maxAbsDelta <= 3, true);
+  assert('gap-free derived Per-Year DARA, not edited: net cash ~0', Math.abs(res.summary.costDeltaSum) <= 3000, true);
 }
 
 // ── Test: runFundedRebalance — gap/Future-30Y block: scale actually applies ─────────────────────
@@ -2206,28 +2206,28 @@ for (const gapFirstYear of GAP_YEARS) {
   const fp = path.resolve('./data/SampleHoldings.csv');
   assert('SampleHoldings.csv is present', existsSync(fp), true);
   {
-    console.log('\nrunFundedRebalance — SampleHoldings pristine mirror: scale must apply and self-finance');
+    console.log('\nrunFundedRebalance — SampleHoldings derived Per-Year DARA, not edited: scale must apply and self-finance');
     const rawHoldings = parseHoldings(readFileSync(fp, 'utf8'));
 
-    // Build the load mirror exactly as the UI does at file load (range form fills empty years w/ LMI).
+    // Build the derived Per-Year DARA exactly as the UI does at file load (range form fills empty years w/ LMI).
     const heldARA = computePortfolioARAByYear(rawHoldings, tipsMarketData, refCPI);
     const heldYears = Object.keys(heldARA).map(Number);
     const firstYear = Math.min(...heldYears), lastYear = Math.max(...heldYears);
     const fullARA = computePortfolioARAByYear(rawHoldings, tipsMarketData, refCPI, { firstYear, lastYear });
     const { median, daraMap } = derivePerYearDara(heldARA, getGapYearBracketCandidates(tipsMarketData));
     const gapSet = new Set(getGapYears(tipsMarketData));
-    const mirror = new Map();
+    const derived = new Map();
     for (let y = firstYear; y <= lastYear; y++) {
-      mirror.set(y, daraMap.has(y) ? daraMap.get(y) : (gapSet.has(y) ? median : Math.round(fullARA[y] ?? 0)));
+      derived.set(y, daraMap.has(y) ? daraMap.get(y) : (gapSet.has(y) ? median : Math.round(fullARA[y] ?? 0)));
     }
 
     const res = runFundedRebalance({
       dara: median, holdings: rawHoldings, tipsMarketData, refCPI, settlementDate,
-      daraByYear: mirror, daraPlanUnedited: true,
+      daraByYear: derived, daraPlanUnedited: true,
     });
     const hasFundingBlock = res.summary.gapYears.length > 0 || res.summary.future30yYears.length > 0;
     assert('SampleHoldings: portfolio actually has a gap/Future-30Y block to fund (else this test proves nothing)', hasFundingBlock, true);
-    assert('SampleHoldings pristine mirror: net cash is small and non-negative (self-financing scale applied)',
+    assert('SampleHoldings derived Per-Year DARA, not edited: net cash is small and non-negative (self-financing scale applied)',
       res.summary.costDeltaSum >= -50 && res.summary.costDeltaSum <= 3000, true);
     console.log(`        net cash: ${Math.round(res.summary.costDeltaSum).toLocaleString()}`);
   }
