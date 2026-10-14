@@ -39,7 +39,7 @@ Nothing in `identifyBrackets` has been changed.
   — it has no remaining call site inside `detectBracketFlags` or `derivePerYearDara`.
 
   Extended past what this item originally scoped: `rebalance-lib.js#derivePerYearDara` (the
-  run-time self-financing recovery for a mirror plan, §Funding the rebalance — a separate median
+  run-time self-financing recovery for a derived Per-Year DARA, §Funding the rebalance — a separate median
   computation from `detectBracketFlags`'s, not touched by ruling 1/2 as written) now runs the same
   `findSpikes`/`inferShapeValue` mechanism, and a genuinely new low-data fallback was added
   throughout: below `MIN_SHAPE_POINTS` (5) held points there's no curve to fit at all, so detection
