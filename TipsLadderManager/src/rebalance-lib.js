@@ -392,7 +392,7 @@ export function inferDARAFromCash({ bracketMode = '2bracket', holdings: holdings
 // and the segment infer solves. Range form (`{ firstYear, lastYear }`): emit EVERY year in the
 // range, including empty ones (a year with no own TIPS gets `ARA = incoming LMI` alone). Holdings
 // maturing after `lastYear` are not emitted but still cascade their coupon into earlier years' LMI.
-// The range form is the file-load "mirror current holdings" population (3.0 §Per-Year DARA from
+// The range form is the file-load derived Per-Year DARA population (3.0 §Per-Year DARA from
 // Portfolio) — every rung shows its true current income so the first Rebalance Ladder is a no-op.
 export function computePortfolioARAByYear(holdingsArr, tipsMarketData, refCPI, range = null) {
   const byYear = {};
@@ -513,7 +513,7 @@ export function hasGapCoverageIntent(holdings, tipsMarketData, refCPI, lastYear)
 // non-bracket years keep full ARA. `gapYears` (structural gap years, 2037-2039) have no TIPS of
 // their own, so their raw ARA is just the bare LMI dripping down from later bonds — nowhere near a
 // real funding target. They take a value read off the same shape instead (3.0 §Per-Year DARA from
-// Portfolio step 2, same mechanism the on-screen mirror in index.html applies; shape-math.js,
+// Portfolio step 2, same mechanism the on-screen derived Per-Year DARA in index.html applies; shape-math.js,
 // RETAINED_BRACKET_TODO.md rulings 1-2). Without this, a caller feeding this map straight into
 // calculateGapParameters sizes the gap years' synthetic quantities off that tiny raw ARA instead
 // of the intended target, collapsing the whole gap block's total cost and, with it, both
@@ -528,7 +528,7 @@ export function hasGapCoverageIntent(holdings, tipsMarketData, refCPI, lastYear)
 // dividing by the held-point count instead of the span is the same "borrowing" bug this whole
 // feature replaces, one level removed. The bracket-candidate fallback keeps the original 1.5x
 // margin (a separate, deliberately conservative constant from the shape replacement itself,
-// unchanged here) so a low-data mirror isn't more eager to auto-cap a rung than it was before.
+// unchanged here) so a low-data derived Per-Year DARA isn't more eager to auto-cap a rung than it was before.
 export function derivePerYearDara(araByYear, bracketCandidates = new Set(), gapYears = new Set(), coverageIntent = true) {
   const entries = Object.entries(araByYear).map(([y, v]) => [parseInt(y, 10), v]);
   const positive = entries.filter(([, v]) => v > 0);
@@ -858,7 +858,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
   // empty rung. Its per-year target is honored as-is (so an explicitly raised DARA — e.g. from Infer
   // LMP — still fills it), but sizeLadder's "fund at least one bond" validation is WAIVED for it: an
   // empty year whose target rounds to 0 is a hole, not a too-low-DARA error. This is the knife-edge
-  // that the load mirror sits on (an empty year's stub DARA ≈ its own incoming LMI). Computed for
+  // that the derived Per-Year DARA sits on (an empty year's stub DARA ≈ its own incoming LMI). Computed for
   // every unheld year regardless of whether the ladder also has a gap/Future-30Y block elsewhere —
   // an unheld year is either a gap/future30y year itself (excluded from this preliminary sweep's
   // rangeYears already, since a structural gap has no candidate TIPS to build a rung from) or an
@@ -2390,7 +2390,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
 //   2. Self-financing exists ONLY to size a plan the tool itself inferred from current holdings (no
 //      stated DARA at all — a broker/legacy file). If the ladder has a gap-year / Future-30Y block to
 //      duration-match (learned from the engine's own `summary.gapYears` / `summary.future30yYears`)
-//      AND the plan is such an unedited, inferred mirror, re-run with a self-financing scale so the
+//      AND the plan is a derived Per-Year DARA not edited, re-run with a self-financing scale so the
 //      funded rungs sell down to fund the bracket excess. With no such block there is nothing to buy
 //      — the direct run already nets to ≈0 and is returned unchanged.
 //
@@ -2399,14 +2399,14 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
 // scaled, edited or not, pinned rows or not. It is the holder's target, run exactly as stated; a
 // negative net cash on the report is the tool's honest answer to "here is what reaching that target
 // costs beyond what the ladder returns on its own" — the holder funds the difference, the same as a
-// negative net cash reads today after a manual per-rung raise. (A hand-edited broker/legacy MIRROR —
+// negative net cash reads today after a manual per-rung raise. (A hand-edited derived Per-Year DARA from a broker/legacy file —
 // no stated block at all — keeps the old all-or-nothing behaviour: any edit switches the scale off
 // entirely, since there is no stated shape underneath it to fall back to.)
 //
 // REGRESSION HISTORY: this scale-application step was accidentally deleted in commit c0d233b
 // (2026-07-16, an unrelated Ref CPI/Index Ratio rounding refactor) — the flag kept being
 // computed and passed in from index.html, but this function silently stopped acting on it, so every
-// default-mirror Run with a gap/Future-30Y block produced large non-self-financing net cash (funded
+// Run of a derived Per-Year DARA with a gap/Future-30Y block produced large non-self-financing net cash (funded
 // years weren't sold down at all). It went undetected for 9 days because the only unit test covering
 // this function exercised the gap-free NO-OP path, never the actual scale-application path — see the
 // paired test below ("runFundedRebalance — gap year or Future 30Y funding: scale actually applies").
@@ -2416,7 +2416,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
 // silently overrode a holder's own explicit DARA increase (e.g. adding cash to the ladder by raising
 // every rung to a higher stated target) back down to whatever the current holdings alone support,
 // which is exactly the outcome a stated plan exists to prevent. Reverted: self-financing is scoped to
-// inferred mirrors only, per the ruling above.
+// derived Per-Year DARA only, per the ruling above.
 export function runFundedRebalance({
   dara, bracketMode = '2bracket', holdings, tipsMarketData, refCPI, settlementDate,
   daraByYear = null, daraPlanUnedited = false, daraPlanIsStated = false,
@@ -2436,7 +2436,7 @@ export function runFundedRebalance({
   const needsFunding = gapCoverageIntent || result.summary.future30yYears.length > 0;
   if (needsFunding && !daraPlanIsStated && daraPlanUnedited) {
     // Recover the shape from the portfolio's own ARA (range form: fills every empty in-range year at
-    // its incoming-LMI stub, matching the display panel's own mirror, instead of the held-years-only
+    // its incoming-LMI stub, matching the display panel's derived Per-Year DARA, instead of the held-years-only
     // form silently dropping them — without this, an unheld year had no entry in daraMap at all,
     // buildMap() below never wrote it into a trial's daraByYear, and runRebalance's own
     // `daraByYear?.get(year) ?? DARA` fallback sized it as a full rung at the scalar DARA -- a
@@ -2454,7 +2454,7 @@ export function runFundedRebalance({
       });
       result = runRebalance({ ...base, dara: scaledMedian, daraByYear: scaledMap });
     } catch {
-      // No self-financing level exists for this mirror. Keep the direct-run result; its net cash
+      // No self-financing level exists for this derived Per-Year DARA. Keep the direct-run result; its net cash
       // carries the shortfall (3.0 §Funding).
     }
   }

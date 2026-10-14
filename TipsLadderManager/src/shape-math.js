@@ -8,7 +8,7 @@
 //
 // Wired into src/before-state-lib.js (detection + the filled-in DARA for a flagged year) and
 // src/rebalance-lib.js's derivePerYearDara (gap-year and bracket-candidate DARA in the run-time
-// mirror recovery). A structural gap year has no held TIPS of its own to fit a curve point at, so
+// derived Per-Year DARA recovery). A structural gap year has no held TIPS of its own to fit a curve point at, so
 // its value is read off the curve by inferShapeValue below, not by smoothCurve/findSpikes alone.
 
 // Median of a numeric array. Even counts average the middle pair, so a curve fitted through an

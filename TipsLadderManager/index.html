@@ -2834,7 +2834,7 @@ function _initRebalDaraFromPortfolio() {
   const { median } = derivePerYearDara(heldARA, new Set());
 
   // Bracket-candidate excess detection (3.0 §Before-State Preview and Bracket-Year Excess
-  // Detection) — replaces the old step-3 1.5x-median auto-cap for THIS mirror population. A
+  // Detection) — replaces the old step-3 1.5x-median auto-cap for THIS derived Per-Year DARA. A
   // flagged year's store entry is immediately filled with its own held-year median (the same
   // "best guess" shown in the DARA input) rather than left unset, so Rebalance Ladder — which reads
   // whatever is on the form — picks up the guess by default until the user edits it.
@@ -3019,7 +3019,7 @@ document.getElementById('dara-plan-import-file').addEventListener('change', asyn
   _bracketAutoCapYears = new Set();
   // Mark this an explicit #fundedYear,dara import, same as one carried by the holdings file itself
   // -- this is the SAME block format, just imported as its own file. A later re-derivation of the
-  // per-year store reads this map rather than re-mirroring the portfolio's natural ARA shape.
+  // per-year store reads this map rather than re-deriving the portfolio's natural ARA shape.
   currentImportedDaraByYear = new Map(daraMap);
   // NOT marked manual — an imported plan is a loaded baseline, honored as-is at Run.
   _daraManualYears = new Set();
@@ -3557,8 +3557,8 @@ let _daraByYearBodyCollapsed = true;
 // panel (and vice versa) after a tab switch.
 let _bracketAutoCapYearsRebal = new Set(), _bracketAutoCapYearsBuild = new Set();
 let _panelYearRange = null;         // { fy, ly } of the years currently shown in the per-year panel
-// The as-loaded/imported map, kept solely so _storeIsPristineMirror() can tell whether the store has
-// been touched since load — not user-facing (Undo/Revert to loaded were removed; edits are cheap
+// The as-loaded/imported map, kept solely so _daraPlanUnedited() can tell whether the store has
+// been edited since load — not user-facing (Undo/Revert to loaded were removed; edits are cheap
 // enough now, via selection Set/Infer DARA, that a history stack wasn't earning its clutter). All
 // swap with the store on mode change.
 let _daraLoadedSnapshot = null;
@@ -3844,8 +3844,8 @@ document.getElementById('selection-infer-btn').addEventListener('click', _runSel
 
 // True when the per-year DARA plan on the form is still exactly what was loaded — no per-rung
 // edits, no selection Infer / Set DARA since. Feeds `runFundedRebalance`'s `daraPlanUnedited`, which
-// only matters for a holdings-inferred mirror (no stated DARA of any kind): an untouched mirror is
-// self-finance-scaled at Run (3.0 §Funding the rebalance), an edited one runs as entered. A STATED
+// only matters for a derived Per-Year DARA (no stated DARA of any kind): one not edited is
+// self-financing-scaled at Run (3.0 §Funding the rebalance), an edited one runs as entered. A STATED
 // plan (`daraPlanIsStated`, computed at the call site from whether a DARA source was ever loaded —
 // see 3.0 §Funding) skips this test entirely: stated DARA is a holder's intent, always run as-is,
 // edited or not.
@@ -4131,7 +4131,7 @@ document.getElementById('run-btn').addEventListener('click', async () => {
 
       // Run the rebalance with self-financing funding (gap/Future-30Y scale). All orchestration
       // lives in the library (3.0 §Funding the rebalance); the shell passes the store and the
-      // pristine flag. Self-financing applies only to an unedited, holdings-inferred mirror
+      // not-edited flag. Self-financing applies only to a derived Per-Year DARA not edited
       // (`daraPlanIsStated` false) — a stated plan (typed, Set DARA, or loaded from a file) always
       // runs exactly as stated, edited or not.
       // Select maturities' pick set overrides the range fields here too (2.0 §Picking Maturities
