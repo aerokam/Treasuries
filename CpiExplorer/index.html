@@ -61,12 +61,6 @@
   .chart-wrap { flex: 1; min-height: 0; padding: 10px; position: relative; }
   canvas { display: block; width: 100% !important; height: 100% !important; }
 
-  /* ── Stats strip ── */
-  #statsStrip { background: #fff; border: 1px solid var(--border-light); border-radius: 8px; padding: 8px 14px; display: flex; gap: 24px; flex-wrap: wrap; flex-shrink: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-  .stat { display: flex; flex-direction: column; gap: 1px; }
-  .stat-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--border-med); }
-  .stat-val { font-size: 13px; font-weight: 600; color: var(--portal-text-main); font-variant-numeric: tabular-nums; }
-  .stat-date { font-size: 11px; font-weight: 400; color: var(--portal-text-muted); }
 </style>
 </head>
 <body>
@@ -146,7 +140,6 @@
         <canvas id="cpiChart"></canvas>
       </div>
     </div>
-    <div id="statsStrip" style="display:none"></div>
   </main>
 
 </div>
