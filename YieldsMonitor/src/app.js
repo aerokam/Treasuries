@@ -310,7 +310,7 @@ function setupUI() {
     }
   });
   document.getElementById('lockRight').addEventListener('change', (e) => { lockRight = e.target.checked; });
-  document.getElementById('hideNonTrading').addEventListener('change', (e) => { hideNonTrading = e.target.checked; updateCharts(); });
+  document.getElementById('hideNonTrading').addEventListener('change', (e) => { hideNonTrading = e.target.checked; const views = captureChartViews(); updateCharts(); restoreChartViews(views); keepSyncedWindow(views); });
   document.getElementById('showQuotedYield').addEventListener('change', async (e) => {
     if (isCurveScope()) {
       if (!e.target.checked && !showSaYieldCurve) {
@@ -357,7 +357,7 @@ function setupUI() {
     const isTips = e.target.dataset.type === 'TIPS';
     Object.keys(AVAILABLE_SYMBOLS).forEach(sym => { if (isTips && sym.endsWith('TIPS')) activeSymbols.delete(sym); else if (!isTips && !sym.endsWith('TIPS')) activeSymbols.delete(sym); });
     document.querySelectorAll('.sym-item-check input').forEach(cb => cb.checked = activeSymbols.has(cb.value));
-    syncChartContainers(); updateAllData();
+    keepZoomDuring(() => { syncChartContainers(); return updateAllData(); });
   }));
   document.querySelectorAll('.range-btn').forEach(btn => btn.addEventListener('click', (e) => {
     document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
@@ -390,7 +390,7 @@ function setupUI() {
   });
   document.querySelectorAll('.sym-item-check input').forEach(cb => cb.addEventListener('change', (e) => {
     if (e.target.checked) activeSymbols.add(e.target.value); else activeSymbols.delete(e.target.value);
-    syncChartContainers(); updateAllData();
+    keepZoomDuring(() => { syncChartContainers(); return updateAllData(); });
   }));
   document.getElementById('refreshAll').addEventListener('click', async () => {
     const views = captureChartViews();
@@ -1083,6 +1083,23 @@ function captureChartViews() {
 // A window whose right edge was at or beyond the old latest point slides forward by the new data's
 // extent, so the latest point stays visible with the same width; any other window is kept as is.
 // With Sync Zoom & Pan on, every chart slides by the same amount.
+// With Sync Zoom & Pan on, a chart that had no zoom of its own (one just added) takes the window the
+// others hold.
+function keepSyncedWindow(views) {
+  if (!syncXAxis) return;
+  const src = Object.keys(views).map(s => charts[s]).find(Boolean);
+  if (src) syncAllChartsX(src);
+}
+
+// Runs a change that is not a new range or new dates (a symbol checked or unchecked), keeping every
+// chart's zoom: the views are captured before the change builds or removes charts.
+async function keepZoomDuring(change) {
+  const views = captureChartViews();
+  await change();
+  restoreChartViews(views);
+  keepSyncedWindow(views);
+}
+
 function restoreChartViews(views) {
   const syms = Object.keys(views).filter(s => charts[s] && chartSeries(s) && chartSeries(s).length > 0);
   if (syms.length === 0) return;
