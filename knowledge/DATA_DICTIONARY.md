@@ -792,6 +792,6 @@ Some values are true only until Treasury issues more TIPS. Left inline as approx
 - <a id="dara-plan"></a>**DARA Plan** = `{ Funded_Year + DARA } + ( Construction_Parameters )`
   *The holder's stated per-year [DARA](#dara) target, for every year a `#fundedYear,dara` block names — gap and Future 30Y years included. May carry [Construction Parameters](#construction-parameters) alongside it.*
 - <a id="per-year-dara"></a>**Per-Year DARA** = `{ Funded_Year + DARA }`
-  *The resolved [DARA](#dara) target for every year in a ladder's range, however it was arrived at — typed by hand, mirrored from holdings, or a loaded [DARA Plan](#dara-plan) — the shape the ladder-sizing engine consumes.*
+  *The resolved [DARA](#dara) target for every year in a ladder's range, however it was arrived at — typed by hand, derived from holdings, or a loaded [DARA Plan](#dara-plan) — the shape the ladder-sizing engine consumes.*
 - <a id="construction-parameters"></a>**Construction Parameters** = [Pre-Ladder Interest](#pre-ladder-interest) + Maturity_Preference + Coupon_Preference + [Available Cash](#available-cash) + Settlement_Year_Coupon_Mode + DARA_Reference_Date
   *Settings a `#fundedYear,dara` block cannot encode but which still change the target ladder — maturity preference and coupon preference, the settlement-year coupon-counting choice, and the Ref CPI date the plan's DARA values are denominated at. Carried in an optional `#params,key=value,...` row alongside a [DARA Plan](#dara-plan)'s `#fundedYear,dara` block, present only when the source file carries one.*
