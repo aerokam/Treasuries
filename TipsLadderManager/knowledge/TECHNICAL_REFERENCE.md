@@ -8,7 +8,6 @@ This document maps conceptual definitions from the [Master Glossary](../../knowl
 
 | Spec Constant | Variable Name | Value / Purpose |
 |---|---|---|
-| REFCPI_CUSIP | `scripts/fetchRefCpi.js#CUSIP` | `912810FD5` (used for fetching daily Ref CPI) |
 | MIN_BRACKET_YEAR | `LOWEST_LOWER_BRACKET_YEAR` | `2032` (defines the search range for the lower bracket) |
 | LOWER_COVER_YIELD | `src/ladder-core.js#LOWER_COVER_YIELD` | `0.04`, the yield at which the Synthetic TIPS of the first Future 30Y year is measured when the Lower cover is chosen (DD §5.0) |
 | EXCLUDE_MATURING_WITHIN_MONTHS | `src/ladder-core.js#EXCLUDE_MATURING_WITHIN_MONTHS` | `3`, the months after the Settlement Date within which a TIPS is not offered in Build: absent from the First Year list and not chosen for a funded year (DD §5.1). `defaultFirstYear`, `tipsMaturingAfterExclusion`, the `excludeMaturingWithinMonths` argument of `selectLadderBonds` and `runBuild`, and the Build picker apply it. |
