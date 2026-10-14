@@ -14,7 +14,7 @@ import { fileURLToPath } from 'url';
 import { nextBondTradingDay, R2_ROOT } from '../../../shared/src/market-data.js';
 import { parseHolidaySet } from '../../../shared/src/settlement.js';
 import { parseCsv as parseCsvRows } from '../../../shared/src/csv.js';
-import { defaultFirstYear } from '../../src/ladder-core.js';
+import { defaultFirstYear, tipsBeyondFirstYearBuffer } from '../../src/ladder-core.js';
 import { localDate } from '../../src/date-util.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -788,6 +788,27 @@ test('build: deselecting the first year entirely moves the ladder\'s real first 
   expect(rangeText).not.toContain(String(SY));
   await expect(page.locator('#first-year')).toBeDisabled();
   await expect(page.locator('#first-year')).toHaveValue(String(SY + 1));
+});
+
+// A TIPS within the First Year buffer (DD §5.1) is not offered by the picker in Build. The expected set is
+// derived from today's quotes with the helper the app uses, not from a hard-coded year or CUSIP.
+test('build: Select maturities does not offer a TIPS within the First Year buffer', async ({ page }) => {
+  test.setTimeout(20_000);
+  const tips = new Map();
+  for (const f of parseCsvRows(await r2Text('Treasuries/FidelityTreasuriesTips.csv'), false)) {
+    if (f[0] === 'TIPS') tips.set(f[2], { cusip: f[2], maturity: localDate(f[6]) });
+  }
+  const settle = localDate(await computeSettleDateStr());
+  const beyond = new Set(tipsBeyondFirstYearBuffer(tips, settle).map(b => b.cusip));
+  const withinBuffer = [...tips.values()].filter(b => b.maturity > settle && !beyond.has(b.cusip)).map(b => b.cusip);
+  await page.locator('.tab-btn[data-mode="build"]').click();
+  await page.locator('#last-year').selectOption({ value: String(SY + 4) });
+  await page.locator('#build-maturity').selectOption({ value: 'select' });
+  await expect(page.locator('#maturity-picker-overlay')).toBeVisible({ timeout: 2_000 });
+  const offered = await page.locator('#maturity-picker-overlay input[type=checkbox][data-year]').evaluateAll(els => els.map(e => e.value));
+  expect(offered.length).toBeGreaterThan(0);
+  for (const cusip of withinBuffer) expect(offered, 'a TIPS within the buffer is not offered').not.toContain(cusip);
+  for (const cusip of offered) expect(beyond.has(cusip), 'every offered TIPS is beyond the buffer').toBe(true);
 });
 
 // Regression: switching the Maturity preference away from "Select maturities" used to wipe every

@@ -17,9 +17,9 @@ import { addMonths } from './date-util.js';
 
 // ─── Default First Year ─────────────────────────────────────────────────────────
 // Spec: DD §5.1 (FIRST_YEAR_BUFFER_MONTHS, Default First Year). A TIPS maturing no later than this many
-// months after the Settlement Date no longer counts toward the ladder's years in Build: the market quotes
-// omit a Treasury within about a week of maturity, so its year would otherwise read as a gap year. One
-// definition; the Build tab and runBuild both read it here.
+// months after the Settlement Date is not offered in Build: it is absent from the First Year list and is
+// not chosen for a funded year (2.0 §Maturity Selection Within a Funded Year). One definition; the Build
+// tab, runBuild and selectLadderBonds' `bufferMonths` all read it here. 0 turns the exclusion off.
 export const FIRST_YEAR_BUFFER_MONTHS = 3;
 
 // The TIPS maturing more than `bufferMonths` months after the Settlement Date.
@@ -520,11 +520,15 @@ function selectYearTips(cands, pref, couponPref = 'higher') {
 // Map<year, cusip[]> naming an explicit TIPS list for that year, bypassing `maturityPref` for
 // just that year. Every other year keeps following `maturityPref` as usual. An override whose
 // CUSIPs don't resolve to that year's candidates is ignored (falls back to the policy pick).
-export function selectLadderBonds({ tipsMarketData, firstYear, lastYear, settlementDate, maturityPref = 'last', couponPref = 'higher', yearOverrides = null }) {
+// `bufferMonths` (Build only; Rebalance leaves it 0): a TIPS maturing no later than that many months
+// after the settlement date is not a candidate for a funded year (tipsBeyondFirstYearBuffer, DD §5.1).
+export function selectLadderBonds({ tipsMarketData, firstYear, lastYear, settlementDate, maturityPref = 'last', couponPref = 'higher', yearOverrides = null, bufferMonths = 0 }) {
   // 1. Gather candidate TIPS per year (maturing after settlement, in range), then apply the policy.
+  const beyondBuffer = bufferMonths > 0 ? new Set(tipsBeyondFirstYearBuffer(tipsMarketData, settlementDate, bufferMonths)) : null;
   const candsByYear = {};
   for (const bond of tipsMarketData.values()) {
     if (!bond.maturity || bond.maturity <= settlementDate) continue;
+    if (beyondBuffer && !beyondBuffer.has(bond)) continue;
     const yr = bond.maturity.getFullYear();
     if (yr < firstYear || yr > lastYear) continue;
     (candsByYear[yr] ??= []).push(bond);
