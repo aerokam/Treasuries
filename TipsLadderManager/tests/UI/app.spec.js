@@ -1554,6 +1554,17 @@ test('per-year DARA: standalone plan file exports and re-imports per-year values
   await expect(rung).toHaveValue('33000');
 });
 
+// A holdings file with no #fundedYear,dara block carries no DARA Plan, so its Per-Year DARA is
+// calculated from the holdings. The status strip says so, and offers no Ref CPI date for it
+// (3.0 §Per-Year DARA from Portfolio, §DARA Reference Date).
+test('a holdings file with no DARA block says its Per-Year DARA is derived from its holdings', async ({ page }) => {
+  test.setTimeout(20_000);
+  await page.locator('#holdings-file').setInputFiles(HOLDINGS_PATH);
+  await expect(page.locator('#status')).toContainText(
+    'This file contains no DARA Plan, so the Per-Year DARA is derived from its holdings at the settlement Ref CPI date.');
+  await expect(page.locator('#dara-set-basis')).toHaveCount(0);
+});
+
 // A DARA plan that records no Ref CPI date of its own (every export written before the date was
 // recorded, and any hand-written plan). The app cannot know the date and does not guess: the values
 // are used as written, and the status strip offers to supply one. Supplying an earlier date scales

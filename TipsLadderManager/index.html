@@ -265,7 +265,7 @@
       <li><b>Supported formats</b>: position CSV export files from Fidelity, Schwab, and Vanguard; a simple <code>cusip,qty</code> file; the tipsladder.com <code>cusip,qty,year</code> format; or this app's own Holdings export.</li>
       <li>For a broker file, the app scans for accounts that hold TIPS and shows only those; if more than one account holds TIPS, a selection dialog lets you choose which to include, with every account selected by default.</li>
       <li>A sample holdings file loads automatically when the app opens, so you can try a rebalance before uploading anything of your own.</li>
-      <li>If you previously used the Export button to export a <b>DARA Plan</b> — a file containing DARA for each funded year — import it separately via <b>Import → DARA Plan</b>; its values drive the rebalance instead of the values mirrored from your holdings, run exactly as stated (see step 3).</li>
+      <li>If you previously used the Export button to export a <b>DARA Plan</b> — a file containing DARA for each funded year — import it separately via <b>Import → DARA Plan</b>; its values drive the rebalance instead of the values derived from your holdings, run exactly as stated (see step 3).</li>
     </ul>
 
     <p><b>2. Check the range.</b> Once holdings load, the table immediately shows your current ladder (the Before columns).</p>
@@ -280,7 +280,7 @@
       <li><b>Each rung separately</b>: edit the per-year table directly (pre-filled with each year's current ARA).</li>
       <li><b>A range of rungs at once</b>: select them — see <b>Using the ladder table</b> below for how.</li>
     </ul>
-    <p style="margin-top:0">Self-financing only ever applies to a fresh, untouched holdings mirror (nothing typed, no file loaded) with a gap or Future 30Y block still needing funding — clicking Rebalance Ladder scales that mirror to the largest self-financing level automatically. A <b>stated</b> DARA — anything you typed, set on a range, or loaded from a DARA Plan file — is never scaled: it runs exactly as stated, and its net cash lands wherever that implies. A negative net cash there means reaching that target costs more than the ladder returns on its own — add the difference in cash, or lower the target. The DARA field shows <b style="color:#7c3aed">by year</b> once any year's DARA differs from the default.</p>
+    <p style="margin-top:0">Self-financing only ever applies to a Per-Year DARA derived from your holdings and still untouched (nothing typed, no file loaded) with a gap or Future 30Y block still needing funding — clicking Rebalance Ladder scales it to the largest self-financing level automatically. A <b>stated</b> DARA — anything you typed, set on a range, or loaded from a DARA Plan file — is never scaled: it runs exactly as stated, and its net cash lands wherever that implies. A negative net cash there means reaching that target costs more than the ladder returns on its own — add the difference in cash, or lower the target. The DARA field shows <b style="color:#7c3aed">by year</b> once any year's DARA differs from the default.</p>
 
     <p><b>4. Verify or modify ladder parameters.</b></p>
     <ul style="margin:0 0 10px 20px;padding:0">
@@ -2781,6 +2781,14 @@ function _initRebalDaraFromPortfolio() {
   const rc = lookupRefCpi(refCpiRows, _defaultRefCpiDateStr);
   if (!(rc > 0)) { renderDaraByYearPanel(); return; }
 
+  // A file with no #fundedYear,dara block carries no DARA Plan, so its per-year values are
+  // calculated from the holdings below; say so (3.0 §DARA Reference Date). Set before the cash
+  // offer, which appends its own row.
+  if (!(currentImportedDaraByYear && currentImportedDaraByYear.size > 0)) {
+    setStatusHTML('This file contains no DARA Plan, so the Per-Year DARA is derived from its holdings '
+      + 'at the settlement Ref CPI date.');
+  }
+
   _offerReceivedCouponsAsCash(currentImportedParams);
 
   // Our own export carries explicit per-year DARA (#fundedYear,dara). Honor it directly — no
@@ -2807,7 +2815,7 @@ function _initRebalDaraFromPortfolio() {
     return;
   }
 
-  // File load MIRRORS current holdings — no inference, no self-financing solve (3.0 §Per-Year DARA
+  // File load derives the per-year DARA from current holdings — no self-financing solve (3.0 §Per-Year DARA
   // from Portfolio). The range form of computePortfolioARAByYear fills every empty in-range year
   // with its incoming LMI, so each rung shows its true current ARA and the first Rebalance Ladder is
   // a no-op.
