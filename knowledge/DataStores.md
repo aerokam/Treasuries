@@ -59,7 +59,7 @@ The old `Treasuries/TipsRef.csv` key was consolidated away (see `R2_Cleanup.md`)
 ## <a id="s4"></a>Ref CPI NSA and SA (S4)
 **Description**: Daily interpolated Reference CPI (NSA and SA) derived from monthly BLS CPI-U data via 31 CFR §356 App. B interpolation. SA daily Ref CPI is a calculated sole source (no official daily SA series).
 **Written by**: [1.10 Interpolate daily Ref CPI NSA and SA](./1.10_Interpolate_Daily_Ref_CPI_NSA_And_SA.md).
-**Update Frequency**: Daily 6:35am ET, unconditionally, as the second step of the SA Factor Update chain ([Data_Pipeline.md](./Data_Pipeline.md)) — not on BLS's own monthly release cadence, since [Monthly CPI (S17)](#s17) it derives from is fetched on the same daily, unconditional schedule.
+**Update Frequency**: Daily 6:35am PT, unconditionally, as the second step of the `SaFactors` task ([Data_Pipeline.md](./Data_Pipeline.md)) — not on BLS's own monthly release cadence, since [Monthly CPI (S17)](#s17) it derives from is fetched on the same daily, unconditional schedule.
 **R2 Key**: `TIPS/RefCpiNsaSa.csv`
 **Read by**: YieldCurves ([3.1](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md)), Yields Monitor ([2.4](../YieldsMonitor/knowledge/2.4_Adjust_For_Seasonality.md)), and [Calculate SA and SAO yields (1.11)](./1.11_Calculate_SA_And_SAO_Yields.md).
 
@@ -97,7 +97,7 @@ The old `Treasuries/TipsRef.csv` key was consolidated away (see `R2_Cleanup.md`)
 **Update Frequency**: Weekdays (end-of-day snapshots) via `updateYieldsHistory.js`.
 
 **Format**: one object keyed by symbol, each value a `{ x, y }` array, e.g. `{ "US10Y": [ { "x": "20260403150000", "y": 4.25 }, ... ], "US30Y": [ ... ], ... }`.
-- `x` is CNBC's compact `tradeTime` string `YYYYMMDDHHMMSS` (no separators). Daily-close bars are stamped at 15:00 ET (`...150000`) — the ~3PM benchmark close (see `YieldsMonitor/knowledge/Close_Price_Investigation.md`).
+- `x` is CNBC's compact `tradeTime` string `YYYYMMDDHHMMSS` (no separators). Daily-close bars are dated at 15:00 ET (`...150000`), the time of the ~3PM benchmark close (see `YieldsMonitor/knowledge/Close_Price_Investigation.md`).
 - `y` is the yield as a number (percent, `%` stripped).
 - A weekly close is dated that week's Friday and a quarterly close the quarter's last weekday. CNBC's own TradeTime for these bars is the start of the week or quarter, which is not the date the close was set.
 
@@ -148,7 +148,7 @@ The old `Treasuries/TipsRef.csv` key was consolidated away (see `R2_Cleanup.md`)
 
 ## <a id="s14"></a>Breakeven inflation (S14)
 **Written by**: [1.3 Calculate yield curve data sets](./1.3_Calculate_Yield_Curve_Data_Sets.md).
-**Description**: Per-TIPS breakeven inflation — the Ask/SA/SAO yield for each TIPS against the yield of its nearest-maturity nominal Treasury, `Market` (broker quotey) source only. Matches the YieldCurves BEI tab's per-bond table, which the app computes but does not persist.
+**Description**: Per-TIPS breakeven inflation — the Ask/SA/SAO yield for each TIPS against the yield of its nearest-maturity nominal Treasury, `Market` source only. Matches the YieldCurves BEI tab's per-bond table, which the app computes but does not persist.
 **Update Frequency**: `Market`-only data, so it changes only when `FidelityQuotes` refreshes (3x daily on weekdays); written by the same chained `updateSpotYieldCurves.js` run as [Yield curves (S13)](#s13) (also chained from `YieldsFromFedInvestPrices`, which this file doesn't depend on — see [Data_Pipeline.md](./Data_Pipeline.md)).
 **R2 Key**: `Treasuries/BreakevenInflation.csv`
 
@@ -173,7 +173,7 @@ The old `Treasuries/TipsRef.csv` key was consolidated away (see `R2_Cleanup.md`)
 
 ## <a id="s15"></a>Bid and ask spreads (S15)
 **Written by**: [1.3 Calculate yield curve data sets](./1.3_Calculate_Yield_Curve_Data_Sets.md).
-**Description**: Per-security broker bid/ask yield and price spread, TIPS and nominal Treasuries combined in one file (`security_type` discriminates, same pattern as [Market quotes (S7)](#s7)'s `Product` column). `Market` (broker quotey) source only — FedInvest carries a single price, not a separate bid and ask.
+**Description**: Per-security broker bid/ask yield and price spread, TIPS and nominal Treasuries combined in one file (`security_type` discriminates, same pattern as [Market quotes (S7)](#s7)'s `Product` column). `Market` source only — FedInvest carries a single price, not a separate bid and ask.
 **Update Frequency**: `Market`-only data, so it changes only when `FidelityQuotes` refreshes (3x daily on weekdays); written by the same chained `updateSpotYieldCurves.js` run as [Yield curves (S13)](#s13) (also chained from `YieldsFromFedInvestPrices`, which this file doesn't depend on — see [Data_Pipeline.md](./Data_Pipeline.md)).
 **R2 Key**: `Treasuries/BidAskSpreads.csv`
 
@@ -242,7 +242,7 @@ The old `Treasuries/TipsRef.csv` key was consolidated away (see `R2_Cleanup.md`)
 
 ## <a id="s10"></a>SA and SAO yields (S10)
 **Description**: TIPS ask/SA/SAO yields derived from [Market quotes (S7)](#s7).
-**Written by**: [1.11 Calculate SA and SAO yields](./1.11_Calculate_SA_And_SAO_Yields.md), on two independent triggers: three times a day whenever [Market quotes (S7)](#s7) is refreshed (`uploadFidelityDownload.js`, chained from the `FidelityQuotes` task), and once more daily as the last step of the SA Factor Update chain, after [1.10](./1.10_Interpolate_Daily_Ref_CPI_NSA_And_SA.md) ([Data_Pipeline.md](./Data_Pipeline.md)).
+**Written by**: [1.11 Calculate SA and SAO yields](./1.11_Calculate_SA_And_SAO_Yields.md), on two independent triggers: three times a day whenever [Market quotes (S7)](#s7) is refreshed (`uploadFidelityDownload.js`, chained from the `FidelityQuotes` task), and once more daily as the last step of the `SaFactors` task, after [1.10](./1.10_Interpolate_Daily_Ref_CPI_NSA_And_SA.md) ([Data_Pipeline.md](./Data_Pipeline.md)).
 **R2 Key**: `TIPS/YieldsSaSao.csv`
 
 | Field | Type | Description |
@@ -304,7 +304,7 @@ The old `Treasuries/TipsRef.csv` key was consolidated away (see `R2_Cleanup.md`)
 ## <a id="s17"></a>[Monthly CPI (S17)](./DATA_DICTIONARY.md#s17)
 **Description**: BLS's monthly CPI-U NSA and SA series (`CUUR0000SA0`/`CUSR0000SA0`), 2019 to present, fetched separately from [CPI history (S8)](#s8) (same series, 1913 to present) so that the daily App. B interpolation that produces [Ref CPI NSA and SA (S4)](#s4) does not depend on S8's own refresh, which runs only on BLS release dates.
 **Written by**: [1.9 Fetch monthly CPI](./1.9_Fetch_Monthly_CPI.md), the first step of `YieldCurves/scripts/updateRefCpi.js`.
-**Update Frequency**: Daily 6:35am ET, unconditionally, as the first step of the SA Factor Update chain ([Data_Pipeline.md](./Data_Pipeline.md)) — a plain daily trigger, not the release-date-aware scheme S8's own task uses, so it re-fetches from BLS on days the underlying monthly value has not changed. Flagged for a fix: [DFD_Worklist.md §3.0 item 11](./DFD_Worklist.md).
+**Update Frequency**: Daily 6:35am PT, unconditionally, as the first step of the `SaFactors` task ([Data_Pipeline.md](./Data_Pipeline.md)) — a plain daily trigger, not the release-date-aware scheme S8's own task uses, so it re-fetches from BLS on days the underlying monthly value has not changed. Flagged for a fix: [DFD_Worklist.md §3.0 item 11](./DFD_Worklist.md).
 **R2 Key**: `bls/CPI.csv`
 **Read by**: `YieldCurves/scripts/calcRefCpi.js`, in the same chained run, to produce [Ref CPI NSA and SA (S4)](#s4).
 
