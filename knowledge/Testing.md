@@ -45,7 +45,10 @@ The other apps have no suite. A suite is added for an app when that app is next 
 | Changed file | Suites run |
 |---|---|
 | Only `TipsLadderManager/data/SampleHoldings.csv` and/or `SampleDaraPlan.csv` | `test:Unit:TipsLadderManager` and `test:UI:TipsLadderManager:SampleHoldings`: the UI tests tagged `@SampleHoldings`, whose results depend on what the sample account holds |
-| A file in an app's directory | That app's suites |
+| A markdown file under any `knowledge/` directory | `test:UI:KnowledgeMap`, the viewer suite, and no app suite |
+| `knowledge/DATA_DICTIONARY.md` | The same, and `test:Unit:TipsLadderManager`, which reads `LOWER_COVER_YIELD` from it |
+| A markdown file elsewhere | None |
+| Any other file in an app's directory | That app's suites |
 | `shared/src/<file>` | `test:Unit:Shared`, plus the suites of every app whose code imports that file, directly or through another file in `shared/src/` |
 | A file in `shared/tests/` | `test:Unit:Shared` |
 | `package.json`, `playwright.config.js`, `scripts/pre-push-tests.js` or `.githooks/pre-push` | Every suite |
