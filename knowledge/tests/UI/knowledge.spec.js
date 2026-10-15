@@ -45,7 +45,7 @@ test.describe('Knowledge Map and Viewer', () => {
   test('toggles a CSV preview in the Data Dictionary', async ({ page }) => {
     await page.goto('/knowledge/viewer.html#/md/knowledge/DATA_DICTIONARY.md');
 
-    const viewLink = page.locator('a:has-text("View")').first();
+    const viewLink = page.locator('a:has-text("View Preview")').first();
     await expect(viewLink).toBeVisible({ timeout: 10000 });
     await viewLink.click();
 
