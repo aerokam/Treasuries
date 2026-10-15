@@ -167,6 +167,8 @@ annual_OID = face × (refCPI(end day) − refCPI(first day held)) / refCPI_dated
 
 `end day` is 1/1 of the next year for an instrument held at the end of the tax year, and the sale or retirement date for an instrument sold or retired.
 
+`principal_payments_received` is zero for a TIPS. The term comes from Treas. Reg. §1.1275-7(d)(4)(ii), which states the inflation adjustment for every inflation-indexed debt instrument, including one that repays principal in installments. A TIPS repays principal only at maturity. In the year of retirement, the index ratio for the retirement date already measures the principal redeemed, so adding the redemption as a principal payment would count it twice.
+
 A negative result is a deflation adjustment, not negative OID: it offsets the stated interest for the year and reduces basis by the same amount (Pub 1212 Example 9).
 
 For the first year held, "first day held" = settlement date. For subsequent years, it is 1/1 of that year.
