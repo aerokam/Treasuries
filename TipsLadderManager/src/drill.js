@@ -578,7 +578,7 @@ export function buildDrillHTML(d, colKey, summary) {
       const weight  = isLower ? (s.origLowerWeight ?? s.lowerWeight)
                    : isNewLower ? (s.newLowerWeight3 ?? 0)
                    : s.upperWeight;
-      const wLabel  = isLower ? 'Orig lower bracket weight' : isNewLower ? 'New lower bracket weight' : 'Upper bracket weight';
+      const wLabel  = isLower ? 'Retained lower bracket weight' : isNewLower ? 'Active lower bracket weight' : 'Upper bracket weight';
       const exCost  = s.gapParams.totalCost * weight;
       const exQty   = d.excessQtyAfter;
       rows = row('Excess Quantity', 'round(<span class="formula-var" data-source="tec">target cost</span> \xf7 <span class="formula-var" data-source="cpb">Cost per TIPS</span>)', exQty, false, undefined, 'qty')
