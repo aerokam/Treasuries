@@ -242,7 +242,7 @@ export function buildDrillHTML(d, colKey, summary) {
     const _isSettleYr = d.fundedYear === summary?.settlementYear;
     const _lmiLabel = _isSettleYr ? 'Remaining later maturity interest' : 'Later maturity interest (LMI)';
     const _lmiDesc = _isSettleYr
-      ? 'coupons from TIPS maturing after this year, paid on or after today, based on RMD Options selection'
+      ? 'coupons from TIPS maturing after this year, paid after today, based on RMD Options selection'
       : 'from TIPS maturing after ' + d.fundedYear;
     // Multi-TIPS funded year (semiannual / all): the year's principal is delivered by several TIPS
     // with different par values, so list each TIPS's P+I contribution (like the rebalance Amount drill)
@@ -380,7 +380,7 @@ export function buildDrillHTML(d, colKey, summary) {
     const _isSettleYr = d.fundedYear === summary?.settlementYear;
     const _lmiLabel = _isSettleYr ? 'Remaining later maturity interest' : 'Later maturity interest (LMI)';
     const _lmiDesc = _isSettleYr
-      ? 'coupons from TIPS maturing after this year, paid on or after today, based on RMD Options selection'
+      ? 'coupons from TIPS maturing after this year, paid after today, based on RMD Options selection'
       : 'from TIPS maturing after ' + d.fundedYear;
     // Compute ownSum first so we can detect PLI-zeroed years (holdings present but all qty=0).
     let ownSum = 0;
@@ -441,7 +441,7 @@ export function buildDrillHTML(d, colKey, summary) {
       const isSettleYr = d.fundedYear === summary?.settlementYear;
       const lmiLabel = isSettleYr ? 'Remaining later maturity interest' : 'Later maturity interest (LMI)';
       const lmiDesc = isSettleYr
-        ? 'coupons from TIPS maturing after this year, paid on or after today, based on RMD Options selection'
+        ? 'coupons from TIPS maturing after this year, paid after today, based on RMD Options selection'
         : 'from TIPS maturing after ' + d.fundedYear;
       const laterMatInt = d.araAfterLaterMatInt ?? 0;
       const sameYearExInt = d.excessLMI_After || 0;
