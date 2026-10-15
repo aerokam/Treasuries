@@ -11,6 +11,9 @@
 4. [Purchase Cost Formula](#purchase-cost-formula)
 5. [Box 3: Qualified Stated Interest (Coupon)](#box-3-qualified-stated-interest-coupon)
 6. [Box 8: OID (Annual Inflation Accrual)](#box-8-oid-annual-inflation-accrual)
+   - [Debt instrument held at the end of the tax year](#debt-instrument-held-at-the-end-of-the-tax-year)
+   - [Debt instrument sold or retired during the tax year](#debt-instrument-sold-or-retired-during-the-tax-year)
+   - [Both cases](#both-cases)
    - [Vanguard — Monthly Breakdown](#vanguard-monthly-breakdown)
    - [Broker Comparison](#broker-comparison)
 7. [Box 12: Amortized Bond Premium (ABP)](#box-12-amortized-bond-premium-abp)
@@ -132,12 +135,35 @@ The Box 3 annual total is the sum of both semi-annual payments. Note: because th
 
 ## Box 8: OID (Annual Inflation Accrual)
 
-Per IRS Pub 1212, annual OID = inflation-adjusted principal at year-end minus inflation-adjusted principal at start of holding period for the year:
+IRS Pub 1212 gives the OID of an inflation-indexed debt instrument for the tax year as two steps. The first step differs by whether the instrument is held at the end of the tax year or is sold or retired during it.
+
+### Debt instrument held at the end of the tax year
+
+Pub 1212 step 1 adds the inflation-adjusted principal for the day after the last day of the tax year and any principal payments received during the year. Step 2 subtracts the inflation-adjusted principal for the first day held during the tax year.
 
 ```
-annual_OID = face × (IR(1/1 next year) − IR(first day held this year))
-           = face × (refCPI(1/1 next year) − refCPI(first day held)) / refCPI_dated_date
+annual_OID = face × IR(1/1 next year) + principal_payments_received
+             − face × IR(first day held this year)
 ```
+
+### Debt instrument sold or retired during the tax year
+
+Pub 1212 step 1 adds the inflation-adjusted principal for the last day on which the instrument was held and any principal payments received during the year. Step 2 is the same as for an instrument held at the end of the tax year.
+
+```
+annual_OID = face × IR(last day held) + principal_payments_received
+             − face × IR(first day held this year)
+```
+
+### Both cases
+
+With `IR(d) = refCPI(d) / refCPI_dated_date` and no principal payments received, the two formulas reduce to:
+
+```
+annual_OID = face × (refCPI(end day) − refCPI(first day held)) / refCPI_dated_date
+```
+
+`end day` is 1/1 of the next year for an instrument held at the end of the tax year, and the last day held for an instrument sold or retired.
 
 For the first year held, "first day held" = settlement date. For subsequent years, it is 1/1 of that year.
 
