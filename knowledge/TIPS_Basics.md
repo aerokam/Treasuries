@@ -122,7 +122,7 @@ Inherited unchanged from **1.0 Bond Basics §Yield Calculation Conventions**: al
 
 Uses the same convention as yield-to-maturity: **Actual/Actual day count, semi-annual compounding** (frequency = 2). Matches Google Sheets `DURATION(settlement, maturity, coupon, yld, 2, 1)`.
 
-The fractional first coupon period `w = DSC/E` (where DSC = days from settlement to next coupon, E = length of that coupon period in days) is used to avoid the ±0.5 y error that arises from rounding to the nearest whole coupon period. See `4.0 §calculateDuration` for the full formula.
+The fractional first coupon period `w = DSC/E` (where DSC = days from settlement to next coupon, E = length of that coupon period in days) is used to avoid the ±0.5 y error that arises from rounding to the nearest whole coupon period. The next coupon is the first one strictly after settlement, so on a coupon date DSC = E and w = 1. See `4.0 §calculateDuration` for the full formula.
 
 **Modified Duration:** Exact first derivative of price with respect to yield, normalized by price:
 

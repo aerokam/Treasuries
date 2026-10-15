@@ -303,7 +303,7 @@
 
 <a id="accrued-interest-nominal"></a>
 ### Accrued Interest (Nominal)
-`Accrued_Interest_Nominal` = `(Coupon_Rate / 2 × 100) × (A / E)` *(interest owed to the seller since the last coupon date, per $100 par — Actual/Actual day count: A = days since last coupon, E = days in the current coupon period. NOT a flat half-coupon. For TIPS, index-ratio adjusted: see [Accrued Interest (Adjusted)](#accrued-interest-adjusted).)*
+`Accrued_Interest_Nominal` = `(Coupon_Rate / 2 × 100) × (A / E)` *(interest owed to the seller since the last coupon date, per $100 par — Actual/Actual day count: A = days since last coupon date, E = days in the current coupon period. A = 0 on a coupon date, because the coupon paid that day is the seller’s. NOT a flat half-coupon. For TIPS, index-ratio adjusted: see [Accrued Interest (Adjusted)](#accrued-interest-adjusted).)*
 
 <a id="settlement-date"></a>
 ### Settlement Date

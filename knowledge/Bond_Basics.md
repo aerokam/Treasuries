@@ -28,7 +28,7 @@ In this specification, "Treasury" refers to U.S. Treasury securities (bills, not
   E = days in the current coupon period
   accruedInterest = (couponRate/2 × 100) × (A / E)   // per $100 par
   ```
-  A bond bought the day after a coupon date owes almost no accrued interest; one bought the day before the next coupon owes nearly the full semiannual coupon. Dirty price (what the buyer actually pays) = Clean Price + Accrued Interest.
+  A bond bought on a coupon date owes no accrued interest (A = 0), because the coupon paid that day is the seller's. A bond bought the day after a coupon date owes almost no accrued interest; one bought the day before the next coupon owes nearly the full semiannual coupon. Dirty price (what the buyer actually pays) = Clean Price + Accrued Interest.
   *(See 2.1 TIPS Basics for the inflation-adjusted extension.)*
 - **[Settlement Date](./DATA_DICTIONARY.md#settlement-date):** Trade date + 1 business day (T+1) for secondary market trades.
 - **Maturity Date:** Date when principal is repaid to bondholder.
