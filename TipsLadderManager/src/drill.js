@@ -1,6 +1,8 @@
 // drill.js -- Drill-down popup HTML builder (6.0_UI_Schema.md)
 // Exports: buildDrillHTML(d, colKey, summary)
 
+import { UPPER_BRACKET_YEAR } from './ladder-core.js';
+
 function fm(n)  { return '$' + Math.round(n).toLocaleString('en-US'); }
 function fm2(n) { return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 function fd(n, dp) { return Number(n).toFixed(dp); }
@@ -1404,7 +1406,7 @@ export function buildSyntheticLMIDrill(summary, year) {
     rows.push({ label: 'Subtotal', value: '$' + Math.round(fromSynthetic).toLocaleString(), total: true });
     rows.push({ sep: true });
   }
-  rows.push({ label: 'Coupon interest from TIPS maturing after 2039', value: '$' + Math.round(fromActual).toLocaleString() });
+  rows.push({ label: `Coupon interest from TIPS maturing after ${UPPER_BRACKET_YEAR - 1}`, value: '$' + Math.round(fromActual).toLocaleString() });
   rows.push({ sep: true });
   rows.push({ label: 'Later Maturity Interest (LMI)', value: '$' + Math.round(g.laterMatInt).toLocaleString(), total: true });
   return rows;
@@ -1443,7 +1445,7 @@ export function buildGapYearDurationDrill(summary, year) {
   return [
     { heading: 'Yield Interpolation' },
     { label: 'Most recently issued 10-year TIPS', note: fmtDate(anchors.before.maturity), value: fd(anchors.before.yield * 100, 3) + '%' },
-    { label: 'Feb 2040 TIPS', note: fmtDate(anchors.after.maturity), value: fd(anchors.after.yield * 100, 3) + '%' },
+    { label: `Feb ${UPPER_BRACKET_YEAR} TIPS`, note: fmtDate(anchors.after.maturity), value: fd(anchors.after.yield * 100, 3) + '%' },
     { label: 'Target date', value: fmtDate(synMat) },
     { sep: true },
     { label: 'Interpolated yield', note: 'linear, by maturity date, between the two anchors above', value: fd(b.synYld * 100, 3) + '%', total: true },

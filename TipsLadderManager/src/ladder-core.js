@@ -37,6 +37,16 @@ export function defaultFirstYear(tipsMarketData, settlementDate, excludeMaturing
 // The upper bracket year: the maturity year of the 30-year TIPS above the gap years (DD §5.1 Upper bracket year).
 export const UPPER_BRACKET_YEAR = 2040;
 
+// The outstanding TIPS maturing in the upper bracket year (the latest, if more than one).
+export function upperBracketBond(tipsMarketData) {
+  let upper = null;
+  for (const bond of tipsMarketData.values()) {
+    if (!bond.maturity || bond.maturity.getFullYear() !== UPPER_BRACKET_YEAR) continue;
+    if (!upper || bond.maturity > upper.maturity) upper = bond;
+  }
+  return upper;
+}
+
 // The gap years (DD Gap Years): the maturity years below the upper bracket year that lie above every issued
 // maturity year, where no 10-year TIPS has yet been issued. Single source; every consumer imports it. A year
 // below the longest-dated issued maturity year with no TIPS is not a gap year, and neither is a year before
@@ -585,17 +595,13 @@ export function selectLadderBonds({ tipsMarketData, firstYear, lastYear, settlem
     }
   }
 
-  // Add 2040 upper bracket if gap years exist and 2040 not already in range.
-  if (gapYears.length > 0 && !yearBondMap[2040]) {
-    for (const bond of tipsMarketData.values()) {
-      if (!bond.maturity) continue;
-      if (bond.maturity.getFullYear() !== 2040) continue;
-      if (!yearBondMap[2040] || bond.maturity > yearBondMap[2040].maturity)
-        yearBondMap[2040] = bond;
-    }
-    if (!yearBondMap[2040]) throw new Error('No TIPS available in 2040 for upper bracket');
-    yearTipsListMap[2040] = [yearBondMap[2040]];   // 2040 has a single Feb TIPS — always length 1
-    rangeYears = [...rangeYears, 2040].sort((a, b) => a - b);
+  // Add the upper bracket year if gap years exist and it is not already in range.
+  if (gapYears.length > 0 && !yearBondMap[UPPER_BRACKET_YEAR]) {
+    const upperBond = upperBracketBond(tipsMarketData);
+    if (!upperBond) throw new Error(`No TIPS available in ${UPPER_BRACKET_YEAR} for upper bracket`);
+    yearBondMap[UPPER_BRACKET_YEAR] = upperBond;
+    yearTipsListMap[UPPER_BRACKET_YEAR] = [upperBond];   // the upper bracket year has a single Feb TIPS — always length 1
+    rangeYears = [...rangeYears, UPPER_BRACKET_YEAR].sort((a, b) => a - b);
   }
 
   // Ensure the lower bracket (latest-maturing pre-gap TIPS) is in yearBondMap/rangeYears.
@@ -852,7 +858,7 @@ export function sizeLadder({
   const firstGapYear = gapYears.length ? Math.min(...gapYears) : null;
   const gapStage = (prelimForLMI, pliCredits) => {
     if (!gapYears.length) return null;
-    const upperBracketYear = 2040;
+    const upperBracketYear = UPPER_BRACKET_YEAR;
     const lowerBracketYear = Math.max(...rangeYears.filter(y => y < firstGapYear));
     const params = calcGapParams(gapYears, tipsMarketData, settlementDate, refCPI, dara, prelimForLMI, pliCredits, daraByYear);
     const upperBond = yearBondMap[upperBracketYear];
