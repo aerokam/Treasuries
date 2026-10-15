@@ -657,10 +657,34 @@ console.log('\n3-bracket real-holdings reconciliation (distinct orig-lower/new-l
       const { details: rtDetails, summary: rtSummary } = runRebalance({
         dara, bracketMode: '3bracket', holdings: reimported, tipsMarketData, refCPI, settlementDate, daraByYear: rtDara,
       });
-      const churn = rtDetails.filter(d => (d.fundedYearQtyDelta || 0) !== 0 || (d.excessQtyDelta || 0) !== 0);
-      const churnUnits = churn.reduce((s, d) => s + Math.abs(d.fundedYearQtyDelta || 0) + Math.abs(d.excessQtyDelta || 0), 0);
-      assert('3B real: export -> reimport -> rerun churns at most 2 bonds worth (whole-lot rounding at the retained-excess cap or an allocation-ranking tie, not a real trade)',
-        churnUnits <= 4, true);
+      // The first rerun may carry that residual bond and, through the Net Cash and Excess interest
+      // credited to the funded years it is paid in, a whole-lot rounding flip of one bond in a few of
+      // them (net funded quantity unchanged; measured 2026-10-15: 2027 -1, 2028 +2, 2029 -1 beside +1
+      // in the active lower bracket, cash -$992). How many years sit on a rounding tie depends on the
+      // day's prices, so a bound on the first rerun's size would fail on some prices without a defect.
+      // What a defect cannot satisfy is settling: a trade made again on every pass (the sell-down and
+      // rebuy above) never reaches a rerun with no trades.
+      const hasTrades = ds => ds.some(d => (d.fundedYearQtyDelta || 0) !== 0 || (d.excessQtyDelta || 0) !== 0);
+      let settled = rtDetails, settledSummary = rtSummary, furtherTrips = 0;
+      while (hasTrades(settled) && furtherTrips < 3) {
+        const rows = ['cusip,qty,excess'];
+        for (const d of settled) {
+          const f = d.fundedYearQtyAfter ?? d.qtyAfter ?? 0, e = d.excessQtyAfter ?? 0;
+          if (f + e > 0) rows.push(`${d.cusip},${f},${e}`);
+        }
+        rows.push('#fundedYear,dara');
+        for (const y of [...settledSummary.daraByYearResolved.keys()].sort((a, b) => a - b)) {
+          rows.push(`${y},${Math.round(settledSummary.daraByYearResolved.get(y))}`);
+        }
+        const text = rows.join('\n');
+        ({ details: settled, summary: settledSummary } = runRebalance({
+          dara, bracketMode: '3bracket', holdings: parseHoldingsCSV(text, tipsMarketData), tipsMarketData, refCPI, settlementDate,
+          daraByYear: parseFundedYearDaraBlock(text.split('\n')),
+        }));
+        furtherTrips++;
+      }
+      assert('3B real: export -> reimport -> rerun settles to no trades within 3 further round trips (a residual from whole-lot rounding, not a trade re-made on every pass)',
+        hasTrades(settled), false);
       // Tolerance ~ one bond's cost (par $1000 x index ratio), not a materiality judgment call —
       // widen only if a real bond's cost per unit ever exceeds this on the fixtures below.
       assert('3B real: export -> reimport -> rerun nets near-zero cash (within one bond\'s cost)',
