@@ -236,7 +236,7 @@
   | `SA` | [SA Yield](#sa-yield), as a decimal; TIPS security rows only |
   | `SAO` | [SAO Yield](#sao-yield), as a decimal; TIPS security rows only |
   | `Spot` | [Spot Yield](#spot-yield) on a grid row, as a decimal on the semi-annual bond-equivalent basis of `Ask`: fitted to the nominal Treasuries for Type `Treasury`, to the TIPS quoted prices for Type `TIPS`, and for Type `BEI` the nominal spot less the TIPS quoted spot |
-  | `Spot SA` | Spot Yield fitted to the TIPS seasonally adjusted prices for Type `TIPS`; for Type `BEI` the nominal spot less the TIPS SA spot ([3.4 §Spot BEI](../YieldCurves/knowledge/3.4_Fit_Spot_Yield_Curves.md#spot-bei)); blank for Type `Treasury` |
+  | `Spot SA` | Spot Yield fitted to the TIPS seasonally adjusted prices for Type `TIPS`; for Type `BEI` the nominal spot less the TIPS SA spot ([3.5 §Across terms](../YieldCurves/knowledge/3.5_Calculate_Breakeven_Inflation.md#across-terms)); blank for Type `Treasury` |
 
 - <a id="s14"></a>**Breakeven inflation (S14)**, `BreakevenInflation.csv` = `{ @cusip + maturity + coupon + ask_yield + sa_yield + sao_yield + nominal_cusip + nominal_maturity + nominal_yield + ask_bei + sa_bei + sao_bei }`
   *R2 key `Treasuries/BreakevenInflation.csv` ([View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/BreakevenInflation.csv)). Header row first, then one row per TIPS in [Market quotes (S7)](#s7): the [Breakeven Inflation](#breakeven-inflation) of its Ask, SA and SAO Yield against the yield of the nominal Treasury nearest to it in maturity, the per security construction.*
