@@ -12,7 +12,7 @@ import { readFileSync, writeFileSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { nextBondTradingDay, R2_ROOT } from '../../../shared/src/market-data.js';
-import { parseHolidaySet } from '../../../shared/src/settlement.js';
+import { parseHolidaySet, actualPaymentDate } from '../../../shared/src/settlement.js';
 import { parseCsv as parseCsvRows } from '../../../shared/src/csv.js';
 import { defaultFirstYear, tipsMaturingAfterExclusion } from '../../src/ladder-core.js';
 import { localDate } from '../../src/date-util.js';
@@ -1852,10 +1852,16 @@ test('Available Cash counts maturity proceeds from rungs that have already matur
   // The rungs that have matured this settlement year are named in the TIPS reference data (a matured bond is no
   // longer quoted); the ladder file is a Build export with those bonds added.
   const settle = await computeSettleDateStr();
+  // A rung has matured when its payment has been made before today (2.0 §Settlement-year LMI: "unpaid" is
+  // checked against the trade date, on the payment date rolled past a weekend or holiday), not before the
+  // settlement date: on a maturity day the payment is dated today and is not yet in hand.
+  const holidays = parseHolidaySet(parseCsvRows(await r2Text('misc/BondHolidaysSifma.csv'), false));
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const maturedBonds = [];
   for (const line of (await r2Text('TIPS/TipsRef.csv')).split(/\r?\n/)) {
     const f = line.split(',');
-    if (/^[A-Z0-9]{9}$/.test(f[0]) && f[1] && f[1] < settle && f[1].slice(0, 4) === settle.slice(0, 4)) maturedBonds.push({ cusip: f[0], maturity: f[1] });
+    if (/^[A-Z0-9]{9}$/.test(f[0]) && f[1] && f[1].slice(0, 4) === settle.slice(0, 4) && actualPaymentDate(localDate(f[1]), holidays) < today) maturedBonds.push({ cusip: f[0], maturity: f[1] });
   }
   test.skip(maturedBonds.length === 0, 'no TIPS has matured yet this settlement year');
   const rungs = [...new Map(maturedBonds.map(m => [m.maturity, m])).values()]; // one bond per maturity date
