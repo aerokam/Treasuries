@@ -39,18 +39,18 @@ All apps fetch data directly from Cloudflare R2 at runtime using public HTTPS UR
 
 | Data Store | File | Primary Consumer(s) |
 |------------|------|---------------------|
-| [S1](./DataStores.md#s1) | YieldsFromFedInvestPrices.csv | A1 (ladder pricing), A2 (yield curves) |
-| [S2](./DataStores.md#s2) | TipsRef.csv | A1 (TIPS metadata) |
-| [S3](./DataStores.md#s3) | RefCPI.csv | A1 (index ratio), A5 (daily Ref CPI series) |
-| [S4](./DataStores.md#s4) | RefCpiNsaSa.csv | A2 (SA factor computation) |
-| [S5](./DataStores.md#s5) | Auctions.csv | A4 (historical auction data) |
-| [S6](./DataStores.md#s6) | YieldHistory/ | A3 (historical yield time series) |
-| [S7](./DataStores.md#s7) | FidelityTreasuriesTips.csv | A2 (broker bid/ask quotes), A9 (nominal fund holdings enrichment) |
-| [S8](./DataStores.md#s8) | CPI_history.csv | A5 (full monthly CPI history 1913+) |
-| [S9](./DataStores.md#s9) | Tentative-Auction-Schedule.xml | A4 (flag TIPS in upcoming auctions) |
-| [S10](./DataStores.md#s10) | YieldsSaSao.csv | A1 (SA yield for the within-year allocation policy), A8 (via a committed snapshot, not this object), A9 (TIPS fund holdings enrichment) |
-| [S11](./DataStores.md#s11) | FundHoldings/&lt;TICKER&gt;.csv | A9 (fund holdings by CUSIP) |
-| [S12](./DataStores.md#s12) | GswTipsCurve.json | A2 (GSW zero reference curve) |
+| [S1](./DATA_DICTIONARY.md#s1) | YieldsFromFedInvestPrices.csv | A1 (ladder pricing), A2 (yield curves) |
+| [S2](./DATA_DICTIONARY.md#s2) | TipsRef.csv | A1 (TIPS metadata) |
+| [S3](./DATA_DICTIONARY.md#s3) | RefCPI.csv | A1 (index ratio), A5 (daily Ref CPI series) |
+| [S4](./DATA_DICTIONARY.md#s4) | RefCpiNsaSa.csv | A2 (SA factor computation) |
+| [S5](./DATA_DICTIONARY.md#s5) | Auctions.csv | A4 (historical auction data) |
+| [S6](./DATA_DICTIONARY.md#s6) | YieldHistory/ | A3 (historical yield time series) |
+| [S7](./DATA_DICTIONARY.md#s7) | FidelityTreasuriesTips.csv | A2 (broker bid/ask quotes), A9 (nominal fund holdings enrichment) |
+| [S8](./DATA_DICTIONARY.md#s8) | CPI_history.csv | A5 (full monthly CPI history 1913+) |
+| [S9](./DATA_DICTIONARY.md#s9) | Tentative-Auction-Schedule.xml | A4 (flag TIPS in upcoming auctions) |
+| [S10](./DATA_DICTIONARY.md#s10) | YieldsSaSao.csv | A1 (SA yield for the within-year allocation policy), A8 (via a committed snapshot, not this object), A9 (TIPS fund holdings enrichment) |
+| [S11](./DATA_DICTIONARY.md#s11) | FundHoldings/&lt;TICKER&gt;.csv | A9 (fund holdings by CUSIP) |
+| [S12](./DATA_DICTIONARY.md#s12) | GswTipsCurve.json | A2 (GSW zero reference curve) |
 
 ---
 
@@ -85,8 +85,7 @@ See [Data_Pipeline.md](./Data_Pipeline.md) for schedules, owners, and script pat
 
 | Document | Scope |
 |----------|-------|
-| [DATA_DICTIONARY.md](./DATA_DICTIONARY.md) | Canonical definitions for all terms, entities, stores, and formulas |
-| [DataStores.md](./DataStores.md) | R2 file schemas and live preview links |
+| [DATA_DICTIONARY.md](./DATA_DICTIONARY.md) | Canonical definitions for all terms, entities, stores (with R2 keys and live previews), and formulas |
 | [Data_Pipeline.md](./Data_Pipeline.md) | Ingestion job schedules and ownership |
 | [Bond_Basics.md](./Bond_Basics.md) | Foundational fixed-income concepts |
 | [TIPS_Basics.md](./TIPS_Basics.md) | TIPS mechanics and index ratio arithmetic |

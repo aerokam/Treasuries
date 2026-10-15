@@ -11,7 +11,7 @@ Follow these steps to verify that the navigation, rendering, and drill-down feat
 - [ ] **Back Navigation**: From inside the viewer, click **← KNOWLEDGE MAP**.
     - *Expected*: Returns to `/knowledge/DFD_LEVEL0` (the full visual map). The viewer should not attempt to render an HTML file — if the guard trips, it redirects automatically.
 - [ ] **Spec Index**: Click **Data Stores**.
-    - *Expected*: Opens the detailed `DataStores.md` spec in the viewer.
+    - *Expected*: Opens `DATA_DICTIONARY.md` at §2.0 Data Stores in the viewer.
 - [ ] **Source Drilling**: Click **FedInvest** in the map.
     - *Expected*: Opens `DATA_DICTIONARY.md` at the E1 schema section, which states the `Prices For:` date and the eight columns of the price table.
 - [ ] **Process Drilling**: Click the **0 Treasury Investors Portal** circle.
@@ -22,7 +22,7 @@ Follow these steps to verify that the navigation, rendering, and drill-down feat
 - [ ] **Bubble 1.0**: Click the **1.0 Build Logic** bubble in the Mermaid diagram.
     - *Expected*: Navigates to the rendered `1.0_Bond_Ladders.md`.
 - [ ] **S1 Cylinder**: Click the **S1** cylinder in the diagram.
-    - *Expected*: Navigates to `DataStores.md` and highlights/scrolls to the S1 row. **NO RAW MD SHOULD BE VISIBLE.**
+    - *Expected*: Navigates to `DATA_DICTIONARY.md` and scrolls to the S1 entry. **NO RAW MD SHOULD BE VISIBLE.**
 
 ## 3. Data Inspection (CSV Previews)
 - [ ] Open **Data Stores** from the top header of the Map.

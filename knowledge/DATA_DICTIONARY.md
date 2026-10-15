@@ -113,10 +113,10 @@
 
 <a id="2.0-data-stores-s"></a>
 ## 2.0 Data Stores (S)
-*Internal R2 data files. Schemas are normalized from External Entities.*
+*Internal R2 data files. Schemas are normalized from External Entities. Each entry states the store's file, its R2 key, its composition, and the layout facts a reader of the file needs. The process that writes a store and the processes that read it are shown on the data flow diagrams, and each is specified in its own process spec.*
 
 - <a id="s1"></a>**FedInvest prices (S1)**, `YieldsFromFedInvestPrices.csv` = `Settlement_Date + { type + @cusip + maturity + coupon + ( datedDateCpi ) + price + yield }`
-  *The first line holds the [Settlement Date](#settlement-date) alone, the second line is the header, and each line after it is one security: the [TIPS Prices](#tips-prices) and the [Treasury Prices](#treasury-prices), each with its yield. Written by [1.1 Download FedInvest prices and calculate yields](./1.1_Download_FedInvest_Prices.md).*
+  *R2 key `Treasuries/YieldsFromFedInvestPrices.csv` ([View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/YieldsFromFedInvestPrices.csv)). The first line holds the [Settlement Date](#settlement-date) alone, the second line is the header, and each line after it is one security: the [TIPS Prices](#tips-prices) and the [Treasury Prices](#treasury-prices), each with its yield.*
 
   | Column | Defined term |
   |---|---|
@@ -128,40 +128,42 @@
   | `price` | [Price](#price) |
   | `yield` | [Yield](#yield) at the settlement date, as a decimal: real for a TIPS, nominal for every other security |
 
-- <a id="s2"></a>**TIPS reference data (S2)**, `TipsRef.csv` = `{ @CUSIP + Maturity + DatedDate + Coupon + DatedDateRefCpi + Term }`
-- <a id="s3"></a>**Ref CPI (S3)**, `RefCPI.csv` = `{ @Date + Ref_CPI }` *— authoritative retrieved NSA Ref CPI (TreasuryDirect), 1997-01-15 (the first TIPS ever issued) to present. Consumed by all apps. See [DataStores.md](./DataStores.md#s3) for how the full range is assembled and kept current.*
-- <a id="s4"></a>**Ref CPI NSA and SA (S4)**, `RefCpiNsaSa.csv` = `{ @Date + CPI_NSA + CPI_SA + SA_Factor }` *— calculated (App. B daily interpolation), built for the SA pipeline: `CPI_NSA` and `CPI_SA` interpolated daily so `SA_Factor = CPI_NSA / CPI_SA`. The daily SA series has no official or retrieved equivalent — this is its **sole source**.*
-- <a id="s5"></a>**Auction results (S5)**, `Auctions.csv` = `{ @CUSIP + @Auction_Date + Security_Type + High_Yield + Bid_to_Cover + Primary_Dealer_Accepted + ... }`
-- <a id="s6"></a>**Yield history (S6)**, `YieldHistory` = `{ @Symbol + { [ Timestamp + Yield_Value ] } }`
-- <a id="s8"></a>**CPI history (S8)**, `CPI_history.csv` = `{ @Year + @Period + PeriodName + NSA + SA }`
-  *Full monthly BLS CPI-U history from January 1913 to present. NSA = `CUUR0000SA0`; SA = `CUSR0000SA0`. SA blank before 1947. R2 key: `bls/CPI_history.csv`.*
-- <a id="s9"></a>**Tentative auction schedule (S9)**, `Tentative-Auction-Schedule.xml` = XML `{ AuctionCalendarDate: [ AuctionDate + SecurityTermWeekYear + SecurityType + ReOpeningIndicator + TIPS + FloatingRate + AnnouncementDate + SettlementDate ] }`
-  *Mirror of the Treasury's Tentative Auction Schedule. Fetched directly by TreasuryAuctions to flag TIPS in the upcoming-auctions feed (matched by `AuctionDate` + `SecurityTermWeekYear`), since that feed lacks a native TIPS flag. R2 key: `Treasuries/Tentative-Auction-Schedule.xml`.*
-- <a id="s10"></a>**SA and SAO yields (S10)**, `YieldsSaSao.csv` = `{ @cusip + maturity + coupon + ask_yield + sa_yield + sao_yield }`
-  *TIPS ask/SA/SAO yields derived from [Market quotes (S7)](#s7), produced by `YieldCurves/scripts/updateSaSaoYields.js` (triggered by the `FidelityQuotes` task). Consumed by TipsLadderManager (`sa_yield`, for the within-year allocation policy), by FundHoldings (enriches TIPS fund holdings with seasonally-adjusted yield), and by SeasonalAdjustments through a committed snapshot rather than this object. R2 key: `TIPS/YieldsSaSao.csv`.*
-- <a id="s11"></a>**Fund holdings (S11)**, `FundHoldings/<TICKER>.csv` — Vanguard/fminvest/PIMCO/Schwab/BondBloxx/iShares fund holdings (E7/E8/E9/E10/E11/E12), one file per fund ticker (VBIL, VTIP, VTP, RBIL, LTPZ, SCHP, XHLF, ICPI), each carrying a metadata row, a holdings table, and a weighted-average total row — see [FundHoldings 1.0 §File Layout](../FundHoldings/knowledge/1.0_FundHoldings.md#file-layout) for the full structure. The raw per-provider fetch (`<TICKER>-Raw.csv`) stays local, not uploaded. A top-level R2 prefix (`FundHoldings/`) rather than nested under `TIPS/`/`Treasuries/`: a single fund's holdings CSV mixes TIPS and nominal rows (discriminated downstream by CUSIP presence in SA and SAO yields (S10), not a column flag), so it doesn't belong to either instrument-type prefix — same rationale as `misc/`. The fetchers' `FundMeta.json` (`{ @Ticker: { fundName, portId | etfId | cusip | portfolioId, expenseRatio, secYield } }`, percent-scale `expenseRatio`/`secYield`) stays in the local scratch dir for `enrichHoldings.js` and is not uploaded. Written by `FundHoldings/updateAllHoldings.js`/`enrichHoldings.js`; fetched directly by `FundHoldings/index.html` client-side.
+- <a id="s2"></a>**TIPS reference data (S2)**, `TipsRef.csv` = `{ @cusip + maturity + datedDate + coupon + datedDateRefCpi + term }`
+  *R2 key `TIPS/TipsRef.csv` ([View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/TIPS/TipsRef.csv)). Header row first, then one row per TIPS [FiscalData (E3)](#e3) has auctioned.*
 
-- <a id="s12"></a>**GSW curve parameters (S12)**, `GswTipsCurve.json` = `@date + beta0 + beta1 + beta2 + beta3 + tau1 + tau2`
-  *Latest published row of the Federal Reserve’s Gürkaynak-Sack-Wright fitted TIPS real yield curve (FEDS 2008-05): the six Svensson parameters and the observation date, nothing evaluated. YieldCurves evaluates the Svensson zero-yield formula from them to draw the GSW zero reference line against its own spot fit. R2 key: `TIPS/GswTipsCurve.json`.*
+  | Column | Defined term |
+  |---|---|
+  | `cusip` | [CUSIP](#cusip) |
+  | `maturity` | [Maturity Date](#maturity-date), `YYYY-MM-DD` |
+  | `datedDate` | [Dated Date](#dated-date), `YYYY-MM-DD` |
+  | `coupon` | [Coupon Rate](#coupon-rate), as a decimal |
+  | `datedDateRefCpi` | dated date [Ref CPI](#ref-cpi) |
+  | `term` | [Term](#term) measured from the Dated Date, as FiscalData states it: `5-Year`, `10-Year`, `30-Year`, or with a part year, `5-Year 6-Month` |
 
-- <a id="s13"></a>**Yield curves (S13)**, `YieldCurves.csv` = `{ term_years + ( maturity_date + @cusip + type ) + source + ( ask_yield + sa_yield + sao_yield ) + ( spot_yield + spot_sa_yield ) }`
-  *Evaluated yields, general-purpose and spreadsheet-ready — every priced Treasury (including STRIPS and, on Market-source rows, Unclassified) and TIPS security (`cusip`/`maturity_date`/`type` populated, `ask_yield`/`sa_yield`/`sao_yield` populated where they exist) plus the fitted nominal, TIPS-quoted and TIPS-SA [spot yield](../YieldCurves/knowledge/3.4_Fit_Spot_Yield_Curves.md) curves evaluated on a half-year term grid, as three rows per term per source (`cusip` = `Spot`, `maturity_date` blank; `type` is `Treasury`, `TIPS`, or `BEI`). `source` is `FedInvest` or `Market`. A `type = Treasury` grid row carries the fitted nominal spot in `spot_yield`. A `type = TIPS` grid row carries the fitted TIPS quoted spot in `spot_yield` and the fitted TIPS SA spot in `spot_sa_yield`. A `type = BEI` grid row carries `spot_yield` = nominal spot − TIPS quoted spot, and `spot_sa_yield` = nominal spot − TIPS SA spot, per [3.4 Fit spot yield curves §Spot BEI](../YieldCurves/knowledge/3.4_Fit_Spot_Yield_Curves.md#spot-bei) — there is no separate `bei` column; BEI is a `type`, computed directly from the fitted values already available at that term, not a second implementation. STRIPS security rows hold the yield calculated from their quoted price, as every other row does, and are excluded from the nominal curve's own fitting inputs, same as every other STRIPS exclusion in this pipeline. Unclassified (a Market-quote CUSIP root the [Treasury CUSIP Reference](./Treasury_CUSIP_Reference.md) does not recognise) gets the same fitting exclusion; it never appears on a FedInvest-source row, since [Select prices and add TIPS reference data (1.1.2)](./1.1_Download_FedInvest_Prices.md#select-prices-and-add-tips-reference-data) states its own type directly rather than deriving it from the CUSIP root. Renamed from `SpotYieldCurves.csv` (2026-09-07) — the file is a general yields resource, not spot-curves-only. Replaces the parameters-only `SpotYieldCurves.json` (retired 2026-09-07): six Svensson coefficients aren't usable in a spreadsheet, so this file stores actual yields via `shared/src/spot-curve.js` instead of the unevaluated parameters [GSW curve parameters (S12)](#s12) still uses. Written by `YieldCurves/scripts/updateSpotYieldCurves.js`, chained from `FidelityQuotes` and `YieldsFromFedInvestPrices` rather than scheduled on its own clock (see [Data_Pipeline.md](./Data_Pipeline.md)). R2 key: `Treasuries/YieldCurves.csv`.*
+- <a id="s3"></a>**Ref CPI (S3)**, `RefCPI.csv` = `{ @date + refCpi }`
+  *R2 key `TIPS/RefCPI.csv` ([View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/TIPS/RefCPI.csv)). The retrieved, authoritative [Ref CPI](#ref-cpi): header row first, then one row per calendar day from 1997-01-15, the dated date of the first TIPS issued, ascending by date. Ref CPI is the same for every TIPS on a given date, so the series is one continuous series.*
 
-- <a id="s14"></a>**Breakeven inflation (S14)**, `BreakevenInflation.csv` = `{ @cusip + maturity + coupon + ask_yield + sa_yield + sao_yield + nominal_cusip + nominal_maturity + nominal_yield + ask_bei + sa_bei + sao_bei }`
-  *Per-TIPS [breakeven inflation](#sa-yield): the Ask/SA/SAO yield for each TIPS against the yield of its nearest-maturity nominal Treasury, `Market` source only (BEI needs the nominal and TIPS yields quoted the same way — [3.4 Fit spot yield curves](../YieldCurves/knowledge/3.4_Fit_Spot_Yield_Curves.md)). Written by `YieldCurves/scripts/updateSpotYieldCurves.js`. R2 key: `Treasuries/BreakevenInflation.csv`.*
+  | Column | Defined term |
+  |---|---|
+  | `date` | the calendar date the value is for, `YYYY-MM-DD` |
+  | `refCpi` | [Ref CPI](#ref-cpi) NSA, as [TreasuryDirect SecIndex (E2)](#e2) states it, to five decimal places |
 
-- <a id="s15"></a>**Bid and ask spreads (S15)**, `BidAskSpreads.csv` = `{ @security_type + @cusip + maturity + coupon + ask_yield + bid_yield + yield_spread_bps + ask_price + bid_price + price_spread_pct }`
-  *Per-security broker bid/ask yield and price spread, TIPS and nominal Treasuries combined (`security_type` = `TIPS` or `Treasury`, same discrimination as [Market quotes (S7)](#s7)'s `Product` column), `Market` source only (FedInvest carries a single price, not a separate bid and ask). Written by `YieldCurves/scripts/updateSpotYieldCurves.js`. R2 key: `Treasuries/BidAskSpreads.csv`.*
-- <a id="s16"></a>**Bond holidays (S16)**, `BondHolidaysSifma.csv` = `{ Date + Holiday_Name }` *— SIFMA's US bond-market holiday schedule, filtered to the eleven base US market holidays plus New Year's Day. Backs the [Bond Holiday](#bond-holiday) term. R2 key: `misc/BondHolidaysSifma.csv`.*
-- <a id="s17"></a>**Monthly CPI (S17)**, `CPI.csv` = `{ @Year + @Period + PeriodName + NSA + SA }` *— the same BLS series as [CPI history (S8)](#s8), 2019 to present, fetched separately so the daily App. B interpolation that produces [Ref CPI NSA and SA (S4)](#s4) does not depend on S8's own release-date-triggered refresh. R2 key: `bls/CPI.csv`.*
-- <a id="s18"></a>**Intraday archive (S18)**, `intraday-raw/` = `{ @Symbol + @Date + { Feed: { TimeRange + { TradeTime + Close } } } + FetchedAtET }`
-  *One immutable daily snapshot per symbol of the raw feeds [CNBC (E5)](#e5) served that day, plus the wall-clock time the snapshot was actually taken (`FetchedAtET`) — the last-resort source when its chart-bar feed itself returns nothing for a symbol. R2 key prefix: `Treasuries/yields-history/intraday-raw/`.*
+- <a id="s4"></a>**Ref CPI NSA and SA (S4)**, `RefCpiNsaSa.csv` = `{ @Ref_CPI_Date + Ref_CPI_NSA + Ref_CPI_SA + SA_Factor }`
+  *R2 key `TIPS/RefCpiNsaSa.csv` ([View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/TIPS/RefCpiNsaSa.csv)). Calculated by the 31 CFR App. B daily interpolation. Header row first, then one row per calendar day, newest row first. The daily SA series has no official or retrieved equivalent: this store is its sole source.*
 
-- <a id="s7"></a>**Market quotes (S7)**, `FidelityTreasuriesTips.csv` — Combined Treasury + TIPS bid/ask quotes (replaces the old separate `FidelityTips.csv`/`FidelityTreasuries.csv` pair as of ~2026-06-23). Local drop path: `~/Downloads/FidelityTreasuriesTips.csv` (gitignored, re-downloaded fresh each run). R2 key: `Treasuries/FidelityTreasuriesTips.csv`.
-  CSV columns (exact header names): `Product, Description, Cusip, State, Coupon, Frequency, Maturity date, Call protected, Call date, Moody's rating, S&P rating, Yield, Bid price/Quantity (min), Adjusted bid price, Inflation factor, Ask price/Quantity (min), Adjusted ask price, Ask yield to worst, Ask yield to sink, Ask yield to maturity, 3rd party price, Depth of book, Attributes`
-  *`Product` = `Treasury` or `TIPS`; parsers filter on this column before further processing (Treasury rows lack `Inflation factor`/`Adjusted bid price`/`Adjusted ask price`; both row types carry `Yield`, which doubles as the bid yield column — there is no separate "Yield Bid" header in the combined export). Parser normalises headers to lowercase. Key fields used: `cusip`, `coupon`, `ask price/quantity (min)` (ask price, unadjusted), `bid price/quantity (min)` (bid price, unadjusted), `adjusted bid price`/`adjusted ask price` (TIPS only), `ask yield to maturity` (ask yield, percentage form), `yield` (bid yield, percentage form). In the Yield Curves app, both yields are always calculated from the quoted price for TIPS and Treasuries alike, never read from `ask yield to maturity` or `yield` — the two sides of a quote share one method, and the calculated figure is more accurate than either quoted one ([3.1.2](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#parse-market-quotes), [3.1.7](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#calculate-tips-yields), [3.1.8](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#calculate-treasury-yields)). `inflation factor` is likewise parsed but not used: the Index Ratio shown is calculated (`shared/src/ref-cpi.js#tipsIndexRatios`), not read from this column. `YieldCurves/scripts/updateSpotYieldCurves.js` calculates all four yields the same way, with the same shared functions. Price spread uses adjusted prices for TIPS (actual dollar cost) and raw prices for Treasuries: `yield_spread_bps = (yield_bid − ask_ytm) × 10000`; `price_spread_pct = (price_ask − price_bid) / price_ask × 100`. Footer line `Date downloaded MM/DD/YYYY HH:MM AM/PM` supplies the download timestamp.*
+  | Column | Defined term |
+  |---|---|
+  | `Ref CPI Date` | the calendar date the values are for, `YYYY-MM-DD` |
+  | `Ref CPI NSA` | [Ref CPI](#ref-cpi) NSA, interpolated daily from [Monthly CPI (S17)](#s17), to five decimal places |
+  | `Ref CPI SA` | the same interpolation applied to the SA series of [Monthly CPI (S17)](#s17), to five decimal places |
+  | `SA Factor` | [SA Factor](#sa-factor), `Ref CPI NSA / Ref CPI SA`, to five decimal places |
 
-  **Column names.** The export uses its source's column names, not this dictionary's. Each one carries a defined term, and where a column name is a broker's own name for a quantity rather than a header, the synonym is recorded on that term:
+- <a id="s5"></a>**Auction results (S5)**, `Auctions.csv` = `{ @cusip + @auction_date + security_type + high_yield + bid_to_cover_ratio + primary_dealer_accepted + ... }`
+  *R2 key `Treasuries/Auctions.csv` ([View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/Auctions.csv)). Header row first, then one row per auction of a security, from 1980-01-01, newest `auction_date` first and by `security_term` within a date. Every field [FiscalData (E3)](#e3) states for an auction is a column under FiscalData's field name, so a field FiscalData adds appears as a new column. A field with no value is written `null`.*
+- <a id="s6"></a>**Yield history (S6)**, `history.json` = `{ @Symbol + { Timestamp + Yield } }`
+  *R2 key `Treasuries/yields-history/history.json` ([View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/yields-history/history.json)). One JSON object keyed by symbol, each value an array of `{ x, y }` points: `x` is the timestamp as `YYYYMMDDHHMMSS`, `y` the [Yield](#yield) as a number in percent. Each point is a closing value at daily resolution, at weekly resolution before the daily points begin and at quarterly resolution before the weekly points begin; [1.7 Update yield history](./1.7_Update_Yield_History.md) specifies the dating.*
+- <a id="s7"></a>**Market quotes (S7)**, `FidelityTreasuriesTips.csv` = `{ Fidelity Fixed Income (E6) row } + Date_Downloaded_Row`
+  *R2 key `Treasuries/FidelityTreasuriesTips.csv` ([View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/FidelityTreasuriesTips.csv)). The rows of [Fidelity Fixed Income (E6)](#e6) with every `="value"` Excel literal-string wrapper stripped to `value`, under the export's header: Treasury and TIPS rows in one file, told apart by the `Product` column. The last row states the [Download Date](#download-date) as `Date downloaded MM/DD/YYYY HH:MM AM/PM`.*
 
   | Column in the export | Defined term |
   |---|---|
@@ -174,8 +176,103 @@
   | `Inflation factor` | [Index Ratio](#index-ratio), TIPS only — the synonym is recorded there |
   | `Ask yield to maturity` | [Yield](#yield), [ask](#ask) side |
   | `Yield` | [Yield](#yield), [bid](#bid) side |
-  | `Product` | security type: TIPS, or a nominal Treasury |
+  | `Product` | security type: `TIPS`, or `Treasury`, which includes STRIPS, told apart from Bill, Note and Bond by CUSIP root ([Treasury CUSIP Reference](./Treasury_CUSIP_Reference.md)) |
 
+- <a id="s8"></a>**CPI history (S8)**, `CPI_history.csv` = `{ @Year + @Period + PeriodName + NSA + SA }`
+  *R2 key `bls/CPI_history.csv` ([View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/bls/CPI_history.csv)). Header row first, then one row per month from January 1913, oldest row first. `NSA` is series `CUUR0000SA0` and `SA` is `CUSR0000SA0` of [BLS (E4)](#e4); `SA` is blank before January 1947.*
+
+  | Column | Defined term |
+  |---|---|
+  | `Year` | four-digit calendar year |
+  | `Period` | BLS period code, `M01` for January |
+  | `PeriodName` | the month's name |
+  | `NSA` | [CPI-U NSA](#cpi-nsa) |
+  | `SA` | [CPI-U SA](#cpi-sa) |
+
+- <a id="s9"></a>**Tentative auction schedule (S9)**, `Tentative-Auction-Schedule.xml` = XML `{ AuctionCalendarDate: [ AuctionDate + SecurityTermWeekYear + SecurityType + ReOpeningIndicator + TIPS + FloatingRate + AnnouncementDate + SettlementDate ] }`
+  *R2 key `Treasuries/Tentative-Auction-Schedule.xml` ([View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/Tentative-Auction-Schedule.xml)). The XML [Treasury Tentative Auction Schedule (E14)](#e14) publishes, unchanged. `ReOpeningIndicator`, `TIPS` and `FloatingRate` are `Y` or `N`.*
+- <a id="s10"></a>**SA and SAO yields (S10)**, `YieldsSaSao.csv` = `{ @cusip + maturity + coupon + ask_yield + sa_yield + sao_yield }`
+  *R2 key `TIPS/YieldsSaSao.csv` ([View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/TIPS/YieldsSaSao.csv)). Header row first, then one row per TIPS in [Market quotes (S7)](#s7).*
+
+  | Column | Defined term |
+  |---|---|
+  | `cusip` | [CUSIP](#cusip) |
+  | `maturity` | [Maturity Date](#maturity-date), `YYYY-MM-DD` |
+  | `coupon` | [Coupon Rate](#coupon-rate), as a decimal |
+  | `ask_yield` | [Yield](#yield), [ask](#ask) side, as a decimal |
+  | `sa_yield` | [SA Yield](#sa-yield), as a decimal |
+  | `sao_yield` | [SAO Yield](#sao-yield), as a decimal |
+
+- <a id="s11"></a>**Fund holdings (S11)**, `<TICKER>.csv` = `Metadata_Row + Holdings_Table + Total_Row`
+  *R2 key `FundHoldings/<TICKER>.csv`. One file per fund ticker (VBIL, VTIP, VTP, RBIL, LTPZ, SCHP, XHLF, ICPI), the holdings of [Vanguard Advisors (E7)](#e7), [fminvest.com (E8)](#e8), [PIMCO (E9)](#e9), [Schwab Asset Management holdings export (E10)](#e10), [BondBloxx product-page holdings table (E11)](#e11) and [BlackRock iShares (E12)](#e12). The `FundHoldings/` prefix stands apart from `TIPS/` and `Treasuries/` because one fund's file holds TIPS and nominal rows together.*
+  - *Metadata row: a header row and one data row, `Ticker`, `Fund Name`, `As of`, `Expense Ratio`, a blank column, `Holdings`, `30-Day SEC Yield`.*
+  - *Holdings table: a header row and one row per holding, `CUSIP`, `Description`, `Maturity Date`, `Coupon`, `% of Fund`, `Market Value`, `Ask Yield`, `SA Yield` and `SAO Yield` for a fund with TIPS holdings, `Term (w)` or `Term (y)`, `Duration (y)`.*
+  - *Total row: no header; `Total / Wtd Avg` in `Description`.*
+
+  *Column detail: [FundHoldings 1.0 §File Layout](../FundHoldings/knowledge/1.0_FundHoldings.md#file-layout).*
+
+- <a id="s12"></a>**GSW curve parameters (S12)**, `GswTipsCurve.json` = `@date + beta0 + beta1 + beta2 + beta3 + tau1 + tau2`
+  *R2 key `TIPS/GswTipsCurve.json` ([View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/TIPS/GswTipsCurve.json)). The latest published row of the Federal Reserve's Gürkaynak-Sack-Wright fitted TIPS real yield curve (FEDS 2008-05) from [Federal Reserve FEDS 2008-05 (E13)](#e13): the six Svensson parameters and the observation date, nothing evaluated.*
+
+  | Field | Defined term |
+  |---|---|
+  | `date` | observation date of the fitted curve, `YYYY-MM-DD` |
+  | `beta0`–`beta3` | Svensson level, slope and two curvature coefficients, in percent |
+  | `tau1`, `tau2` | Svensson decay parameters, in years |
+
+- <a id="s13"></a>**Yield curves (S13)**, `YieldCurves.csv` = `{ Term_y + ( Maturity + CUSIP + Type ) + Source + ( Ask + SA + SAO ) + ( Spot + Spot_SA ) }`
+  *R2 key `Treasuries/YieldCurves.csv` ([View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/YieldCurves.csv)). Header row first, then two kinds of row, general-purpose and spreadsheet-ready.*
+  - *A **security row** is one priced security: every Bill, Note, Bond, STRIPS and TIPS, and on a `Market` row an Unclassified security, a [Market quotes (S7)](#s7) CUSIP root the [Treasury CUSIP Reference](./Treasury_CUSIP_Reference.md) does not recognise. A FedInvest-source row never has Type `Unclassified`: [1.1.2](./1.1_Download_FedInvest_Prices.md#select-prices-and-add-tips-reference-data) states its type directly.*
+  - *A **grid row** is a fitted [Spot Yield Curve](#spot-yield-curves) evaluated at one term, with `CUSIP` = `Spot` and `Maturity` blank. There are three grid rows per term per `Source`, Type `Treasury`, `TIPS` and `BEI`. The terms are half-year steps from 0.5 across the union of the valid ranges of the three fits of that `Source`. A cell is blank where its fit is outside its valid range at that term or fails its sanity check (`shared/src/spot-curve.js#spotCurveFit`), and the rest of the row is kept.*
+
+  | Column | Defined term |
+  |---|---|
+  | `Term (y)` | [Term](#term): from the source's [Settlement Date](#settlement-date) to maturity on a security row, and the fitted curve's horizon from the same settlement date on a grid row |
+  | `Maturity` | [Maturity Date](#maturity-date), `YYYY-MM-DD`; blank on a grid row |
+  | `CUSIP` | [CUSIP](#cusip) on a security row; `Spot` on a grid row |
+  | `Type` | security row: `Bill`, `Note`, `Bond`, `STRIPS`, `TIPS` or `Unclassified`; grid row: `Treasury` (fitted nominal spot), `TIPS` (fitted TIPS spot) or `BEI` ([Breakeven Inflation](#breakeven-inflation) across terms) |
+  | `Source` | `FedInvest` ([FedInvest prices (S1)](#s1)) or `Market` ([Market quotes (S7)](#s7)) |
+  | `Ask` | [Yield](#yield) calculated from the row's price at its source's settlement date, as a decimal. The price of a FedInvest-source row is the one [1.1.2](./1.1_Download_FedInvest_Prices.md#select-prices-and-add-tips-reference-data) selects from the Buy, Sell and End of Day prices of [FedInvest (E1)](#e1), not an ask |
+  | `SA` | [SA Yield](#sa-yield), as a decimal; TIPS security rows only |
+  | `SAO` | [SAO Yield](#sao-yield), as a decimal; TIPS security rows only |
+  | `Spot` | [Spot Yield](#spot-yield) on a grid row, as a decimal on the semi-annual bond-equivalent basis of `Ask`: fitted to the nominal Treasuries for Type `Treasury`, to the TIPS quoted prices for Type `TIPS`, and for Type `BEI` the nominal spot less the TIPS quoted spot |
+  | `Spot SA` | Spot Yield fitted to the TIPS seasonally adjusted prices for Type `TIPS`; for Type `BEI` the nominal spot less the TIPS SA spot ([3.4 §Spot BEI](../YieldCurves/knowledge/3.4_Fit_Spot_Yield_Curves.md#spot-bei)); blank for Type `Treasury` |
+
+- <a id="s14"></a>**Breakeven inflation (S14)**, `BreakevenInflation.csv` = `{ @cusip + maturity + coupon + ask_yield + sa_yield + sao_yield + nominal_cusip + nominal_maturity + nominal_yield + ask_bei + sa_bei + sao_bei }`
+  *R2 key `Treasuries/BreakevenInflation.csv` ([View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/BreakevenInflation.csv)). Header row first, then one row per TIPS in [Market quotes (S7)](#s7): the [Breakeven Inflation](#breakeven-inflation) of its Ask, SA and SAO Yield against the yield of the nominal Treasury nearest to it in maturity, the per security construction.*
+
+  | Column | Defined term |
+  |---|---|
+  | `cusip`, `maturity`, `coupon`, `ask_yield`, `sa_yield`, `sao_yield` | as in [SA and SAO yields (S10)](#s10) |
+  | `nominal_cusip` | [CUSIP](#cusip) of the nominal Treasury nearest in maturity to the TIPS |
+  | `nominal_maturity` | [Maturity Date](#maturity-date) of that nominal Treasury |
+  | `nominal_yield` | [Yield](#yield) of that nominal Treasury, [ask](#ask) side, as a decimal |
+  | `ask_bei` | `nominal_yield − ask_yield` |
+  | `sa_bei` | `nominal_yield − sa_yield` |
+  | `sao_bei` | `nominal_yield − sao_yield` |
+
+- <a id="s15"></a>**Bid and ask spreads (S15)**, `BidAskSpreads.csv` = `{ @security_type + @cusip + maturity + coupon + ask_yield + bid_yield + yield_spread_bps + ask_price + bid_price + price_spread_pct }`
+  *R2 key `Treasuries/BidAskSpreads.csv` ([View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/BidAskSpreads.csv)). Header row first, then one row per TIPS and nominal Treasury in [Market quotes (S7)](#s7), the [Bid and Ask Spreads](#bid-and-ask-spreads) of each.*
+
+  | Column | Defined term |
+  |---|---|
+  | `security_type` | `TIPS` or `Treasury` |
+  | `cusip` | [CUSIP](#cusip) |
+  | `maturity` | [Maturity Date](#maturity-date), `YYYY-MM-DD` |
+  | `coupon` | [Coupon Rate](#coupon-rate), as a decimal |
+  | `ask_yield` | [Yield](#yield), [ask](#ask) side, as a decimal |
+  | `bid_yield` | [Yield](#yield), [bid](#bid) side, as a decimal |
+  | `yield_spread_bps` | the yield spread of [Bid and Ask Spreads](#bid-and-ask-spreads), in basis points |
+  | `ask_price` | [Price](#price), ask side, unadjusted |
+  | `bid_price` | [Price](#price), bid side, unadjusted |
+  | `price_spread_pct` | the price spread of [Bid and Ask Spreads](#bid-and-ask-spreads), in percent |
+
+- <a id="s16"></a>**Bond holidays (S16)**, `BondHolidaysSifma.csv` = `{ Date + Holiday_Name }`
+  *R2 key `misc/BondHolidaysSifma.csv` ([View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/misc/BondHolidaysSifma.csv)). SIFMA's US bond-market holiday schedule, filtered to the eleven base US market holidays plus New Year's Day. No header row. `Date` is written as `"Weekday, Month D, YYYY"`. Backs the [Bond Holiday](#bond-holiday) term.*
+- <a id="s17"></a>**Monthly CPI (S17)**, `CPI.csv` = `{ @Year + @Period + PeriodName + NSA + SA }`
+  *R2 key `bls/CPI.csv` ([View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/bls/CPI.csv)). The same series and columns as [CPI history (S8)](#s8), January 2019 onward, newest row first.*
+- <a id="s18"></a>**Intraday archive (S18)**, `{YYYYMMDD}.json` = `@Symbol + @Date + { Feed: { TimeRange + { TradeTime + Close } } } + FetchedAtET`
+  *R2 key `Treasuries/yields-history/intraday-raw/{symbol}/{YYYYMMDD}.json`. One immutable daily snapshot per symbol of the raw feeds [CNBC (E5)](#e5) served that day, and `FetchedAtET`, the wall-clock time the snapshot was taken.*
 
 ---
 
@@ -604,7 +701,7 @@ coverExcessCost_c = Future 30Y total cost × coverWeight_c
 
 <a id="sa-factor"></a>
 ### SA Factor
-`SA_Factor` = `Ref_CPI_NSA(date) / Ref_CPI_SA(date)` *(daily ratio that isolates the seasonal component of the Ref CPI. `Ref_CPI_NSA` is the Treasury-published Ref CPI. `Ref_CPI_SA` applies the same 31 CFR App. B daily interpolation to BLS's monthly seasonally adjusted CPI-U — a constructed series, since no official seasonally adjusted Ref CPI exists. Analogous to the monthly seasonal factors BLS publishes (`NSA index / SA index`, shown ×100 to 3 dp), but daily and unscaled. Stored unrounded in [`RefCpiNsaSa.csv`](#s4); lookup via `shared/src/ref-cpi.js#saFactorForDate`.)*
+`SA_Factor` = `Ref_CPI_NSA(date) / Ref_CPI_SA(date)` *(daily ratio that isolates the seasonal component of the Ref CPI. `Ref_CPI_NSA` is the Treasury-published Ref CPI. `Ref_CPI_SA` applies the same 31 CFR App. B daily interpolation to BLS's monthly seasonally adjusted CPI-U — a constructed series, since no official seasonally adjusted Ref CPI exists. Analogous to the monthly seasonal factors BLS publishes (`NSA index / SA index`, shown ×100 to 3 dp), but daily and unscaled. Stored to five decimal places in [`RefCpiNsaSa.csv`](#s4); lookup via `shared/src/ref-cpi.js#saFactorForDate`.)*
 
 <a id="sa-yield"></a>
 ### SA Yield

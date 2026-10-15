@@ -230,25 +230,25 @@
   <text class="flow-label" x="1129" y="494" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#charts-and-tables"><tspan class="lk">charts and tables</tspan></a></text>
   <text class="flow-label" x="1129" y="562" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#view-selections"><tspan class="lk">view selections</tspan></a></text>
   <g class="entity"><rect x="1190" y="390" width="145" height="260" rx="3"/><text class="e-name" x="1262.5" y="525">User</text></g>
-  <a class="store" href="viewer.html#/md/knowledge/DataStores.md#s1">
+  <a class="store" href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s1">
     <rect x="40" y="270" width="215" height="40" fill="transparent" stroke="none"/>
     <line x1="40" y1="270" x2="255" y2="270"/>
     <line x1="40" y1="310" x2="255" y2="310"/>
     <text class="s-name" x="147.5" y="295">FedInvest prices (S1)</text>
   </a>
-  <a class="store" href="viewer.html#/md/knowledge/DataStores.md#s7">
+  <a class="store" href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s7">
     <rect x="40" y="388" width="215" height="40" fill="transparent" stroke="none"/>
     <line x1="40" y1="388" x2="255" y2="388"/>
     <line x1="40" y1="428" x2="255" y2="428"/>
     <text class="s-name" x="147.5" y="413">Market quotes (S7)</text>
   </a>
-  <a class="store" href="viewer.html#/md/knowledge/DataStores.md#s4">
+  <a class="store" href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s4">
     <rect x="40" y="506" width="215" height="40" fill="transparent" stroke="none"/>
     <line x1="40" y1="506" x2="255" y2="506"/>
     <line x1="40" y1="546" x2="255" y2="546"/>
     <text class="s-name" x="147.5" y="531">Ref CPI NSA and SA (S4)</text>
   </a>
-  <a class="store" href="viewer.html#/md/knowledge/DataStores.md#s16">
+  <a class="store" href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s16">
     <rect x="40" y="624" width="215" height="40" fill="transparent" stroke="none"/>
     <line x1="40" y1="624" x2="255" y2="624"/>
     <line x1="40" y1="664" x2="255" y2="664"/>
@@ -304,7 +304,7 @@
 
 <p class="notes">
   <b>No process here writes a data store.</b> Every flow ends at 3.7 and is gone when the page closes.
-  The spot yield curves, breakeven inflation and bid and ask spreads are available from R2 all the same: Level 1 process 1 executes the same calculations as a scheduled job and writes <a href="viewer.html#/md/knowledge/DataStores.md#s13">Yield curves (S13)</a>, Breakeven inflation (S14) and Bid and ask spreads (S15). Each calculation is defined once, in shared/src/, and imported by both.
+  The spot yield curves, breakeven inflation and bid and ask spreads are available from R2 all the same: Level 1 process 1 executes the same calculations as a scheduled job and writes <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s13">Yield curves (S13)</a>, Breakeven inflation (S14) and Bid and ask spreads (S15). Each calculation is defined once, in shared/src/, and imported by both.
   3.1 is the only process that reads a store; the others take their input from each other. It explodes at <a href="DFD_LEVEL3_YC_LOAD.html">Level 3</a>.
   Each flow is named by the one structure it holds, defined in <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#6.0-data-flows">Data Dictionary &sect;6.0</a>. Two structures passing between the same two processes are drawn as two flows.
   The page also reads the GSW curve parameters, for a reference curve drawn only on an analysis view opened with ?gsw. No view of the app uses them otherwise, so they are not drawn here.

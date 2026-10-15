@@ -39,8 +39,8 @@ graph LR
 
     %% Links to Specs
     click P1 "#/md/TreasuryAuctions/knowledge/Data_Pipeline.md" "View Data Logic"
-    click S5 "#/md/knowledge/DataStores.md#s5" "View Schema"
-    click S9 "#/md/knowledge/DataStores.md#s9" "View Tentative Data"
+    click S5 "#/md/knowledge/DATA_DICTIONARY.md#s5" "View Schema"
+    click S9 "#/md/knowledge/DATA_DICTIONARY.md#s9" "View Tentative Data"
 ```
 
 ---

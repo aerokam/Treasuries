@@ -134,6 +134,6 @@ it knows only words already rejected.
 - **A schema line can contradict its own prose.** `S12: GswTipsCurve.json` was written
   `{ @date + beta0 ... }`, but DD §0.0 defines `{ x }` as iteration and the file holds a single
   record. The vocabulary gate cannot catch this class of error.
-- **DataStores documents the file; the DD documents the entity.** A store entry carries the exact
+- **A DD store entry documents the file in its exact header names.** A store entry carries the exact
   header row, including a header like `Coupon` that differs from the DD's normalized `Coupon_Rate`.
   S7 sets that precedent.

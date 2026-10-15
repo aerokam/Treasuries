@@ -38,7 +38,7 @@ export function nextBondTradingDay(isoDateStr, holidaySet) {
 export { parseCsvRows as parseCsv };
 
 // Parses TIPS reference data (S2, TIPS/TipsRef.csv), FiscalData's immutable per-CUSIP
-// metadata -- knowledge/DataStores.md#s2. One implementation, used by fetchAuxTipsData()
+// metadata -- knowledge/DATA_DICTIONARY.md#s2. One implementation, used by fetchAuxTipsData()
 // below and by any other caller that needs S2 without the RefCPI/YieldsSaSao fetches that
 // function bundles with it (projects/CLAUDE.md §2a).
 // Returns: [{ cusip, maturity, datedDate, coupon, datedDateRefCpi, term }]

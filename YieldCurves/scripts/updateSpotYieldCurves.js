@@ -8,7 +8,7 @@
 // (Single Source of Truth, projects/CLAUDE.md §2a).
 //
 // Writes three files under Treasuries/ (spot curves cover nominals AND TIPS, so they are
-// not TIPS-specific — see knowledge/DataStores.md):
+// not TIPS-specific — see knowledge/DATA_DICTIONARY.md#s13):
 //   Treasuries/YieldCurves.csv        — per-security Ask/SA/SAO yields plus evaluated
 //                                        nominal/TIPS-quoted/TIPS-SA spot yields and
 //                                        spot BEI on a term grid — one spreadsheet-ready,
@@ -63,7 +63,7 @@ function evalFitAt(fit, t) {
 
 // Fitted grid rows: THREE Type rows per term (Treasury / TIPS / BEI), one row per source.
 // A grid row carries CUSIP = "Spot" (not blank) so it reads consistently with security
-// rows — see knowledge/DataStores.md#s13. The three underlying curves (nominal, TIPS
+// rows — see knowledge/DATA_DICTIONARY.md#s13. The three underlying curves (nominal, TIPS
 // quoted, TIPS SA) may each have a different valid range, so the grid spans their union
 // and a cell is left blank at any term/fit combination where that particular curve isn't
 // valid, rather than truncating the whole grid to the narrowest curve's range.
@@ -145,7 +145,7 @@ async function main() {
   // Filtered: STRIPS and Unclassified excluded, for the coupon-bond price-space curve fit
   // only — the price/yield relationship of a STRIPS is already a pure zero-coupon discount, but the
   // *nominal fit* is a coupon-bond price-space fit (cashflowSchedule) and STRIPS aren't part of
-  // its fitting universe here, same as S1's fitting inputs (knowledge/DataStores.md#s13).
+  // its fitting universe here, same as S1's fitting inputs (knowledge/DATA_DICTIONARY.md#s13).
   // Unclassified gets the same treatment: its cash-flow structure is unknown (that's what the
   // tag means), so it can't be fit as a plain coupon bond either.
   const fidNominalBonds = fidNominalBondsAll.filter(b => !isStrip(b.cusip) && b.cusipType !== 'Unclassified');
@@ -189,7 +189,7 @@ async function main() {
 
   // ── YieldCurves.csv rows: one row per actual security (Ask/SA/SAO populated where they
   // exist) plus rows per fitted grid point (Spot/Spot SA populated, Type = Treasury/TIPS/BEI).
-  // See knowledge/DataStores.md#s13 for the column list and rationale. ──────────────────
+  // See knowledge/DATA_DICTIONARY.md#s13 for the column list and rationale. ──────────────────
   const evalRows = [];
   for (const b of fedNominalBondsAll) evalRows.push({
     term_years: termOf(b.maturity, fedSettleStr), maturity_date: b.maturity, cusip: b.cusip,

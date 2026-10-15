@@ -73,7 +73,7 @@ Between current slide 2 and current slide 3:
 - `calcRefCpi.js`: applies 31 CFR Part 356 App. B (3-month lag, daily linear
   interpolation — `shared/src/ref-cpi.js#refCpiFromMonthly`) to **both** monthly
   series → daily Ref CPI NSA, daily Ref CPI SA, `SA Factor = NSA / SA` →
-  `TIPS/RefCpiNsaSa.csv` (DataStores S4).
+  `TIPS/RefCpiNsaSa.csv` (Data Dictionary S4).
 - Separately, `scripts/fetchRefCpi.js` pulls the **official** daily Ref CPI (NSA
   only) from TreasuryDirect → `TIPS/RefCPI.csv`, used to cross-check the
   calculated NSA.

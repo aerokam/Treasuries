@@ -18,7 +18,7 @@ const ROOT = path.join(__dirname, '..');
 const NL = '\r\n';
 const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
 const V = p => 'viewer.html#/md/' + p;
-const DS = a => V('knowledge/DataStores.md' + (a ? '#' + a : ''));
+const DS = a => V('knowledge/DATA_DICTIONARY.md#' + (a || '2.0-data-stores-s'));
 const K = 'YieldCurves/knowledge/';
 const F31 = K + '3.1_Parse_Sources_And_Calculate_Yields.md';
 
@@ -467,7 +467,7 @@ function level2YieldCurves() {
     up: 'DFD_LEVEL1.html', upLabel: 'Level 1',
     spec: V('YieldCurves/README.md'), specLabel: 'Yield Curves specs', svg: P.join(NL),
     notes: ['  <b>No process here writes a data store.</b> Every flow ends at 3.7 and is gone when the page closes.',
-      '  The spot yield curves, breakeven inflation and bid and ask spreads are available from R2 all the same: Level 1 process 1 executes the same calculations as a scheduled job and writes <a href="viewer.html#/md/knowledge/DataStores.md#s13">Yield curves (S13)</a>, Breakeven inflation (S14) and Bid and ask spreads (S15). Each calculation is defined once, in shared/src/, and imported by both.',
+      '  The spot yield curves, breakeven inflation and bid and ask spreads are available from R2 all the same: Level 1 process 1 executes the same calculations as a scheduled job and writes <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s13">Yield curves (S13)</a>, Breakeven inflation (S14) and Bid and ask spreads (S15). Each calculation is defined once, in shared/src/, and imported by both.',
       '  3.1 is the only process that reads a store; the others take their input from each other. It explodes at <a href="DFD_LEVEL3_YC_LOAD.html">Level 3</a>.',
       '  Each flow is named by the one structure it holds, defined in <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#6.0-data-flows">Data Dictionary &sect;6.0</a>. Two structures passing between the same two processes are drawn as two flows.',
       '  The page also reads the GSW curve parameters, for a reference curve drawn only on an analysis view opened with ?gsw. No view of the app uses them otherwise, so they are not drawn here.'].join(NL)
@@ -596,7 +596,7 @@ function level2YieldsMonitor() {
     notes: ['  <b>No process here writes a data store.</b> Every flow ends at 2.5, 2.6 or 2.7 and is gone when the page closes.',
       '  <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#e5">CNBC (E5)</a> is drawn as a box, in the store column, since this is the one place a Level 2 diagram in this portal shows an app reading an entity directly, live — no acquisition job stands between it and the app (see <a href="viewer.html#/md/knowledge/DFD_Worklist.md">DFD_Worklist.md</a> §4.0). Its two flows are independently named: <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#market-yields">market yields</a>, its chart-bar feed, to 2.1; <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#live-quotes">live quotes</a>, its quote service, to 2.2.',
       '  2.1 explodes at <a href="DFD_LEVEL3_YM_ASSEMBLE.html">Level 3</a>.',
-      '  2.3 and 2.4 each read <a href="viewer.html#/md/knowledge/DataStores.md#s16">Bond holidays (S16)</a> directly, to exclude a weekend or holiday bar from their own calculation, rather than through 2.1.',
+      '  2.3 and 2.4 each read <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s16">Bond holidays (S16)</a> directly, to exclude a weekend or holiday bar from their own calculation, rather than through 2.1.',
       '  Each flow is named by the one structure it holds, defined in <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#6.0-data-flows">Data Dictionary &sect;6.4</a>.'].join(NL)
   });
 }
@@ -644,7 +644,7 @@ function level3YieldsMonitorAssemble() {
     up: 'DFD_LEVEL2_YIELDSMONITOR.html', upLabel: 'Level 2 — Yields Monitor', svg: P.join(NL),
     notes: ['  One process per family of UI ranges — 2D/10D, 1Y/2Y/3Y, 10Y/ALL and Custom — each independent: only one is active at a time, so nothing here combines their output.',
       '  Every process here drills to its own section of <a href="' + S() + '">2.1 Assemble range data</a>.',
-      '  Every process also reads <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#market-yields">market yields</a> live, from <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#e5">CNBC (E5)</a>\'s chart-bar feed, for its own primary feed or its own live tip — only <a href="viewer.html#/md/knowledge/DataStores.md#s18">Intraday archive (S18)</a> and <a href="viewer.html#/md/knowledge/DataStores.md#s6">Yield history (S6)</a> are the fallbacks drawn on the left.'].join(NL)
+      '  Every process also reads <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#market-yields">market yields</a> live, from <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#e5">CNBC (E5)</a>\'s chart-bar feed, for its own primary feed or its own live tip — only <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s18">Intraday archive (S18)</a> and <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s6">Yield history (S6)</a> are the fallbacks drawn on the left.'].join(NL)
   });
 }
 

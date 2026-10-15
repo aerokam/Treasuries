@@ -1,6 +1,6 @@
 // fidelity-parse.js -- shared parser for Fidelity's combined Treasury+TIPS CSV export
 // (R2 key Treasuries/FidelityTreasuriesTips.csv). Spec: YieldCurves/knowledge/
-// 3.1_Parse_Sources_And_Calculate_Yields.md#parse-market-quotes (3.1.2), knowledge/DataStores.md#s7.
+// 3.1_Parse_Sources_And_Calculate_Yields.md#parse-market-quotes (3.1.2), knowledge/DATA_DICTIONARY.md#s7.
 //
 // Field-shape helpers (cleanFidelityField, fidPriceField, fidParseMaturity, the download-date
 // pair) are source-format-only. The two row parsers below are the single canonical home for

@@ -5,7 +5,7 @@
 This file is interaction/workflow guidance only — commands, tool gotchas, git hooks. It is **not** a substitute for the specs and must never restate spec content (see the top-level `CLAUDE.md`'s Specs-First Mandate and Single Source of Truth directive). Before touching code in a project that has a `knowledge/` folder, read the governing spec(s) first:
 
 - **TipsLadderManager**: `TipsLadderManager/knowledge/1.0`–`6.0`, plus `DATA_DICTIONARY.md`, `TECHNICAL_REFERENCE.md`, `PROJECT_VISION.md` in the same folder.
-- **Shared/global** (R2 data stores, ingestion pipelines, domain terminology used by every app): repo-root `knowledge/DATA_DICTIONARY.md`, `Data_Pipeline.md`, `DataStores.md`, `Bond_Basics.md`, `TIPS_Basics.md`.
+- **Shared/global** (R2 data stores, ingestion pipelines, domain terminology used by every app): repo-root `knowledge/DATA_DICTIONARY.md`, `Data_Pipeline.md`, `Bond_Basics.md`, `TIPS_Basics.md`.
 - **YieldCurves**: `YieldCurves/knowledge/` (SA/SAO adjustment logic, visual standards) plus the shared specs above for data pipeline facts — YieldCurves has no separate project-level data-pipeline spec of its own.
 
 If a claim below ever conflicts with a spec, the spec wins — fix this file, don't propagate the stale claim.
@@ -201,7 +201,7 @@ Column schema, rendering, and popup routing are specified in `knowledge/5.0_UI_S
 
 ### Data Infrastructure
 
-Yield-source pipeline (default vs. cross-check source) is specified in `knowledge/3.1_Data_Pipeline.md` §4.0. Full R2 file manifest: repo-root `knowledge/DataStores.md` / `DATA_DICTIONARY.md`.
+Yield-source pipeline (default vs. cross-check source) is specified in `knowledge/3.1_Data_Pipeline.md` §4.0. Full R2 file manifest: repo-root `knowledge/DATA_DICTIONARY.md` §2.0.
 
 - **Scheduled updates**: Windows Task Scheduler (local)
 
@@ -228,7 +228,7 @@ npx serve .               # Serve locally (run from root of Treasuries repo)
 
 ### Data Infrastructure (R2)
 
-R2 file manifest, update schedule, and ownership are specified in the repo-root `knowledge/Data_Pipeline.md` and `knowledge/DataStores.md` (covers `Treasuries/YieldsFromFedInvestPrices.csv`, `Treasuries/FidelityTreasuriesTips.csv`, `TIPS/RefCpiNsaSa.csv`, `TIPS/YieldsSaSao.csv`, `misc/BondHolidaysSifma.csv`). Do not restate here.
+R2 file manifest, update schedule, and ownership are specified in the repo-root `knowledge/Data_Pipeline.md` and `knowledge/DATA_DICTIONARY.md` §2.0 (covers `Treasuries/YieldsFromFedInvestPrices.csv`, `Treasuries/FidelityTreasuriesTips.csv`, `TIPS/RefCpiNsaSa.csv`, `TIPS/YieldsSaSao.csv`, `misc/BondHolidaysSifma.csv`). Do not restate here.
 
 ### Fidelity Download Flow
 

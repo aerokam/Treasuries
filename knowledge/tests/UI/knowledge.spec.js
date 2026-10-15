@@ -42,8 +42,8 @@ test.describe('Knowledge Map and Viewer', () => {
     await expect(body).toContainText('Implemented by:');
   });
 
-  test('toggles a CSV preview in the DataStores doc', async ({ page }) => {
-    await page.goto('/knowledge/viewer.html#/md/knowledge/DataStores.md');
+  test('toggles a CSV preview in the Data Dictionary', async ({ page }) => {
+    await page.goto('/knowledge/viewer.html#/md/knowledge/DATA_DICTIONARY.md');
 
     const viewLink = page.locator('a:has-text("View")').first();
     await expect(viewLink).toBeVisible({ timeout: 10000 });

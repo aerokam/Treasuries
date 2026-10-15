@@ -12,7 +12,7 @@ Yields Monitor is process 2 on [Level 1](/knowledge/DFD_LEVEL1). Its [Level 2 di
 
 | Process | Spec | What it does |
 |---|---|---|
-| 2.1 | [Assemble range data](../YieldsMonitor/knowledge/2.1_Assemble_Range_Data.md) | Builds each symbol's [Yield Series](./DATA_DICTIONARY.md#yield-series) for the active range, from [Yield history (S6)](./DataStores.md#s6), [Intraday archive (S18)](./DataStores.md#s18) and CNBC's live feed, in whichever combination the range calls for. |
+| 2.1 | [Assemble range data](../YieldsMonitor/knowledge/2.1_Assemble_Range_Data.md) | Builds each symbol's [Yield Series](./DATA_DICTIONARY.md#yield-series) for the active range, from [Yield history (S6)](./DATA_DICTIONARY.md#s6), [Intraday archive (S18)](./DATA_DICTIONARY.md#s18) and CNBC's live feed, in whichever combination the range calls for. |
 | 2.2 | [Read live quotes](../YieldsMonitor/knowledge/2.2_Read_Live_Quotes.md) | Reads every symbol's live Yield and prior close from CNBC's quote service, and today's real bond behind each Seasonally Adjusted TIPS symbol. |
 | 2.3 | [Calculate day change](../YieldsMonitor/knowledge/2.3_Calculate_Day_Change.md) | Calculates the [Day Change](./DATA_DICTIONARY.md#day-change): the current Yield less the prior trading day's 17:05 ET close. |
 | 2.4 | [Adjust for seasonality](../YieldsMonitor/knowledge/2.4_Adjust_For_Seasonality.md) | Carries each TIPS symbol's Yield Series through the same Price → SA Price → SA Yield transform Yield Curves applies to an actual TIPS. |

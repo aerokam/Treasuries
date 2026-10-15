@@ -537,7 +537,7 @@ async function fetchWithTimeout(url, options = {}, timeout = 8000, retries = 2) 
 // Single consolidated, symbol-nested history file: { "US10Y": [{x,y}, ...], ... }
 const R2_HISTORY_URL = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/yields-history/history.json';
 
-// Daily raw-feed snapshots (see knowledge/DataStores.md#s18), written
+// Daily raw-feed snapshots (see knowledge/DATA_DICTIONARY.md#s18), written
 // weekdays at 17:05 ET by archiveIntraday.js — the last-resort fallback for 2D/10D when
 // CNBC's live feed itself returns nothing.
 const INTRADAY_ARCHIVE_BASE = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/yields-history/intraday-raw';

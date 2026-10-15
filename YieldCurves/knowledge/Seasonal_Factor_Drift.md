@@ -4,7 +4,7 @@
 
 **Status:** Research supporting the **S_maturity** input to the seasonal adjustment ([3.2 Adjust for seasonality](3.2_Adjust_For_Seasonality.md)). Same relation to 1.0 that [SAO Residual Analysis](SAO_Residual_Analysis.md) has to [3.3](3.3_Adjust_For_Other_Effects.md).
 **Dependencies:** [3.2 Adjust for seasonality](3.2_Adjust_For_Seasonality.md), [Canty](Canty.md), [DATA_DICTIONARY.md#sa-factor](../../knowledge/DATA_DICTIONARY.md#sa-factor), [DATA_DICTIONARY.md#sa-price-factor](../../knowledge/DATA_DICTIONARY.md#sa-price-factor), [DATA_DICTIONARY.md#cpi-sa](../../knowledge/DATA_DICTIONARY.md#cpi-sa).
-**Data snapshot:** FRED `CPIAUCNS` (NSA, 1913–) and `CPIAUCSL` (SA, 1947–), monthly, overlap 1947-01 … 2026-07 (954 months). Live [S1](../../knowledge/DataStores.md#s1) and [S4](../../knowledge/DataStores.md#s4), settlement 2026-09-08, 53 TIPS.
+**Data snapshot:** FRED `CPIAUCNS` (NSA, 1913–) and `CPIAUCSL` (SA, 1947–), monthly, overlap 1947-01 … 2026-07 (954 months). Live [S1](../../knowledge/DATA_DICTIONARY.md#s1) and [S4](../../knowledge/DATA_DICTIONARY.md#s4), settlement 2026-09-08, 53 TIPS.
 
 ---
 

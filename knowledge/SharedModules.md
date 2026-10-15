@@ -32,7 +32,7 @@ caller's spec.
 - `localDate(s)` — parses `'YYYY-MM-DD'` into a local-time `Date`.
 - `toIsoDate(date)` — formats a `Date` back to `'YYYY-MM-DD'`.
 - `nextBusinessDay(date, holidaySet)` — the next date that is not a weekend or a listed holiday; always advances at least one day.
-- `parseHolidaySet(rows)` — builds the holiday `Set` from [Bond holidays (S16)](./DataStores.md#s16)'s rows.
+- `parseHolidaySet(rows)` — builds the holiday `Set` from [Bond holidays (S16)](./DATA_DICTIONARY.md#s16)'s rows.
 - `actualPaymentDate(d, holidaySet)` — the date a payment scheduled for `d` is actually made: `d` itself if already a trading day, otherwise the next one. Not the same as `nextBusinessDay`, which always advances.
 
 **Called by**: [4.1.1 Fetch and parse market quotes](../TipsLadderManager/knowledge/4.1_Load_Market_Data.md#fetch-and-parse-market-quotes) and [4.1.3 Fetch auxiliary TIPS data](../TipsLadderManager/knowledge/4.1_Load_Market_Data.md#fetch-auxiliary-tips-data) (TipsLadderManager), and the Rebalance ladder process (`actualPaymentDate` for the Cash Flow Calendar and settlement-year LMI — see [2.0 TIPS Ladders §Gap Year Coverage Model](../TipsLadderManager/knowledge/2.0_TIPS_Ladders.md#gap-year-coverage-model)), [3.1.6 Determine settlement date](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#determine-settlement-date) (YieldCurves), and other processes across the portal — not yet swept for a complete list.
@@ -55,14 +55,14 @@ caller's spec.
 
 ## <a id="m4"></a>fidelity-parse.js (M4)
 **File**: `shared/src/fidelity-parse.js`
-**Purpose**: Parses Fidelity's combined Treasury+TIPS export ([Market quotes (S7)](./DataStores.md#s7)) — the row-shape and field-cleanup logic every consumer of that source shares, so which CUSIPs are kept, which settlement date the quote is stated at, and what to do with a dropped row stays with each caller.
+**Purpose**: Parses Fidelity's combined Treasury+TIPS export ([Market quotes (S7)](./DATA_DICTIONARY.md#s7)) — the row-shape and field-cleanup logic every consumer of that source shares, so which CUSIPs are kept, which settlement date the quote is stated at, and what to do with a dropped row stays with each caller.
 **Exports**:
 - `parseFidelityTipsRows(text)` — one row per TIPS CUSIP, Fidelity's quoted fields.
 - `parseFidelityNominalRows(text, { settleIso, onUnknownCusip })` — one row per non-TIPS CUSIP (Bills, Notes, Bonds and STRIPS alike), both yields calculated from the quoted ask/bid price rather than read from Fidelity's stated yields.
 - `parseFidelityDownloadDate(text)` / `fidelityDownloadDateIso(dateStr)` — the `"Date downloaded"` footer, parsed and normalized to ISO.
 - `cleanFidelityField(val)`, `fidPriceField(raw)`, `fidParseMaturity(s)` — field-shape helpers for Fidelity's CSV quirks.
 
-**Called by**: [4.1.1 Fetch and parse market quotes](../TipsLadderManager/knowledge/4.1_Load_Market_Data.md#fetch-and-parse-market-quotes) (TipsLadderManager, `parseFidelityTipsRows`) and [3.1.2 Parse market quotes](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#parse-market-quotes) (YieldCurves, both row parsers, for the app and for the acquisition job that writes [Yield curves (S13)](./DataStores.md#s13)).
+**Called by**: [4.1.1 Fetch and parse market quotes](../TipsLadderManager/knowledge/4.1_Load_Market_Data.md#fetch-and-parse-market-quotes) (TipsLadderManager, `parseFidelityTipsRows`) and [3.1.2 Parse market quotes](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#parse-market-quotes) (YieldCurves, both row parsers, for the app and for the acquisition job that writes [Yield curves (S13)](./DATA_DICTIONARY.md#s13)).
 
 ---
 
