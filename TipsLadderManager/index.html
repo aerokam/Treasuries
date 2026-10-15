@@ -2254,7 +2254,7 @@ function _settlementYearCashReceivedSince(holdingsArr, afterDateStr) {
     for (const d of couponSchedule(yearStart, b.maturity)) {
       if (d.getFullYear() !== year) continue;
       if (after && d <= after) continue;
-      if (_actualPaymentDate(d) >= today) continue;
+      if (_actualPaymentDate(d) > today) continue;
       const ev = _couponEventCalc(b, d, activeRc, activeDateIso);
       coupons += ev.couponPerBond * h.qty;
       // The final coupon date IS the maturity date, so principal lands with it.
@@ -2284,7 +2284,7 @@ function _settlementYearPaymentDates(holdingsArr, which = 'paid') {
     if (!b?.maturity || !h.qty) continue;
     for (const d of couponSchedule(yearStart, b.maturity)) {
       if (d.getFullYear() !== year) continue;
-      const made = _actualPaymentDate(d) < today;
+      const made = _actualPaymentDate(d) <= today;
       if (which === 'paid' ? !made : made) continue;
       seen.add(_isoDate(d));
     }
@@ -2294,12 +2294,12 @@ function _settlementYearPaymentDates(holdingsArr, which = 'paid') {
 
 // The choice a file’s own Ref CPI date amounts to. A ladder stated part-way through the settlement
 // year has generated every payment from that date forward, which is the same window as "after the
-// last payment date before it". A date in an earlier year excludes nothing, so the whole settlement
+// last payment date on or before it", since a payment is in the account on its date. A date in an earlier year excludes nothing, so the whole settlement
 // year counts. This is also the earliest choice offered: a holder cannot have been collecting since
 // before the ladder was stated.
 function _cashAfterFromRefCpiDate(refCpiDate) {
   if (!refCpiDate) return null;
-  const prior = _settlementYearPaymentDates(currentHoldingsArray).filter(d => d < refCpiDate);
+  const prior = _settlementYearPaymentDates(currentHoldingsArray).filter(d => d <= refCpiDate);
   return prior.length ? prior[prior.length - 1] : null;
 }
 
@@ -2342,7 +2342,7 @@ function buildCashFlowData(holdingsArr) {
     const b = tipsMarketData.get(h.cusip);
     if (!b?.maturity || !h.qty) continue;
     for (const d of couponSchedule(walkFrom, b.maturity)) {
-      if (_actualPaymentDate(d) < today) continue;
+      if (_actualPaymentDate(d) <= today) continue;
       const ev = _couponEventCalc(b, d, activeRc, activeDateIso);
       const { principalPerBond, couponPerBond } = ev;
       const calc = {

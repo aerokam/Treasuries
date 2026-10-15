@@ -1062,8 +1062,11 @@ test('rebalance: gap-free portfolio with interior holes makes no large trades', 
   // Honoring the derived by-year DARA is a no-op; allow ±3 bonds for integer rounding only.
   expect(maxAbsDelta, `Largest |Qty Delta| was ${maxAbsDelta} bonds — the gap-free derived Per-Year DARA must not trade`).toBeLessThanOrEqual(3);
 
+  // Coupons already received this year are offered as Available Cash and applied toward the first rung, so
+  // the no-op's net cash is that credit (one rung sells fewer bonds), not zero.
   const netCash = parseNetCash(await page.locator('#net-cash-val').textContent());
-  expect(Math.abs(netCash), `Net cash ${netCash} should be ≈0 for a gap-free no-op`).toBeLessThanOrEqual(3000);
+  const offered = Number(await page.locator('#available-cash').inputValue()) || 0;
+  expect(Math.abs(netCash - offered), `Net cash ${netCash} should equal the Available Cash ${offered} credited, ±rounding`).toBeLessThanOrEqual(1500);
 });
 
 // ── 16c. Infer DARA over a selected range fills an empty interior year ────────
@@ -1852,16 +1855,16 @@ test('Available Cash counts maturity proceeds from rungs that have already matur
   // The rungs that have matured this settlement year are named in the TIPS reference data (a matured bond is no
   // longer quoted); the ladder file is a Build export with those bonds added.
   const settle = await computeSettleDateStr();
-  // A rung has matured when its payment has been made before today (2.0 §Settlement-year LMI: "unpaid" is
-  // checked against the trade date, on the payment date rolled past a weekend or holiday), not before the
-  // settlement date: on a maturity day the payment is dated today and is not yet in hand.
+  // A rung has matured when its payment date, rolled past a weekend or holiday, is today or earlier: maturity
+  // proceeds are in the account on the maturity date. The settlement date is the date a trade settles, not a
+  // date a payment is made.
   const holidays = parseHolidaySet(parseCsvRows(await r2Text('misc/BondHolidaysSifma.csv'), false));
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const maturedBonds = [];
   for (const line of (await r2Text('TIPS/TipsRef.csv')).split(/\r?\n/)) {
     const f = line.split(',');
-    if (/^[A-Z0-9]{9}$/.test(f[0]) && f[1] && f[1].slice(0, 4) === settle.slice(0, 4) && actualPaymentDate(localDate(f[1]), holidays) < today) maturedBonds.push({ cusip: f[0], maturity: f[1] });
+    if (/^[A-Z0-9]{9}$/.test(f[0]) && f[1] && f[1].slice(0, 4) === settle.slice(0, 4) && actualPaymentDate(localDate(f[1]), holidays) <= today) maturedBonds.push({ cusip: f[0], maturity: f[1] });
   }
   test.skip(maturedBonds.length === 0, 'no TIPS has matured yet this settlement year');
   const rungs = [...new Map(maturedBonds.map(m => [m.maturity, m])).values()]; // one bond per maturity date
@@ -2278,7 +2281,10 @@ test('Cash Flow Calendar: amounts show to the penny, for exact comparison agains
   expect(count).toBeGreaterThan(0);
   for (const t of await amountCells.allTextContents()) expect(t).toMatch(/^\$[\d,]+\.\d{2}$/);
 
-  // Level-3 (date) drill popup matches the same penny precision.
+  // Level-3 (date) drill popup matches the same penny precision. Only the settlement year opens expanded, and
+  // it has no date once the year's last payment has been made, so expand the first year listed.
+  const firstYear = page.locator('#cash-flow-content tr.cf-year-header').first();
+  if ((await firstYear.getAttribute('data-expanded')) === 'false') await firstYear.click();
   await page.locator('#cash-flow-content td.cf-date-cell:visible').first().click();
   const popupAmounts = page.locator('#shared-popup td:last-child');
   const popupCount = await popupAmounts.count();

@@ -315,7 +315,7 @@ function simulatedInterestByYear({
     const paid = actualPaymentDate(date, bondHolidays);
     const year = date.getFullYear();
     if (year !== settlementYear) return true;
-    if (rmdCouponMode === 'none' || paid < tradeDate) return false;
+    if (rmdCouponMode === 'none' || paid <= tradeDate) return false;
     if (rmdCouponMode === 'last') return rmdLastDate != null && +paid === +rmdLastDate;
     return true;
   };
@@ -710,7 +710,7 @@ export function remainingCouponPaymentsThisYear(maturity, settlementDate, bondHo
   const walkFrom = new Date(tradeDate); walkFrom.setDate(walkFrom.getDate() - 10);
   return couponSchedule(walkFrom, maturity)
     .map(d => actualPaymentDate(d, bondHolidays))
-    .filter(actual => actual >= tradeDate && actual.getFullYear() === year)
+    .filter(actual => actual > tradeDate && actual.getFullYear() === year)
     .length;
 }
 
@@ -733,7 +733,7 @@ export function latestRemainingCouponDate(maturities, settlementDate, bondHolida
     const walkFrom = new Date(tradeDate); walkFrom.setDate(walkFrom.getDate() - 10);
     for (const d of couponSchedule(walkFrom, maturity)) {
       const actual = actualPaymentDate(d, bondHolidays);
-      if (actual >= tradeDate && actual.getFullYear() === year && (!maxDate || actual > maxDate)) maxDate = actual;
+      if (actual > tradeDate && actual.getFullYear() === year && (!maxDate || actual > maxDate)) maxDate = actual;
     }
   }
   return maxDate;
@@ -759,7 +759,7 @@ export function rmdCappedRemainingCoupons(maturity, settlementDate, bondHolidays
     const walkFrom = new Date(tradeDate); walkFrom.setDate(walkFrom.getDate() - 10);
     const hasIt = couponSchedule(walkFrom, maturity).some(d => {
       const actual = actualPaymentDate(d, bondHolidays);
-      return actual >= tradeDate && actual.getFullYear() === year && +actual === +target;
+      return actual > tradeDate && actual.getFullYear() === year && +actual === +target;
     });
     return hasIt ? 1 : 0;
   }
