@@ -17,24 +17,6 @@ production impact go here.
   2. The same approach for the gap years. Open: a DD term for the simulated 10-year TIPS, the issue dates (January and July), how the aging active lower bracket is treated (the static-aged bracket check has not been run), and 2.0 has no gap-year section yet. The DD already says bracket excess is sold as the TIPS it stands in for are issued.
 - **Potential enhancement (logged 2026-10-05):** the lower cover is now chosen by rule instead of being the 2056, so a holder who already holds 2056 Cover Excess would need handling like [Retained Bracket Excess](../knowledge/DATA_DICTIONARY.md#retained-bracket-excess) gives the gap years. No one is known to have used the app for Future 30Y years, so this is deferred.
 
-### Multi-bracket mode's lower bracket can resolve to a retained year instead of the canonical Active Lower Bracket
-
-- **Found:** 2026-09-30, alongside the gap-coverage-intent fix above: on McNeill Joint WROS
-  (real account, Multi-bracket mode), `result.summary.brackets.lowerYear` resolved to 2032 — a
-  retained holding — instead of 2036, the canonical Active Lower Bracket (`getActiveLowerBracketYear`
-  in `before-state-lib.js`, resolved from `tipsMarketData` alone, holdings never consulted; 3.0
-  §Active Lower Bracket already documents this correctly). 2-bracket mode has an explicit override
-  for exactly this (`rebalance-lib.js` `runRebalance`, `bracketMode === '2bracket'` block); Multi-bracket
-  mode has no equivalent, so `identifyBrackets`'s own excess-ARA pick stands unchallenged.
-- **Deferred, not fixed:** the gap-coverage-intent fix above makes this moot for the reported case —
-  with no genuine coverage intent, no bracket-excess trade lands at 2032 or anywhere else, so the
-  wrong `lowerYear` had no visible effect once retested (net cash −$2,371,020 → $0, zero trades). The
-  developer asked to fix the bigger (gap-coverage) problem first; this is a real bug against an
-  already-correct spec and should still be looked at once a case with genuine coverage intent and a
-  retained lower-bracket holding can be tested against it.
-- **Files likely involved:** `src/rebalance-lib.js` (`identifyBrackets`, the `bracketMode` branch
-  around line 1055).
-
 ### Help text still to be walked, section by section
 
 The worklist moved to `knowledge/Terminology_Worklist.md` on 2026-09-06, since the work now spans
@@ -354,6 +336,13 @@ per-CUSIP prices for a past date (3.1 §4.0).
 - **Found 2026-10-10** while testing the Future 30Y credits. `accruedInterest` in `shared/src/bond-math.js` takes the next coupon on or after the settlement date, so on a coupon date the elapsed days equal the days in the period and it returns a full half-year coupon, where the convention is 0 on the coupon date. The Future 30Y test works around it. Not yet checked whether any caller settles on a coupon date, or whether the app intends the full coupon.
 
 ## FIXED
+
+### Multi-bracket mode's `brackets.lowerYear` is the retained lower bracket, not a wrong Active Lower Bracket
+
+- **Reported:** 2026-09-30: on a Multi-bracket run `result.summary.brackets.lowerYear` was 2032, a retained holding, where 2036 was expected.
+- **Closed 2026-10-14 as not a bug.** In Multi-bracket mode `brackets.lowerYear` names the retained lower bracket (`identifyBrackets`, from holdings) and `newLowerYear` names the Active Lower Bracket (from `tipsMarketData` alone, `runRebalance`). The Gap Dur popup, the Bracket Cost drill and the year headers already read the two that way. Checked on the current market data with a held 2032 TIPS: with excess, the retained weight is non-zero and the retained excess is partly sold; with the year funded only, its weight is 0 and the output is identical to 2-bracket mode.
+- **Real discrepancy found while checking:** the Bracket Cost drill and the bracket year header still named the two brackets "Orig/Original lower" and "New lower", which the Gap Dur popup had already retired. They now read "Retained lower bracket" and "Active lower bracket" (DD §Retained Lower Bracket, §Active Lower Bracket), and `scripts/check-vocabulary.js` bans the retired names in strings.
+
 
 ### inferFirstYearFromHoldings required the pre-gap anchor to be a January maturity
 
