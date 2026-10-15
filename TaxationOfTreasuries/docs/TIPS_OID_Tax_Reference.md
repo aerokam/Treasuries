@@ -13,7 +13,7 @@
 6. [Box 8: OID (Annual Inflation Accrual)](#box-8-oid-annual-inflation-accrual)
    - [Debt instrument held at the end of the tax year](#debt-instrument-held-at-the-end-of-the-tax-year)
    - [Debt instrument sold or retired during the tax year](#debt-instrument-sold-or-retired-during-the-tax-year)
-   - [Both cases](#both-cases)
+   - [Step 2 (both cases)](#step-2-both-cases)
    - [Vanguard — Monthly Breakdown](#vanguard-monthly-breakdown)
    - [Broker Comparison](#broker-comparison)
 7. [Box 12: Amortized Bond Premium (ABP)](#box-12-amortized-bond-premium-abp)
@@ -135,11 +135,11 @@ The Box 3 annual total is the sum of both semi-annual payments. Note: because th
 
 ## Box 8: OID (Annual Inflation Accrual)
 
-IRS Pub 1212 gives the OID of an inflation-indexed debt instrument for the tax year as two steps. The first step differs by whether the instrument is held at the end of the tax year or is sold or retired during it.
+IRS Pub 1212 (Inflation-Indexed Debt Instruments, coupon bond method, which applies to TIPS) gives the OID for the tax year as two steps. Step 1 differs by whether the instrument is held at the end of the tax year or is sold or retired during it. Step 2 is the same for both.
 
 ### Debt instrument held at the end of the tax year
 
-Pub 1212 step 1 adds the inflation-adjusted principal for the day after the last day of the tax year and any principal payments received during the year. Step 2 subtracts the inflation-adjusted principal for the first day held during the tax year.
+> "Add the inflation-adjusted principal amount for the day after the last day of the tax year and any principal payments you received during the year. (For TIPS, multiply the par value by the index ratio for the day after the last day of the tax year, and add any principal payments received.)"
 
 ```
 annual_OID = face × IR(1/1 next year) + principal_payments_received
@@ -148,22 +148,26 @@ annual_OID = face × IR(1/1 next year) + principal_payments_received
 
 ### Debt instrument sold or retired during the tax year
 
-Pub 1212 step 1 adds the inflation-adjusted principal for the last day on which the instrument was held and any principal payments received during the year. Step 2 is the same as for an instrument held at the end of the tax year.
+> "Add the inflation-adjusted principal amount for the last day on which you held the debt instrument during the tax year and any principal payments you received during the year. (For TIPS, multiply the par value by the index ratio for the sale or retirement date, and add any principal payments received.)"
 
 ```
-annual_OID = face × IR(last day held) + principal_payments_received
+annual_OID = face × IR(sale or retirement date) + principal_payments_received
              − face × IR(first day held this year)
 ```
 
-### Both cases
+### Step 2 (both cases)
 
-With `IR(d) = refCPI(d) / refCPI_dated_date` and no principal payments received, the two formulas reduce to:
+> "Subtract from (1) above the inflation-adjusted principal amount for the first day on which you held the debt instrument during the tax year. (For TIPS, subtract from (1) above the product of the par value multiplied by the index ratio for the first day held during the tax year.)"
+
+With `IR(d) = refCPI(d) / refCPI_dated_date` and no principal payments received, the two cases reduce to:
 
 ```
 annual_OID = face × (refCPI(end day) − refCPI(first day held)) / refCPI_dated_date
 ```
 
-`end day` is 1/1 of the next year for an instrument held at the end of the tax year, and the last day held for an instrument sold or retired.
+`end day` is 1/1 of the next year for an instrument held at the end of the tax year, and the sale or retirement date for an instrument sold or retired.
+
+A negative result is a deflation adjustment, not negative OID: it offsets the stated interest for the year and reduces basis by the same amount (Pub 1212 Example 9).
 
 For the first year held, "first day held" = settlement date. For subsequent years, it is 1/1 of that year.
 
