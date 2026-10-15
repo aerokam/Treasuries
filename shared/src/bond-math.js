@@ -36,6 +36,12 @@ export function _nextCouponOnOrAfter(settle, mature) {
   return candidates.find(c => c >= settle && c <= mature) || null;
 }
 
+// The first coupon a buyer settling on `settle` receives: strictly after the settlement date, because a coupon
+// payable on the settlement date is paid to the seller (accrued interest is 0 that day, A = 0).
+export function _nextCouponAfter(settle, mature) {
+  return _nextCouponOnOrAfter(new Date(settle.getFullYear(), settle.getMonth(), settle.getDate() + 1), mature);
+}
+
 // Full Macaulay-duration workings: coupon-date walk, day-count fractions, per-period cash
 // flows/PVs. calculateDuration/calculateMDuration are thin wrappers over this — single source
 // for both the final number and any UI that needs to show how it was derived (5.0 §Nested
@@ -43,7 +49,7 @@ export function _nextCouponOnOrAfter(settle, mature) {
 // Returns null if inputs are degenerate (settlement >= maturity, yld <= -2, or no coupon dates).
 export function calculateDurationDetail(settlement, maturity, coupon, yld) {
   if (settlement >= maturity || yld <= -2) return null;
-  const nextCpn = _nextCouponOnOrAfter(settlement, maturity);
+  const nextCpn = _nextCouponAfter(settlement, maturity);
   if (!nextCpn) return null;
   const mDay   = maturity.getDate();
   const lastCpn = addSemiannualPeriods(nextCpn, -1, mDay);
@@ -186,9 +192,10 @@ export function termYears(settle, maturity) {
 // Prorates the current coupon period by days elapsed since the last coupon date.
 // Returns accrued interest per $100 par (nominal — no index ratio applied), plus
 // the day-count components (A = days since last coupon, E = days in period).
+// On a coupon date the last coupon date is that date: A = 0 and the coupon paid that day is the seller's.
 // settle: Date object. mature: Date object.
 export function accruedInterest(coupon, settle, mature) {
-  const nextCoupon = _nextCouponOnOrAfter(settle, mature);
+  const nextCoupon = _nextCouponAfter(settle, mature);
   if (!nextCoupon) return { accrued: 0, A: 0, E: 0, lastCoupon: null, nextCoupon: null };
   const lastCoupon = addSemiannualPeriods(nextCoupon, -1, mature.getDate());
   const E = daysBetween(lastCoupon, nextCoupon);
@@ -229,24 +236,7 @@ export function yieldFromPrice(cleanPrice, coupon, settle, mature) {
     if (daysToMat < daysInYear / 2) return (100 / cleanPrice - 1) * daysInYear / daysToMat;
   }
 
-  const matMon = mature.getMonth() + 1;
-  const cm1 = matMon <= 6 ? matMon : matMon - 6;
-  const cm2 = cm1 + 6;
-
-  function nextCouponOnOrAfter(d) {
-    const mDay = mature.getDate(); // use maturity day, not hardcoded 15
-    const candidates = [];
-    for (let y = d.getFullYear() - 1; y <= d.getFullYear() + 1; y++) {
-      for (const mon of [cm1, cm2]) {
-        const lastDay = new Date(y, mon, 0).getDate(); // last day of that month
-        candidates.push(new Date(y, mon - 1, Math.min(mDay, lastDay)));
-      }
-    }
-    candidates.sort((a, b) => a - b);
-    return candidates.find(c => c >= d && c <= mature) || null;
-  }
-
-  const nextCoupon = nextCouponOnOrAfter(settle);
+  const nextCoupon = _nextCouponAfter(settle, mature);
   if (!nextCoupon) return null;
   const { accrued, E } = accruedInterest(coupon, settle, mature);
   const DSC = daysBetween(settle, nextCoupon);
@@ -306,24 +296,8 @@ export function priceFromYield(yld, coupon, settle, mature) {
   if (settle >= mature) return null;
 
   const semiCoupon = (coupon / 2) * 100;
-  const matMon = mature.getMonth() + 1;
-  const cm1 = matMon <= 6 ? matMon : matMon - 6;
-  const cm2 = cm1 + 6;
 
-  function nextCouponOnOrAfter(d) {
-    const mDay = mature.getDate();
-    const candidates = [];
-    for (let y = d.getFullYear() - 1; y <= d.getFullYear() + 1; y++) {
-      for (const mon of [cm1, cm2]) {
-        const lastDay = new Date(y, mon, 0).getDate();
-        candidates.push(new Date(y, mon - 1, Math.min(mDay, lastDay)));
-      }
-    }
-    candidates.sort((a, b) => a - b);
-    return candidates.find(c => c >= d && c <= mature) || null;
-  }
-
-  const nextCoupon = nextCouponOnOrAfter(settle);
+  const nextCoupon = _nextCouponAfter(settle, mature);
   if (!nextCoupon) return null;
 
   const { accrued, E } = accruedInterest(coupon, settle, mature);

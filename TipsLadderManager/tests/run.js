@@ -1473,8 +1473,8 @@ console.log('\nFuture 30Y: the three amounts credited against the full annual co
 {
   const S = settlementDate, SY = S.getFullYear();
   const aiPerTips = (b, ir, date) => {
-    const { accrued, nextCoupon } = accruedInterest(b.coupon ?? 0, date, b.maturity);
-    return nextCoupon && +nextCoupon === +date ? 0 : accrued / 100 * ir * 1000;   // on a coupon date the buyer takes none of that coupon
+    const { accrued } = accruedInterest(b.coupon ?? 0, date, b.maturity);
+    return accrued / 100 * ir * 1000;   // accruedInterest returns 0 on a coupon date: that coupon is the seller's
   };
   const cleanPerTips = (b, ir, date) => priceFromYield(b.yield, b.coupon ?? 0, date, b.maturity) / 100 * ir * 1000;
   const couponsPaid = (b, ir, a, z) => couponSchedule(a, b.maturity).filter(d => d > a && d <= z && d < b.maturity).length * 1000 * ir * (b.coupon ?? 0) / 2;

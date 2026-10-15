@@ -9,7 +9,7 @@
 // YieldsMonitor's SA historical reconstruction sweeping settle across every calendar
 // day — and diverged from priceFromYield, which never had that special case).
 
-import { yieldFromPrice, priceFromYield, daysBetween, accruedInterest } from '../src/bond-math.js';
+import { yieldFromPrice, priceFromYield, daysBetween, accruedInterest, calculateMDuration } from '../src/bond-math.js';
 
 let pass = 0, fail = 0;
 const ok = (cond, msg) => { if (cond) { pass++; } else { fail++; console.error('  ✗ ' + msg); } };
@@ -112,6 +112,27 @@ function roundTrips(settle, mature, coupon, yld, tol = 1e-9) {
   ok(late.A === E_expected - 1, `accruedInterest: A=E-1 the day before the next coupon (got ${late.A})`);
   ok(Math.abs(late.accrued - (E_expected - 1) / E_expected) < 1e-9, `accruedInterest: accrued = semiCoupon x (E-1)/E (got ${late.accrued})`);
   ok(late.accrued < 1.0, `accruedInterest: accrued strictly below the full semiannual coupon (got ${late.accrued})`);
+
+  // On a coupon date the coupon paid that day is the seller's: A = 0, accrued 0, the buyer's first coupon is the
+  // next one, and a final-period settlement on the last coupon date still reaches maturity.
+  const onCoupon = accruedInterest(coupon, new Date(2026, 0, 15), maturity);
+  ok(onCoupon.A === 0 && onCoupon.accrued === 0, `accruedInterest: A=0 and accrued=0 on a coupon date (got A=${onCoupon.A}, accrued=${onCoupon.accrued})`);
+  ok(+onCoupon.lastCoupon === +new Date(2026, 0, 15) && +onCoupon.nextCoupon === +new Date(2026, 6, 15),
+    'accruedInterest: on a coupon date that date is the last coupon and the next is six months on');
+  const penultimate = accruedInterest(coupon, new Date(2035, 6, 15), maturity);
+  ok(penultimate.A === 0 && +penultimate.nextCoupon === +maturity, 'accruedInterest: the coupon date before maturity has A=0 and the next coupon is the maturity');
+
+  // Price, yield and duration stay continuous across the coupon date: the price of the same yield on the coupon date
+  // sits between the day before and the day after, and yield from that price returns the yield.
+  const p0 = priceFromYield(0.03, coupon, new Date(2026, 0, 14), maturity);
+  const p1 = priceFromYield(0.03, coupon, new Date(2026, 0, 15), maturity);
+  const p2 = priceFromYield(0.03, coupon, new Date(2026, 0, 16), maturity);
+  ok(p1 > Math.min(p0, p2) - 0.05 && p1 < Math.max(p0, p2) + 0.05, `priceFromYield: continuous across a coupon date (${p0.toFixed(4)}, ${p1.toFixed(4)}, ${p2.toFixed(4)})`);
+  ok(Math.abs(yieldFromPrice(p1, coupon, new Date(2026, 0, 15), maturity) - 0.03) < 1e-9, 'yieldFromPrice: inverts priceFromYield on a coupon date');
+  const m0 = calculateMDuration(new Date(2026, 0, 14), maturity, coupon, 0.03);
+  const m1 = calculateMDuration(new Date(2026, 0, 15), maturity, coupon, 0.03);
+  const m2 = calculateMDuration(new Date(2026, 0, 16), maturity, coupon, 0.03);
+  ok(Math.abs(m1 - m2) < 0.01 && m1 > m0, `calculateMDuration: on a coupon date the coupon paid that day is not the buyer's, so duration matches the next day and exceeds the day before, which still holds it (${m0.toFixed(4)}, ${m1.toFixed(4)}, ${m2.toFixed(4)})`);
 }
 
 console.log(`\n${fail === 0 ? 'PASS' : 'FAIL'} — ${pass} passed, ${fail} failed`);
