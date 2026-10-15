@@ -165,7 +165,7 @@ With `IR(d) = refCPI(d) / refCPI_dated_date` and no principal payments received,
 annual_OID = face × (refCPI(end day) − refCPI(first day held)) / refCPI_dated_date
 ```
 
-`end day` is 1/1 of the next year for an instrument held at the end of the tax year, and the sale or retirement date for an instrument sold or retired.
+`end day` is 1/1 of the next year for an instrument held at the end of the tax year, and the sale or retirement date for an instrument sold or retired. Pub 1212 says retirement date; for a TIPS that is the maturity date, the date on which principal is repaid.
 
 `principal_payments_received` is zero for a TIPS. The term comes from Treas. Reg. §1.1275-7(d)(4)(ii), which states the inflation adjustment for every inflation-indexed debt instrument, including one that repays principal in installments. A TIPS repays principal only at maturity. In the year of retirement, the index ratio for the retirement date already measures the principal redeemed, so adding the redemption as a principal payment would count it twice.
 
