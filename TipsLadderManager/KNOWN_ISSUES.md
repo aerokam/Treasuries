@@ -331,11 +331,13 @@ per-CUSIP prices for a past date (3.1 §4.0).
   anchor yield — 2.0 §Future 30Y Rungs) appears in no popup. The only way to recover it is to back
   it out of the displayed P+I: 1,014.38 implies 2 × 14.38 = 2.876%, against an actual 2.875%.
 - **Status:** open.
-### Accrued interest on a coupon date: shared function returns a full coupon (to verify)
-
-- **Found 2026-10-10** while testing the Future 30Y credits. `accruedInterest` in `shared/src/bond-math.js` takes the next coupon on or after the settlement date, so on a coupon date the elapsed days equal the days in the period and it returns a full half-year coupon, where the convention is 0 on the coupon date. The Future 30Y test works around it. Not yet checked whether any caller settles on a coupon date, or whether the app intends the full coupon.
-
 ## FIXED
+
+### Accrued interest on a coupon date: a coupon payable on the settlement date was the buyer's
+
+- **Found 2026-10-10** while testing the Future 30Y credits; **fixed 2026-10-15** (`2463383`). `accruedInterest` in `shared/src/bond-math.js` took the next coupon on or after the settlement date, so on a coupon date A = E and it returned a full half-year coupon, where [1.0 Bond Basics §Accrued Interest](../knowledge/Bond_Basics.md) defines A as the days since the last coupon date (0 on a coupon date: the coupon paid that day is the seller's).
+- **Reach:** the Trade Ticket's Accrued Interest column for any trade settling on a coupon date (a trade placed the day before one), and `calculateDuration`, which counted that coupon at t = 0 and so understated duration by about 0.09 year on a 10-year TIPS. Prices and yields were never affected: the coupon at t = 0 cancelled the full accrued.
+- **Fix:** accrued interest, yield, price and duration use the first coupon strictly after the settlement date (`_nextCouponAfter`); `couponSchedule` keeps on-or-after, since a payment dated the settlement date is still listed. `yieldFromPrice` and `priceFromYield` no longer carry their own copies of the coupon finder. The Future 30Y test's workaround is removed.
 
 ### Multi-bracket mode's `brackets.lowerYear` is the retained lower bracket, not a wrong Active Lower Bracket
 
