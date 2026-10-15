@@ -2182,11 +2182,11 @@ function _bondOrMatured(cusip) {
   return { cusip, maturity: localDate(r.maturity), coupon: r.coupon, datedDateRefCpi: r.datedDateRefCpi, price: null, yield: null };
 }
 
-// The maturity of a CUSIP that TIPS Market Data no longer quotes because its rung has matured (TipsRef maturity on
-// or before the settlement date), else null. The Holdings File import keeps such a CUSIP for Available Cash.
+// The maturity of a CUSIP that TIPS Market Data no longer quotes because its rung has matured (the payment date of its TipsRef maturity is
+// on or before today), else null. The Holdings File import keeps such a CUSIP for Available Cash.
 function _maturedMaturity(cusip) {
   const maturity = _bondOrMatured(cusip)?.maturity;
-  return maturity && settlementDate && maturedOnOrBefore(maturity, settlementDate) ? maturity : null;
+  return maturity && _tradeDateStr && maturedOnOrBefore(_actualPaymentDate(maturity), localDate(_tradeDateStr)) ? maturity : null;
 }
 
 // Every settlement-year payment this portfolio has already generated, one entry per payment date,

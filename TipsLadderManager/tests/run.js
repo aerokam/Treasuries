@@ -919,14 +919,14 @@ const parseMkt = buildTipsMarketData([
 
   // A rung matured on or before the settlement date is kept (Available Cash maturity proceeds); every other
   // CUSIP absent from TIPS Market Data is dropped. The test's TIPS reference data entries:
-  const settleD = new Date(2026, 9, 15);
+  const today15 = new Date(2026, 9, 15);
   const refMat = new Map([['MATURED01', new Date(2026, 0, 15)], ['MATBOUND1', new Date(2026, 9, 15)], ['OUTSTAND1', new Date(2027, 0, 15)]]);
-  const isMat = c => (refMat.has(c) && maturedOnOrBefore(refMat.get(c), settleD)) ? refMat.get(c) : null;
+  const isMat = c => (refMat.has(c) && maturedOnOrBefore(refMat.get(c), today15)) ? refMat.get(c) : null;
   const mrU = parseHoldingsFile(['cusip,qty,excess', 'PARSEAAA1,5,0', 'MATURED01,3,0', 'MATBOUND1,2,0', 'OUTSTAND1,4,0', 'NOTINREF9,6,0'].join('\n'), parseMkt, isMat);
   assert('matured: kept with outstanding market-data CUSIP', mrU.holdings.map(h => h.cusip).join(','), 'PARSEAAA1,MATURED01,MATBOUND1');
   assert('matured: kept CUSIPs not in skipped; outstanding-without-quote and not-in-reference dropped and listed', mrU.skipped.join(','), 'OUTSTAND1,NOTINREF9');
-  assert('matured on the settlement date is matured', maturedOnOrBefore(new Date(2026, 9, 15), settleD), true);
-  assert('matured the day after the settlement date is not', maturedOnOrBefore(new Date(2026, 9, 16), settleD), false);
+  assert('a payment dated today is matured', maturedOnOrBefore(new Date(2026, 9, 15), today15), true);
+  assert('a payment dated tomorrow is not matured', maturedOnOrBefore(new Date(2026, 9, 16), today15), false);
   const mrT = parseHoldingsFile(['MATURED01,3,2026', 'MATURED01,1,2027', 'OUTSTAND1,4,2027'].join('\n'), parseMkt, isMat);
   assert('tipsladder.com: matured kept (funded 3, excess 1), outstanding without quote dropped', `${mrT.holdings.map(h => h.cusip + ':' + h.qty + '/' + h.excessQty).join(',')}|${mrT.skipped.join(',')}`, 'MATURED01:4/1|OUTSTAND1');
   const mrP = parseHoldingsFile(['cusip,qty', 'MATURED01,3', 'OUTSTAND1,4'].join('\n'), parseMkt, isMat);

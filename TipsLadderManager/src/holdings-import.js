@@ -28,10 +28,11 @@ export function detectHoldingsFormat(text) {
 }
 
 // A CUSIP absent from TIPS Market Data is dropped (4.2.1) and recorded once in `skipped`, in file order.
-// True when a maturity date falls on or before the settlement date (a rung that has matured).
-export function maturedOnOrBefore(maturity, settlementDate) {
+// True when a payment date falls on or before the given day (a rung that has matured: maturity proceeds are in
+// the account on the payment date, so the day is today, not the settlement date of a trade).
+export function maturedOnOrBefore(paymentDate, day) {
   const key = d => d.getFullYear() * 10000 + d.getMonth() * 100 + d.getDate();
-  return key(maturity) <= key(settlementDate);
+  return key(paymentDate) <= key(day);
 }
 
 function noteSkipped(skipped, cusip) {
