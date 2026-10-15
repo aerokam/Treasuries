@@ -13,6 +13,9 @@
 //     code imports that file, directly or through another shared/src file (read from the import
 //     statements at push time, not from a hand-kept list);
 //   - a change to shared/tests runs the Shared unit tests;
+//   - a markdown file runs no app suite: under any knowledge/ directory it runs the viewer suite
+//     (KnowledgeMap), and the Data Dictionary also runs TipsLadderManager's unit suite, which reads
+//     LOWER_COVER_YIELD from it;
 //   - a change to the test wiring itself (package.json, playwright.config.js, this script, the
 //     hook) runs every suite.
 // So a Primer-only push runs nothing, and a YieldsMonitor-only push never pays for
@@ -127,18 +130,31 @@ function importingDirs(sharedFiles) {
   return dirs;
 }
 
+// A markdown file is read by no app suite, so editing one never runs an app's suites. The viewer
+// suite (the `knowledge` directory) renders the knowledge/ specs, so a markdown file under any
+// knowledge/ directory runs it. DOC_READERS names the suites that read a particular markdown file's
+// text: TipsLadderManager's unit suite reads LOWER_COVER_YIELD from the Data Dictionary.
+const DOC_FILE = /\.md$/i;
+const DOC_READERS = { 'knowledge/DATA_DICTIONARY.md': ['test:Unit:TipsLadderManager'] };
+
 function suitesFor(files) {
   if (files.some(f => TEST_WIRING.has(f))) return SUITES;
   if (files.length && files.every(f => SAMPLE_FILES.has(f))) return SAMPLE_SUITES;
   const dirs = new Set();
+  const scripts = new Set();
   const sharedSrc = [];
   for (const f of files) {
+    if (DOC_FILE.test(f)) {
+      if (/(^|\/)knowledge\//.test(f)) dirs.add('knowledge');
+      for (const s of DOC_READERS[f] ?? []) scripts.add(s);
+      continue;
+    }
     const top = f.split('/')[0];
     if (f.startsWith('shared/src/')) sharedSrc.push(f);
     dirs.add(top);
   }
   if (sharedSrc.length) for (const d of importingDirs(affectedSharedFiles(sharedSrc))) dirs.add(d);
-  return SUITES.filter(s => dirs.has(s.dir));
+  return SUITES.filter(s => dirs.has(s.dir) || scripts.has(s.script));
 }
 
 function readStdin() {
