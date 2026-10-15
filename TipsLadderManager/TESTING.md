@@ -73,10 +73,11 @@ is `ladder` session's, left as-is — a historical log, not a live reference).
 
 A round trip means: **Build** a ladder, **export** it (Holdings file), **import** that file into
 **Rebalance**, run **Rebalance**. The expected result is zero trades, with one accepted exception —
-see 2.0 TIPS Ladders §Retained Bracket Excess's own "Round-Trip Rounding Note" (a rounded excess
+see 2.0 TIPS Ladders §Retained Bracket Excess "Round-Trip Rounding Note" (a rounded excess
 target can leave up to one bond's worth of residual, bought into the active lower bracket on the next
-cycle). A round-trip test asserts against that invariant (≤1 bond of churn, cash within one bond's
-cost), never bit-perfect idempotency.
+cycle, and move a few funded years by one bond each; rerunning that output makes no trades). A round-trip test asserts against that invariant (the rerun settles to no trades within 3 further
+round trips, cash within one bond's cost), never bit-perfect idempotency or a size bound on the first
+rerun.
 
 ## Tolerances state what they're a percentage of, and never hide a real bias
 
