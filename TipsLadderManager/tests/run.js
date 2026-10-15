@@ -1053,26 +1053,31 @@ console.log('\nBuild — RMD Options (settlement-year remaining-coupon LMI)');
 }
 
 // ── Test: remainingCouponPaymentsThisYear — trade date (today) vs settlementDate (T+1) cutoff ──
-// A coupon due Saturday Aug 15 rolls to Monday Aug 17 (actualPaymentDate). If "today" is Aug 17
-// (the coupon is being paid TODAY), it must still count as available cash — matching the Cash Flow
-// Calendar's own cutoff (today, 5.0 §Cash Flow Calendar), not settlementDate, which is T+1 (Aug 18)
-// and would wrongly exclude a coupon on the very day it pays. Regression for the bug reported after
-// the original settlement-year-LMI fix: comparing against settlementDate instead of the trade date.
+// A coupon due Saturday Aug 15 is paid on Monday Aug 17 (actualPaymentDate). A payment dated today is
+// paid today: maturity proceeds and coupons are in the account on the payment date, so on Aug 17 the
+// coupon is no longer a remaining coupon. The cutoff is today (5.0 §Cash Flow Calendar), not
+// settlementDate, which is T+1: on Friday Aug 14, settlement is Monday Aug 17, and a cutoff at
+// settlementDate would drop a coupon that has not yet been paid.
 console.log('\nremainingCouponPaymentsThisYear — trade date vs settlementDate (T+1) cutoff');
 {
   const maturity = localDate('2036-02-15');    // Feb/Aug coupon cycle
-  const settleAug18 = localDate('2026-08-18'); // settlementDate: T+1 from today
-  const tradeAug17 = localDate('2026-08-17');  // today — the coupon's actual (rolled) payment date
+  const tradeAug14 = localDate('2026-08-14');  // Friday: the coupon is due Saturday, paid Monday
+  const settleAug17 = localDate('2026-08-17'); // settlementDate for a trade placed on Aug 14 (T+1 business day)
+  const tradeAug17 = localDate('2026-08-17');  // today is the coupon's actual (rolled) payment date
+  const settleAug18 = localDate('2026-08-18'); // settlementDate for a trade placed on Aug 17
   const tradeAug18 = localDate('2026-08-18');  // the day after payment
 
-  assert('coupon paid exactly on trade date (today) still counts as remaining',
-    remainingCouponPaymentsThisYear(maturity, settleAug18, new Set(), tradeAug17), 1);
-  assert('same coupon no longer counts the day after it paid',
+  assert('coupon due before the settlement date and not yet paid today counts as remaining',
+    remainingCouponPaymentsThisYear(maturity, settleAug17, new Set(), tradeAug14), 1);
+  assert('coupon paid exactly on the trade date (today) is paid, not remaining',
+    remainingCouponPaymentsThisYear(maturity, settleAug18, new Set(), tradeAug17), 0);
+  assert('same coupon is not remaining the day after it paid',
     remainingCouponPaymentsThisYear(maturity, settleAug18, new Set(), tradeAug18), 0);
-  // Omitting tradeDate falls back to settlementDate (T+1) — the pre-fix cutoff, which wrongly
-  // excludes a coupon paid today. Documents the bug this fixes; not the desired production behavior.
-  assert('omitting tradeDate reproduces the old (buggy) settlementDate-cutoff behavior',
-    remainingCouponPaymentsThisYear(maturity, settleAug18, new Set()), 0);
+  // Omitting tradeDate falls back to settlementDate (T+1), which drops a coupon that pays on the
+  // settlement date and has not yet been paid. Documents the cutoff production runs avoid by passing the
+  // real trade date.
+  assert('omitting tradeDate reproduces the settlementDate cutoff: a coupon paid on the settlement date is dropped',
+    remainingCouponPaymentsThisYear(maturity, settleAug17, new Set()), 0);
 }
 
 // ── Test: RMD Options 'last' mode is pool-wide, not per-bond ──────────────────────────────────
@@ -1085,22 +1090,22 @@ console.log('\nremainingCouponPaymentsThisYear — trade date vs settlementDate 
 console.log("\nRMD Options 'last' mode: pool-wide latest date, not each bond's own latest");
 {
   const settleAug18 = localDate('2026-08-18');
-  const tradeAug17  = localDate('2026-08-17');
+  const tradeAug16  = localDate('2026-08-16'); // Sunday: the Aug 15 coupon is paid tomorrow
   const bondFebAug  = localDate('2036-02-15'); // Feb/Aug cycle -> Aug 15 (Sat) rolls to Aug 17
   const bondAprOct  = localDate('2040-04-15'); // Apr/Oct cycle -> only Oct 15 remains by August
 
-  const maxDate = latestRemainingCouponDate([bondFebAug, bondAprOct], settleAug18, new Set(), tradeAug17);
+  const maxDate = latestRemainingCouponDate([bondFebAug, bondAprOct], settleAug18, new Set(), tradeAug16);
   assert("pool-wide latest remaining date is Oct 15 2026 (the later of the two bonds' own dates)",
     maxDate?.getTime(), localDate('2026-10-15').getTime());
 
   assert("'last': the Feb/Aug bond contributes 0 -- its own remaining coupon (Aug 17) is earlier than the pool's shared last date",
-    rmdCappedRemainingCoupons(bondFebAug, settleAug18, new Set(), 'last', tradeAug17, maxDate), 0);
+    rmdCappedRemainingCoupons(bondFebAug, settleAug18, new Set(), 'last', tradeAug16, maxDate), 0);
   assert("'last': the Apr/Oct bond contributes 1 -- its coupon lands exactly on the pool's last date",
-    rmdCappedRemainingCoupons(bondAprOct, settleAug18, new Set(), 'last', tradeAug17, maxDate), 1);
+    rmdCappedRemainingCoupons(bondAprOct, settleAug18, new Set(), 'last', tradeAug16, maxDate), 1);
   assert("'all': the Feb/Aug bond still contributes its own remaining coupon (1), unaffected by the pool",
-    rmdCappedRemainingCoupons(bondFebAug, settleAug18, new Set(), 'all', tradeAug17), 1);
+    rmdCappedRemainingCoupons(bondFebAug, settleAug18, new Set(), 'all', tradeAug16), 1);
   assert("'all': the Apr/Oct bond also contributes 1",
-    rmdCappedRemainingCoupons(bondAprOct, settleAug18, new Set(), 'all', tradeAug17), 1);
+    rmdCappedRemainingCoupons(bondAprOct, settleAug18, new Set(), 'all', tradeAug16), 1);
 }
 
 // ── Test: synthetic coupon — the eighth at or below the yield (2.0 §Gap Years step 3) ──────
