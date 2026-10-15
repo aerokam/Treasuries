@@ -1237,6 +1237,39 @@ console.log('\nFuture 30Y: the cover pair, the Maximum Future 30Y Rungs and the 
   console.log(`        lower ${lower.b.maturity.getFullYear()} (${lower.d.toFixed(3)})  upper ${upper.b.maturity.getFullYear()} (${upper.d.toFixed(3)})  counts that pass: ${passing.join(', ')}`);
 }
 
+// ── Test: the DD §5.1 values that state a value, derived from the market data ─────────────────────
+// DD §5.1 protocol item 3: each stated value is derived here from the market data and asserted equal to the
+// table. Issuance drift then fails this test, and the table is updated with a new "As of" date.
+console.log('\nDD §5.1 issuance-dependent values: derived from market data, asserted against the table');
+{
+  const ddText = readFileSync(new URL('../../knowledge/DATA_DICTIONARY.md', import.meta.url), 'utf8');
+  const cellsOf = (label) => {
+    const line = ddText.split(/\r?\n/).find(l => l.startsWith(`| ${label} |`));
+    if (!line) throw new Error(`DD §5.1 has no "${label}" row`);
+    return line.split('|').map(s => s.trim()).filter(Boolean);   // label, rule, as-of value, changes when
+  };
+  const monthsByYear = new Map();
+  for (const b of tipsMarketData.values()) {
+    if (!b.maturity || b.maturity <= settlementDate) continue;
+    const y = b.maturity.getFullYear();
+    if (!monthsByYear.has(y)) monthsByYear.set(y, new Set());
+    monthsByYear.get(y).add(b.maturity.getMonth() + 1);
+  }
+  const years = [...monthsByYear.keys()].sort((a, b) => a - b);
+  const lastNonFebruaryYear = Math.max(...years.filter(y => [...monthsByYear.get(y)].some(m => m !== 2)));
+  const longestYear = years[years.length - 1];
+  const boundaryYear = years.find(y => y > lastNonFebruaryYear);
+  const lastQuarterlyYear = Math.max(...years.filter(y => [1, 4, 7, 10].every(m => monthsByYear.get(y).has(m))));
+
+  assert(`Longest issued maturity year: derived ${longestYear}, DD §5.1 states ${cellsOf('Longest issued maturity year')[2]}`, longestYear, Number(cellsOf('Longest issued maturity year')[2]));
+  assert(`Multi-maturity boundary: derived ${boundaryYear} (the first maturity year after the last non-February maturity, ${lastNonFebruaryYear}), DD §5.1 states ${cellsOf('Multi-maturity boundary')[2]}`, boundaryYear, Number(cellsOf('Multi-maturity boundary')[2]));
+  const pattern = cellsOf('Maturity-month pattern')[2].match(/^quarterly ≤~(\d{4}), Jan\/Jul ≤~(\d{4}), Feb (\d{4})\+$/);
+  if (!pattern) throw new Error('DD §5.1 Maturity-month pattern is not "quarterly ≤~YYYY, Jan/Jul ≤~YYYY, Feb YYYY+"');
+  assert(`Maturity-month pattern, quarterly: derived last year with a January, April, July and October maturity ${lastQuarterlyYear}, DD §5.1 states ${pattern[1]}`, lastQuarterlyYear, Number(pattern[1]));
+  assert(`Maturity-month pattern, January/July: derived last year with a non-February maturity ${lastNonFebruaryYear}, DD §5.1 states ${pattern[2]}`, lastNonFebruaryYear, Number(pattern[2]));
+  assert(`Maturity-month pattern, February: derived first February-only year ${boundaryYear}, DD §5.1 states ${pattern[3]}`, boundaryYear, Number(pattern[3]));
+}
+
 // ── Test: Build — Future 30Y years (lastYear > maxRealYear) ───────────────────────
 console.log(`\nBuild: DARA=50000, lastYear=${MAX_YEAR + 4} (Future 30Y years)`);
 {
