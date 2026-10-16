@@ -2925,3 +2925,15 @@ test('Mkt popup: every Index Ratio is shown to nine decimals and Price x Index R
     expect(Math.abs(Number(price) * Number(ratio) - Number(adj)), cusip + ' Price x Index Ratio shown reproduces the Adj Price shown').toBeLessThanOrEqual(tolerance);
   }
 });
+// A funded year's Amount is for the whole year, so its popup is titled by the year and the column name, with no maturity month.
+test('Amount popups: a funded year\'s Amount Before and Amount After popups are titled by the year, not by a maturity month', async ({ page }) => {
+  await page.locator('#run-btn').click();
+  await expect(page.locator('#simple-table')).toBeVisible({ timeout: 4_000 });
+  const row = page.locator('#simple-table tr.fy-group-header').first();
+  const year = await row.getAttribute('data-fy');
+  for (const [key, label] of [['amtBefore', 'Amount Before'], ['amtAfter', 'Amount After']]) {
+    await row.locator(`td[data-col="${key}"]`).click();
+    await expect(page.locator('#drill-title')).toHaveText(`${year} \u2014 ${label}`);
+    await page.locator('#drill-close').click();
+  }
+});

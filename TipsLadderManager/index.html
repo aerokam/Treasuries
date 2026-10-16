@@ -4216,7 +4216,8 @@ document.addEventListener('click', e => {
     if (!d) return;
     _currentDrillData = d; _currentDrillColKey = colKey;
     const html = buildDrillHTML(d, colKey, summary);
-    document.getElementById('drill-title').textContent = drillYear != null ? drillYear + ' — Amount' : (d.maturityStr || d.fundedYear) + ' — ' + colKey;
+    const _fyCol = COLS.find(c => c.key === colKey && c.fyLevel);   // an Amount is for the whole funded year: titled by the year, not by one TIPS's maturity month
+    document.getElementById('drill-title').textContent = drillYear != null ? drillYear + ' — Amount' : _fyCol ? d.fundedYear + ' — ' + _fyCol.label : (d.maturityStr || d.fundedYear) + ' — ' + colKey;
     document.getElementById('drill-content').innerHTML = html;
     document.getElementById('drill-modal').style.width = '';   // a drag pins the width; size to the new content
     document.getElementById('drill-overlay').style.display = 'block';
