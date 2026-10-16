@@ -155,16 +155,6 @@ export function couponSchedule(settle, maturity) {
   return dates;
 }
 
-// ─── Leap-day day-count helper ────────────────────────────────────────────────
-// True if Feb 29 falls strictly after d1 and on/before d2.
-export function hasLeapDayBetween(d1, d2) {
-  for (let yr = d1.getFullYear(); yr <= d2.getFullYear(); yr++) {
-    const feb29 = new Date(yr, 1, 29);
-    if (feb29.getMonth() === 1 && feb29 > d1 && feb29 <= d2) return true;
-  }
-  return false;
-}
-
 // ─── Days in the year following a given date ──────────────────────────────────
 // Per Treasury's Treasury-bill investment-rate formula (ofcalc6decbill.pdf, "Price,
 // Yield and Rate Calculations for a Treasury Bill"): y = the actual number of days
@@ -337,10 +327,4 @@ export function calcMktWtdAvg(values, costs) {
     den += c;
   }
   return den > 0 ? num / den : 0;
-}
-
-// ─── Rung amount ──────────────────────────────────────────────────────────────
-// Spec: 5.0 §rungAmount, 4.0 Phase 5 ARA After formula
-export function rungAmount(qty, piPerBond, laterMatInt) {
-  return qty * piPerBond + laterMatInt;
 }
