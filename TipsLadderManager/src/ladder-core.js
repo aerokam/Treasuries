@@ -12,7 +12,7 @@
 import { bondCalcs, calculateMDuration, couponSchedule, priceFromYield } from '../../shared/src/bond-math.js';
 import { actualPaymentDate, lastBusinessDayOfMonth } from '../../shared/src/settlement.js';
 import { indexRatio as calcIndexRatio, TREASURY_ROUNDING, NO_ROUNDING } from '../../shared/src/ref-cpi.js';
-import { bracketWeights, bracketWeightsN, bracketExcessQtys, fyQty as _fyQty, gapParamsCore, future30yParamsCore, syntheticCoupon } from './gap-math.js';
+import { bracketWeights, bracketWeightsN, bracketExcessQtys, gapParamsCore, future30yParamsCore, syntheticCoupon } from './gap-math.js';
 import { addMonths } from './date-util.js';
 
 // ─── Default First Year ─────────────────────────────────────────────────────────
@@ -547,7 +547,7 @@ function selectYearTips(cands, pref, couponPref = 'higher') {
 //   yearBondMap[year]     — the single representative (latest of the list); every
 //                           bracket/gap/cover path keys off this and is unaffected,
 //                           and it equals the legacy pick when the list has length 1.
-// `yearOverrides` (prototype, Build only — 2.0 §Picking Maturities for a Funded Year): a
+// `yearOverrides` (prototype, Build and Rebalance — 2.0 §Picking Maturities for a Funded Year): a
 // Map<year, cusip[]> naming an explicit TIPS list for that year, bypassing `maturityPref` for
 // just that year. Every other year keeps following `maturityPref` as usual. An override whose
 // CUSIPs don't resolve to that year's candidates is ignored (falls back to the policy pick).

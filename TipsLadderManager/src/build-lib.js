@@ -4,7 +4,7 @@
 // Entry point: runBuild({ dara, lastYear, tipsMarketData, refCPI, settlementDate })
 
 import { fmtDate } from './date-util.js';
-import { bondCalcs, calculateMDuration, rungAmount, calcMktWtdAvg } from '../../shared/src/bond-math.js';
+import { bondCalcs, calculateMDuration, calcMktWtdAvg } from '../../shared/src/bond-math.js';
 import { sizeLadder, selectLadderBonds, fundedYearAmount, syntheticYearAmounts, defaultFirstYear, EXCLUDE_MATURING_WITHIN_MONTHS } from './ladder-core.js';
 
 // ─── Main entry point ──────────────────────────────────────────────────────────

@@ -150,20 +150,6 @@ export function bracketExcessQtys(totalCost, lowerWeight, upperWeight, lowerCost
   };
 }
 
-// ─── Funded year qty (simple single-CUSIP case) ───────────────────────────────
-// Spec: 4.0 Phase 4 step 2 targetFYQty, 5.0 §fyQty
-// Note: multi-bond year logic in rebalance-lib.js extends this with sell-earliest-first
-export function fyQty(dara, laterMatInt, piPerBond) {
-  return Math.max(0, Math.round((dara - laterMatInt) / piPerBond));
-}
-
-// ─── Later maturity interest contribution ─────────────────────────────────────
-// Spec: 4.0 Phase 4 step 4
-// annualInt comes from bondCalcs(bond, refCPI).annualInt
-export function laterMatIntContribution(qty, annualInt) {
-  return qty * annualInt;
-}
-
 // ─── Gap parameters core sweep (shared by build and rebalance) ─────────────────
 // Spec: 2.0 §Gap Years, §Duration Matching. Single source of truth for the gap-year
 // synthetic ladder sweep. The ONLY thing build and rebalance supply differently is
