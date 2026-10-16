@@ -719,7 +719,6 @@ import { makeDraggableResizable } from './src/modal.js';
 import { rankForYear } from './src/allocation-policy.js';
 import { accruedInterest, bondCalcs, couponSchedule } from '../shared/src/bond-math.js';
 import { loadMarketData, lookupRefCpi, nextBondTradingDay } from '../shared/src/market-data.js';
-import { indexRatio, NO_ROUNDING } from '../shared/src/ref-cpi.js';
 import { actualPaymentDate } from '../shared/src/settlement.js';
 window.lookupRefCpi = lookupRefCpi;
 import { parseHoldingsFile, maturedOnOrBefore } from './src/holdings-import.js';
@@ -4361,7 +4360,7 @@ async function _showTipsRefModal(type) {
       html += '<td>' + (r.datedDate || '') + '</td><td' + R + '>' + (r.datedDateRefCpi != null ? r.datedDateRefCpi.toFixed(5) : '') + '</td>';
     } else {
       const ref = tipsRefMap.get(r.cusip);
-      const ir = indexRatio(refCpiSett, ref?.datedDateRefCpi, NO_ROUNDING);
+      const ir = ref?.datedDateRefCpi ? refCpiSett / ref.datedDateRefCpi : null;
       const adjPrice = ir != null ? r.price * ir : null;
       html += '<td' + R + '>' + r.price.toFixed(3) + '</td>';
       html += '<td' + R + '>' + (ir != null ? ir.toFixed(5) : '—') + '</td>';
