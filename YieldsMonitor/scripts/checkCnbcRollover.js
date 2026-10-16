@@ -11,7 +11,8 @@
 // settlement-date) and comparing it to CNBC's own archived quoted yield for that day
 // (Treasuries/yields-history/history.json), until the fit flips back to the old candidate. That
 // boundary is the flip date. Appends the pinned entry to CNBC_ROLLOVER_LOG and the spec table,
-// runs the unit tests, and — only if they pass — commits and pushes both files. On any failure
+// runs the unit tests, and — only if they pass — commits both files (pathspec-limited) and pushes
+// only when local main has no other unpushed commits and origin/main is not ahead. On any failure
 // (test failure, an unresolvable/ambiguous transition) it reverts its own edits and just logs,
 // rather than leaving a half-applied or unverified change behind.
 //
@@ -209,6 +210,36 @@ function run(cmd) {
   return execSync(cmd, { cwd: REPO_ROOT, stdio: ['ignore', 'pipe', 'pipe'] }).toString();
 }
 
+// Decides whether the pin commit may be pushed. `ahead` is the count of local commits not on
+// origin/main (before the pin commit), `behind` the count of origin/main commits not in local
+// main; null means the count could not be read. A push of origin main ships every unpushed local
+// commit of every session, so it happens only when local main has none besides the pin commit.
+export function shouldPush({ ahead, behind }) {
+  if (!Number.isInteger(ahead) || !Number.isInteger(behind)) {
+    return { push: false, reason: 'push skipped because the unpushed-commit count could not be read from origin/main' };
+  }
+  if (ahead !== 0) {
+    return { push: false, reason: `push skipped because local main has ${ahead} unpushed commit(s)` };
+  }
+  if (behind !== 0) {
+    return { push: false, reason: `push skipped because origin/main is ahead of local main by ${behind} commit(s)` };
+  }
+  return { push: true, reason: 'local main has no unpushed commits and origin/main is not ahead' };
+}
+
+function readAheadBehind() {
+  try {
+    run('git fetch origin');
+    return {
+      ahead: parseInt(run('git rev-list --count origin/main..HEAD').trim(), 10),
+      behind: parseInt(run('git rev-list --count HEAD..origin/main').trim(), 10),
+    };
+  } catch (err) {
+    log(`git fetch / rev-list failed: ${err.message}`);
+    return { ahead: null, behind: null };
+  }
+}
+
 export async function main() {
   log('Checking CNBC_ROLLOVER_LOG against live CNBC bond identity...');
   const [liveQuotes, archivedYields, refRows] = await Promise.all([
@@ -264,7 +295,8 @@ export async function main() {
     return;
   }
 
-  log('Tests passed. Committing and pushing...');
+  log('Tests passed. Committing...');
+  const decision = shouldPush(readAheadBehind());
   const summary = pinned.map(p => `${p.sym} -> ${p.flipDate}/${p.maturity}`).join(', ');
   const message = [
     `Auto-pin CNBC rollover: ${summary}`,
@@ -283,12 +315,13 @@ export async function main() {
   fs.writeFileSync(msgFile, message);
   try {
     run(`git add "${REL_LOG_MODULE}" "${REL_SPEC_MD}"`);
-    run(`git commit -F "${msgFile}"`);
-    run('git push origin main');
+    // Pathspec limits the commit to the two pinned files; other sessions' staged files stay staged.
+    run(`git commit -F "${msgFile}" -- "${REL_LOG_MODULE}" "${REL_SPEC_MD}"`);
+    if (decision.push) run('git push origin main');
   } finally {
     fs.rmSync(msgFile, { force: true });
   }
-  log('Committed and pushed.');
+  log(decision.push ? 'Committed and pushed.' : `Committed locally only: ${decision.reason}.`);
 }
 
 // Only when run directly, so the exported pieces stay importable for testing (see
