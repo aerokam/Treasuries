@@ -4,9 +4,8 @@
 // security objects every process downstream of 3.1 works from.
 //
 // This function produces the Ask Yield and the Bid Yield and nothing else. The SA Price Factor and
-// the SA Yield are produced by 3.2 (shared/src/sa-yields.js#saYieldsFromTipsYields), the Index
-// Ratio by 3.1.9 (shared/src/ref-cpi.js#tipsIndexRatios) and the spreads by 3.6
-// (shared/src/spreads.js), each from the output of this one.
+// the SA Yield are produced by 3.2 (shared/src/sa-yields.js#saYieldsFromTipsYields) and the
+// spreads by 3.6 (shared/src/spreads.js), each from the output of this one.
 //
 // One implementation, imported by the YieldCurves page (YieldCurves/src/app.js) and by the
 // acquisition jobs that write S10, S13, S14 and S15 (YieldCurves/scripts/updateSaSaoYields.js,

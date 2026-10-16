@@ -1,6 +1,6 @@
 // Yield Curves — Frontend Logic
 import { yieldFromPrice, cashflowSchedule, termYears } from '../../shared/src/bond-math.js';
-import { saFactorForDate, maturitySaFactor, tipsIndexRatios } from '../../shared/src/ref-cpi.js';
+import { saFactorForDate, maturitySaFactor } from '../../shared/src/ref-cpi.js';
 import { tipsYieldsFromPrices } from '../../shared/src/tips-yields.js';
 import { saYieldsFromTipsYields } from '../../shared/src/sa-yields.js';
 import { treasuryYieldsFromPrices } from '../../shared/src/treasury-yields.js';
@@ -18,7 +18,6 @@ import { initDatePicker } from '../../shared/src/date-picker.js';
 import { calendarTimeAxis } from '../../shared/src/chart-time-axis.js';
 import { isStrip } from '../../shared/src/treasury-cusip.js';
 import { parseFidelityDownloadDate, fidelityDownloadDateIso, parseFidelityTipsRows, parseFidelityNominalRows } from '../../shared/src/fidelity-parse.js';
-import { parseTipsRefRows } from '../../shared/src/market-data.js';
 
 console.log("YieldCurves app.js loading...");
 
@@ -28,7 +27,6 @@ const REF_CPI_CSV_URL = `${R2_BASE_URL}/TIPS/RefCpiNsaSa.csv`;
 const HOLIDAYS_CSV_URL = `${R2_BASE_URL}/misc/BondHolidaysSifma.csv`;
 const FIDELITY_URL = `${R2_BASE_URL}/Treasuries/FidelityTreasuriesTips.csv`;
 const GSW_TIPS_CURVE_URL = `${R2_BASE_URL}/TIPS/GswTipsCurve.json`;   // { date, beta0..beta3, tau1, tau2 } — updateGswTipsCurve.js
-const TIPS_REF_CSV_URL = `${R2_BASE_URL}/TIPS/TipsRef.csv`;   // S2 -- dated date Ref CPI per CUSIP, for the market-quote Index Ratio (3.1.9)
 
 // The GSW reference line is an analysis aid, not an end-user feature — the published curve
 // is only weekly (Tuesdays, through the prior Friday) so it goes stale fast. Hidden unless
@@ -69,7 +67,6 @@ function iqrClipBounds(source, minFence = 0.5) {
 let rawYieldsData = null;
 let rawNominalsData = null;
 let rawRefCpiData = null;
-let tipsRefByCusip = null;   // S2 (TipsRef.csv) rows by CUSIP, for the market-quote Index Ratio
 let holidaySet = new Set();
 let brokerPrices = null;
 let brokerDownloadDate = null;    // download date string from Fidelity TIPS CSV footer
@@ -437,13 +434,12 @@ async function init() {
   
   try {
     console.log("Fetching market data...");
-    const [yieldsRes, refCpiRes, holidayRes, fidRes, gswRes, tipsRefRes] = await Promise.all([
+    const [yieldsRes, refCpiRes, holidayRes, fidRes, gswRes] = await Promise.all([
       fetch(YIELDS_CSV_URL, { cache: 'no-cache' }).then(r => { console.log("Yields fetched"); return r; }).catch(e => ({ ok: false, error: e })),
       fetch(REF_CPI_CSV_URL, { cache: 'no-cache' }).then(r => { console.log("RefCPI fetched"); return r; }).catch(e => ({ ok: false, error: e })),
       fetch(HOLIDAYS_CSV_URL, { cache: 'no-cache' }).then(r => { console.log("Holidays fetched"); return r; }).catch(e => ({ ok: false, error: e })),
       fetch(FIDELITY_URL, { cache: 'no-cache' }).then(r => { console.log("Fidelity fetched"); return r; }).catch(e => ({ ok: false, error: e })),
       fetch(GSW_TIPS_CURVE_URL, { cache: 'no-cache' }).then(r => { console.log("GSW curve fetched"); return r; }).catch(e => ({ ok: false, error: e })),
-      fetch(TIPS_REF_CSV_URL, { cache: 'no-cache' }).then(r => { console.log("TipsRef fetched"); return r; }).catch(e => ({ ok: false, error: e })),
     ]);
 
     gswTipsCurve = await parseGswParameters(gswRes);
@@ -458,16 +454,6 @@ async function init() {
       refCpiRes.text(),
       holidayRes.text(),
     ]);
-
-    // S2 (TipsRef.csv): dated date Ref CPI per CUSIP for the market-quote Index Ratio (3.1.9).
-    // A missing/failed fetch leaves market-quote TIPS without an Index Ratio rather than
-    // without a page -- the same tolerance the GSW curve fetch gets above.
-    if (tipsRefRes.ok) {
-      const tipsRefRows = parseTipsRefRows(await tipsRefRes.text());
-      tipsRefByCusip = new Map(tipsRefRows.map(r => [r.cusip, r]));
-    } else {
-      console.warn('TipsRef.csv not available on R2 -- market-quote Index Ratio will be blank');
-    }
 
     console.log("Parsing CSVs...");
     const fedInvest = parseFedInvestPrices(yieldsText);
@@ -1075,19 +1061,13 @@ function renderNominalsChart(fedBonds, fidBonds, fedSpotBonds, fidSpotBonds) {
 
 }
 
-// The TIPS of one source (FedInvest or Market) is built in four steps, each one implementation
+// The TIPS of one source (FedInvest or Market) is built in three steps, each one implementation
 // shared with the acquisition jobs that write S10, S13, S14 and S15:
 //   shared/src/tips-yields.js#tipsYieldsFromPrices   Ask Yield and Bid Yield (3.1.7)
 //   shared/src/sa-yields.js#saYieldsFromTipsYields   SA Price Factor and SA Yield (3.2)
 //   shared/src/spreads.js#addTipsSpreads             yield and price spreads (3.6)
-//   shared/src/ref-cpi.js#tipsIndexRatios            Index Ratio (3.1.9), attached below
-const tipsFor = (quotesByCusip, isBroker) => {
-  const bonds = addTipsSpreads(saYieldsFromTipsYields(
-    tipsYieldsFromPrices(rawYieldsData, quotesByCusip, isBroker, marketSettleIso()), rawRefCpiData));
-  const indexRatioByCusip = tipsIndexRatios(rawYieldsData, rawRefCpiData, quotesByCusip, isBroker, marketSettleIso(), tipsRefByCusip);
-  bonds.forEach(b => { b.indexRatio = indexRatioByCusip.get(b.cusip) ?? NaN; });
-  return bonds;
-};
+const tipsFor = (quotesByCusip, isBroker) => addTipsSpreads(saYieldsFromTipsYields(
+  tipsYieldsFromPrices(rawYieldsData, quotesByCusip, isBroker, marketSettleIso()), rawRefCpiData));
 
 function processAndRenderTips() {
   const statusEl = document.getElementById('status');
@@ -2105,7 +2085,7 @@ function renderSpreadTable(bonds, tab) {
     const thead = document.querySelector('#saTable thead tr');
     window._currentBonds = bonds;
     thead.innerHTML = `
-      <th>Maturity</th><th>CUSIP</th><th>Coupon</th><th>Infl. Factor</th>
+      <th>Maturity</th><th>CUSIP</th><th>Coupon</th>
       <th>Bid Price (Adj)</th><th>Ask Price (Adj)</th><th>Price Spread %</th>
       <th>Bid Yield</th><th>Ask Yield</th><th>Yield Spread (bps)</th>`;
     tbody.innerHTML = bonds.map(b => `
@@ -2113,7 +2093,6 @@ function renderSpreadTable(bonds, tab) {
         <td>${fmtMMM(b.maturity)}</td>
         <td>${b.cusip}</td>
         <td>${(b.coupon * 100).toFixed(3)}%</td>
-        <td>${isNaN(b.indexRatio) ? '—' : b.indexRatio.toFixed(5)}</td>
         <td>${fmtP(b.adjBidPrice)}</td>
         <td>${fmtP(b.adjAskPrice)}</td>
         <td>${fmtPct(b.priceSpreadPct)}</td>
