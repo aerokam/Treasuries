@@ -47,7 +47,7 @@ caller's spec.
 - `accruedInterest(coupon, settle, mature)`, `couponSchedule(settle, mature)` — day-count proration and coupon payment dates.
 - `calculateDuration` / `calculateMDuration` / `calculateDurationDetail` — Macaulay and Modified Duration.
 - `termYears(settle, maturity)` — the one term measure (`DFD_Worklist.md` §3.9).
-- `cashflowSchedule`, `daysBetween`, `hasLeapDayBetween`, `daysInYearFrom`, `calcMktWtdAvg`, `rungAmount` — supporting calculations for the above.
+- `cashflowSchedule`, `daysBetween`, `daysInYearFrom`, `calcMktWtdAvg` — supporting calculations for the above.
 
 **Called by**: [4.1.1 Fetch and parse market quotes](../TipsLadderManager/knowledge/4.1_Load_Market_Data.md#fetch-and-parse-market-quotes) (TipsLadderManager, `yieldFromPrice`), [4.3.2 Build the ladder](../TipsLadderManager/knowledge/4.3_Build_Ladder.md#build-the-ladder) and [4.4.3 Rebalance the ladder](../TipsLadderManager/knowledge/4.4_Rebalance_Ladder.md#rebalance-the-ladder) (TipsLadderManager — `accruedInterest`, `bondCalcs`, `couponSchedule`), [3.1.7 Calculate TIPS yields](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#calculate-tips-yields) and [3.1.8 Calculate Treasury yields](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#calculate-treasury-yields) (YieldCurves), and other processes across the portal — not yet swept for a complete list.
 
