@@ -102,7 +102,7 @@ async function main() {
 
   console.log(`\nLEGEND / HOW IT WORKS`);
   console.log(`  • History (1Y+) stores the DAILY-feed close ≈ ~3PM benchmark (Treasury CMT/real ~3:30PM; Tradeweb 3/4PM).`);
-  console.log(`  • 1Y/2Y/3Y are daily → reread fresh. 10Y weekly, ALL quarterly → persistent merge keeps finer recent resolution.`);
+  console.log(`  • 1Y/2Y/3Y are daily → 6M read once per symbol, reused unless it does not reach the cutoff or a fresh read is asked for. 10Y weekly, ALL quarterly → persistent merge keeps finer recent resolution.`);
   console.log(`  • 2D/10D show live intraday incl. the 17:05 session-end print (NOT stored).`);
   console.log(`  • Full detail: knowledge/Close_Price_Investigation.md\n`);
 }

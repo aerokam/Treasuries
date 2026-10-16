@@ -100,7 +100,7 @@ function compactOn() { return hideNonTrading && intradayRange(); }
 function unitSpanPos() { return compactOn() ? toCalendarScaledTime : null; }
 function lockRightAxis() { return compactOn() ? { toPos: toTradingTime, fromPos: fromTradingTime } : null; }
 function plotSeries(series) { return compactOn() && series ? series.filter(p => inTradingSession(+p.x)) : series; }
-let customStartDate = null; // Date (ET midnight of start day) | null — exclusive lower bound for Custom range
+let customStartDate = null; // Date (ET midnight of start day) | null — inclusive lower bound for Custom range
 let customEndDate = null;   // Date (ET midnight of day after end day) | null — exclusive upper bound for Custom range
 const xMaxAnchors = {}; // sym -> pinned xMax timestamp (set when data loads)
 let isSyncing = false;
@@ -847,7 +847,10 @@ async function fetchOne(symbol, range, force = false) {
       if (range === '1Y') t.setFullYear(t.getFullYear() - 1); else if (range === '2Y') t.setFullYear(t.getFullYear() - 2); else if (range === '3Y') t.setFullYear(t.getFullYear() - 3); else if (range === '10Y') t.setFullYear(t.getFullYear() - 10); else if (range === 'ALL') t.setFullYear(t.getFullYear() - 50);
     });
     if (range === '1Y' || range === '2Y' || range === '3Y') {
-      // Reread provider 6M (daily ~3Y) fresh each load — same feed cnbc.com uses; no history.json, no 5D tip.
+      // Daily bars from provider 6M (~3Y), the same feed cnbc.com uses, kept per symbol and reused
+      // unless missing, not reaching the cutoff, or the user asked for a fresh read (force); then
+      // the 5D bars are appended, and Yield history (S6) fills the span older than the first daily
+      // bar (2.1.2).
       // CNBC's 6M timeRange is unreliable per-symbol: it returns a fully-null payload (not an
       // empty array) for some symbols regardless of retry (observed 2026-08-20: US2YTIPS and
       // US10YTIPS, consistently, while every other symbol's 6M feed works). Since the shorter
