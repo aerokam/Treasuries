@@ -461,7 +461,7 @@ per-CUSIP prices for a past date (3.1 §4.0).
 - **Side task, same session:** the Import/Export menu's **CUSIP/Qty** option is relabeled
   **Holdings** — the export has carried funded/excess split, DARA, and construction params for a
   while now, not just CUSIP and quantity.
-- **Files:** `src/rebalance-lib.js`, `index.html`, `tests/run.js`, `knowledge/3.0_TIPS_Ladder_Rebalancing.md`, `knowledge/2.1_Broker_Import.md`.
+- **Files:** `src/rebalance-lib.js`, `index.html`, `tests/run.js`, `knowledge/3.0_TIPS_Ladder_Rebalancing.md`, `knowledge/2.1_Export.md`.
 
 ### A same-maturity-year retained TIPS was invisible whenever no separate, older bracket YEAR was also retained
 
@@ -507,7 +507,7 @@ per-CUSIP prices for a past date (3.1 §4.0).
   both maturities held, then reload and rerun — both must be untouched) and all 86 Playwright E2E
   cases pass. Reproduced and confirmed fixed against the reporting account's own file, run through
   `rebalance-lib.js` with live market data directly (not just the synthetic fixture).
-- **Files:** `src/rebalance-lib.js`, `tests/run.js`, `knowledge/2.1_Broker_Import.md`.
+- **Files:** `src/rebalance-lib.js`, `tests/run.js`, `knowledge/2.1_Export.md`.
 
 ### A bracket's own solved weight never reached a trade when the retained and active lower brackets shared a maturity year
 

@@ -23,8 +23,8 @@ The logic for aligning existing holdings to a target.
 - **There is a single rebalance mode**: it rebuilds the ladder from the current portfolio toward the per-year DARA targets, buying and selling as required. An earlier "Gap-only" (minimal-trades) mode was scrapped.
 - **Technically Precise Algorithm**: [View 3.0 Specs](../TipsLadderManager/knowledge/3.0_TIPS_Ladder_Rebalancing.md).
 
-### [3.0 Broker Data Ingestion](../TipsLadderManager/knowledge/2.1_Broker_Import.md)
-Normalizes exported CSV data from brokers (Fidelity, Schwab) into the app's internal holding format.
+### [2.1 Export](../TipsLadderManager/knowledge/2.1_Export.md)
+The Holdings Export, the DARA Plan File and the Ladder CSV that the Export menu writes. Importing a holdings file is [4.2](../TipsLadderManager/knowledge/4.2_Import_Holdings_And_DARA_Plan.md).
 
 ---
 
