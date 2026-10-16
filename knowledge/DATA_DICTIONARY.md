@@ -611,7 +611,7 @@ Displayed as **Amount**, and as **Real Amount** where a fuller header fits. The 
 
 <a id="excess-tips"></a>
 ### Excess TIPS
-`Excess_TIPS` = *The TIPS a [Bracket Year](#bracket-year) holds for duration matching. The quantity follows from that bracket year’s [Bracket Weight](#bracket-weight), which the duration match determines. Named for the bracket year they serve: **excess lower bracket year TIPS**, **excess 2040 TIPS**.*
+`Excess_TIPS` = *The TIPS a [Bracket Year](#bracket-year) holds for duration matching. The quantity follows from that bracket year’s [Bracket Weight](#bracket-weight), which the duration match determines. Named for the bracket year they serve: **excess lower bracket year TIPS**, **excess 2040 TIPS**. [Cover Excess](#cover-excess), the Excess TIPS held in a [Cover Year](#cover-year), is a subset of Excess TIPS.*
 
 <a id="cover-year"></a>
 ### Cover Year
@@ -676,7 +676,7 @@ excessCost_b = gap total cost × bracketWeight_b
 
 <a id="cover-excess"></a>
 ### Cover Excess
-`Cover_Excess` = *The TIPS a [Cover Year](#cover-year) holds for duration matching. The Future 30Y counterpart of [Excess TIPS](#excess-tips): the quantity follows from that cover year’s [Cover Weight](#cover-weight), which the duration match determines.*
+`Cover_Excess` = *The [Excess TIPS](#excess-tips) held in a [Cover Year](#cover-year), a subset of Excess TIPS: the quantity follows from that cover year’s [Cover Weight](#cover-weight), which the duration match determines.*
 
 <a id="cover-weight"></a>
 ### Cover Weight
