@@ -2,11 +2,13 @@
 import { yieldFromPrice, cashflowSchedule, termYears } from '../../shared/src/bond-math.js';
 import { saFactorForDate, maturitySaFactor, tipsIndexRatios } from '../../shared/src/ref-cpi.js';
 import { tipsYieldsFromPrices } from '../../shared/src/tips-yields.js';
+import { saYieldsFromTipsYields } from '../../shared/src/sa-yields.js';
 import { treasuryYieldsFromPrices } from '../../shared/src/treasury-yields.js';
-import { yieldSpreadBps, priceSpreadPct } from '../../shared/src/spreads.js';
-import { findClosestNominal } from '../../shared/src/breakeven.js';
+import { addTipsSpreads, addTreasurySpreads } from '../../shared/src/spreads.js';
+import { findClosestNominal, spotBreakevenAcrossTerms } from '../../shared/src/breakeven.js';
 import {
   SAO_NOISE_YRS, SAO_BLEND_START_YRS, SAO_BLEND_END_YRS,
+  TREASURIES_SPOT_FIT, TIPS_SPOT_FIT, TIPS_SA_SPOT_FIT,
   nssBasis, zToSA, spotCurveFit, spotCurveGrid, spotCurveTermGrid, calculateSAO,
 } from '../../shared/src/spot-curve.js';
 import { parseCsv } from '../../shared/src/csv.js';
@@ -26,7 +28,7 @@ const REF_CPI_CSV_URL = `${R2_BASE_URL}/TIPS/RefCpiNsaSa.csv`;
 const HOLIDAYS_CSV_URL = `${R2_BASE_URL}/misc/BondHolidaysSifma.csv`;
 const FIDELITY_URL = `${R2_BASE_URL}/Treasuries/FidelityTreasuriesTips.csv`;
 const GSW_TIPS_CURVE_URL = `${R2_BASE_URL}/TIPS/GswTipsCurve.json`;   // { date, beta0..beta3, tau1, tau2 } — updateGswTipsCurve.js
-const TIPS_REF_CSV_URL = `${R2_BASE_URL}/TIPS/TipsRef.csv`;   // S2 -- dated date Ref CPI per CUSIP, for the market-quote Index Ratio (3.1.7)
+const TIPS_REF_CSV_URL = `${R2_BASE_URL}/TIPS/TipsRef.csv`;   // S2 -- dated date Ref CPI per CUSIP, for the market-quote Index Ratio (3.1.9)
 
 // The GSW reference line is an analysis aid, not an end-user feature — the published curve
 // is only weekly (Tuesdays, through the prior Friday) so it goes stale fast. Hidden unless
@@ -457,7 +459,7 @@ async function init() {
       holidayRes.text(),
     ]);
 
-    // S2 (TipsRef.csv): dated date Ref CPI per CUSIP for the market-quote Index Ratio (3.1.7).
+    // S2 (TipsRef.csv): dated date Ref CPI per CUSIP for the market-quote Index Ratio (3.1.9).
     // A missing/failed fetch leaves market-quote TIPS without an Index Ratio rather than
     // without a page -- the same tolerance the GSW curve fetch gets above.
     if (tipsRefRes.ok) {
@@ -629,6 +631,11 @@ function parseFidelityNominals(text, settleIso = null) {
   return { bonds, downloadDate: parseFidelityDownloadDate(text) };
 }
 
+// The Treasuries the spot curve of 3.4 is fitted to: every Bill, Note and Bond. A STRIPS and an
+// Unclassified CUSIP are excluded. Used by the Treasuries tab and by the Spot BEI of the
+// Breakeven tab, so both draw the same curve.
+const treasuriesSpotSet = bonds => bonds.filter(b => !isStrip(b.cusip) && b.type !== 'MARKET BASED STRIPS' && b.type !== 'MARKET BASED UNCLASSIFIED');
+
 function processAndRenderNominals() {
   const statusEl = document.getElementById('status');
   const showFed = document.getElementById('chkFedInvest').checked;
@@ -657,12 +664,8 @@ function processAndRenderNominals() {
     // fitted to). Bills are already zero-coupon, so they anchor the short end. Unclassified
     // is excluded the same way STRIPS is: its true cash-flow structure is unknown, so it
     // cannot be fit as a plain coupon bond.
-    let fedSpotSet = showFed
-      ? rawNominalsData.filter(r => !isStrip(r.cusip) && r.type !== 'MARKET BASED UNCLASSIFIED')
-      : null;
-    let fidSpotSet = showFid
-      ? fidelityNominalsData.filter(b => !isStrip(b.cusip) && b.type !== 'MARKET BASED STRIPS' && b.type !== 'MARKET BASED UNCLASSIFIED')
-      : null;
+    let fedSpotSet = showFed ? treasuriesSpotSet(rawNominalsData) : null;
+    let fidSpotSet = showFid ? treasuriesSpotSet(fidelityNominalsData) : null;
 
     // Filter STRIPS unless user opts in (already handled by the initial filter above for performance, but we keep the fidProcessed part consistent)
     if (!nominalsShowStrips) {
@@ -702,12 +705,7 @@ function processAndRenderNominals() {
     const startTermY = refSettle ? termYears(refSettle, startDate) : -Infinity;
     const endTermY = refSettle ? termYears(refSettle, endDate) : Infinity;
 
-    if (fidFiltered) {
-      fidFiltered.forEach(b => {
-        b.yieldSpreadBps = yieldSpreadBps(b.yield, b.bidYield);
-        b.priceSpreadPct = priceSpreadPct(b.price, b.bidPrice);
-      });
-    }
+    if (fidFiltered) addTreasurySpreads(fidFiltered);
 
     if (spreadModeActive && fidFiltered) {
       renderSpreadCharts(fidFiltered, 'treasuries');
@@ -813,7 +811,7 @@ function renderNominalsTable(fedBonds, fidBonds, fedSpotBonds, fidSpotBonds, sta
   if (spotColIdx !== -1) {
     const curveByTerm = new Map();   // term.toFixed(4) -> { term, fed, mkt }
     const addCurve = (bonds, source) => {
-      const grid = bonds && spotCurveTermGrid(bonds, { priceOf: b => b.price, yieldOf: b => b.yield, minT: 0.25 });
+      const grid = bonds && spotCurveTermGrid(bonds, TREASURIES_SPOT_FIT);
       if (!grid) return;
       for (const { t, y } of grid) {
         if (t < startTermY || t > endTermY) continue;
@@ -882,7 +880,7 @@ function renderNominalsChart(fedBonds, fidBonds, fedSpotBonds, fidSpotBonds) {
     if (fedSpotBonds && fedSpotBonds.length) nomCurveSrc.push({ bonds: fedSpotBonds, sfx: bothSpot ? ' (FedInvest)' : '', color: '#0f172a' });
     if (fidSpotBonds && fidSpotBonds.length) nomCurveSrc.push({ bonds: fidSpotBonds, sfx: bothSpot ? ' (Market)' : '',    color: '#b45309' });
     for (const { bonds, sfx, color } of nomCurveSrc) {
-      const grid = spotCurveGrid(bonds, { priceOf: b => b.price, yieldOf: b => b.yield, yToX, minT: 0.25 });
+      const grid = spotCurveGrid(bonds, { ...TREASURIES_SPOT_FIT, yToX });
       if (grid) seriesDef.push({ label: `Spot${sfx}`, data: grid, color, w: 2.5, dash: [], curve: true, r: 0, markerR: 2 });
     }
   }
@@ -1077,14 +1075,15 @@ function renderNominalsChart(fedBonds, fidBonds, fedSpotBonds, fidSpotBonds) {
 
 }
 
-// The TIPS yields for one source (FedInvest or Market) is built by
-// shared/src/tips-yields.js#tipsYieldsFromPrices — one implementation for this page and
-// for the acquisition job that publishes S13, S14 and S15 (3.1_Parse_Sources_And_Calculate_Yields.md §3.1.7).
-// Index Ratio is a separate calculation (ref-cpi.js#tipsIndexRatios) attached onto the result
-// afterward for whichever rows the market-quote TIPS table renders -- it has no dependency on
-// yield or Price and tipsYieldsFromPrices does not calculate it.
+// The TIPS of one source (FedInvest or Market) is built in four steps, each one implementation
+// shared with the acquisition jobs that write S10, S13, S14 and S15:
+//   shared/src/tips-yields.js#tipsYieldsFromPrices   Ask Yield and Bid Yield (3.1.7)
+//   shared/src/sa-yields.js#saYieldsFromTipsYields   SA Price Factor and SA Yield (3.2)
+//   shared/src/spreads.js#addTipsSpreads             yield and price spreads (3.6)
+//   shared/src/ref-cpi.js#tipsIndexRatios            Index Ratio (3.1.9), attached below
 const tipsFor = (quotesByCusip, isBroker) => {
-  const bonds = tipsYieldsFromPrices(rawYieldsData, rawRefCpiData, quotesByCusip, isBroker, marketSettleIso());
+  const bonds = addTipsSpreads(saYieldsFromTipsYields(
+    tipsYieldsFromPrices(rawYieldsData, quotesByCusip, isBroker, marketSettleIso()), rawRefCpiData));
   const indexRatioByCusip = tipsIndexRatios(rawYieldsData, rawRefCpiData, quotesByCusip, isBroker, marketSettleIso(), tipsRefByCusip);
   bonds.forEach(b => { b.indexRatio = indexRatioByCusip.get(b.cusip) ?? NaN; });
   return bonds;
@@ -1214,12 +1213,12 @@ function renderTable(fedBonds, brokerBonds) {
     }
   };
   if (cols.some(c => c.key === 'spot')) {
-    addCurve('spot', fedBonds, 'fed', { priceOf: bd => bd.price, yieldOf: bd => bd.askYield });
-    addCurve('spot', brokerBonds, 'mkt', { priceOf: bd => bd.price, yieldOf: bd => bd.askYield });
+    addCurve('spot', fedBonds, 'fed', TIPS_SPOT_FIT);
+    addCurve('spot', brokerBonds, 'mkt', TIPS_SPOT_FIT);
   }
   if (cols.some(c => c.key === 'spotSa')) {
-    addCurve('spotSa', fedBonds, 'fed', { priceOf: bd => bd.price * bd.saRatio, yieldOf: bd => bd.saYield });
-    addCurve('spotSa', brokerBonds, 'mkt', { priceOf: bd => bd.price * bd.saRatio, yieldOf: bd => bd.saYield });
+    addCurve('spotSa', fedBonds, 'fed', TIPS_SA_SPOT_FIT);
+    addCurve('spotSa', brokerBonds, 'mkt', TIPS_SA_SPOT_FIT);
   }
   for (const { term, ...vals } of curveByTerm.values()) {
     const cells = cols.map(c => {
@@ -1367,9 +1366,9 @@ function renderChart(fedBonds, brokerBonds) {
   if (fedBonds)    curveSrc.push({ bonds: fedBonds,    sfx: both ? ' (Fed)' : '',    color: '#1a56db' });
   if (brokerBonds) curveSrc.push({ bonds: brokerBonds, sfx: both ? ' (Market)' : '', color: '#b45309' });
   for (const { bonds, sfx, color } of curveSrc) {
-    const ask = spotCurveGrid(bonds, { priceOf: b => b.price, yieldOf: b => b.askYield, yToX });
+    const ask = spotCurveGrid(bonds, { ...TIPS_SPOT_FIT, yToX });
     if (ask) seriesDef.push({ label: `Spot${sfx}`, data: ask, color, curve: true, w: 2.25, dash: [], style: 'circle', r: 0, markerR: 2 });
-    const sa = spotCurveGrid(bonds, { priceOf: b => b.price * b.saRatio, yieldOf: b => b.saYield, yToX });
+    const sa = spotCurveGrid(bonds, { ...TIPS_SA_SPOT_FIT, yToX });
     if (sa) seriesDef.push({ label: `Spot SA${sfx}`, data: sa, color, curve: true, w: 2.25, dash: [2, 3], style: 'circle', r: 0, markerR: 2 });
   }
   // GSW zero reference (analysis aid, ?gsw only): evaluate its published Svensson parameters
@@ -1569,25 +1568,14 @@ function processAndRenderBei() {
       b.beiSao = nom.yield - b.saoYield;
     });
 
-    // Spot BEI: the nominal zero curve minus the seasonally adjusted real zero curve, on a
-    // horizon grid — a true same-horizon breakeven at every point, unlike the per-bond
-    // closest-maturity match above.
+    // Spot BEI (3.5 Across terms): the Treasuries curve the Treasuries tab draws, less the TIPS SA
+    // curve the TIPS tab draws, at every Term where both exist -- a true same-horizon
+    // breakeven at every point, unlike the per-bond closest-maturity match above.
     const yToX = yearsToX(Date.now());
-    const nomFit = spotCurveFit(
-      nominalCandidates.filter(n => n.type === 'MARKET BASED NOTE' || n.type === 'MARKET BASED BOND'),
-      { priceOf: n => n.price, yieldOf: n => n.yield, minT: 1 });
-    const saFit = spotCurveFit(tips, { priceOf: b => b.price * b.saRatio, yieldOf: b => b.saYield });
-    let spotBeiGrid = null;
-    if (nomFit && saFit) {
-      spotBeiGrid = [];
-      const t0 = Math.max(2, Math.ceil(Math.max(nomFit.tMin, saFit.tMin) * 2) / 2);
-      const t1 = Math.min(nomFit.tMax, saFit.tMax);
-      for (let t = t0; t <= t1 + 1e-9; t += 0.5) {
-        const zn = zToSA(nomFit.z(t)), zr = zToSA(saFit.z(t));
-        if (nomFit.sane(zn) && saFit.sane(zr)) spotBeiGrid.push({ x: yToX(t), y: parseFloat((zn - zr).toFixed(3)) });
-      }
-      if (spotBeiGrid.length < 3) spotBeiGrid = null;
-    }
+    const nomFit = spotCurveFit(treasuriesSpotSet(fidelityNominalsData), TREASURIES_SPOT_FIT);
+    const saFit = spotCurveFit(tips, TIPS_SA_SPOT_FIT);
+    const spotBei = spotBreakevenAcrossTerms(nomFit, saFit);
+    const spotBeiGrid = spotBei && spotBei.map(({ t, bei }) => ({ x: yToX(t), y: parseFloat(bei.toFixed(3)) }));
 
     const startEl = document.getElementById('startMaturity');
     const endEl = document.getElementById('endMaturity');

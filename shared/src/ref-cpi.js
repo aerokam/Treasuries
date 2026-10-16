@@ -128,10 +128,11 @@ export function indexRatioNineDecimal(refCpi, datedDateRefCpi) {
   return Math.round(nudge(ratio * factor)) / factor;
 }
 
-// Index Ratio of every TIPS in a source, keyed by CUSIP -- independent of, and not
-// consumed by, TIPS yield calculation (tips-yields.js#tipsYieldsFromPrices). This does
-// not belong inside that function: Index Ratio does not use Price and is not a yield.
-// The only current consumer is the market-quote TIPS table YieldCurves/src/app.js
+// Index Ratio of every TIPS in a source, keyed by CUSIP: Calculate index ratios, process 3.1.9
+// (YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#calculate-index-ratios).
+// Independent of, and not consumed by, Calculate TIPS yields (3.1.7,
+// shared/src/tips-yields.js#tipsYieldsFromPrices): Index Ratio does not use Price and is not a
+// yield. The only current consumer is the market-quote TIPS table YieldCurves/src/app.js
 // renders; nothing downstream of that reads it, and it is not published to any store.
 //
 // tipsRows        S1's TIPS rows, each carrying cusip and datedDateCpi

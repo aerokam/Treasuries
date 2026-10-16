@@ -8,9 +8,9 @@
 //
 // Run: node YieldCurves/scripts/updateSaSaoYields.js
 import { uploadToR2 } from './r2.js';
-import { yieldFromPrice } from '../../shared/src/bond-math.js';
+import { tipsYieldsFromPrices } from '../../shared/src/tips-yields.js';
+import { saYieldsFromTipsYields } from '../../shared/src/sa-yields.js';
 import { calculateSAO } from '../../shared/src/spot-curve.js';
-import { saFactorForDate, maturitySaFactor } from '../../shared/src/ref-cpi.js';
 import { parseCsv } from '../../shared/src/csv.js';
 import { localDate, toIsoDate, nextBusinessDay, parseHolidaySet } from '../../shared/src/settlement.js';
 import { parseFidelityDownloadDate, fidelityDownloadDateIso, parseFidelityTipsRows } from '../../shared/src/fidelity-parse.js';
@@ -50,29 +50,17 @@ async function main() {
   // Parse RefCPI
   console.log(`Fetching SA factors from ${REF_CPI_URL}...`);
   const refCpiRes = await fetch(REF_CPI_URL);
+  if (!refCpiRes.ok) throw new Error(`Failed to fetch SA factors: ${refCpiRes.status}`);
   const refCpiText = await refCpiRes.text();
   const refCpiData = parseCsv(refCpiText);
 
-  // Parse Bonds — the same TIPS row parser the YieldCurves app reads this store with.
-  const processed = parseFidelityTipsRows(fidText).map(r => {
-    const { cusip, coupon, maturity, askPrice: price } = r;
-    if (!maturity || isNaN(price) || isNaN(coupon)) return null;
-    const maturityDate = localDate(maturity);
-    if (!maturityDate) return null;
-
-    const saS = saFactorForDate(refCpiData, settleDateStr);
-    const saM = maturitySaFactor(refCpiData, maturity, settleDateStr);
-
-    if (saS == null || saM == null) return null;
-
-    const askYield = yieldFromPrice(price, coupon, settleDate, maturityDate);
-    const saPrice = price * (saS / saM);
-    const saYield = yieldFromPrice(saPrice, coupon, settleDate, maturityDate);
-
-    if (askYield === null || saYield === null) return null;
-
-    return { cusip, maturity, coupon, askYield, saYield, maturityDate, settlementDate: settleDateStr };
-  }).filter(Boolean).sort((a, b) => a.maturityDate - b.maturityDate);
+  // Parse Bonds — the same TIPS row parser the YieldCurves app reads this store with, then the
+  // same two calculations: the TIPS yields (3.1.7) and the SA Yield (3.2).
+  const quotesByCusip = new Map(parseFidelityTipsRows(fidText)
+    .filter(r => r.maturity && !isNaN(r.askPrice))
+    .map(r => [r.cusip, r]));
+  const processed = saYieldsFromTipsYields(
+    tipsYieldsFromPrices(null, quotesByCusip, true, settleDateStr), refCpiData);
 
   console.log(`Processed ${processed.length} market TIPS bonds.`);
 
@@ -84,9 +72,11 @@ async function main() {
   // Generate CSV
   // NOTE: Coupon and Yields are written using the project's internal Decimal standard 
   // (e.g., 0.01 = 1%) to ensure compatibility with spreadsheet formulas and core logic.
+  // A TIPS with no SA Yield (3.2) has blank sa_yield and sao_yield cells.
+  const fix7 = v => Number.isFinite(v) ? v.toFixed(7) : '';
   const header = "cusip,maturity,coupon,ask_yield,sa_yield,sao_yield";
   const lines = processed.map(b => 
-    `${b.cusip},${b.maturity},${b.coupon.toFixed(7)},${b.askYield.toFixed(7)},${b.saYield.toFixed(7)},${b.saoYield.toFixed(7)}`
+    `${b.cusip},${b.maturity},${b.coupon.toFixed(7)},${b.askYield.toFixed(7)},${fix7(b.saYield)},${fix7(b.saoYield)}`
   );
   const csvContent = [header, ...lines].join('\n') + '\n';
 

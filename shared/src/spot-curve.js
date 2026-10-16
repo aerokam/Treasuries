@@ -170,6 +170,15 @@ export function spotCurveFit(bonds, { priceOf, yieldOf, minT = SAO_NOISE_YRS }) 
   };
 }
 
+// The options each spot curve of 3.4 is fitted with, defined once so every consumer (the app's
+// tabs, the breakeven across terms and the acquisition job that writes S13) fits the same
+// curve. The Treasuries curve is fitted to the price and yield of every Bill, Note and Bond from
+// a minimum Term of 0.25 years; the TIPS curve to the ask prices, and the TIPS SA curve to the
+// ask prices multiplied by the SA Price Factor, from the default minimum Term.
+export const TREASURIES_SPOT_FIT = { priceOf: b => b.price, yieldOf: b => b.yield, minT: 0.25 };
+export const TIPS_SPOT_FIT = { priceOf: b => b.price, yieldOf: b => b.askYield };
+export const TIPS_SA_SPOT_FIT = { priceOf: b => b.price * b.saRatio, yieldOf: b => b.saYield };
+
 // Step terms from tMin to tMax in fixed increments, always including tMax itself as the
 // final term even when it falls between steps — a fit's domain ends at its longest fitted
 // bond's exact maturity, not at the nearest step below it. Never extends past tMax: GSW's
@@ -236,9 +245,10 @@ export function calculateSAO(bonds) {
   const settle = localDate(bonds[0].settlementDate) || new Date();
   const yrs = bonds.map(b => termYears(settle, b.maturityDate));   // DATA_DICTIONARY.md#term
 
-  // Fit on reliable points only; near-maturity SA yields are price-noise-dominated.
+  // Fit on reliable points only; near-maturity SA yields are price-noise-dominated. A TIPS
+  // with no SA Yield (3.2) has no SAO Yield, and is left out of the fit.
   const fitIdx = [];
-  for (let i = 0; i < n; i++) if (yrs[i] >= SAO_NOISE_YRS) fitIdx.push(i);
+  for (let i = 0; i < n; i++) if (yrs[i] >= SAO_NOISE_YRS && Number.isFinite(bonds[i].saYield)) fitIdx.push(i);
   const curve = fitNSS(fitIdx.map(i => yrs[i]), fitIdx.map(i => bonds[i].saYield));
   // Below the shortest fitted maturity the global NSS form is unconstrained and its
   // extrapolation diverges (a near-maturity TIPS can swing hundreds of bps negative).
@@ -248,6 +258,7 @@ export function calculateSAO(bonds) {
 
   for (let i = 0; i < n; i++) {
     const b = bonds[i];
+    if (!Number.isFinite(b.saYield)) { sao[i] = NaN; continue; }
     const fit = curve ? curve(Math.max(yrs[i], tMin)) : b.saYield;
     const weight = yrs[i] < SAO_NOISE_YRS
       ? 1
