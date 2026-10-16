@@ -2113,8 +2113,8 @@ function _couponEventCalc(bond, d, activeRc, activeDateIso) {
   const actualRc = lookupRefCpi(refCpiRows, dIso);
   const isActual = actualRc != null;
   const eventRc = isActual ? actualRc : activeRc;
-  const { principalPerBond, indexRatio } = bondCalcs(bond, eventRc);
-  return { eventRc, isActual, principalPerBond, indexRatio,
+  const { principalPerBond, indexRatio, paymentIndexRatio } = bondCalcs(bond, eventRc);
+  return { eventRc, isActual, principalPerBond, indexRatio, paymentIndexRatio,
     couponPerBond: principalPerBond * (bond.coupon ?? 0) / 2,
     refCpiDateDisplay: _fmtLongDate(localDate(isActual ? dIso : activeDateIso)) };
 }
@@ -2346,7 +2346,7 @@ function buildCashFlowData(holdingsArr) {
       const ev = _couponEventCalc(b, d, activeRc, activeDateIso);
       const { principalPerBond, couponPerBond } = ev;
       const calc = {
-        qty: h.qty, refCPI: ev.eventRc, datedDateRefCpi: b.datedDateRefCpi, indexRatio: ev.indexRatio,
+        qty: h.qty, refCPI: ev.eventRc, datedDateRefCpi: b.datedDateRefCpi, indexRatio: ev.indexRatio, paymentIndexRatio: ev.paymentIndexRatio,
         principalPerBond, coupon: b.coupon ?? 0,
         isActual: ev.isActual, refCpiDateDisplay: ev.refCpiDateDisplay,
       };
@@ -4233,8 +4233,8 @@ document.addEventListener('click', e => {
       const _rcDateIso = _defaultRefCpiDateStr;
       const _dForRefCpi = _rcDateIso ? { ...(d || {}), settlementDate: _fmtMDY(_rcDateIso) } : (d || {});
       showPopup(drillL3, 'Ref CPI Interpolation', (c) => buildRefCpiDrill(_dForRefCpi, c, refCpiRows), 'Ref CPI', 'quant');
-    } else if (key === 'indexRatio') {
-      showPopup(drillL3, 'Index Ratio Calculation', (c) => buildIndexRatioDrill(d), 'Index Ratio');
+    } else if (key === 'indexRatio' || key === 'paymentIndexRatio') {
+      showPopup(drillL3, 'Index Ratio Calculation', (c) => buildIndexRatioDrill(d, key === 'paymentIndexRatio' ? 'payment' : 'cost'), 'Index Ratio');
     } else if (key.startsWith('pipb-')) {
       const idx = parseInt(key.slice(5), 10);
       const hArr = _currentDrillColKey === 'amtBefore' ? d?.araBeforeHoldings : d?.araAfterHoldings;

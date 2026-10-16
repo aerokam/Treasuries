@@ -2678,7 +2678,7 @@ for (const { kind, dara, pli } of [{ kind: 'gap', dara: '80000', pli: true }, { 
       const pNums = c.numbers.match(/\(([\d.]+)\s*÷\s*100\)\s*×\s*([\d.]+)\s*×\s*1,000\s*=\s*\$([\d,.]+)/);
       expect(pNums, why('the Cost per TIPS numbers read (Price ÷ 100) × Index Ratio × 1,000 = Cost per TIPS: ' + c.numbers)).not.toBeNull();
       const cptVal = moneyOf(c.value);
-      expect(pNums[2], why('the Index Ratio of a Synthetic TIPS reads 1.00000')).toBe('1.00000');
+      expect(pNums[2], why('the Index Ratio of a Synthetic TIPS reads 1.000000000')).toBe('1.000000000');
       expect(moneyOf(pNums[3])).toBe(cptVal);
       expect(Math.abs(Number(pNums[1]) / 100 * Number(pNums[2]) * 1000 - cptVal), why('Cost per TIPS agrees with the displayed Price and Index Ratio')).toBeLessThan(0.011);
       expect(c.note, why('the Price is explained from the Yield and Coupon Rate of the Synthetic TIPS')).toMatch(/Price computed from the Yield \([\d.]+%\) and the Coupon Rate \([\d.]+%\) of the Synthetic TIPS/);
@@ -2832,4 +2832,81 @@ test('plain file with one unknown CUSIP shows the skipped CUSIP message in #stat
   // The DARA / Available Cash notices a plain file also raises stay; the skipped message is its own last row.
   await expect(page.locator('#status > div').last()).toHaveText('1 CUSIP(s) not in TIPS Market Data skipped: ZZZZZZZZ9', { timeout: 4_000 });
   await expect(page.locator('#status')).not.toHaveClass(/error/);
+});
+
+// ── Index Ratio decimals in drills (5.0 §Index Ratio decimals in drills) ──────
+// Nine decimals where the Index Ratio feeds Cost per TIPS, Accrued Interest or sale proceeds (unrounded);
+// five where it feeds Par Value per TIPS, a coupon or a principal payment (Treasury's rule). Each row must
+// reproduce its result from the numbers shown.
+async function labelValueRows(scope) {
+  return scope.locator('tr').evaluateAll(trs => trs.map(tr => {
+    const tds = [...tr.querySelectorAll('td')];
+    return { label: (tds[0]?.childNodes[0]?.textContent ?? '').trim(), value: (tds[tds.length - 1]?.textContent ?? '').trim() };
+  }));
+}
+const valueOf = (rows, label) => rows.find(r => r.label.toLowerCase() === label.toLowerCase())?.value;
+const money = s => Number(String(s).replace(/[$,]/g, ''));
+
+test('Index Ratio decimals: a Cost per TIPS drill shows nine decimals and price/100 x ratio x 1,000 reproduces the Cost per TIPS to the cent', async ({ page }) => {
+  await page.locator('#holdings-file').setInputFiles(HOLDINGS_PATH);
+  await page.locator('#run-btn').click();
+  await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 4_000 });
+  await page.locator('#simple-table tbody tr.fy-group-header').first().click();
+  await page.locator('#simple-table tbody td[data-col="costBefore"]').first().click();
+  await expect(page.locator('#drill-overlay')).toBeVisible();
+  const rows = await labelValueRows(page.locator('#drill-content'));
+  const ratio = valueOf(rows, 'Index ratio');
+  expect(ratio, 'Index ratio shows nine decimals where it feeds Cost per TIPS').toMatch(/^\d+\.\d{9}$/);
+  const price = Number(valueOf(rows, 'Price (unadjusted)'));
+  const cost = money(valueOf(rows, 'Cost per TIPS'));
+  expect(Math.abs(Math.round(price / 100 * Number(ratio) * 1000 * 100) / 100 - cost), 'price/100 x ratio shown x 1,000 equals the Cost per TIPS shown').toBeLessThan(0.0051);
+
+  // The Index Ratio drill reached from a Cost per TIPS row shows the same nine decimals.
+  await page.locator('.drill-l3[data-l3="indexRatio"]').click();
+  await expect(page.locator('#shared-popup'), 'the Index Ratio drill shows the ratio of the row it was opened from').toContainText(ratio);
+});
+
+test('Index Ratio decimals: a Par Value per TIPS drill shows the payment ratio to five decimals and 1,000 x ratio equals the Par Value per TIPS', async ({ page }) => {
+  await page.locator('#holdings-file').setInputFiles(HOLDINGS_PATH);
+  await page.locator('#run-btn').click();
+  await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 4_000 });
+  await page.locator('#simple-table tbody tr.fy-group-header').first().click();
+  await page.locator('#simple-table tbody td[data-col="qtyAfter"]').first().click();
+  await expect(page.locator('#drill-overlay')).toBeVisible();
+  const rows = await labelValueRows(page.locator('#drill-content'));
+  const ratio = valueOf(rows, 'Index ratio');
+  expect(ratio, 'Index ratio shows five decimals where it feeds Par Value per TIPS').toMatch(/^\d+\.\d{5}$/);
+  expect((1000 * Number(ratio)).toFixed(2), '1,000 x ratio shown equals the Par Value per TIPS shown').toBe(valueOf(rows, 'Par Value per TIPS'));
+  await page.locator('.drill-l3[data-l3="paymentIndexRatio"]').click();
+  await expect(page.locator('#shared-popup'), 'the Index Ratio drill shows the ratio of the row it was opened from').toContainText(ratio);
+});
+
+test('Index Ratio decimals: a Cash Flow Calendar principal or coupon drill shows the payment ratio to five decimals', async ({ page }) => {
+  test.setTimeout(20_000);
+  await page.locator('#holdings-file').setInputFiles(HOLDINGS_PATH);
+  await expect(page.locator('#cash-flow-btn')).toBeVisible({ timeout: 4_000 });
+  await page.locator('#cash-flow-btn').click();
+  const firstYear = page.locator('#cash-flow-content tr.cf-year-header').first();
+  if ((await firstYear.getAttribute('data-expanded')) === 'false') await firstYear.click();
+  await page.locator('#cash-flow-content td.cf-date-cell:visible').first().click();
+  await page.locator('#shared-popup .cf-event-drill').first().click();
+  await expect(page.locator('#shared-popup-l3')).toBeVisible();
+  const rows = await labelValueRows(page.locator('#shared-popup-l3'));
+  const ratio = valueOf(rows, 'Index ratio');
+  expect(ratio).toMatch(/^\d+\.\d{5}$/);
+  expect(money(valueOf(rows, 'Par Value per TIPS')), '1,000 x ratio shown equals the Par Value per TIPS shown').toBeCloseTo(1000 * Number(ratio), 2);
+});
+
+test('Index Ratio decimals: a Trade Ticket Cost drill shows nine decimals and reproduces the Cost per TIPS', async ({ page }) => {
+  await page.locator('#holdings-file').setInputFiles(HOLDINGS_PATH);
+  await page.locator('#run-btn').click();
+  await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 4_000 });
+  await page.locator('#trade-ticket-btn').click();
+  const cell = page.locator('#trade-ticket-content td.tt-drill[data-tt-key="cost"]').first();
+  test.skip(await cell.count() === 0, 'the rebalance recommends no trades');
+  await cell.click();
+  const rows = await labelValueRows(page.locator('#shared-popup'));
+  const ratio = valueOf(rows, 'Index Ratio');
+  expect(ratio).toMatch(/^\d+\.\d{9}$/);
+  expect(Math.abs(Number(valueOf(rows, 'Price')) / 100 * Number(ratio) * 1000 - money(valueOf(rows, 'Cost per TIPS'))), 'price/100 x ratio shown x 1,000 reproduces the Cost per TIPS to the cent (price shown to three decimals)').toBeLessThan(0.02);
 });

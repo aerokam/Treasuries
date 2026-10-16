@@ -245,7 +245,7 @@ export function computeBeforeState({ holdings, tipsMarketData, refCPI, firstYear
       // their coverage lives entirely in an adjacent bracket year's excess.
       rows.push({
         cusip: '', maturityStr: '', fundedYear: y, coupon: 0, yield: null, nPeriods: 2, principalPerBond: 0,
-        costPerBond: 0, price: null, refCPI, datedDateRefCpi: null, indexRatio: null,
+        costPerBond: 0, price: null, refCPI, datedDateRefCpi: null, indexRatio: null, paymentIndexRatio: null,
         fundedYearQtyBefore: 0, excessQtyBefore: 0, qtyBefore: 0, isBracketTarget: false,
         araBeforeTotal: gapYears.includes(y) ? null : rawARA,
         araBeforeLaterMatInt: rawARA, araBeforeHoldings: [], excessLMI_Before: 0, DARA: yearDara,
@@ -301,11 +301,11 @@ export function computeBeforeState({ holdings, tipsMarketData, refCPI, firstYear
     let first = true;
     for (const [cusip, qty] of cusipMap) {
       const bond = tipsMarketData.get(cusip);
-      const { costPerBond, piPerBond, principalPerBond, nPeriods, indexRatio } = bondCalcs(bond, refCPI);
+      const { costPerBond, piPerBond, principalPerBond, nPeriods, indexRatio, paymentIndexRatio } = bondCalcs(bond, refCPI);
       const coupon = bond.coupon ?? 0;
       const row = {
         cusip, maturityStr: fmtDate(bond.maturity), fundedYear: y,
-        coupon, yield: bond.yield ?? null, nPeriods, principalPerBond, costPerBond, piPerBond,
+        coupon, yield: bond.yield ?? null, nPeriods, principalPerBond, paymentIndexRatio, costPerBond, piPerBond,
         price: bond.price ?? null, refCPI, datedDateRefCpi: bond.datedDateRefCpi ?? refCPI, indexRatio,
         // Qty/Cost Before are never split by the funded/excess guess for an ORDINARY year (3.0
         // §Before-State Preview) — the full held quantity is the funded-side figure. A FLAGGED

@@ -9,7 +9,7 @@ import { computeBeforeState, detectBracketFlags, heldYearMedianExcluding } from 
 import { EXCLUDE_MATURING_WITHIN_MONTHS, defaultFirstYear, tipsMaturingAfterExclusion, remainingCouponPaymentsThisYear, rmdCappedRemainingCoupons, latestRemainingCouponDate, future30yLimit, maxLastYear, selectLadderBonds, selectFuture30yCovers, LOWER_COVER_YIELD, gapRebalances } from '../src/ladder-core.js';
 import { bracketWeights, bracketWeightsN, syntheticCoupon } from '../src/gap-math.js';
 import { findSpikes, smoothCurve } from '../src/shape-math.js';
-import { buildDurationPopupRows, buildBracketWeightDrill, buildFuture30yDurationPopupRows, buildFuture30yLMIDrill, buildSyntheticPIDrill } from '../src/drill.js';
+import { buildDurationPopupRows, buildBracketWeightDrill, buildFuture30yDurationPopupRows, buildFuture30yLMIDrill, buildSyntheticPIDrill, buildDrillHTML, buildIndexRatioDrill, buildCashFlowEventDrill, buildTradeTicketCostDrill } from '../src/drill.js';
 import { rankForYear, levelValues } from '../src/allocation-policy.js';
 import { runBuild } from '../src/build-lib.js';
 import { parseBrokerCSV } from '../src/broker-import.js';
@@ -3788,6 +3788,41 @@ console.log('\nFuture 30Y Dur popup — cost-weighted average, computed match, c
   assert('runBuild: a First Year with no TIPS does not throw', err, null);
   assert('runBuild: the ladder starts at the first year with a TIPS', built?.summary.firstYear, 2032);
   assert('runBuild: the gap years are 2037-2039', built?.summary.gapYears.join(','), '2037,2038,2039');
+}
+
+console.log('\nIndex Ratio decimals in drills — nine where it feeds Cost per TIPS, five where it feeds Par Value per TIPS (5.0)');
+{
+  // The value cell of the row with this label in a drill's HTML.
+  const cellOf = (html, label) => {
+    const chunk = html.split('<tr').find(c => c.includes('>' + label + '</td>'));
+    return chunk ? [...chunk.matchAll(/<td[^>]*>([^<]*)<\/td>/g)].map(m => m[1]).pop() : undefined;
+  };
+  const { summary, details } = runBuild({ dara: 40000, lastYear: MAX_YEAR, tipsMarketData, refCPI, settlementDate });
+  const rows = details.filter(d => d.cusip && d.price != null && !(d.fundedRungs && d.fundedRungs.length > 1));
+  assert('Index Ratio drills: the build has TIPS rows to check', rows.length > 0, true);
+  let costBad = 0, parBad = 0, nine = 0, five = 0;
+  for (const d of rows) {
+    const cost = buildDrillHTML(d, 'cost', summary);
+    const ir9 = cellOf(cost, 'Index ratio');
+    if (/^\d+\.\d{9}$/.test(ir9)) nine++;
+    if (Math.abs(Number(cellOf(cost, 'Price (unadjusted)')) / 100 * Number(ir9) * 1000 - d.costPerBond) > 0.006) costBad++;
+    const amt = buildDrillHTML(d, 'amount', summary);
+    const ir5 = cellOf(amt, 'Index ratio');
+    if (/^\d+\.\d{5}$/.test(ir5)) five++;
+    if ((1000 * Number(ir5)).toFixed(2) !== cellOf(amt, 'Par Value per TIPS')) parBad++;
+  }
+  assert('Index Ratio drills: every Cost per TIPS drill shows the Index Ratio to nine decimals', nine, rows.length);
+  assert('Index Ratio drills: price/100 x the Index Ratio shown x 1,000 equals the Cost per TIPS in every Cost drill', costBad, 0);
+  assert('Index Ratio drills: every Par Value per TIPS drill shows the payment Index Ratio to five decimals', five, rows.length);
+  assert('Index Ratio drills: 1,000 x the Index Ratio shown equals the Par Value per TIPS shown in every Amount drill', parBad, 0);
+  const d0 = rows[0];
+  assert('Index Ratio drills: the Index Ratio drill of a Cost per TIPS shows the unrounded ratio to nine decimals', buildIndexRatioDrill(d0).find(r => r.label === 'Index Ratio').value, d0.indexRatio.toFixed(9));
+  assert('Index Ratio drills: the Index Ratio drill of a Par Value per TIPS shows the payment ratio to five decimals', buildIndexRatioDrill(d0, 'payment').find(r => r.label === 'Index Ratio').value, d0.paymentIndexRatio.toFixed(5));
+  assert('Index Ratio drills: the Trade Ticket Cost drill shows nine decimals', buildTradeTicketCostDrill({ price: 100, indexRatio: d0.indexRatio, costPerBond: 1, qty: 1, cost: 1 }).find(r => r.label === 'Index Ratio').value, d0.indexRatio.toFixed(9));
+  const bc = bondCalcs({ coupon: 0.01, datedDateRefCpi: 250, price: 100, maturity: new Date(2030, 3, 15) }, 337.123456789);
+  const ev = buildCashFlowEventDrill({ refCPI: 337.123456789, datedDateRefCpi: 250, indexRatio: bc.indexRatio, paymentIndexRatio: bc.paymentIndexRatio, principalPerBond: bc.principalPerBond, coupon: 0.01, qty: 1, amount: 1, type: 'principal' });
+  assert('Index Ratio drills: a Cash Flow Calendar event shows the payment Index Ratio to five decimals', ev.find(r => r.label === 'Index ratio').value, bc.paymentIndexRatio.toFixed(5));
+  assert('Index Ratio drills: the Par Value per TIPS of the event is 1,000 x the ratio shown', ev.find(r => r.label === 'Par Value per TIPS').value, '$' + (1000 * Number(bc.paymentIndexRatio.toFixed(5))).toLocaleString('en-US', { minimumFractionDigits: 2 }));
 }
 
 console.log(`\n${passed + failed} tests: ${passed} passed, ${failed} failed`);

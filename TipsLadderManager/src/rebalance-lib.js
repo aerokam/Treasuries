@@ -2195,7 +2195,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
     details.unshift({
       cusip: h.cusip, maturityStr: fmtDate(h.maturity), fundedYear: h.year,
       coupon: b.coupon, yield: b.yield, saYield: b.saYield ?? null, price: b.price, datedDateRefCpi: b.datedDateRefCpi, refCPI, indexRatio: ir,
-      principalPerBond: 1000 * pir, costPerBond: (b.price / 100 * ir * 1000),
+      principalPerBond: 1000 * pir, paymentIndexRatio: pir, costPerBond: (b.price / 100 * ir * 1000),
       DARA: daraByYear?.get(h.year) ?? DARA,
       qtyBefore: h.qty, qtyAfter: tQ,
       // Displayed Before is the reallocated split, not the raw honest LMI-formula split
@@ -2287,7 +2287,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
     const newDetail = {
       cusip: bst.targetCUSIP, maturityStr: fmtDate(tb.maturity), fundedYear: bYear,
       coupon: tb.coupon, yield: tb.yield, saYield: tb.saYield ?? null, price: tb.price, datedDateRefCpi: tb.datedDateRefCpi, refCPI, indexRatio: ir,
-      principalPerBond: 1000 * pir, costPerBond: cpb, DARA: rowDARA,
+      principalPerBond: 1000 * pir, paymentIndexRatio: pir, costPerBond: cpb, DARA: rowDARA,
       qtyBefore: 0, qtyAfter: bst.targetQty,
       fundedYearQtyBefore: 0, fundedYearQtyAfter: bst.targetFundedYearQty,
       isBracketTarget: bst.isBracket, isFuture30yCover: bst.isBracket && future30yCoverYearSet.has(bYear),
@@ -2365,7 +2365,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
     const newDetail = {
       cusip: fc, maturityStr: fmtDate(tb.maturity), fundedYear: bYear,
       coupon: tb.coupon, yield: tb.yield, saYield: tb.saYield ?? null, price: tb.price, datedDateRefCpi: tb.datedDateRefCpi, refCPI, indexRatio: ir,
-      principalPerBond: 1000 * pir, costPerBond: cpb, DARA: rowDARA,
+      principalPerBond: 1000 * pir, paymentIndexRatio: pir, costPerBond: cpb, DARA: rowDARA,
       qtyBefore: 0, qtyAfter: ns.newQty,
       fundedYearQtyBefore: 0, fundedYearQtyAfter: ns.newQty,
       isBracketTarget: false, isFuture30yCover: false,
@@ -2438,7 +2438,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
       const newDetail = {
         cusip: newLowerCUSIP, maturityStr: fmtDate(nlBond.maturity), fundedYear: bYear,
         coupon: nlBond.coupon, yield: nlBond.yield, saYield: nlBond.saYield ?? null, price: nlBond.price, datedDateRefCpi: nlBond.datedDateRefCpi, refCPI, indexRatio: ir,
-        principalPerBond: 1000 * pir, costPerBond: newLowerCostPerBond3, DARA: rowDARA,
+        principalPerBond: 1000 * pir, paymentIndexRatio: pir, costPerBond: newLowerCostPerBond3, DARA: rowDARA,
         qtyBefore: 0, qtyAfter: exA,
         fundedYearQtyBefore: 0, fundedYearQtyAfter: 0,
         isBracketTarget: true, isFuture30yCover: false, isGapBracket: true,
@@ -2499,7 +2499,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
       const newDetail = {
         cusip: bond.cusip, maturityStr: fmtDate(bond.maturity), fundedYear: year,
         coupon: bond.coupon, yield: bond.yield, saYield: bond.saYield ?? null, price: bond.price, datedDateRefCpi: bond.datedDateRefCpi, refCPI, indexRatio: ir,
-        principalPerBond: 1000 * pir, costPerBond: cpb, DARA: rowDARA,
+        principalPerBond: 1000 * pir, paymentIndexRatio: pir, costPerBond: cpb, DARA: rowDARA,
         qtyBefore: 0, qtyAfter: 0, fundedYearQtyBefore: 0, fundedYearQtyAfter: 0,
         isBracketTarget: false, isFuture30yCover: false,
         isGapBracket: gapYears.length > 0 && (year === brackets.lowerYear || year === brackets.upperYear || (is3Bracket && year === newLowerYear)),

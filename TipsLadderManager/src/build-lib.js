@@ -163,6 +163,7 @@ export function runBuild({ dara, firstYear: firstYearOpt, lastYear, tipsMarketDa
         refCPI,
         indexRatio: r.ir,
         principalPerBond: ppb,
+        paymentIndexRatio: r.pir,
         halfOrFull: hof,
         nPeriods: nP,
         dara: first ? yearDara : null,
