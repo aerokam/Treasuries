@@ -612,7 +612,7 @@ function level3YieldsMonitorAssemble() {
     { id: '2.1.1', name: ['Assemble', '2D/10D', 'range data'], href: S('assemble-2d-10d-range-data'), reads: ['ia'], out: {} },
     { id: '2.1.2', name: ['Assemble', '1Y/2Y/3Y', 'range data'], href: S('assemble-1y-2y-3y-range-data'), reads: ['yhist'], out: {} },
     { id: '2.1.3', name: ['Assemble', '10Y/ALL', 'range data'], href: S('assemble-10y-all-range-data'), reads: ['yhist'], out: {} },
-    { id: '2.1.4', name: ['Assemble', 'Custom', 'range data'], href: S('assemble-custom-range-data'), reads: ['yhist'], out: {} },
+    { id: '2.1.4', name: ['Assemble', 'Custom', 'range data'], href: S('assemble-custom-range-data'), reads: ['yhist', 'ia'], out: {} },
   ];
   const SX = 40, SW = 205, PR = 60, W = 1150, H = 780;
   const sy = i => 220 + i * 340;

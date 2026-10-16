@@ -13,9 +13,9 @@ While this tool uses high-resolution (intraday) and real-time data feeds, offici
 | :--- | :--- | :--- | :--- |
 | **2D** | CNBC | `1D` | Intraday |
 | **10D** | CNBC | `5D` | Recent history |
-| **1Y / 2Y / 3Y** | CNBC | `6M` (same feed for all three) | Reread fresh each load, filtered client-side to the selected cutoff |
-| **10Y / ALL** | R2 | `yields-history/history.json` | Persistent daily-close baseline |
-| **Custom** | R2 + CNBC | `yields-history/history.json` + `5D` tip | Baseline plus latest live points |
+| **1Y / 2Y / 3Y** | CNBC, R2 | `6M` (same feed for all three) and `5D`; `yields-history/history.json` before the first `6M` bar | One `6M` read per symbol, filtered to the selected cutoff and read again only when it does not reach the cutoff or the user asked for a fresh read |
+| **10Y / ALL** | R2, CNBC | `yields-history/history.json` and `5D` | Daily-close baseline plus the `5D` bars later than its last point |
+| **Custom** | R2, CNBC | `yields-history/history.json` and `5D`; `1D` and the Intraday archive for the Time Series chart | Baseline plus the `5D` bars later than its last point |
 
 ## Symbol Reference
 
@@ -43,9 +43,9 @@ The following symbols are currently supported and grouped by security type:
 
 **2D, 10D ranges**: Use CNBC's chart-bar feed with mapped `timeRange` (1D, 5D).
 
-**1Y, 2Y, 3Y ranges**: CNBC's chart-bar feed with `6M` `timeRange` — the same feed is refetched fresh for all three UI ranges and filtered client-side to the selected cutoff. This is deliberate (matches CNBC's own daily window, no drift), not a CORS fallback.
+**1Y, 2Y, 3Y ranges**: CNBC's chart-bar feed with `6M` `timeRange` — one read per symbol serves all three UI ranges and is filtered client-side to the selected cutoff.
 
-**5D latest yields**: All ranges (except 10D) append CNBC 5D data for current market context.
+**5D bars**: 1Y, 2Y, 3Y, 10Y, ALL and Custom append the `5D` bars later than their last point. 2D also reads `5D`, for the day change.
 
 - **Base URL**: `https://webql-redesign.cnbcfm.com/graphql`
 - **Operation**: `getQuoteChartData`
