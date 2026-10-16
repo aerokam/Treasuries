@@ -2,7 +2,7 @@
 // Exports: buildTipsMarketData, runRebalance, localDate, inferDARAFromCash, inferScaledDARAFromPortfolio
 
 import { bondCalcs, calculateMDuration, yieldFromPrice, calcMktWtdAvg } from '../../shared/src/bond-math.js';
-import { indexRatio as calcIndexRatio } from '../../shared/src/ref-cpi.js';
+import { indexRatio as calcIndexRatio, TREASURY_ROUNDING, NO_ROUNDING } from '../../shared/src/ref-cpi.js';
 export { yieldFromPrice };
 import { interpolateYield, syntheticCoupon, bracketWeights, bracketWeightsN, gapParamsCore, future30yParamsCore } from './gap-math.js';
 import { findSpikes, evenSpread, MIN_SHAPE_POINTS, inferShapeValue } from './shape-math.js';
@@ -21,7 +21,7 @@ export const LOWEST_LOWER_BRACKET_YEAR = 2032;
 export function calculatePIPerBond(cusip, maturity, refCPI, tipsMarketData) {
   const bond = tipsMarketData.get(cusip);
   if (!bond) return 0;
-  const indexRatio = calcIndexRatio(refCPI, bond.datedDateRefCpi || refCPI);
+  const indexRatio = calcIndexRatio(refCPI, bond.datedDateRefCpi || refCPI, TREASURY_ROUNDING);
   const adjustedPrincipal = 1000 * indexRatio;
   const annualInterest = adjustedPrincipal * bond.coupon;
   const month = maturity.getMonth() + 1;
@@ -112,7 +112,7 @@ function calculateGapParameters(gapYears, settlementDate, refCPI, tipsMarketData
       yearBonds.sort((a, b) => a.maturity - b.maturity);
       const b = yearBonds[yearBonds.length - 1];
       const coupon = b.coupon ?? 0;
-      const ir = calcIndexRatio(refCPI, b.datedDateRefCpi || refCPI);
+      const ir = calcIndexRatio(refCPI, b.datedDateRefCpi || refCPI, TREASURY_ROUNDING);
       const piPB = 1000 * ir + (b.maturity.getMonth() + 1 < 7 ? 0.5 : 1.0) * 1000 * ir * coupon;
       const qty = Math.max(0, Math.round(((daraByYear?.get(year) ?? DARA) - runningLMI) / piPB));
       const annInt = qty * 1000 * ir * coupon;
@@ -133,7 +133,7 @@ function calculateGapParameters(gapYears, settlementDate, refCPI, tipsMarketData
   const bond2040 = tipsMarketData.get(_ub2040CUSIP);
   const coupon2040 = bond2040?.coupon ?? 0;
   const datedDateRefCpi2040 = bond2040?.datedDateRefCpi ?? refCPI;
-  const indexRatio2040 = calcIndexRatio(refCPI, datedDateRefCpi2040);
+  const indexRatio2040 = calcIndexRatio(refCPI, datedDateRefCpi2040, TREASURY_ROUNDING);
   const piPerBond2040 = calculatePIPerBond(_ub2040CUSIP, _ub2040Maturity, refCPI, tipsMarketData);
   // When lastYear < 2040, 2040 is purely a bracket (not a funded rung) — use actual holdings qty for LMI
   const targetQty2040 = lastYear < UPPER_BRACKET_YEAR
@@ -215,7 +215,7 @@ export function inferFirstYearFromHoldings({ holdings, tipsMarketData, refCPI, s
     if (!h) return 0;
     const b = tipsMarketData.get(h.cusip);
     if (!b) return 0;
-    const ir = calcIndexRatio(refCPI, b.datedDateRefCpi ?? refCPI);
+    const ir = calcIndexRatio(refCPI, b.datedDateRefCpi ?? refCPI, TREASURY_ROUNDING);
     const m = b.maturity.getMonth() + 1;
     return 1000 * ir + 1000 * ir * b.coupon * (m < 7 ? 0.5 : 1.0);
   };
@@ -235,7 +235,7 @@ export function inferFirstYearFromHoldings({ holdings, tipsMarketData, refCPI, s
     let p = 0, c = 0;
     for (const h of enriched.filter(e => e.year === year)) {
       const b = tipsMarketData.get(h.cusip);
-      const ir = calcIndexRatio(refCPI, b.datedDateRefCpi ?? refCPI);
+      const ir = calcIndexRatio(refCPI, b.datedDateRefCpi ?? refCPI, TREASURY_ROUNDING);
       const ap = 1000 * ir, m = h.maturity.getMonth() + 1;
       const fundedQty = h.qty - (h.excessQty ?? 0);
       p += fundedQty * ap; c += fundedQty * ap * b.coupon * (m < 7 ? 0.5 : 1.0);
@@ -290,8 +290,8 @@ export function inferLastYearFromHoldings({ holdings, tipsMarketData, refCPI, se
   const obsLo = exOf(lower.cusip), obsUp = exOf(upper.cusip);
   if (obsLo + obsUp <= 0) return null;   // no Cover Excess → ladder ends at maxTipsYear
 
-  const cpbL = (lower.price ?? 0) / 100 * calcIndexRatio(refCPI, lower.datedDateRefCpi ?? refCPI) * 1000;
-  const cpbU = (upper.price ?? 0) / 100 * calcIndexRatio(refCPI, upper.datedDateRefCpi ?? refCPI) * 1000;
+  const cpbL = (lower.price ?? 0) / 100 * calcIndexRatio(refCPI, lower.datedDateRefCpi ?? refCPI, NO_ROUNDING) * 1000;
+  const cpbU = (upper.price ?? 0) / 100 * calcIndexRatio(refCPI, upper.datedDateRefCpi ?? refCPI, NO_ROUNDING) * 1000;
   if (!(cpbL > 0) || !(cpbU > 0)) return null;
 
   // Cost-weighted observed upper weight, matched against the build's predicted weight per candidate year.
@@ -324,7 +324,7 @@ export function impliedFuture30yInterest({ holdings, tipsMarketData, refCPI, set
   const declaredExcess = (cusip) => holdings.reduce((s, h) => h.cusip === cusip && h.excessQty != null ? s + h.excessQty : s, 0);
   const lowerQty0 = declaredExcess(lower.cusip), upperQty0 = declaredExcess(upper.cusip);
   if (lowerQty0 + upperQty0 <= 0) return null;
-  const cpb = (b) => (b.price ?? 0) / 100 * calcIndexRatio(refCPI, b.datedDateRefCpi ?? refCPI) * 1000;
+  const cpb = (b) => (b.price ?? 0) / 100 * calcIndexRatio(refCPI, b.datedDateRefCpi ?? refCPI, NO_ROUNDING) * 1000;
   const heldCost = lowerQty0 * cpb(lower) + upperQty0 * cpb(upper);
   const future30yYears = [];
   for (let y = covers.maxTipsYear + 1; y <= lastYear; y++) future30yYears.push(y);
@@ -378,7 +378,7 @@ export function impliedGapInterest({ holdings, tipsMarketData, refCPI, settlemen
     if (yr >= LOWEST_LOWER_BRACKET_YEAR && yr < minGap && qty0 > 0) retained.push({ bond: b, qty0 });
   }
   retained.sort((a, b) => a.bond.maturity - b.bond.maturity);
-  const cpb = (b) => (b.price ?? 0) / 100 * calcIndexRatio(refCPI, b.datedDateRefCpi ?? refCPI) * 1000;
+  const cpb = (b) => (b.price ?? 0) / 100 * calcIndexRatio(refCPI, b.datedDateRefCpi ?? refCPI, NO_ROUNDING) * 1000;
   const heldCost = lowerQty0 * cpb(lowerBracketBond) + upperQty0 * cpb(upperBracketBond) + retained.reduce((s, r) => s + r.qty0 * cpb(r.bond), 0);
   if (!(heldCost > 0)) return null;
   // The actual TIPS above the gap years: their funded part's annual interest, at each maturity year.
@@ -388,7 +388,7 @@ export function impliedGapInterest({ holdings, tipsMarketData, refCPI, settlemen
     if (!b?.maturity || b.maturity.getFullYear() <= maxStructuralGap) continue;
     const funded = Math.max(0, h.qty - (h.excessQty ?? 0));
     const yr = b.maturity.getFullYear();
-    lmiAboveByYear[yr] = (lmiAboveByYear[yr] ?? 0) + funded * 1000 * calcIndexRatio(refCPI, b.datedDateRefCpi ?? refCPI) * (b.coupon ?? 0);
+    lmiAboveByYear[yr] = (lmiAboveByYear[yr] ?? 0) + funded * 1000 * calcIndexRatio(refCPI, b.datedDateRefCpi ?? refCPI, TREASURY_ROUNDING) * (b.coupon ?? 0);
   }
   const pass1 = (dara) => gapParamsCore({ gapYears, tipsMarketData, settlementDate, dara, lmiAboveByYear });
   let lo = 0, hi = 1000;
@@ -412,7 +412,7 @@ export function inferDARAFromCash({ bracketMode = '2bracket', holdings: holdings
   for (const h of holdingsRaw) {
     const bond = tipsMarketData.get(h.cusip);
     if (!bond) continue;
-    const ir = calcIndexRatio(refCPI, bond.datedDateRefCpi ?? refCPI);
+    const ir = calcIndexRatio(refCPI, bond.datedDateRefCpi ?? refCPI, NO_ROUNDING);
     portfolioCash += h.qty * (bond.price ?? 0) / 100 * ir * 1000;
   }
   let lo = 1000, hi = 1000000, foundDARA = lo;
@@ -453,7 +453,7 @@ export function computePortfolioARAByYear(holdingsArr, tipsMarketData, refCPI, r
   for (const h of holdingsArr) {
     const b = tipsMarketData.get(h.cusip);
     if (!b?.maturity) continue;
-    const ir = calcIndexRatio(refCPI, b.datedDateRefCpi ?? refCPI);
+    const ir = calcIndexRatio(refCPI, b.datedDateRefCpi ?? refCPI, TREASURY_ROUNDING);
     const year = b.maturity.getFullYear();
     const m = b.maturity.getMonth() + 1;
     const nPay = m < 7 ? 1 : 2;  // Jan-Jun: 1 final coupon; Jul-Dec: 2
@@ -711,7 +711,7 @@ export function inferScaledDARAFromPortfolio({ daraMap, median: _median, holding
     if (ex <= 0) continue;
     const bond = tipsMarketData.get(h.cusip);
     if (!bond?.maturity) continue;
-    const ir = calcIndexRatio(refCPI, bond.datedDateRefCpi ?? refCPI);
+    const ir = calcIndexRatio(refCPI, bond.datedDateRefCpi ?? refCPI, TREASURY_ROUNDING);
     const yr = bond.maturity.getFullYear();
     const annual = ex * 1000 * ir * (bond.coupon ?? 0);
     if (_coverCusips.has(h.cusip) || _gapLegCusips.has(h.cusip)) coverExcessCoupon.push({ year: yr, annual });
@@ -947,7 +947,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
       const b = tipsMarketData.get(holding.cusip);
       const cp = b?.coupon ?? 0;
       const bc = b?.datedDateRefCpi ?? refCPI;
-      const ir = calcIndexRatio(refCPI, bc);
+      const ir = calcIndexRatio(refCPI, bc, TREASURY_ROUNDING);
       const ap = 1000 * ir;
       const mF = holding.maturity.getMonth() + 1;
       const lastYI = mF < 7 ? (ap * cp * 0.5) : (ap * cp * 1.0);
@@ -1034,7 +1034,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
       ...(heldImpliedGap ? [[heldImpliedGap.lowerBracketBond, heldImpliedGap.lowerQty0], [heldImpliedGap.upperBracketBond, heldImpliedGap.upperQty0], ...heldImpliedGap.retained.map(r => [r.bond, r.qty0])] : []),
     ]
       .filter(([b, q]) => b && q > 0)
-      .map(([b, q]) => ({ year: b.maturity.getFullYear(), bond: b, perCoupon: q * 1000 * calcIndexRatio(refCPI, b.datedDateRefCpi ?? refCPI) * (b.coupon ?? 0) / 2 }));
+      .map(([b, q]) => ({ year: b.maturity.getFullYear(), bond: b, perCoupon: q * 1000 * calcIndexRatio(refCPI, b.datedDateRefCpi ?? refCPI, TREASURY_ROUNDING) * (b.coupon ?? 0) / 2 }));
     const cascaded = (year) => coverHeld.reduce((s, c) => c.year <= year ? s
       : s + c.perCoupon * (year === _settlementYearForARA
         ? rmdCappedRemainingCoupons(c.bond.maturity, settlementDate, bondHolidays, rmdCouponMode, tradeDate, _rmdLastDateBefore)
@@ -1293,7 +1293,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
       // Spec 2.0 §Retained Bracket Excess; 3.0 §Lower bracket priority rule.
       const _excessCostOf = (year, cusip, ownNeedQty = null) => {
         const b   = tipsMarketData.get(cusip);
-        const cpb = (b?.price ?? 0) / 100 * calcIndexRatio(refCPI, b?.datedDateRefCpi ?? refCPI) * 1000;
+        const cpb = (b?.price ?? 0) / 100 * calcIndexRatio(refCPI, b?.datedDateRefCpi ?? refCPI, NO_ROUNDING) * 1000;
         const h   = yearInfo[year]?.holdings?.find(x => x.cusip === cusip);
         const need = ownNeedQty != null ? ownNeedQty : (bracketTargetFundedYearQtyBefore[year] ?? 0);
         return Math.max(0, (h?.qty ?? 0) - need) * cpb;
@@ -1322,7 +1322,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
       const activeFloorCost = _excessCostOf(newLowerYear, newLowerCUSIP);
       const activeFloorWeight = gapParams.totalCost > 0 ? activeFloorCost / gapParams.totalCost : 0;
       if (retainedList.length) {
-        const _cpbOf = (cusip) => { const b = tipsMarketData.get(cusip); return (b?.price ?? 0) / 100 * calcIndexRatio(refCPI, b?.datedDateRefCpi ?? refCPI) * 1000; };
+        const _cpbOf = (cusip) => { const b = tipsMarketData.get(cusip); return (b?.price ?? 0) / 100 * calcIndexRatio(refCPI, b?.datedDateRefCpi ?? refCPI, NO_ROUNDING) * 1000; };
         gapRetainedInput = {
           retained: retainedList.map(r => ({ cusip: r.cusip, year: r.year, bond: tipsMarketData.get(r.cusip), heldQty: _cpbOf(r.cusip) > 0 ? Math.round(r.excessCost / _cpbOf(r.cusip)) : 0 })),
           activeHeldQty: _cpbOf(newLowerCUSIP) > 0 ? Math.round(activeFloorCost / _cpbOf(newLowerCUSIP)) : 0,
@@ -1364,7 +1364,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
       // sell-to-fund-this-year drain, which does not know it is a retained leg.
       for (const r of sameYearRetained) {
         const b   = tipsMarketData.get(r.cusip);
-        const cpb = (b?.price ?? 0) / 100 * calcIndexRatio(refCPI, b?.datedDateRefCpi ?? refCPI) * 1000;
+        const cpb = (b?.price ?? 0) / 100 * calcIndexRatio(refCPI, b?.datedDateRefCpi ?? refCPI, NO_ROUNDING) * 1000;
         const held = yearInfo[r.year]?.holdings?.find(x => x.cusip === r.cusip)?.qty ?? 0;
         const excessQty = cpb > 0 ? Math.max(0, Math.round((bracketExcessTargetCost[r.cusip] || 0) / cpb)) : 0;
         const fundedQty = Math.min(held, r.ownFundedNeedQty);
@@ -1522,7 +1522,8 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
     }
 
     const tBond = tipsMarketData.get(targetCUSIP);
-    const ir = (calcIndexRatio(refCPI, tBond?.datedDateRefCpi ?? refCPI));
+    const ir = calcIndexRatio(refCPI, tBond?.datedDateRefCpi ?? refCPI, NO_ROUNDING);
+    const pir = calcIndexRatio(refCPI, tBond?.datedDateRefCpi ?? refCPI, TREASURY_ROUNDING);
     const costPerBond = (tBond?.price ?? 0) / 100 * ir * 1000;
     const targetCurrentQty = yi.holdings.find(h => h.cusip === targetCUSIP)?.qty ?? 0;
 
@@ -1530,7 +1531,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
     // whenever maturityPref picked a different maturity than the bracket's canonical excess CUSIP.
     const fundedIsTarget = fundedCUSIP === targetCUSIP;
     const fBond = fundedIsTarget ? tBond : tipsMarketData.get(fundedCUSIP);
-    const fIr = fundedIsTarget ? ir : calcIndexRatio(refCPI, fBond?.datedDateRefCpi ?? refCPI);
+    const fIr = fundedIsTarget ? ir : calcIndexRatio(refCPI, fBond?.datedDateRefCpi ?? refCPI, NO_ROUNDING);
     const fCostPerBond = fundedIsTarget ? costPerBond : (fBond?.price ?? 0) / 100 * fIr * 1000;
     const fundedCurrentQty = fundedIsTarget ? targetCurrentQty : (yi.holdings.find(h => h.cusip === fundedCUSIP)?.qty ?? 0);
 
@@ -1556,8 +1557,8 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
       //    is 0: the Cover Excess is sold before it matures (DD §Same-Maturity Excess Interest).
       const excessLMI = excessSoldYear(year) ? 0
         : isSettlementYear && tBond?.maturity
-        ? excessQtyTarget * 1000 * ir * (tBond?.coupon ?? 0) / 2 * rmdCappedRemainingCoupons(tBond.maturity, settlementDate, bondHolidays, rmdCouponMode, tradeDate, _rmdLastDateAfter)
-        : excessQtyTarget * 1000 * ir * (tBond?.coupon ?? 0);
+        ? excessQtyTarget * 1000 * pir * (tBond?.coupon ?? 0) / 2 * rmdCappedRemainingCoupons(tBond.maturity, settlementDate, bondHolidays, rmdCouponMode, tradeDate, _rmdLastDateAfter)
+        : excessQtyTarget * 1000 * pir * (tBond?.coupon ?? 0);
 
       // 3. Calculate needed P+I, subtracting both incoming LMI and current year excess LMI
       const effectivePartialCredit = (year === partialCreditYear) ? partialCredit : 0;
@@ -1571,7 +1572,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
           if (h.cusip !== targetCUSIP && h.cusip !== fundedCUSIP && h.qty > 0) {
             postRebalQtyMap[h.cusip] = 0;
             const b2 = tipsMarketData.get(h.cusip);
-            const c2 = (b2?.price ?? 0) / 100 * (calcIndexRatio(refCPI, b2?.datedDateRefCpi ?? refCPI)) * 1000;
+            const c2 = (b2?.price ?? 0) / 100 * (calcIndexRatio(refCPI, b2?.datedDateRefCpi ?? refCPI, NO_ROUNDING)) * 1000;
             nonTargetSells[h.cusip] = { newQty: 0, qtyDelta: -h.qty, costDelta: h.qty * c2, targetCost: 0 };
           }
         }
@@ -1669,7 +1670,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
         for (const h of nonTarget) {
           if (postRebalQtyMap[h.cusip] !== h.qty) {
             const b = tipsMarketData.get(h.cusip);
-            const c = (b?.price ?? 0) / 100 * (calcIndexRatio(refCPI, b?.datedDateRefCpi ?? refCPI)) * 1000;
+            const c = (b?.price ?? 0) / 100 * (calcIndexRatio(refCPI, b?.datedDateRefCpi ?? refCPI, NO_ROUNDING)) * 1000;
             nonTargetSells[h.cusip] = { newQty: postRebalQtyMap[h.cusip], qtyDelta: postRebalQtyMap[h.cusip] - h.qty, costDelta: -((postRebalQtyMap[h.cusip] - h.qty) * c), targetCost: postRebalQtyMap[h.cusip] * c };
           }
         }
@@ -1688,7 +1689,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
             postRebalQtyMap[cusip] = finalQty;
             if (finalQty !== heldQty) {
               const b2 = tipsMarketData.get(cusip);
-              const c2 = (b2?.price ?? 0) / 100 * (calcIndexRatio(refCPI, b2?.datedDateRefCpi ?? refCPI)) * 1000;
+              const c2 = (b2?.price ?? 0) / 100 * (calcIndexRatio(refCPI, b2?.datedDateRefCpi ?? refCPI, NO_ROUNDING)) * 1000;
               nonTargetSells[cusip] = { newQty: finalQty, qtyDelta: finalQty - heldQty, costDelta: -((finalQty - heldQty) * c2), targetCost: finalQty * c2 };
             }
           }
@@ -1729,7 +1730,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
         postRebalQtyMap[h.cusip] = 0;
         if (h.cusip !== targetCUSIP) {
           const b2 = tipsMarketData.get(h.cusip);
-          const c2 = (b2?.price ?? 0) / 100 * (calcIndexRatio(refCPI, b2?.datedDateRefCpi ?? refCPI)) * 1000;
+          const c2 = (b2?.price ?? 0) / 100 * (calcIndexRatio(refCPI, b2?.datedDateRefCpi ?? refCPI, NO_ROUNDING)) * 1000;
           nonTargetSells[h.cusip] = { newQty: 0, qtyDelta: -h.qty, costDelta: h.qty * c2, targetCost: 0 };
         }
       }
@@ -1747,7 +1748,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
         postRebalQtyMap[h.cusip] = 0;
         if (h.cusip !== targetCUSIP) {
           const b2 = tipsMarketData.get(h.cusip);
-          const c2 = (b2?.price ?? 0) / 100 * (calcIndexRatio(refCPI, b2?.datedDateRefCpi ?? refCPI)) * 1000;
+          const c2 = (b2?.price ?? 0) / 100 * (calcIndexRatio(refCPI, b2?.datedDateRefCpi ?? refCPI, NO_ROUNDING)) * 1000;
           nonTargetSells[h.cusip] = { newQty: 0, qtyDelta: -h.qty, costDelta: h.qty * c2, targetCost: 0 };
         }
       }
@@ -1760,7 +1761,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
       const b = tipsMarketData.get(h.cusip);
       if (b) {
         const qty = postRebalQtyMap[h.cusip] ?? h.qty;
-        const ir2 = calcIndexRatio(refCPI, b.datedDateRefCpi || refCPI);
+        const ir2 = calcIndexRatio(refCPI, b.datedDateRefCpi || refCPI, TREASURY_ROUNDING);
         rebuildLaterMatInt += qty * ir2 * 1000 * b.coupon;
         rebuildLaterMatIntRemaining += qty * ir2 * 1000 * b.coupon / 2 * rmdCappedRemainingCoupons(b.maturity, settlementDate, bondHolidays, rmdCouponMode, tradeDate, _rmdLastDateAfter);
       }
@@ -1769,7 +1770,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
     if (targetCUSIP && !yi.holdings.some(h => h.cusip === targetCUSIP) && (postRebalQtyMap[targetCUSIP] ?? 0) > 0) {
       const _blmi = tipsMarketData.get(targetCUSIP);
       if (_blmi) {
-        const ir3 = calcIndexRatio(refCPI, _blmi.datedDateRefCpi || refCPI);
+        const ir3 = calcIndexRatio(refCPI, _blmi.datedDateRefCpi || refCPI, TREASURY_ROUNDING);
         rebuildLaterMatInt += postRebalQtyMap[targetCUSIP] * ir3 * 1000 * _blmi.coupon;
         rebuildLaterMatIntRemaining += postRebalQtyMap[targetCUSIP] * ir3 * 1000 * _blmi.coupon / 2 * rmdCappedRemainingCoupons(_blmi.maturity, settlementDate, bondHolidays, rmdCouponMode, tradeDate, _rmdLastDateAfter);
       }
@@ -1779,7 +1780,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
     if (fundedCUSIP && fundedCUSIP !== targetCUSIP && !yi.holdings.some(h => h.cusip === fundedCUSIP) && (postRebalQtyMap[fundedCUSIP] ?? 0) > 0) {
       const _flmi = tipsMarketData.get(fundedCUSIP);
       if (_flmi) {
-        const ir4 = calcIndexRatio(refCPI, _flmi.datedDateRefCpi || refCPI);
+        const ir4 = calcIndexRatio(refCPI, _flmi.datedDateRefCpi || refCPI, TREASURY_ROUNDING);
         rebuildLaterMatInt += postRebalQtyMap[fundedCUSIP] * ir4 * 1000 * _flmi.coupon;
         rebuildLaterMatIntRemaining += postRebalQtyMap[fundedCUSIP] * ir4 * 1000 * _flmi.coupon / 2 * rmdCappedRemainingCoupons(_flmi.maturity, settlementDate, bondHolidays, rmdCouponMode, tradeDate, _rmdLastDateAfter);
       }
@@ -1790,7 +1791,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
       const _cb = tipsMarketData.get(buySellTargets[year].targetCUSIP);
       const _cex = buySellTargets[year].targetQty - buySellTargets[year].targetFundedYearQty;
       if (_cb && _cex > 0) {
-        const _irc = calcIndexRatio(refCPI, _cb.datedDateRefCpi || refCPI);
+        const _irc = calcIndexRatio(refCPI, _cb.datedDateRefCpi || refCPI, TREASURY_ROUNDING);
         rebuildLaterMatInt -= _cex * _irc * 1000 * _cb.coupon;
         rebuildLaterMatIntRemaining -= _cex * _irc * 1000 * _cb.coupon / 2 * rmdCappedRemainingCoupons(_cb.maturity, settlementDate, bondHolidays, rmdCouponMode, tradeDate, _rmdLastDateAfter);
       }
@@ -1801,7 +1802,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
         const _rb = tipsMarketData.get(cusip);
         const _rex = finalQty - Math.min(yi.holdings.find(h => h.cusip === cusip)?.qty ?? 0, sameYearRetainedNeed.get(cusip) ?? 0);
         if (_rb && _rex > 0) {
-          const _irr = calcIndexRatio(refCPI, _rb.datedDateRefCpi || refCPI);
+          const _irr = calcIndexRatio(refCPI, _rb.datedDateRefCpi || refCPI, TREASURY_ROUNDING);
           rebuildLaterMatInt -= _rex * _irr * 1000 * _rb.coupon;
           rebuildLaterMatIntRemaining -= _rex * _irr * 1000 * _rb.coupon / 2 * rmdCappedRemainingCoupons(_rb.maturity, settlementDate, bondHolidays, rmdCouponMode, tradeDate, _rmdLastDateAfter);
         }
@@ -1884,7 +1885,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
       if (cy <= year || !(qty > 0)) continue;
       const cb = tipsMarketData.get(cusip);
       if (!cb) continue;
-      const annual = qty * 1000 * calcIndexRatio(refCPI, cb.datedDateRefCpi ?? refCPI) * (cb.coupon ?? 0);
+      const annual = qty * 1000 * calcIndexRatio(refCPI, cb.datedDateRefCpi ?? refCPI, TREASURY_ROUNDING) * (cb.coupon ?? 0);
       s += remainingOnly ? annual / 2 * rmdCappedRemainingCoupons(cb.maturity, settlementDate, bondHolidays, rmdCouponMode, tradeDate, _rmdLastDateBefore) : annual;
     }
     return s;
@@ -1910,7 +1911,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
     if (yearInfo[year]) {
       for (const h of yearInfo[year].holdings) {
         const b = tipsMarketData.get(h.cusip);
-        const ir = calcIndexRatio(refCPI, b?.datedDateRefCpi ?? refCPI);
+        const ir = calcIndexRatio(refCPI, b?.datedDateRefCpi ?? refCPI, TREASURY_ROUNDING);
         const ap = 1000 * ir;
         const isBT = (bracketYearSet.has(year) && h.cusip === buySellTargets[year]?.targetCUSIP);
         const qFunded = isBT ? Math.min(bracketTargetFundedYearQtyBefore[year] ?? 0, h.qty) : h.qty;
@@ -1959,7 +1960,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
     if (yearInfo[year]) {
       for (const h of yearInfo[year].holdings) {
         const b = tipsMarketData.get(h.cusip);
-        const ir = calcIndexRatio(refCPI, b?.datedDateRefCpi ?? refCPI);
+        const ir = calcIndexRatio(refCPI, b?.datedDateRefCpi ?? refCPI, TREASURY_ROUNDING);
         const ap = 1000 * ir;
         const isBT = (bracketYearSet.has(year) && h.cusip === buySellTargets[year]?.targetCUSIP);
         
@@ -1980,7 +1981,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
       if (_bst4 && !yearInfo[year]?.holdings.some(h => h.cusip === _bst4.targetCUSIP)) {
         const _tb4 = tipsMarketData.get(_bst4.targetCUSIP);
         if (_tb4?.maturity) {
-          const _ir4 = calcIndexRatio(refCPI, _tb4.datedDateRefCpi ?? refCPI);
+          const _ir4 = calcIndexRatio(refCPI, _tb4.datedDateRefCpi ?? refCPI, TREASURY_ROUNDING);
           const _ap4 = 1000 * _ir4;
           const _m4 = _tb4.maturity.getMonth() + 1;
           
@@ -2002,7 +2003,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
       if (_fc5 && _fc5 !== buySellTargets[year]?.targetCUSIP && !yearInfo[year]?.holdings.some(h => h.cusip === _fc5) && (postRebalQtyMap[_fc5] ?? 0) > 0) {
         const _tb5 = tipsMarketData.get(_fc5);
         if (_tb5?.maturity) {
-          const _ir5 = calcIndexRatio(refCPI, _tb5.datedDateRefCpi ?? refCPI);
+          const _ir5 = calcIndexRatio(refCPI, _tb5.datedDateRefCpi ?? refCPI, TREASURY_ROUNDING);
           const _ap5 = 1000 * _ir5;
           const _m5 = _tb5.maturity.getMonth() + 1;
           const qF5 = postRebalQtyMap[_fc5];
@@ -2046,8 +2047,8 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
   // Summary Metrics
   const lowerBondS = tipsMarketData.get(brackets.lowerCUSIP);
   const upperBondS = tipsMarketData.get(brackets.upperCUSIP);
-  const lowerCostPerBond = (lowerBondS?.price ?? 0) / 100 * (calcIndexRatio(refCPI, lowerBondS?.datedDateRefCpi ?? refCPI)) * 1000;
-  const upperCostPerBond = (upperBondS?.price ?? 0) / 100 * (calcIndexRatio(refCPI, upperBondS?.datedDateRefCpi ?? refCPI)) * 1000;
+  const lowerCostPerBond = (lowerBondS?.price ?? 0) / 100 * (calcIndexRatio(refCPI, lowerBondS?.datedDateRefCpi ?? refCPI, NO_ROUNDING)) * 1000;
+  const upperCostPerBond = (upperBondS?.price ?? 0) / 100 * (calcIndexRatio(refCPI, upperBondS?.datedDateRefCpi ?? refCPI, NO_ROUNDING)) * 1000;
 
   const lowerPreviousExcessCost = Math.max(0, (yearInfo[brackets.lowerYear]?.holdings?.find(h=>h.cusip===brackets.lowerCUSIP)?.qty ?? 0) - (bracketTargetFundedYearQtyBefore[brackets.lowerYear] ?? 0)) * lowerCostPerBond;
   const upperPreviousExcessCost = Math.max(0, (yearInfo[brackets.upperYear]?.holdings?.find(h=>h.cusip===brackets.upperCUSIP)?.qty ?? 0) - (bracketTargetFundedYearQtyBefore[brackets.upperYear] ?? 0)) * upperCostPerBond;
@@ -2061,7 +2062,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
   let newLowerCostPerBond3 = 0;
   if (is3Bracket) {
     const nlBond = tipsMarketData.get(newLowerCUSIP);
-    newLowerCostPerBond3 = (nlBond?.price ?? 0) / 100 * (calcIndexRatio(refCPI, nlBond?.datedDateRefCpi ?? refCPI)) * 1000;
+    newLowerCostPerBond3 = (nlBond?.price ?? 0) / 100 * (calcIndexRatio(refCPI, nlBond?.datedDateRefCpi ?? refCPI, NO_ROUNDING)) * 1000;
     newLowerPreviousExcessCost3 = Math.max(0, (yearInfo[newLowerYear]?.holdings?.find(h=>h.cusip===newLowerCUSIP)?.qty ?? 0) - (bracketTargetFundedYearQtyBefore[newLowerYear] ?? 0)) * newLowerCostPerBond3;
     // Read the active bracket's own solved target directly (CUSIP-keyed, set at the bracketWeightsN
     // solve above) rather than buySellTargets[newLowerYear] — when the active bracket's year
@@ -2093,8 +2094,8 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
       fy = h.year;
       for (const oh of yearInfo[h.year].holdings) {
         const b = tipsMarketData.get(oh.cusip);
-        const ir = calcIndexRatio(refCPI, b?.datedDateRefCpi ?? refCPI);
-        const ap = 1000 * ir;
+        const ir = calcIndexRatio(refCPI, b?.datedDateRefCpi ?? refCPI, NO_ROUNDING);
+        const ap = 1000 * calcIndexRatio(refCPI, b?.datedDateRefCpi ?? refCPI, TREASURY_ROUNDING);
         const m = oh.maturity.getMonth() + 1;
         pFY += oh.qty * ap; iFY += oh.qty * ap * b.coupon * (m < 7 ? 0.5 : 1.0);
         cFY += oh.qty * (b.price / 100 * ir * 1000);
@@ -2105,7 +2106,8 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
     }
 
     const b = tipsMarketData.get(h.cusip);
-    const ir = calcIndexRatio(refCPI, b?.datedDateRefCpi ?? refCPI);
+    const ir = calcIndexRatio(refCPI, b?.datedDateRefCpi ?? refCPI, NO_ROUNDING);
+    const pir = calcIndexRatio(refCPI, b?.datedDateRefCpi ?? refCPI, TREASURY_ROUNDING);
     const bst_loop = buySellTargets[h.year];
     let tFundedYearQty = 0;
     if (bst_loop && h.cusip === bst_loop.targetCUSIP) {
@@ -2117,7 +2119,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
     }
 
     if (!outLMI[h.year]) outLMI[h.year] = 0;
-    outLMI[h.year] += tQ * 1000 * ir * b.coupon;
+    outLMI[h.year] += tQ * 1000 * pir * b.coupon;
 
     // A same-maturity-year retained TIPS (DD §Bracket Year TIPS) is never `bst_loop.targetCUSIP` —
     // that names the Active Lower/Upper Bracket CUSIP for the year — so without this it would fall
@@ -2180,7 +2182,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
     const excessQtyDelta = exA - reallocExcessBefore;
 
     const bForLMI = tipsMarketData.get(h.cusip);
-    const irForLMI = calcIndexRatio(refCPI, bForLMI?.datedDateRefCpi ?? refCPI);
+    const irForLMI = calcIndexRatio(refCPI, bForLMI?.datedDateRefCpi ?? refCPI, TREASURY_ROUNDING);
     const annIntPerBond = 1000 * irForLMI * (bForLMI?.coupon ?? 0);
     // Same-Maturity Excess Interest: 0 for a bracket or cover year (DD §Same-Maturity Excess Interest).
     const isSoldExcessYear = excessSoldYear(h.year);
@@ -2193,7 +2195,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
     details.unshift({
       cusip: h.cusip, maturityStr: fmtDate(h.maturity), fundedYear: h.year,
       coupon: b.coupon, yield: b.yield, saYield: b.saYield ?? null, price: b.price, datedDateRefCpi: b.datedDateRefCpi, refCPI, indexRatio: ir,
-      principalPerBond: 1000 * ir, costPerBond: (b.price / 100 * ir * 1000),
+      principalPerBond: 1000 * pir, costPerBond: (b.price / 100 * ir * 1000),
       DARA: daraByYear?.get(h.year) ?? DARA,
       qtyBefore: h.qty, qtyAfter: tQ,
       // Displayed Before is the reallocated split, not the raw honest LMI-formula split
@@ -2262,7 +2264,8 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
     if (!(bst.qtyDelta > 0)) continue; // no buy
     const tb = tipsMarketData.get(bst.targetCUSIP);
     if (!tb?.maturity) continue;
-    const ir = calcIndexRatio(refCPI, tb.datedDateRefCpi ?? refCPI);
+    const ir = calcIndexRatio(refCPI, tb.datedDateRefCpi ?? refCPI, NO_ROUNDING);
+    const pir = calcIndexRatio(refCPI, tb.datedDateRefCpi ?? refCPI, TREASURY_ROUNDING);
     const cpb = (tb.price ?? 0) / 100 * ir * 1000;
     const piPB = calculatePIPerBond(bst.targetCUSIP, tb.maturity, refCPI, tipsMarketData);
     const m = tb.maturity.getMonth() + 1;
@@ -2273,18 +2276,18 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
     const rowDARA = daraByYear?.get(bYear) ?? DARA;
     const exA = bst.targetQty - bst.targetFundedYearQty;
     const bondForSyn = tipsMarketData.get(bst.targetCUSIP);
-    const irForSyn = calcIndexRatio(refCPI, bondForSyn?.datedDateRefCpi ?? refCPI);
+    const irForSyn = calcIndexRatio(refCPI, bondForSyn?.datedDateRefCpi ?? refCPI, TREASURY_ROUNDING);
     const excessLMI = excessSoldYear(bYear) ? 0 : exA * 1000 * irForSyn * (bondForSyn?.coupon ?? 0);
     
     const holdingsAfterSyn = [{ 
       cusip: bst.targetCUSIP, maturityMonth: m - 1, maturityYear: tb.maturity.getFullYear(), 
-      qty: bst.targetFundedYearQty, principalPerBond: 1000 * ir, nPeriods: m < 7 ? 1 : 2, coupon: tb.coupon ?? 0 
+      qty: bst.targetFundedYearQty, principalPerBond: 1000 * pir, nPeriods: m < 7 ? 1 : 2, coupon: tb.coupon ?? 0 
     }];
 
     const newDetail = {
       cusip: bst.targetCUSIP, maturityStr: fmtDate(tb.maturity), fundedYear: bYear,
       coupon: tb.coupon, yield: tb.yield, saYield: tb.saYield ?? null, price: tb.price, datedDateRefCpi: tb.datedDateRefCpi, refCPI, indexRatio: ir,
-      principalPerBond: 1000 * ir, costPerBond: cpb, DARA: rowDARA,
+      principalPerBond: 1000 * pir, costPerBond: cpb, DARA: rowDARA,
       qtyBefore: 0, qtyAfter: bst.targetQty,
       fundedYearQtyBefore: 0, fundedYearQtyAfter: bst.targetFundedYearQty,
       isBracketTarget: bst.isBracket, isFuture30yCover: bst.isBracket && future30yCoverYearSet.has(bYear),
@@ -2297,8 +2300,8 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
       araBeforeTotal: araB, araAfterTotal: araA,
       araBeforePrincipal: 0, araBeforeOwnCoupon: 0, araBeforeLaterMatInt: lmiBefore,
       araBeforeHoldings: [],
-      araAfterPrincipal: bst.targetFundedYearQty * 1000 * ir,
-      araAfterOwnCoupon: bst.targetFundedYearQty * 1000 * ir * tb.coupon * (m < 7 ? 0.5 : 1.0),
+      araAfterPrincipal: bst.targetFundedYearQty * 1000 * pir,
+      araAfterOwnCoupon: bst.targetFundedYearQty * 1000 * pir * tb.coupon * (m < 7 ? 0.5 : 1.0),
       araAfterLaterMatInt: yearLaterMatIntSnapshot[bYear] ?? 0,
       araAfterHoldings: holdingsAfterSyn,
       preLadderCreditForYear: postARABreakdown[bYear]?.pliCredit ?? 0,
@@ -2343,7 +2346,8 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
     if (!ns || !(ns.qtyDelta > 0)) continue;                      // no buy
     const tb = tipsMarketData.get(fc);
     if (!tb?.maturity) continue;
-    const ir = calcIndexRatio(refCPI, tb.datedDateRefCpi ?? refCPI);
+    const ir = calcIndexRatio(refCPI, tb.datedDateRefCpi ?? refCPI, NO_ROUNDING);
+    const pir = calcIndexRatio(refCPI, tb.datedDateRefCpi ?? refCPI, TREASURY_ROUNDING);
     const cpb = (tb.price ?? 0) / 100 * ir * 1000;
     const piPB = calculatePIPerBond(fc, tb.maturity, refCPI, tipsMarketData);
     const m = tb.maturity.getMonth() + 1;
@@ -2355,13 +2359,13 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
 
     const holdingsAfterSyn = [{
       cusip: fc, maturityMonth: m - 1, maturityYear: tb.maturity.getFullYear(),
-      qty: ns.newQty, principalPerBond: 1000 * ir, nPeriods: m < 7 ? 1 : 2, coupon: tb.coupon ?? 0
+      qty: ns.newQty, principalPerBond: 1000 * pir, nPeriods: m < 7 ? 1 : 2, coupon: tb.coupon ?? 0
     }];
 
     const newDetail = {
       cusip: fc, maturityStr: fmtDate(tb.maturity), fundedYear: bYear,
       coupon: tb.coupon, yield: tb.yield, saYield: tb.saYield ?? null, price: tb.price, datedDateRefCpi: tb.datedDateRefCpi, refCPI, indexRatio: ir,
-      principalPerBond: 1000 * ir, costPerBond: cpb, DARA: rowDARA,
+      principalPerBond: 1000 * pir, costPerBond: cpb, DARA: rowDARA,
       qtyBefore: 0, qtyAfter: ns.newQty,
       fundedYearQtyBefore: 0, fundedYearQtyAfter: ns.newQty,
       isBracketTarget: false, isFuture30yCover: false,
@@ -2373,8 +2377,8 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
       araBeforeTotal: araB, araAfterTotal: araA,
       araBeforePrincipal: 0, araBeforeOwnCoupon: 0, araBeforeLaterMatInt: lmiBefore,
       araBeforeHoldings: [],
-      araAfterPrincipal: ns.newQty * 1000 * ir,
-      araAfterOwnCoupon: ns.newQty * 1000 * ir * tb.coupon * (m < 7 ? 0.5 : 1.0),
+      araAfterPrincipal: ns.newQty * 1000 * pir,
+      araAfterOwnCoupon: ns.newQty * 1000 * pir * tb.coupon * (m < 7 ? 0.5 : 1.0),
       araAfterLaterMatInt: yearLaterMatIntSnapshot[bYear] ?? 0,
       araAfterHoldings: holdingsAfterSyn,
       preLadderCreditForYear: postARABreakdown[bYear]?.pliCredit ?? 0,
@@ -2421,19 +2425,20 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
     const exA = newLowerCostPerBond3 > 0 ? Math.max(0, Math.round((bracketExcessTargetCost[newLowerCUSIP] || 0) / newLowerCostPerBond3)) : 0;
     if (nlBond?.maturity && exA > 0) {
       const bYear = newLowerYear;
-      const ir = calcIndexRatio(refCPI, nlBond.datedDateRefCpi ?? refCPI);
+      const ir = calcIndexRatio(refCPI, nlBond.datedDateRefCpi ?? refCPI, NO_ROUNDING);
+      const pir = calcIndexRatio(refCPI, nlBond.datedDateRefCpi ?? refCPI, TREASURY_ROUNDING);
       const piPB = calculatePIPerBond(newLowerCUSIP, nlBond.maturity, refCPI, tipsMarketData);
       const m = nlBond.maturity.getMonth() + 1;
       const araB = beforeARAByYear[bYear] ?? 0;
       const araA = postARAByYear[bYear] ?? 0;
       const rowDARA = daraByYear?.get(bYear) ?? DARA;
-      const excessLMI = exA * 1000 * ir * (nlBond.coupon ?? 0);
+      const excessLMI = exA * 1000 * pir * (nlBond.coupon ?? 0);
       const targetCost = exA * newLowerCostPerBond3;
 
       const newDetail = {
         cusip: newLowerCUSIP, maturityStr: fmtDate(nlBond.maturity), fundedYear: bYear,
         coupon: nlBond.coupon, yield: nlBond.yield, saYield: nlBond.saYield ?? null, price: nlBond.price, datedDateRefCpi: nlBond.datedDateRefCpi, refCPI, indexRatio: ir,
-        principalPerBond: 1000 * ir, costPerBond: newLowerCostPerBond3, DARA: rowDARA,
+        principalPerBond: 1000 * pir, costPerBond: newLowerCostPerBond3, DARA: rowDARA,
         qtyBefore: 0, qtyAfter: exA,
         fundedYearQtyBefore: 0, fundedYearQtyAfter: 0,
         isBracketTarget: true, isFuture30yCover: false, isGapBracket: true,
@@ -2482,7 +2487,8 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
       if (year < firstYear || year > lastYear || emittedYears.has(year)) continue;
       const bond = _canon.yearBondMap[year];
       if (!bond?.maturity) continue;
-      const ir = calcIndexRatio(refCPI, bond.datedDateRefCpi ?? refCPI);
+      const ir = calcIndexRatio(refCPI, bond.datedDateRefCpi ?? refCPI, NO_ROUNDING);
+      const pir = calcIndexRatio(refCPI, bond.datedDateRefCpi ?? refCPI, TREASURY_ROUNDING);
       const cpb = (bond.price ?? 0) / 100 * ir * 1000;
       const m = bond.maturity.getMonth() + 1;
       const araB = beforeARAByYear[year] ?? 0;
@@ -2493,7 +2499,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
       const newDetail = {
         cusip: bond.cusip, maturityStr: fmtDate(bond.maturity), fundedYear: year,
         coupon: bond.coupon, yield: bond.yield, saYield: bond.saYield ?? null, price: bond.price, datedDateRefCpi: bond.datedDateRefCpi, refCPI, indexRatio: ir,
-        principalPerBond: 1000 * ir, costPerBond: cpb, DARA: rowDARA,
+        principalPerBond: 1000 * pir, costPerBond: cpb, DARA: rowDARA,
         qtyBefore: 0, qtyAfter: 0, fundedYearQtyBefore: 0, fundedYearQtyAfter: 0,
         isBracketTarget: false, isFuture30yCover: false,
         isGapBracket: gapYears.length > 0 && (year === brackets.lowerYear || year === brackets.upperYear || (is3Bracket && year === newLowerYear)),

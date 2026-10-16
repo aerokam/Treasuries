@@ -49,7 +49,7 @@ export function fidelityDownloadDateIso(dateStr) {
 // decimal form (e.g. -0.02 = -2%) -- callers decide whether to trust them directly or
 // recompute from price via shared/src/bond-math.js's yieldFromPrice.
 // Returns: [{ cusip, coupon, maturity (ISO or null), askPrice, bidPrice, adjAskPrice,
-//   adjBidPrice, indexRatio, askYield, bidYield }]
+//   adjBidPrice, askYield, bidYield }]
 export function parseFidelityTipsRows(text) {
   const rows = parseCsv(text);
   const out = [];
@@ -69,7 +69,6 @@ export function parseFidelityTipsRows(text) {
       bidPrice: parseFloat(fidPriceField(n['price bid'] || n['bid price/quantity (min)'] || '')),
       adjAskPrice: parseFloat(cleanFidelityField(n['adjusted price ask'] || n['adjusted ask price'] || '').replace(/,/g, '')),
       adjBidPrice: parseFloat(cleanFidelityField(n['adjusted price bid'] || n['adjusted bid price'] || '').replace(/,/g, '')),
-      indexRatio: parseFloat(cleanFidelityField(n['inflation factor'] || '')),
       askYield: parseFloat(cleanFidelityField(n['ask yield to maturity'] || '')) / 100,
       bidYield: parseFloat(cleanFidelityField(n['yield bid'] || n['yield'] || '')) / 100,
     });

@@ -1,6 +1,6 @@
 // ref-cpi.js — Single canonical home for Reference CPI logic.
-// Spec: knowledge/DATA_DICTIONARY.md#ref-cpi, knowledge/TIPS_Basics.md,
-//       YieldCurves/knowledge/3.2_Adjust_For_Seasonality.md
+// Spec: knowledge/DATA_DICTIONARY.md#ref-cpi, knowledge/DATA_DICTIONARY.md#index-ratio,
+//       knowledge/TIPS_Basics.md, YieldCurves/knowledge/3.2_Adjust_For_Seasonality.md
 //
 // Per the project-wide no-redundancy directive (projects/CLAUDE.md §2a), all
 // Ref CPI logic lives here and is imported — never copied inline.
@@ -35,7 +35,8 @@ export function lookupRefCpi(rows, dateStr) {
 // ─── Truncate-then-round (31 CFR §356 App. B §I.B.3) ─────────────────────────
 // "Interpolation calculations are truncated to six decimal places, then
 // rounded to five decimal places — so Ref CPI and Index Ratio are always
-// expressed to five decimal places." Applied at both computation points below.
+// expressed to five decimal places." Applied to the interpolated Ref CPI
+// (refCpiFromMonthly) and to the Index Ratio under TREASURY_ROUNDING (indexRatio).
 // IEEE754 doubles can represent an exact n-decimal value as e.g.
 // 1.1500349999999999 instead of 1.150035, which silently truncates/rounds
 // one digit low. Nudge by an epsilon before a trunc/round step so an exact
@@ -49,8 +50,7 @@ export function lookupRefCpi(rows, dateStr) {
 // 256.093645 -> must round up to 256.09365, absolute-nudge version gave
 // 256.09364). At 1e-12 relative this is ~4500 ulps at any magnitude this
 // function is used at -- far above representation noise, far below one
-// unit in the 6th/5th decimal place (or the 9th, for indexRatioNineDecimal
-// below). Verified against TreasuryDirect's published Ref CPI series: 0
+// unit in the 6th/5th decimal place. Verified against TreasuryDirect's published Ref CPI series: 0
 // mismatches (was 28) -- see shared/tests/ref-cpi.test.js.
 //
 // Note: nudging by sign(x)*epsilon shifts negative half-way values from
@@ -106,61 +106,31 @@ export function monthlyCpiMap(rows, valueKey = 'value') {
   return m;
 }
 
-// ─── Index ratio ─────────────────────────────────────────────────────────────
-export function indexRatio(refCpi, datedDateRefCpi) {
-  return (refCpi != null && datedDateRefCpi) ? truncateThenRound(refCpi / datedDateRefCpi) : null;
-}
-
-// Ref CPI(settlement) / Ref CPI(dated date), rounded once, half up, to nine decimal
-// places -- reproduces a real broker's displayed Index Ratio to that many places, on
-// every TIPS in every quote file tested (knowledge/DFD_Worklist.md §3.12). This is not
-// evidence of a stated broker rounding rule -- it is only known to match at 9 decimal
-// places, consistent with a broker computing at full precision and displaying 9 places.
-// Not Treasury's own truncate-6-round-5 rule (indexRatio() above), which is scoped to
-// Treasury's own auction and settlement mechanics and does not apply to a broker's
-// tax-lot accrual math -- see TaxationOfTreasuries/docs/TIPS_OID_Tax_Reference.md, which
-// shows the Treasury-rounded ratio understating a real 1099-B by three cents where the
-// full-precision ratio reproduces it exactly.
-export function indexRatioNineDecimal(refCpi, datedDateRefCpi) {
-  if (refCpi == null || datedDateRefCpi == null || isNaN(refCpi) || isNaN(datedDateRefCpi) || !datedDateRefCpi) return null;
-  const ratio = refCpi / datedDateRefCpi;
-  const factor = 1e9;
-  return Math.round(nudge(ratio * factor)) / factor;
-}
-
-// Index Ratio of every TIPS in a source, keyed by CUSIP: Calculate index ratios, process 3.1.9
-// (YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#calculate-index-ratios).
-// Independent of, and not consumed by, Calculate TIPS yields (3.1.7,
-// shared/src/tips-yields.js#tipsYieldsFromPrices): Index Ratio does not use Price and is not a
-// yield. The only current consumer is the market-quote TIPS table YieldCurves/src/app.js
-// renders; nothing downstream of that reads it, and it is not published to any store.
+// ─── Index Ratio ─────────────────────────────────────────────────────────────
+// The single calculation of the Index Ratio (DATA_DICTIONARY.md#index-ratio):
+// Ref CPI(settlement) / Ref CPI(dated date). The Ref CPI at the Settlement Date is the same
+// for every TIPS; the dated date Ref CPI is the TIPS's own.
 //
-// tipsRows        S1's TIPS rows, each carrying cusip and datedDateCpi
-// refCpiRows      S4, parsed
-// quotesByCusip   S7's TIPS quotes by CUSIP, or null when the quoted source isn't shown
-// isBroker        true for a market quote, false for FedInvest
-// marketSettleIso the settlement date the market quotes are stated at, 'YYYY-MM-DD'.
-//                 Ignored when isBroker is false, where each row's own settlementDate is used.
-// tipsRefByCusip  S2 (TIPS/TipsRef.csv) rows by CUSIP, giving a market-quote TIPS its
-//                 dated date Ref CPI -- S7 doesn't carry it. Ignored when isBroker is false.
-//
-// Returns a Map<cusip, indexRatio>. A TIPS with no settlement date, or whose Ref CPI at
-// either date is unavailable, is left out of the map rather than mapped to NaN.
-export function tipsIndexRatios(tipsRows, refCpiRows, quotesByCusip, isBroker, marketSettleIso, tipsRefByCusip = null) {
-  const source = isBroker ? Array.from(quotesByCusip ? quotesByCusip.values() : []) : tipsRows;
-  const result = new Map();
-  for (const row of source) {
-    const cusip = row.cusip;
-    const settleDateStr = isBroker ? marketSettleIso : row.settlementDate;
-    if (!cusip || !settleDateStr) continue;
-    const settleRefCpi = refCpiNsaForDate(refCpiRows, settleDateStr);
-    const datedDateRefCpi = isBroker
-      ? (tipsRefByCusip ? tipsRefByCusip.get(cusip)?.datedDateRefCpi ?? null : null)
-      : (row.datedDateCpi != null && row.datedDateCpi !== '' ? parseFloat(row.datedDateCpi) : null);
-    const ratio = indexRatioNineDecimal(settleRefCpi, datedDateRefCpi);
-    if (ratio != null) result.set(cusip, ratio);
+// `rounding` is required and has exactly two values, so that every caller states which one it
+// means:
+//   TREASURY_ROUNDING  the ratio truncated to six decimal places, then rounded to five, as
+//                      31 CFR §356 App. B states for the principal and interest payments Treasury
+//                      calculates. Use it for an amount Treasury pays or calculates: the
+//                      Inflation-Adjusted Principal and every amount derived from it.
+//   NO_ROUNDING        the ratio as the division gives it. Use it for an amount traded or accrued
+//                      in the market: Cost per TIPS, sale proceeds, Accrued Interest (Adjusted),
+//                      Adjusted Price.
+// Returns null when the settlement Ref CPI is missing or the dated date Ref CPI is missing or zero.
+export const TREASURY_ROUNDING = 'treasury';
+export const NO_ROUNDING = 'none';
+
+export function indexRatio(settlementRefCpi, datedDateRefCpi, rounding) {
+  if (rounding !== TREASURY_ROUNDING && rounding !== NO_ROUNDING) {
+    throw new Error(`indexRatio: rounding must be TREASURY_ROUNDING or NO_ROUNDING (got ${String(rounding)})`);
   }
-  return result;
+  if (settlementRefCpi == null || !datedDateRefCpi) return null;
+  const ratio = settlementRefCpi / datedDateRefCpi;
+  return rounding === TREASURY_ROUNDING ? truncateThenRound(ratio) : ratio;
 }
 
 // ─── SA Factor lookup (RefCpiNsaSa.csv rows) ─────────────────────────────────
@@ -186,18 +156,6 @@ export function saFactorForDate(rows, dateStr) {
     if (!best || d > best['Ref CPI Date']) best = r;
   }
   return best ? parseFloat(best['SA Factor']) : null;
-}
-
-// Exact-date NSA Ref CPI from the same S4 rows saFactorForDate() reads
-// (RefCpiNsaSa.csv). Used as the settlement-date Ref CPI for
-// indexRatioNineDecimal() above: S4's "Ref CPI NSA" column states the same
-// value as the authoritative retrieved series (S3, RefCPI.csv) on every date
-// tested (knowledge/DFD_Worklist.md §3.12), so a caller that already loads S4
-// for the SA factors needs no separate S3 fetch. Returns null when dateStr
-// has no row (S4 starts 2019-04-01) -- there is no "snap" to a nearby date.
-export function refCpiNsaForDate(rows, dateStr) {
-  const row = rows.find(r => r['Ref CPI Date'] === dateStr);
-  return row ? parseFloat(row['Ref CPI NSA']) : null;
 }
 
 // ─── Credibility factor for a projected maturity SA factor ──────────────────

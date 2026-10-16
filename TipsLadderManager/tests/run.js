@@ -18,7 +18,7 @@ import { loadMarketData, nextBondTradingDay, lookupRefCpi } from '../../shared/s
 import { installFixtureFetch } from './market-fixture.js';
 import { ladderRoles } from './ladder-fixtures.js';
 import { bondCalcs, calculateMDuration, priceFromYield, accruedInterest, couponSchedule, daysBetween } from '../../shared/src/bond-math.js';
-import { indexRatio } from '../../shared/src/ref-cpi.js';
+import { indexRatio, TREASURY_ROUNDING, NO_ROUNDING } from '../../shared/src/ref-cpi.js';
 import { actualPaymentDate } from '../../shared/src/settlement.js';
 
 
@@ -1529,8 +1529,10 @@ console.log('\nFuture 30Y: the three amounts credited against the full annual co
     const shiftLabel = bp ? `yields ${bp > 0 ? '+' : '−'}50 bp` : 'market yields';
     const limit = future30yLimit({ tipsMarketData: market, settlementDate: S, refCPI, bondHolidays });
     const { lowerCoverBond: L, upperCoverBond: U, maxTipsYear } = limit.covers;
-    const irL = indexRatio(refCPI, L.datedDateRefCpi ?? refCPI), irU = indexRatio(refCPI, U.datedDateRefCpi ?? refCPI);
-    const coverPair = [[L, irL], [U, irU]];
+    const irL = indexRatio(refCPI, L.datedDateRefCpi ?? refCPI, NO_ROUNDING), irU = indexRatio(refCPI, U.datedDateRefCpi ?? refCPI, NO_ROUNDING);
+    const pirL = indexRatio(refCPI, L.datedDateRefCpi ?? refCPI, TREASURY_ROUNDING), pirU = indexRatio(refCPI, U.datedDateRefCpi ?? refCPI, TREASURY_ROUNDING);
+    // [bond, Index Ratio for prices and accrued interest (traded), Index Ratio for the coupons Treasury pays]
+    const coverPair = [[L, irL, pirL], [U, irU, pirU]];
     let cases = 0, worstIdentity = 0, worstShareOfBound = 0;
     const identityMiss = [], roundingMiss = [], returnMiss = [];
     console.log(`        ${shiftLabel}: lower cover ${L.maturity.getFullYear()}, upper cover ${U.maturity.getFullYear()}, ladder’s last year at most ${limit.lastYearMax}; DARA $100,000 flat, as % of one year’s full coupons:`);
@@ -1570,7 +1572,7 @@ console.log('\nFuture 30Y: the three amounts credited against the full annual co
             const a = dates[p], z = dates[p + 1], days = daysBetween(a, z);
             let wCov = 0, rCov = 0, cCov = 0, gapMax = 0;
             coverPair.forEach(([b, ir], i) => {
-              const q = held[p][i], dA = cleanPerTips(b, ir, a) + aiPerTips(b, ir, a), dZ = cleanPerTips(b, ir, z) + aiPerTips(b, ir, z), c = couponsPaid(b, ir, a, z);
+              const q = held[p][i], dA = cleanPerTips(b, ir, a) + aiPerTips(b, ir, a), dZ = cleanPerTips(b, ir, z) + aiPerTips(b, ir, z), c = couponsPaid(b, coverPair[i][2], a, z);
               wCov += q * dA; rCov += q * (dZ - dA + c); cCov += q * c;
               gapMax = Math.max(gapMax, Math.abs(G(b.yield, days) - G(ya, days)));
             });
@@ -1587,7 +1589,7 @@ console.log('\nFuture 30Y: the three amounts credited against the full annual co
           //    and paid on or after it, less the accrued interest of every Future 30Y TIPS.
           const settlementYearCoupon = (b, ir) => couponSchedule(new Date(SY, 0, 1), b.maturity)
             .filter(d => d <= S && d.getFullYear() === SY && d < b.maturity && actualPaymentDate(d, bondHolidays) >= S).length * 1000 * ir * (b.coupon ?? 0) / 2;
-          const t3 = coverPair.reduce((s, [b, ir], i) => s + held[0][i] * (aiPerTips(b, ir, S) + settlementYearCoupon(b, ir)), 0)
+          const t3 = coverPair.reduce((s, [b, ir, pir], i) => s + held[0][i] * (aiPerTips(b, ir, S) + settlementYearCoupon(b, pir)), 0)
             - bd.reduce((s, r) => s + r.qty * aiPerTips(syn(r.year), 1, S), 0);
           // 4. On the issue dates: accrued interest of the Simulated Outstanding Future 30Y TIPS bought less that of the Cover Excess sold.
           let t4 = 0;
@@ -3578,7 +3580,8 @@ console.log('\nFuture 30Y Dur popup — cost-weighted average, computed match, c
 
     const bracketBond = (year) => tipsMarketData.get(details.find(d => d.fundedYear === year && d.isGapBracket).cusip);
     const lowerBond = bracketBond(s.lowerYear), upperBond = bracketBond(s.upperYear);
-    const irOf = b => indexRatio(refCPI, b.datedDateRefCpi ?? refCPI);
+    const irOf = b => indexRatio(refCPI, b.datedDateRefCpi ?? refCPI, NO_ROUNDING);   // prices a traded TIPS
+    const paymentIrOf = b => indexRatio(refCPI, b.datedDateRefCpi ?? refCPI, TREASURY_ROUNDING);   // coupon Treasury pays
     const cpbOn = (b, date) => priceFromYield(b.yield, b.coupon, date, b.maturity) / 100 * irOf(b) * 1000;
 
     conv.forEach((c, k) => {
@@ -3634,7 +3637,7 @@ console.log('\nFuture 30Y Dur popup — cost-weighted average, computed match, c
           if (y === SY && actualPaymentDate(date, bondHolidays) < settlementDate) continue;   // the settlement year counts only a coupon not yet paid
           let q = q0;
           for (const c of conv) if (c.issueDate < date) q = key === 'lower' ? c.lowerQtyAfter : c.upperQtyAfter;
-          exc += q * 1000 * irOf(bond) * bond.coupon / 2;
+          exc += q * 1000 * paymentIrOf(bond) * bond.coupon / 2;
         }
       }
       assert(t + ': interest of the Excess TIPS, each coupon on the quantity held on its date', s.gapExcessInterestByYear.get(y) ?? 0, exc, 1e-6);

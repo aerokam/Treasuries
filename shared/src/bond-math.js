@@ -2,7 +2,7 @@
 // Pure per-unit calculations ($1,000 face value).
 // Spec: ../knowledge/TIPS_Basics.md, knowledge/4.0_Computation_Modules.md §bond-math.js
 
-import { indexRatio as calcIndexRatio } from './ref-cpi.js';
+import { indexRatio as calcIndexRatio, TREASURY_ROUNDING, NO_ROUNDING } from './ref-cpi.js';
 
 // ─── Calendar-day count ───────────────────────────────────────────────────────
 // Date objects here are local-midnight timestamps (`new Date(y, m, d)`). Diffing
@@ -106,20 +106,24 @@ export function cashflowSchedule(settlement, maturity, coupon) {
 }
 
 // ─── Per-unit quantities ($1,000 face) ──────────────────────────────────────
-// Spec: 2.1 TIPS Basics, 5.0 §bondCalcs
+// Spec: 2.1 TIPS Basics, TipsLadderManager/knowledge/4.0_Computation_Modules.md §bondCalcs
 // security: { coupon, datedDateRefCpi, price, maturity: Date }
+// indexRatio is unrounded and prices what is traded (costPerBond). paymentIndexRatio is the
+// Index Ratio under Treasury's rule and gives the amounts Treasury pays or calculates
+// (principalPerBond and everything derived from it).
 export function bondCalcs(bond, refCPI) {
   const coupon          = bond.coupon  ?? 0;
   const datedDateRefCpi         = bond.datedDateRefCpi ?? refCPI;
-  const indexRatio      = calcIndexRatio(refCPI, datedDateRefCpi);
-  const principalPerBond = 1000 * indexRatio;
+  const indexRatio      = calcIndexRatio(refCPI, datedDateRefCpi, NO_ROUNDING);
+  const paymentIndexRatio = calcIndexRatio(refCPI, datedDateRefCpi, TREASURY_ROUNDING);
+  const principalPerBond = 1000 * paymentIndexRatio;
   const costPerBond     = (bond.price ?? 0) / 100 * indexRatio * 1000;
   const nPeriods        = (bond.maturity.getMonth() + 1) < 7 ? 1 : 2;
   const couponPerPeriod = coupon / 2;
   const ownRungInt      = principalPerBond * couponPerPeriod * nPeriods;
   const piPerBond       = principalPerBond + ownRungInt;
   const annualInt       = principalPerBond * coupon;
-  return { indexRatio, principalPerBond, costPerBond, nPeriods, couponPerPeriod, ownRungInt, piPerBond, annualInt };
+  return { indexRatio, paymentIndexRatio, principalPerBond, costPerBond, nPeriods, couponPerPeriod, ownRungInt, piPerBond, annualInt };
 }
 
 // ─── Semi-annual date arithmetic (end-of-month safe) ─────────────────────────

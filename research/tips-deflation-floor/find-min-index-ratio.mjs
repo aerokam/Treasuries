@@ -28,7 +28,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { parseCsv } from '../../shared/src/csv.js';
-import { lookupRefCpi, indexRatio, refCpiFromMonthly, monthlyCpiMap } from '../../shared/src/ref-cpi.js';
+import { lookupRefCpi, indexRatio, TREASURY_ROUNDING, refCpiFromMonthly, monthlyCpiMap } from '../../shared/src/ref-cpi.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -155,7 +155,7 @@ async function main() {
       maturity_date: s.maturityDate,
       ref_cpi_on_dated_date: s.refCpiOnDated,
       ref_cpi_at_maturity: refCpiAtMaturity,
-      index_ratio_at_maturity: indexRatio(refCpiAtMaturity, s.refCpiOnDated),
+      index_ratio_at_maturity: indexRatio(refCpiAtMaturity, s.refCpiOnDated, TREASURY_ROUNDING),   // the ratio the principal at maturity is paid on
     });
   }
   results.sort((a, b) => a.index_ratio_at_maturity - b.index_ratio_at_maturity);

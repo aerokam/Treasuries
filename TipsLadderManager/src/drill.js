@@ -220,7 +220,7 @@ function syntheticYearAmountRows(a) {
 
 export function buildDrillHTML(d, colKey, summary) {
   const nPeriods         = d.nPeriods != null ? d.nPeriods : (d.halfOrFull === 0.5 ? 1 : 2);
-  const principalPerBond = d.principalPerBond != null ? d.principalPerBond : 1000 * d.indexRatio;
+  const principalPerBond = d.principalPerBond;
   const couponPct        = fd(d.coupon / 2 * 100, 5) + '%';
   const couponLabel      = nPeriods === 1 ? 'Last coupon (1 period)' : 'Last 2 coupons (2 periods)';
 

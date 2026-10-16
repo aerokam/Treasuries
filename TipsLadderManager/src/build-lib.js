@@ -93,14 +93,14 @@ export function runBuild({ dara, firstYear: firstYearOpt, lastYear, tipsMarketDa
     const isBracket    = excessQty > 0;
     const isFuture30yCover = future30yExQty > 0;
 
-    // Year-level funded aggregates — Σ over sub-rungs, each sized from its OWN pi/ir/coupon
+    // Year-level funded aggregates — Σ over sub-rungs, each sized from its OWN pi/pir/coupon
     // (multi-TIPS years: quarterly ≤~2030, Jan/Jul ≤~2035). N=1 reproduces the legacy single-TIPS year.
     let fundedYearQty = 0, fundedYearPITotal = 0, fundedPrincipalTotal = 0, fundedOwnRungInt = 0;
     const fundedRungs = [];
     for (const r of rungs) {
       const moF = r.bond.maturity.getMonth() + 1;
       const hof = moF < 7 ? 0.5 : 1.0, nP = moF < 7 ? 1 : 2;
-      const ppb = 1000 * r.ir;
+      const ppb = 1000 * r.pir;
       fundedYearQty += r.qty;
       fundedYearPITotal += r.qty * r.pi;
       fundedPrincipalTotal += r.qty * ppb;
@@ -131,8 +131,8 @@ export function runBuild({ dara, firstYear: firstYearOpt, lastYear, tipsMarketDa
     rungs.forEach((r, j) => {
       const moF = r.bond.maturity.getMonth() + 1;
       const hof = moF < 7 ? 0.5 : 1.0, nP = moF < 7 ? 1 : 2;
-      const ppb = 1000 * r.ir;
-      const cpb_i = r.bond.price != null ? (r.bond.price / 100) * r.ir * 1000 : bondCalcs(r.bond, refCPI).costPerBond;
+      const ppb = 1000 * r.pir;
+      const cpb_i = bondCalcs(r.bond, refCPI).costPerBond;
       const rungCost = r.qty * cpb_i;
       const mDuration = calculateMDuration(settlementDate, r.bond.maturity, r.bond.coupon ?? 0, r.bond.yield ?? 0);
       const first = j === 0;
@@ -162,6 +162,7 @@ export function runBuild({ dara, firstYear: firstYearOpt, lastYear, tipsMarketDa
         datedDateRefCpi: r.bond.datedDateRefCpi ?? refCPI,
         refCPI,
         indexRatio: r.ir,
+        principalPerBond: ppb,
         halfOrFull: hof,
         nPeriods: nP,
         dara: first ? yearDara : null,

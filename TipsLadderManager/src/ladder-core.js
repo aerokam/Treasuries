@@ -11,7 +11,7 @@
 
 import { bondCalcs, calculateMDuration, couponSchedule, priceFromYield } from '../../shared/src/bond-math.js';
 import { actualPaymentDate, lastBusinessDayOfMonth } from '../../shared/src/settlement.js';
-import { indexRatio as calcIndexRatio } from '../../shared/src/ref-cpi.js';
+import { indexRatio as calcIndexRatio, TREASURY_ROUNDING, NO_ROUNDING } from '../../shared/src/ref-cpi.js';
 import { bracketWeights, bracketWeightsN, bracketExcessQtys, fyQty as _fyQty, gapParamsCore, future30yParamsCore, syntheticCoupon } from './gap-math.js';
 import { addMonths } from './date-util.js';
 
@@ -145,8 +145,8 @@ export function sizeFuture30yCover({
       future30yFellBack = true; future30yCoverReason = 'belowLower';
     }
 
-    const future30yLowerCPB = (future30yLowerCoverBond.price ?? 0) / 100 * calcIndexRatio(refCPI, future30yLowerCoverBond.datedDateRefCpi ?? refCPI) * 1000;
-    const future30yUpperCPB = (future30yUpperCoverBond.price ?? 0) / 100 * calcIndexRatio(refCPI, future30yUpperCoverBond.datedDateRefCpi ?? refCPI) * 1000;
+    const future30yLowerCPB = bondCalcs(future30yLowerCoverBond, refCPI).costPerBond;
+    const future30yUpperCPB = bondCalcs(future30yUpperCoverBond, refCPI).costPerBond;
     ({ lowerExQty: future30yLowerExQty, upperExQty: future30yUpperExQty } = bracketExcessQtys(future30yParams.future30yTotalCost, future30yLowerWeight, future30yUpperWeight, future30yLowerCPB, future30yUpperCPB));
     future30yTotalExcessCost = future30yLowerExQty * future30yLowerCPB + future30yUpperExQty * future30yUpperCPB;
     future30yLowerMonth = BL_MONTHS[future30yLowerCoverBond.maturity.getMonth()];
@@ -214,7 +214,7 @@ function simulatedRebalances({ kind, breakdown: rows, lowerBond, upperBond, reta
   const breakdown = [...(rows ?? [])].sort((a, b) => a.year - b.year);
   const retainedQty0 = retained.map(r => r.qty0 ?? 0);
   if (!breakdown.length || !lowerBond || !upperBond) return { conversions: [], lowerQty0, upperQty0, retainedQty0 };
-  const irOfBond = (bond) => calcIndexRatio(refCPI, bond.datedDateRefCpi ?? refCPI);
+  const irOfBond = (bond) => calcIndexRatio(refCPI, bond.datedDateRefCpi ?? refCPI, NO_ROUNDING);   // prices a traded TIPS (cost)
   const irL = irOfBond(lowerBond), irU = irOfBond(upperBond);
   const cpbOn = (bond, ir, date) => (priceFromYield(bond.yield ?? 0, bond.coupon ?? 0, date, bond.maturity) ?? 0) / 100 * ir * 1000;
   const durOn = (bond, date) => calculateMDuration(date, bond.maturity, bond.coupon ?? 0, bond.yield ?? 0);
@@ -351,7 +351,7 @@ function simulatedInterestByYear({
     // Excess TIPS, on each bracket TIPS' own coupon dates in this year.
     for (const { bond, qty0, after } of legs) {
       if (!bond?.maturity) continue;
-      const ir = calcIndexRatio(refCPI, bond.datedDateRefCpi ?? refCPI);
+      const ir = calcIndexRatio(refCPI, bond.datedDateRefCpi ?? refCPI, TREASURY_ROUNDING);
       const halfPerBond = 1000 * ir * (bond.coupon ?? 0) / 2;
       const from = new Date(year, 0, 1);
       for (const date of couponSchedule(from, bond.maturity)) {
@@ -660,12 +660,14 @@ export function selectLadderBonds({ tipsMarketData, firstYear, lastYear, settlem
 // sub-rung delivers an ≈ equal share of that year's maturity cash. Each sub-rung is sized
 // from its OWN pi; the LATEST maturity absorbs the rounding remainder so the year lands on
 // `need`. Same-year sub-rungs never feed each other's LMI (they mature in-year), so a single
-// year-level `need` is the correct thing to split. Returns [{ bond, ir, pi, coupon, qty }]
+// year-level `need` is the correct thing to split. Returns [{ bond, ir, pir, pi, coupon, qty }]
 // earliest→latest (qty ≥ 0). N=1 reproduces the legacy single-TIPS sizing exactly.
+// `ir` is the unrounded Index Ratio; `pir` is the Index Ratio under Treasury's rule, which every
+// amount Treasury pays (principal, coupon) is calculated from.
 function sizeYearRungs(list, need, refCPI) {
   const rungs = list.map(bond => {
-    const { indexRatio: ir, piPerBond: pi } = bondCalcs(bond, refCPI);
-    return { bond, ir, pi, coupon: bond.coupon ?? 0, qty: 0 };
+    const { indexRatio: ir, paymentIndexRatio: pir, piPerBond: pi } = bondCalcs(bond, refCPI);
+    return { bond, ir, pir, pi, coupon: bond.coupon ?? 0, qty: 0 };
   });
   const N = rungs.length;
   if (N === 0 || need <= 0) return rungs;
@@ -685,7 +687,7 @@ function aggregateRungs(rungs) {
   let qty = 0, annualInterest = 0, piTotal = 0;
   for (const r of rungs) {
     qty += r.qty;
-    annualInterest += r.qty * 1000 * r.ir * r.coupon;
+    annualInterest += r.qty * 1000 * r.pir * r.coupon;
     piTotal += r.qty * r.pi;
   }
   return { qty, annualInterest, piTotal };
@@ -864,9 +866,9 @@ export function sizeLadder({
     const upperBond = yearBondMap[upperBracketYear];
     const lowerBond = yearBondMap[lowerBracketYear];
     const upperDur = calculateMDuration(settlementDate, upperBond.maturity, upperBond.coupon ?? 0, upperBond.yield ?? 0);
-    const upperCPB = (upperBond.price ?? 0) / 100 * calcIndexRatio(refCPI, upperBond.datedDateRefCpi ?? refCPI) * 1000;
+    const upperCPB = bondCalcs(upperBond, refCPI).costPerBond;
     const lowerDur = calculateMDuration(settlementDate, lowerBond.maturity, lowerBond.coupon ?? 0, lowerBond.yield ?? 0);
-    const lowerCPB = (lowerBond.price ?? 0) / 100 * calcIndexRatio(refCPI, lowerBond.datedDateRefCpi ?? refCPI) * 1000;
+    const lowerCPB = bondCalcs(lowerBond, refCPI).costPerBond;
     // The Excess TIPS at settlement. A Rebalance with Retained Bracket Excess (gapRetained: the retained
     // maturities, oldest first, each with the excess it holds, and the excess the active lower bracket holds)
     // freezes the retained maturities at what they hold and solves the active lower and upper brackets
@@ -877,7 +879,7 @@ export function sizeLadder({
       ({ lowerWeight: wL, upperWeight: wU } = bracketWeights(lowerDur, upperDur, params.avgDuration));
       ({ lowerExQty: exL, upperExQty: exU } = bracketExcessQtys(params.totalCost, wL, wU, lowerCPB, upperCPB));
     } else {
-      const cpbOf = (b) => (b.price ?? 0) / 100 * calcIndexRatio(refCPI, b.datedDateRefCpi ?? refCPI) * 1000;
+      const cpbOf = (b) => bondCalcs(b, refCPI).costPerBond;
       const total = params.totalCost;
       const wN = bracketWeightsN({
         retained: retainedLegs.map(r => ({ excessCost: r.heldQty * cpbOf(r.bond), duration: calculateMDuration(settlementDate, r.bond.maturity, r.bond.coupon ?? 0, r.bond.yield ?? 0) })),
@@ -951,7 +953,7 @@ export function sizeLadder({
       for (const [y, pr] of Object.entries(prelim)) {
         if (parseInt(y, 10) <= settlementYear) continue;
         for (const r of pr.rungs) {
-          sum += r.qty * r.ir * 1000 * r.coupon / 2
+          sum += r.qty * r.pir * 1000 * r.coupon / 2
                * rmdCappedRemainingCoupons(r.bond.maturity, settlementDate, bondHolidays, rmdCouponMode, tradeDate, passLastDate);
         }
       }
@@ -1073,7 +1075,7 @@ export function sizeLadder({
       corrRungs[year] = rungs;
       corrFYQty[year] = fyQty;
       runningLMI += fundedCoupon;
-      runningLMIRemaining += rungs.reduce((s, r) => s + r.qty * r.ir * 1000 * r.coupon / 2 * rmdCappedRemainingCoupons(r.bond.maturity, settlementDate, bondHolidays, rmdCouponMode, tradeDate, rmdLastDate), 0);
+      runningLMIRemaining += rungs.reduce((s, r) => s + r.qty * r.pir * 1000 * r.coupon / 2 * rmdCappedRemainingCoupons(r.bond.maturity, settlementDate, bondHolidays, rmdCouponMode, tradeDate, rmdLastDate), 0);
     }
   }
 

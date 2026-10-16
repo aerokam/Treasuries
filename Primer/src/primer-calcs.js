@@ -4,6 +4,7 @@
 // before the matching function below mounts its widget into the page.
 import { lookupRefCpi, pickFeaturedTips, datedDateRefCpiFor, fmtDate, pickFeaturedNote } from './primer-data.js';
 import { priceFromYield } from '../../shared/src/bond-math.js';
+import { indexRatio, TREASURY_ROUNDING, NO_ROUNDING } from '../../shared/src/ref-cpi.js';
 
 function wireIndexRatioCalc(el, data) {
   const rows = data.refCpiRows;
@@ -51,12 +52,13 @@ function wireIndexRatioCalc(el, data) {
       out.innerHTML = `<p class="err">No Ref CPI data for that date.</p>`;
       return;
     }
-    const ratio = refCpiDate / datedDateRefCpi;
+    const ratio = indexRatio(refCpiDate, datedDateRefCpi, NO_ROUNDING);
+    const paymentRatio = indexRatio(refCpiDate, datedDateRefCpi, TREASURY_ROUNDING);
     out.innerHTML = `
       <div class="row"><span>Dated Date Ref CPI (${fmtDate(tips.datedDate)})</span><b>${datedDateRefCpi.toFixed(5)}</b></div>
       <div class="row"><span>Ref CPI on ${dateStr}</span><b>${refCpiDate.toFixed(5)}</b></div>
       <div class="row"><span>Index Ratio</span><b>${ratio.toFixed(5)}</b></div>
-      <div class="row"><span>$1,000 par → inflation-adjusted</span><b>$${(1000 * ratio).toFixed(2)}</b></div>
+      <div class="row"><span>$1,000 par → inflation-adjusted</span><b>$${(1000 * paymentRatio).toFixed(2)}</b></div>
     `;
   }
   sel.addEventListener('change', () => { syncDateBounds(); recompute(); });
@@ -70,7 +72,8 @@ function wireInflAdjPrincipal(el, data) {
   const datedDateRefCpi = datedDateRefCpiFor(data, tips.cusip);
   const settle = data.settlementDate;
   const refCpi = lookupRefCpi(data.refCpiRows, settle) ?? lookupRefCpi(data.refCpiRows, data.refCpiRows[data.refCpiRows.length - 1].date);
-  const ratio = refCpi && datedDateRefCpi ? refCpi / datedDateRefCpi : null;
+  const ratio = indexRatio(refCpi, datedDateRefCpi, NO_ROUNDING);
+  const paymentRatio = indexRatio(refCpi, datedDateRefCpi, TREASURY_ROUNDING);
 
   el.innerHTML = `
     <div class="calc">
@@ -92,8 +95,8 @@ function wireInflAdjPrincipal(el, data) {
     out.innerHTML = `
       <div class="row"><span>Index Ratio</span><b>${ratio.toFixed(5)}</b></div>
       <div class="row"><span>Par amount</span><b>$${par.toLocaleString()}</b></div>
-      <div class="row"><span>Inflation-adjusted principal</span><b>$${(par * ratio).toFixed(2)}</b></div>
-      <div class="row"><span>Next semiannual coupon (${(tips.coupon * 100).toFixed(3)}% ÷ 2)</span><b>$${(par * ratio * tips.coupon / 2).toFixed(2)}</b></div>
+      <div class="row"><span>Inflation-adjusted principal</span><b>$${(par * paymentRatio).toFixed(2)}</b></div>
+      <div class="row"><span>Next semiannual coupon (${(tips.coupon * 100).toFixed(3)}% ÷ 2)</span><b>$${(par * paymentRatio * tips.coupon / 2).toFixed(2)}</b></div>
     `;
   }
   inp.addEventListener('input', recompute);

@@ -7,8 +7,8 @@
 // bad data or a bug in the interpolation — exactly the failure mode that
 // derailed the TipsReference session.
 
-import { lookupRefCpi, refCpiFromMonthly, monthlyCpiMap, indexRatio, saFactorForDate,
-         maturitySaFactor, credibilityFactor, seasonalDriftSigma } from '../src/ref-cpi.js';
+import { lookupRefCpi, refCpiFromMonthly, monthlyCpiMap, indexRatio, TREASURY_ROUNDING, NO_ROUNDING,
+         saFactorForDate, maturitySaFactor, credibilityFactor, seasonalDriftSigma } from '../src/ref-cpi.js';
 import { parseCsv } from '../src/csv.js';
 
 const R2 = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev';
@@ -107,9 +107,25 @@ async function main() {
   ok(lookupRefCpi([], '2026-01-15') === null, 'empty rows → null');
 
   // ── indexRatio ──
-  ok(Math.abs(indexRatio(300, 150) - 2) < 1e-12, 'indexRatio basic');
-  ok(indexRatio(300, 0) === null, 'indexRatio zero base → null');
-  ok(indexRatio(null, 150) === null, 'indexRatio null refCpi → null');
+  ok(Math.abs(indexRatio(300, 150, TREASURY_ROUNDING) - 2) < 1e-12, 'indexRatio basic');
+  ok(indexRatio(300, 0, TREASURY_ROUNDING) === null, 'indexRatio zero base → null');
+  ok(indexRatio(null, 150, TREASURY_ROUNDING) === null, 'indexRatio null refCpi → null');
+  ok(indexRatio(300, 0, NO_ROUNDING) === null, 'indexRatio zero base, unrounded → null');
+  ok(indexRatio(null, 150, NO_ROUNDING) === null, 'indexRatio null refCpi, unrounded → null');
+
+  // The rounding is required and has exactly two values: no default hides the choice.
+  for (const bad of [undefined, null, 'nine', 5]) {
+    let threw = false;
+    try { indexRatio(300, 150, bad); } catch (_) { threw = true; }
+    ok(threw, `indexRatio with rounding ${String(bad)} throws`);
+  }
+
+  // Unrounded is the division as it stands; Treasury's rule truncates to six decimals, then rounds to five.
+  // 334.14087 / 290.54829 = 1.1500349... (see the truncation regression below)
+  const exactRatio = 334.14087 / 290.54829;
+  ok(indexRatio(334.14087, 290.54829, NO_ROUNDING) === exactRatio, 'unrounded Index Ratio is the plain quotient');
+  ok(indexRatio(334.14087, 290.54829, NO_ROUNDING) !== indexRatio(334.14087, 290.54829, TREASURY_ROUNDING),
+     'unrounded and Treasury-rounded Index Ratios differ where the quotient has more than five decimals');
 
   // ── 31 CFR §356 App. B §I.B.3 worked example (Ref CPI April 1996) ──
   // Ref CPI_Apr1,1996 = CPI_Jan,1996 = 154.40; Ref CPI_May1,1996 = CPI_Feb,1996 = 154.90.
@@ -118,7 +134,7 @@ async function main() {
   const rcApr16 = refCpiFromMonthly('1996-04-16', cfrMonthly);
   ok(rcApr15 === 154.63333, `CFR example: Ref CPI Apr15,1996 truncate6/round5 → 154.63333 (got ${rcApr15})`);
   ok(rcApr16 === 154.65000, `CFR example: Ref CPI Apr16,1996 → 154.65000 (got ${rcApr16})`);
-  ok(indexRatio(rcApr16, rcApr15) === 1.00011, `CFR example: Index Ratio Apr16,1996 → 1.00011 (got ${indexRatio(rcApr16, rcApr15)})`);
+  ok(indexRatio(rcApr16, rcApr15, TREASURY_ROUNDING) === 1.00011, `CFR example: Index Ratio Apr16,1996 → 1.00011 (got ${indexRatio(rcApr16, rcApr15, TREASURY_ROUNDING)})`);
 
   // ── Regression: IEEE754 truncation bug reported against 91282CEZ0 (2026-08-27) ──
   // TreasuryDirect's own detail page shows Index Ratio 1.15004 for this CUSIP/date
@@ -126,7 +142,7 @@ async function main() {
   // 1.150035, whose 6th decimal is exactly 5 — a case where multiply/trunc/divide
   // float arithmetic silently lands on 1.1500349999999999 and rounds down to
   // 1.15003 instead of 1.15004. See shared/src/ref-cpi.js truncateThenRound.
-  ok(indexRatio(334.14087, 290.54829) === 1.15004, `truncation regression: 334.14087/290.54829 → 1.15004 (got ${indexRatio(334.14087, 290.54829)})`);
+  ok(indexRatio(334.14087, 290.54829, TREASURY_ROUNDING) === 1.15004, `truncation regression: 334.14087/290.54829 → 1.15004 (got ${indexRatio(334.14087, 290.54829, TREASURY_ROUNDING)})`);
 
   // ── Regression: the fix above used a FIXED absolute epsilon, which is ~4 ulps at
   // index-ratio magnitude (~1e6 after scaling, so it worked) but ~0.01 ulps at Ref CPI
@@ -141,7 +157,7 @@ async function main() {
   // truncateThenRound.
   const cpiMay2019 = 256.092, cpiJun2019 = 256.143;
   const rc2019Aug02 = cpiMay2019 + (2 - 1) / 31 * (cpiJun2019 - cpiMay2019);
-  const irRounded = indexRatio(rc2019Aug02, 1); // indexRatio(x,1) applies truncateThenRound to x alone
+  const irRounded = indexRatio(rc2019Aug02, 1, TREASURY_ROUNDING); // indexRatio(x,1,TREASURY_ROUNDING) applies truncateThenRound to x alone
   ok(irRounded === 256.09365, `magnitude regression: Ref-CPI-scale truncateThenRound(256.093645...) → 256.09365 (got ${irRounded})`);
 
   // ── saFactorForDate ── (uses the raw CSV-column shape, via the shared parser)

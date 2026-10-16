@@ -3,6 +3,7 @@
 import { yieldFromPrice, calculateDuration, daysBetween } from '../../shared/src/bond-math.js';
 import { calculateSAO, fitNSS } from '../../shared/src/spot-curve.js';
 import { localDate } from '../../shared/src/settlement.js';
+import { indexRatio, NO_ROUNDING } from '../../shared/src/ref-cpi.js';
 
 const R2 = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev';
 const fetchText = async u => (await fetch(u, { cache: 'no-cache' })).text();
@@ -123,7 +124,7 @@ const rSettleNSA = parseFloat(rRows.find(r=>r["Ref CPI Date"]===settleStr)?.["Re
 const rawByCusip={}; for(const r of yRows) rawByCusip[r.cusip]=r;
 for(const b of bonds){
   const dcpi=parseFloat(rawByCusip[b.cusip]?.datedDateCpi);
-  b.indexRatio = rSettleNSA/dcpi;
+  b.indexRatio = indexRatio(rSettleNSA, dcpi, NO_ROUNDING) ?? NaN;
 }
 console.log(`\nRefCPI NSA @ settle ${settleStr} = ${rSettleNSA}`);
 console.log('\n=== Region 2027-2031: residual vs INDEX RATIO and MONTH ===');

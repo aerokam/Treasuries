@@ -9,7 +9,7 @@
 // YieldsMonitor's SA historical reconstruction sweeping settle across every calendar
 // day — and diverged from priceFromYield, which never had that special case).
 
-import { yieldFromPrice, priceFromYield, daysBetween, accruedInterest, calculateMDuration } from '../src/bond-math.js';
+import { yieldFromPrice, priceFromYield, daysBetween, accruedInterest, calculateMDuration, bondCalcs } from '../src/bond-math.js';
 
 let pass = 0, fail = 0;
 const ok = (cond, msg) => { if (cond) { pass++; } else { fail++; console.error('  ✗ ' + msg); } };
@@ -133,6 +133,25 @@ function roundTrips(settle, mature, coupon, yld, tol = 1e-9) {
   const m1 = calculateMDuration(new Date(2026, 0, 15), maturity, coupon, 0.03);
   const m2 = calculateMDuration(new Date(2026, 0, 16), maturity, coupon, 0.03);
   ok(Math.abs(m1 - m2) < 0.01 && m1 > m0, `calculateMDuration: on a coupon date the coupon paid that day is not the buyer's, so duration matches the next day and exceeds the day before, which still holds it (${m0.toFixed(4)}, ${m1.toFixed(4)}, ${m2.toFixed(4)})`);
+}
+
+// bondCalcs: the Index Ratio is unrounded and prices what is traded (Cost per TIPS); the payment
+// Index Ratio is Treasury's rule (truncate to six decimals, round to five) and gives the
+// Inflation-Adjusted Principal and everything derived from it (TipsLadderManager/knowledge/4.0 §bondCalcs).
+{
+  // 334.14087 / 290.54829 = 1.150034999... : Treasury's rule gives 1.15004 (see ref-cpi.test.js)
+  const bond = { price: 98.5, coupon: 0.02, datedDateRefCpi: 290.54829, maturity: new Date(2030, 6, 15) };
+  const c = bondCalcs(bond, 334.14087);
+  const exact = 334.14087 / 290.54829;
+  ok(c.indexRatio === exact, `bondCalcs: indexRatio is the unrounded quotient (got ${c.indexRatio})`);
+  ok(c.paymentIndexRatio === 1.15004, `bondCalcs: paymentIndexRatio is Treasury's rule, 1.15004 (got ${c.paymentIndexRatio})`);
+  ok(c.principalPerBond === 1000 * 1.15004, `bondCalcs: principalPerBond is 1,000 x paymentIndexRatio (got ${c.principalPerBond})`);
+  ok(Math.abs(c.costPerBond - 98.5 / 100 * exact * 1000) < 1e-9, `bondCalcs: costPerBond is Price / 100 x unrounded indexRatio x 1,000 (got ${c.costPerBond})`);
+  ok(Math.abs(c.costPerBond - 98.5 / 100 * c.paymentIndexRatio * 1000) > 1e-4, 'bondCalcs: costPerBond does not use the payment Index Ratio');
+  ok(Math.abs(c.annualInt - c.principalPerBond * 0.02) < 1e-12 && Math.abs(c.piPerBond - (c.principalPerBond + c.ownRungInt)) < 1e-12, 'bondCalcs: coupon and P+I derive from principalPerBond');
+  // A Synthetic TIPS has no dated date Ref CPI of its own: Index Ratio 1 under both rules.
+  const syn = bondCalcs({ price: 100, coupon: 0.02, maturity: new Date(2040, 0, 15) }, 334.14087);
+  ok(syn.indexRatio === 1 && syn.paymentIndexRatio === 1 && syn.principalPerBond === 1000, 'bondCalcs: without a dated date Ref CPI the Index Ratio is 1 under both rules');
 }
 
 console.log(`\n${fail === 0 ? 'PASS' : 'FAIL'} — ${pass} passed, ${fail} failed`);
