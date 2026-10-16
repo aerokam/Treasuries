@@ -4363,7 +4363,7 @@ async function _showTipsRefModal(type) {
       const ir = ref?.datedDateRefCpi ? refCpiSett / ref.datedDateRefCpi : null;
       const adjPrice = ir != null ? r.price * ir : null;
       html += '<td' + R + '>' + r.price.toFixed(3) + '</td>';
-      html += '<td' + R + '>' + (ir != null ? ir.toFixed(5) : '—') + '</td>';
+      html += '<td' + R + '>' + (ir != null ? ir.toFixed(9) : '—') + '</td>';
       html += '<td' + R + '>' + (adjPrice != null ? adjPrice.toFixed(3) : '—') + '</td>';
       html += '<td' + R + '>' + (r.yield * 100).toFixed(3) + '%</td>';
       html += '<td' + R + '>' + (r.saYield != null ? (r.saYield * 100).toFixed(3) + '%' : '—') + '</td>';

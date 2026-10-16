@@ -2910,3 +2910,18 @@ test('Index Ratio decimals: a Trade Ticket Cost drill shows nine decimals and re
   expect(ratio).toMatch(/^\d+\.\d{9}$/);
   expect(Math.abs(Number(valueOf(rows, 'Price')) / 100 * Number(ratio) * 1000 - money(valueOf(rows, 'Cost per TIPS'))), 'price/100 x ratio shown x 1,000 reproduces the Cost per TIPS to the cent (price shown to three decimals)').toBeLessThan(0.02);
 });
+
+test('Mkt popup: every Index Ratio is shown to nine decimals and Price x Index Ratio reproduces the Adj Price shown', async ({ page }) => {
+  await page.locator('.tips-mkt-link').click();
+  await expect(page.locator('#tipsref-title')).toHaveText('TIPS Mkt Data');
+  const rows = await page.locator('#tipsref-table tbody tr').evaluateAll(trs => trs.map(tr => [...tr.cells].map(c => c.textContent.trim())));
+  expect(rows.length).toBeGreaterThan(0);
+  // Columns: CUSIP, Maturity, Coupon, Price, Index Ratio, Adj Price, Yield, SA Yield
+  for (const cells of rows) {
+    const [cusip, , , price, ratio, adj] = cells;
+    expect(ratio, cusip + ' Index Ratio is shown to nine decimals').toMatch(/^\d+\.\d{9}$/);
+    // Price is shown to three decimals (error up to 0.0005 x ratio), the ratio to nine (error up to 0.0000000005 x price), the Adj Price to three (0.0005).
+    const tolerance = 0.0005 * Number(ratio) + 0.0000000005 * Number(price) + 0.0005 + 1e-9;
+    expect(Math.abs(Number(price) * Number(ratio) - Number(adj)), cusip + ' Price x Index Ratio shown reproduces the Adj Price shown').toBeLessThanOrEqual(tolerance);
+  }
+});
