@@ -1,8 +1,8 @@
 // Treasury Yields Monitor - app.js
 import { handleChartKeydown, setupAxisWheelZoom, snapYBounds, snapYAfterZoom, applyLockRight } from '../../shared/src/chart-keys.js';
 import { applyXTimeUnit } from '../../shared/src/chart-time-axis.js';
-import { priceFromYield, yieldFromPrice } from '../../shared/src/bond-math.js';
-import { saFactorForDate, maturitySaFactor } from '../../shared/src/ref-cpi.js';
+import { priceFromYield } from '../../shared/src/bond-math.js';
+import { saYieldsFromTipsYields } from '../../shared/src/sa-yields.js';
 import { parseCsv } from '../../shared/src/csv.js';
 import { localDate, toIsoDate, nextBusinessDay, parseHolidaySet } from '../../shared/src/settlement.js';
 import { resolveTipsBond } from './cnbc-rollover-log.js';
@@ -701,7 +701,10 @@ async function ensureSaDataLoaded() {
 // Seasonally-adjusted yield for a single quote, using the real bond's coupon/maturity
 // (bondMeta, from fetchTipsBondMeta). tradeDateStr is "MM/DD/YYYY" (getEtDateStr format);
 // settlement is T+1 bond trading day from the trade date (see knowledge/DATA_DICTIONARY.md
-// #settlement-date). Returns null if any required input isn't available yet.
+// #settlement-date). The SA Price Factor and the SA Yield are calculated by
+// shared/src/sa-yields.js#saYieldsFromTipsYields, the one implementation (3.2); this function
+// supplies the Settlement Date and the price that the quoted Yield implies. Returns null if any
+// required input isn't available yet.
 function saYieldForQuote(yieldPct, tradeDateStr, bondMeta, holidaySet, saRows) {
   if (!saRows || !bondMeta) return null;
   const [mm, dd, yyyy] = tradeDateStr.split('/').map(Number);
@@ -709,15 +712,12 @@ function saYieldForQuote(yieldPct, tradeDateStr, bondMeta, holidaySet, saRows) {
   const settle = nextBusinessDay(tradeDate, holidaySet);
   const mature = bondMeta.maturity;
   if (!mature || settle >= mature) return null;
-  const saSettle = saFactorForDate(saRows, toIsoDate(settle));
-  const saMature = maturitySaFactor(saRows, toIsoDate(mature), toIsoDate(settle));
-  if (saSettle == null || saMature == null || isNaN(saSettle) || isNaN(saMature)) return null;
-  const yld = yieldPct / 100;
-  const price = priceFromYield(yld, bondMeta.coupon, settle, mature);
+  const price = priceFromYield(yieldPct / 100, bondMeta.coupon, settle, mature);
   if (price == null) return null;
-  const saPrice = price * (saSettle / saMature);
-  const saYield = yieldFromPrice(saPrice, bondMeta.coupon, settle, mature);
-  return saYield == null ? null : saYield * 100;
+  const [sa] = saYieldsFromTipsYields([{
+    price, coupon: bondMeta.coupon, maturity: toIsoDate(mature), maturityDate: mature, settlementDate: toIsoDate(settle),
+  }], saRows);
+  return isNaN(sa.saYield) ? null : sa.saYield * 100;
 }
 
 // Bond identity per point: today's point uses CNBC's live-fetched bond (empirically
