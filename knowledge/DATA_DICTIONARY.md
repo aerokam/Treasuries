@@ -471,9 +471,11 @@ For nominal Treasuries, 31 CFR §356.2 applies: *"Dated date means the date from
 ### Index Ratio
 `Index_Ratio` = `Ref_CPI_settle / Ref_CPI_dated`
 
+*Not rounded. [Inflation-Adjusted Principal](#inflation-adjusted-principal) uses it truncated to six decimal places, then rounded to five.*
+
 <a id="inflation-adjusted-principal"></a>
 ### Inflation-Adjusted Principal
-`Inflation_Adjusted_Principal` = `Face_Value × Index_Ratio`
+`Inflation_Adjusted_Principal` = `Face_Value × Index_Ratio` *(the Index Ratio truncated to six decimal places, then rounded to five, as [31 CFR 356 Appendix B](./31_CFR_356_Definitions_And_Formulas.md) states for the principal and interest payments Treasury calculates)*
 
 <a id="annual-interest-real"></a>
 ### Annual Interest (Real)
