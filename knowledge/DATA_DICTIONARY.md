@@ -11,7 +11,7 @@
 
 *Every term below, alphabetically, including synonyms. The entries themselves are grouped by category in the sections that follow.*
 
-**A** &nbsp; [AA](#aa) &middot; [Accrued Interest (Adjusted)](#accrued-interest-adjusted) &middot; [Accrued Interest (Nominal)](#accrued-interest-nominal) &middot; [Active Lower Bracket](#active-lower-bracket) &middot; [amount](#ara) *(see ARA)* &middot; [Annual Interest (Nominal)](#annual-interest-nominal) &middot; [Annual Interest (Real)](#annual-interest-real) &middot; [App Inputs](#app-inputs) &middot; [App Outputs](#app-outputs) &middot; [ARA](#ara) &middot; [Ask / Bid](#ask) &middot; [Auction Results](#auction-results) &middot; [Auction results (S5)](#s5) &middot; [Available Cash](#available-cash) &middot; [Axis Scales](#axis-scales)
+**A** &nbsp; [AA](#aa) &middot; [Accrued Interest (Adjusted)](#accrued-interest-adjusted) &middot; [Accrued Interest (Nominal)](#accrued-interest-nominal) &middot; [Active Lower Bracket](#active-lower-bracket) &middot; [Adjusted Price](#adjusted-price) &middot; [amount](#ara) *(see ARA)* &middot; [Annual Interest (Nominal)](#annual-interest-nominal) &middot; [Annual Interest (Real)](#annual-interest-real) &middot; [App Inputs](#app-inputs) &middot; [App Outputs](#app-outputs) &middot; [ARA](#ara) &middot; [Ask / Bid](#ask) &middot; [Auction Results](#auction-results) &middot; [Auction results (S5)](#s5) &middot; [Available Cash](#available-cash) &middot; [Axis Scales](#axis-scales)
 
 **B** &nbsp; [bei](#breakeven-inflation) *(see Breakeven Inflation (BEI))* &middot; [bid](#ask) *(see Ask / Bid)* &middot; [Bid and Ask Spreads](#bid-and-ask-spreads) &middot; [Bid and ask spreads (S15)](#s15) &middot; [BlackRock iShares (E12)](#e12) &middot; [BLS (E4)](#e4) &middot; [Bond Holiday](#bond-holiday) &middot; [Bond holidays (S16)](#s16) &middot; [Bond Ladder](#bond-ladder) &middot; [BondBloxx product-page holdings table (E11)](#e11) &middot; [bracket maturity](#bracket-year-tips) *(see Bracket Year TIPS)* &middot; [Bracket Weight](#bracket-weight) &middot; [Bracket Year](#bracket-year) &middot; [Bracket Year TIPS](#bracket-year-tips) &middot; [Breakeven Inflation (BEI)](#breakeven-inflation) &middot; [Breakeven inflation (S14)](#s14)
 
@@ -27,7 +27,7 @@
 
 **H** &nbsp; [Holdings](#holdings) &middot; [Holdings Export](#holdings-export-format) &middot; [Holdings File](#holdings-file)
 
-**I** &nbsp; [Index Ratio](#index-ratio) &middot; [Inflation Compensation](#inflation-compensation) &middot; [inflation factor](#index-ratio) *(see Index Ratio)* &middot; [Inflation-Adjusted Principal](#inflation-adjusted-principal) &middot; [Intraday archive (S18)](#s18) &middot; [IQR Clip](#iqr-clip)
+**I** &nbsp; [Index Ratio](#index-ratio) &middot; [Index Ratios](#index-ratios) &middot; [Inflation Compensation](#inflation-compensation) &middot; [inflation factor](#index-ratio) *(see Index Ratio)* &middot; [Inflation-Adjusted Principal](#inflation-adjusted-principal) &middot; [Intraday archive (S18)](#s18) &middot; [IQR Clip](#iqr-clip)
 
 **L** &nbsp; [Ladder](#ladder) &middot; [ladder eligible tips](#outstanding-tips) *(see Outstanding TIPS)* &middot; [ladder period](#ladder) *(see Ladder)* &middot; [Last-Year Interest](#last-year-interest) &middot; [Live Quotes](#live-quotes) &middot; [LMI](#lmi)
 
@@ -172,7 +172,7 @@
   | `Maturity date` | [Maturity Date](#maturity-date) |
   | `Ask price/Quantity (min)` | [Price](#price), ask side |
   | `Bid price/Quantity (min)` | [Price](#price), bid side |
-  | `Adjusted ask price` / `Adjusted bid price` | Price × [Index Ratio](#index-ratio), TIPS only |
+  | `Adjusted ask price` / `Adjusted bid price` | [Adjusted Ask Price / Adjusted Bid Price](#adjusted-price), TIPS only |
   | `Inflation factor` | [Index Ratio](#index-ratio), TIPS only — the synonym is recorded there |
   | `Ask yield to maturity` | [Yield](#yield), [ask](#ask) side |
   | `Yield` | [Yield](#yield), [bid](#bid) side |
@@ -299,7 +299,13 @@
 <a id="price"></a>
 <a id="clean-price"></a>
 ### Price
-`Price` = *Market value expressed as percentage of par (e.g., 102.5 = 102.5% of par), before inflation adjustment. By convention, "price" means this clean price — excluding accrued interest — unless dirty price is named explicitly, though dirty price (clean price plus accrued interest) is rarely invoked for a TIPS in practice, since the accrued interest on a TIPS is itself inflation-adjusted. Canty (2009) formal notation for the clean price: CP. Canty's own "dirty price" (DP) is a different quantity from that market-convention sense, unrelated to accrued interest: `DP = CP × Index Ratio`, what this codebase calls [Adjusted ask price / Adjusted bid price](#s7) for a TIPS.*
+`Price` = *Market value expressed as percentage of par (e.g., 102.5 = 102.5% of par), before inflation adjustment. By convention, "price" means this clean price — excluding accrued interest — unless dirty price is named explicitly, though dirty price (clean price plus accrued interest) is rarely invoked for a TIPS in practice, since the accrued interest on a TIPS is itself inflation-adjusted. Canty (2009) formal notation for the clean price: CP. Canty's own "dirty price" (DP) is a different quantity from that market-convention sense, unrelated to accrued interest: `DP = CP × Index Ratio`, the [Adjusted Price](#adjusted-price) of a TIPS.*
+
+<a id="adjusted-price"></a>
+<a id="adjusted-ask-price"></a>
+<a id="adjusted-bid-price"></a>
+### Adjusted Price
+`Adjusted_Price` = `Price × Index_Ratio` *(a TIPS only. The Adjusted Ask Price is the ask [Price](#price) so adjusted and the Adjusted Bid Price the bid Price, as [Market quotes (S7)](#s7) states them in its `Adjusted ask price` and `Adjusted bid price` columns.)*
 
 <a id="accrued-interest-nominal"></a>
 ### Accrued Interest (Nominal)
@@ -825,14 +831,16 @@ Some values are true only until Treasury issues more TIPS. Left inline as approx
   *Each TIPS in [FedInvest (E1)](#e1) that [TIPS reference data (S2)](#s2) also holds, with one [Price](#price) from E1 and the coupon rate, maturity date and dated date [Ref CPI](#ref-cpi) from TIPS reference data (S2). The [Settlement Date](#settlement-date) of the prices is a separate flow.*
 - <a id="treasury-prices"></a>**Treasury Prices** = `{ @CUSIP + Security_Type + Coupon_Rate + Maturity_Date + Price }`
   *Each market-based bill, note and bond in [FedInvest (E1)](#e1), with one [Price](#price). The [Settlement Date](#settlement-date) of the prices is a separate flow.*
-- <a id="tips-quotes"></a>**TIPS Quotes** = `{ @CUSIP + Coupon_Rate + Maturity_Date + Ask_Price + ( Bid_Price ) }`
-  *The TIPS in [Market quotes (S7)](#s7), each with its [ask and bid](#ask) prices.*
+- <a id="tips-quotes"></a>**TIPS Quotes** = `{ @CUSIP + Coupon_Rate + Maturity_Date + Ask_Price + ( Bid_Price ) + ( Adjusted_Ask_Price ) + ( Adjusted_Bid_Price ) }`
+  *The TIPS in [Market quotes (S7)](#s7), each with its [ask and bid](#ask) prices and their [Adjusted Prices](#adjusted-price).*
 - <a id="treasury-quotes"></a>**Treasury Quotes** = `{ @CUSIP + Security_Type + Coupon_Rate + Maturity_Date + Ask_Price + ( Bid_Price ) }`
   *The nominal Treasuries in [Market quotes (S7)](#s7), STRIPS included.*
 - <a id="tips-yields"></a>**TIPS Yields** = `{ [ TIPS_Prices | TIPS_Quotes ] + Ask_Yield + ( Bid_Yield ) }`
-  *Each TIPS with the [yield](#yield) calculated from its price at its settlement date. A quoted TIPS also has the yield of its bid price. [Index Ratio](#index-ratio) is not part of this flow: it has no dependency on price or yield and is calculated separately, by `shared/src/ref-cpi.js#tipsIndexRatios`, not read from [Market quotes (S7)](#s7)'s `Inflation factor` column — that column is parsed but not used.*
+  *Each TIPS with the [yield](#yield) calculated from its price at its settlement date. A quoted TIPS also has the yield of its bid price. The [Index Ratio](#index-ratio) of a TIPS is a separate flow, [Index Ratios](#index-ratios).*
 - <a id="treasury-yields"></a>**Treasury Yields** = `{ [ Treasury_Prices | Treasury_Quotes ] + Ask_Yield + ( Bid_Yield ) }`
   *Each nominal Treasury with the [yield](#yield) calculated from its price at its settlement date. A quoted Treasury also has the yield of its bid price; a Treasury from [FedInvest prices (S1)](#s1) has one yield only, not a true ask or a true bid.*
+- <a id="index-ratios"></a>**Index Ratios** = `{ @CUSIP + Index_Ratio }`
+  *Each TIPS with its [Index Ratio](#index-ratio) at the [Settlement Date](#settlement-date) of its source, calculated from the [Ref CPI](#ref-cpi) on that date and the dated date Ref CPI. A TIPS with no Ref CPI at either date has none.*
 - <a id="sa-yields"></a>**SA Yields** = `{ TIPS_Yields + SA_Price_Factor + SA_Yield }`
   *Each TIPS with its [SA Price Factor](#sa-price-factor) and [SA Yield](#sa-yield).*
 - <a id="sao-yields"></a>**SAO Yields** = `{ SA_Yields + SAO_Yield }`
@@ -840,7 +848,7 @@ Some values are true only until Treasury issues more TIPS. Left inline as approx
 - <a id="spot-yield-curves"></a>**Spot Yield Curves** = `{ [ Treasury | TIPS | TIPS_SA ] + { Term + Spot_Yield } }`
   *For each source shown, one [Spot Yield](#spot-yield) curve per series: fitted to the nominal Treasuries, to the TIPS quoted prices and to the TIPS seasonally adjusted prices.*
 - <a id="bid-and-ask-spreads"></a>**Bid and Ask Spreads** = `{ @CUSIP + Security_Type + Yield_Spread + Price_Spread }`
-  *For each security quoted on both sides: the yield spread, the [bid](#ask) yield less the ask yield, in basis points; and the price spread, the ask price less the bid price, as a percentage of the ask price, from adjusted prices for a TIPS and clean prices for a nominal Treasury. [Bid and ask spreads (S15)](#s15) is the published form.*
+  *For each security quoted on both sides: the yield spread, the [bid](#ask) yield less the ask yield, in basis points; and the price spread, the ask price less the bid price, as a percentage of the ask price, from [Adjusted Prices](#adjusted-price) for a TIPS and clean prices for a nominal Treasury. [Bid and ask spreads (S15)](#s15) holds it.*
 - <a id="view-selections"></a>**View Selections** = *The choices a user makes on an app's own page, driving what it fetches and draws. Composition differs by app:*
 
   - *Yield Curves: `Tab + ( Spread_Mode ) + { Source } + { Series } + Maturity_Range + Horizontal_Axis_Mode + IQR_Clip_Setting` — the Treasuries, TIPS or breakeven tab; spread mode; the sources and series shown; the range of maturities; calendar or term on the horizontal axis; and whether the [IQR Clip](#iqr-clip) applies.*
