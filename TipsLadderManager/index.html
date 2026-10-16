@@ -271,7 +271,7 @@
     <p><b>2. Check the range.</b> Once holdings load, the table immediately shows your current ladder (the Before columns).</p>
     <ul style="margin:0 0 10px 20px;padding:0">
       <li><b>First Year</b> is the earliest maturity year in your holdings; <b>Last Year</b> is the latest.</li>
-      <li>Override Last Year in the dropdown to extend or shorten the ladder; the tool identifies the appropriate TIPS for any new years automatically.</li>
+      <li>Override Last Year in the dropdown to extend or shorten the ladder; the tool identifies the appropriate TIPS for any new years automatically. Past the longest issued maturity year the ladder has Future 30Y years, up to the <a href="../knowledge/viewer.html#/md/TipsLadderManager/knowledge/2.0_TIPS_Ladders.md#limit-on-the-ladders-last-year" target="_blank" style="color:#2563eb;text-decoration:none;">Maximum Future 30Y Rungs</a>. <b>Future 30Y years are a highly experimental feature.</b> The maximum is worked out from the current market yields, and a fall in yields lowers it: a ladder built to today's maximum may then no longer reach its duration match, so it cannot be relied on if yields fall a lot.</li>
     </ul>
 
     <p><b>3. Set DARA (Desired Annual Real Amount).</b></p>
@@ -320,7 +320,7 @@
     <div id="help-mode-build">
     <p>Build a TIPS ladder from scratch, with no existing holdings: it calculates which TIPS to buy so that each funded year produces its <b><a href="../knowledge/viewer.html#/md/knowledge/DATA_DICTIONARY.md#ara" target="_blank" style="color:#2563eb;text-decoration:none;">ARA</a></b> (Annual Real Amount — the actual cash flow the ladder produces for that year, which may differ from DARA due to rounding), targeting the <b><a href="../knowledge/viewer.html#/md/knowledge/DATA_DICTIONARY.md#dara" target="_blank" style="color:#2563eb;text-decoration:none;">DARA</a></b> (Desired Annual Real Amount) you specify for it. It also calculates which excess TIPS the ladder needs to hold to duration-match the gap years (2037–2039, where no TIPS have been issued yet) or, for a ladder extending past the last issued 30-year TIPS, the Future 30Y rungs. See <a href="../knowledge/viewer.html#/md/TipsLadderManager/knowledge/2.0_TIPS_Ladders.md#duration-matching-brackets" target="_blank" style="color:#2563eb;text-decoration:none;">Duration Matching</a> for more details.</p>
 
-    <p><b>1. Choose First Year and Last Year.</b> First Year defaults to the <a href="../knowledge/viewer.html#/md/knowledge/DATA_DICTIONARY.md#5.1-issuance-dependent-values" target="_blank" style="color:#2563eb;text-decoration:none;">Default First Year</a>.</p>
+    <p><b>1. Choose First Year and Last Year.</b> First Year defaults to the <a href="../knowledge/viewer.html#/md/knowledge/DATA_DICTIONARY.md#5.1-issuance-dependent-values" target="_blank" style="color:#2563eb;text-decoration:none;">Default First Year</a>. Past the longest issued maturity year the ladder has Future 30Y years, up to the <a href="../knowledge/viewer.html#/md/TipsLadderManager/knowledge/2.0_TIPS_Ladders.md#limit-on-the-ladders-last-year" target="_blank" style="color:#2563eb;text-decoration:none;">Maximum Future 30Y Rungs</a>. <b>Future 30Y years are a highly experimental feature.</b> The maximum is worked out from the current market yields, and a fall in yields lowers it: a ladder built to today's maximum may then no longer reach its duration match, so it cannot be relied on if yields fall a lot.</p>
     <p style="margin-top:0">A TIPS that matures within <a href="../knowledge/viewer.html#/md/knowledge/DATA_DICTIONARY.md#5.1-issuance-dependent-values" target="_blank" style="color:#2563eb;text-decoration:none;">EXCLUDE_MATURING_WITHIN_MONTHS</a> months of the Settlement Date is not offered in Build: it is not in the First Year list and is not chosen for a funded year, whatever the Maturity preference. A TIPS that short gives little protection against unexpected inflation. Rebalance still shows the TIPS your holdings file holds.</p>
 
     <p><b>2. Set DARA (Desired Annual Real Amount).</b></p>
@@ -719,6 +719,7 @@ import { makeDraggableResizable } from './src/modal.js';
 import { rankForYear } from './src/allocation-policy.js';
 import { accruedInterest, bondCalcs, couponSchedule } from '../shared/src/bond-math.js';
 import { loadMarketData, lookupRefCpi, nextBondTradingDay } from '../shared/src/market-data.js';
+import { indexRatio, NO_ROUNDING } from '../shared/src/ref-cpi.js';
 import { actualPaymentDate } from '../shared/src/settlement.js';
 window.lookupRefCpi = lookupRefCpi;
 import { parseHoldingsFile, maturedOnOrBefore } from './src/holdings-import.js';
@@ -4360,7 +4361,7 @@ async function _showTipsRefModal(type) {
       html += '<td>' + (r.datedDate || '') + '</td><td' + R + '>' + (r.datedDateRefCpi != null ? r.datedDateRefCpi.toFixed(5) : '') + '</td>';
     } else {
       const ref = tipsRefMap.get(r.cusip);
-      const ir = ref?.datedDateRefCpi ? refCpiSett / ref.datedDateRefCpi : null;
+      const ir = indexRatio(refCpiSett, ref?.datedDateRefCpi, NO_ROUNDING);
       const adjPrice = ir != null ? r.price * ir : null;
       html += '<td' + R + '>' + r.price.toFixed(3) + '</td>';
       html += '<td' + R + '>' + (ir != null ? ir.toFixed(5) : '—') + '</td>';
