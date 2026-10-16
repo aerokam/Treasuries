@@ -1302,7 +1302,7 @@ function _exportLadderCsv() {
     const d = details[ri];
     const isBT = mode === 'rebal' ? (d.excessQtyBefore > 0 || d.excessQtyAfter > 0) : d.excessQty > 0;
 
-    const principal     = 1000 * d.indexRatio;
+    const principal     = d.principalPerBond;   // Inflation-Adjusted Principal: the Index Ratio under Treasury's rule (DD)
     const hof           = d.halfOrFull ?? (d.nPeriods === 1 ? 0.5 : 1.0);
     const lmi           = d.longerDatedLMI ?? d.araAfterLaterMatInt;
     const intFromExcess = (typeof d.excessLMI_After === 'number' && d.excessLMI_After > 0) ? d.excessLMI_After : null;

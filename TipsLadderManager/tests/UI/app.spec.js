@@ -11,7 +11,8 @@ import { test, expect } from 'playwright/test';
 import { readFileSync, writeFileSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { nextBondTradingDay, R2_ROOT } from '../../../shared/src/market-data.js';
+import { nextBondTradingDay, R2_ROOT, parseTipsRefRows } from '../../../shared/src/market-data.js';
+import { indexRatio, lookupRefCpi, TREASURY_ROUNDING, NO_ROUNDING } from '../../../shared/src/ref-cpi.js';
 import { parseHolidaySet, actualPaymentDate } from '../../../shared/src/settlement.js';
 import { parseCsv as parseCsvRows } from '../../../shared/src/csv.js';
 import { defaultFirstYear, tipsMaturingAfterExclusion } from '../../src/ladder-core.js';
@@ -969,6 +970,44 @@ test('build: export menu Ladder CSV option enabled after run', async ({ page }) 
   await expect(page.locator('#build-output')).toHaveCSS('display', 'block', { timeout: 4_000 });
   await expect(page.locator('#export-opt-ladder-csv')).toBeEnabled();
 });
+
+// The Export's "Principal per TIPS" is the Inflation-Adjusted Principal Treasury pays: 1,000 times the Index Ratio
+// truncated to six decimals and rounded to five (DD Inflation-Adjusted Principal), not times the unrounded
+// Index Ratio. Independent derivation from the Ref CPI series (S3) and the dated date Ref CPI (S2).
+for (const mode of ['build', 'rebalance']) {
+  test(`${mode}: exported Principal per TIPS is 1,000 x the Index Ratio under Treasury's rule, for every row`, async ({ page }) => {
+    if (mode === 'build') {
+      await page.locator('.tab-btn[data-mode="build"]').click();
+    } else {
+      await page.locator('#holdings-file').setInputFiles(HOLDINGS_PATH);
+    }
+    await page.locator('#run-btn').click();
+    await expect(page.locator(mode === 'build' ? '#build-output' : '#simple-table tbody tr').first()).toBeVisible({ timeout: 6_000 });
+    await expect(page.locator('#export-opt-ladder-csv')).toBeEnabled();
+    const [download] = await Promise.all([
+      page.waitForEvent('download'),
+      chooseMenu(page, 'export-menu', 'ladder-csv'),
+    ]);
+    const rows = parseCsvRows(readFileSync(await download.path(), 'utf8'));
+    const refCpiRows = parseCsvRows(await r2Text('TIPS/RefCPI.csv')).map(r => ({ date: r.date, refCpi: parseFloat(r.refCpi) }));
+    const datedByCusip = new Map(parseTipsRefRows(await r2Text('TIPS/TipsRef.csv')).map(r => [r.cusip, r.datedDateRefCpi]));
+    const settleRefCpi = lookupRefCpi(refCpiRows, await computeSettleDateStr());
+    expect(settleRefCpi, 'Ref CPI at the Settlement Date').not.toBeNull();
+
+    let checked = 0, differsFromUnrounded = 0;
+    for (const r of rows) {
+      const dated = datedByCusip.get(r['CUSIP']);
+      if (dated == null || r['Principal per TIPS'] === '' || r['Principal per TIPS'] == null) continue;
+      const exported = parseFloat(r['Principal per TIPS']);
+      const expected = 1000 * indexRatio(settleRefCpi, dated, TREASURY_ROUNDING);
+      expect(exported, `${r['CUSIP']}: Principal per TIPS`).toBeCloseTo(expected, 6);
+      if (Math.abs(1000 * indexRatio(settleRefCpi, dated, NO_ROUNDING) - expected) > 1e-6) differsFromUnrounded++;
+      checked++;
+    }
+    expect(checked, 'rows checked').toBeGreaterThan(0);
+    expect(differsFromUnrounded, 'rows where the unrounded ratio would give a different principal (the test can fail)').toBeGreaterThan(0);
+  });
+}
 
 test('rebalance: no negative Qty After values at low DARA', { tag: '@SampleHoldings' }, async ({ page }) => {
   await page.locator('#holdings-file').setInputFiles(HOLDINGS_PATH);
