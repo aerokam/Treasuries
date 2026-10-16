@@ -3,7 +3,7 @@
 // Mocks EVERY R2 fetch (YieldsFromFedInvestPrices.csv, FidelityTreasuriesTips.csv,
 // RefCPI.csv, TipsRef.csv, YieldsSaSao.csv, BondHolidaysSifma.csv) via page.route() in beforeEach below, fulfilled with the file's current R2 content (r2Text, fetched once per run; nothing market-related is committed);
 // the test browser has no live network egress in a sandboxed session, so an unmocked R2 URL fails with
-// "Failed to fetch" (this is by design, not flakiness; well-known, see 3.1_Data_Pipeline.md §Testing).
+// "Failed to fetch" (this is by design, not flakiness; well-known, see TESTING.md §Mock every R2 fetch).
 // Any new required R2 fetch added to shared/src/market-data.js MUST get a matching route() mock here, or
 // every test hangs/fails at the beforeEach's data-load wait, not just tests that touch the new field.
 

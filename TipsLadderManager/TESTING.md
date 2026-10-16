@@ -17,11 +17,28 @@ a test run is not itself a download day: the Fidelity download date becomes toda
 settlement), and the first line of the FedInvest file becomes the settlement date.
 
 Consequence: the test suite needs live network access to R2, and the UI-test browser sandbox has none —
-see 3.1 Data Pipeline §5.0 for the fixture-mocking mechanics this requires.
+see [Mock every R2 fetch](#mock-every-r2-fetch) for the mechanics this requires.
 
 **The test clock is never pinned to an old date.** A pinned date is exactly the committed-snapshot
 problem in a different form — it quietly assumes today's market shape matches some date in the past,
 and stops being true the moment that stops holding.
+
+<a id="mock-every-r2-fetch"></a>
+## Mock every R2 fetch
+
+The `beforeEach` of `tests/UI/app.spec.js` mocks every R2 fetch that `market-data.js` makes, with `page.route()`, and fulfills each with the current R2 content of that file, fetched once per run by the test process (`r2Text`). The files are `YieldsFromFedInvestPrices.csv`, `FidelityTreasuriesTips.csv`, `RefCPI.csv`, `TipsRef.csv`, `YieldsSaSao.csv` and `BondHolidaysSifma.csv`. No fixture file is committed ([Live market data, never a committed snapshot](#live-market-data-never-a-committed-snapshot)).
+
+The UI-test browser has no live network egress in a sandboxed session, which is a property of that kind of sandbox and not an outage. `curl` from the same machine reaches R2, and a browser does not. An unmocked R2 URL does not fail alone: `fetchAuxTipsData()`, `fetchTipsData()` and `fetchFidelityTipsData()` use `Promise.all`, which rejects with "Failed to fetch" and shows "Failed to load market data: Failed to fetch" in the UI. The `beforeEach` waits for `#run-btn` to become enabled, so every test in the file times out, and not only the tests of the new field. The symptom looks like an R2 outage or a CORS problem, and the cause is a missing mock.
+
+A new required fetch in `shared/src/market-data.js` needs a matching line in the `beforeEach` of `app.spec.js`, beside the existing ones:
+
+```
+page.route('**/<R2 path>', async r => r.fulfill({ body: await r2Text('<R2 path>'), contentType: 'text/csv' }))
+```
+
+A suite that goes from all green to all red after a new data source was added fails first at this line.
+
+**The server under test.** `playwright.config.js` sets `reuseExistingServer: true` on port 8080. When a persistent dev server of another checkout (`main`, or another worktree) is bound to that port, Playwright reuses it and does not serve the code of this checkout, so a green run can describe the wrong code. Before trusting a green run in a worktree or branch other than the one on 8080, `curl` a string unique to the change and look for it, for example `curl http://localhost:8080/... | grep <change>`.
 
 ## No test depends on specific holdings
 
