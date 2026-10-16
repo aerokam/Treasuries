@@ -135,14 +135,14 @@ export function buildPreLadderPoolDrill(summary, plCreditForYear) {
     rows.push({ label: 'Pre-ladder interest from the Simulated Outstanding Future 10Y TIPS and the Excess TIPS', note: 'coupons of the Simulated Outstanding Future 10Y TIPS and of the Excess TIPS paid before the ladder starts', value: fm(gapPool) });
   }
   if (future30yPool > 0) {
-    rows.push({ label: 'Pre-ladder interest from the simulated TIPS and the Cover Excess', note: 'coupons of the Simulated Outstanding Future 30Y TIPS and of the Cover Excess paid before the ladder starts', value: fm(future30yPool) });
+    rows.push({ label: 'Pre-ladder interest from the Simulated Outstanding Future 30Y TIPS and the Excess TIPS', note: 'coupons of the Simulated Outstanding Future 30Y TIPS and of the Excess TIPS paid before the ladder starts', value: fm(future30yPool) });
   }
   const showNet = Math.abs(netCashPool) >= 0.5;
   if (showNet) {
     rows.push({ label: 'Net Cash', note: netCashNote(summary?.gapYears?.length > 0, summary?.future30yYears?.length > 0, 'before the ladder starts'), value: (netCashPool < 0 ? '−' + fm(-netCashPool) : fm(netCashPool)) });
   }
   rows.push({ sep: true });
-  const totalNote = ['coupon interest', gapPool > 0 ? 'Simulated Outstanding Future 10Y TIPS and Excess TIPS interest' : null, future30yPool > 0 ? 'simulated TIPS and Cover Excess interest' : null, showNet ? 'Net Cash' : null].filter(Boolean).join(' + ');
+  const totalNote = ['coupon interest', gapPool > 0 ? 'Simulated Outstanding Future 10Y TIPS and Excess TIPS interest' : null, future30yPool > 0 ? 'Simulated Outstanding Future 30Y TIPS and Excess TIPS interest' : null, showNet ? 'Net Cash' : null].filter(Boolean).join(' + ');
   rows.push({ label: 'Total pre-ladder pool', note: totalNote, value: fm(total), total: true });
   if (plCreditForYear > 0) {
     rows.push({ sep: true });
@@ -161,25 +161,22 @@ export function buildPreLadderPoolDrill(summary, plCreditForYear) {
 // Net Cash. The one Net Cash row carries the Net Cash of both kinds when a ladder has gap years and Future 30Y years.
 const hasNetCash = (net) => Math.abs(net) >= 0.5;
 function netCashNote(hasGap, hasFuture30y, when) {
-  const sold = [hasGap ? 'Excess TIPS' : null, hasFuture30y ? 'Cover Excess' : null].filter(Boolean).join(' and ');
   const bought = [hasGap ? 'Simulated Outstanding Future 10Y TIPS' : null, hasFuture30y ? 'Simulated Outstanding Future 30Y TIPS' : null].filter(Boolean).join(' and ');
-  return 'cash from selling ' + (sold || 'Cover Excess') + ' ' + when + ', beyond the cost of the ' + (bought || 'Simulated Outstanding Future 30Y TIPS') + ' bought';
+  return 'cash from selling Excess TIPS ' + when + ', beyond the cost of the ' + (bought || 'Simulated Outstanding Future 30Y TIPS') + ' bought';
 }
 // `c` = { sim, cov, net, gapSim, gapExc, gapNet } for one year.
 function future30yInterestRows(year, c, sign = '') {
   const net = (c.net ?? 0) + (c.gapNet ?? 0);
   return ((c.gapSim ?? 0) > 0 ? row('Simulated Outstanding Future 10Y TIPS interest', 'coupons paid in ' + year + ' by the Simulated Outstanding Future 10Y TIPS issued by then', sign + fm(c.gapSim), false, undefined, 'gapsim') : '')
-    + ((c.gapExc ?? 0) > 0 ? row('Excess TIPS interest', 'coupons paid in ' + year + ' by the Excess TIPS', sign + fm(c.gapExc), false, undefined, 'gapexc') : '')
-    + ((c.sim ?? 0) > 0 ? row('Simulated Future 30Y TIPS interest', 'coupons paid in ' + year + ' by the Simulated Outstanding Future 30Y TIPS issued by then', sign + fm(c.sim), false, undefined, 'sim') : '')
-    + ((c.cov ?? 0) > 0 ? row('Cover Excess interest', 'coupons paid in ' + year + ' by the Cover Excess', sign + fm(c.cov), false, undefined, 'cov') : '')
+    + ((c.gapExc ?? 0) + (c.cov ?? 0) > 0 ? row('Excess TIPS interest', 'coupons paid in ' + year + ' by the Excess TIPS', sign + fm((c.gapExc ?? 0) + (c.cov ?? 0)), false, undefined, 'exc') : '')
+    + ((c.sim ?? 0) > 0 ? row('Simulated Outstanding Future 30Y TIPS interest', 'coupons paid in ' + year + ' by the Simulated Outstanding Future 30Y TIPS issued by then', sign + fm(c.sim), false, undefined, 'sim') : '')
     + (hasNetCash(net) ? row('Net Cash', netCashNote((c.gapNet ?? 0) !== 0, (c.net ?? 0) !== 0 || (c.gapNet ?? 0) === 0, 'in this year'), (net < 0 ? (sign ? '+' : '−') + fm(-net) : sign + fm(net)), false, undefined, 'net') : '');
 }
 function future30yInterestFmla(c, op = '+') {
   const net = (c.net ?? 0) + (c.gapNet ?? 0);
   return ((c.gapSim ?? 0) > 0 ? ' ' + op + ' <span class="formula-var" data-source="gapsim">Simulated Outstanding Future 10Y TIPS interest</span>' : '')
-    + ((c.gapExc ?? 0) > 0 ? ' ' + op + ' <span class="formula-var" data-source="gapexc">Excess TIPS interest</span>' : '')
-    + ((c.sim ?? 0) > 0 ? ' ' + op + ' <span class="formula-var" data-source="sim">Simulated Future 30Y TIPS interest</span>' : '')
-    + ((c.cov ?? 0) > 0 ? ' ' + op + ' <span class="formula-var" data-source="cov">Cover Excess interest</span>' : '')
+    + ((c.gapExc ?? 0) + (c.cov ?? 0) > 0 ? ' ' + op + ' <span class="formula-var" data-source="exc">Excess TIPS interest</span>' : '')
+    + ((c.sim ?? 0) > 0 ? ' ' + op + ' <span class="formula-var" data-source="sim">Simulated Outstanding Future 30Y TIPS interest</span>' : '')
     + (hasNetCash(net) ? ' ' + op + ' <span class="formula-var" data-source="net">Net Cash</span>' : '');
 }
 // The credited amounts of a year's detail entry; Before reads the Before fields.

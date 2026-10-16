@@ -542,7 +542,7 @@ test('drill popup: clicking Pre-ladder credit opens Level 3 pool composition wit
       await expect(l3).toBeVisible();                                   // was failing: nothing happened
       await expect(l3).toContainText('Pre-ladder pool composition');
       await expect(l3).toContainText('Pre-ladder coupon interest');
-      await expect(l3).toContainText('Pre-ladder interest from the simulated TIPS and the Cover Excess');
+      await expect(l3).toContainText('Pre-ladder interest from the Simulated Outstanding Future 30Y TIPS and the Excess TIPS');
       await expect(l3).toContainText('Net Cash');                      // the issue dates before the ladder starts
       await l3.locator('#sp-close').click();
       found = true;
@@ -582,7 +582,7 @@ test('drill popup: gap-year PLI credit drills into pool composition', async ({ p
   const l3 = page.locator('#shared-popup');
   await expect(l3).toBeVisible();
   await expect(l3).toContainText('Pre-ladder pool composition');
-  await expect(l3).toContainText('Pre-ladder interest from the simulated TIPS and the Cover Excess');
+  await expect(l3).toContainText('Pre-ladder interest from the Simulated Outstanding Future 30Y TIPS and the Excess TIPS');
   await expect(l3).toContainText('Applied to this year');
   await l3.locator('#sp-close').click();
   await expect(l3).not.toBeVisible();
@@ -1411,7 +1411,7 @@ test('build: a funded year before the first gap year shows the gap year amounts 
   const expandAllBtn = page.locator('#expand-collapse-all-btn');
   if ((await expandAllBtn.textContent())?.trim() === 'Expand All') await expandAllBtn.click();
   const signed = (s) => (s.trim().startsWith('−') ? -1 : 1) * Number(s.replace(/[^0-9.]/g, ''));
-  const components = /^(Principal|Last coupon|Last 2 coupons|Later maturity interest|Remaining later maturity|Same-maturity excess|Pre-ladder credit|Simulated Outstanding Future 10Y TIPS interest|Excess TIPS interest|Simulated Future 30Y TIPS interest|Cover Excess interest|Net Cash|Available cash)/;
+  const components = /^(Principal|Last coupon|Last 2 coupons|Later maturity interest|Remaining later maturity|Same-maturity excess|Pre-ladder credit|Simulated Outstanding Future 10Y TIPS interest|Excess TIPS interest|Simulated Outstanding Future 30Y TIPS interest|Net Cash|Available cash)/;
   for (const year of [SY + 1, SY + 2, gap[0] - 1]) {
     const cell = page.locator(`#build-table tr.fy-group-header[data-fy="${year}"] td.drillable[data-col="amount"]`);
     await expect(cell, `${year} carries a drillable Amount`).toBeVisible();
@@ -1537,7 +1537,7 @@ test('build: a funded year with an issue date shows a Net Cash line in its Amoun
   await expect(page.locator('#drill-overlay')).toBeVisible({ timeout: 4_000 });
   await expect(page.locator('#drill-content')).toContainText('Net Cash');
   // The year holds a January issue date (a gap year) and a February one (a Future 30Y year): one Net Cash line names both.
-  await expect(page.locator('#drill-content')).toContainText('cash from selling Excess TIPS and Cover Excess in this year, beyond the cost of the Simulated Outstanding Future 10Y TIPS and Simulated Outstanding Future 30Y TIPS bought');
+  await expect(page.locator('#drill-content')).toContainText('cash from selling Excess TIPS in this year, beyond the cost of the Simulated Outstanding Future 10Y TIPS and Simulated Outstanding Future 30Y TIPS bought');
   await page.locator('#drill-close').click();
 });
 
