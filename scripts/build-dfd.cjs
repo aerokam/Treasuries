@@ -62,7 +62,7 @@ const TERMS = {
   'tentative auction schedule': 'tentative-auction-schedule',
   'TIPS prices': 'tips-prices', 'Treasury prices': 'treasury-prices', 'TIPS quotes': 'tips-quotes',
   'Treasury quotes': 'treasury-quotes', 'TIPS yields': 'tips-yields', 'Treasury yields': 'treasury-yields',
-  'SA factors': 'sa-factor', 'index ratios': 'index-ratios', 'Ref CPI': 'ref-cpi', 'SA yields': 'sa-yields', 'SAO yields': 'sao-yields',
+  'SA factors': 'sa-factor', 'Ref CPI': 'ref-cpi', 'SA yields': 'sa-yields', 'SAO yields': 'sao-yields',
   'spot yield curves': 'spot-yield-curves', 'breakeven inflation': 'breakeven-inflation',
   'bid and ask spreads': 'bid-and-ask-spreads', 'settlement date': 'settlement-date',
   'download date': 'download-date', 'bond holidays': 'bond-holiday',
@@ -305,7 +305,7 @@ function level1() {
     { key: 'pr', cat: 'educational', name: ['Treasury', 'Primer'], spec: V('Primer/knowledge/1.0_Primer.md'), reads: ['fedinv', 'tipsref', 'refcpi'] },
     { key: 'ce', cat: 'reference', name: ['CPI', 'Explorer'], spec: V('CpiExplorer/knowledge/1.0_Overview.md'), reads: ['refcpi', 'cpihist'] },
     { key: 'ym', cat: 'workflow', name: ['Yields', 'Monitor'], spec: 'DFD_LEVEL2_YIELDSMONITOR.html', reads: ['tipsref', 'nsasa', 'hol', 'yhist', 'ia'] },
-    { key: 'yc', cat: 'workflow', name: ['Yield', 'Curves'], spec: 'DFD_LEVEL2_YIELDCURVES.html', reads: ['fedinv', 'tipsref', 'nsasa', 'quotes', 'gsw', 'hol'] },
+    { key: 'yc', cat: 'workflow', name: ['Yield', 'Curves'], spec: 'DFD_LEVEL2_YIELDCURVES.html', reads: ['fedinv', 'nsasa', 'quotes', 'gsw', 'hol'] },
     { key: 'sa', cat: 'educational', name: ['Seasonal', 'Adjustments'], spec: V('SeasonalAdjustments/knowledge/1.0_SeasonalAdjustments_Explorer.md'), reads: ['nsasa', 'hol'] },
     { key: 'fh', cat: 'reference', name: ['Fund', 'Holdings'], spec: V('FundHoldings/knowledge/1.0_FundHoldings.md'), reads: ['funds'] },
     { key: 'ta', cat: 'reference', name: ['Treasury', 'Auctions'], spec: V('knowledge/TreasuryAuctions.md'), reads: ['auctions', 'tent'] },
@@ -422,14 +422,13 @@ function level2YieldCurves() {
   const stores = [
     { id: 'fedinv', name: 'FedInvest prices', href: DS('s1') },
     { id: 'quotes', name: 'Market quotes', href: DS('s7') },
-    { id: 'tipsref', name: 'TIPS reference data', href: DS('s2') },
     { id: 'nsasa', name: 'Ref CPI NSA and SA', href: DS('s4') },
     { id: 'hol', name: 'Bond holidays', href: DS('s16') },
   ];
   const procs = [
-    { id: '3.1', name: ['Parse sources', 'and calculate', 'yields'], href: 'DFD_LEVEL3_YC_LOAD.html', reads: ['fedinv', 'quotes', 'tipsref', 'nsasa', 'hol'],
+    { id: '3.1', name: ['Parse sources', 'and calculate', 'yields'], href: 'DFD_LEVEL3_YC_LOAD.html', reads: ['fedinv', 'quotes', 'nsasa', 'hol'],
       out: { '3.2': ['TIPS yields', 'SA factors'], '3.4': ['Treasury yields'], '3.5': ['Treasury yields'],
-             '3.6': ['TIPS yields', 'Treasury yields'], '3.7': ['Treasury yields', 'index ratios', 'download date'] } },
+             '3.6': ['TIPS yields', 'Treasury yields'], '3.7': ['Treasury yields', 'download date'] } },
     { id: '3.2', name: ['Adjust for', 'seasonality'], href: V(K + '3.2_Adjust_For_Seasonality.md'), reads: [],
       out: { '3.3': ['SA yields'], '3.4': ['SA yields'] } },
     { id: '3.3', name: ['Adjust for', 'other effects'], href: V(K + '3.3_Adjust_For_Other_Effects.md'), reads: [],
@@ -447,7 +446,7 @@ function level2YieldCurves() {
   const H = 1000, W = 1360;
   const OBS = procs.map(q => ({ x: px[q.id], y: py[q.id], r: PR }));
   const LBL = [];
-  const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 2 for Yield Curves: seven processes reading five data stores. No process writes a data store.">`, marker()];
+  const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 2 for Yield Curves: seven processes reading four data stores. No process writes a data store.">`, marker()];
   const sIdx = Object.fromEntries(stores.map((s, i) => [s.id, i]));
   procs.forEach(p => p.reads.forEach(id => {
     const y = sy(sIdx[id]), [x2, y2] = toCircle(SX + SW + 5, y, px[p.id], py[p.id], PR);
@@ -482,26 +481,24 @@ function level3YieldCurvesLoad() {
     { id: 'quotes', name: 'Market quotes', href: DS('s7') },
     { id: 'nsasa', name: 'Ref CPI NSA and SA', href: DS('s4') },
     { id: 'hol', name: 'Bond holidays', href: DS('s16') },
-    { id: 'tipsref', name: 'TIPS reference data', href: DS('s2') },
   ];
   const S = a => V(F31 + '#' + a);
   const procs = [
-    { id: '3.1.1', name: ['Parse FedInvest', 'prices'], href: S('parse-fedinvest-prices'), reads: ['fedinv'], out: { '3.1.7': ['TIPS prices', 'settlement date'], '3.1.8': ['Treasury prices', 'settlement date'], '3.1.9': ['TIPS prices', 'settlement date'] } },
-    { id: '3.1.2', name: ['Parse market', 'quotes'], href: S('parse-market-quotes'), reads: ['quotes'], out: { '3.1.6': ['download date'], '3.1.7': ['TIPS quotes'], '3.1.8': ['Treasury quotes'], '3.1.9': ['TIPS quotes'] } },
-    { id: '3.1.3', name: ['Parse Ref CPI', 'and SA factors'], href: S('parse-ref-cpi-and-sa-factors'), reads: ['nsasa'], out: { '3.1.9': ['Ref CPI'] } },
+    { id: '3.1.1', name: ['Parse FedInvest', 'prices'], href: S('parse-fedinvest-prices'), reads: ['fedinv'], out: { '3.1.7': ['TIPS prices', 'settlement date'], '3.1.8': ['Treasury prices', 'settlement date'] } },
+    { id: '3.1.2', name: ['Parse market', 'quotes'], href: S('parse-market-quotes'), reads: ['quotes'], out: { '3.1.6': ['download date'], '3.1.7': ['TIPS quotes'], '3.1.8': ['Treasury quotes'] } },
+    { id: '3.1.3', name: ['Parse Ref CPI', 'and SA factors'], href: S('parse-ref-cpi-and-sa-factors'), reads: ['nsasa'], out: {} },
     { id: '3.1.4', name: ['Parse bond', 'holidays'], href: S('parse-bond-holidays'), reads: ['hol'], out: { '3.1.6': ['bond holidays'] } },
-    { id: '3.1.6', name: ['Determine', 'settlement date'], href: S('determine-settlement-date'), reads: [], out: { '3.1.7': ['settlement date'], '3.1.8': ['settlement date'], '3.1.9': ['settlement date'] } },
+    { id: '3.1.6', name: ['Determine', 'settlement date'], href: S('determine-settlement-date'), reads: [], out: { '3.1.7': ['settlement date'], '3.1.8': ['settlement date'] } },
     { id: '3.1.7', name: ['Calculate', 'TIPS yields'], href: S('calculate-tips-yields'), reads: [], out: {} },
     { id: '3.1.8', name: ['Calculate', 'Treasury yields'], href: S('calculate-treasury-yields'), reads: [], out: {} },
-    { id: '3.1.9', name: ['Calculate', 'index ratios'], href: S('calculate-index-ratios'), reads: ['tipsref'], out: {} },
   ];
   const SX = 40, SW = 205, PR = 56, W = 1340, H = 900;
   const sy = i => 150 + i * 150;
-  const px = { '3.1.1': 400, '3.1.2': 400, '3.1.3': 400, '3.1.4': 400, '3.1.6': 640, '3.1.7': 880, '3.1.8': 880, '3.1.9': 880 };
-  const py = { '3.1.1': 150, '3.1.2': 300, '3.1.3': 450, '3.1.4': 600, '3.1.6': 680, '3.1.7': 300, '3.1.8': 540, '3.1.9': 780 };
+  const px = { '3.1.1': 400, '3.1.2': 400, '3.1.3': 400, '3.1.4': 400, '3.1.6': 640, '3.1.7': 880, '3.1.8': 880 };
+  const py = { '3.1.1': 150, '3.1.2': 300, '3.1.3': 450, '3.1.4': 600, '3.1.6': 680, '3.1.7': 300, '3.1.8': 540 };
   const OBS = procs.map(q => ({ x: px[q.id], y: py[q.id], r: PR }));
   const LBL = [];
-  const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 3: Yield Curves 3.1, one process per source parsed and four that calculate from what the parses produce.">`, marker()];
+  const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 3: Yield Curves 3.1, one process per source parsed and three that calculate from what the parses produce.">`, marker()];
   const sIdx = Object.fromEntries(stores.map((s, i) => [s.id, i]));
   procs.forEach(p => p.reads.forEach(id => {
     const y = sy(sIdx[id]), [x2, y2] = toCircle(SX + SW + 5, y, px[p.id], py[p.id], PR);
@@ -510,7 +507,7 @@ function level3YieldCurvesLoad() {
   P.push(internalFlows(procs, px, py, PR, OBS, LBL));
   // The outputs of 3.1 at Level 2, each leaving the process that produces it.
   [['3.1.2', 110, 'download date  →  3.7'], ['3.1.7', 300, 'TIPS yields  →  3.2 and 3.6'], ['3.1.3', 420, 'SA factors  →  3.2'],
-   ['3.1.8', 540, 'Treasury yields  →  3.4 to 3.7'], ['3.1.9', 780, 'index ratios  →  3.7']].forEach(([id, y, lab]) => {
+   ['3.1.8', 540, 'Treasury yields  →  3.4 to 3.7']].forEach(([id, y, lab]) => {
     const [x1, y1] = fromCircle(px[id], py[id], PR, W - 12, y);
     const others = OBS.filter(o => !(o.x === px[id] && o.y === py[id]));
     P.push(flow(x1, y1, W - 12, y, { obstacles: others }));
@@ -524,9 +521,9 @@ function level3YieldCurvesLoad() {
     spec: V(F31), specLabel: '3.1 Parse sources and calculate yields',
     title: 'Yield Curves 3.1 — Level 3', h1: 'Level 3 &mdash; Yield Curves 3.1 Parse sources and calculate yields', maxWidth: W,
     up: 'DFD_LEVEL2_YIELDCURVES.html', upLabel: 'Level 2 — Yield Curves', svg: P.join(NL),
-    notes: ['  One process per source parsed, then 3.1.6, 3.1.7, 3.1.8 and 3.1.9, which calculate from what the parses produce. The five flows leaving on the right are the outputs of 3.1 at Level 2.',
+    notes: ['  One process per source parsed, then 3.1.6, 3.1.7 and 3.1.8, which calculate from what the parses produce. The four flows leaving on the right are the outputs of 3.1 at Level 2.',
       '  Every process here drills to its own section of <a href="viewer.html#/md/' + F31 + '">3.1 Parse sources and calculate yields</a>.',
-      '  3.1.3 sends the Ref CPI to 3.1.9, and its SA factors leave 3.1 directly, for 3.2.',
+      '  3.1.3 produces nothing another process here uses: its output leaves 3.1 directly, for 3.2.',
       '  3.1.5 Parse GSW parameters is specified but not drawn. Its output is drawn only on an analysis view opened with ?gsw, and no view of the app uses it otherwise.'].join(NL)
   });
 }
@@ -850,7 +847,7 @@ function level3YieldCurvesRender() {
   const arriving = [
     ['3.7.3', 'Treasury yields  ←  3.1'], ['3.7.3', 'spot yield curves  ←  3.4'], ['3.7.3', 'download date  ←  3.1'],
     ['3.7.4', 'SAO yields  ←  3.3'], ['3.7.4', 'spot yield curves  ←  3.4'], ['3.7.4', 'download date  ←  3.1'],
-    ['3.7.5', 'breakeven inflation  ←  3.5'], ['3.7.6', 'bid and ask spreads  ←  3.6'], ['3.7.6', 'index ratios  ←  3.1'],
+    ['3.7.5', 'breakeven inflation  ←  3.5'], ['3.7.6', 'bid and ask spreads  ←  3.6'],
   ];
   views.forEach(to => {
     const here = arriving.filter(([t]) => t === to);

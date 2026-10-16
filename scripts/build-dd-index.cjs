@@ -9,7 +9,7 @@
 // gives the alphabetical lookup that grouping costs.
 //
 // Every anchor is indexed, not only the heading, so a synonym leads to the term
-// it is a synonym for: "inflation factor" finds Index Ratio.
+// it is a synonym for.
 const fs = require('fs');
 const path = require('path');
 
