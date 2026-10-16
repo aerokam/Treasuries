@@ -663,7 +663,7 @@ excessCost_b = gap total cost × bracketWeight_b
 
 <a id="last-year-interest"></a>
 ### Last-Year Interest
-`Last_Year_Interest` = *Interest paid in a funded year by securities maturing in that year. Treasuries pay semiannually, so a January–June maturity pays one coupon in its final year and a July–December maturity pays two (1.0 Bond Ladders §Bond Ladder Concepts).*
+`Last_Year_Interest` = *Interest paid in a funded year by securities maturing in that year. Treasuries pay semiannually, so a January–June maturity pays one coupon in its final year and a July–December maturity pays two ([Bond Basics](./Bond_Basics.md), Last-Year Interest Payments).*
 
 <a id="duration-matching"></a>
 ### Duration Matching
