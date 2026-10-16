@@ -3,6 +3,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import puppeteer from "puppeteer";
 import { parseCsv } from "../../shared/src/csv.js";
+import { fidPriceField } from "../../shared/src/fidelity-parse.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.join(__dirname, "..", "data");
@@ -99,15 +100,13 @@ async function loadFidelityTipsPriceMap() {
     if ((r.Product || "").toLowerCase() !== "tips") continue;
     const maturity = r["Maturity date"];
     const coupon = Number(r.Coupon);
-    const adjustedAskPrice = Number(r["Adjusted ask price"]);
-    const indexRatio = Number(r["Inflation factor"]);
-    if (!maturity || Number.isNaN(coupon) || !adjustedAskPrice || !indexRatio) continue;
+    const rawAskPrice = Number(fidPriceField(r["Ask price/Quantity (min)"]));
+    if (!maturity || Number.isNaN(coupon) || !rawAskPrice) continue;
     // SCHP's Quantity is already inflation-adjusted (current) face value, not
     // original par (confirmed by cross-checking against the fund's own
-    // abbreviated Market Value display) — so Market Value uses the raw price,
-    // not the inflation-adjusted price, or the inflation factor would be
-    // double-counted.
-    const rawAskPrice = adjustedAskPrice / indexRatio;
+    // abbreviated Market Value display) — so Market Value uses the Ask price,
+    // not the Adjusted ask price, or the inflation adjustment would be
+    // counted twice.
     map.set(`${maturity}|${coupon}`, { cusip: r.Cusip, rawAskPrice });
   }
   return map;
