@@ -3,7 +3,7 @@
 **Constrains:** [Render time series (2.5)](./2.5_Render_Time_Series.md), [Render yield curve snapshots (2.6)](./2.6_Render_Yield_Curve_Snapshots.md), [Render breakeven inflation (2.7)](./2.7_Render_Breakeven_Inflation.md)
 **Implemented by:** `YieldsMonitor/src/app.js`, `shared/src/chart-keys.js`
 
-Conventions shared across every chart in the app, so each of 2.5, 2.6 and 2.7 states only what is specific to its own tab.
+Conventions of every chart in the app.
 
 ## Timezone and precision
 
@@ -18,27 +18,28 @@ Every chart, on every tab, supports the same navigation, from `shared/src/chart-
   - Holding Ctrl: X-axis only.
   - Holding Shift: Y-axis only.
 - Click and drag: pans in any direction.
-- Keyboard arrows and +/-: pans or zooms around the chart's current center.
+- Keyboard arrows pan the chart by 10% of its visible span, and the + and - keys zoom it.
 
 ## Data point markers
 
-Every Time Series chart draws each of its series' points as a marker, radius 2.5 px, while adjacent visible points are at least 8 px apart across the plot area, and draws only the line otherwise. The decision is made again on every update, so a zoom or pan that spreads the points apart shows the markers and one that bunches them hides them. A series may draw 8 px past the plot area's right edge, so the marker of a point at that edge is drawn whole. Implemented by `YieldsMonitor/src/custom-series.js#showMarkers`.
+Every Time Series chart draws each point of its series as a marker of radius 2.5 px while adjacent visible points are at least 8 px apart across the plot area, and draws only the line otherwise. The decision is made again on every update, so a zoom or pan that widens the spacing of the points shows the markers and one that narrows it hides them. A series may draw 8 px past the plot area's right edge, so the marker of a point at that edge is drawn whole. Implemented by `YieldsMonitor/src/custom-series.js#showMarkers`.
 
 ## Time Series chart options
 
-Sync Zoom & Pan, Lock Right and Hide non-trading hours are three checkboxes in one sidebar group, in that order, for the Time Series tab's own charts only.
+Sync Zoom & Pan, Lock Right and Hide non-trading hours are three checkboxes in one sidebar group, in that order, for the charts of the Time Series tab.
 
 ### Sync Zoom & Pan
 
 On by default. The Yield Curves and Breakeven Inflation tabs each hold a single chart, so there is nothing to synchronize there.
 
-- When on, zooming or panning any one Time Series chart applies the same X-axis (time) window to every other active Time Series chart, so a movement on one is a movement on all of them.
-- The Y-axis is never synchronized: each chart keeps its own scale, since two symbols' Yields rarely span the same range.
-- A pan additionally carries each other chart's own Y-axis by the same offset the source chart's Y-axis moved by, when that chart has been independently zoomed on Y before — so a synchronized pan does not snap a manually adjusted chart back to its auto-fit bounds.
+- When on, zooming or panning one Time Series chart applies the same X-axis (time) window to every other active Time Series chart.
+- A zoom of the Y-axis of one chart applies the same zoom factor to the Y-axis of every other chart.
+- A pan that moves the Y-axis of one chart by an offset moves the Y-axis of every other chart by the same offset.
+- Otherwise each chart keeps its Y-axis scale, which refits to the visible points unless the chart was zoomed on Y.
 
 ### Lock Right
 
-Off by default. When on, every zoom re-anchors the chart's right edge to the most recent data point, so narrowing the visible window never loses sight of the latest reading. With Hide non-trading hours on, the latest reading is the latest point drawn, the last one inside trading hours, and the window's width is held as drawn, so a zoom never moves the window onto hours that are not shown.
+Off by default. When on, every zoom keeps the right edge of the chart at the latest point, so narrowing the visible window keeps the latest reading in view. With Hide non-trading hours on, the latest reading is the latest point drawn, the last one inside trading hours, and the window's width is held as drawn, so a zoom never moves the window onto hours that are not shown.
 
 ### Hide non-trading hours
 
@@ -46,4 +47,4 @@ Off by default; applies to the 2D, 10D and Custom ranges only, and has no effect
 
 ## Y-axis auto-rescale
 
-Left to itself, a chart's Y-axis snaps to the range of whatever is actually visible in the current X-axis window, rounded to a clean step — not to the full series' own min and max. This keeps the visible Yield movement at maximum resolution as the user pans or zooms, rather than leaving headroom for data currently off-screen. A chart the user has manually zoomed on Y is left alone by this rescale until the user resets it, unless the change is one that alters what is plotted rather than how far it is zoomed (a symbol added or removed, or a Quoted/SA toggle) — such a change always rescales, since a stale manual Y-zoom against newly different data can otherwise clip a line off the visible chart entirely.
+The Y-axis of a chart fits the points visible in the current X-axis window, with bounds rounded to a step, so the visible Yield movement fills the chart as the user pans or zooms. A chart that the user zoomed on Y keeps its Y-axis until the user resets it, except after a change of what is plotted (a symbol added or removed, or a change of the Quoted or Seasonally Adjusted checkbox), which refits it, because the earlier zoom can clip the new line out of the chart.
