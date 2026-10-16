@@ -59,6 +59,7 @@ indexRatio(date) = refCPI(date) / refCPI(datedDate)
 ```
 parValue = faceValue * indexRatio
 ```
+The Index Ratio in this formula is rounded as [Inflation-Adjusted Principal](./DATA_DICTIONARY.md#inflation-adjusted-principal) states.
 
 **Inflation-Adjusted Annual Interest (per TIPS):**
 ```

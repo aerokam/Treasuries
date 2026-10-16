@@ -62,7 +62,7 @@ Adhere to the following variable mappings:
 - `fundedYearQty` (not `fyQty`): Quantity of TIPS needed for the funded year portion.
 - `costPerBond`: `(price/100) * indexRatio * 1000`. (Legacy variable name; in prose, say "cost per TIPS".)
 - `piPerBond`: The total Principal + Interest payout per $1,000 unit at maturity. (Legacy variable name; in prose, say "P+I per TIPS".)
-- `indexRatio`: `refCPI / baseCPI`.
+- `indexRatio`: `refCPI / datedDateRefCpi`, not rounded. `paymentIndexRatio`: the same ratio truncated to six decimal places, then rounded to five, for principal and interest.
 
 ### 4. Testing & Validation
 - **STOP ON FAIL (MANDATORY)**: If any test fails, stop immediately and debug.
