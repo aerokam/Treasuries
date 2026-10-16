@@ -192,7 +192,7 @@
 - <a id="s9"></a>**Tentative auction schedule (S9)**, `Tentative-Auction-Schedule.xml` = XML `{ AuctionCalendarDate: [ AuctionDate + SecurityTermWeekYear + SecurityType + ReOpeningIndicator + TIPS + FloatingRate + AnnouncementDate + SettlementDate ] }`
   *R2 key `Treasuries/Tentative-Auction-Schedule.xml` ([View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/Tentative-Auction-Schedule.xml)). The XML [Treasury Tentative Auction Schedule (E14)](#e14) publishes, unchanged. `ReOpeningIndicator`, `TIPS` and `FloatingRate` are `Y` or `N`.*
 - <a id="s10"></a>**SA and SAO yields (S10)**, `YieldsSaSao.csv` = `{ @cusip + maturity + coupon + ask_yield + sa_yield + sao_yield }`
-  *R2 key `TIPS/YieldsSaSao.csv` ([View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/TIPS/YieldsSaSao.csv)). Header row first, then one row per TIPS in [Market quotes (S7)](#s7).*
+  *R2 key `TIPS/YieldsSaSao.csv` ([View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/TIPS/YieldsSaSao.csv)). Header row first, then one row per TIPS in [Market quotes (S7)](#s7). A TIPS with no SA Yield has blank `sa_yield` and `sao_yield` cells.*
 
   | Column | Defined term |
   |---|---|
