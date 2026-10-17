@@ -567,7 +567,7 @@ Displayed as **Amount**, and as **Real Amount** where a fuller header fits. The 
 <a id="pre-ladder-credit"></a>
 <a id="pre-ladder-interest"></a>
 ### Pre-Ladder Interest (PLI)
-`Pre_Ladder_Interest` = *Coupon interest earned on the ladder’s holdings in the years between settlement and the first funded year, pooled and credited to the earliest funded years until the pool is exhausted. Income arriving before the ladder starts paying out, which would otherwise go unused. Shown in the Amount popup as **Pre-ladder credit**, the share of the pool this funded year received. Enabled by the **Pre-ladder int.** control (2.0 §Pre-Ladder Interest).*
+`Pre_Ladder_Interest` = *Coupon interest earned on the ladder’s holdings in the years between settlement and the first funded year, credited to the earliest funded years until it is exhausted. Income arriving before the ladder starts paying out, which would otherwise go unused. Shown in the Amount popup as **Pre-ladder credit**, the share of it this funded year received. Enabled by the **Pre-ladder int.** control (2.0 §Pre-Ladder Interest).*
 
 <a id="gap-years"></a>
 ### Gap Years
@@ -647,7 +647,7 @@ excessCost_b = gap total cost × bracketWeight_b
 
 <a id="available-cash"></a>
 ### Available Cash
-`Available_Cash` = *Cash on hand applied toward the [ARA](#ara) of the earliest [Funded Years](#funded-year). A pool, applied to the earliest funded year first and moving up the ladder until exhausted, so a year it covers in full needs no TIPS. Stated by the holder rather than detected: cash intended for reinvestment in the ladder is simply not entered (2.0 §Available Cash).*
+`Available_Cash` = *Cash on hand applied toward the [ARA](#ara) of the earliest [Funded Years](#funded-year). Applied to the earliest funded year first and moving up the ladder until exhausted, so a year it covers in full needs no TIPS. Stated by the holder rather than detected: cash intended for reinvestment in the ladder is simply not entered (2.0 §Available Cash).*
 
 <a id="net-cash"></a>
 ### Net Cash
