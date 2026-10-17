@@ -57,8 +57,8 @@ function roundTrips(settle, mature, coupon, yld, tol = 1e-9) {
 }
 
 // Zero-coupon bill whose term spans Feb 29 (leap day) uses 366, not 365, per
-// Treasury's published convention (TIPS_Basics.md "Exception — zero-coupon
-// Treasury Bills").
+// Treasury's published convention (Bond_Basics.md §Treasury Bill Yield
+// (Investment Rate).
 {
   const settle = new Date(2028, 0, 15), mature = new Date(2028, 3, 15); // 2028 is a leap year
   const price = 98.9;
