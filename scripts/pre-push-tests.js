@@ -74,6 +74,7 @@ const SUITES = [
   { script: 'test:UI:YieldsMonitor', dir: 'YieldsMonitor' },
   { script: 'test:UI:KnowledgeMap', dir: 'knowledge' },
   { script: 'test:Unit:Shared', dir: 'shared' },
+  { script: 'test:Unit:CpiExplorer', dir: 'CpiExplorer' },
 ];
 const TEST_WIRING = new Set(['package.json', 'playwright.config.js', 'scripts/pre-push-tests.js', '.githooks/pre-push']);
 

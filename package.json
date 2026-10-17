@@ -16,7 +16,8 @@
     "test:UI:YieldsMonitor": "playwright test --project=YieldsMonitor",
     "test:Unit:YieldsMonitor": "node --test \"YieldsMonitor/tests/*.test.js\"",
     "test:UI:KnowledgeMap": "playwright test --project=KnowledgeMap",
-    "test:Unit:Shared": "node --test \"shared/tests/*.test.js\""
+    "test:Unit:Shared": "node --test \"shared/tests/*.test.js\"",
+    "test:Unit:CpiExplorer": "node --test \"CpiExplorer/tests/Unit/*.test.js\""
   },
   "dependencies": {
     "express": "^4.21.2",

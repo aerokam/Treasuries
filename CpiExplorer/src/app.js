@@ -100,6 +100,7 @@ function fmt(n, decimals = 2) {
 
 function render() {
   if (!state.dataSources.length) return;
+  document.querySelector('.chart-panel-header').textContent = yAxisLabel();
   const datasets = [];
   const p2pResults = [];
   const ext = combinedExtent();

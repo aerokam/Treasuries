@@ -11,6 +11,21 @@ export function isoDate(d) {
   return `${y}-${m}-${day}`;
 }
 
+/**
+ * Date n calendar months from `date` (negative n looks back; a year is 12 months).
+ * Keeps the day of the month, or uses the last day of the target month when that
+ * month has no such day (2024-03-31 minus 1 month is 2024-02-29). Local time.
+ */
+export function shiftMonths(date, n) {
+  const d = new Date(date);
+  const day = d.getDate();
+  d.setDate(1);
+  d.setMonth(d.getMonth() + n);
+  const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  d.setDate(Math.min(day, lastDay));
+  return d;
+}
+
 /** Get value from a row by field name ('nsa' | 'sa' | 'value') */
 function getVal(row, field) {
   return row[field] ?? null;
@@ -65,8 +80,7 @@ export function calcYoY(rows, field, isDaily = false) {
     for (let i = 0; i < rows.length; i++) {
       const v = getVal(rows[i], field);
       if (v === null) continue;
-      const targetDate = new Date(rows[i].date);
-      targetDate.setFullYear(targetDate.getFullYear() - 1);
+      const targetDate = shiftMonths(rows[i].date, -12);
       const prior = findClosestOnOrBefore(rows, field, targetDate);
       if (prior === null) continue;
       labels.push(isoDate(rows[i].date));
@@ -99,8 +113,7 @@ export function calcMoM(rows, field, isDaily = false) {
     for (let i = 0; i < rows.length; i++) {
       const v = getVal(rows[i], field);
       if (v === null) continue;
-      const targetDate = new Date(rows[i].date);
-      targetDate.setMonth(targetDate.getMonth() - 1);
+      const targetDate = shiftMonths(rows[i].date, -1);
       const prior = findClosestOnOrBefore(rows, field, targetDate);
       if (prior === null) continue;
       labels.push(isoDate(rows[i].date));
@@ -134,8 +147,7 @@ export function calcRolling(rows, field, windowMonths, isDaily = false) {
     for (let i = 0; i < rows.length; i++) {
       const v = getVal(rows[i], field);
       if (v === null) continue;
-      const targetDate = new Date(rows[i].date);
-      targetDate.setMonth(targetDate.getMonth() - windowMonths);
+      const targetDate = shiftMonths(rows[i].date, -windowMonths);
       const prior = findClosestOnOrBefore(rows, field, targetDate);
       if (prior === null) continue;
       labels.push(isoDate(rows[i].date));
@@ -158,22 +170,21 @@ export function calcP2P(rows, field, startDate, endDate) {
   const inRange = filterRows(rows, startDate, endDate);
   const indexSeries = calcIndex(inRange, field);
 
-  // Find the closest valid rows on or before each boundary
-  const startVal = findClosestOnOrBefore(rows, field, startDate);
-  const endVal   = findClosestOnOrBefore(rows, field, endDate);
+  // Closest row with a value on or before each boundary; value, month count and labels
+  // all come from these two rows.
+  const startRow = findRowOnOrBefore(rows, field, startDate);
+  const endRow   = findRowOnOrBefore(rows, field, endDate);
+  const startVal = startRow ? getVal(startRow, field) : null;
+  const endVal   = endRow   ? getVal(endRow, field)   : null;
 
   if (startVal === null || endVal === null || startVal === 0) {
     return { changePct: null, annualized: null, months: null, startVal, endVal,
              startLabel: '', endLabel: '', series: { labels: [], values: [] } };
   }
 
-  // Compute month count between boundary dates
-  const startRow = rows.find(r => r.date <= startDate && getVal(r, field) !== null);
-  const endRow   = [...rows].reverse().find(r => r.date <= endDate && getVal(r, field) !== null);
-  const months = startRow && endRow
-    ? (endRow.date.getFullYear()   - startRow.date.getFullYear())   * 12
-    + (endRow.date.getMonth()      - startRow.date.getMonth())
-    : 0;
+  // Month count between the two boundary rows
+  const months = (endRow.date.getFullYear() - startRow.date.getFullYear()) * 12
+               + (endRow.date.getMonth()    - startRow.date.getMonth());
 
   const changePct = (endVal / startVal - 1) * 100;
   const annualized = months > 0 ? (Math.pow(endVal / startVal, 12 / months) - 1) * 100 : null;
@@ -187,26 +198,31 @@ export function calcP2P(rows, field, startDate, endDate) {
   return {
     changePct, annualized, months,
     startVal, endVal,
-    startLabel: startRow ? isoDate(startRow.date) : '',
-    endLabel:   endRow   ? isoDate(endRow.date)   : '',
+    startLabel: isoDate(startRow.date),
+    endLabel:   isoDate(endRow.date),
     series,
   };
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-/** Binary search: find the value of `field` for the last row with date <= targetDate. */
-function findClosestOnOrBefore(rows, field, targetDate) {
-  let lo = 0, hi = rows.length - 1, result = null;
+/** Binary search: the last row with date <= targetDate and a non-null `field` value, or null. */
+function findRowOnOrBefore(rows, field, targetDate) {
+  let lo = 0, hi = rows.length - 1;
   while (lo <= hi) {
     const mid = (lo + hi) >> 1;
-    if (rows[mid].date <= targetDate) {
-      const v = getVal(rows[mid], field);
-      if (v !== null) result = v;
-      lo = mid + 1;
-    } else {
-      hi = mid - 1;
-    }
+    if (rows[mid].date <= targetDate) lo = mid + 1;
+    else hi = mid - 1;
   }
-  return result;
+  // hi is the last row dated on or before targetDate; step back over rows with no value.
+  for (let i = hi; i >= 0; i--) {
+    if (getVal(rows[i], field) !== null) return rows[i];
+  }
+  return null;
+}
+
+/** Value of `field` for the last row with date <= targetDate (see findRowOnOrBefore). */
+function findClosestOnOrBefore(rows, field, targetDate) {
+  const row = findRowOnOrBefore(rows, field, targetDate);
+  return row ? getVal(row, field) : null;
 }

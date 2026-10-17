@@ -22,6 +22,7 @@ A suite is a script in the root `package.json`, named `test:<kind>:<App>`, and r
 | `test:UI:YieldsMonitor` | YieldsMonitor | `YieldsMonitor/tests/UI/` |
 | `test:UI:KnowledgeMap` | The Knowledge Map diagrams and `viewer.html` | `knowledge/tests/UI/` |
 | `test:Unit:Shared` | `shared/src/`, the modules every app imports | `shared/tests/*.test.js` |
+| `test:Unit:CpiExplorer` | CpiExplorer calculations | `CpiExplorer/tests/Unit/*.test.js` |
 
 Arguments after `--` reach the test runner, for example `npm run test:UI:YieldCurves -- --headed`.
 
