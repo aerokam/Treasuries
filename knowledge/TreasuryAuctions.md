@@ -1,65 +1,20 @@
-# TreasuryAuctions (App Overview)
+# Treasury Auctions (App Overview)
 
-**TreasuryAuctions** is a tool for monitoring and analyzing U.S. Treasury auction results (Bills, Notes, Bonds, and TIPS). It provides historical data and real-time updates on upcoming issuances.
-
----
-
-## 1.0 App Context (Level 1 DFD)
-
-```mermaid
-graph LR
-    %% Data Stores (S)
-    S5[(S5 Auctions.csv)]
-    S9[(S9 Tentative-Auction-Schedule.xml)]
-    E3[E3 FiscalData]
-    E4[E4 Treasury XML]
-
-    %% Processes (P)
-    P1((1.0 Auction Search))
-    P2((2.0 Historical Trends))
-    P3((3.0 Upcoming TIPS Logic))
-    P4((4.0 Interactive Filters))
-
-    %% User (E)
-    U[User / Investor]
-
-    %% Inbound Data
-    S5 --> P1
-    E3 -->|Live Fetch| P1
-    E4 -->|XML Scraping| S9
-    S9 --> P3
-    P1 --> P3
-    
-    %% Internal Flows
-    P3 --> P2
-    P2 --> P4
-    
-    %% User Interaction
-    U <-->|Search / Filter| P4
-
-    %% Links to Specs
-    click P1 "#/md/TreasuryAuctions/knowledge/Data_Pipeline.md" "View Data Logic"
-    click S5 "#/md/knowledge/DATA_DICTIONARY.md#s5" "View Schema"
-    click S9 "#/md/knowledge/DATA_DICTIONARY.md#s9" "View Tentative Data"
-```
+**Treasury Auctions** lists the results of every U.S. Treasury auction held since 1980 (Bills, Notes, Bonds and TIPS), the auctions FiscalData has announced, and Treasury's tentative auction schedule. Each list has its own tab, and the Historical Auctions tab filters, sorts and reorders its columns like a spreadsheet.
 
 ---
 
-## 2.0 Core Processes
+## Data flow diagram
 
-### [1.0 Auction Search](../TreasuryAuctions/knowledge/Data_Pipeline.md)
-Retrieves auction results from both the local `Auctions.csv` database and live from FiscalData.
-- **Goal**: Enable exploration of historical auction performance (e.g., high yields, bid-to-cover ratios).
-- **Sources**: FiscalData (accounting/od/auctions_query).
+Treasury Auctions is process 5 on [Level 1](/knowledge/DFD_LEVEL1). It reads [Auction results (S5)](./DATA_DICTIONARY.md#s5) and [Tentative auction schedule (S9)](./DATA_DICTIONARY.md#s9) from R2, and the upcoming auctions of [FiscalData (E3)](./DATA_DICTIONARY.md#e3) directly.
 
-### 2.0 Upcoming TIPS Logic
-Augments the live `upcoming_auctions` feed with accurate TIPS identification.
-- **Source**: `Tentative-Auction-Schedule.xml` (S9).
-- **Goal**: Label TIPS in the upcoming table even when the official API lacks the field.
+## Specs
 
----
+| Spec | What it specifies |
+|---|---|
+| [Data and Views](../TreasuryAuctions/knowledge/Data_And_Views.md) | What the page loads and the rows and columns of each tab, including how an upcoming auction is flagged TIPS. |
+| [Filtering and Columns](../TreasuryAuctions/knowledge/1.0_Filtering_And_Columns.md) | Column formats, typed filters, calendar date ranges, sorting, the column chooser and column widths. |
 
-## 3.0 Foundational Logic (The Engine Room)
+## Reference specs
 
-- **[Auctions Query Reference](./AuctionsQuery_Reference.md)**: Technical guide to FiscalData's query fields and logic.
-- **[Data Pipeline](./Data_Pipeline.md)**: Details on the local **Auction Refresh** job that maintains the historical database.
+- [FiscalData auctions_query Reference](./AuctionsQuery_Reference.md): the query parameters, operators and fields of the endpoint that [Fetch auction results (1.4)](./1.4_Fetch_Auction_Results.md) reads.
