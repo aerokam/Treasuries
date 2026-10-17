@@ -111,7 +111,7 @@ function gapBreakdownRows(gapParams, dara) {
     rows += row(g.year + ' quantity', fmla, g.qty, false, undefined, id + 'qty')
           + row('\u21b3 P+I per synthetic TIPS', '', fm2(g.piPerBond), false, undefined, id + 'pi')
           + row('\u21b3 LMI (actual TIPS + longer synth)', 'coupon from funded years above + synth LMI from longer gap years', fm(g.laterMatInt), false, undefined, id + 'lmi')
-          + (pliCredit > 0 ? row('\u21b3 PLI credit', 'pre-ladder pool applied to this gap year', fm(pliCredit), false, 'plcpool:' + Math.round(pliCredit), id + 'pli') : '')
+          + (pliCredit > 0 ? row('\u21b3 PLI credit', 'Pre-Ladder Interest applied to this gap year', fm(pliCredit), false, 'plcpool:' + Math.round(pliCredit), id + 'pli') : '')
           + row('\u21b3 Theoretical cost', '<span class="formula-var" data-source="' + id + 'qty">Quantity</span> \xd7 $1,000 \xd7 price ' + fd(g.synPrice ?? 100, 3) + ' \u00f7 100', fm(g.cost ?? g.qty * 1000));
   });
   return rows;
@@ -143,10 +143,10 @@ export function buildPreLadderPoolDrill(summary, plCreditForYear) {
   }
   rows.push({ sep: true });
   const totalNote = ['coupon interest', gapPool > 0 ? 'Simulated Outstanding Future 10Y TIPS and Excess TIPS interest' : null, future30yPool > 0 ? 'Simulated Outstanding Future 30Y TIPS and Excess TIPS interest' : null, showNet ? 'Net Cash' : null].filter(Boolean).join(' + ');
-  rows.push({ label: 'Total pre-ladder pool', note: totalNote, value: fm(total), total: true });
+  rows.push({ label: 'Total Pre-Ladder Interest', note: totalNote, value: fm(total), total: true });
   if (plCreditForYear > 0) {
     rows.push({ sep: true });
-    rows.push({ label: 'Applied to this year', note: 'slice of the pool credited here', value: fm(plCreditForYear) });
+    rows.push({ label: 'Applied to this year', note: 'slice of the Pre-Ladder Interest credited here', value: fm(plCreditForYear) });
   }
   return rows;
 }
@@ -203,7 +203,7 @@ function syntheticYearAmountRows(a) {
         : 'full annual coupons of the Simulated Outstanding Future 30Y TIPS of the later Future 30Y years', fm(a.laterMatInt), false, undefined, 'lmi');
   let fmla = '<span class="formula-var" data-source="pi">P+I</span> + <span class="formula-var" data-source="lmi">LMI</span>';
   if (isGap && a.pliCredit > 0) {
-    rows += row('Pre-ladder credit', 'pre-ladder pool applied to this gap year', fm(a.pliCredit), false, 'plcpool:' + Math.round(a.pliCredit), 'plc');
+    rows += row('Pre-ladder credit', 'Pre-Ladder Interest applied to this gap year', fm(a.pliCredit), false, 'plcpool:' + Math.round(a.pliCredit), 'plc');
     fmla += ' + <span class="formula-var" data-source="plc">Pre-ladder credit</span>';
   }
   rows += sep()
@@ -272,7 +272,7 @@ export function buildDrillHTML(d, colKey, summary) {
         row('Funded-year TIPS subtotal', 'principal + last-year coupons across the year’s TIPS', fm(ownSum)) +
         row(_lmiLabel, _lmiDesc, fm(longerDatedInt), false, undefined, 'lmi') +
         (sameYearExInt > 0 ? row('Same-maturity excess interest', 'from excess TIPS maturing in ' + d.fundedYear, fm(sameYearExInt), false, undefined, 'exlmi') : '') +
-        (_plCredit - _cashCredit > 0 ? row('Pre-ladder credit', 'pre-ladder pool applied to this year', fm(_plCredit - _cashCredit), false, 'plcpool') : '') +
+        (_plCredit - _cashCredit > 0 ? row('Pre-ladder credit', 'Pre-Ladder Interest applied to this year', fm(_plCredit - _cashCredit), false, 'plcpool') : '') +
         future30yInterestRows(d.fundedYear, _cred) +
         (_cashCredit > 0 ? row('Available cash', 'cash on hand applied to this year', fm(_cashCredit)) : '') +
         sep() +
@@ -292,7 +292,7 @@ export function buildDrillHTML(d, colKey, summary) {
       row(couponLabel, '<span class="formula-var" data-source="ppb">Par Value/TIPS</span> \xd7 <span class="formula-var" data-source="cpp">coupon/period</span> \xd7 <span class="formula-var" data-source="cp">periods</span> \xd7 <span class="formula-var" data-source="qty">Quantity</span>', fm(d.fundedYearOwnRungInt)) +
       row(_lmiLabel, _lmiDesc, fm(longerDatedInt), false, undefined, 'lmi') +
       (sameYearExInt > 0 ? row('Same-maturity excess interest', 'from excess TIPS maturing in ' + d.fundedYear, fm(sameYearExInt), false, undefined, 'exlmi') : '') +
-      (_plCredit - _cashCredit > 0 ? row('Pre-ladder credit', 'pre-ladder pool applied to this year', fm(_plCredit - _cashCredit), false, 'plcpool') : '') +
+      (_plCredit - _cashCredit > 0 ? row('Pre-ladder credit', 'Pre-Ladder Interest applied to this year', fm(_plCredit - _cashCredit), false, 'plcpool') : '') +
       future30yInterestRows(d.fundedYear, _cred) +
       (_cashCredit > 0 ? row('Available cash', 'cash on hand applied to this year', fm(_cashCredit)) : '') +
       sep() +
@@ -410,7 +410,7 @@ export function buildDrillHTML(d, colKey, summary) {
       rows += row('Same-maturity excess interest', _exDesc, fm(excessLMI), false, undefined, 'exlmi');
     }
     if (_plShown > 0) {
-      rows += row('Pre-ladder credit', 'pre-ladder pool applied to this year', fm(_plShown), false, 'plcpool', 'plc');
+      rows += row('Pre-ladder credit', 'Pre-Ladder Interest applied to this year', fm(_plShown), false, 'plcpool', 'plc');
     }
     rows += future30yInterestRows(d.fundedYear, _cred);
     if (_cashCredit > 0) {
@@ -471,7 +471,7 @@ export function buildDrillHTML(d, colKey, summary) {
         row('DARA', '', fm(dara), false, undefined, 'dara') +
         row(lmiLabel, lmiDesc, '−' + fm(laterMatInt), false, undefined, 'lmi') +
         (sameYearExInt > 0 ? row('Same-maturity excess interest', 'from excess TIPS maturing in ' + d.fundedYear, '−' + fm(sameYearExInt), false, undefined, 'exlmi') : '') +
-        (plCredit > 0 ? row('Pre-ladder credit', 'pre-ladder pool applied to this year', '−' + fm(plCredit), false, undefined, 'plc') : '') +
+        (plCredit > 0 ? row('Pre-ladder credit', 'Pre-Ladder Interest applied to this year', '−' + fm(plCredit), false, undefined, 'plc') : '') +
         future30yInterestRows(d.fundedYear, cred, '−') +
         (cashCredit > 0 ? row('↳ of which Available cash', 'cash on hand applied to this year', fm(cashCredit)) : '') +
         sep() +

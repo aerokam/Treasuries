@@ -876,7 +876,7 @@ document.getElementById('available-cash-help').addEventListener('click', e => {
   }
 
   sections.push(
-    { prose: 'Cash available to apply toward the annual real amount of the earliest funded year or years. The pool is applied to the earliest funded year first and moves up the ladder until it is exhausted, so a year it covers in full buys no TIPS.' },
+    { prose: 'Cash available to apply toward the annual real amount of the earliest funded year or years. The Available Cash is applied to the earliest funded year first and moves up the ladder until it is exhausted, so a year it covers in full buys no TIPS.' },
     { prose: 'Cash intended for reinvestment in the ladder is not entered here. Leave the box empty; Net Cash then reports the cost of the purchases as a negative figure.' },
     { sep: true },
     { heading: 'When the app enters a figure' },
@@ -4100,6 +4100,9 @@ document.getElementById('run-btn').addEventListener('click', async () => {
       // firstYearOverride/lastYearOverride stay whatever the (possibly blank) fields hold, so the
       // engine keeps deriving the range from holdings exactly as before this feature existed.
       const picked = _pickedYearRange();
+      // A year in the picked range with no pick has a DARA of 0, as in Build (2.0 §Picking Maturities for a Funded Year).
+      // Written to the store too, so the per-year DARA fields show the 0.
+      if (picked) for (const year of _pickerYears()) if (!_yearMaturityOverrides.get(year)?.length) _daraByYearStore.set(year, 0);
       const _runDaraByYear = getDaraByYear();
       const result = runFundedRebalance({
         dara: finalDara,
@@ -4250,7 +4253,7 @@ document.addEventListener('click', e => {
       const summary = currentMode === 'build' ? buildSummary : rebalSummary;
       const credit = key.startsWith('plcpool:') ? (parseFloat(key.slice(8)) || 0) : (d?.preLadderCreditForYear || 0);
       const rows = buildPreLadderPoolDrill(summary, credit);
-      showPopup(drillL3, 'Pre-ladder pool composition', rows);
+      showPopup(drillL3, 'Pre-Ladder Interest composition', rows);
     } else if (key.startsWith('bracketwt-')) {
       const which = key.slice(10);
       const summary = currentMode === 'build' ? buildSummary : rebalSummary;

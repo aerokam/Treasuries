@@ -540,7 +540,7 @@ test('drill popup: clicking Pre-ladder credit opens Level 3 pool composition wit
       await plc.first().click();
       const l3 = page.locator('#shared-popup');
       await expect(l3).toBeVisible();                                   // was failing: nothing happened
-      await expect(l3).toContainText('Pre-ladder pool composition');
+      await expect(l3).toContainText('Pre-Ladder Interest composition');
       await expect(l3).toContainText('Pre-ladder coupon interest');
       await expect(l3).toContainText('Pre-ladder interest from the Simulated Outstanding Future 30Y TIPS and the Excess TIPS');
       await expect(l3).toContainText('Net Cash');                      // the issue dates before the ladder starts
@@ -581,7 +581,7 @@ test('drill popup: gap-year PLI credit drills into pool composition', async ({ p
 
   const l3 = page.locator('#shared-popup');
   await expect(l3).toBeVisible();
-  await expect(l3).toContainText('Pre-ladder pool composition');
+  await expect(l3).toContainText('Pre-Ladder Interest composition');
   await expect(l3).toContainText('Pre-ladder interest from the Simulated Outstanding Future 30Y TIPS and the Excess TIPS');
   await expect(l3).toContainText('Applied to this year');
   await l3.locator('#sp-close').click();
@@ -852,6 +852,25 @@ test('rebalance: Select maturities picks determine the effective range there too
   await expect(page.locator('#rebal-last-year')).toBeDisabled();
   await expect(page.locator('#rebal-first-year')).toHaveValue(String(SY + 1));
   await expect(page.locator('#rebal-last-year')).toHaveValue(String(SY + 1));
+});
+
+// Select maturities in Rebalance: a year inside the picked range with no pick has a DARA of 0, as in Build.
+test('rebalance: Select maturities gives a year in the picked range with no pick a DARA of 0', async ({ page }) => {
+  test.setTimeout(20_000);
+  await page.locator('#holdings-file').setInputFiles(HOLDINGS_PATH);
+  await expect(page.locator('.fy-dara-input[data-year]').first()).toBeVisible({ timeout: 4_000 });
+  await page.locator('#build-maturity').selectOption({ value: 'select' });
+  await expect(page.locator('#maturity-picker-overlay')).toBeVisible({ timeout: 2_000 });
+  for (const btn of await page.locator('.mp-col-none').all()) await btn.click();
+  await page.locator(`input[type=checkbox][data-year="${SY + 1}"]`).first().check();
+  await page.locator(`input[type=checkbox][data-year="${SY + 3}"]`).first().check();
+  await page.locator('#maturity-picker-apply').click();
+  await expect(page.locator('#maturity-picker-overlay')).toBeHidden();
+  await page.locator('#run-btn').click();
+  await expect(page.locator('#simple-table')).toBeVisible({ timeout: 4_000 });
+  await expect(page.locator(`.fy-dara-input[data-year="${SY + 2}"]`)).toHaveValue('0');
+  expect(Number(await page.locator(`.fy-dara-input[data-year="${SY + 1}"]`).inputValue())).toBeGreaterThan(0);
+  expect(Number(await page.locator(`.fy-dara-input[data-year="${SY + 3}"]`).inputValue())).toBeGreaterThan(0);
 });
 
 // Rebuilding #simple-table on every Rebalance Ladder run wipes every fy-group-header's
@@ -2770,7 +2789,7 @@ for (const { kind, dara, pli } of [{ kind: 'gap', dara: '80000', pli: true }, { 
     expect(moneyOf((await nested.innerText()).match(/P\+I per synthetic TIPS\s+(\$[\d,.]+)\s*$/m)[1]), 'the P+I drill reaches the P+I per TIPS in the Quantity row').toBe(amounts[amounts.length - 1]);
     if (isGap && pli) {
       await qrow.locator('.drill-l3[data-l3^="plcpool:"]').click();
-      await expect(nested).toContainText('Pre-ladder pool composition');
+      await expect(nested).toContainText('Pre-Ladder Interest composition');
       expect(moneyOf((await nested.innerText()).match(/Applied to this year[\s\S]*?(\$[\d,]+)\s*$/m)[1])).toBe(amounts[2]);
     }
     expect(await rowOf('ycpt-' + year).locator('.drill-l3').count(), 'the Price is plain text: the Cost per TIPS row has no link').toBe(0);
