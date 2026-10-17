@@ -168,7 +168,7 @@
 // (null beyond the published range; no snap-back).
 import { lookupRefCpi, indexRatio, TREASURY_ROUNDING } from '../shared/src/ref-cpi.js';
 // Duration + coupon-date helpers from the single shared bond-math home (no inline copies).
-import { calculateDuration, _nextCouponOnOrAfter } from '../shared/src/bond-math.js';
+import { calculateDuration, calculateMDuration, termYears, _nextCouponOnOrAfter } from '../shared/src/bond-math.js';
 // Shared date picker (the canonical native type=date; projects/CLAUDE.md §2a).
 import { initDatePicker } from '../shared/src/date-picker.js';
 // Shared date range filter manager (projects/CLAUDE.md §2a).
@@ -533,10 +533,10 @@ async function loadData() {
     allRows = d.tipsRefRows.map(function(ref) {
       var yields = yieldsMap[ref.cusip];
       var matDate = ref.maturity ? new Date(ref.maturity + 'T12:00:00Z') : null;
-      var term = (matDate && matDate > settlDate) ? (matDate - settlDate) / (365.25 * 86400000) : null;
+      var term = (matDate && matDate > settlDate) ? termYears(settlDate, matDate) : null;
       var macDur = (matDate && ref.coupon != null && yields && yields.yield != null && !isNaN(yields.yield))
         ? calculateDuration(settlDate, matDate, ref.coupon, yields.yield) : null;
-      var modDur = (macDur != null && yields) ? macDur / (1 + yields.yield / 2) : null;
+      var modDur = (macDur != null) ? calculateMDuration(settlDate, matDate, ref.coupon, yields.yield) : null;
       return {
         cusip:       ref.cusip,
         maturity:    ref.maturity,
