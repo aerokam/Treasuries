@@ -17,10 +17,23 @@ The TIPS seasonally adjusted (SA) and SA with Other Adjustment (SAO) yield curve
 ### 1a. Gridline color
 Horizontal and vertical gridlines share one color, `rgba(0,0,0,0.08)` (`GRID_COLOR` in `src/app.js`), on every chart — Yield Curves, Breakeven, and both Bid-Ask Spread charts, in Maturity mode and Term mode alike. Visible against the chart background but subordinate to the plotted series.
 
+<a id="time-aligned-x-axis"></a>
 ### 2. Time-Aligned X-Axis (Calendar Mode)
 Calendar mode uses `calendarTimeAxis()` from `shared/src/chart-time-axis.js`. Tick positions and gridlines are generated from calendar boundaries — not by Chart.js autoSkip — guaranteeing the same months appear at the same positions every year at every zoom level. All intervals anchor to January.
 
-- **Density**: Always produces ≥ 6 ticks across the visible span by picking the largest calendar-aligned interval (1 month → 10 years) that still satisfies the threshold.
+- **Density**: Always produces ≥ 6 ticks across the visible span by picking the largest calendar-aligned interval (1 month → 10 years) that still satisfies the threshold. A span of 6 times an interval or more can use that interval, and a span under 2 months uses day ticks:
+
+  | Visible span | Tick interval |
+  |---|---|
+  | under 2 months | 7 days above 20 days of span, 3 days above 7 days, otherwise 1 day |
+  | 2 to under 12 months | 1 month |
+  | 12 to under 18 months | 2 months |
+  | 18 to under 36 months | 3 months |
+  | 3 to under 6 years | 6 months |
+  | 6 to under 12 years | 1 year |
+  | 12 to under 30 years | 2 years |
+  | 30 to under 60 years | 5 years |
+  | 60 years or more | 10 years |
 - **Gridline colour**: see §1a — the shared `GRID_COLOR`, passed to `calendarTimeAxis()` as `gridColor`.
 - **Formatting**: Label format determined by average spacing between ticks — year-only (≥ 300 days), `MMM YYYY` (25–299 days), `MMM D` (< 25 days).
 - **Mid-year axis start**: Year-level ticks anchor to January 1st, so when the visible range begins after January 1st of its own year (e.g. a bond curve starting 10/2026), that year's January anchor falls before the axis min and gets dropped — the first labeled tick is the next aligned year instead (e.g. 2028, not 2026). Tried adding a boundary tick at the true axis start to show that year too (2026-08-02); reverted — it crowded against the next regular label, and a follow-up attempt at unlabeled minor gridlines every year crashed Chart.js's own tick generator on resize. Parked; revisit only with a plan for how Chart.js will actually be exercised (resize timing included), not just the tick-math in isolation.
