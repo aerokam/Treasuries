@@ -62,11 +62,9 @@ test.describe('Knowledge Map and Viewer', () => {
   });
 
   test('follows an internal link inside a rendered mermaid diagram', async ({ page }) => {
-    // TreasuryAuctions.md is one of the two remaining pre-template apps still carrying a
-    // hand-drawn Mermaid diagram (TipsLadderManager's own copy was replaced by the generated
-    // DFD_LEVEL2_TIPSLADDERMANAGER.html); this test only exercises the viewer's Mermaid
-    // click-through wiring, not any one app's diagram content.
-    await page.goto('/knowledge/viewer.html#/md/knowledge/TreasuryAuctions.md');
+    // knowledge/tests/fixtures/MermaidLink.md is a fixture: no spec carries a Mermaid diagram, so
+    // this test exercises only the viewer's Mermaid click-through wiring.
+    await page.goto('/knowledge/viewer.html#/md/knowledge/tests/fixtures/MermaidLink.md');
 
     const mermaidSvg = page.locator('.mermaid svg');
     await expect(mermaidSvg).toBeVisible({ timeout: 15000 });
