@@ -122,6 +122,77 @@ function fmtVal(v, fmt) {
   }
 }
 
+// ── Column filters: the one matcher and the one input wiring, used by both tables ──
+
+// True when the row satisfies every non-empty filter in the filter object (field -> filter string).
+// Plain text is a substring match against the displayed text (mm/dd/yyyy for date fields).
+// A leading >, <, >= or <= compares dates (mm/dd/yyyy target normalised to ISO) or numbers.
+function rowMatchesFilters(row, filterObj) {
+  return Object.entries(filterObj).every(([f, v]) => {
+    const filterStr = v.trim().toLowerCase();
+    if (!filterStr) return true;
+    const fmt = detectFmt(f);
+    const rawVal = (row[f] || '').toString();
+    // Match against the displayed mm/dd/yyyy form for date fields so typed "/" isn't a dead end
+    const val = (fmt === 'date' ? fmtVal(rawVal, fmt) : rawVal).toLowerCase();
+
+    // Support range filters: >, <, >=, <=
+    const match = filterStr.match(/^(>=|<=|>|<)(.*)$/);
+    if (match) {
+      const op = match[1];
+      let target = match[2].trim();
+      const rVal = row[f];
+      if (rVal === '' || rVal == null) return false;
+
+      // Normalize mm/dd/yyyy (or m/d/yyyy) targets to ISO yyyy-mm-dd for comparison
+      const mdY = target.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+      if (mdY) target = `${mdY[3]}-${mdY[1].padStart(2, '0')}-${mdY[2].padStart(2, '0')}`;
+
+      // If it's a date field or target looks like a date
+      if (fmt === 'date' || /^\d{4}-\d{2}-\d{2}$/.test(target)) {
+        const rowDate = rVal.substring(0, 10);
+        if (op === '>') return rowDate > target;
+        if (op === '<') return rowDate < target;
+        if (op === '>=') return rowDate >= target;
+        if (op === '<=') return rowDate <= target;
+      }
+
+      // Numeric comparison
+      const nRow = parseFloat(rVal);
+      const nTarget = parseFloat(target);
+      if (!isNaN(nRow) && !isNaN(nTarget)) {
+        if (op === '>') return nRow > nTarget;
+        if (op === '<') return nRow < nTarget;
+        if (op === '>=') return nRow >= nTarget;
+        if (op === '<=') return nRow <= nTarget;
+      }
+    }
+
+    return val.includes(filterStr);
+  });
+}
+
+// Wires the `input` listener of every .filter-input under thead: masks date fields, stores the
+// value in filterState (field -> filter string), toggles .active, and calls onChange after a 200 ms debounce.
+function wireFilterInputs(thead, filterState, onChange) {
+  let debounceTimer;
+  thead.querySelectorAll('.filter-input').forEach(inp => {
+    inp.addEventListener('input', e => {
+      const f = e.target.dataset.field;
+      let v = e.target.value;
+      if (detectFmt(f) === 'date') {
+        v = autoMaskDateFilter(v);
+        e.target.value = v;
+        e.target.setSelectionRange(v.length, v.length);
+      }
+      filterState[f] = v;
+      e.target.classList.toggle('active', !!v);
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(onChange, 200);
+    });
+  });
+}
+
 // ── CSV parser ────────────────────────────────────────────────────────────────
 function parseCSV(text) {
   const lines = text.trim().split('\n');
@@ -160,6 +231,7 @@ let tentativeAuctions = [];    // Parsed from Treasury's Tentative Auction Sched
 let tentSortCol = null;
 let tentSortAsc = true;
 let tentFilters = {};
+let upcomingCount = 0;           // data rows in the Upcoming table (the message row is not counted)
 
 let orderedColumns = { all: [], bills: [], notesbonds: [], tips: [] };
 const DEFAULT_COL_WIDTHS = { issue_date: 82, maturity_date: 82 }; // wide enough to show a fully-typed mm/dd/yyyy filter
@@ -259,52 +331,7 @@ function getActiveRows() {
   }
 
   // Apply column filters
-  const activeFilters = Object.entries(filters).filter(([, v]) => v.trim());
-  if (activeFilters.length) {
-    rows = rows.filter(r =>
-      activeFilters.every(([f, v]) => {
-        const fmt = detectFmt(f);
-        const rawVal = (r[f] || '').toString();
-        // Match against the displayed mm/dd/yyyy form for date fields so typed "/" isn't a dead end
-        const val = (fmt === 'date' ? fmtVal(rawVal, fmt) : rawVal).toLowerCase();
-        const filterStr = v.trim().toLowerCase();
-
-        // Support range filters: >, <, >=, <=
-        const match = filterStr.match(/^(>=|<=|>|<)(.*)$/);
-        if (match) {
-          const op = match[1];
-          let target = match[2].trim();
-          const rVal = r[f];
-          if (rVal === '' || rVal == null) return false;
-
-          // Normalize mm/dd/yyyy (or m/d/yyyy) targets to ISO yyyy-mm-dd for comparison
-          const mdY = target.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-          if (mdY) target = `${mdY[3]}-${mdY[1].padStart(2, '0')}-${mdY[2].padStart(2, '0')}`;
-
-          // If it's a date field or target looks like a date
-          if (fmt === 'date' || /^\d{4}-\d{2}-\d{2}$/.test(target)) {
-            const rowDate = rVal.substring(0, 10);
-            if (op === '>') return rowDate > target;
-            if (op === '<') return rowDate < target;
-            if (op === '>=') return rowDate >= target;
-            if (op === '<=') return rowDate <= target;
-          }
-
-          // Numeric comparison
-          const nRow = parseFloat(rVal);
-          const nTarget = parseFloat(target);
-          if (!isNaN(nRow) && !isNaN(nTarget)) {
-            if (op === '>') return nRow > nTarget;
-            if (op === '<') return nRow < nTarget;
-            if (op === '>=') return nRow >= nTarget;
-            if (op === '<=') return nRow <= nTarget;
-          }
-        }
-
-        return val.includes(filterStr);
-      })
-    );
-  }
+  rows = rows.filter(r => rowMatchesFilters(r, filters));
 
   // Sort
   if (sortCol !== null) {
@@ -448,22 +475,7 @@ function renderTable() {
   });
 
   // Filter input handlers (debounced)
-  let debounceTimer;
-  thead.querySelectorAll('.filter-input').forEach(inp => {
-    inp.addEventListener('input', e => {
-      const f = e.target.dataset.field;
-      let v = e.target.value;
-      if (detectFmt(f) === 'date') {
-        v = autoMaskDateFilter(v);
-        e.target.value = v;
-        e.target.setSelectionRange(v.length, v.length);
-      }
-      filters[f] = v;
-      e.target.classList.toggle('active', !!v);
-      clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(() => renderBody(cols), 200);
-    });
-  });
+  wireFilterInputs(thead, filters, () => renderBody(cols));
 
   // Range toggle handlers — open/close the range popover for a given field
   if (dateRangeFilter) {
@@ -494,6 +506,7 @@ function renderBody(cols) {
       return `<td data-field="${f}" ${width}>${fmtVal(r[f], detectFmt(f))}</td>`;
     }).join('')}</tr>`;
   }).join('');
+  if (!document.getElementById('tab-historical').classList.contains('active')) return;
   const countEl = document.getElementById('row-count');
   if (capped) {
     countEl.innerHTML = `<span style="color:#f59e0b;font-weight:600;">Showing ${ROW_LIMIT} of ${totalRows.toLocaleString()} rows — use date range to see more</span>`;
@@ -503,27 +516,42 @@ function renderBody(cols) {
 }
 
 // ── Render upcoming ───────────────────────────────────────────────────────────
+// Writes the Upcoming count into #row-count when the Upcoming tab is the active tab.
+function showUpcomingCount() {
+  if (!document.getElementById('tab-upcoming').classList.contains('active')) return;
+  document.getElementById('row-count').textContent = `${upcomingCount} upcoming auctions`;
+}
+
 function renderUpcoming(csvText) {
   const tbody = document.getElementById('upcoming-tbody');
   const thead = document.getElementById('upcoming-thead');
   if (!csvText) {
     thead.innerHTML = '';
     tbody.innerHTML = '<tr><td style="padding:8px 10px;color:#64748b;font-style:italic;">No upcoming auction data available.</td></tr>';
+    upcomingCount = 0;
+    showUpcomingCount();
     return;
   }
   let { headers, rows } = parseCSV(csvText);
   if (!rows.length) {
     thead.innerHTML = '';
     tbody.innerHTML = '<tr><td style="padding:8px 10px;color:#64748b;font-style:italic;">No upcoming auctions found.</td></tr>';
+    upcomingCount = 0;
+    showUpcomingCount();
     return;
   }
 
-  // Cross-reference with Tentative Schedule and identify TIPS
+  // Cross-reference with Tentative Schedule and the CUSIPs of past TIPS auctions to identify TIPS.
+  // A reopening states a different security_term than the Tentative Schedule, but carries the CUSIP of the original issue.
+  const tipsCusips = new Set(
+    allData.filter(a => a.inflation_index_security === 'Yes' && a.cusip).map(a => a.cusip)
+  );
   const extendedHeaders = [...headers, 'inflation_index_security'];
   rows.forEach(r => {
     const rDate = (r.auction_date || '').trim();
     const rTerm = (r.security_term || '').toLowerCase().trim();
     const isActuallyTips = (r.security_type || '').toLowerCase().includes('tips');
+    const isKnownTipsCusip = !!r.cusip && tipsCusips.has(r.cusip);
 
     const isTentativeTips = tentativeAuctions.some(t => {
       const tDate = (t.auction_date || '').trim();
@@ -531,7 +559,7 @@ function renderUpcoming(csvText) {
       return tDate === rDate && tTerm === rTerm && t.tips === 'Yes';
     });
 
-    r.inflation_index_security = (isActuallyTips || isTentativeTips) ? 'Yes' : 'No';
+    r.inflation_index_security = (isActuallyTips || isTentativeTips || isKnownTipsCusip) ? 'Yes' : 'No';
   });
 
   thead.innerHTML = extendedHeaders.map(f => `<th>${fieldLabel(f)}</th>`).join('');
@@ -550,6 +578,8 @@ function renderUpcoming(csvText) {
       return `<td${cellClass}>${fmtVal(val, fmt)}</td>`;
     }).join('')}</tr>`;
   }).join('');
+  upcomingCount = rows.length;
+  showUpcomingCount();
 }
 
 function tentWeekKey(dateStr) {
@@ -613,22 +643,7 @@ function renderTentative() {
   });
 
   // Filter input handlers (debounced)
-  let debounceTimer;
-  thead.querySelectorAll('.filter-input').forEach(inp => {
-    inp.addEventListener('input', e => {
-      const f = e.target.dataset.field;
-      let v = e.target.value;
-      if (detectFmt(f) === 'date') {
-        v = autoMaskDateFilter(v);
-        e.target.value = v;
-        e.target.setSelectionRange(v.length, v.length);
-      }
-      tentFilters[f] = v;
-      e.target.classList.toggle('active', !!v);
-      clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(renderTentBody, 200);
-    });
-  });
+  wireFilterInputs(thead, tentFilters, renderTentBody);
 
   // Fix filter row sticky top
   requestAnimationFrame(() => {
@@ -648,16 +663,9 @@ function renderTentBody() {
 
   // Exclude FRNs, then apply column filters
   let rows = tentativeAuctions.filter(a => a.floating_rate !== 'Yes');
-  const activeFilters = Object.entries(tentFilters).filter(([, v]) => v.trim());
-  if (activeFilters.length) {
-    rows = rows.filter(r =>
-      activeFilters.every(([f, v]) =>
-        (r[f] || '').toLowerCase().includes(v.trim().toLowerCase())
-      )
-    );
-  }
+  rows = rows.filter(r => rowMatchesFilters(r, tentFilters));
 
-  // Sort
+  // Sort (raw values, so ISO dates order correctly)
   if (tentSortCol) {
     const field = tentSortCol;
     rows = [...rows].sort((a, b) => {
@@ -679,7 +687,7 @@ function renderTentBody() {
       const val = node[f.key];
       let cellStyle = '';
       if (f.key === 'tips' && val === 'Yes') cellStyle = ' style="color:#059669; font-weight:600;"';
-      rowHtml += `<td${cellStyle}>${val}</td>`;
+      rowHtml += `<td${cellStyle}>${fmtVal(val, detectFmt(f.key))}</td>`;
     });
     rowHtml += '</tr>';
     return rowHtml;
@@ -883,9 +891,7 @@ function init() {
       renderTentative();
       document.getElementById('row-count').textContent = '';
     } else if (tabName === 'upcoming') {
-      // For upcoming tab, we update the row count from the upcoming table
-      const count = document.getElementById('upcoming-tbody').querySelectorAll('tr').length;
-      document.getElementById('row-count').textContent = `${count} upcoming auctions`;
+      showUpcomingCount();
     } else {
       renderTable(); // Updates row-count for historical
     }
