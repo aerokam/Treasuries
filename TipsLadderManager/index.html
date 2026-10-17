@@ -4251,9 +4251,12 @@ document.addEventListener('click', e => {
       // Funded-year credit comes from the detail row; gap-year credit is encoded in the key
       // ('plcpool:<slice>') since each gap rung has its own slice of the shared pool.
       const summary = currentMode === 'build' ? buildSummary : rebalSummary;
-      const credit = key.startsWith('plcpool:') ? (parseFloat(key.slice(8)) || 0) : (d?.preLadderCreditForYear || 0);
+      const _plBefore = _currentDrillColKey === 'amtBefore';
+      const _plTotal = (_plBefore ? d?.preLadderCreditForYearBefore : d?.preLadderCreditForYear) || 0;
+      // After: Available Cash is part of the year's credit and shown as its own line, so the Pre-Ladder Interest applied is the rest.
+      const credit = key.startsWith('plcpool:') ? (parseFloat(key.slice(8)) || 0) : _plBefore ? _plTotal : _plTotal - Math.min(d?.availableCashCredit || 0, _plTotal);
       const rows = buildPreLadderPoolDrill(summary, credit);
-      showPopup(drillL3, 'Pre-Ladder Interest composition', rows);
+      showPopup(drillL3, 'Pre-Ladder Interest', rows);
     } else if (key.startsWith('bracketwt-')) {
       const which = key.slice(10);
       const summary = currentMode === 'build' ? buildSummary : rebalSummary;
