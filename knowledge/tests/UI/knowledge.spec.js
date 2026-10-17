@@ -75,7 +75,7 @@ test.describe('Knowledge Map and Viewer', () => {
     // The target is whatever the diagram currently points at; what matters is
     // that the click loads another document rather than leaving the viewer.
     await expect(page).toHaveURL(/#\/md\/.+\.md/, { timeout: 10000 });
-    await expect(page).not.toHaveURL(/TreasuryAuctions\.md$/);
+    await expect(page).not.toHaveURL(/MermaidLink\.md$/);
     await expect(page.locator('#content h1')).toBeVisible({ timeout: 10000 });
   });
 
