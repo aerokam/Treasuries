@@ -39,7 +39,7 @@
 
 **O** &nbsp; [Outstanding TIPS](#outstanding-tips)
 
-**P** &nbsp; [P+I](#pi) &middot; [P+I per TIPS](#pi-per-tips) &middot; [Par Value (Nominal)](#par-value) &middot; [Par Yield](#par-yield) &middot; [Pass 1](#pass-1) &middot; [Pass 2](#pass-2) &middot; [Per-Year DARA](#per-year-dara) &middot; [PIMCO (E9)](#e9) &middot; [Plain CUSIP/Quantity Format](#plain-format) &middot; [pre ladder interest](#pre-ladder-credit) *(see Pre-Ladder Interest (PLI))* &middot; [Pre-Ladder Interest (PLI)](#pre-ladder-credit) &middot; [Price](#price)
+**P** &nbsp; [P+I](#pi) &middot; [P+I per TIPS](#pi-per-tips) &middot; [Par Value](#par-value) &middot; [Par Yield](#par-yield) &middot; [Pass 1](#pass-1) &middot; [Pass 2](#pass-2) &middot; [Per-Year DARA](#per-year-dara) &middot; [PIMCO (E9)](#e9) &middot; [Plain CUSIP/Quantity Format](#plain-format) &middot; [pre ladder interest](#pre-ladder-credit) *(see Pre-Ladder Interest (PLI))* &middot; [Pre-Ladder Interest (PLI)](#pre-ladder-credit) &middot; [Price](#price)
 
 **Q** &nbsp; [Quantity](#quantity)
 
@@ -290,17 +290,17 @@
 
 <a id="face-value"></a>
 ### Face Value
-`Face_Value` = `Quantity × 1000` *(original, unadjusted principal — the baseline unit of account)*
+`Face_Value` = `Quantity × 1000` *(the principal of a security as issued, before any inflation adjustment. A synonym of [Par Value](#par-value), used in a different context: Face Value for the amount held, Par Value for the amount a [Price](#price) is stated against.)*
 
 <a id="par-value"></a>
 <a id="par-value-nominal"></a>
-### Par Value (Nominal)
-`Par_Value_Nominal` = *Current principal value of a nominal Treasury. Equals Face Value at all times. See [Inflation-Adjusted Principal](#inflation-adjusted-principal) for the TIPS case.*
+### Par Value
+`Par_Value` = *A synonym of [Face Value](#face-value). A [Price](#price) is expressed as a percentage of par: a price of 98 is 98% of par, which is $980 for a par value of $1,000. For a TIPS, par is the unadjusted Face Value, $1,000 per TIPS, and not the [Inflation-Adjusted Principal](#inflation-adjusted-principal).*
 
 <a id="price"></a>
 <a id="clean-price"></a>
 ### Price
-`Price` = *Market value expressed as percentage of par (e.g., 102.5 = 102.5% of par), before inflation adjustment. By convention, "price" means this clean price — excluding accrued interest — unless dirty price is named explicitly, though dirty price (clean price plus accrued interest) is rarely invoked for a TIPS in practice, since the accrued interest on a TIPS is itself inflation-adjusted. Canty (2009) formal notation for the clean price: CP. Canty's own "dirty price" (DP) is a different quantity from that market-convention sense, unrelated to accrued interest: `DP = CP × Index Ratio`, the [Adjusted Price](#adjusted-price) of a TIPS.*
+`Price` = *Market value expressed as a percentage of par: a price of 98 is 98% of par, which is $980 for a par value of $1,000. A price is unadjusted, before inflation adjustment, unless qualified (see [Adjusted Price](#adjusted-price)). By convention, "price" means this clean price — excluding accrued interest — unless dirty price is named explicitly, though dirty price (clean price plus accrued interest) is rarely invoked for a TIPS in practice, since the accrued interest on a TIPS is itself inflation-adjusted. Canty (2009) formal notation for the clean price: CP. Canty's own "dirty price" (DP) is a different quantity from that market-convention sense, unrelated to accrued interest: `DP = CP × Index Ratio`, the [Adjusted Price](#adjusted-price) of a TIPS.*
 
 <a id="adjusted-price"></a>
 <a id="adjusted-ask-price"></a>
@@ -475,7 +475,7 @@ For nominal Treasuries, 31 CFR §356.2 applies: *"Dated date means the date from
 
 <a id="inflation-adjusted-principal"></a>
 ### Inflation-Adjusted Principal
-`Inflation_Adjusted_Principal` = `Face_Value × Index_Ratio` *(the Index Ratio truncated to six decimal places, then rounded to five, as [31 CFR 356 Appendix B](./31_CFR_356_Definitions_And_Formulas.md) states for the principal and interest payments Treasury calculates)*
+`Inflation_Adjusted_Principal` = `Face_Value × Index_Ratio` *(the Index Ratio truncated to six decimal places, then rounded to five, as [31 CFR 356 Appendix B](./31_CFR_356_Definitions_And_Formulas.md) states for the principal and interest payments Treasury calculates). A TIPS is redeemed at maturity at its Inflation-Adjusted Principal or at its [Par Value](#par-value), whichever is greater ([31 CFR 356 §356.5](./31_CFR_356_Definitions_And_Formulas.md)).*
 
 <a id="annual-interest-real"></a>
 ### Annual Interest (Real)

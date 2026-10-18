@@ -14,7 +14,7 @@
 
 - **[Quantity](./DATA_DICTIONARY.md#quantity):** The number of $1,000 units of a security (e.g., 50).
 - **[Face Value](./DATA_DICTIONARY.md#face-value):** The original, unadjusted principal amount of a security (e.g., $50,000 for a quantity of 50). This is the baseline amount used as the unit of account.
-- **[Par Value (Nominal)](./DATA_DICTIONARY.md#par-value-nominal):** The current principal value of a nominal Treasury, which equals its Face Value. The current principal value of a TIPS is its [Inflation-Adjusted Principal](./DATA_DICTIONARY.md#inflation-adjusted-principal) (see [TIPS Basics](./TIPS_Basics.md)).
+- **[Par Value](./DATA_DICTIONARY.md#par-value):** A synonym of Face Value, the amount a [Price](./DATA_DICTIONARY.md#price) is a percentage of. The current principal value of a TIPS is its [Inflation-Adjusted Principal](./DATA_DICTIONARY.md#inflation-adjusted-principal) (see [TIPS Basics](./TIPS_Basics.md)).
 - **[Annual Interest (Nominal)](./DATA_DICTIONARY.md#annual-interest-nominal):** The fixed annual coupon rate multiplied by the Face Value of a nominal Treasury. For a TIPS it is multiplied by the Inflation-Adjusted Principal instead.
   ```
   annualInterest = Face Value * couponRate (nominal)

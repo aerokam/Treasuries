@@ -1,48 +1,22 @@
-# Par, Principal, and Face Value: Distinctions and Relationships
+# Par, Principal, and Face Value
 
-In debt markets, face value, par, and principal are the three core terms used to describe the underlying value of a bond. While they are often used interchangeably, they are not always identical.
+[Face Value](../../knowledge/DATA_DICTIONARY.md#face-value) and [Par Value](../../knowledge/DATA_DICTIONARY.md#par-value) are synonyms, used in different contexts: Face Value for the amount held, and Par Value for the amount a [Price](../../knowledge/DATA_DICTIONARY.md#price) is stated against. Principal is the amount that earns interest and is repaid at maturity. For a nominal Treasury the three are the same amount, and for a TIPS they are not.
 
-To see how they relate, it helps to separate the physical/legal label (face value), the pricing benchmark (par), and the actual money owed (principal).
+## A Nominal Treasury
 
-## How the Three Terms Align (The Standard Case)
-
-For a standard, plain-vanilla fixed-income security (like a traditional corporate bond or a nominal Treasury note), all three terms refer to the exact same dollar amount.
-
-If you buy a newly issued, standard $1,000 bond:
+For a nominal Treasury note of one $1,000 unit:
 
 - **Face Value** is $1,000.
-- **Par** is $1,000 (the baseline 100% pricing mark).
-- **Principal** is $1,000 (the capital sum that the issuer borrows and must repay you at maturity).
+- **Par Value** is $1,000.
+- **Principal** is $1,000, the amount on which interest is calculated and the amount repaid at maturity.
 
-## Where "Principal" Diverges from "Face Value" and "Par"
+## A TIPS
 
-In more complex debt instruments, principal becomes a dynamic variable, while face value and par remain fixed anchors.
+- **Face Value and Par Value** stay at $1,000 per TIPS. They are the unadjusted amount.
+- **Principal** is the [Inflation-Adjusted Principal](../../knowledge/DATA_DICTIONARY.md#inflation-adjusted-principal): the Face Value multiplied by the [Index Ratio](../../knowledge/DATA_DICTIONARY.md#index-ratio). If cumulative inflation since the Dated Date is 20%, the Inflation-Adjusted Principal of a $1,000 TIPS is $1,200.
+- **Interest** is a fixed percentage of the Inflation-Adjusted Principal, and not of the Face Value.
+- **At maturity** Treasury pays the Inflation-Adjusted Principal or the Par Value, whichever is greater.
 
-### Inflation-Protected Debt (e.g., TIPS)
+## Price
 
-This is the most common place where the terms split.
-
-- **Face Value (and Par)**: Stays completely static. If you buy a $1,000 TIPS bond, its face value is always $1,000.
-- **Principal**: Changes daily. The inflation-adjusted principal is calculated by multiplying the static face value by an index ratio (based on the CPI). If cumulative inflation rises by 20%, your adjusted principal becomes $1,200.
-- **The Relationship**: The coupon interest payments are calculated as a fixed percentage of this adjusted principal, not the original face value. At maturity, the Treasury pays you the adjusted principal (or the original face value, whichever is greater).
-
-### Amortizing Debt (e.g., Mortgages, MBS)
-
-For debt that is paid down over time rather than in one lump sum at the end:
-
-- **Face Value (and Par)**: Refers to the original size of the loan at issuance (e.g., $100,000).
-- **Principal (Current Principal Outstanding)**: Decreases with every monthly payment. After five years of payments, the remaining outstanding principal might only be $85,000, even though the security's original face value remains $100,000.
-
-## The Distinction in Pricing and Yield Formulas
-
-In bond math and market trading, the terms serve distinct mathematical roles:
-
-- **"Par"** is a percentage benchmark (100.00). Debt is quoted as a percentage of par. If a bond is trading at "98," it is trading at 98% of its par value.
-- **"Principal"** is the basis for interest. Interest is always paid on the current outstanding principal balance.
-- **"Face Value"** is the fixed legal contract. It is the legal definition of the debt's original denomination used to calculate the par relationship.
-
-### Summary
-
-- **Face Value** is the static denomination.
-- **Par** is the 100% price baseline.
-- **Principal** is the actual, live debt balance outstanding that earns interest and must be repaid.
+A price is expressed as a percentage of par. A price of 98 is 98% of par, which is $980 for a par value of $1,000. A price is unadjusted unless qualified: the [Adjusted Price](../../knowledge/DATA_DICTIONARY.md#adjusted-price) of a TIPS is its price multiplied by the Index Ratio.
