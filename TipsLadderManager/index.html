@@ -372,14 +372,10 @@
 
 <div id="bracket-tooltip"></div>
 
-<!-- Date popover, shared frame for the two separate date entries (3.0 §DARA Reference Date):
-     - File’s Ref CPI date, which restates per-year DARA amounts and nothing else. Offered only
-       where the loaded file carries those amounts but records no date they were stated at.
-     - Cash received since, which payments Available Cash includes
-       (2.0 §Available Cash). Offered wherever the app filled that figure in from a file that
-       records no date. It is not a Ref CPI date and scales nothing.
-     They were one entry until 2026-08-28, which read as though supplying a date to a broker positions export
-     would restate amounts that file never carried. -->
+<!-- Date popover (3.0 §DARA Reference Date): the file’s Ref CPI date, which restates per-year DARA
+     amounts and nothing else. Offered only where the loaded file carries those amounts but records no
+     date they were stated at. Which payments Available Cash includes is chosen in the Available Cash
+     popover below (2.0 §Available Cash), not here. -->
 <div id="dara-basis-popover" class="menu-dropdown" hidden style="position:fixed;min-width:240px;max-width:280px;padding:10px 12px;font-size:12px;color:var(--portal-text-main)">
   <div style="font-weight:700;margin-bottom:6px">File’s Ref CPI date</div>
   <div id="dara-basis-note" style="font-size:11px;line-height:1.4;margin-bottom:8px"></div>
