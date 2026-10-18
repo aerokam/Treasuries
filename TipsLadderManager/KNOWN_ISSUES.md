@@ -174,23 +174,10 @@ developer are there.
 ### Spec/code discrepancy audit (from CLAUDE.md cleanup)
 
 - **Found:** 2026-07-31, during a CLAUDE.md audit that removed content duplicated from specs.
-- **Context:** the audit surfaced three pieces of code with no spec coverage, and confirmed one
-  real discrepancy elsewhere (`Treasuries/CLAUDE.md`'s stale yield-source list — already fixed).
-  These three still need investigation to determine whether they're undocumented-but-correct or
-  genuine drift between spec and implementation:
-  1. `src/modal.js` (`makeDraggableResizable`) — shared drag/resize frame for every modal (TipsRef,
-     maturity picker). No spec documents it.
-  2. `inferDARAFromCash()` (`src/rebalance-lib.js`) — binary-searches for the largest DARA where
-     `costDeltaSum >= 0`. No spec describes this function; 3.0 instead documents a different
-     mechanism (`inferScaledDARAFromPortfolio`'s self-financing scale) for the Run-rebalance path.
-     Need to determine whether this is legacy/import-path-only, superseded, or still load-bearing.
-  3. `fundedYear`/`runBuild` naming convention (currently in `CLAUDE.md`'s TipsLadderManager
-     section) — not stated as a rule in any spec's own naming table (4.0's "Variable Naming
-     Harmonization" table covers a different set of variables).
-- **Broader ask:** beyond these three, do a fuller pass for other spec/code discrepancies generally
-  — not just missing coverage, but places where a spec's claim no longer matches what the code
-  actually does.
-- **Status:** open, not yet investigated.
+- **Status (2026-10-18):** of the three pieces of code that had no spec coverage, `src/modal.js` is now specified in [6.0 §Modal Frame Standard](./knowledge/6.0_UI_Layout.md), and the `fundedYear` and `runBuild` names are the ones the code uses; the table in [4.0 §Variable Naming](./knowledge/4.0_Computation_Modules.md) named `fyQty` for the Funded Year quantity where the code names it `fundedYearQty`, and now says `fundedYearQty`. Still open:
+  1. `inferDARAFromCash()` (`src/rebalance-lib.js`) binary-searches for the largest DARA where `costDeltaSum >= 0`. No spec describes it, and 3.0 documents a different mechanism for the Run-rebalance path (`inferScaledDARAFromPortfolio`, the self-financing scale). Nothing in the app calls it: only `tests/run.js` does, and a comment in `index.html` still says the DARA field is populated by it. Decide whether to delete it with its tests.
+  2. `fundedYear`/`runBuild` naming (`fundedYear` and not `fy`; `runBuild`, `renderBuildOutput`, `buildSummary`, `buildDetails`, `build-table`) is stated in no spec.
+- **Broader ask:** a pass for other places where a spec's claim no longer matches what the code does. The 2026-10 sweep of the specs against the code covered process 1, Yield Curves, Yields Monitor, TipsLadderManager 1.0 to 6.0, Treasury Auctions, CPI Explorer, Seasonal Adjustments, TIPS Reference, Fund Holdings, the Primer, Bond Basics and TIPS Basics.
 
 ### A year-old ladder, reloaded, is not self-financing
 
