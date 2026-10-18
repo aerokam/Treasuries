@@ -27,8 +27,8 @@ Canty's paper uses generic notation for inflation-linked bonds across any market
 
 | Canty notation | TIPS equivalent | Notes |
 |---|---|---|
-| $I_t$ — inflation index at date $t$ | **Ref CPI** on date $t$ | Non-seasonally adjusted CPI-U, daily-interpolated per 31 CFR § 356 App. B with a 3-month lag. The adjusted principal of a TIPS = face value × (Ref CPI(t) / Ref CPI(dated date)), so the principal changes daily with the Ref CPI. |
-| $I_{Base}$ — base index | **Ref CPI on the dated date** | Fixed at issuance; the inflation index ratio = Ref CPI(settle) / Ref CPI(dated date). This ratio multiplies the face value to give the current adjusted principal. |
+| $I_t$ — inflation index at date $t$ | **Ref CPI** on date $t$ | Non-seasonally adjusted CPI-U, daily-interpolated per 31 CFR § 356 App. B with a 3-month lag. The adjusted principal of a TIPS = par × (Ref CPI(t) / Ref CPI(dated date)), so the principal changes daily with the Ref CPI. |
+| $I_{Base}$ — base index | **Ref CPI on the dated date** | Fixed at issuance; the inflation index ratio = Ref CPI(settle) / Ref CPI(dated date). This ratio multiplies the par to give the current adjusted principal. |
 | $I_{Settle}$ — index at settlement | **Ref CPI on the settlement date** | App. B interpolation for the specific day of the settlement month |
 | $I_i$ — index at each payment date | **Ref CPI on each payment date** | Interpolated for the month/day of each semi-annual coupon and the final maturity |
 | $T_t$ — trend component | **Ref CPI SA** on date $t$ | Because $S = \text{NSA}/\text{SA}$ and $I = T \times S$, the trend component is literally the daily-interpolated seasonally adjusted Ref CPI |

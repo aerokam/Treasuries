@@ -39,7 +39,7 @@
 
 **O** &nbsp; [Outstanding TIPS](#outstanding-tips)
 
-**P** &nbsp; [P+I](#pi) &middot; [P+I per TIPS](#pi-per-tips) &middot; [Par Value](#par-value) &middot; [Par Yield](#par-yield) &middot; [Pass 1](#pass-1) &middot; [Pass 2](#pass-2) &middot; [Per-Year DARA](#per-year-dara) &middot; [PIMCO (E9)](#e9) &middot; [Plain CUSIP/Quantity Format](#plain-format) &middot; [pre ladder interest](#pre-ladder-credit) *(see Pre-Ladder Interest (PLI))* &middot; [Pre-Ladder Interest (PLI)](#pre-ladder-credit) &middot; [Price](#price)
+**P** &nbsp; [P+I](#pi) &middot; [P+I per TIPS](#pi-per-tips) &middot; [Par](#par) &middot; [Par Yield](#par-yield) &middot; [Pass 1](#pass-1) &middot; [Pass 2](#pass-2) &middot; [Per-Year DARA](#per-year-dara) &middot; [PIMCO (E9)](#e9) &middot; [Plain CUSIP/Quantity Format](#plain-format) &middot; [pre ladder interest](#pre-ladder-credit) *(see Pre-Ladder Interest (PLI))* &middot; [Pre-Ladder Interest (PLI)](#pre-ladder-credit) &middot; [Price](#price)
 
 **Q** &nbsp; [Quantity](#quantity)
 
@@ -101,7 +101,7 @@
 - <a id="e9"></a>**PIMCO (E9)** = `CUSIP + Description (Holding_Name) + Coupon_Rate + Percent_Of_Net_Assets + Market_Value + Notional/Par_Value_Quantity/Units + Maturity_Date + AsOfDate`
   *Fund holdings for PIMCO funds (currently LTPZ only), fetched as an xlsx export from `fund-ui.pimco.com/fund-detail-api/api/funds/<CUSIP>/topTenHoldings/export?asOfDate=9999-12-31` (despite the endpoint name, the far-future `asOfDate` returns full holdings, not just the top ten). Keyed by the fund's own CUSIP with no public ticker lookup, so it is hardcoded per fund in `FundHoldings/pimco/updateLtpzHoldings.js`. `Coupon_Rate` is rounded to 2 decimals by PIMCO (lossy for the eighth-of-a-percent coupons TIPS carry, e.g. 1.375% → "1.38"); the scraper instead parses the precise coupon from the trailing number in `Description` (e.g. "TSY INFL IX N/B 02/44 1.375"), falling back to `Coupon_Rate` only when `Description` has no parseable suffix (cash/sweep/currency lines). Expense ratio comes from `key-information` → `netExpenseRatio` (percent-scale already, not date-sensitive so fetched at "latest"). 30-Day SEC yield comes from `fund-stats` → `unsubsidized30SecYield` × 100 (a true fraction, unlike every other PIMCO field used here — confirmed by grepping the product page's own Angular bundle for the label's data binding, present at two separate places on the page, both bound to this exact field). `key-statistics`' similarly-named `subsidizedSecYield` is a different, month-end (not live-daily) figure and is *not* what the page displays under "30-Day SEC Yield" — do not use it. The `asOfDate=9999-12-31` "latest" trick (used for every other endpoint on this API, including the holdings export) does *not* apply to `unsubsidized30SecYield`: PIMCO's backend already has a business day's worth of that figure the product page hasn't published yet (confirmed by direct testing — the page kept showing a stale value even after a hard refresh, i.e. a genuine backend lag on this specific regulatory figure, not caching). SEC yield must be for the same date as the holdings themselves (the as-of date already shown in the app's banner) — rather than guessing a fixed day-offset, the scraper fetches `fund-stats` at that exact `asOfDate` (converted from the holdings export's own `AsOfDate:` line). Fetched daily by the `FundHoldings` Windows Task, same as E7/E8.*
 - <a id="e10"></a>**Schwab Asset Management holdings export (E10)** = `As-Of-Date + Symbol + Quantity + Percent_of_Assets + Name + BBG_FIGI + Coupon_Rate + Maturity_Date`
-  *Fund holdings for Schwab funds (currently SCHP only): a date-stamped CSV linked from `schwabassetmanagement.com/products/<ticker>` (filename e.g. `SCHP_FundHoldings_2026-07-31.CSV`, discovered by scraping the link each run since the date changes). Schwab's site 403s plain HTTP requests (Akamai bot protection, confirmed by direct testing); `FundHoldings/schwab/updateSchpHoldings.js` uses Puppeteer (headless Chrome) to load the product page and fetch the CSV from within that page's session. Unlike E7-E9, this export carries no CUSIP (identifies securities by Bloomberg FIGI instead) and no dollar Market Value (only `Quantity` + a precise `Percent_of_Assets`). The scraper resolves both by matching each holding's `(Maturity_Date, Coupon_Rate)` — a unique key for TIPS — against [Market quotes (S7)](#s7) (FidelityTreasuriesTips.csv, which is CUSIP-keyed and carries price): `Quantity` is confirmed (by cross-checking against the fund's own abbreviated Market Value display) to already be inflation-adjusted current face value, not original par, so `Market Value = Quantity × S7 Ask price / 100` (the *Ask price*, not the Adjusted ask price: `Quantity` is already inflation-adjusted, so the Adjusted ask price would count the inflation adjustment twice). The fund's cash-sweep line ("SSC GOVERNMENT MM GVMXX") reports a Bloomberg FIGI with no CUSIP and isn't in Market quotes (S7) (not a Treasury/TIPS security); its CUSIP (7839989D1) is hardcoded from PIMCO (E9), which sweeps the same State Street fund and reports it directly. Expense ratio and SEC Yield (30 Day) are rendered directly into the already-loaded product page's key-stats table (no separate request) — the page also repeats expense ratio in a simpler summary-band span earlier in the page, but the scraper anchors on the detailed table row specifically. Fetched daily by the `FundHoldings` Windows Task, same as E7-E9.*
+  *Fund holdings for Schwab funds (currently SCHP only): a date-stamped CSV linked from `schwabassetmanagement.com/products/<ticker>` (filename e.g. `SCHP_FundHoldings_2026-07-31.CSV`, discovered by scraping the link each run since the date changes). Schwab's site 403s plain HTTP requests (Akamai bot protection, confirmed by direct testing); `FundHoldings/schwab/updateSchpHoldings.js` uses Puppeteer (headless Chrome) to load the product page and fetch the CSV from within that page's session. Unlike E7-E9, this export carries no CUSIP (identifies securities by Bloomberg FIGI instead) and no dollar Market Value (only `Quantity` + a precise `Percent_of_Assets`). The scraper resolves both by matching each holding's `(Maturity_Date, Coupon_Rate)` — a unique key for TIPS — against [Market quotes (S7)](#s7) (FidelityTreasuriesTips.csv, which is CUSIP-keyed and carries price): `Quantity` is confirmed (by cross-checking against the fund's own abbreviated Market Value display) to already be the [Inflation-Adjusted Principal](#inflation-adjusted-principal), not the par, so `Market Value = Quantity × S7 Ask price / 100` (the *Ask price*, not the Adjusted ask price: `Quantity` is already inflation-adjusted, so the Adjusted ask price would count the inflation adjustment twice). The fund's cash-sweep line ("SSC GOVERNMENT MM GVMXX") reports a Bloomberg FIGI with no CUSIP and isn't in Market quotes (S7) (not a Treasury/TIPS security); its CUSIP (7839989D1) is hardcoded from PIMCO (E9), which sweeps the same State Street fund and reports it directly. Expense ratio and SEC Yield (30 Day) are rendered directly into the already-loaded product page's key-stats table (no separate request) — the page also repeats expense ratio in a simpler summary-band span earlier in the page, but the scraper anchors on the detailed table row specifically. Fetched daily by the `FundHoldings` Windows Task, same as E7-E9.*
 - <a id="e11"></a>**BondBloxx product-page holdings table (E11)** = `Name + CUSIP + Market_Value + Percent_of_Net_Assets`
   *Fund holdings for BondBloxx funds (currently XHLF only): unlike E7-E10, BondBloxx exposes no JSON/CSV API — the product page at `bondbloxxetf.com/<fund-slug>/` server-renders the full "All Holdings" table as static HTML (the page's own "Download CSV" button just re-serializes this same table client-side via JS), so `FundHoldings/bondbloxx/updateXhlfHoldings.js` fetches the page and parses the table directly (`<table border="1">`, the only one on the page with that exact attribute). Fund slug is hardcoded per ticker with no public ticker lookup. The table carries no Quantity, Coupon, or Maturity Date column: XHLF holds only zero-coupon T-Bills, whose `Name` reads `"US T BILL ZCP MM/DD/YY"` — Coupon (0) and Maturity Date are parsed from that suffix (analogous to fminvest.com (E8)'s name-suffix parsing); the CASHUSD and NET OTHER ASSETS balancing rows don't match the suffix pattern and are left with a blank Coupon/Maturity Date, naturally excluded downstream (no CUSIP match in the yield files). Expense ratio and 30-Day Sec Yield are rendered directly into the same already-fetched product page (no separate request). Fetched daily by the `FundHoldings` Windows Task, same as E7-E10.*
 - <a id="e12"></a>**BlackRock iShares (E12)** = `Name + Sector + Asset_Class + Market_Value + Weight_(%) + Notional_Value + Par_Value + CUSIP + ISIN + SEDOL + Price + Duration + YTM_(%) + Maturity + Coupon_(%) + Mod._Duration + Real_Duration + Real_YTM_(%)`
@@ -286,21 +286,22 @@
 
 <a id="quantity"></a>
 ### Quantity
-`Quantity` = *Integer number of $1,000 face-value units held (e.g., 50 = $50,000 face value)*
+`Quantity` = *Integer number of $1,000 par units held (e.g., 50 = $50,000 par)*
+
+<a id="par"></a>
+<a id="par-value"></a>
+<a id="par-value-nominal"></a>
+### Par
+`Par` = *The stated value of a security at original issuance, the "par amount" of [31 CFR 356.2](./31_CFR_356_Definitions_And_Formulas.md). It applies to any amount of securities and not to one security: an auction states its offering, bids and awards in par, and a holding has a par of its [Quantity](#quantity) × $1,000, so a Quantity of 50 has a par of $50,000. A [Price](#price) is expressed as a percentage of par: a price of 98 is 98% of par, which is $980 for a par of $1,000. For a TIPS, par excludes the inflation adjustment, so it stays at $1,000 per TIPS while the [Inflation-Adjusted Principal](#inflation-adjusted-principal) changes.*
 
 <a id="face-value"></a>
 ### Face Value
-`Face_Value` = `Quantity × 1000` *(the principal of a security as issued, before any inflation adjustment. A synonym of [Par Value](#par-value), used in a different context: Face Value for the amount held, Par Value for the amount a [Price](#price) is stated against.)*
-
-<a id="par-value"></a>
-<a id="par-value-nominal"></a>
-### Par Value
-`Par_Value` = *A synonym of [Face Value](#face-value). A [Price](#price) is expressed as a percentage of par: a price of 98 is 98% of par, which is $980 for a par value of $1,000. For a TIPS, par is the unadjusted Face Value, $1,000 per TIPS, and not the [Inflation-Adjusted Principal](#inflation-adjusted-principal).*
+`Face_Value` = *A synonym of [Par](#par), used in different contexts.*
 
 <a id="price"></a>
 <a id="clean-price"></a>
 ### Price
-`Price` = *Market value expressed as a percentage of par: a price of 98 is 98% of par, which is $980 for a par value of $1,000. A price is unadjusted, before inflation adjustment, unless qualified (see [Adjusted Price](#adjusted-price)). By convention, "price" means this clean price — excluding accrued interest — unless dirty price is named explicitly, though dirty price (clean price plus accrued interest) is rarely invoked for a TIPS in practice, since the accrued interest on a TIPS is itself inflation-adjusted. Canty (2009) formal notation for the clean price: CP. Canty's own "dirty price" (DP) is a different quantity from that market-convention sense, unrelated to accrued interest: `DP = CP × Index Ratio`, the [Adjusted Price](#adjusted-price) of a TIPS.*
+`Price` = *Market value expressed as a percentage of par: a price of 98 is 98% of par, which is $980 for a par of $1,000. A price is unadjusted, before inflation adjustment, unless qualified (see [Adjusted Price](#adjusted-price)). By convention, "price" means this clean price — excluding accrued interest — unless dirty price is named explicitly, though dirty price (clean price plus accrued interest) is rarely invoked for a TIPS in practice, since the accrued interest on a TIPS is itself inflation-adjusted. Canty (2009) formal notation for the clean price: CP. Canty's own "dirty price" (DP) is a different quantity from that market-convention sense, unrelated to accrued interest: `DP = CP × Index Ratio`, the [Adjusted Price](#adjusted-price) of a TIPS.*
 
 <a id="adjusted-price"></a>
 <a id="adjusted-ask-price"></a>
@@ -475,11 +476,11 @@ For nominal Treasuries, 31 CFR §356.2 applies: *"Dated date means the date from
 
 <a id="inflation-adjusted-principal"></a>
 ### Inflation-Adjusted Principal
-`Inflation_Adjusted_Principal` = `Face_Value × Index_Ratio` *(the Index Ratio truncated to six decimal places, then rounded to five, as [31 CFR 356 Appendix B](./31_CFR_356_Definitions_And_Formulas.md) states for the principal and interest payments Treasury calculates). A TIPS is redeemed at maturity at its Inflation-Adjusted Principal or at its [Par Value](#par-value), whichever is greater ([31 CFR 356 §356.5](./31_CFR_356_Definitions_And_Formulas.md)).*
+`Inflation_Adjusted_Principal` = `Par × Index_Ratio` *(the Index Ratio truncated to six decimal places, then rounded to five, as [31 CFR 356 Appendix B](./31_CFR_356_Definitions_And_Formulas.md) states for the principal and interest payments Treasury calculates). A TIPS is redeemed at maturity at its Inflation-Adjusted Principal or at its [Par](#par), whichever is greater ([31 CFR 356 §356.5](./31_CFR_356_Definitions_And_Formulas.md)).*
 
 <a id="annual-interest-real"></a>
 ### Annual Interest (Real)
-`Annual_Interest_Real` = `Face_Value × Coupon_Rate` *(coupon applied to fixed face value — constant in real terms)*
+`Annual_Interest_Real` = `Par × Coupon_Rate` *(coupon applied to the fixed par — constant in real terms)*
 
 <a id="annual-interest-nominal"></a>
 ### Annual Interest (Nominal)
@@ -495,7 +496,7 @@ For nominal Treasuries, 31 CFR §356.2 applies: *"Dated date means the date from
 
 <a id="cost-per-tips"></a>
 ### Cost per TIPS
-`Cost_per_TIPS` = `(Price / 100) × Index_Ratio × 1000` *(nominal cost to purchase one $1,000 face-value unit)*
+`Cost_per_TIPS` = `(Price / 100) × Index_Ratio × 1000` *(nominal cost to purchase one $1,000 par unit)*
 
 <a id="accrued-interest-adjusted"></a>
 ### Accrued Interest (Adjusted)
@@ -877,12 +878,12 @@ Some values are true only until Treasury issues more TIPS. Left inline as approx
 - <a id="broker-positions-export"></a>**Broker Positions Export**
   *A csv file downloaded from a broker's positions view (holdings view, at Vanguard) under a name the user chooses; brokers use positions and holdings interchangeably. It lists every position, of every security type, in each of usually several accounts. From the accounts the user selects, the app extracts the TIPS positions, which it calls [Holdings](#holdings).*
 - <a id="fidelity-export"></a>**Fidelity Export**
-  Columns read: `Account number`, `Account name`, `Symbol` (a CUSIP), `Quantity` (states [Face Value](#face-value)).
+  Columns read: `Account number`, `Account name`, `Symbol` (a CUSIP), `Quantity` (states [Par](#par)).
 - <a id="schwab-export"></a>**Schwab Export**
-  Columns read: `Symbol` (a CUSIP), `Qty (Quantity)` (states [Face Value](#face-value)).
+  Columns read: `Symbol` (a CUSIP), `Qty (Quantity)` (states [Par](#par)).
   *Each account's rows are preceded by a row naming the account rather than a column, format `"Name ...LastFourDigits"`, e.g. `"Amy_POD ...387"`, and followed by an `"Account Total"` row.*
 - <a id="vanguard-export"></a>**Vanguard Export**
-  Columns read: `Account Number`, `Investment Name`, `Symbol` (a CUSIP, when present), `Shares` (states [Face Value](#face-value)).
+  Columns read: `Account Number`, `Investment Name`, `Symbol` (a CUSIP, when present), `Shares` (states [Par](#par)).
 - <a id="holdings-export-format"></a>**Holdings Export** = `{ @CUSIP + Qty + Excess_Qty }`
   *This app's prior export of a build or rebalance result. Every row is a TIPS. Header row (exact text): `cusip,qty,excess`. Example row: `912810RQ3,5,0`. May carry a trailing [DARA Plan](#dara-plan)'s `#fundedYear,dara` row and [Construction Parameters](#construction-parameters)' `#params` row.*
 - <a id="tipsladdercom-format"></a>**tipsladder.com Format** = `{ CUSIP + Qty + Year }` per row, no header row, one or more rows per CUSIP

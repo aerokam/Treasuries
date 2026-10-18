@@ -9,9 +9,9 @@
 
 **[TIPS](./DATA_DICTIONARY.md#tips) (Treasury Inflation-Protected Securities):** Marketable Treasury securities whose principal is adjusted by changes in the Consumer Price Index.
 
-- **[Quantity](./DATA_DICTIONARY.md#quantity):** Number of TIPS held; qty 1 = $1,000 face value (e.g., qty 50 = $50,000 face value).
-- **[Face Value](./DATA_DICTIONARY.md#face-value):** Quantity × $1,000 (e.g., $50,000).
-- **[Inflation-Adjusted Principal](./DATA_DICTIONARY.md#inflation-adjusted-principal):** The principal after the adjustment for inflation or deflation: the Face Value times the Index Ratio. It is the amount on which interest is calculated and which is repaid at maturity, unless the [Par Value](./DATA_DICTIONARY.md#par-value) is greater ([31 CFR 356 §356.5](./31_CFR_356_Definitions_And_Formulas.md)).
+- **[Quantity](./DATA_DICTIONARY.md#quantity):** Number of TIPS held; qty 1 = $1,000 par (e.g., qty 50 = $50,000 par).
+- **[Par](./DATA_DICTIONARY.md#par):** Quantity × $1,000 (e.g., $50,000). The par excludes the inflation adjustment.
+- **[Inflation-Adjusted Principal](./DATA_DICTIONARY.md#inflation-adjusted-principal):** The principal after the adjustment for inflation or deflation: the par times the Index Ratio. It is the amount on which interest is calculated and which is repaid at maturity, unless the [par](./DATA_DICTIONARY.md#par) is greater ([31 CFR 356 §356.5](./31_CFR_356_Definitions_And_Formulas.md)).
 
 **[CPI-U NSA](./DATA_DICTIONARY.md#cpi-nsa):** Consumer Price Index for All Urban Consumers, Not Seasonally Adjusted.
 - Published monthly by the Bureau of Labor Statistics.
@@ -49,7 +49,7 @@ indexRatio(date) = refCPI(date) / refCPI(datedDate)
 
 **Inflation-Adjusted Principal:**
 ```
-adjustedPrincipal = faceValue * indexRatio
+adjustedPrincipal = par * indexRatio
 ```
 The Index Ratio in this formula is rounded as [Inflation-Adjusted Principal](./DATA_DICTIONARY.md#inflation-adjusted-principal) states.
 
@@ -87,13 +87,13 @@ piPerBond = adjustedPrincipal + lastYearInterest
 ```
 
 **[Cost per TIPS](./DATA_DICTIONARY.md#cost-per-tips):**
-The nominal cost to purchase one $1,000 Face Value unit.
+The nominal cost to purchase one $1,000 par unit.
 ```
 costPerBond = price/100 × indexRatio × 1,000
 ```
 
 **[Accrued Interest](./DATA_DICTIONARY.md#accrued-interest-adjusted):**
-Extends [Bond Basics §Accrued Interest](./Bond_Basics.md) the same way Inflation-Adjusted Principal extends [Face Value](./DATA_DICTIONARY.md#face-value): take the nominal accrued interest per $100 par (Actual/Actual day count, the A/E convention of Yield Calculation Conventions and Duration below) and apply the Index Ratio.
+Extends [Bond Basics §Accrued Interest](./Bond_Basics.md) the same way Inflation-Adjusted Principal extends [Par](./DATA_DICTIONARY.md#par): take the nominal accrued interest per $100 par (Actual/Actual day count, the A/E convention of Yield Calculation Conventions and Duration below) and apply the Index Ratio.
 ```
 accruedPerBond = accruedInterestNominal / 100 × indexRatio × 1,000   // real dollars per bond
 ```

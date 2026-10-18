@@ -6,18 +6,17 @@
 ---
 
 ## Scope
-"Treasury" here means U.S. Treasury securities: bills, notes, bonds and TIPS. The market uses "bond" for any of them. Treasury distinguishes [Treasury Bills](./DATA_DICTIONARY.md#treasury-bill) (original maturity up to 1 year), [Treasury Notes](./DATA_DICTIONARY.md#treasury-note) (2 to 10 years) and [Treasury Bonds](./DATA_DICTIONARY.md#treasury-bond) (over 10 years), and issues [TIPS](./DATA_DICTIONARY.md#tips) as notes or bonds. "Bond" below is the $1,000 unit of account, and the security type is named where it matters.
+"Treasury" here means U.S. Treasury securities: bills, notes, bonds and TIPS. The market uses "bond" for any of them. Treasury distinguishes [Treasury Bills](./DATA_DICTIONARY.md#treasury-bill) (original maturity up to 1 year), [Treasury Notes](./DATA_DICTIONARY.md#treasury-note) (2 to 10 years) and [Treasury Bonds](./DATA_DICTIONARY.md#treasury-bond) (over 10 years), and issues [TIPS](./DATA_DICTIONARY.md#tips) as notes or bonds. "Bond" below is the $1,000 par unit, and the security type is named where it matters.
 
 ---
 
 ## Core Terms
 
 - **[Quantity](./DATA_DICTIONARY.md#quantity):** The number of $1,000 units of a security (e.g., 50).
-- **[Face Value](./DATA_DICTIONARY.md#face-value):** The original, unadjusted principal amount of a security (e.g., $50,000 for a quantity of 50). This is the baseline amount used as the unit of account.
-- **[Par Value](./DATA_DICTIONARY.md#par-value):** A synonym of Face Value, the amount a [Price](./DATA_DICTIONARY.md#price) is a percentage of. The current principal value of a TIPS is its [Inflation-Adjusted Principal](./DATA_DICTIONARY.md#inflation-adjusted-principal) (see [TIPS Basics](./TIPS_Basics.md)).
-- **[Annual Interest (Nominal)](./DATA_DICTIONARY.md#annual-interest-nominal):** The fixed annual coupon rate multiplied by the Face Value of a nominal Treasury. For a TIPS it is multiplied by the Inflation-Adjusted Principal instead.
+- **[Par](./DATA_DICTIONARY.md#par):** The stated value of a security at original issuance, for any amount of securities (e.g., $50,000 for a quantity of 50). A [Price](./DATA_DICTIONARY.md#price) is a percentage of it. [Face Value](./DATA_DICTIONARY.md#face-value) is a synonym. The current principal value of a TIPS is its [Inflation-Adjusted Principal](./DATA_DICTIONARY.md#inflation-adjusted-principal) (see [TIPS Basics](./TIPS_Basics.md)).
+- **[Annual Interest (Nominal)](./DATA_DICTIONARY.md#annual-interest-nominal):** The fixed annual coupon rate multiplied by the par of a nominal Treasury. For a TIPS it is multiplied by the Inflation-Adjusted Principal instead.
   ```
-  annualInterest = Face Value * couponRate (nominal)
+  annualInterest = par * couponRate (nominal)
   ```
   *(See [TIPS Basics](./TIPS_Basics.md) for the inflation-adjusted interest formulas.)*
 - **[Price](./DATA_DICTIONARY.md#price):** Market value expressed as percentage of par (e.g., 102.5 = 102.5% of par). The [clean price](./DATA_DICTIONARY.md#clean-price) is the quoted price, excluding accrued interest.
