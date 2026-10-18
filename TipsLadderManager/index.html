@@ -837,8 +837,9 @@ document.getElementById('available-cash-help').addEventListener('click', e => {
     { prose: 'Cash intended for reinvestment in the ladder is not entered here. Leave the box empty; Net Cash then reports the cost of the purchases as a negative figure.' },
     { sep: true },
     { heading: 'Payments received this year' },
-    { prose: 'The coupons and maturity proceeds the ladder has paid this year are cash on hand unless they were reinvested. Click the box to count the payments after a chosen payment date, or to state an amount outright.' },
+    { prose: 'Coupons and maturity proceeds are assumed applied toward the Amount of the year they are paid. When the settlement year is a funded year, the payments already made this year are Available Cash, so that year needs fewer TIPS.' },
     { prose: 'A Holdings file this app saved records a Ref CPI date, and the payments after that date are entered for you; the box is marked amber. Any other file, a broker positions export included, records no date, so the box starts at 0.' },
+    { prose: 'When the first funded year is after the settlement year, the payments already made this year are assumed applied toward the settlement year, which the ladder does not show, and the box starts at 0 for every file. To count payments toward the funded years instead, click the box and choose the payments after a chosen payment date, or state an amount outright.' },
     { prose: 'Maturity proceeds are counted under every Coupons setting. Coupons are counted only under <b>All remaining</b>, because <b>Only last</b> and <b>None</b> treat the coupons already paid as reinvested. A broker positions export does not list a rung that has matured, so its proceeds are stated in the amount.' },
     { prose: 'A stated amount is used as entered and is not revised, including when the Coupons setting changes. Choosing payments again asks for the figure the app counts.' },
   ];
@@ -2050,21 +2051,25 @@ function _couponEventCalc(bond, d, activeRc, activeDateIso) {
     refCpiDateDisplay: _fmtLongDate(localDate(isActual ? dIso : activeDateIso)) };
 }
 
-// Sets Available Cash at load (2.0 §Available Cash §Cash already received). A file that records a Ref
-// CPI date is offered the settlement-year coupons and maturity proceeds since that date, marked amber
-// so it reads as the app's figure rather than the holder's. A file that records no date (a broker
-// positions export, a hand-written plan) says nothing about how long the ladder has been held, so the
-// app enters nothing: the box starts at 0 as a stated amount, and the holder picks the payments in the
-// chooser or states a figure. A file that stated its own Available Cash has already said what it holds
-// and is left alone. A ladder saved today has nothing since its date, so the total comes back zero on
-// its own — no special case for the same-day round trip. Called from both load paths (holdings file /
-// account selection, and a standalone DARA plan), so the two can never disagree about the figure.
+// Sets Available Cash at load (2.0 §Available Cash §Cash already received). Payments are assumed
+// applied toward the Amount of the year they are paid, so the settlement-year payments are Available
+// Cash only where the settlement year is a funded year, which is where the Default First Year is not
+// after it. There, a file that records a Ref CPI date is offered the coupons and maturity proceeds since
+// that date, marked amber so it reads as the app's figure rather than the holder's. Otherwise the app
+// enters nothing and the box starts at 0 as a stated amount: a file that records no date (a broker
+// positions export, a hand-written plan) says nothing about how long the ladder has been held, and
+// payments of a year before the first funded year went to that year. The holder picks the payments in
+// the chooser or states a figure. A file that stated its own Available Cash has already said what it
+// holds and is left alone. A ladder saved today has nothing since its date, so the total comes back
+// zero on its own — no special case for the same-day round trip. Called from both load paths (holdings
+// file / account selection, and a standalone DARA plan), so the two can never disagree about the figure.
 function _offerReceivedCouponsAsCash(params) {
   if (params?.availableCash > 0 || currentMode !== 'rebalance') { _syncAvailableCashInput(); return; }
   _cashFileRefCpiDate = params?.refCpiDate ?? null;
   _cashAfterDefault = _cashAfterFromRefCpiDate(_cashFileRefCpiDate);
   _cashAfterDate = _cashAfterDefault;
-  if (!_cashFileRefCpiDate) {
+  const settlementIsFunded = defaultFirstYear(tipsMarketData, settlementDate) <= settlementDate.getFullYear();
+  if (!_cashFileRefCpiDate || !settlementIsFunded) {
     _availableCash = 0;
     _availableCashAuto = false;
     _availableCashUserSet = true;

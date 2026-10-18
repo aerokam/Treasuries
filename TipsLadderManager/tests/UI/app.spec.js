@@ -2035,7 +2035,9 @@ test('Available Cash is offered from coupons already received, only for a ladder
   await expect(cash).toHaveValue('');
   await expect(mark).toBeHidden();
 
-  // The same plan stated a year ago: every coupon paid since counts, and the offer returns.
+  // The same plan stated a year ago: where the settlement year is a funded year, every payment since
+  // counts and the offer returns. Before the first funded year the payments are assumed applied toward
+  // the settlement year, so nothing is entered, and choosing the payments counts them toward the ladder.
   // availableCash=0 is written here on purpose: the CUSIP/Qty export always emits the key, so every
   // ladder that never had cash entered carries a zero. Reading that as "the file stated its cash"
   // would suppress the offer on precisely the aged exports it exists for.
@@ -2045,8 +2047,17 @@ test('Available Cash is offered from coupons already received, only for a ladder
     '#fundedYear,dara', ...years.map(y => y + ',40000')].join('\n') + '\n');
   await chooseMenu(page, 'import-menu', 'dara-plan');
   await page.locator('#dara-plan-import-file').setInputFiles(planAged);
-  await expect(mark).toBeVisible();
-  expect(Number(await cash.inputValue())).toBeGreaterThan(0);
+  const settleYear = Number((await computeSettleDateStr()).slice(0, 4));
+  if (SY <= settleYear) {
+    await expect(mark).toBeVisible();
+    expect(Number(await cash.inputValue())).toBeGreaterThan(0);
+  } else {
+    await expect(cash).toHaveValue('');
+    await expect(mark).toBeHidden();
+    await chooseEveryPayment(page);
+    expect(Number(await cash.inputValue())).toBeGreaterThan(0);
+    await expect(mark).toBeVisible();
+  }
 });
 
 test('DARA plan with no Ref CPI date: used as written, then scaled once a date is supplied', async ({ page }) => {
