@@ -1983,18 +1983,21 @@ test('Available Cash counts maturity proceeds from rungs that have already matur
   await expect(page.locator('#available-cash-auto')).toBeVisible({ timeout: 4_000 });
   const offered = Number(await cash.inputValue());
 
-  // The help popup leads with what arrived on each payment date, and names the rungs that matured.
-  await page.locator('#available-cash-help').click();
-  const text = await page.locator('body').innerText();
-  // The table header is uppercased by CSS, and innerText reflects that.
-  expect(text).toMatch(/coupons/i);
-  expect(text).toMatch(/principal/i);
-  expect(text).toMatch(/rungs that have matured/i);
-
   // Maturity proceeds dwarf the coupons here: whole rungs of ten bonds each against part of a year of coupons.
-  const matured = text.match(/matured \d{2}\/\d{2}\/\d{4}/g) ?? [];
-  expect(matured.length, 'every matured rung is named').toBe(rungs.length);
   expect(offered, 'the matured rungs plus coupons are a large figure').toBeGreaterThan(8000 * rungs.length);
+});
+
+// The Available Cash help opens with what the figure is for and what to leave out, then says which
+// payments are counted. It carries no table of payments: the choices and their amounts are in the popup
+// the box opens.
+test('the Available Cash help states what the figure is for and carries no payment table', async ({ page }) => {
+  test.setTimeout(20_000);
+  await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 4_000 });
+  await page.locator('#available-cash-help').click();
+  const help = page.locator('#shared-popup');
+  await expect(help).toContainText('Cash available to apply toward the annual real amount of the earliest funded year or years.');
+  await expect(help).toContainText('Cash intended for reinvestment in the ladder is not entered here.');
+  await expect(help).not.toContainText('not counted');
 });
 
 // Coupons a held ladder has already collected this year are money in hand (2.0 §Available Cash),

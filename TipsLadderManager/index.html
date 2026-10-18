@@ -832,80 +832,16 @@ document.getElementById('alloc-policy-help').addEventListener('click', e => {
 
 document.getElementById('available-cash-help').addEventListener('click', e => {
   e.stopPropagation();
-  const sections = [];
-
-  // What has arrived, before anything about what it means. This is the figure being questioned when
-  // the help is opened, and it was previously at the bottom under everything explaining it.
-  const ledger = _settlementYearPaymentLedger(currentHoldingsArray);
-  if (ledger.length > 0) {
-    const money = v => v > 0 ? '$' + Math.round(v).toLocaleString() : '—';
-    const couponsCount = _rmdCouponMode === 'all';
-    const stated = _availableCashUserSet;   // the box holds a stated amount, so no payment is counted
-    const cell = (v, on) => '<td style="text-align:right;padding:2px 0 2px 14px;font-variant-numeric:tabular-nums'
-      + (on ? '' : ';color:#94a3b8;text-decoration:line-through') + '">' + money(v) + '</td>';
-    let rows = '<tr style="font-size:10px;color:#64748b;text-transform:uppercase">'
-      + '<td style="padding:0 0 3px">Paid</td>'
-      + '<td style="text-align:right;padding:0 0 3px 14px">Coupons</td>'
-      + '<td style="text-align:right;padding:0 0 3px 14px">Principal</td></tr>';
-    for (const e of ledger) {
-      rows += '<tr><td style="padding:2px 0">' + esc(_shortDay(e.date))
-        + (e.counted && !stated ? '' : ' <span style="font-size:10px;color:#94a3b8">not counted</span>') + '</td>'
-        + cell(e.coupons, e.counted && !stated && couponsCount)
-        + cell(e.principal, e.counted && !stated) + '</tr>';
-    }
-    rows += '<tr><td colspan="3" style="padding:3px 0 0"><hr style="border:none;border-top:1px solid #cbd5e1;margin:0"></td></tr>'
-      + '<tr style="font-weight:700"><td style="padding:3px 0">Available Cash</td>'
-      + '<td colspan="2" style="text-align:right;padding:3px 0;font-variant-numeric:tabular-nums">$'
-      + Math.round(_availableCash).toLocaleString() + '</td></tr>';
-    sections.push({ html: '<table style="border-collapse:collapse;width:100%">' + rows + '</table>' });
-    const win = stated
-      ? 'The box holds an amount stated outright, so none of these payments is counted. Open the chooser from the box and pick a starting point to count the payments after it.'
-      : _cashAfterDate
-      ? 'Every payment after the ' + esc(_shortDay(_cashAfterDate))
-        + ' coupon payment date is included; earlier ones are not.'
-      : 'Every payment above is included.';
-    const cpn = couponsCount || stated ? ''
-      : ' Coupons are excluded, the <b>Coupons</b> setting being <b>'
-        + (_rmdCouponMode === 'none' ? 'None' : 'Only last') + '</b>.';
-    sections.push({ prose: '<span style="font-size:11px;color:#334155">' + win + cpn + '</span>' });
-    sections.push({ sep: true });
-  }
-
-  sections.push(
+  const sections = [
     { prose: 'Cash available to apply toward the annual real amount of the earliest funded year or years. The Available Cash is applied to the earliest funded year first and moves up the ladder until it is exhausted, so a year it covers in full buys no TIPS.' },
     { prose: 'Cash intended for reinvestment in the ladder is not entered here. Leave the box empty; Net Cash then reports the cost of the purchases as a negative figure.' },
     { sep: true },
-    { heading: 'When the app enters a figure' },
-    { prose: 'A ladder loaded in Rebalance may have been held over part of the settlement year, and the cash flows it generated over that part may have been received. Settlement-year income is assumed applied toward that year&rsquo;s Amount rather than reinvested, so it is cash on hand and belongs here. Whether the app enters a figure depends on what the loaded file records.' },
-    { prose: '<b>A Holdings file this app saved</b> records the settlement Ref CPI date in effect when it was saved. Settlement-year coupons and maturity proceeds after that date are included. Anything from an earlier year never is, however far back the recorded date falls: a rung funds its own year, and money received in an earlier year was applied toward that year. A file saved today has nothing after its date, so nothing is entered, and exporting a ladder and loading it back the same day proposes no trades. Where a figure is entered, the box is marked amber to show it is the app&rsquo;s rather than yours.' },
-    { prose: '<b>A broker positions export</b> records no date at all, and the same holds for any other file without a Ref CPI date. The app cannot tell how long the ladder has been held, so it enters nothing and the box starts at 0. Open the chooser from the box to count the settlement-year payments after a starting point, or state the amount outright.' },
-    { prose: 'The starting point is a coupon payment date to count <i>after</i>, chosen from the dates this portfolio was actually paid on. Cash reaches the holder only on those dates, so no other starting point would produce a different figure.' },
-    { prose: 'That choice governs this figure only. It is not a Ref CPI date and restates nothing. Scaling per-year amounts to a Ref CPI date is a separate entry, offered where a loaded DARA plan carries amounts but records no Ref CPI date; a file carrying no per-year amounts, a broker positions export among them, has nothing there to restate.' },
-    { sep: true },
-    { heading: 'What is counted' },
-    { prose: '<b>Coupons</b> already paid on every holding.' },
-    { prose: '<b>Maturity proceeds.</b> A rung that has matured paid out its inflation-adjusted principal together with its final coupon, which is that year&rsquo;s Amount arriving. A ladder holding January, April and July rungs and rebalanced in August has been paid all three; the later in the year, the more of the settlement year&rsquo;s rungs have already paid out.' },
-    { prose: 'Maturity proceeds are recoverable only from a Holdings file this app saved, which keeps the matured rung and its quantity. A broker positions export lists current holdings, and a matured rung is no longer held, so it is absent from the file and its proceeds are yours to enter.' },
-    { sep: true },
-    { heading: 'The coupon half follows the Coupons setting' },
-    { prose: 'Whether the settlement year&rsquo;s coupons are applied toward that year&rsquo;s Amount or reinvested is a single question, stated on the settlement year&rsquo;s <b>Coupons</b> control. This figure follows that control rather than asking again, and is recomputed when it changes:' },
-    { prose: '<b>All remaining:</b> coupons are applied toward this year, so every coupon already paid is included.<br><b>Only last:</b> every coupon but the final one is reinvested, and each coupon already paid precedes the last one still to arrive, so none are included.<br><b>None:</b> all are reinvested, so none are included.' },
-    { prose: '<b>Maturity proceeds do not follow it.</b> Returned principal is not coupon income, and a rung exists to mature and be applied toward its year&rsquo;s Amount, so it is included under every setting.' },
-    { prose: 'Coupons still to arrive this year are not counted here. They have not been received, so they are not cash on hand; they are income to the settlement year&rsquo;s own rung, governed by the <b>Coupons</b> control.' },
-    { sep: true },
-    { prose: 'Entering a figure ends the offer, as does clearing the box. The amber mark clears, the entered value is used as stated, and the app does not revise it, including on a later change to the Coupons setting. Choosing a window again asks for the app&rsquo;s figure back.' },
-  );
-
-  // Which rungs the principal came from, named at the end rather than in the table above, where a
-  // CUSIP per row would crowd out the figures.
-  const maturedAll = ledger.flatMap(e => e.matured);
-  if (maturedAll.length > 0) {
-    sections.push({ sep: true },
-      { heading: 'Rungs that have matured' },
-      { prose: maturedAll
-        .map(x => esc(x.cusip) + ', ' + x.qty + ' &times; matured ' + esc(_fmtMDY(_isoDate(x.maturity))))
-        .join('<br>') });
-  }
+    { heading: 'Payments received this year' },
+    { prose: 'The coupons and maturity proceeds the ladder has paid this year are cash on hand unless they were reinvested. Click the box to count the payments after a chosen payment date, or to state an amount outright.' },
+    { prose: 'A Holdings file this app saved records a Ref CPI date, and the payments after that date are entered for you; the box is marked amber. Any other file, a broker positions export included, records no date, so the box starts at 0.' },
+    { prose: 'Maturity proceeds are counted under every Coupons setting. Coupons are counted only under <b>All remaining</b>, because <b>Only last</b> and <b>None</b> treat the coupons already paid as reinvested. A broker positions export does not list a rung that has matured, so its proceeds are stated in the amount.' },
+    { prose: 'A stated amount is used as entered and is not revised, including when the Coupons setting changes. Choosing payments again asks for the figure the app counts.' },
+  ];
   showPopup(e.currentTarget, 'Available Cash', sections);
 });
 document.getElementById('bracket-mode-help').addEventListener('click', e => {
@@ -2181,33 +2117,6 @@ function _bondOrMatured(cusip) {
 function _maturedMaturity(cusip) {
   const maturity = _bondOrMatured(cusip)?.maturity;
   return maturity && _tradeDateStr && maturedOnOrBefore(_actualPaymentDate(maturity), localDate(_tradeDateStr)) ? maturity : null;
-}
-
-// Every settlement-year payment this portfolio has already generated, one entry per payment date,
-// with what arrived on it: coupons, and principal where a rung matured that day. Whether a date is
-// counted toward Available Cash depends on the window and, for the coupon half, on the coupon-
-// counting choice, so each entry carries that rather than leaving the reader to work out why the
-// figures do not add up to the total.
-function _settlementYearPaymentLedger(holdingsArr) {
-  const out = [];
-  const dates = _settlementYearPaymentDates(holdingsArr);
-  if (dates.length === 0) return out;
-  let prev = null;
-  let runningCoupons = 0, runningPrincipal = 0;
-  // Each date’s own figures are the difference between counting after the date before it and
-  // counting after this one, so the arithmetic behind the total is the arithmetic on show.
-  for (const d of dates) {
-    const upToPrev = _settlementYearCashReceivedSince(holdingsArr, prev);
-    const upToThis = _settlementYearCashReceivedSince(holdingsArr, d);
-    const coupons = upToPrev.coupons - upToThis.coupons;
-    const principal = upToPrev.principal - upToThis.principal;
-    const matured = upToPrev.matured.filter(m => !upToThis.matured.some(x => x.cusip === m.cusip));
-    const counted = !_cashAfterDate || d > _cashAfterDate;
-    out.push({ date: d, coupons, principal, matured, counted });
-    runningCoupons += coupons; runningPrincipal += principal;
-    prev = d;
-  }
-  return out;
 }
 
 // Settlement-year cash this portfolio has ALREADY RECEIVED — money the holder collected during the
