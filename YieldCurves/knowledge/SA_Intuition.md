@@ -35,7 +35,7 @@ By applying $Price \times (S_{settle} / S_{maturity})$, we "flatten the hill." E
 When you see the **SA Yield** in the chart, you are seeing the true market reward for lending money, entirely independent of whether the bond matures in a "lucky" inflation month or not.
 
 ---
-*Authority: 31 CFR § 356 Appendix B; Canty (1998) "TIPS Seasonal Adjustments"*
+*Authority: 31 CFR § 356 Appendix B; [Canty (2009)](./Canty.md), "Seasonally Adjusted Prices for Inflation-Linked Bonds"*
 
 ## Terms
 - [SA Factor](../../knowledge/DATA_DICTIONARY.md#sa-factor)
