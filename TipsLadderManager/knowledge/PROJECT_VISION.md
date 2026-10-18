@@ -1,81 +1,50 @@
-# TIPS Ladder Builder — Project Vision
+# TIPS Ladder Manager: Project Vision
 
 ## Purpose
 
-A web-based tool for building and rebalancing TIPS (Treasury Inflation-Protected Securities) ladders. Designed to be both practically useful for investment decisions and **educational** — every number on screen should be explainable down to first principles.
+A web-based tool for building and rebalancing [TIPS Ladders](../../knowledge/DATA_DICTIONARY.md#tips-ladder). It is meant to support investment decisions and to teach: every number on screen can be explained down to first principles.
 
 ---
 
-## Current State (as of early 2026)
+## What the App Does
 
-Both core modes are shipped and operational:
-
-- **Build**: Given a DARA and time horizon, constructs a fresh TIPS ladder with duration-matching excess for gap years (2037–2039)
-- **Rebalance**: Given current holdings, computes trades needed to realign the ladder — either gap-only (fill newly-available maturities from bracket proceeds) or full (rebuild from current portfolio cash at inferred DARA)
-
-The UI provides:
-- Main table: CUSIP/Maturity/Funded Year rows with bracket rows split into funded year portion (main row) + Gap portion (sub-row)
-- Drill-down popups on key cells showing the full calculation chain
-- Parameters bar and net cash/market value callout
-- Frozen headers and totals row
+- **Build** constructs a TIPS Ladder from a [DARA](../../knowledge/DATA_DICTIONARY.md#dara), a First Year and a Last Year ([Build Ladder (4.3)](./4.3_Build_Ladder.md)).
+- **Rebalance** reads the user's holdings and computes the trades that bring them to the ladder ([Rebalance Ladder (4.4)](./4.4_Rebalance_Ladder.md), [TIPS Ladder Rebalancing (3.0)](./3.0_TIPS_Ladder_Rebalancing.md)).
 
 ---
 
 ## Design Principles
 
 ### 1. Educational over opaque
-Every displayed value should be traceable: popup → formula → spec doc. The tool should teach the math, not just show results. A user who clicks through every popup should understand TIPS ladder construction from first principles.
+Every displayed value traces from popup to formula to spec section. A user who clicks through every popup sees how a TIPS Ladder is constructed.
 
 ### 2. Spec-first development
-The knowledge MD files are the source of truth. Code implements the spec; the spec is not inferred from code. Any calculation question is answered from the spec first, then verified in code.
+The knowledge files are the source of truth. The code implements the spec, and the spec is not inferred from the code. A calculation question is answered from the spec first and then verified in the code.
 
-### 3. Build and Rebalance share a common mathematical foundation
-They are the same algorithm — both do a longest-to-shortest ladder sweep, both use duration-matching to size bracket excess, both use the same cost/P+I formulas. The difference is only in the "before state": Rebalance has one (current holdings), Build does not. The codebase should reflect this shared foundation rather than treating them as separate implementations.
+### 3. Build and Rebalance share one foundation
+Both calculate the same quantities from the same formulas and differ only in the state before the run: Rebalance has the holdings, Build has none. The code follows that foundation, and [TIPS Ladder Rebalancing (3.0)](./3.0_TIPS_Ladder_Rebalancing.md) §Build ≡ Rebalance states the invariant.
 
-### 4. Transparency via progressive disclosure
-- Main table: clean, user-facing values
-- Popup (one click): full calculation chain for any cell
-- Future: deeper drill-down into sub-components (e.g., duration derivation, yield interpolation, RefCPI lookup)
-
----
-
-## Long-Term UX Vision
-
-The ideal UX is a layered drill-down:
-
-1. **Summary view**: Total portfolio value, net cash impact, ARA vs DARA gap
-2. **Ladder table**: Per-rung view with funded year/Gap split for bracket years
-3. **Cell popup**: Full calculation chain for any value (current)
-4. **Deep drill**: Sub-popups for components — e.g., click "Later Maturity Interest" in an ARA popup to see the running pool breakdown; click a duration to see the yield curve and interpolation
-5. **Weight rationale**: Visual showing gap years' average duration and how brackets bracket it
-
-This positions the tool as educational infrastructure for understanding TIPS ladders, not just a trade calculator.
-
----
-
-## Completed Refactor (March 2026)
-
-The following architectural improvements have been implemented to stabilize the codebase:
-
-1. **Modularization**: JS moved from `index.html` to `src/` modules (`render.js`, `drill.js`, `data.js`, etc.).
-2. **Unified Rendering**: Single `buildDrillHTML` and `COLS` schema serving both Build and Rebalance modes.
-3. **Variable Harmonization**: Consistent naming (`fyQty`, `costPerBond`) across `build-lib` and `rebalance-lib`.
-4. **Shared Math**: Gap/bracket logic extracted to `src/gap-math.js`.
-5. **Data Pipeline**: Backend scripts moved to `scripts/` and integrated with Cloudflare R2 via GitHub Actions.
-6. **Testing**: Robust E2E and regression suite in `tests/` with static fixtures.
+### 4. Progressive disclosure
+- The main table shows the values the user acts on.
+- A popup, one click from a cell, shows the calculation chain of that cell.
+- A second-level popup, one click from a popup row, shows a component of the chain, such as a duration calculation ([UI Schema (5.0)](./5.0_UI_Schema.md)).
 
 ---
 
 ## Knowledge Architecture
 
-The `knowledge/` directory is the spec layer:
+The `knowledge/` directory is the spec layer. Lower-numbered specs are the foundation of higher-numbered ones:
 
-- **1.0** Bond Basics → **2.0** Bond Ladders → **2.1** TIPS Basics → **3.0** TIPS Ladders / **3.1** Data Pipeline → **4.0** TIPS Ladder Rebalancing / **4.1** Broker Import
-- Each file inherits from dependencies; formulas are additive up the chain
-- **4.0** is the primary reference: contains all named quantities, formulas, code variable mapping, and algorithm phases
-- When adding a new displayed value: spec it in the appropriate knowledge file first, then implement
+- **1.0** [Bond Ladders](./1.0_Bond_Ladders.md), which requires [Bond Basics](../../knowledge/Bond_Basics.md)
+- **2.0** [TIPS Ladders](./2.0_TIPS_Ladders.md), with **2.1** [Export](./2.1_Export.md); requires [TIPS Basics](../../knowledge/TIPS_Basics.md)
+- **3.0** [TIPS Ladder Rebalancing](./3.0_TIPS_Ladder_Rebalancing.md), with **3.1** [Data Pipeline](./3.1_Data_Pipeline.md)
+- **4.0** [Computation Modules](./4.0_Computation_Modules.md), with **4.1** to **4.4**, one spec for each process
+- **5.0** [UI Schema](./5.0_UI_Schema.md) and **6.0** [UI Layout](./6.0_UI_Layout.md)
 
-The traceability chain for any popup value:
+The terms are defined once, in the [Data Dictionary](../../knowledge/DATA_DICTIONARY.md). The [Technical Reference](./TECHNICAL_REFERENCE.md) maps them to code symbols.
+
+A new displayed value is specified in the appropriate spec first and then implemented. The chain from the screen to the code:
+
 ```
-UI display → popup formula → spec section (4.0 Named Quantities or Phase formulas) → code variable (4.0 Code Variable Mapping) → implementation
+UI display → popup row (5.0) → spec section (2.0, 3.0 or 4.x) → code symbol (Technical Reference) → implementation
 ```

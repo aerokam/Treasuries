@@ -1,6 +1,6 @@
 # TipsLadderManager Technical Reference
 
-This document maps conceptual definitions from the [Master Glossary](../../knowledge/DATA_DICTIONARY.md) to specific implementation variables and constants within the TipsLadderManager project.
+This document maps the terms of the [Data Dictionary](../../knowledge/DATA_DICTIONARY.md) to specific implementation variables and constants within the TipsLadderManager project.
 
 ---
 
@@ -8,10 +8,10 @@ This document maps conceptual definitions from the [Master Glossary](../../knowl
 
 | Spec Constant | Variable Name | Value / Purpose |
 |---|---|---|
-| MIN_BRACKET_YEAR | `LOWEST_LOWER_BRACKET_YEAR` | `2032` (defines the search range for the lower bracket) |
-| LOWER_COVER_YIELD | `src/ladder-core.js#LOWER_COVER_YIELD` | `0.04`, the yield at which the Synthetic TIPS of the first Future 30Y year is measured when the Lower cover is chosen (DD §5.0) |
-| EXCLUDE_MATURING_WITHIN_MONTHS | `src/ladder-core.js#EXCLUDE_MATURING_WITHIN_MONTHS` | `3`, the months after the Settlement Date within which a TIPS is not offered in Build: absent from the First Year list and not chosen for a funded year (DD §5.1). `defaultFirstYear`, `tipsMaturingAfterExclusion`, the `excludeMaturingWithinMonths` argument of `selectLadderBonds` and `runBuild`, and the Build picker apply it. |
-| MAX_LAST_YEAR | `src/ladder-core.js#maxLastYear` | Longest-dated issued TIPS maturity year + the Maximum Future 30Y Rungs (DD §5.1). It is the upper bound of the Last Year selector; the years after the longest issued maturity year are Future 30Y Rungs covered by the Cover Excess. |
+| `LOWEST_LOWER_BRACKET_YEAR` | `src/rebalance-lib.js#LOWEST_LOWER_BRACKET_YEAR` | `2032`, the floor of the search range for the lower bracket among the holdings (DD §5.0) |
+| `LOWER_COVER_YIELD` | `src/ladder-core.js#LOWER_COVER_YIELD` | `0.04`, the yield at which the Synthetic TIPS of the first Future 30Y year is measured when the Lower cover is chosen (DD §5.0) |
+| `EXCLUDE_MATURING_WITHIN_MONTHS` | `src/ladder-core.js#EXCLUDE_MATURING_WITHIN_MONTHS` | `3`, the months after the Settlement Date within which a TIPS is not offered in Build: absent from the First Year list and not chosen for a funded year (DD §5.1). `defaultFirstYear`, `tipsMaturingAfterExclusion`, the `excludeMaturingWithinMonths` argument of `selectLadderBonds` and `runBuild`, and the Build picker apply it. |
+| Ladder’s last year, at most | `src/ladder-core.js#maxLastYear` | The longest issued maturity year plus the Maximum Future 30Y Rungs (DD §5.1). It is the upper bound of the Last Year selector. |
 
 ---
 
@@ -35,20 +35,20 @@ This document maps conceptual definitions from the [Master Glossary](../../knowl
 |---|---|---|
 | [Quantity](../../knowledge/DATA_DICTIONARY.md#quantity) (Current) | `d.qtyBefore` | N/A |
 | [Quantity](../../knowledge/DATA_DICTIONARY.md#quantity) (Target) | `d.qtyAfter` | `d.fundedYearQty + d.excessQty` |
-| Funded Year Qty | `d.fyQty` | `d.fundedYearQty` |
-| Excess Qty | `d.excessQtyAfter` | `d.excessQty` |
+| Funded Year Qty | `d.fundedYearQtyBefore`, `d.fundedYearQtyAfter` | `d.fundedYearQty` |
+| Excess Qty | `d.excessQtyBefore`, `d.excessQtyAfter` | `d.excessQty` |
 
 ---
 
 ## Gap Year and Future 30Y Coverage & Ladder Bounds
 
-Concepts from 2.0 §Duration Matching and §Gap/Future-30Y, bound to code symbols. A run of years with no issued TIPS is a
-stretch of years whose TIPS have not yet been issued; each is duration-covered by a *pair* of real TIPS.
+Concepts from 2.0 §Duration Matching (Brackets) and §Future 30Y Cover Pair, bound to code symbols. A [Gap Year](../../knowledge/DATA_DICTIONARY.md#gap-years) and a Future 30Y year each take a pair of real TIPS.
 
 | Concept | Code Symbol | Notes |
 |---|---|---|
 | First / Last Funded Year (ladder endpoints) | `firstYear` / `lastYear` | endpoints of the ladder, not bracket years |
-| Gap lower bracket / upper bracket (gap **bracket pair**) | `lowerYear`/`lowerCUSIP`, `upperYear`/`upperCUSIP` | most recently issued 10-year TIPS below the gap / 2040 |
+| Lower bracket and upper bracket of the Gap Years (gap **bracket pair**) | `lowerYear`/`lowerCUSIP`, `upperYear`/`upperCUSIP` | the held [Bracket Maturity](../../knowledge/DATA_DICTIONARY.md#bracket-maturity) from `LOWEST_LOWER_BRACKET_YEAR` to the year before the first Gap Year with the most ARA above DARA; the February maturity of `UPPER_BRACKET_YEAR` (2040, `src/ladder-core.js`) |
+| [Active Lower Bracket](../../knowledge/DATA_DICTIONARY.md#active-lower-bracket) | `newLowerYear`/`newLowerCUSIP` | the latest-maturing TIPS with a maturity year before the first Gap Year |
 | Future-30Y lower cover / upper cover (Future-30Y **cover pair**) | `future30yLowerCoverBond` / `future30yUpperCoverBond` | the rule in 2.0 §Future 30Y Cover Pair |
 | Imported excess (cover/bracket excess from the file's excess column) | `h.excessQty` (Holdings Export or tipsladder.com format import) | a calculated field, only ever written by this app's export; records build intent, not user-edited |
 | First-funded-year recovery (reverse-engineer gap duration match) | `inferFirstYearFromHoldings` | gap side may use the excess→DARA ratio shortcut |
@@ -59,10 +59,10 @@ stretch of years whose TIPS have not yet been issued; each is duration-covered b
 ## Project-Specific Details
 
 ### Settlement Date
-In this project, the settlement date is determined by `walkBackFromToday(fedinvestData)`. It is typically T+1 or the most recent available price date.
+The [Settlement Date](../../knowledge/DATA_DICTIONARY.md#settlement-date) is set by `loadMarketData()`, as [Load Market Data (4.1)](./4.1_Load_Market_Data.md) states.
 
 ### Annual Real Amount (ARA) Components
 For drill-down purposes, the code splits ARA into components:
 - `d.araAfterPrincipal`: (Quantity * Adjusted Principal)
-- `d.araAfterOwnCoupon`: (Quantity * Semi-annual interest * nPayments)
+- `d.araAfterOwnCoupon`: the [Last-Year Interest](../../knowledge/DATA_DICTIONARY.md#last-year-interest) of the Quantity
 - `d.araAfterLaterMatInt`: Sum of LMI from already-processed rungs.
