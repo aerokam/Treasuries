@@ -1,87 +1,43 @@
 # Treasury Investors Portal
 
-The portal is the browser-based entry point to all Treasury investment tools. It links to nine standalone apps plus one third-party tool, each focused on a distinct phase of Treasury portfolio management. All portal apps run privately in the browser; no user data is uploaded to any server.
+The portal is the browser-based entry point to all Treasury investment tools. It links to ten apps and one third-party tool, each focused on a distinct phase of Treasury portfolio management. The apps run in the browser, and no user data is uploaded to any server.
 
 **URL (GH Pages):** `https://aerokam.github.io/Treasuries/`
 
 ---
 
-## 1.0 App Catalog (A)
+## 1.0 App Catalog
 
-| ID | App | Folder | Purpose |
-|----|-----|--------|---------|
-| A1 | Ladder Manager | [TipsLadderManager/](../TipsLadderManager/knowledge/) | Design and rebalance TIPS ladders; deep-drill calculation chains |
-| A2 | Yield Curves | [YieldCurves/](../YieldCurves/knowledge/) | Treasury yield curves with seasonal adjustment (SA/SAO) overlays |
-| A3 | Yields Monitor | [YieldsMonitor/](../YieldsMonitor/knowledge/) | Live intraday and historical yield charts for selected maturities, with an optional SA yield overlay for all five TIPS maturities (1Y/2Y/5Y/10Y/30Y) |
-| A4 | Treasury Auctions | [TreasuryAuctions/](../TreasuryAuctions/knowledge/) | Upcoming and historical auction results with spreadsheet-style filtering |
-| A5 | TIPS Reference | [TipsReference/](../TipsReference/knowledge/) | Live TIPS reference table: CUSIP, maturity, coupon, Dated Date Ref CPI, price, index ratio, adjusted price, and yield |
-| A6 | CPI Explorer | [CpiExplorer/](../CpiExplorer/knowledge/) | CPI index levels, YoY/MoM changes, rolling windows, and CAGR over any date range |
-| A7 | Taxation of Treasuries | [TaxationOfTreasuries/](../TaxationOfTreasuries/) | Reference docs for federal and state tax treatment of Treasury bills, notes, bonds, and TIPS — OID, inflation adjustments, 1099 reconciliation |
-| A8 | Seasonal Adjustments | [SeasonalAdjustments/](../SeasonalAdjustments/knowledge/) | Interactive explainer for TIPS seasonal adjustment and the SA/SAO yield series |
-| A9 | Fund Holdings | [FundHoldings/](../FundHoldings/knowledge/) | Vanguard/F/m Treasury & TIPS fund holdings by CUSIP, enriched with ask/SA/SAO yield, term, and duration |
-| A10 | After-Tax TIPS Ladder Calculator *(third-party)* | https://motips.pythonanywhere.com/data-entry/ | After-tax return calculator for TIPS ladders; linked from the portal because it complements the suite but is not a portal app |
+The numbers are the process numbers of [Level 1](/knowledge/DFD_LEVEL1), and the order is the order of the portal index.
+
+| # | App | Folder | Purpose |
+|---|-----|--------|---------|
+| 2 | Yields Monitor | [YieldsMonitor/](../YieldsMonitor/knowledge/) | Live intraday and historical yield charts for selected maturities, with an optional SA yield overlay for all five TIPS maturities (1Y/2Y/5Y/10Y/30Y) |
+| 3 | Yield Curves | [YieldCurves/](../YieldCurves/knowledge/) | Treasury yield curves with seasonal adjustment (SA/SAO) overlays |
+| 4 | Ladder Manager | [TipsLadderManager/](../TipsLadderManager/knowledge/) | Design and rebalance TIPS ladders; deep-drill calculation chains |
+| 5 | Treasury Auctions | [TreasuryAuctions/](../TreasuryAuctions/knowledge/) | Upcoming and historical auction results with spreadsheet-style filtering |
+| 6 | TIPS Reference | [TipsReference/](../TipsReference/knowledge/) | TIPS reference table: CUSIP, maturity, coupon, Dated Date Ref CPI, price, index ratio, adjusted price, yield, term, duration and next coupon |
+| 7 | CPI Explorer | [CpiExplorer/](../CpiExplorer/knowledge/) | CPI index levels, YoY/MoM changes, rolling windows, and point-to-point annualized change over any date range |
+| 8 | Taxation of Treasuries | [TaxationOfTreasuries/](../TaxationOfTreasuries/) | Reference docs for federal and state tax treatment of Treasury bills, notes, bonds, and TIPS: OID, inflation adjustments, 1099 reconciliation |
+| 9 | Fund Holdings | [FundHoldings/](../FundHoldings/knowledge/) | Treasury and TIPS fund holdings by CUSIP, enriched with ask yield, SA and SAO yield, term and duration |
+| 10 | Portal Primer | [Primer/](../Primer/knowledge/) | A guided walkthrough of the portal, app by app, with the Treasury and TIPS terminology behind each screen |
+| 11 | Seasonal Adjustments | [SeasonalAdjustments/](../SeasonalAdjustments/knowledge/) | Slide deck on TIPS seasonal adjustment and the SA/SAO yield series |
+| | After-Tax TIPS Ladder Calculator *(third-party)* | https://motips.pythonanywhere.com/ | After-tax return calculator for TIPS ladders; linked from the portal because it complements the suite but is not a portal app |
 
 ---
 
 ## 2.0 System Architecture
 
-```
-External Sources (E)  →  Ingestion Jobs (P)  →  Cloudflare R2 (S)  →  Browser Apps (A)
-     E1–E12                GH Actions /               S1–S12                A1–A9
-                         Local Tasks (Win)
-```
+External sources are read by scheduled jobs (process 1 on Level 1), which write the data stores on Cloudflare R2. The apps read the stores directly from R2 at runtime over public HTTPS URLs, with two exceptions: Yields Monitor reads its market yields and live quotes, and Treasury Auctions its upcoming auctions, straight from the sources. There is no server-side rendering and no authentication.
 
-All apps fetch data directly from Cloudflare R2 at runtime using public HTTPS URLs. No server-side rendering; no authentication.
-
----
-
-## 3.0 Data Store Assignments (S → A)
-
-| Data Store | File | Primary Consumer(s) |
-|------------|------|---------------------|
-| [S1](./DATA_DICTIONARY.md#s1) | YieldsFromFedInvestPrices.csv | A1 (ladder pricing), A2 (yield curves) |
-| [S2](./DATA_DICTIONARY.md#s2) | TipsRef.csv | A1 (TIPS metadata) |
-| [S3](./DATA_DICTIONARY.md#s3) | RefCPI.csv | A1 (index ratio), A5 (daily Ref CPI series) |
-| [S4](./DATA_DICTIONARY.md#s4) | RefCpiNsaSa.csv | A2 (SA factor computation) |
-| [S5](./DATA_DICTIONARY.md#s5) | Auctions.csv | A4 (historical auction data) |
-| [S6](./DATA_DICTIONARY.md#s6) | YieldHistory/ | A3 (historical yield time series) |
-| [S7](./DATA_DICTIONARY.md#s7) | FidelityTreasuriesTips.csv | A2 (broker bid/ask quotes), A9 (nominal fund holdings enrichment) |
-| [S8](./DATA_DICTIONARY.md#s8) | CPI_history.csv | A5 (full monthly CPI history 1913+) |
-| [S9](./DATA_DICTIONARY.md#s9) | Tentative-Auction-Schedule.xml | A4 (flag TIPS in upcoming auctions) |
-| [S10](./DATA_DICTIONARY.md#s10) | YieldsSaSao.csv | A1 (SA yield for the within-year allocation policy), A8 (via a committed snapshot, not this object), A9 (TIPS fund holdings enrichment) |
-| [S11](./DATA_DICTIONARY.md#s11) | FundHoldings/&lt;TICKER&gt;.csv | A9 (fund holdings by CUSIP) |
-| [S12](./DATA_DICTIONARY.md#s12) | GswTipsCurve.json | A2 (GSW zero reference curve) |
+- The sources and their fields: [Data Dictionary §1.0](./DATA_DICTIONARY.md#1.0-external-entities-e).
+- The stores, with R2 keys and live previews: [Data Dictionary §2.0](./DATA_DICTIONARY.md#2.0-data-stores-s).
+- Which app reads which store: [Level 1](/knowledge/DFD_LEVEL1) and the Level 2 diagram of each app.
+- The ingestion jobs, with schedules, scripts and outputs: [Data_Pipeline.md](./Data_Pipeline.md).
 
 ---
 
-## 4.0 External Entities (E)
-
-All definitions are canonical in the [Data Dictionary](./DATA_DICTIONARY.md#1.0-external-entities-e).
-
-| ID | Source | Consumed By |
-|----|--------|-------------|
-| [E1](./DATA_DICTIONARY.md#e1) | FedInvest | A1, A2 |
-| [E2](./DATA_DICTIONARY.md#e2) | TreasuryDirect SecIndex | A1, A5 |
-| [E3](./DATA_DICTIONARY.md#e3) | FiscalData | A4 |
-| [E4](./DATA_DICTIONARY.md#e4) | BLS | A2 (SA), A5 (CPI history) |
-| [E5](./DATA_DICTIONARY.md#e5) | CNBC | A3 |
-| [E6](./DATA_DICTIONARY.md#e6) | Fidelity Fixed Income | A2 |
-| [E7](./DATA_DICTIONARY.md#e7) | Vanguard Advisors | A9 |
-| [E8](./DATA_DICTIONARY.md#e8) | fminvest.com | A9 |
-| [E9](./DATA_DICTIONARY.md#e9) | PIMCO | A9 |
-| [E10](./DATA_DICTIONARY.md#e10) | Schwab Asset Management holdings export | A9 |
-| [E11](./DATA_DICTIONARY.md#e11) | BondBloxx product-page holdings table | A9 |
-| [E12](./DATA_DICTIONARY.md#e12) | BlackRock iShares | A9 |
-
----
-
-## 5.0 Ingestion Pipeline
-
-See [Data_Pipeline.md](./Data_Pipeline.md) for schedules, owners, and script paths.
-
----
-
-## 6.0 Shared Knowledge Base
+## 3.0 Shared Knowledge Base
 
 | Document | Scope |
 |----------|-------|
@@ -90,23 +46,25 @@ See [Data_Pipeline.md](./Data_Pipeline.md) for schedules, owners, and script pat
 | [Bond_Basics.md](./Bond_Basics.md) | Foundational fixed-income concepts |
 | [TIPS_Basics.md](./TIPS_Basics.md) | TIPS mechanics and index ratio arithmetic |
 | [Treasury_CUSIP_Reference.md](./Treasury_CUSIP_Reference.md) | CUSIP structure and lookup reference |
-| [VERIFICATION_SUITE.md](./VERIFICATION_SUITE.md) | Setup checks and data validation procedures |
+| [VERIFICATION_SUITE.md](./VERIFICATION_SUITE.md) | Manual checks of the knowledge map and viewer |
 | [Testing.md](./Testing.md) | Automated test suites per app and which ones run before a push |
 | [Admin_Dashboard.md](./Admin_Dashboard.md) | Local monitoring dashboard for pipeline health |
 
 ---
 
-## 7.0 App-Level Knowledge (Internal Specs)
+## 4.0 App-Level Knowledge (Internal Specs)
 
-Most apps have a `knowledge/` subdirectory with their own DFD, process specs, and calculation documentation. TaxationOfTreasuries serves its content directly from `docs/` (the reference MDs are the spec).
+Most apps have a `knowledge/` subdirectory with their own process specs and calculation documentation. TaxationOfTreasuries serves its content directly from `docs/` (the reference MDs are the spec).
 
 | App | Key Specs |
 |-----|-----------|
-| TipsLadderManager | [1.0 Bond Ladders](../TipsLadderManager/knowledge/1.0_Bond_Ladders.md) · [2.0 TIPS Ladders](../TipsLadderManager/knowledge/2.0_TIPS_Ladders.md) · [3.0 Rebalancing](../TipsLadderManager/knowledge/3.0_TIPS_Ladder_Rebalancing.md) · [4.0 Computation](../TipsLadderManager/knowledge/4.0_Computation_Modules.md) · [5.0 UI Schema](../TipsLadderManager/knowledge/5.0_UI_Schema.md) |
-| YieldCurves | [3.1 Parse sources and calculate yields](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md) · [3.2 Adjust for seasonality](../YieldCurves/knowledge/3.2_Adjust_For_Seasonality.md) · [3.3 Adjust for other effects](../YieldCurves/knowledge/3.3_Adjust_For_Other_Effects.md) · [3.4 Fit spot yield curves](../YieldCurves/knowledge/3.4_Fit_Spot_Yield_Curves.md) · [3.5 Calculate breakeven inflation](../YieldCurves/knowledge/3.5_Calculate_Breakeven_Inflation.md) · [3.6 Calculate bid and ask spreads](../YieldCurves/knowledge/3.6_Calculate_Bid_And_Ask_Spreads.md) · [3.7 Render charts and tables](../YieldCurves/knowledge/3.7_Render_Charts_And_Tables.md) · [Visual Standards](../YieldCurves/knowledge/Visual_Standards.md) |
-| YieldsMonitor | [2.1 Assemble range data](../YieldsMonitor/knowledge/2.1_Assemble_Range_Data.md) · [2.2 Read live quotes](../YieldsMonitor/knowledge/2.2_Read_Live_Quotes.md) · [2.3 Calculate day change](../YieldsMonitor/knowledge/2.3_Calculate_Day_Change.md) · [2.4 Adjust for seasonality](../YieldsMonitor/knowledge/2.4_Adjust_For_Seasonality.md) · [2.5 Render time series](../YieldsMonitor/knowledge/2.5_Render_Time_Series.md) · [2.6 Render yield curve snapshots](../YieldsMonitor/knowledge/2.6_Render_Yield_Curve_Snapshots.md) · [2.7 Render breakeven inflation](../YieldsMonitor/knowledge/2.7_Render_Breakeven_Inflation.md) · [Visual Standards](../YieldsMonitor/knowledge/Visual_Standards.md) |
-| TreasuryAuctions | [Data and Views](../TreasuryAuctions/knowledge/Data_And_Views.md) · [Filtering and Columns](../TreasuryAuctions/knowledge/1.0_Filtering_And_Columns.md) |
+| TipsLadderManager | [Overview](./TipsLadderManager.md) · [1.0 Bond Ladders](../TipsLadderManager/knowledge/1.0_Bond_Ladders.md) · [2.0 TIPS Ladders](../TipsLadderManager/knowledge/2.0_TIPS_Ladders.md) · [3.0 Rebalancing](../TipsLadderManager/knowledge/3.0_TIPS_Ladder_Rebalancing.md) · [4.0 Computation](../TipsLadderManager/knowledge/4.0_Computation_Modules.md) · [5.0 UI Schema](../TipsLadderManager/knowledge/5.0_UI_Schema.md) · [6.0 UI Layout](../TipsLadderManager/knowledge/6.0_UI_Layout.md) |
+| YieldCurves | [Overview](./YieldCurves.md) · [3.1 Parse sources and calculate yields](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md) · [3.2 Adjust for seasonality](../YieldCurves/knowledge/3.2_Adjust_For_Seasonality.md) · [3.3 Adjust for other effects](../YieldCurves/knowledge/3.3_Adjust_For_Other_Effects.md) · [3.4 Fit spot yield curves](../YieldCurves/knowledge/3.4_Fit_Spot_Yield_Curves.md) · [3.5 Calculate breakeven inflation](../YieldCurves/knowledge/3.5_Calculate_Breakeven_Inflation.md) · [3.6 Calculate bid and ask spreads](../YieldCurves/knowledge/3.6_Calculate_Bid_And_Ask_Spreads.md) · [3.7 Render charts and tables](../YieldCurves/knowledge/3.7_Render_Charts_And_Tables.md) · [Visual Standards](../YieldCurves/knowledge/Visual_Standards.md) |
+| YieldsMonitor | [Overview](./YieldsMonitor.md) · [2.1 Assemble range data](../YieldsMonitor/knowledge/2.1_Assemble_Range_Data.md) · [2.2 Read live quotes](../YieldsMonitor/knowledge/2.2_Read_Live_Quotes.md) · [2.3 Calculate day change](../YieldsMonitor/knowledge/2.3_Calculate_Day_Change.md) · [2.4 Adjust for seasonality](../YieldsMonitor/knowledge/2.4_Adjust_For_Seasonality.md) · [2.5 Render time series](../YieldsMonitor/knowledge/2.5_Render_Time_Series.md) · [2.6 Render yield curve snapshots](../YieldsMonitor/knowledge/2.6_Render_Yield_Curve_Snapshots.md) · [2.7 Render breakeven inflation](../YieldsMonitor/knowledge/2.7_Render_Breakeven_Inflation.md) · [Visual Standards](../YieldsMonitor/knowledge/Visual_Standards.md) |
+| TreasuryAuctions | [Overview](./TreasuryAuctions.md) · [Data and Views](../TreasuryAuctions/knowledge/Data_And_Views.md) · [Filtering and Columns](../TreasuryAuctions/knowledge/1.0_Filtering_And_Columns.md) |
+| TipsReference | [1.0 TIPS Reference](../TipsReference/knowledge/1.0_TIPS_Reference.md) |
 | CpiExplorer | [1.0 Overview](../CpiExplorer/knowledge/1.0_Overview.md) · [2.0 Technical Spec](../CpiExplorer/knowledge/2.0_Technical_Spec.md) |
-| SeasonalAdjustments | [knowledge/](../SeasonalAdjustments/knowledge/) *(self-contained interactive explainer; see knowledge dir for details)* |
 | TaxationOfTreasuries | [Foundation](../TaxationOfTreasuries/docs/TaxationOfTreasuries_Foundation.md) · [Treasury Bills](../TaxationOfTreasuries/docs/TaxationOfTreasuryBills.md) · [Notes & Bonds](../TaxationOfTreasuries/docs/TaxationOfTreasuryNotesAndBonds.md) · [TIPS OID Reference](../TaxationOfTreasuries/docs/TIPS_OID_Tax_Reference.md) |
 | FundHoldings | [1.0 Fund Holdings](../FundHoldings/knowledge/1.0_FundHoldings.md) |
+| Primer | [1.0 Primer](../Primer/knowledge/1.0_Primer.md) |
+| SeasonalAdjustments | [1.0 Seasonal Adjustments Explorer](../SeasonalAdjustments/knowledge/1.0_SeasonalAdjustments_Explorer.md) |

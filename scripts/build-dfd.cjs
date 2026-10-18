@@ -302,7 +302,7 @@ function level1() {
   const apps = [
     { key: 'lm', cat: 'workflow', name: ['Ladder', 'Manager'], spec: 'DFD_LEVEL2_TIPSLADDERMANAGER.html', reads: ['quotes', 'tipsref', 'refcpi', 'sasao', 'hol'] },
     { key: 'tr', cat: 'reference', name: ['TIPS', 'Reference'], spec: V('TipsReference/knowledge/1.0_TIPS_Reference.md'), reads: ['tipsref', 'refcpi', 'sasao', 'hol'] },
-    { key: 'pr', cat: 'educational', name: ['Treasury', 'Primer'], spec: V('Primer/knowledge/1.0_Primer.md'), reads: ['fedinv', 'tipsref', 'refcpi'] },
+    { key: 'pr', cat: 'educational', name: ['Portal', 'Primer'], spec: V('Primer/knowledge/1.0_Primer.md'), reads: ['fedinv', 'tipsref', 'refcpi'] },
     { key: 'ce', cat: 'reference', name: ['CPI', 'Explorer'], spec: V('CpiExplorer/knowledge/1.0_Overview.md'), reads: ['refcpi', 'cpihist'] },
     { key: 'ym', cat: 'workflow', name: ['Yields', 'Monitor'], spec: 'DFD_LEVEL2_YIELDSMONITOR.html', reads: ['tipsref', 'nsasa', 'hol', 'yhist', 'ia'] },
     { key: 'yc', cat: 'workflow', name: ['Yield', 'Curves'], spec: 'DFD_LEVEL2_YIELDCURVES.html', reads: ['fedinv', 'nsasa', 'quotes', 'gsw', 'hol'] },
