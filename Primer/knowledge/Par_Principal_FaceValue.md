@@ -10,7 +10,7 @@ For a standard, plain-vanilla fixed-income security (like a traditional corporat
 
 If you buy a newly issued, standard $1,000 bond:
 
-- **Face Value** is $1,000 (the physical number printed on the certificate or ledger).
+- **Face Value** is $1,000.
 - **Par** is $1,000 (the baseline 100% pricing mark).
 - **Principal** is $1,000 (the capital sum that the issuer borrows and must repay you at maturity).
 
@@ -22,7 +22,7 @@ In more complex debt instruments, principal becomes a dynamic variable, while fa
 
 This is the most common place where the terms split.
 
-- **Face Value (and Par)**: Stays completely static. If you buy a $1,000 TIPS bond, its face value is always $1,000. It is priced relative to a "Par" of 100.
+- **Face Value (and Par)**: Stays completely static. If you buy a $1,000 TIPS bond, its face value is always $1,000.
 - **Principal**: Changes daily. The inflation-adjusted principal is calculated by multiplying the static face value by an index ratio (based on the CPI). If cumulative inflation rises by 20%, your adjusted principal becomes $1,200.
 - **The Relationship**: The coupon interest payments are calculated as a fixed percentage of this adjusted principal, not the original face value. At maturity, the Treasury pays you the adjusted principal (or the original face value, whichever is greater).
 
@@ -43,6 +43,6 @@ In bond math and market trading, the terms serve distinct mathematical roles:
 
 ### Summary
 
-- **Face Value** is the static, printed denomination.
+- **Face Value** is the static denomination.
 - **Par** is the 100% price baseline.
 - **Principal** is the actual, live debt balance outstanding that earns interest and must be repaid.
