@@ -32,13 +32,13 @@ This tool is designed for **transparency first**. Every number in the UI is trac
 
 **DARA (Desired Annual Real Amount)** — Your desired annual real amount from the ladder. Each rung is sized to produce this amount.
 
-**Gap Years** — Years within the current TIPS timeline (e.g. 2037–2039) where Treasury has not issued securities. These are covered by holding excess bonds in surrounding *bracket* years to match the average duration of the missing maturities.
+**[Gap Years](../knowledge/DATA_DICTIONARY.md#gap-years)** — The years after the longest-dated issued 10-year TIPS maturity year and before the upper bracket year, 2040, where Treasury has not yet issued a 10-year TIPS. Excess TIPS in the surrounding *bracket* years cover them by matching the average duration of the missing maturities.
 
-**Future 30Y Rungs** — Years beyond the currently issued TIPS (e.g. 2057–2066). Like gap years, these are handled via duration-matched excess in existing long-dated cover pairs (currently the 2052 and 2056 TIPS).
+**Future 30Y Rungs** — The years after the longest issued maturity year, up to the Maximum Future 30Y Rungs of [Issuance-Dependent Values](../knowledge/DATA_DICTIONARY.md#5.1-issuance-dependent-values). Like Gap Years, they are covered by duration-matched excess, in a pair of existing long-dated TIPS ([Cover Year TIPS](../knowledge/DATA_DICTIONARY.md#cover-year-tips)).
 
-**Bracket Years** — Maturity years used to cover gaps or Future 30Y rungs. *Upper bracket*: always the Feb 2040 TIPS. *Active lower bracket*: the most recently issued 10-year TIPS. With **Retain lower bracket excess** on, excess you already hold in a retained lower bracket is kept and never added to; it is sold, oldest first, only if the lower brackets are over-covered.
+**[Bracket Years](../knowledge/DATA_DICTIONARY.md#bracket-year)** — Maturity years used to cover Gap Years. *Upper bracket*: always the February 2040 TIPS. *Active lower bracket*: the most recently issued 10-year TIPS. With **Multi-bracket** (the default), the excess you already hold in an older lower bracket is kept and never added to; it is sold, oldest first, only if the lower brackets are over-covered ([Retained Bracket Excess](../knowledge/DATA_DICTIONARY.md#retained-bracket-excess)).
 
-**Same-Maturity Excess Interest** — Bracket and cover excess TIPS are ordinary held bonds: interest paid in their own maturity year counts toward that year's amount, and it also flows down as LMI to every shorter year, the same as any other TIPS's coupon. Bracket excess (lower/upper gap brackets) covers gap years; cover excess (the Future 30Y cover pair) covers Future 30Y rungs. Example: excess Feb 2056 TIPS held to cover Future 30Y rungs (2057–2066) — their interest contributes to the 2056 funded year's amount, reducing the quantity of 2056 TIPS needed, and the same coupon also flows down to 2055 and every year below.
+**Excess interest** — Bracket Excess and Cover Excess are ordinary held bonds: the interest they pay flows down as [LMI](../knowledge/DATA_DICTIONARY.md#lmi) to every shorter-maturity year, as any other coupon does. [Same-Maturity Excess Interest](../knowledge/DATA_DICTIONARY.md#same-maturity-excess-interest) states the interest that counts toward the Amount of the year it is paid in.
 
 ---
 
@@ -46,11 +46,11 @@ This tool is designed for **transparency first**. Every number in the UI is trac
 
 | Data | Source | Schedule |
 |---|---|---|
-| TIPS prices & yields | Market prices from a broker | Several times per weekday |
-| Reference CPI | BLS (via TreasuryDirect) | Monthly |
-| TIPS metadata (coupon, dated date Ref CPI) | TreasuryDirect securities list | As needed |
+| Market quotes: TIPS prices and yields | A broker download | Weekdays at 5:05am, 9:35am and 2:05pm PT |
+| Ref CPI | TreasuryDirect | Each BLS release date, at 6:30am PT |
+| TIPS reference data (coupon, dated date Ref CPI) | FiscalData | Weekdays at 8:35am and 10:05am PT |
 
-Prices are fetched from the broker feed several times a day and uploaded to Cloudflare R2; the app fetches the CSV data directly from R2. FedInvest (TreasuryDirect) prices are also ingested daily as a dormant cross-check path, not currently surfaced in the app.
+The market quotes are uploaded to Cloudflare R2, and the app reads the CSV data directly from R2. FedInvest prices are also stored each weekday as a dormant source, not currently used by the app.
 
 ---
 
@@ -58,7 +58,7 @@ Prices are fetched from the broker feed several times a day and uploaded to Clou
 
 This project is built on **spec-first development**. All logic and formulas are documented in the following knowledge-base files:
 
-- **[Master Glossary](../knowledge/DATA_DICTIONARY.md)**: Authoritative source for all financial terms, mathematical formulas, and project-specific terminology.
+- **[Data Dictionary](../knowledge/DATA_DICTIONARY.md)**: Defines every term the specs and the app use.
 - **[Bond Basics](../knowledge/Bond_Basics.md)**: Fundamental concepts for nominal Treasuries.
 - **[TIPS Basics](../knowledge/TIPS_Basics.md)**: Detailed interpolation logic and inflation-adjustment rules.
 - **[TIPS Ladder Rebalancing](./knowledge/3.0_TIPS_Ladder_Rebalancing.md)**: The core algorithm for rebalancing existing holdings.
@@ -73,4 +73,4 @@ To get started, visit the [Treasury Investors Portal](https://aerokam.github.io/
 
 ## Local Development
 
-For local development, execute `npx serve .` from the root directory of the `Treasuries` repository and navigate to `http://localhost:8080/TipsLadderManager/`. (Note: Root serving is required for shared components).
+For local development, execute `npx serve . -p 8080` from the root directory of the `Treasuries` repository and navigate to `http://localhost:8080/TipsLadderManager/`. (Note: Root serving is required for shared components).
