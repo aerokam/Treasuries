@@ -8,19 +8,9 @@ Audit run 2026-04-30. Cleanup executed 2026-05-21.
 
 ---
 
-## Confirmed Active — Keep
+## Live Objects
 
-| Prefix | Files |
-|--------|-------|
-| `TIPS/` | `RefCPI.csv`, `TipsRef.csv`, `RefCpiNsaSa.csv`, `Tentative-Auction-Schedule.xml`, `YieldsSaSao.csv` |
-| `Treasuries/` | `YieldsFromFedInvestPrices.csv`, `Auctions.csv`, `FidelityTreasuriesTips.csv`, `yield-history/*.json` (14 files) |
-| `bls/` | `CPI.csv`, `CPI_history.csv`, `CpiReleaseSchedule2025.csv`, `CpiReleaseSchedule2026.csv` |
-| `misc/` | `BondHolidaysSifma.csv` |
-| `schwab/` | `SchwabHoldings-SCHP.csv` (written by external ScrapeSchwabHoldings project) |
-
-### Key dependencies:
-- `TIPS/TipsRef.csv` — used by `scripts/getYieldsFedInvest.js` (script input) and TipsLadderManager browser app
-- `TIPS/RefCPI.csv` — used by TipsLadderManager and CpiExplorer
+The data stores of the bucket, with their R2 keys, are in [Data Dictionary §2.0](./DATA_DICTIONARY.md#2.0-data-stores-s). The sections below are dated corrections made to the bucket.
 
 ---
 
