@@ -839,9 +839,8 @@ document.getElementById('available-cash-help').addEventListener('click', e => {
     { heading: 'Payments received this year' },
     { prose: 'Coupons and maturity proceeds are assumed applied toward the Amount of the year they are paid. When the settlement year is a funded year, the payments already made this year are Available Cash, so that year needs fewer TIPS.' },
     { prose: 'A Holdings file this app saved records a Ref CPI date, and the payments after that date are entered for you; the box is marked amber. Any other file, a broker positions export included, records no date, so the box starts at 0.' },
-    { prose: 'When the first funded year is after the settlement year, the payments already made this year are assumed applied toward the settlement year, which the ladder does not show, and the box starts at 0 for every file. To count payments toward the funded years instead, click the box and choose the payments after a chosen payment date, or state an amount outright.' },
-    { prose: 'Maturity proceeds are counted under every Coupons setting. Coupons are counted only under <b>All remaining</b>, because <b>Only last</b> and <b>None</b> treat the coupons already paid as reinvested. A broker positions export does not list a rung that has matured, so its proceeds are stated in the amount.' },
-    { prose: 'A stated amount is used as entered and is not revised, including when the Coupons setting changes. Choosing payments again asks for the figure the app counts.' },
+    { prose: 'When the first funded year is after the settlement year, the payments already made this year are assumed applied toward the settlement year, which the ladder does not show, and the box starts at 0 for every file. To count payments toward the funded years instead, click the box and choose the payments after a chosen payment date, or type an amount.' },
+    { prose: 'A broker positions export does not include TIPS that have matured, so include proceeds from these that apply toward funded year amounts in Available Cash.' },
   ];
   showPopup(e.currentTarget, 'Available Cash', sections);
 });
@@ -2080,26 +2079,17 @@ function _offerReceivedCouponsAsCash(params) {
   _applyReceivedCashOffer();
 }
 
-// Recomputes the offered figure against the coupon-counting choice in force, and is re-run whenever
-// that choice changes (2.0 §Available Cash §Cash already received). Whether this year's coupons were
-// kept toward this year or reinvested is ONE decision, asked once on the settlement year's Coupons
-// control; this box follows it rather than asking again:
+// Puts the payments received since `_cashAfterDate` in the box as the app's figure (2.0 §Available Cash
+// §Cash already received): every coupon and every maturity proceed paid after that payment date. The
+// Coupon Counting choice covers the coupons still to arrive and does not enter this figure, which the
+// Available Cash chooser alone decides.
 //
-//   'all'  — coupons are kept, so every one already paid is offered
-//   'last' — every coupon but the final one is reinvested, and each already-paid coupon is by
-//            definition earlier than the last one still to arrive, so none are offered
-//   'none' — all are reinvested, so none are offered
-//
-// Maturity proceeds do NOT follow it. Returned principal is not coupon income, and a rung exists to
-// mature and be applied toward its year's Amount, so it counts under every setting.
-//
-// Silent once the holder has typed a figure of their own (`_availableCashUserSet`), including
-// clearing the box to nothing: their number is theirs, and a later change to the coupon control must
-// not overwrite it.
+// Silent once the holder has stated a figure (`_availableCashUserSet`), including clearing the box to
+// nothing: their number stands.
 function _applyReceivedCashOffer() {
   if (_availableCashUserSet || currentMode !== 'rebalance') return;
   const r = _settlementYearCashReceivedSince(currentHoldingsArray, _cashAfterDate);
-  const total = (_rmdCouponMode === 'all' ? r.coupons : 0) + r.principal;
+  const total = r.coupons + r.principal;
   _availableCash = total > 0 ? total : 0;
   _availableCashAuto = total > 0;
   _syncAvailableCashInput();
@@ -2213,12 +2203,12 @@ function _cashAfterFromRefCpiDate(refCpiDate) {
 
 // What Available Cash is made of, named the way 2.0 §Available Cash names it: coupons already
 // paid, and maturity proceeds from rungs that have matured. Which of the two are in play is not
-// fixed — the coupon half answers to the coupon-counting choice, and a file of current positions
+// fixed — no coupon may have been paid since the chosen date, and a file of current positions
 // carries no matured rung to draw proceeds from — so every string that says what the figure
 // includes asks here rather than asserting both.
 function _cashComponentsLabel() {
   const r = _settlementYearCashReceivedSince(currentHoldingsArray, _cashAfterDate);
-  const coupons = _rmdCouponMode === 'all' && r.coupons > 0;
+  const coupons = r.coupons > 0;
   const principal = r.principal > 0;
   if (coupons && principal) return 'coupons and maturity proceeds';
   if (principal) return 'maturity proceeds';
@@ -2918,8 +2908,6 @@ document.getElementById('dara-plan-import-file').addEventListener('change', asyn
   const vals = [...daraMap.values()].sort((a, b) => a - b);
   _availableCash = importedParams?.availableCash ?? 0;
   _availableCashAuto = false;
-  // The coupon-counting choice is restored FIRST: the offer below is computed against it, so
-  // offering before restoring would credit coupons a plan saved with 'none' says were reinvested.
   _rmdCouponMode = importedParams?.rmdCouponMode ?? 'all';
   // A plan restates the ladder at its own Ref CPI date, so the received-cash window moves with it.
   _offerReceivedCouponsAsCash(importedParams);
@@ -3284,8 +3272,7 @@ let _availableCash = 0;   // 2.0 §Available Cash — ladder-wide, consumed earl
 // control amber; cleared by any edit, and by any reset that zeroes the figure.
 let _availableCashAuto = false;
 // True once the holder has stated (or cleared) the figure, and from load for a file that records no Ref
-// CPI date, where the app has no basis for a figure. The app then stops touching the box entirely — no
-// recompute when the coupon-counting choice changes.
+// CPI date, where the app has no basis for a figure. The app then stops touching the box.
 let _availableCashUserSet = false;
 // The coupon payment date the count runs AFTER, exclusive of that date’s own payment. Null counts
 // the whole settlement year. Kept so the offer can be recomputed later without the file’s params in
@@ -3310,7 +3297,7 @@ function _syncAvailableCashInput() {
     ? 'Settlement-year ' + _cashComponentsLabel()
       + (_cashAfterDate ? ' after the ' + _shortDay(_cashAfterDate) + ' coupon payment date' : '')
       + '. Click to change.'
-    : 'Click to choose which payments are included, or to state an amount.';
+    : 'Click to choose which payments are included, or to type an amount.';
 }
 
 // The figure is either one the app counts from the payments this ladder has generated, or one the holder
@@ -3329,7 +3316,7 @@ function _openAvailableCashChooser() {
   }
   list.innerHTML = values.map(v => {
     const r = _settlementYearCashReceivedSince(currentHoldingsArray, v || null);
-    const amt = (_rmdCouponMode === 'all' ? r.coupons : 0) + r.principal;
+    const amt = r.coupons + r.principal;
     const label = v ? 'After ' + esc(_shortDay(v)) : 'Every settlement-year payment';
     const on = !_availableCashUserSet && (_cashAfterDate ?? '') === v;
     return '<label style="display:flex;align-items:center;gap:6px;font-size:12px;padding:2px 0">'
@@ -3348,7 +3335,7 @@ function _openAvailableCashChooser() {
   maturedNote.hidden = currentImportedParams != null;
   maturedNote.innerHTML = 'A rung that matured earlier this settlement year is no longer held, so a '
     + 'file of current positions does not list it and the choices above cannot count its principal. '
-    + 'That principal was applied toward this year&rsquo;s Amount all the same: state the total here.';
+    + 'That principal was applied toward this year&rsquo;s Amount all the same: type the total here.';
   const manual = pop.querySelector('input[value="manual"]');
   manual.checked = _availableCashUserSet;
   document.getElementById('available-cash-manual').value = _availableCashUserSet && _availableCash
@@ -3374,6 +3361,10 @@ document.getElementById('available-cash').addEventListener('focus', _openAvailab
 document.getElementById('available-cash-cancel').addEventListener('click', () => {
   document.getElementById('available-cash-popover').hidden = true;
 });
+// Typing an amount is choosing it: the Amount choice is selected without a separate click on its button.
+document.getElementById('available-cash-manual').addEventListener('input', () => {
+  document.querySelector('#available-cash-popover input[value="manual"]').checked = true;
+});
 document.getElementById('available-cash-apply').addEventListener('click', () => {
   const pop = document.getElementById('available-cash-popover');
   const picked = pop.querySelector('input[name="available-cash-choice"]:checked');
@@ -3387,7 +3378,7 @@ document.getElementById('available-cash-apply').addEventListener('click', () => 
     _availableCashUserSet = true;
   } else {
     // Picking a set of payments is asking for the figure they produce, so it takes the box back
-    // from a stated amount.
+    // from a typed amount.
     _cashAfterDate = picked.value || null;
     _availableCashUserSet = false;
     _applyReceivedCashOffer();
@@ -3791,10 +3782,7 @@ function getDaraByYear() {
     }
     const r = _settlementYearCashReceivedSince(currentHoldingsArray, _cashAfterDate);
     if (r.coupons > 0) {
-      const amt = '$' + Math.round(r.coupons).toLocaleString();
-      bits.push('Coupons already received are counted in <b>Available Cash</b>, not here. '
-        + '<b>All remaining</b> counts them (' + amt + '); <b>None</b> and <b>Only last</b> do not, '
-        + 'treating them as reinvested.');
+      bits.push('Coupons already received are counted in <b>Available Cash</b>, not here.');
     }
     return bits.join('<br><br>');
   };
@@ -3825,8 +3813,6 @@ function getDaraByYear() {
     r.addEventListener('change', () => {
       if (!r.checked) return;
       _rmdCouponMode = r.value;
-      // One decision, two places it shows: the offered Available Cash follows this control.
-      _applyReceivedCashOffer();
       document.getElementById('rmd-linkage-note').innerHTML = linkageNoteHTML();
       commitAndMaybeRecompute();
     });

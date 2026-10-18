@@ -1843,9 +1843,9 @@ test('the ladder table keeps its expansion state when a top-card control changes
 });
 
 // The figure is either one the app counts from the payments already received or one the holder
-// states outright, and both are chosen in the popup the field opens (2.0 §Available Cash). Clicking
+// types, and both are chosen in the popup the field opens (2.0 §Available Cash). Clicking
 // the field does not put a cursor in it: the chooser is where the figure is set.
-test('Available Cash takes either a set of received payments or a stated amount', async ({ page }) => {
+test('Available Cash takes either a set of received payments or a typed amount', async ({ page }) => {
   test.setTimeout(20_000);
   const cash = page.locator('#available-cash');
   const pop = page.locator('#available-cash-popover');
@@ -1859,17 +1859,19 @@ test('Available Cash takes either a set of received payments or a stated amount'
   expect(wholeYear).toBeGreaterThan(0);
   await expect(page.locator('#available-cash-auto')).toBeVisible();
 
-  // A stated amount stands, and the amber mark clears: the figure is no longer the app's.
+  // A typed amount stands, and the amber mark clears: the figure is no longer the app's. Typing it selects
+  // Amount and clears the payment choices, with no click on the Amount button.
   await cash.click();
   await expect(pop).toBeVisible();
-  await pop.locator('input[value="manual"]').check();
   await page.locator('#available-cash-manual').fill('1234');
+  await expect(pop.locator('input[value="manual"]')).toBeChecked();
+  await expect(pop.locator('input[value=""]')).not.toBeChecked();
   await page.locator('#available-cash-apply').click();
   await expect(pop).toBeHidden();
   await expect(cash).toHaveValue('1234');
   await expect(page.locator('#available-cash-auto')).toBeHidden();
 
-  // Reopening shows the stated amount, and choosing payments again asks for the app's figure back.
+  // Reopening shows the typed amount, and choosing payments again asks for the app's figure back.
   await cash.click();
   await expect(pop.locator('input[value="manual"]')).toBeChecked();
   await expect(page.locator('#available-cash-manual')).toHaveValue('1234');
@@ -1880,26 +1882,23 @@ test('Available Cash takes either a set of received payments or a stated amount'
 
   // Cancel leaves the figure alone.
   await cash.click();
-  await pop.locator('input[value="manual"]').check();
   await page.locator('#available-cash-manual').fill('99');
   await page.locator('#available-cash-cancel').click();
   await expect(pop).toBeHidden();
   expect(Number(await cash.inputValue() || 0)).toBeCloseTo(wholeYear, 2);
 });
 
-// Whether this year's coupons were kept toward this year or reinvested is one decision, asked on the
-// settlement year's Coupons control. The offered Available Cash follows it live. Maturity proceeds do
-// not: returned principal is not coupon income. And once the holder types a figure of their own, the
-// app stops touching the box, including when the Coupons setting changes afterwards.
-test('Available Cash follows the Coupons setting, and stops once the holder sets it', async ({ page }) => {
+// Available Cash is the payments already received, and the chooser alone decides which of them count. The
+// Coupon Counting choice covers the coupons still to arrive, so changing it leaves the figure alone, and a
+// figure the holder states stands whatever the choice.
+test('Available Cash does not follow the Coupon Counting choice', async ({ page }) => {
   test.setTimeout(20_000);
   const cash = page.locator('#available-cash');
   const mark = page.locator('#available-cash-auto');
   await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 4_000 });
 
   // Sample holdings: a broker-style file, so the app enters nothing; every payment, once chosen, is
-  // coupons only (a broker never lists a matured bond). That makes it the clean case for watching the
-  // coupon half switch off.
+  // coupons only (a broker never lists a matured bond).
   await expect(cash).toHaveValue('');
   await chooseEveryPayment(page);
   const withAll = Number(await cash.inputValue());
@@ -1911,26 +1910,16 @@ test('Available Cash follows the Coupons setting, and stops once the holder sets
   const link = page.locator(`#simple-table tr.fy-group-header[data-fy="${firstYear}"] .fy-rmd-link`);
   const pop = page.locator('#rmd-options-popover');
 
-  // None: every coupon is reinvested, so none of the ones already paid are counted either.
-  await link.click();
-  await pop.locator('input[name="rmd-coupon-mode"][value="none"]').check();
-  await page.locator('#rmd-options-close').click();
-  await expect(cash).toHaveValue('');
+  // None and Only last leave the payments already received as they were.
+  for (const mode of ['none', 'last', 'all']) {
+    await link.click();
+    await pop.locator(`input[name="rmd-coupon-mode"][value="${mode}"]`).check();
+    await page.locator('#rmd-options-close').click();
+    await expect(cash).toHaveValue(String(withAll));
+    await expect(mark).toBeVisible();
+  }
 
-  // Only last: same reasoning — every already-paid coupon is earlier than the last still to arrive.
-  await link.click();
-  await pop.locator('input[name="rmd-coupon-mode"][value="last"]').check();
-  await page.locator('#rmd-options-close').click();
-  await expect(cash).toHaveValue('');
-
-  // Back to All remaining and the offer returns, unchanged.
-  await link.click();
-  await pop.locator('input[name="rmd-coupon-mode"][value="all"]').check();
-  await page.locator('#rmd-options-close').click();
-  await expect(cash).toHaveValue(String(withAll));
-  await expect(mark).toBeVisible();
-
-  // A figure the holder states is theirs: the Coupons control must not overwrite it afterwards.
+  // A figure the holder states stands: the Coupon Counting choice does not change it.
   await cash.click();
   await page.locator('#available-cash-popover input[value="manual"]').check();
   await page.locator('#available-cash-manual').fill('7500');
