@@ -77,7 +77,7 @@ function bondVarRows(d, nPeriods, principalPerBond, couponPct) {
   return row('Ref CPI', '', fd(d.refCPI, 5), false, 'refCPI', 'refcpi')
     + row('Dated date Ref CPI', '', fd(d.datedDateRefCpi, 5), false, undefined, 'datedDateRefCpi')
     + row('Index ratio', '<span class="formula-var" data-source="refcpi">Ref CPI</span> \xf7 <span class="formula-var" data-source="datedDateRefCpi">Dated date Ref CPI</span>', fd(d.paymentIndexRatio, 5), false, 'paymentIndexRatio', 'ir')
-    + row('Par Value per TIPS', '1,000 \xd7 <span class="formula-var" data-source="ir">index ratio</span>', fd(principalPerBond, 2), false, undefined, 'ppb')
+    + row('Inflation-Adjusted Principal per TIPS', '1,000 \xd7 <span class="formula-var" data-source="ir">index ratio</span>', fd(principalPerBond, 2), false, undefined, 'ppb')
     + row('Coupon per period', 'annual coupon \xf7 2', couponPct, false, undefined, 'cpp')
     + row('Yield', '', fd(d.yield * 100, 3) + '%')
     + row('SA Yield', '', d.saYield != null ? fd(d.saYield * 100, 3) + '%' : '—')
@@ -245,7 +245,7 @@ export function buildDrillHTML(d, colKey, summary) {
       : 'from TIPS maturing after ' + d.fundedYear;
     // Multi-TIPS funded year (semiannual / all): the year's principal is delivered by several TIPS
     // with different par values, so list each TIPS's P+I contribution (like the rebalance Amount drill)
-    // rather than a single "Par Value × Qty". Single-TIPS years keep the detailed per-bond breakdown.
+    // rather than a single "Inflation-Adjusted Principal × Qty". Single-TIPS years keep the detailed per-bond breakdown.
     const _rungs = (d.fundedRungs && d.fundedRungs.length > 1) ? d.fundedRungs : null;
 
     let totalFmla = _rungs
@@ -288,8 +288,8 @@ export function buildDrillHTML(d, colKey, summary) {
       sep() +
       bondVarRows(d, nPeriods, principalPerBond, couponPct) +
       sep() +
-      row('Principal', '<span class="formula-var" data-source="ppb">Par Value/TIPS</span> \xd7 <span class="formula-var" data-source="qty">Quantity</span>', fm(d.fundedYearPrincipalTotal)) +
-      row(couponLabel, '<span class="formula-var" data-source="ppb">Par Value/TIPS</span> \xd7 <span class="formula-var" data-source="cpp">coupon/period</span> \xd7 <span class="formula-var" data-source="cp">periods</span> \xd7 <span class="formula-var" data-source="qty">Quantity</span>', fm(d.fundedYearOwnRungInt)) +
+      row('Principal', '<span class="formula-var" data-source="ppb">Inflation-Adjusted Principal/TIPS</span> \xd7 <span class="formula-var" data-source="qty">Quantity</span>', fm(d.fundedYearPrincipalTotal)) +
+      row(couponLabel, '<span class="formula-var" data-source="ppb">Inflation-Adjusted Principal/TIPS</span> \xd7 <span class="formula-var" data-source="cpp">coupon/period</span> \xd7 <span class="formula-var" data-source="cp">periods</span> \xd7 <span class="formula-var" data-source="qty">Quantity</span>', fm(d.fundedYearOwnRungInt)) +
       row(_lmiLabel, _lmiDesc, fm(longerDatedInt), false, undefined, 'lmi') +
       (sameYearExInt > 0 ? row('Same-maturity excess interest', 'from excess TIPS maturing in ' + d.fundedYear, fm(sameYearExInt), false, undefined, 'exlmi') : '') +
       (_plCredit - _cashCredit > 0 ? row('Pre-ladder credit', 'Pre-Ladder Interest applied to this year', fm(_plCredit - _cashCredit), false, 'plcpool') : '') +
@@ -479,7 +479,7 @@ export function buildDrillHTML(d, colKey, summary) {
         sep() +
         bondVarRows(d, nPeriods, principalPerBond, couponPct) +
         sep() +
-        row('P+I per TIPS', '<span class="formula-var" data-source="ppb">Par Value/TIPS</span> × (1 + <span class="formula-var" data-source="cpp">coupon/period</span> × <span class="formula-var" data-source="cp">periods</span>)', fm2(piPerBond), false, undefined, 'pipb') +
+        row('P+I per TIPS', '<span class="formula-var" data-source="ppb">Inflation-Adjusted Principal/TIPS</span> × (1 + <span class="formula-var" data-source="cpp">coupon/period</span> × <span class="formula-var" data-source="cp">periods</span>)', fm2(piPerBond), false, undefined, 'pipb') +
         sep() +
         row('Quantity After', qtyFmla, fyQty, true);
     }
@@ -660,7 +660,7 @@ export function buildPIPerBondDrill(h) {
   const couponNote = '$' + fd(h.principalPerBond, 2) + ' \u00d7 ' + fd(h.coupon / 2 * 100, 5) + '% \u00d7 ' + h.nPeriods + ' (' + periodLabel + ')';
   return [
     { label: 'Index ratio', note: 'Ref CPI \u00f7 Dated date Ref CPI', value: fd(ir, 5) },
-    { label: 'Par Value', note: '1,000 \u00d7 index ratio', value: '$' + fd(h.principalPerBond, 2) },
+    { label: 'Inflation-Adjusted Principal', note: '1,000 \u00d7 index ratio', value: '$' + fd(h.principalPerBond, 2) },
     { label: 'Coupon interest', note: couponNote, value: '$' + fd(couponInterest, 2) },
     { sep: true },
     { label: 'P+I per TIPS', value: '$' + fd(piPB, 2), total: true }
@@ -752,15 +752,15 @@ export function buildCashFlowEventDrill(e) {
     { label: 'Ref CPI', value: fd(e.refCPI, 5) },
     { label: 'Dated date Ref CPI', value: fd(e.datedDateRefCpi, 5) },
     { label: 'Index ratio', note: 'Ref CPI \xf7 Dated date Ref CPI', value: fd(e.paymentIndexRatio, 5) },
-    { label: 'Par Value per TIPS', note: '1,000 \xd7 index ratio', value: fm2(e.principalPerBond) },
+    { label: 'Inflation-Adjusted Principal per TIPS', note: '1,000 \xd7 index ratio', value: fm2(e.principalPerBond) },
   ];
   if (e.type === 'coupon') {
     rows.push({ label: 'Coupon per period', note: 'annual coupon \xf7 2', value: fd(e.coupon / 2 * 100, 5) + '%' });
     rows.push({ sep: true });
-    rows.push({ label: 'Coupon per TIPS', note: 'Par Value/TIPS \xd7 coupon/period', value: fm2(e.principalPerBond * e.coupon / 2) });
+    rows.push({ label: 'Coupon per TIPS', note: 'Inflation-Adjusted Principal/TIPS \xd7 coupon/period', value: fm2(e.principalPerBond * e.coupon / 2) });
   } else {
     rows.push({ sep: true });
-    rows.push({ label: 'Principal per TIPS', note: 'Par Value/TIPS at this index ratio', value: fm2(e.principalPerBond) });
+    rows.push({ label: 'Principal per TIPS', note: 'Inflation-Adjusted Principal/TIPS at this index ratio', value: fm2(e.principalPerBond) });
   }
   rows.push({ label: 'Quantity', value: e.qty });
   rows.push({ sep: true });

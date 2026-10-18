@@ -3790,7 +3790,7 @@ console.log('\nFuture 30Y Dur popup — cost-weighted average, computed match, c
   assert('runBuild: the gap years are 2037-2039', built?.summary.gapYears.join(','), '2037,2038,2039');
 }
 
-console.log('\nIndex Ratio decimals in drills — nine where it feeds Cost per TIPS, five where it feeds Par Value per TIPS (5.0)');
+console.log('\nIndex Ratio decimals in drills — nine where it feeds Cost per TIPS, five where it feeds Inflation-Adjusted Principal per TIPS (5.0)');
 {
   // The value cell of the row with this label in a drill's HTML.
   const cellOf = (html, label) => {
@@ -3809,20 +3809,20 @@ console.log('\nIndex Ratio decimals in drills — nine where it feeds Cost per T
     const amt = buildDrillHTML(d, 'amount', summary);
     const ir5 = cellOf(amt, 'Index ratio');
     if (/^\d+\.\d{5}$/.test(ir5)) five++;
-    if ((1000 * Number(ir5)).toFixed(2) !== cellOf(amt, 'Par Value per TIPS')) parBad++;
+    if ((1000 * Number(ir5)).toFixed(2) !== cellOf(amt, 'Inflation-Adjusted Principal per TIPS')) parBad++;
   }
   assert('Index Ratio drills: every Cost per TIPS drill shows the Index Ratio to nine decimals', nine, rows.length);
   assert('Index Ratio drills: price/100 x the Index Ratio shown x 1,000 equals the Cost per TIPS in every Cost drill', costBad, 0);
-  assert('Index Ratio drills: every Par Value per TIPS drill shows the payment Index Ratio to five decimals', five, rows.length);
-  assert('Index Ratio drills: 1,000 x the Index Ratio shown equals the Par Value per TIPS shown in every Amount drill', parBad, 0);
+  assert('Index Ratio drills: every Inflation-Adjusted Principal per TIPS drill shows the payment Index Ratio to five decimals', five, rows.length);
+  assert('Index Ratio drills: 1,000 x the Index Ratio shown equals the Inflation-Adjusted Principal per TIPS shown in every Amount drill', parBad, 0);
   const d0 = rows[0];
   assert('Index Ratio drills: the Index Ratio drill of a Cost per TIPS shows the unrounded ratio to nine decimals', buildIndexRatioDrill(d0).find(r => r.label === 'Index Ratio').value, d0.indexRatio.toFixed(9));
-  assert('Index Ratio drills: the Index Ratio drill of a Par Value per TIPS shows the payment ratio to five decimals', buildIndexRatioDrill(d0, 'payment').find(r => r.label === 'Index Ratio').value, d0.paymentIndexRatio.toFixed(5));
+  assert('Index Ratio drills: the Index Ratio drill of a Inflation-Adjusted Principal per TIPS shows the payment ratio to five decimals', buildIndexRatioDrill(d0, 'payment').find(r => r.label === 'Index Ratio').value, d0.paymentIndexRatio.toFixed(5));
   assert('Index Ratio drills: the Trade Ticket Cost drill shows nine decimals', buildTradeTicketCostDrill({ price: 100, indexRatio: d0.indexRatio, costPerBond: 1, qty: 1, cost: 1 }).find(r => r.label === 'Index Ratio').value, d0.indexRatio.toFixed(9));
   const bc = bondCalcs({ coupon: 0.01, datedDateRefCpi: 250, price: 100, maturity: new Date(2030, 3, 15) }, 337.123456789);
   const ev = buildCashFlowEventDrill({ refCPI: 337.123456789, datedDateRefCpi: 250, indexRatio: bc.indexRatio, paymentIndexRatio: bc.paymentIndexRatio, principalPerBond: bc.principalPerBond, coupon: 0.01, qty: 1, amount: 1, type: 'principal' });
   assert('Index Ratio drills: a Cash Flow Calendar event shows the payment Index Ratio to five decimals', ev.find(r => r.label === 'Index ratio').value, bc.paymentIndexRatio.toFixed(5));
-  assert('Index Ratio drills: the Par Value per TIPS of the event is 1,000 x the ratio shown', ev.find(r => r.label === 'Par Value per TIPS').value, '$' + (1000 * Number(bc.paymentIndexRatio.toFixed(5))).toLocaleString('en-US', { minimumFractionDigits: 2 }));
+  assert('Index Ratio drills: the Inflation-Adjusted Principal per TIPS of the event is 1,000 x the ratio shown', ev.find(r => r.label === 'Inflation-Adjusted Principal per TIPS').value, '$' + (1000 * Number(bc.paymentIndexRatio.toFixed(5))).toLocaleString('en-US', { minimumFractionDigits: 2 }));
 }
 
 console.log(`\n${passed + failed} tests: ${passed} passed, ${failed} failed`);

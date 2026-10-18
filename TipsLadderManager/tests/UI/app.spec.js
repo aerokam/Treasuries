@@ -2909,7 +2909,7 @@ test('plain file with one unknown CUSIP shows the skipped CUSIP message in #stat
 
 // ── Index Ratio decimals in drills (5.0 §Index Ratio decimals in drills) ──────
 // Nine decimals where the Index Ratio feeds Cost per TIPS, Accrued Interest or sale proceeds (unrounded);
-// five where it feeds Par Value per TIPS, a coupon or a principal payment (Treasury's rule). Each row must
+// five where it feeds Inflation-Adjusted Principal per TIPS, a coupon or a principal payment (Treasury's rule). Each row must
 // reproduce its result from the numbers shown.
 async function labelValueRows(scope) {
   return scope.locator('tr').evaluateAll(trs => trs.map(tr => {
@@ -2939,7 +2939,7 @@ test('Index Ratio decimals: a Cost per TIPS drill shows nine decimals and price/
   await expect(page.locator('#shared-popup'), 'the Index Ratio drill shows the ratio of the row it was opened from').toContainText(ratio);
 });
 
-test('Index Ratio decimals: a Par Value per TIPS drill shows the payment ratio to five decimals and 1,000 x ratio equals the Par Value per TIPS', async ({ page }) => {
+test('Index Ratio decimals: a Inflation-Adjusted Principal per TIPS drill shows the payment ratio to five decimals and 1,000 x ratio equals the Inflation-Adjusted Principal per TIPS', async ({ page }) => {
   await page.locator('#holdings-file').setInputFiles(HOLDINGS_PATH);
   await page.locator('#run-btn').click();
   await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 4_000 });
@@ -2948,8 +2948,8 @@ test('Index Ratio decimals: a Par Value per TIPS drill shows the payment ratio t
   await expect(page.locator('#drill-overlay')).toBeVisible();
   const rows = await labelValueRows(page.locator('#drill-content'));
   const ratio = valueOf(rows, 'Index ratio');
-  expect(ratio, 'Index ratio shows five decimals where it feeds Par Value per TIPS').toMatch(/^\d+\.\d{5}$/);
-  expect((1000 * Number(ratio)).toFixed(2), '1,000 x ratio shown equals the Par Value per TIPS shown').toBe(valueOf(rows, 'Par Value per TIPS'));
+  expect(ratio, 'Index ratio shows five decimals where it feeds Inflation-Adjusted Principal per TIPS').toMatch(/^\d+\.\d{5}$/);
+  expect((1000 * Number(ratio)).toFixed(2), '1,000 x ratio shown equals the Inflation-Adjusted Principal per TIPS shown').toBe(valueOf(rows, 'Inflation-Adjusted Principal per TIPS'));
   await page.locator('.drill-l3[data-l3="paymentIndexRatio"]').click();
   await expect(page.locator('#shared-popup'), 'the Index Ratio drill shows the ratio of the row it was opened from').toContainText(ratio);
 });
@@ -2967,7 +2967,7 @@ test('Index Ratio decimals: a Cash Flow Calendar principal or coupon drill shows
   const rows = await labelValueRows(page.locator('#shared-popup-l3'));
   const ratio = valueOf(rows, 'Index ratio');
   expect(ratio).toMatch(/^\d+\.\d{5}$/);
-  expect(money(valueOf(rows, 'Par Value per TIPS')), '1,000 x ratio shown equals the Par Value per TIPS shown').toBeCloseTo(1000 * Number(ratio), 2);
+  expect(money(valueOf(rows, 'Inflation-Adjusted Principal per TIPS')), '1,000 x ratio shown equals the Inflation-Adjusted Principal per TIPS shown').toBeCloseTo(1000 * Number(ratio), 2);
 });
 
 test('Index Ratio decimals: a Trade Ticket Cost drill shows nine decimals and reproduces the Cost per TIPS', async ({ page }) => {
