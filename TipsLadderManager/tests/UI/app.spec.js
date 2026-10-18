@@ -1735,28 +1735,35 @@ test('a holdings file with no DARA block says its Per-Year DARA is derived from 
 // recorded, and any hand-written plan). The app cannot know the date and does not guess: the values
 // are used as written, and the status strip offers to supply one. Supplying an earlier date scales
 // the values from it to the settlement date (3.0 §DARA Reference Date).
-// A broker file records no date, so the whole settlement year is counted. That is the right default
-// for a position held all along, but it is an assumption the holder cannot otherwise see, and it
-// moves trades, so the strip says so and offers the alternatives.
+// The sample holdings are a broker-style file with no Ref CPI date, and the app cannot tell how long
+// such a ladder has been held, so it enters nothing: Available Cash starts at 0, and the holder counts
+// the payments in the popup the field opens or states an amount.
 //
 // The window is chosen from the coupon payment dates this portfolio was actually paid on, exclusive
 // of the date named. Cash arrives only on those dates, so a free calendar offered a year of days of
 // which at most six differed, and could not say whether the date picked was itself counted.
+// Choose every settlement-year payment in the Available Cash popup, which asks for the app's figure.
+async function chooseEveryPayment(page) {
+  await page.locator('#available-cash').click();
+  await page.locator('#available-cash-popover input[value=""]').check();
+  await page.locator('#available-cash-apply').click();
+}
+
 test("the received-cash window is chosen from this portfolio's own payment dates, exclusive of the one named", async ({ page }) => {
   test.setTimeout(20_000);
   const cash = page.locator('#available-cash');
   const pop = page.locator('#available-cash-popover');
   await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 4_000 });
 
-  // Auto-loaded sample holdings: broker-style, no #params line, so no date of its own.
-  const wholeYear = Number(await cash.inputValue());
-  expect(wholeYear).toBeGreaterThan(0);
-  await expect(page.locator('#status')).toContainText('the settlement-year coupons this file carries');
-  await expect(page.locator('#cash-set-since')).toBeVisible();
+  // Auto-loaded sample holdings: broker-style, no #params line, so no date of its own and no figure.
+  await expect(cash).toHaveValue('');
+  await expect(page.locator('#available-cash-auto')).toBeHidden();
+  await expect(page.locator('#cash-set-since')).toHaveCount(0);
 
   // The choices live in a popup the Available Cash field itself opens, alongside a plain amount.
-  await page.locator('#cash-set-since').click();
+  await cash.click();
   await expect(pop).toBeVisible();
+  await expect(pop).toContainText('may have generated');
 
   const opts = await pop.locator('input[name="available-cash-choice"]').evaluateAll(
     els => els.map(e => ({ value: e.value, label: e.closest('label').textContent }))
@@ -1770,6 +1777,14 @@ test("the received-cash window is chosen from this portfolio's own payment dates
     expect(o.label, 'every other choice names a payment date').toContain('After');
     expect(o.value, 'and is a settlement-year date').toContain(String(settleYear) + '-');
   }
+
+  // The stated 0 is what is chosen. Choosing every payment asks for the app's figure.
+  await expect(pop.locator('input[value="manual"]')).toBeChecked();
+  await pop.locator('input[value=""]').check();
+  await page.locator('#available-cash-apply').click();
+  const wholeYear = Number(await cash.inputValue());
+  expect(wholeYear).toBeGreaterThan(0);
+  await cash.click();
 
   // Counting after the first payment date drops that payment, so less is on hand.
   await pop.locator(`input[value="${opts[1].value}"]`).check();
@@ -1836,6 +1851,10 @@ test('Available Cash takes either a set of received payments or a stated amount'
   const pop = page.locator('#available-cash-popover');
   await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 4_000 });
 
+  // The sample holdings record no date, so the box starts at 0 and the app's figure is asked for.
+  await expect(cash).toHaveValue('');
+  await expect(page.locator('#available-cash-auto')).toBeHidden();
+  await chooseEveryPayment(page);
   const wholeYear = Number(await cash.inputValue());
   expect(wholeYear).toBeGreaterThan(0);
   await expect(page.locator('#available-cash-auto')).toBeVisible();
@@ -1878,10 +1897,13 @@ test('Available Cash follows the Coupons setting, and stops once the holder sets
   const mark = page.locator('#available-cash-auto');
   await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 4_000 });
 
-  // Sample holdings: a broker-style file, so the offer is coupons only (a broker never lists a
-  // matured bond). That makes it the clean case for watching the coupon half switch off.
+  // Sample holdings: a broker-style file, so the app enters nothing; every payment, once chosen, is
+  // coupons only (a broker never lists a matured bond). That makes it the clean case for watching the
+  // coupon half switch off.
+  await expect(cash).toHaveValue('');
+  await chooseEveryPayment(page);
   const withAll = Number(await cash.inputValue());
-  expect(withAll, 'coupons received this year are offered by default').toBeGreaterThan(0);
+  expect(withAll, 'coupons received this year are counted once chosen').toBeGreaterThan(0);
   await expect(mark).toBeVisible();
 
   const firstYear = await page.locator('#simple-table .fy-dara-input[data-year]').first().getAttribute('data-year');
@@ -1949,6 +1971,15 @@ test('Available Cash counts maturity proceeds from rungs that have already matur
   const ladderFile = test.info().outputPath('matured-ladder.csv');
   writeFileSync(ladderFile, readFileSync(base, 'utf8') + rungs.map(m => m.cusip + ',10,0').join('\n') + '\n');
   await page.locator('#holdings-file').setInputFiles(ladderFile);
+  // The file records no date, so nothing is entered. The first choice in the popup shows what every
+  // payment comes to; wait until it holds the matured rungs, which says the file has loaded.
+  await expect.poll(async () => {
+    await cash.click();
+    const label = await page.locator('#available-cash-choices label').first().innerText();
+    await page.locator('#available-cash-cancel').click();
+    return Number(label.replace(/[^0-9]/g, ''));
+  }, { timeout: 6_000 }).toBeGreaterThan(8000 * rungs.length);
+  await chooseEveryPayment(page);
   await expect(page.locator('#available-cash-auto')).toBeVisible({ timeout: 4_000 });
   const offered = Number(await cash.inputValue());
 
@@ -1967,26 +1998,19 @@ test('Available Cash counts maturity proceeds from rungs that have already matur
 });
 
 // Coupons a held ladder has already collected this year are money in hand (2.0 §Available Cash),
-// so the app offers that total in Available Cash, marked amber. The window starts at the date the
-// loaded ladder was stated at: a plan stated as of today has collected nothing since, which is what
-// keeps a same-day build → export → import round trip at zero trades.
-test('Available Cash is offered from coupons already received, and only for a ladder stated in the past', async ({ page }) => {
+// so the app offers that total in Available Cash, marked amber, when the file records the date the
+// ladder was stated at. The window starts at that date: a plan stated as of today has collected nothing
+// since, which is what keeps a same-day build → export → import round trip at zero trades. A file with
+// no date is offered nothing.
+test('Available Cash is offered from coupons already received, only for a ladder stated in the past, and not for a file with no date', async ({ page }) => {
   test.setTimeout(20_000);
   const cash = page.locator('#available-cash');
   const mark = page.locator('#available-cash-auto');
 
-  // The auto-loaded sample holdings state no date at all — a real position, held all year.
+  // The auto-loaded sample holdings state no date at all, so the app cannot say how long they have
+  // been held and enters nothing.
   await expect(page.locator('.fy-dara-input[data-year]').first()).toBeVisible({ timeout: 4_000 });
-  const offered = Number(await cash.inputValue());
-  expect(offered, 'a held portfolio has received some of this year’s coupons').toBeGreaterThan(0);
-  await expect(mark).toBeVisible();
-  await expect(cash).toHaveClass(/auto-filled/);
-
-  // Typing over it hands the figure back to the user.
-  await cash.click();
-  await page.locator('#available-cash-popover input[value="manual"]').check();
-  await page.locator('#available-cash-manual').fill('1234');
-  await page.locator('#available-cash-apply').click();
+  await expect(cash).toHaveValue('');
   await expect(mark).toBeHidden();
   await expect(cash).not.toHaveClass(/auto-filled/);
 
