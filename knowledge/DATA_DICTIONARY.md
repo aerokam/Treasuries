@@ -805,6 +805,7 @@ Some values are true only until Treasury issues more TIPS. Left inline as approx
   *Every price [FedInvest (E1)](#e1) publishes for a security — Buy, Sell and End of Day alike. Only the Buy price is a midpoint of dealer bid and ask. Renamed from "Daily Mid-Market Prices" (2026-09-18): that name asserted of the whole flow what is only true of the Buy price.*
 - <a id="daily-ref-cpi"></a>**Daily Ref CPI** = [TreasuryDirect SecIndex (E2)](#e2)
 - <a id="auction-results"></a>**Auction Results** = *the auction records of* [FiscalData (E3)](#e3)
+- <a id="upcoming-auctions"></a>**Upcoming Auctions** = *the upcoming auction records of* [FiscalData (E3)](#e3)
 - <a id="tips-reference-data"></a>**TIPS Reference Data** = *the TIPS security records of* [FiscalData (E3)](#e3)
 - <a id="monthly-cpi-u"></a>**Monthly CPI-U** = [BLS (E4)](#e4)
 - <a id="market-yields"></a>**Market Yields** = [CNBC (E5)](#e5) chart-bar feed
@@ -817,7 +818,7 @@ Some values are true only until Treasury issues more TIPS. Left inline as approx
 ### 6.2 Level 0 and Level 1
 
 - <a id="source-data"></a>**Source Data** = `FedInvest_Daily_Price_List + Daily_Ref_CPI + Auction_Results + TIPS_Reference_Data + Monthly_CPI_U + Market_Yields + Market_Quotes + Fund_Holdings + GSW_Curve_Parameters + Tentative_Auction_Schedule`
-  *Every flow from an external entity that process 1 reads, drawn as one flow into it at Level 1. [Live Quotes](#live-quotes) is not part of it: no acquisition job reads [CNBC (E5)](#e5)'s quote service — [Yields Monitor](../YieldsMonitor/knowledge/2.2_Read_Live_Quotes.md) reads it directly, the one flow at Level 1 that enters an app rather than process 1.*
+  *Every flow from an external entity that process 1 reads, drawn as one flow into it at Level 1. [Live Quotes](#live-quotes) and [Upcoming Auctions](#upcoming-auctions) are not part of it: no acquisition job reads [CNBC (E5)](#e5)'s quote service or the upcoming auctions of [FiscalData (E3)](#e3). [Yields Monitor](../YieldsMonitor/knowledge/2.2_Read_Live_Quotes.md) reads the first directly and [Treasury Auctions](./TreasuryAuctions.md) the second, and Level 1 draws each as a flow into that app rather than into process 1.*
 - <a id="reference-data"></a>**Reference Data** = `{ FedInvest prices (S1) | TIPS reference data (S2) | Ref CPI (S3) | Ref CPI NSA and SA (S4) | Auction results (S5) | Yield history (S6) | Market quotes (S7) | CPI history (S8) | Tentative auction schedule (S9) | SA and SAO yields (S10) | Fund holdings (S11) | GSW curve parameters (S12) | Yield curves (S13) | Breakeven inflation (S14) | Bid and ask spreads (S15) | Bond holidays (S16) | Monthly CPI (S17) }`
   *The contents of the R2 data stores.*
 - <a id="app-inputs"></a>**App Inputs** = *What a user enters or selects in an app. [View Selections](#view-selections) are the Yield Curves case.*

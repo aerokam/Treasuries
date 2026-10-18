@@ -6,7 +6,7 @@
 
 ## Data flow diagram
 
-Treasury Auctions is process 5 on [Level 1](/knowledge/DFD_LEVEL1). It reads [Auction results (S5)](./DATA_DICTIONARY.md#s5) and [Tentative auction schedule (S9)](./DATA_DICTIONARY.md#s9) from R2, and the upcoming auctions of [FiscalData (E3)](./DATA_DICTIONARY.md#e3) directly.
+Treasury Auctions is process 5 on [Level 1](/knowledge/DFD_LEVEL1). It reads [Auction results (S5)](./DATA_DICTIONARY.md#s5) and [Tentative auction schedule (S9)](./DATA_DICTIONARY.md#s9) from R2, and [Upcoming Auctions](./DATA_DICTIONARY.md#upcoming-auctions) from [FiscalData (E3)](./DATA_DICTIONARY.md#e3) directly.
 
 ## Specs
 

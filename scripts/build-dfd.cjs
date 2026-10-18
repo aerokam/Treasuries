@@ -68,7 +68,7 @@ const TERMS = {
   'download date': 'download-date', 'bond holidays': 'bond-holiday',
   'view selections': 'view-selections', 'axis scales': 'axis-scales', 'drill request': 'drill-request',
   'charts and tables': 'charts-and-tables', 'drill popup': 'drill-popup',
-  'live quotes': 'live-quotes', 'yield series': 'yield-series', 'day change': 'day-change',
+  'live quotes': 'live-quotes', 'upcoming auctions': 'upcoming-auctions', 'yield series': 'yield-series', 'day change': 'day-change',
   'TIPS market data': 'tips-market-data',
   'SA yield series': 'sa-yield-series',
   'Holdings File': 'holdings-file', 'DARA Plan File': 'dara-plan-file',
@@ -374,6 +374,13 @@ function level1() {
   P.push(labelAt(AX - 70, 40, 'market yields', 'middle'));
   P.push(flow(AX + 70, 15, ymR[0], ymR[1], { obstacles: OBS }));
   P.push(labelAt(AX + 70, 64, 'live quotes', 'middle'));
+
+  // Treasury Auctions reads the upcoming auctions of FiscalData directly as well; no
+  // acquisition job stores them.
+  const taJ = apps.findIndex(a => a.key === 'ta'), taY = ay(taJ);
+  const taX0 = AX + 140, taY0 = taY - 80, taE = toCircle(taX0, taY0, AX, taY, AR);
+  P.push(flow(taX0, taY0, taE[0], taE[1], { obstacles: OBS }));
+  P.push(labelAt(taX0, taY0 - 8, 'upcoming auctions', 'middle'));
 
   apps.forEach((a, j) => {
     const y = ay(j);

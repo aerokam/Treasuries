@@ -11,7 +11,7 @@ When the page opens and when the user clicks Refresh:
 
 - Fetch three sources in parallel, each with the browser cache bypassed:
   - [Auction results (S5)](../../knowledge/DATA_DICTIONARY.md#s5), from its public R2 URL.
-  - The upcoming auctions of [FiscalData (E3)](../../knowledge/DATA_DICTIONARY.md#e3), from the `upcoming_auctions` endpoint: the fields `cusip`, `announcemt_date`, `auction_date`, `issue_date`, `security_term`, `security_type` and `reopening`, for `auction_date` on or after the current UTC date, sorted by `announcemt_date` and then `auction_date`.
+  - [Upcoming Auctions](../../knowledge/DATA_DICTIONARY.md#upcoming-auctions), from the `upcoming_auctions` endpoint of [FiscalData (E3)](../../knowledge/DATA_DICTIONARY.md#e3): the fields `cusip`, `announcemt_date`, `auction_date`, `issue_date`, `security_term`, `security_type` and `reopening`, for `auction_date` on or after the current UTC date, sorted by `announcemt_date` and then `auction_date`.
   - [Tentative auction schedule (S9)](../../knowledge/DATA_DICTIONARY.md#s9), from its public R2 URL.
 - Read each `AuctionCalendarDate` node of S9 as one schedule row:
   - Keep `AuctionDate`, `SecurityTermWeekYear`, `SecurityType`, `AnnouncementDate` and `SettlementDate` as stated.
