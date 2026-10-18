@@ -1,133 +1,100 @@
 # 0.1 Admin Dashboard
 
+**Implemented by:** `Dashboard/server.js`, `Dashboard/index.html`, `Dashboard/jobs.json`, `Dashboard/start.cmd`, `scripts/run-dashboard.cmd`
+
 ## Purpose
 
-A personal, local-first monitoring and control panel for the full Treasuries ecosystem. Single page. Runs via a local Express server at `http://localhost:3737`. Designed for one user (repo owner).
+A local monitoring and control panel for the data pipelines of the portal, for the one developer. A single page, served by a local Express server at `http://localhost:3737`.
 
 ---
 
-## Design Philosophy: Pipeline-Row Model
+## Pipeline Rows
 
-Each app card is organized around **data pipelines**, not generic "Data" and "Jobs" sections. A pipeline row represents a single data chain:
+Each app has a card, and each card has one row for each data pipeline, a chain from a job to an R2 file to the feature of the app that reads it:
 
 ```
 [Job/Source]  →  [R2 file]  →  [UI feature]
 ```
 
-Every row shows:
-- **What the data is** — descriptive label using the app's own vocabulary
-- **Which UI feature it feeds** — so staleness means something concrete
-- **How fresh it is** — R2 file age as the canonical freshness signal
-- **How to refresh it** — Run button(s) for GH workflows and/or local scripts, inline on the same row
-- **Who else uses it** — "also used by" badge when the same R2 file is shared across apps
-
-The dashboard should feel like it was written by someone who knows the system. Terms like "FedInvest daily prices", "Broker quotes — Treasuries", and "TIPS reference metadata" — not workflow file names.
+A row shows:
+- **What the data is**, in the vocabulary of the app (for example "FedInvest daily prices"), not a job or script name.
+- **Which feature it feeds**, so that a stale file means something concrete.
+- **How fresh it is**: the age of the R2 file, from the `Last-Modified` header of a `HEAD` request.
+- **How to refresh it**: a Run button for each local job registered for the row.
+- **Who else uses it**: an "also used by" badge when the same R2 key appears in the pipelines of more than one app.
 
 ---
 
-## Architecture
+## Server (`Dashboard/server.js`)
 
-### Local Server (`Dashboard/server.js`)
+- Node.js with Express, on port `3737` (the `PORT` environment variable overrides it). `npm run dashboard` from the repo root starts it.
+- Routes:
+  - `GET /`: `Dashboard/index.html`.
+  - `GET /api/health`: `{ ok: true }`.
+  - `GET /api/jobs`: the registry in `Dashboard/jobs.json`.
+  - `GET /api/status`: the status of every app card ([Status Response](#status-response)).
+  - `GET /api/preview?source=r2&key=<key>&lines=<n>`: the first `n` lines of an R2 file (`n` from 1 to 200, 12 by default) as `{ lines[], total }`, with each line cut at 500 characters so that a single-line JSON file stays previewable.
+  - `GET /api/run/:jobId`: runs the `cmd` of the job with `shell: true` in its `cwd` and streams `{ type, text }` events over SSE (`start`, `out`, `err`, `exit`). The child process is killed when the client disconnects. The time and exit code of the last run of each job are kept in memory.
+- `Dashboard/start.cmd` opens `http://localhost:3737` in the browser and starts the server. It does not check whether the server is already running, and a second start fails with `EADDRINUSE`.
+- `scripts/run-dashboard.cmd` starts the server hidden and opens no browser, only when nothing is listening on port 3737. The scheduled task `DashboardServer` ([Data_Pipeline.md](./Data_Pipeline.md); registered by `scripts/setup-windows-tasks.ps1`) runs it at 6:00am PT on weekdays and every 30 minutes for the following 18 hours, so a crash during the day is recovered. The log is `logs/dashboard.log`.
 
-- **Runtime:** Node.js + Express, port `3737`
-- **Role:** Serve `index.html`; expose REST API for status aggregation and job execution
-- **REST API:** `GET /api/status` (aggregated R2 freshness + job history), `GET /api/jobs`, `GET /api/preview?source=r2&key=<key>&lines=<n>` → `{ lines[], total }` (lines capped at 500 chars so single-line JSON stays previewable), `GET /api/run/:jobId` → **SSE** stream of `{type,text}` events (`start`/`out`/`err`/`exit`); spawns the job's `cmd` with `shell:true` in its `cwd`, killed if the client disconnects, and records `lastRunAt`/`exitCode` in in-memory job history
-- **Start command:** `npm run dashboard` from repo root
-- **Manual launcher:** `Dashboard/start.cmd` — opens a browser tab and starts the server (unguarded; errors harmlessly with `EADDRINUSE` if 3737 is already up)
-- **Auto-start (headless):** `scripts/run-dashboard.cmd` — guarded launcher used by the `DashboardServer` scheduled task. Starts the server only if nothing is LISTENING on 3737 (idempotent), runs it hidden via `Start-Process`, and never opens a browser. Logs to `logs/dashboard.log` (+ `dashboard.out/err.log`).
-- **Keep-alive task:** `DashboardServer` (registered in `scripts/setup-windows-tasks.ps1`) fires weekday mornings at 6:00am PT and repeats every 30 min for 18h as a self-heal heartbeat — the guard makes repeats harmless. Chosen over a logon trigger because the machine stays logged in continuously.
+### Portal link
 
-### Portal entry point (local-only)
+`index.html` of the portal shows "Dashboard Monitor →" in the Mission box only when it can fetch `local-admin.json`, a gitignored file that holds `{ "dashboardUrl": "http://localhost:3737/" }`. GitHub Pages never receives that file, so the link stays hidden there. A `no-cors` probe of `/api/status` labels the link "Dashboard Monitor (start server) →" when the server is down.
 
-The top-level portal (`index.html`) shows a discreet **"Dashboard Monitor →"** link in the Mission box, but only on a local checkout. Gating: on load it `fetch()`es `local-admin.json` (a gitignored sentinel that carries `{ "dashboardUrl": "http://localhost:3737/" }`); if present, the link is revealed and a `mode:'no-cors'` probe of `/api/status` annotates it ("Dashboard Monitor →" when up, "… (start server) →" when down). On GitHub Pages the sentinel is absent (never deployed), so the link stays hidden.
+### Frontend (`Dashboard/index.html`)
 
-### Dashboard Frontend (`Dashboard/index.html`)
-
-- Vanilla JS, no build step
-- Polls `/api/status` on load and every 60s
-- UI conventions follow the rest of the repo
-
-### Knowledge Map & Viewer (`knowledge/`)
-
-The knowledge base is a set of static files served by `npx serve . -p 8080` (the same static server used for Playwright tests). There are two entry points:
-
-- **`/knowledge/DFD_LEVEL0`** — the visual DFD context diagram (`knowledge/DFD_LEVEL0.html`), Level 0 of the levelled data flow diagrams (`DFD_Worklist.md` §1.0). This is the top-level navigation hub; all app overviews and spec docs are reachable from here, by drilling down through Level 1, 2 and 3 or via the flat Spec Index below the diagram. "Knowledge Map" is the user-facing name for that whole reachable set of diagrams and specs, not for this one file — this file is only its top level.
-- **`/knowledge/viewer#/md/<path>`** — the markdown viewer (`knowledge/viewer.html`). Fetches any `.md` file in the repo and renders it with syntax highlighting, Mermaid diagrams, and CSV preview inline.
-
-**Routing rules inside the viewer:**
-- Only `.md` files should be targeted as viewer hash paths. The viewer guards against `.html` targets: if the hash ever resolves to a `.html` file, it immediately redirects to that file's direct URL instead of trying to render its HTML source as markdown.
-- The `← KNOWLEDGE MAP` nav link is a relative `DFD_LEVEL0.html` reference, resolved against `knowledge/`, the only directory the viewer is ever opened from.
-
-**URL conventions:**
-- `npx serve` strips `.html` extensions and serves clean URLs. Always reference these files by their clean URL (`/knowledge/DFD_LEVEL0`, `/knowledge/viewer`), not by the `.html` filename. Source `href` attributes may still contain `.html` but the browser will be redirected to the clean URL.
+Vanilla JavaScript with no build step. It loads `/api/status` on open and every 60 seconds.
 
 ---
 
 ## App Pipelines
 
-Each app has a set of named pipelines. The server's `APP_CONFIGS` is the authoritative definition. Summary:
+`APP_CONFIGS` in `Dashboard/server.js` defines them. A job column names the job IDs of `jobs.json`.
 
 ### YieldCurves
 
-| Pipeline label | R2 file | Local job | Feeds |
-|---|---|---|---|
-| FedInvest daily prices | `YieldsFromFedInvestPrices.csv` | FedInvest Download | All yield curves |
-| Broker quotes — Treasury + TIPS | `FidelityTreasuriesTips.csv` | Fidelity Download + Upload to R2 | Market tab (nominals + TIPS) |
-| CPI seasonal adjustment factors | `RefCpiNsaSa.csv` | SA Factor Update | CPI overlay |
-| SIFMA bond market holidays | `misc/BondHolidaysSifma.csv` | *(Manual Upload)* | Business-day calculations |
+| Pipeline | R2 key | Job IDs | Feeds | Stale after |
+|---|---|---|---|---|
+| FedInvest daily prices | `Treasuries/YieldsFromFedInvestPrices.csv` | `fedinvest-download` | All yield curves | 24 h |
+| Broker quotes — Treasury + TIPS | `Treasuries/FidelityTreasuriesTips.csv` | `fidelity-download`, `upload-fidelity` | Market tab (nominals + TIPS) | 24 h |
+| CPI seasonal adjustment factors | `TIPS/RefCpiNsaSa.csv` | `update-ref-cpi-nsa-sa` | CPI overlay | 720 h |
+| SIFMA bond market holidays | `misc/BondHolidaysSifma.csv` | none | Business-day calculations | 8,760 h |
 
 ### YieldsMonitor
 
-| Pipeline label | R2 file | Local job | Feeds |
-|---|---|---|---|
-| Daily yields-history snapshots | `yields-history/history.json` *(consolidated, all 14)* | Update Yields History | History charts — 14 symbols |
-| Live Treasury yields | *(none — live browser fetch)* | — | Live yield display + intraday charts |
-
-Note: YieldsMonitor does **not** read `YieldsFromFedInvestPrices.csv`. Its only R2 dependency is the single consolidated `yields-history/history.json` (nested by symbol, all 14). Live data comes from CNBC, fetched directly in the browser.
+| Pipeline | R2 key | Job IDs | Feeds | Stale after |
+|---|---|---|---|---|
+| Daily yields-history snapshots | `Treasuries/yields-history/history.json` | `update-yields-history` | History charts, 14 symbols | 24 h |
+| Live Treasury yields | none (the browser reads the feed on page load) | none | Live yield display and intraday charts | none |
+| Feed inspector (diagnostic) | none | `inspect-feeds` | An annotated snapshot of every feed, on demand ([Close Price Investigation](../YieldsMonitor/knowledge/Close_Price_Investigation.md)) | none |
 
 ### TipsLadderManager
 
-| Pipeline label | R2 file | Local job | Feeds |
-|---|---|---|---|
-| FedInvest daily prices | `YieldsFromFedInvestPrices.csv` | FedInvest Download | Ladder pricing — all TIPS |
-| TIPS reference metadata | `TipsRef.csv` | TIPS Ref Refresh | Coupon + dated-date lookups |
-| Reference CPI index | `RefCPI.csv` | Ref CPI Refresh | Index ratio calculations |
+| Pipeline | R2 key | Job IDs | Feeds | Stale after |
+|---|---|---|---|---|
+| FedInvest daily prices | `Treasuries/YieldsFromFedInvestPrices.csv` | `fedinvest-download` | Ladder pricing, all TIPS | 24 h |
+| TIPS reference metadata | `TIPS/TipsRef.csv` | `fetch-tips-ref` | Coupon and dated-date lookups | 720 h |
+| Reference CPI index | `TIPS/RefCPI.csv` | `fetch-ref-cpi` | Index ratio calculations | 720 h |
 
 ### TreasuryAuctions
 
-| Pipeline label | R2 file | Local job | Feeds |
-|---|---|---|---|
-| Historical auction results | `Auctions.csv` | Auction Refresh | All, Bills, Notes/Bonds, TIPS tabs |
-| Upcoming auctions | *(none — live fetch)* | — | Calendar view |
+| Pipeline | R2 key | Job IDs | Feeds | Stale after |
+|---|---|---|---|---|
+| Historical auction results | `Treasuries/Auctions.csv` | `get-auctions` | All, Bills, Notes/Bonds, TIPS tabs | 12 h |
+| Upcoming auctions | none (the browser reads FiscalData on page load) | none | Calendar view | none |
 
-**Shared files:**
-- `YieldsFromFedInvestPrices.csv` is shared by YieldCurves and TipsLadderManager. Both read the same R2 key (`Treasuries/YieldsFromFedInvestPrices.csv`) written by the local **FedInvest Download** task.
-- `RefCPI.csv` is shared: written by the local **Ref CPI Refresh** task and used by TipsLadderManager and YieldCurves.
+An R2 key that appears under two apps carries the "also used by" badge: `YieldsFromFedInvestPrices.csv` appears under YieldCurves and TipsLadderManager.
 
 ---
 
 ## Staleness
 
-| App / Pipeline | Staleness threshold |
-|---|---|
-| YieldCurves, YieldsMonitor, TipsLadderManager — daily data | 24 hours |
-| TreasuryAuctions — `Auctions.csv` | 12 hours |
-| Monthly data (CPI files, TipsRef) | 720 hours (30 days) |
-
-Card border: green = all r2 files within threshold · amber = any stale · red = any error.
+A file is stale when its age in hours exceeds its threshold. A pipeline marked `weekdayOnly` (the FedInvest, broker quote, CPI seasonal and holiday files and the yields history) adds 24 hours for each Saturday and Sunday that has begun since the file was last modified. The card border is green when every file is within its threshold, amber when any file is stale and red when a `HEAD` request for any file fails.
 
 ---
 
-## API Endpoints
-
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/api/status` | Returns full pipeline status for all apps |
-| `GET` | `/api/preview` | Returns first N lines of a local file or R2 key |
-| `POST` | `/api/run/:jobId` | Executes a registered local script; streams output via SSE |
-| `GET` | `/api/health` | Returns `{ ok: true }` |
-
-### `/api/status` response shape
+## Status Response
 
 ```js
 {
@@ -139,75 +106,26 @@ Card border: green = all r2 files within threshold · amber = any stale · red =
       id, label, feeds,
       r2Key: string | null,
       r2: { key, lastModified, status, shortName } | null,
-      localJobs: [{ id, label, cmd, windowsTaskName?: string, nextRunAt?: string | null }],
-      alsoUsedBy: string[],   // other app labels sharing this r2Key
+      localJobs: [{ id, label, cmd, nextRunAt?, lastRunAt?, lastExitCode? }],
+      alsoUsedBy: string[],
       stalenessHours: number | null,
-      liveNote: string | null,  // for pipelines with no R2 file (live fetches)
-      r2Note: string | null,    // e.g. "14 symbol files; US10Y shown as representative"
+      weekdayOnly: boolean,
+      liveNote: string | null,
+      r2Note: string | null,
     }]
   }]
 }
 ```
 
-R2 HEAD requests are deduplicated per status request — shared files are fetched once.
+One `HEAD` request is made for each distinct R2 key in a status request.
+
+`Dashboard/jobs.json` is the registry of local scripts, with the fields `id`, `label`, `cmd`, `cwd`, `apps` and, optionally, `windowsTaskNames`. For a job that has `windowsTaskNames`, the server queries each task with `schtasks /query /fo csv /nh /tn "<name>"`, reads the "Next Run Time" column as a date, drops a task that is not found, reports `N/A` or `Disabled` or whose next run has passed, and returns the earliest remaining time as `nextRunAt`, or `null` when none remains. One `schtasks` call is made for each task name.
 
 ---
 
-## Configuration
+## Not Matched
 
-| Constant | Value |
-|---|---|
-| R2 public base URL | `https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev` |
-| Portal URL | `https://aerokam.github.io/Treasuries/` |
-
-`Dashboard/jobs.json` — local script registry (committed, no secrets):
-```json
-[
-  { "id": "fidelity-download", "label": "Fidelity Download", "cmd": "...", "apps": ["yieldcurves"], "windowsTaskNames": ["FidelityQuotes"] },
-  { "id": "fedinvest-download", "label": "FedInvest Download", "cmd": "...", "apps": ["yieldcurves"] },
-  { "id": "upload-fidelity", "label": "Upload to R2", "cmd": "...", "apps": ["yieldcurves"] }
-]
-```
-
-`windowsTaskNames` (optional) — a list of Windows Task Scheduler task names. Where it is set, `Dashboard/server.js#getWindowsTaskNextRun` queries each one at status time to populate `nextRunAt`:
-```
-schtasks /query /fo csv /nh /tn "<task name>"
-```
-The "Next Run Time" field of the CSV output is parsed as a date. A task that is not found, reports `N/A` or `Disabled`, or whose next run has already passed contributes nothing; the earliest of the remaining times is returned as an ISO string, and `null` when none remain.
-
-- Only jobs carrying `windowsTaskNames` get a `nextRunAt` in the response; others omit the field.
-- One `schtasks` call is made per task name, with no deduplication.
-
----
-
-## Startup / Taskbar Shortcut
-
-`Dashboard/start.cmd`:
-1. `curl -s http://localhost:3737/api/health` — if 200, skip to step 3
-2. `start /B node Dashboard/server.js` — start server detached
-3. Wait up to 5s for health check to pass
-4. `start http://localhost:3737` — open in default browser
-
----
-
-## File Layout
-
-```
-Treasuries/
-  Dashboard/
-    server.js         # Express server + APP_CONFIGS
-    index.html        # Single-page dashboard
-    jobs.json         # Local script registry
-    start.cmd         # Taskbar launcher
-    .env              # Secrets (gitignored)
-  knowledge/
-    Admin_Dashboard.md   ← this file
-```
-
----
-
-## Deferred / Known Issues
-
-- **`Yields.csv` rename** — completed. Renamed to `YieldsFromFedInvestPrices.csv` across all code, tests, knowledge docs, and Dashboard. R2 key updated; old `Treasuries/Yields.csv` object can be deleted from R2 after next pipeline run confirms the new key.
-- **YieldsMonitor yield history** — 14 symbol files; dashboard checks US10Y as a representative sample for freshness. Could expand to check all 14 and show min/max age.
-- **Deployment** — local-only; blocked by local script execution requirement.
+- The pipelines name the job IDs `update-ref-cpi-nsa-sa`, `fetch-tips-ref`, `fetch-ref-cpi` and `get-auctions`, and `jobs.json` registers none of them (it registers `update-ref-cpi` for the Ref CPI NSA and SA update). The rows of those pipelines therefore show no Run button.
+- `jobs.json` registers `bond-holidays-update` and `update-tentative-schedule`, and no pipeline lists either.
+- The cards cover four apps and 10 of the data stores. The Tentative auction schedule, SA and SAO yields, Fund holdings, GSW curve parameters and the other stores that process 1 writes have no row.
+- The server runs locally only, because the jobs need local script execution.
