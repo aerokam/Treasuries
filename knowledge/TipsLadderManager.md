@@ -1,49 +1,29 @@
 # TipsLadderManager (App Overview)
 
-**TipsLadderManager** is a browser-based tool for designing and rebalancing TIPS (Treasury Inflation-Protected Securities) ladders. It serves as both a practical utility for wealth management and an educational resource for first-principles financial math.
+**TipsLadderManager** is a browser-based tool for designing and rebalancing [TIPS Ladders](./DATA_DICTIONARY.md#tips-ladder). It serves as a practical utility and as an educational resource: every number on screen traces to a calculation chain.
 
 ---
 
-## 1.0 App Context (Level 1 DFD)
+## Data flow diagram
 
-*Superseded by the generated [Level 2 diagram](/knowledge/DFD_LEVEL2_TIPSLADDERMANAGER) — a draft, not yet a finished decomposition (see its own notes for the open questions). The Mermaid sketch this section used to carry was hand-drawn before that generator existed and had drifted from the code (e.g. it named the dormant FedInvest source as the only source, and showed no path for the app's default Market-quotes source); it is removed rather than fixed in place, since the generated diagram now owns this.*
+Ladder Manager is process 4 on [Level 1](/knowledge/DFD_LEVEL1). Its [Level 2 diagram](/knowledge/DFD_LEVEL2_TIPSLADDERMANAGER) shows the five processes below, the data stores process 4.1 reads and the flows between them.
 
----
+## Process specs
 
-## 2.0 Core Processes
+| Process | Spec | What it does |
+|---|---|---|
+| 4.1 | [Load market data](../TipsLadderManager/knowledge/4.1_Load_Market_Data.md) | Reads the market quotes, the TIPS reference data, the Ref CPI, the SA and SAO yields and the Bond Holidays, and sets the [Settlement Date](./DATA_DICTIONARY.md#settlement-date). |
+| 4.2 | [Import holdings and DARA plan](../TipsLadderManager/knowledge/4.2_Import_Holdings_And_DARA_Plan.md) | Reads the [Holdings File](./DATA_DICTIONARY.md#holdings-file) and the [DARA Plan File](./DATA_DICTIONARY.md#dara-plan-file) that the Import menu offers. |
+| 4.3 | [Build ladder](../TipsLadderManager/knowledge/4.3_Build_Ladder.md) | Builds a TIPS Ladder from a [DARA](./DATA_DICTIONARY.md#dara), a First Year and a Last Year. |
+| 4.4 | [Rebalance ladder](../TipsLadderManager/knowledge/4.4_Rebalance_Ladder.md) | Computes the trades that bring the holdings to the ladder, as [TIPS Ladder Rebalancing (3.0)](../TipsLadderManager/knowledge/3.0_TIPS_Ladder_Rebalancing.md) states. There is one rebalance. |
+| 4.5 | [Render and export](../TipsLadderManager/knowledge/5.0_UI_Schema.md) | Draws the build and rebalance results, with the popups of [UI Layout (6.0)](../TipsLadderManager/knowledge/6.0_UI_Layout.md); [Export (2.1)](../TipsLadderManager/knowledge/2.1_Export.md) specifies the Export menu. |
 
-### [1.0 Ladder Construction (Build Mode)](../TipsLadderManager/knowledge/2.0_TIPS_Ladders.md)
-The algorithm for building a new ladder from scratch.
-- **Inputs**: [DARA](./DATA_DICTIONARY.md#dara), First Year and Last Year, Current Market Yields.
-- **Key Constraints**: Longest-to-shortest construction, [Gap Year](./DATA_DICTIONARY.md#gap-years) handling via [Bracket Years](./DATA_DICTIONARY.md#bracket-year).
+## Foundations
 
-### [2.0 Ladder Rebalancing (Rebalance Mode)](../TipsLadderManager/knowledge/3.0_TIPS_Ladder_Rebalancing.md)
-The logic for aligning existing holdings to a target.
-- **Inputs**: Current Holdings (Manual/Import), [DARA](./DATA_DICTIONARY.md#dara) (Inferred/User), [RefCPI](./DATA_DICTIONARY.md#ref-cpi).
-- **There is a single rebalance mode**: it rebuilds the ladder from the current portfolio toward the per-year DARA targets, buying and selling as required. An earlier "Gap-only" (minimal-trades) mode was scrapped.
-- **Technically Precise Algorithm**: [View 3.0 Specs](../TipsLadderManager/knowledge/3.0_TIPS_Ladder_Rebalancing.md).
+- [Bond Ladders (1.0)](../TipsLadderManager/knowledge/1.0_Bond_Ladders.md): the concepts of any ladder, nominal or TIPS.
+- [TIPS Ladders (2.0)](../TipsLadderManager/knowledge/2.0_TIPS_Ladders.md): Build, with the Gap Years and the Future 30Y years.
+- [Computation Modules (4.0)](../TipsLadderManager/knowledge/4.0_Computation_Modules.md): the functions the processes call.
+- [Data Pipeline (3.1)](../TipsLadderManager/knowledge/3.1_Data_Pipeline.md): the sources `loadMarketData()` chooses between.
+- [Bond Basics](./Bond_Basics.md) and [TIPS Basics](./TIPS_Basics.md): the formulas shared by every app.
 
-### [2.1 Export](../TipsLadderManager/knowledge/2.1_Export.md)
-The Holdings Export, the DARA Plan File and the Ladder CSV that the Export menu writes. Importing a holdings file is [4.2](../TipsLadderManager/knowledge/4.2_Import_Holdings_And_DARA_Plan.md).
-
----
-
-## 3.0 Foundational Logic (The Engine Room)
-
-These documents contain the "bottom-level" technical specifications required to rebuild the app:
-
-- **[Bond Ladder Foundations (1.0)](../TipsLadderManager/knowledge/1.0_Bond_Ladders.md)**: Conceptual groundwork for any ladder (Nominal or TIPS).
-- **[Computation Modules (4.0)](../TipsLadderManager/knowledge/4.0_Computation_Modules.md)**: Mathematical functions for PV, Duration, and Accrued Interest.
-- **[UI & Schema (5.0)](../TipsLadderManager/knowledge/5.0_UI_Schema.md)**: Data structures for the internal ladder model and DOM mapping.
-- **[Bond Math (shared)](./Bond_Basics.md)**: Global financial formulas used across all apps.
-
----
-
-## 4.0 Data Lifecycle
-
-TipsLadderManager fetches its market context from Cloudflare R2 on every page load.
-- **[TIPS Data Pipeline (3.1)](../TipsLadderManager/knowledge/3.1_Data_Pipeline.md)**: Detailed specs for the ingestion of prices and metadata.
-- **Source (default)**: `FidelityTreasuriesTips.csv`, broker market prices, updated several times per weekday.
-- **Source (dormant cross-check)**: `YieldsFromFedInvestPrices.csv` (updated daily ~1 PM ET), not exposed in the app UI.
-- **Source**: `RefCPI.csv` (updated monthly on BLS release).
-- **Persistence**: User holdings are stored in browser `localStorage`.
+The app keeps no holdings in the browser. The files that the Export menu writes carry the holdings and the DARA Plan between sessions.
