@@ -34,6 +34,7 @@ caller's spec.
 - `nextBusinessDay(date, holidaySet)` — the next date that is not a weekend or a listed holiday; always advances at least one day.
 - `parseHolidaySet(rows)` — builds the holiday `Set` from [Bond holidays (S16)](./DATA_DICTIONARY.md#s16)'s rows.
 - `actualPaymentDate(d, holidaySet)` — the date a payment scheduled for `d` is actually made: `d` itself if already a trading day, otherwise the next one. Not the same as `nextBusinessDay`, which always advances.
+- `lastBusinessDayOfMonth(year, monthIndex, holidaySet)` — the last bond trading day of a month (`monthIndex` is 0-based).
 
 **Called by**: [4.1.1 Fetch and parse market quotes](../TipsLadderManager/knowledge/4.1_Load_Market_Data.md#fetch-and-parse-market-quotes) and [4.1.3 Fetch auxiliary TIPS data](../TipsLadderManager/knowledge/4.1_Load_Market_Data.md#fetch-auxiliary-tips-data) (TipsLadderManager), and the Rebalance ladder process (`actualPaymentDate` for the Cash Flow Calendar and settlement-year LMI — see [2.0 TIPS Ladders §Gap Year Coverage Model](../TipsLadderManager/knowledge/2.0_TIPS_Ladders.md#gap-year-coverage-model)), [3.1.6 Determine settlement date](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#determine-settlement-date) (YieldCurves), and other processes across the portal — not yet swept for a complete list.
 
@@ -45,6 +46,7 @@ caller's spec.
 **Exports used across the callers below**:
 - `yieldFromPrice(cleanPrice, coupon, settle, mature)` / `priceFromYield(yld, coupon, settle, mature)` — the yield-from-price calculation and its inverse, for every security type and every source (`DFD_Worklist.md` §3.0 item 14).
 - `accruedInterest(coupon, settle, mature)`, `couponSchedule(settle, mature)` — day-count proration and coupon payment dates.
+- `bondCalcs(bond, refCPI)` — the Index Ratio, the Index Ratio rounded as Treasury rounds it, and the principal, cost, interest and P+I of one $1,000 unit.
 - `calculateDuration` / `calculateMDuration` / `calculateDurationDetail` — Macaulay and Modified Duration.
 - `termYears(settle, maturity)` — the one term measure (`DFD_Worklist.md` §3.9).
 - `cashflowSchedule`, `daysBetween`, `daysInYearFrom`, `calcMktWtdAvg` — supporting calculations for the above.
@@ -69,6 +71,6 @@ caller's spec.
 ## <a id="m5"></a>ladder-core.js (M5)
 **File**: `TipsLadderManager/src/ladder-core.js`
 **Purpose**: The single authoritative implementation of "size the target ladder from a DARA." Unlike M1-M4, this module's algorithm is too large for a registry entry — it is specified in full at [2.0 TIPS Ladders](../TipsLadderManager/knowledge/2.0_TIPS_Ladders.md) (§Algorithm and the duration-matching/PLI/Future 30Y sections it covers), not here. This entry only names the exports and their callers.
-**Exports**: `selectLadderBonds`, `sizeLadder`, `sizeFuture30yCover`, `sizeYearRungs`/`aggregateRungs` — see 2.0 for what each does.
+**Exports**: `selectLadderBonds`, `sizeLadder`, `sizeFuture30yCover`, `fundedYearAmount`, `future30yRebalances`, `gapRebalances`, `maxLastYear` and the rest of its exports — see 2.0 for what each does.
 
 **Called by**: [Build the ladder (4.3.2)](../TipsLadderManager/knowledge/4.3_Build_Ladder.md#build-the-ladder) and [Rebalance the ladder (4.4.3)](../TipsLadderManager/knowledge/4.4_Rebalance_Ladder.md#rebalance-the-ladder).
