@@ -1372,9 +1372,21 @@ function adjustFirstPointToClosingTime(firstPoint) {
 // pickLast=false returns that day's first print (the close, for a historical day); pickLast=true
 // returns the last print (the latest reading on the end day). Returns null when the series has
 // no print that day, so the curve shows a gap rather than borrowing a value from another date.
+// With Hide non-trading hours on, the start reading is the first point inside the opening window
+// and the end reading is the last point inside the closing window, so a symbol that did not quote
+// in the window is a gap. A window is [fromMin, toMin] in ET minutes after midnight.
+const CURVE_START_WINDOW = [8 * 60, 8 * 60 + 30], CURVE_END_WINDOW = [17 * 60, 17 * 60 + 5];
+function etMinutesOfDay(ts) { const p = ET_FULL_FMT.formatToParts(new Date(+ts)).reduce((a, pt) => ({ ...a, [pt.type]: +pt.value }), {}); return p.hour * 60 + p.minute; }
+function curveWindow(pickLast) { return compactOn() ? (pickLast ? CURVE_END_WINDOW : CURVE_START_WINDOW) : null; }
+function windowLabel(dateStr, pickLast) {
+  const [from, to] = pickLast ? CURVE_END_WINDOW : CURVE_START_WINDOW, hm = m => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+  return `${dateStr}, ${hm(from)}–${hm(to)} ET`;
+}
+
 function valueFromSeriesOnDate(data, dateStr, pickLast) {
   if (!data || !data.length || !dateStr) return null;
-  const pts = data.filter(p => getEtDateStr(p.x) === dateStr);
+  const win = curveWindow(pickLast);
+  const pts = data.filter(p => getEtDateStr(p.x) === dateStr && (!win || (etMinutesOfDay(p.x) >= win[0] && etMinutesOfDay(p.x) <= win[1])));
   if (!pts.length) return null;
   return (pickLast ? pts[pts.length - 1] : pts[0]).y;
 }
@@ -1403,7 +1415,7 @@ function updateYieldCurves() {
   const startDateStr = refStart ? getEtDateStr(refStart.x) : null;
   const endDateStr = refEnd ? getEtDateStr(refEnd.x) : null;
   const sT = refStart ? adjustFirstPointToClosingTime(refStart.x) : null, eT = refEnd ? refEnd.x : null;
-  const sL = sT ? ET_HM_FMT.format(sT) + ' ET' : '—', eL = eT ? ET_HM_FMT.format(eT) + ' ET' : '—';
+  const sL = sT ? (compactOn() ? windowLabel(startDateStr, false) : ET_HM_FMT.format(sT) + ' ET') : '—', eL = eT ? (compactOn() ? windowLabel(endDateStr, true) : ET_HM_FMT.format(eT) + ' ET') : '—';
 
   // SA overlay data, per SA-eligible symbol, for the active range — reused by both the TIPS
   // curve (direct SA yield) and the BEI curve (Nominal - SA yield). Same "overlay, don't

@@ -79,6 +79,24 @@ test.describe('Yields Monitor Regression Tests', () => {
     expect((await state()).compact).toBe(false);
   });
 
+  test('Hide non-trading hours labels the curves with the opening and closing windows', async ({ page }) => {
+    const labels = () => page.locator('canvas#yield-curve-nominal').evaluate((canvas) => Chart.getChart(canvas).data.datasets.slice(0, 2).map(d => d.label));
+    await page.locator('.range-btn[data-range="10D"]').click();
+    await expect(page.locator('#fetchStatus')).toContainText('TIPS latest:');
+    await page.locator('#hideNonTrading').check();
+    await page.locator('.tab-btn[data-tab="yieldcurves"]').click();
+    const [start, end] = await labels();
+    expect(start).toMatch(/, 08:00–08:30 ET$/);
+    expect(end).toMatch(/, 17:00–17:05 ET$/);
+
+    await page.locator('.tab-btn[data-tab="timeseries"]').click();
+    await page.locator('#hideNonTrading').uncheck();
+    await page.locator('.tab-btn[data-tab="yieldcurves"]').click();
+    const [startOff, endOff] = await labels();
+    expect(startOff).not.toContain('–');
+    expect(endOff).not.toContain('–');
+  });
+
   test('Hide non-trading hours applies to the Custom range and keeps its daily-only points', async ({ page }) => {
     await page.locator('.range-btn[data-range="Custom"]').click();
     const iso = ms => new Date(ms).toISOString().slice(0, 10);
