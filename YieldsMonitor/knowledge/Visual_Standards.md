@@ -43,7 +43,7 @@ Off by default. When on, every zoom keeps the right edge of the chart at the lat
 
 ### Hide non-trading hours
 
-Off by default; applies to the 2D, 10D and Custom ranges only, and has no effect on any other range. See [Render time series (2.5)](./2.5_Render_Time_Series.md#hide-non-trading-hours-2d-10d-and-custom-ranges-only).
+On by default; applies to the 2D, 10D and Custom ranges only, and has no effect on any other range. See [Render time series (2.5)](./2.5_Render_Time_Series.md#hide-non-trading-hours-2d-10d-and-custom-ranges-only).
 
 ## Y-axis auto-rescale
 

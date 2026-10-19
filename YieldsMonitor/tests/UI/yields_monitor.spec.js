@@ -79,6 +79,12 @@ test.describe('Yields Monitor Regression Tests', () => {
     expect((await state()).compact).toBe(false);
   });
 
+  test('Hide non-trading hours is on by default', async ({ page }) => {
+    await expect(page.locator('#hideNonTrading')).toBeChecked();
+    const compact = await page.locator('canvas#chart-US10Y').evaluate((canvas) => Chart.getChart(canvas).scales.x.options.compact);
+    expect(compact).toBe(true);
+  });
+
   test('Hide non-trading hours labels the curves with the opening and closing windows', async ({ page }) => {
     const labels = () => page.locator('canvas#yield-curve-nominal').evaluate((canvas) => Chart.getChart(canvas).data.datasets.slice(0, 2).map(d => d.label));
     await page.locator('.range-btn[data-range="10D"]').click();
@@ -110,6 +116,7 @@ test.describe('Yields Monitor Regression Tests', () => {
       const mins = chart.data.datasets[0].data.map(p => { const q = hm.formatToParts(new Date(p.x)).reduce((a, t) => ({ ...a, [t.type]: +t.value }), {}); return q.hour * 60 + q.minute; });
       return { compact: chart.scales.x.options.compact, n: mins.length, outside: mins.filter(m => m < 480 || m > 1025).length };
     });
+    await page.locator('#hideNonTrading').uncheck();
     const off = await read();
     expect(off.compact).toBe(false);
     expect(off.outside).toBeGreaterThan(0);

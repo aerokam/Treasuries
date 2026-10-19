@@ -852,7 +852,7 @@ Some values are true only until Treasury issues more TIPS. Left inline as approx
 - <a id="view-selections"></a>**View Selections** = *The choices a user makes on an app's own page, driving what it fetches and draws. Composition differs by app:*
 
   - *Yield Curves: `Tab + ( Spread_Mode ) + { Source } + { Series } + Maturity_Range + Horizontal_Axis_Mode + IQR_Clip_Setting` — the Treasuries, TIPS or breakeven tab; spread mode; the sources and series shown; the range of maturities; calendar or term on the horizontal axis; and whether the [IQR Clip](#iqr-clip) applies.*
-  - *Yields Monitor: `Range + ( Custom_Start_Date + Custom_End_Date ) + { Symbol } + Tab + Show_Quoted + Show_SA + Sync_Zoom_And_Pan + Lock_Right` — the preset or Custom time range; the symbols checked; the active tab; whether the quoted and/or seasonally adjusted line is shown; and the two chart-navigation toggles.*
+  - *Yields Monitor: `Range + ( Custom_Start_Date + Custom_End_Date ) + { Symbol } + Tab + Show_Quoted + Show_SA + Sync_Zoom_And_Pan + Lock_Right + Hide_Non_Trading_Hours` — the preset or Custom time range; the symbols checked; the active tab; whether the quoted and/or seasonally adjusted line is shown; and the Sync Zoom & Pan, Lock Right and Hide non-trading hours checkboxes.*
 - <a id="axis-scales"></a>**Axis Scales** = `Horizontal_Axis_Range + Vertical_Axis_Range`
   *The ranges of the two chart axes: the horizontal axis in calendar dates or in [Term](#term), and the vertical axis in yield, floored by any [IQR Clip](#iqr-clip).*
 - <a id="drill-request"></a>**Drill Request** = `@CUSIP + Figure`

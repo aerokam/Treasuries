@@ -556,8 +556,8 @@ function level2YieldsMonitor() {
       out: { '2.5': ['day change'] } },
     { id: '2.4', name: ['Adjust for', 'seasonality'], href: V(KYM + '2.4_Adjust_For_Seasonality.md'), reads: ['tipsref', 'nsasa', 'hol'],
       out: { '2.5': ['SA yield series'], '2.6': ['SA yield series'], '2.7': ['SA yield series'] } },
-    { id: '2.5', name: ['Render time', 'series'], href: V(KYM + '2.5_Render_Time_Series.md'), reads: [], out: {} },
-    { id: '2.6', name: ['Render yield', 'curve', 'snapshots'], href: V(KYM + '2.6_Render_Yield_Curve_Snapshots.md'), reads: [], out: {} },
+    { id: '2.5', name: ['Render time', 'series'], href: V(KYM + '2.5_Render_Time_Series.md'), reads: ['hol'], out: {} },
+    { id: '2.6', name: ['Render yield', 'curve', 'snapshots'], href: V(KYM + '2.6_Render_Yield_Curve_Snapshots.md'), reads: ['hol'], out: {} },
     { id: '2.7', name: ['Render', 'breakeven', 'inflation'], href: V(KYM + '2.7_Render_Breakeven_Inflation.md'), reads: [], out: {} },
   ];
   const SX = 40, SW = 215, EH = 52, PR = 58, UX = 1190, UW = 145;
@@ -603,7 +603,7 @@ function level2YieldsMonitor() {
     notes: ['  <b>No process here writes a data store.</b> Every flow ends at 2.5, 2.6 or 2.7 and is gone when the page closes.',
       '  <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#e5">CNBC (E5)</a> is drawn as a box, in the store column, since this is the one place a Level 2 diagram in this portal shows an app reading an entity directly, live — no acquisition job stands between it and the app (see <a href="viewer.html#/md/knowledge/DFD_Worklist.md">DFD_Worklist.md</a> §4.0). Its two flows are independently named: <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#market-yields">market yields</a>, its chart-bar feed, to 2.1; <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#live-quotes">live quotes</a>, its quote service, to 2.2.',
       '  2.1 explodes at <a href="DFD_LEVEL3_YM_ASSEMBLE.html">Level 3</a>.',
-      '  2.3 and 2.4 each read <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s16">Bond holidays (S16)</a> directly, to exclude a weekend or holiday bar from their own calculation, rather than through 2.1.',
+      '  2.3 and 2.4 each read <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s16">Bond holidays (S16)</a> directly, to exclude a weekend or holiday bar from their own calculation, rather than through 2.1. 2.5 and 2.6 read it to leave a Bond Holiday out of the points drawn.',
       '  Each flow is named by the one structure it holds, defined in <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#6.0-data-flows">Data Dictionary &sect;6.4</a>.'].join(NL)
   });
 }

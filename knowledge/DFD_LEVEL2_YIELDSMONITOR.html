@@ -195,6 +195,8 @@
   <path class="flow" d="M 260.0 750.0 Q 416.0 725.0 572.0 750.0" marker-end="url(#a1)"/>
   <path class="flow" d="M 260.0 895.0 Q 408.1 807.8 576.0 771.2" marker-end="url(#a1)"/>
   <path class="flow" d="M 260.0 605.0 Q 408.1 692.2 576.0 728.8" marker-end="url(#a1)"/>
+  <path class="flow" d="M 260.0 605.0 Q 500.7 370.8 802.6 223.4" marker-end="url(#a1)"/>
+  <path class="flow" d="M 260.0 605.0 Q 495.0 405.3 793.5 482.9" marker-end="url(#a1)"/>
   <path class="flow" d="M 260.0 446.0 Q 305.7 393.2 365.6 357.3" marker-end="url(#a1)"/>
   <text class="flow-label" x="267" y="438"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#market-yields"><tspan class="lk">market yields</tspan></a></text>
   <path class="flow" d="M 260.0 474.0 Q 318.5 505.9 364.1 554.5" marker-end="url(#a1)"/>
@@ -315,7 +317,7 @@
   <b>No process here writes a data store.</b> Every flow ends at 2.5, 2.6 or 2.7 and is gone when the page closes.
   <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#e5">CNBC (E5)</a> is drawn as a box, in the store column, since this is the one place a Level 2 diagram in this portal shows an app reading an entity directly, live — no acquisition job stands between it and the app (see <a href="viewer.html#/md/knowledge/DFD_Worklist.md">DFD_Worklist.md</a> §4.0). Its two flows are independently named: <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#market-yields">market yields</a>, its chart-bar feed, to 2.1; <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#live-quotes">live quotes</a>, its quote service, to 2.2.
   2.1 explodes at <a href="DFD_LEVEL3_YM_ASSEMBLE.html">Level 3</a>.
-  2.3 and 2.4 each read <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s16">Bond holidays (S16)</a> directly, to exclude a weekend or holiday bar from their own calculation, rather than through 2.1.
+  2.3 and 2.4 each read <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s16">Bond holidays (S16)</a> directly, to exclude a weekend or holiday bar from their own calculation, rather than through 2.1. 2.5 and 2.6 read it to leave a Bond Holiday out of the points drawn.
   Each flow is named by the one structure it holds, defined in <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#6.0-data-flows">Data Dictionary &sect;6.4</a>.
 </p>
 
