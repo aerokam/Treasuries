@@ -3058,6 +3058,20 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
       assert(`maturityPref='${maturityPref}' with need unchanged: Apr untouched`, qtyDeltaFor(details, APR27), 0);
       assert(`maturityPref='${maturityPref}' with need unchanged: Oct untouched`, qtyDeltaFor(details, OCT27), 0);
     }
+
+    // (5) Select maturities: a held TIPS the picks leave out is sold in full, whatever the DARA of the
+    // year (2.0 §Picking Maturities for a Funded Year, 3.0 §Target CUSIP resolution). The picked TIPS
+    // carry the need of the year, so the year buys where the sale leaves it below its need.
+    for (const [label, dm] of [['need unchanged', baseDaraMap], ['need grown', grownDara]]) {
+      const { details } = runAlloc({
+        dara: scaledMedian, holdings, tipsMarketData, refCPI, settlementDate,
+        daraByYear: dm, maturityPref: 'select',
+        yearOverrides: new Map([[Y, [JAN27, OCT27]]]),
+      });
+      const aprHeld = holdings.find(h => h.cusip === APR27).qty;
+      assert(`Select maturities, ${label}: the held Apr TIPS outside the picks is sold in full`, qtyDeltaFor(details, APR27), -aprHeld);
+      assert(`Select maturities, ${label}: the picked TIPS do not sell`, qtyDeltaFor(details, JAN27) >= 0 && qtyDeltaFor(details, OCT27) >= 0, true);
+    }
   }
 }
 

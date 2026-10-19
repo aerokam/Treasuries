@@ -1446,6 +1446,16 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
     const piMap = {};
     for (const h of yi.holdings) piMap[h.cusip] = calculatePIPerBond(h.cusip, h.maturity, refCPI, tipsMarketData);
 
+    // A held TIPS of an ordinary year that is not among the year's picks is sold in full, whatever the DARA
+    // (2.0 §Picking Maturities for a Funded Year, 3.0 §Target CUSIP resolution). It takes no part in the
+    // ranking or the levelling below.
+    const droppedCusips = new Set();
+    if (!isBracket) {
+      const picks = yearOverrides?.get(year);
+      const picked = new Set((_canon.yearTipsListMap[year] ?? []).map(b => b.cusip).filter(c => picks?.includes(c)));
+      if (picked.size) for (const h of yi.holdings) if (!picked.has(h.cusip)) droppedCusips.add(h.cusip);
+    }
+
     if (isBracket) {
       if (gapYears.length > 0 && year === brackets.lowerYear) targetCUSIP = brackets.lowerCUSIP;
       else if (gapYears.length > 0 && year === brackets.upperYear) targetCUSIP = brackets.upperCUSIP;
@@ -1460,7 +1470,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
       // collapsed toward the single latest CUSIP on every rebalance.
       yearRank = rankForYear({
         candidates: _canon.yearTipsListMap[year] ?? [],
-        held: yi.holdings,
+        held: yi.holdings.filter(h => !droppedCusips.has(h.cusip)),
         piMap,
         tipsMarketData,
         policy: allocationPolicy,
@@ -1610,6 +1620,15 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
         // direction of every trade in the year. A year whose total must fall only sells, a year whose total
         // must rise only buys, and a year whose total is unchanged does not trade. The allocation policy
         // chooses WHICH maturity trades, never both directions (2.0 §Within-Year Allocation Policy).
+        // Held TIPS outside the picks are sold in full first. The direction rule then applies to the TIPS that remain.
+        for (const h of yi.holdings) {
+          if (!droppedCusips.has(h.cusip)) continue;
+          postRebalQtyMap[h.cusip] = 0;
+          curPI -= h.qty * piMap[h.cusip];
+          const b = tipsMarketData.get(h.cusip);
+          const c = (b?.price ?? 0) / 100 * (calcIndexRatio(refCPI, b?.datedDateRefCpi ?? refCPI, NO_ROUNDING)) * 1000;
+          nonTargetSells[h.cusip] = { newQty: 0, qtyDelta: -h.qty, costDelta: h.qty * c, targetCost: 0 };
+        }
         const yearPIHeld = curPI;
         const yearFalls = needed < yearPIHeld, yearRises = needed > yearPIHeld;
         const isEqualLevel = !isBracket && allocationPolicy === 'equal' && nonTarget.length > 0;
