@@ -43,13 +43,42 @@ function etDayNum(ms) {
 
 const mod = (a, n) => ((a % n) + n) % n;
 
+// Bond-market holidays, as the weekday ordinals (weeks * 5 + Monday-based weekday) of the holidays
+// that fall on a weekday, ascending. A holiday is a non-trading day like a weekend: no session, no
+// width. Set once the holiday list is read; until then every weekday is a trading day.
+let holidayOrdinals = [];
+const weekdayOrdinal = d => Math.floor((d + 3) / 7) * 5 + mod(d + 3, 7);
+
+// `isoDates`: 'YYYY-MM-DD' strings, the form the shared holiday set holds.
+export function setHolidays(isoDates) {
+  const ords = [];
+  for (const iso of isoDates || []) {
+    const [y, m, day] = iso.split('-').map(Number);
+    const d = Date.UTC(y, m - 1, day) / DAY_MS;
+    if (mod(d + 3, 7) <= 4) ords.push(weekdayOrdinal(d));
+  }
+  holidayOrdinals = ords.sort((a, b) => a - b);
+}
+
+const isHolidayDay = d => holidayOrdinals.includes(weekdayOrdinal(d));
+const isNonTradingDay = d => mod(d + 3, 7) > 4 || isHolidayDay(d);
+
+// Trading days before calendar day `d`: weekdays before it, less the holidays among them.
+function tradingDaysBefore(d) {
+  const dow = mod(d + 3, 7), upTo = Math.floor((d + 3) / 7) * 5 + Math.min(dow, 5);
+  let holidays = 0;
+  while (holidays < holidayOrdinals.length && holidayOrdinals[holidays] < upTo) holidays++;
+  return upTo - holidays;
+}
+
 // Position on the compact axis of a real timestamp. A moment outside a session takes the position
-// of the nearest session edge of its own day; a weekend takes the end of the preceding Friday.
+// of the nearest session edge of its own day; a weekend or a holiday takes the end of the
+// preceding trading day.
 export function toTradingTime(ms) {
-  const d = etDayNum(ms), dow = mod(d + 3, 7), weekNum = Math.floor((d + 3) / 7); // Monday = 0
-  if (dow > 4) return (weekNum * 5 + 4) * PERIOD_MS + SESSION_MS;
+  const d = etDayNum(ms), n = tradingDaysBefore(d);
+  if (isNonTradingDay(d)) return (n - 1) * PERIOD_MS + SESSION_MS;
   const { open } = dayInfo(d);
-  return (weekNum * 5 + dow) * PERIOD_MS + Math.min(Math.max(ms - open, 0), SESSION_MS);
+  return n * PERIOD_MS + Math.min(Math.max(ms - open, 0), SESSION_MS);
 }
 
 // Compact-axis position scaled so one session (with its separator) spans one calendar day, for
@@ -61,14 +90,16 @@ export function toCalendarScaledTime(ms) {
 // Real timestamp at a compact-axis position; a position in the gap between sessions is the close.
 export function fromTradingTime(t) {
   const w = Math.floor(t / PERIOD_MS), r = Math.min(Math.max(t - w * PERIOD_MS, 0), SESSION_MS);
-  const d = Math.floor(w / 5) * 7 + mod(w, 5) - 3;
+  let k = w; // the w-th trading day is the weekday ordinal k once the holidays before it are skipped
+  for (const h of holidayOrdinals) if (h <= k) k++;
+  const d = Math.floor(k / 5) * 7 + mod(k, 5) - 3;
   return dayInfo(d).open + r;
 }
 
-// True for a weekday moment from 08:00 through 17:05 ET.
+// True for a moment from 08:00 through 17:05 ET on a weekday that is not a holiday.
 export function inTradingSession(ms) {
   const d = etDayNum(ms);
-  if (mod(d + 3, 7) > 4) return false;
+  if (isNonTradingDay(d)) return false;
   const { open, close } = dayInfo(d);
   return ms >= open && ms <= close;
 }
@@ -76,6 +107,11 @@ export function inTradingSession(ms) {
 // True for a Saturday or Sunday moment, ET.
 export function isWeekendMoment(ms) {
   return mod(etDayNum(ms) + 3, 7) > 4;
+}
+
+// True for a moment on a weekend or a holiday, ET: a day with no width on the compact axis.
+export function isNonTradingMoment(ms) {
+  return isNonTradingDay(etDayNum(ms));
 }
 
 // Tick step for a visible span: the smallest step from a short list of round intervals that leaves
@@ -142,7 +178,7 @@ export function createTradingTimeScale(Chart) {
       const compact = this.options.compact;
       const unitTicks = () => {
         if (!compact) return base;
-        if (this.options.time.unit === 'day') return base.filter(t => !isWeekendMoment(t.value));
+        if (this.options.time.unit === 'day') return base.filter(t => !isNonTradingMoment(t.value));
         if (this.options.time.unit !== 'hour' && this.options.time.unit !== 'minute') return base;
         return base.filter(t => inTradingSession(t.value));
       };
@@ -155,7 +191,7 @@ export function createTradingTimeScale(Chart) {
       const step = niceTickStep(span, maxTicks);
       if (step === null || step > 30 * DAY_MS || days >= 90 * DAY_MS) return unitTicks();
       let values = alignedTicks(min, max, step);
-      if (compact) values = step >= DAY_MS ? values.filter(v => !isWeekendMoment(v)) : values.filter(inTradingSession);
+      if (compact) values = step >= DAY_MS ? values.filter(v => !isNonTradingMoment(v)) : values.filter(inTradingSession);
       return values.map(value => ({ value }));
     }
   };

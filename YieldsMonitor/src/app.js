@@ -7,7 +7,7 @@ import { parseCsv } from '../../shared/src/csv.js';
 import { localDate, toIsoDate, nextBusinessDay, parseHolidaySet } from '../../shared/src/settlement.js';
 import { resolveTipsBond } from './cnbc-rollover-log.js';
 import { layerCustomSeries, archiveDatesToRead, customBounds, showMarkers, countVisible, DATE_ONLY_RANGES } from './custom-series.js';
-import { createTradingTimeScale, tradingGapPlugin, inTradingSession, toTradingTime, fromTradingTime, toCalendarScaledTime } from './trading-time.js';
+import { createTradingTimeScale, tradingGapPlugin, inTradingSession, toTradingTime, fromTradingTime, toCalendarScaledTime, setHolidays } from './trading-time.js';
 
 Chart.register(createTradingTimeScale(Chart));
 
@@ -695,7 +695,14 @@ async function ensureSaDataLoaded() {
   if (!refCpiSaRows) refCpiSaRows = await fetchRefCpiSaRows();
   if (!tipsBondMeta) tipsBondMeta = await fetchTipsBondMeta();
   if (!tipsRefRows) tipsRefRows = await fetchTipsRefRows();
+  await ensureHolidaysLoaded();
+}
+
+// The bond-market holidays are non-trading days for Hide non-trading hours as well as for SA, so
+// they are read before the charts are drawn, whether or not SA is on.
+async function ensureHolidaysLoaded() {
   if (saHolidaySet.size === 0) saHolidaySet = await fetchSaHolidaySet();
+  setHolidays(saHolidaySet);
 }
 
 // Seasonally-adjusted yield for a single quote, using the real bond's coupon/maturity
@@ -1344,7 +1351,7 @@ function updateCharts() {
 }
 
 async function updateAllData(force = false) {
-  await fetchAllData(force);
+  await Promise.all([fetchAllData(force), ensureHolidaysLoaded()]);
   updateCharts();
 }
 
@@ -1409,7 +1416,7 @@ function updateYieldCurves() {
   // TIPS and Nominal alike, rather than just the anchor's own line).
   const ANCHOR_PRIORITY = ['US10YTIPS', 'US1YTIPS', 'US30YTIPS', 'US2YTIPS'];
   const anchorSym = ANCHOR_PRIORITY.find(s => rangeData[s] && rangeData[s].length) || 'US10YTIPS';
-  const refData = rangeData[anchorSym];
+  const refData = plotSeries(rangeData[anchorSym]); // with Hide non-trading hours on, only the points drawn
   const refStart = refData && refData.length ? refData[0] : null;
   const refEnd = refData && refData.length ? refData[refData.length - 1] : null;
   const startDateStr = refStart ? getEtDateStr(refStart.x) : null;
