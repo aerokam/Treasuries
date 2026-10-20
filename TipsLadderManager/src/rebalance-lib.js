@@ -45,7 +45,7 @@ export function buildTipsMarketData(yieldsRows, saYieldByCusip = null) {
   return map;
 }
 
-function identifyBrackets(gapYears, holdings, yearInfo, tipsMarketData, araByYear, DARA, firstYear = 0) {
+function identifyBrackets(gapYears, holdings, yearInfo, tipsMarketData, araByYear, DARA, firstYear = 0, daraByYear = null) {
   if (gapYears.length === 0) return { lowerCUSIP: null, lowerYear: null, lowerMaturity: null, upperCUSIP: null, upperYear: null, upperMaturity: null };
   const minGapYear = Math.min(...gapYears);
   const upperYear = UPPER_BRACKET_YEAR;
@@ -69,8 +69,8 @@ function identifyBrackets(gapYears, holdings, yearInfo, tipsMarketData, araByYea
     const y = bond.maturity.getFullYear();
     if (y >= LOWEST_LOWER_BRACKET_YEAR && y < minGapYear && totalQty > 0) {
       // Metric: Excess ARA. The bracket is the TIPS with the most spare capacity (ARA >> DARA).
-      const excess = (araByYear[y] || 0) - DARA;
-      // A year whose ARA does not exceed the DARA holds no spare capacity, so it is not a retained lower bracket.
+      const excess = (araByYear[y] || 0) - (daraByYear?.get(y) ?? DARA);
+      // A year whose ARA does not exceed the DARA of that year holds no spare capacity, so it is not a retained lower bracket.
       if (!(excess > 0)) continue;
       if (excess > maxExcess || (excess === maxExcess && totalQty > (cusipTotals.get(lowerCUSIP) || -1))) {
         maxExcess = excess; lowerCUSIP = cusip; lowerYear = y; lowerMaturity = bond.maturity;
@@ -1110,7 +1110,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
   const gapParams = calculateGapParameters(gapYears, settlementDate, refCPI, tipsMarketData, DARA, holdings, lastYear, pliCreditByGapYear, daraByYear, zeroedFundedYears);
 
   const minGapYear = gapYears.length > 0 ? Math.min(...gapYears) : Infinity;
-  const brackets  = identifyBrackets(gapYears, holdings, yearInfo, tipsMarketData, araByYear, DARA, firstYear);
+  const brackets  = identifyBrackets(gapYears, holdings, yearInfo, tipsMarketData, araByYear, DARA, firstYear, daraByYear);
 
   // 2-bracket: lower bracket is always the canonical tipsMarketData lower (latest-maturing TIPS below
   // minGapYear). identifyBrackets may return an older year found via excess-ARA.

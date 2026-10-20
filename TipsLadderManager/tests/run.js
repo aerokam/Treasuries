@@ -3161,6 +3161,9 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
   // A held year whose ARA does not exceed its DARA holds no spare capacity, so it is not a retained lower bracket (3.0 §Retained Maturities).
   assert('a small holding in a pre-gap year below its DARA is not a retained lower bracket', rowIn(fromNothing, 'TEST35JUL')?.isBracketTarget, false);
   assert('with no spare capacity held, the lower bracket is the active lower bracket', fromNothing.summary.brackets.lowerYear, 2036);
+  // The comparison is with the DARA of that year in the plan, not with one flat DARA: a year under its planned DARA has no excess whatever the flat figure is.
+  const planDriven = runRebalance({ dara: 100, bracketMode: '3bracket', holdings: [{ cusip: 'TEST35JUL', qty: 1, excessQty: 0 }], tipsMarketData: map, refCPI, settlementDate, daraByYear: new Map(bAll.summary.daraByYearResolved), firstYearOverride: 2035, lastYearOverride: 2040, maturityPref: 'all' });
+  assert('a held year under its planned DARA is not a retained lower bracket, whatever the flat DARA', rowIn(planDriven, 'TEST35JUL')?.isBracketTarget, false);
   const roundTrip = rebAll(bAll.details.filter(d => d.fundedYearQty + d.excessQty > 0).map(d => ({ cusip: d.cusip, qty: d.fundedYearQty + d.excessQty, excessQty: d.excessQty })));
   assert('Build with all maturity months, imported and rebalanced: the bracket year does not trade', roundTrip.details.filter(d => d.fundedYear === 2036).every(d => d.qtyAfter === d.qtyBefore), true);
 }
