@@ -3173,6 +3173,30 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
   // display half of the same bug (2.0 §Retained Bracket Excess).
   assert('idempotent reload: Jan 2036 is recognized as a bracket target (isBracketTarget)', jan36Row?.isBracketTarget, true);
   assert('idempotent reload: Jan 2036 excessQtyBefore reflects its imported split, not 0', (jan36Row?.excessQtyBefore ?? 0) > 0, true);
+  // Select maturities in a bracket year: a TIPS outside the picks has a funded contribution of 0 and keeps its
+  // Excess TIPS; the picked TIPS carry the funded need of the year (2.0 §Picking Maturities for a Funded Year,
+  // 3.0 §Target CUSIP resolution).
+  const selRun = (holdings, picks) => runRebalance({
+    dara: 20000, bracketMode: '3bracket', holdings, tipsMarketData: map, refCPI, settlementDate,
+    maturityPref: 'select', yearOverrides: new Map([[2036, picks]]),
+  });
+  const rowOf = (r, cusip) => r.details.find(d => d.cusip === cusip);
+  // Jan 2036 holds a funded contribution (17) and Excess TIPS (5); Jul 2036 holds Excess TIPS only. holdingsC reverses it:
+  // Jan 2036 holds Excess TIPS only (5) and Jul 2036 holds a funded contribution (13) and Excess TIPS (27).
+  const holdingsC = holdingsB.map(h => h.cusip === 'TEST36JAN' ? { cusip: h.cusip, qty: 5, excessQty: 5 } : h.cusip === 'TEST36JUL' ? { cusip: h.cusip, qty: 40, excessQty: 27 } : h);
+  for (const [label, holdings, out, kept] of [
+    ['Jan 2036 outside the picks', holdingsB, 'TEST36JAN', 'TEST36JUL'],
+    ['Jul 2036 outside the picks', holdingsC, 'TEST36JUL', 'TEST36JAN'],
+  ]) {
+    const base = selRun(holdings, ['TEST36JAN', 'TEST36JUL']);
+    const r = selRun(holdings, [kept]);
+    const outRow = rowOf(r, out), baseOut = rowOf(base, out), keptRow = rowOf(r, kept), baseKept = rowOf(base, kept);
+    assert(label + ': it held a funded contribution', baseOut.fundedYearQtyBefore > 0, true);
+    assert(label + ': its funded contribution is sold', outRow.fundedYearQtyAfter, 0);
+    assert(label + ': its Excess TIPS stay at the quantity of the run with both picked', outRow.excessQtyAfter, baseOut.excessQtyAfter);
+    assert(label + ': the picked TIPS keeps its Excess TIPS', keptRow.excessQtyAfter, baseKept.excessQtyAfter);
+    assert(label + ': the picked TIPS carries the funded need the sale leaves', keptRow.fundedYearQtyAfter > baseKept.fundedYearQtyAfter, true);
+  }
 }
 
 // ── Test: Available Cash — ladder-wide pool consumed earliest rung first ─────────────────────

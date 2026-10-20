@@ -1284,6 +1284,13 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
   // this) — lets the details loop below split its row into funded/excess like any other bracket
   // target, instead of showing its entire holding as "funded" (2.0 §Retained Bracket Excess).
   const sameYearRetainedNeed = new Map(sameYearRetained.map(r => [r.cusip, r.ownFundedNeedQty]));
+  // The picks of Select maturities that name a TIPS of the year; empty when the year has no pick (2.0 §Picking Maturities for a Funded Year).
+  const pickedFor = year => {
+    const picks = yearOverrides?.get(year);
+    return new Set((_canon.yearTipsListMap[year] ?? []).map(b => b.cusip).filter(c => picks?.includes(c)));
+  };
+  // Same-maturity-year retained maturities outside the picks: their funded contribution is sold, their excess stays.
+  const retainedUnpicked = new Set(sameYearRetained.filter(r => { const pk = pickedFor(r.year); return pk.size > 0 && !pk.has(r.cusip); }).map(r => r.cusip));
   if (gapYears.length > 0) {
     if (is3Bracket) {
       // Retained lower brackets are frozen at the excess already held and enter the
@@ -1367,7 +1374,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
         const cpb = (b?.price ?? 0) / 100 * calcIndexRatio(refCPI, b?.datedDateRefCpi ?? refCPI, NO_ROUNDING) * 1000;
         const held = yearInfo[r.year]?.holdings?.find(x => x.cusip === r.cusip)?.qty ?? 0;
         const excessQty = cpb > 0 ? Math.max(0, Math.round((bracketExcessTargetCost[r.cusip] || 0) / cpb)) : 0;
-        const fundedQty = Math.min(held, r.ownFundedNeedQty);
+        const fundedQty = retainedUnpicked.has(r.cusip) ? 0 : Math.min(held, r.ownFundedNeedQty);
         sameYearRetainedFinal.set(r.cusip, fundedQty + excessQty);
       }
     }
@@ -1450,11 +1457,8 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
     // (2.0 §Picking Maturities for a Funded Year, 3.0 §Target CUSIP resolution). It takes no part in the
     // ranking or the levelling below.
     const droppedCusips = new Set();
-    if (!isBracket) {
-      const picks = yearOverrides?.get(year);
-      const picked = new Set((_canon.yearTipsListMap[year] ?? []).map(b => b.cusip).filter(c => picks?.includes(c)));
-      if (picked.size) for (const h of yi.holdings) if (!picked.has(h.cusip)) droppedCusips.add(h.cusip);
-    }
+    const picked = pickedFor(year);
+    if (!isBracket && picked.size) for (const h of yi.holdings) if (!picked.has(h.cusip)) droppedCusips.add(h.cusip);
 
     if (isBracket) {
       if (gapYears.length > 0 && year === brackets.lowerYear) targetCUSIP = brackets.lowerCUSIP;
@@ -1462,6 +1466,9 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
       else if (is3Bracket && year === newLowerYear) targetCUSIP = newLowerCUSIP;
       else if (future30yYears.length > 0 && year === future30yLowerYear) targetCUSIP = future30yLowerCoverBond.cusip;
       else if (future30yYears.length > 0 && year === future30yUpperYear) targetCUSIP = future30yUpperCoverBond.cusip;
+      // A bracket year sells every held TIPS outside the picks in full, apart from its excess CUSIP and its
+      // same-maturity-year retained maturities, which keep their excess and sell only their funded contribution.
+      if (picked.size) for (const h of yi.holdings) if (!picked.has(h.cusip) && h.cusip !== targetCUSIP && !sameYearRetainedFinal.has(h.cusip)) droppedCusips.add(h.cusip);
     } else {
       // 2.0 §Within-Year Allocation Policy / 3.0 §Named Quantities (Rebalance): candidates come
       // from the canonical yearTipsListMap (maturityPref/yearOverrides-driven), not re-derived
@@ -1503,7 +1510,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
     if (isBracket) {
       yearRank = rankForYear({
         candidates: _canon.yearTipsListMap[year] ?? [],
-        held: yi.holdings,
+        held: yi.holdings.filter(h => !droppedCusips.has(h.cusip)),
         piMap,
         tipsMarketData,
         policy: 'maturity',
@@ -1517,8 +1524,11 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
     // so ranking unconditionally could pick a DIFFERENT CUSIP than targetCUSIP even under the
     // unchanged default, which is a regression (a same-maturity-year buy+sell pair), not a fix. Only
     // an actual non-default maturityPref should ever move the funded role off targetCUSIP.
-    const fundedCUSIP = (isBracket && maturityPref !== 'last')
-      ? (yearRank[0]?.cusip ?? targetCUSIP)
+    // The excess CUSIP outside the picks funds nothing: the picked TIPS carry the funded need of the year (3.0 §Target CUSIP resolution).
+    const targetUnpicked = isBracket && picked.size > 0 && targetCUSIP != null && !picked.has(targetCUSIP);
+    const fundedRank = isBracket && picked.size ? yearRank.filter(r => picked.has(r.cusip)) : yearRank;
+    const fundedCUSIP = (isBracket && (maturityPref !== 'last' || targetUnpicked))
+      ? (fundedRank[0]?.cusip ?? targetCUSIP)
       : targetCUSIP;
     fundedCUSIPByYear[year] = fundedCUSIP;
     const fundedIsRetained = isBracket && fundedCUSIP !== targetCUSIP && sameYearRetainedFinal.has(fundedCUSIP);
@@ -1600,7 +1610,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
         const targetExcessHeld = isBracket
           ? Math.max(0, targetCurrentQty - (bracketTargetFundedYearQtyBefore[year] ?? targetCurrentQty))
           : 0;
-        const targetFundedHeld = targetCurrentQty - targetExcessHeld;
+        const targetFundedHeld = targetUnpicked ? 0 : targetCurrentQty - targetExcessHeld;
         // Sell order (3.0 §Within-Year Allocation Policy / §Target CUSIP resolution): least-
         // preferred-to-hold first. For ordinary years this is allocationPolicy's own rank; for a
         // bracket year it is the maturity-direction rank computed above, minus the excess-bearing
@@ -1615,7 +1625,11 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
           .reverse()
           .map(r => yi.holdings.find(h => h.cusip === r.cusip));
         let curPI = yi.holdings.reduce((s, h) => s + h.qty * piMap[h.cusip], 0)
-                  - targetExcessHeld * piMap[targetCUSIP];
+                  - (targetUnpicked ? targetCurrentQty : targetExcessHeld) * piMap[targetCUSIP];
+        // A same-maturity-year retained maturity outside the picks sells its funded contribution.
+        if (isBracket) for (const h of yi.holdings) {
+          if (retainedUnpicked.has(h.cusip)) curPI -= Math.min(h.qty, sameYearRetainedNeed.get(h.cusip) ?? 0) * piMap[h.cusip];
+        }
         // The year's total P+I is what the DARA sets (3.0 §Named Quantities): its net change decides the
         // direction of every trade in the year. A year whose total must fall only sells, a year whose total
         // must rise only buys, and a year whose total is unchanged does not trade. The allocation policy
@@ -1722,7 +1736,9 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
           const retainedExcessQty = fundedIsRetained && fCostPerBond > 0
             ? Math.max(0, Math.round((bracketExcessTargetCost[fundedCUSIP] || 0) / fCostPerBond))
             : 0;
-          const fundedFinalQty = fundedCurrentQty + fundedGrowthQty + retainedExcessQty;
+          // A retained maturity already holds its excess share inside fundedCurrentQty: only its funded holding is the base.
+          const fundedBaseQty = fundedIsRetained ? Math.min(fundedCurrentQty, sameYearRetainedNeed.get(fundedCUSIP) ?? 0) : fundedCurrentQty;
+          const fundedFinalQty = fundedBaseQty + fundedGrowthQty + retainedExcessQty;
           postRebalQtyMap[fundedCUSIP] = fundedFinalQty;
           if (fundedFinalQty !== fundedCurrentQty) {
             nonTargetSells[fundedCUSIP] = { newQty: fundedFinalQty, qtyDelta: fundedFinalQty - fundedCurrentQty, costDelta: -((fundedFinalQty - fundedCurrentQty) * fCostPerBond), targetCost: fundedFinalQty * fCostPerBond };
@@ -1819,7 +1835,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
     if (is3Bracket && year === newLowerYear && sameYearRetainedFinal.size > 0) {
       for (const [cusip, finalQty] of sameYearRetainedFinal) {
         const _rb = tipsMarketData.get(cusip);
-        const _rex = finalQty - Math.min(yi.holdings.find(h => h.cusip === cusip)?.qty ?? 0, sameYearRetainedNeed.get(cusip) ?? 0);
+        const _rex = finalQty - (retainedUnpicked.has(cusip) ? 0 : Math.min(yi.holdings.find(h => h.cusip === cusip)?.qty ?? 0, sameYearRetainedNeed.get(cusip) ?? 0));
         if (_rb && _rex > 0) {
           const _irr = calcIndexRatio(refCPI, _rb.datedDateRefCpi || refCPI, TREASURY_ROUNDING);
           rebuildLaterMatInt -= _rex * _irr * 1000 * _rb.coupon;
@@ -2146,7 +2162,11 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
     // it was resolved above) would be lost, showing the entire holding as funded. Its own frozen
     // funded need overrides tFundedYearQty the same way `bst_loop`/`nonTargetSells` set it above.
     const sameYearOwnNeed = sameYearRetainedNeed.get(h.cusip);
-    if (sameYearOwnNeed != null) tFundedYearQty = Math.min(h.qty, sameYearOwnNeed);
+    if (sameYearOwnNeed != null) {
+      // Its funded share is what it holds beyond its solved excess share, so a shortfall bought into it shows as funded.
+      const _fundedHeld = retainedUnpicked.has(h.cusip) ? 0 : Math.min(h.qty, sameYearOwnNeed);
+      tFundedYearQty = tQ - ((sameYearRetainedFinal.get(h.cusip) ?? tQ) - _fundedHeld);
+    }
     const isBT = !!(bst_loop?.isBracket && h.cusip === bst_loop.targetCUSIP) || sameYearOwnNeed != null;
     const cpbHere = (b.price ?? 0) / 100 * ir * 1000;
     // Current-holdings split at a bracket year: how much of what's actually held counts as this
