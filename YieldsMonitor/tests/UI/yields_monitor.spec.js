@@ -103,6 +103,27 @@ test.describe('Yields Monitor Regression Tests', () => {
     expect(endOff).not.toContain('–');
   });
 
+  test('Tooltips show a Yield to two decimals and the sidebar to three', async ({ page }) => {
+    await expect(page.locator('#fetchStatus')).toContainText('TIPS latest:');
+    const timeSeries = await page.locator('canvas#chart-US10Y').evaluate((canvas) => {
+      const chart = Chart.getChart(canvas);
+      const cb = chart.options.plugins.tooltip.callbacks.label;
+      return cb({ datasetIndex: 0, parsed: { y: 4.3214 } });
+    });
+    expect(timeSeries).toBe('Yield: 4.32%');
+
+    await page.locator('.tab-btn[data-tab="yieldcurves"]').click();
+    const curve = await page.locator('canvas#yield-curve-nominal').evaluate((canvas) => {
+      const chart = Chart.getChart(canvas);
+      const cb = chart.options.plugins.tooltip.callbacks.label;
+      return cb({ dataset: { label: 'Start' }, parsed: { y: 4.3256 } });
+    });
+    expect(curve).toBe('Start: 4.33');
+
+    await page.locator('.tab-btn[data-tab="timeseries"]').click();
+    await expect(page.locator('#yield-US10Y')).toHaveText(/^\d+\.\d{3}%$/);
+  });
+
   test('Hide non-trading hours applies to the Custom range and keeps its daily-only points', async ({ page }) => {
     await page.locator('.range-btn[data-range="Custom"]').click();
     const iso = ms => new Date(ms).toISOString().slice(0, 10);

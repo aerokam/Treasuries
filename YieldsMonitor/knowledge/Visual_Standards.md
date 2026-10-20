@@ -8,7 +8,8 @@ Conventions of every chart in the app.
 ## Timezone and precision
 
 - Every displayed time is Eastern Time.
-- Every displayed [Yield](../../knowledge/DATA_DICTIONARY.md#yield) is shown to three decimal places (e.g. `4.321%`).
+- Every displayed [Yield](../../knowledge/DATA_DICTIONARY.md#yield) is shown to three decimal places (e.g. `4.321%`), in the sidebar and on the chart axes.
+- Every Yield in a chart tooltip is shown to two decimal places (e.g. `4.32%`).
 
 ## Pan and zoom
 
