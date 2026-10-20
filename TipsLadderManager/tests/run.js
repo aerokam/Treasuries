@@ -3798,12 +3798,23 @@ console.log('\nFuture 30Y Dur popup — cost-weighted average, computed match, c
   const before = rS.gapRebalancesBefore.conversions, build = bS.gapRebalances.conversions;
   assertGapConversionsMatch(before, 'less Excess TIPS held, Before');
   assert('less Excess TIPS held: Before starts from the held quantities', before[0].lowerQtyBefore === heldLowerExcess && before[0].upperQtyBefore === heldUpperExcess, true);
-  assert('less Excess TIPS held: each conversion goes to the quantity a build gives',
-    before.every((c, k) => c.lowerQtyAfter === build[k].lowerQtyAfter && c.upperQtyAfter === build[k].upperQtyAfter), true);
-  // Only the first conversion differs from a build, by the Excess TIPS not held: its Net Cash is lower by the cost of buying them.
-  assert('less Excess TIPS held: the Net Cash of the first conversion is that of a build less the cost of the Excess TIPS not held',
-    before[0].netCash, build[0].netCash - (bS.lowerExQty - heldLowerExcess) * before[0].lowerCostPerBond - (bS.upperExQty - heldUpperExcess) * before[0].upperCostPerBond, 1e-6);
-  assert('less Excess TIPS held: the Net Cash of every later conversion is that of a build', before.slice(1).every((c, k) => Math.abs(c.netCash - build[k + 1].netCash) < 1e-6), true);
+  // Before is what the holdings pay: nothing is bought to reach the duration match, so the Simulated Outstanding Future 10Y TIPS are the
+  // share of a build's that the Excess TIPS held pays for (3.0 §Before and the gap year rebalances).
+  const simQty = (cs) => cs.reduce((s, c) => s + c.simulatedQty, 0);
+  assert('less Excess TIPS held: Before has fewer Simulated Outstanding Future 10Y TIPS than a build, and some', simQty(before) < simQty(build) && simQty(before) > 0, true);
+  assert('less Excess TIPS held: Before does not buy the Excess TIPS not held', before[0].lowerQtyAfter < build[0].lowerQtyAfter && before[0].upperQtyAfter <= build[0].upperQtyAfter, true);
+  assert('less Excess TIPS held: the Net Cash of the first conversion is above that of buying the Excess TIPS not held',
+    before[0].netCash > build[0].netCash - (bS.lowerExQty - heldLowerExcess) * before[0].lowerCostPerBond - (bS.upperExQty - heldUpperExcess) * before[0].upperCostPerBond, true);
+  // With none held, nothing is credited and no gap year shows an Amount Before.
+  const noExcessHoldings = holdings.map(h => ({ ...h, qty: h.qty - h.excessQty, excessQty: 0 })).filter(h => h.qty > 0);
+  const { summary: nS } = runRebalance({
+    dara: DARA, bracketMode: '3bracket', holdings: noExcessHoldings, tipsMarketData, refCPI, settlementDate, bondHolidays,
+    daraByYear: new Map(bS.daraByYearResolved), firstYearOverride: SY, lastYearOverride: MAX_YEAR,
+  });
+  const sumAll = (m) => [...m.values()].reduce((a, v) => a + Math.abs(v), 0);
+  assert('no Excess TIPS held: Before credits no Simulated Outstanding Future 10Y TIPS interest', sumAll(nS.gapSimulatedInterestBefore), 0);
+  assert('no Excess TIPS held: Before credits no Net Cash', sumAll(nS.gapNetCashBefore), 0);
+  assert('no Excess TIPS held: Before shows no Amount for a gap year', Object.values(nS.syntheticYearAmountsBefore).every(a => a.amount === 0), true);
   const sumOf = (m) => [...m.values()].reduce((a, v) => a + v, 0);
   assert('less Excess TIPS held: Before credits less Excess TIPS interest than After', sumOf(rS.gapExcessInterestBefore) < sumOf(rS.gapExcessInterestByYear), true);
   assert('less Excess TIPS held: After credits what a build credits', Math.abs(sumOf(rS.gapExcessInterestByYear) - sumOf(bS.gapExcessInterestByYear)) < 0.01, true);

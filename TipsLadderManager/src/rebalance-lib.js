@@ -4,7 +4,7 @@
 import { bondCalcs, calculateMDuration, yieldFromPrice, calcMktWtdAvg } from '../../shared/src/bond-math.js';
 import { indexRatio as calcIndexRatio, TREASURY_ROUNDING, NO_ROUNDING } from '../../shared/src/ref-cpi.js';
 export { yieldFromPrice };
-import { interpolateYield, syntheticCoupon, bracketWeights, bracketWeightsN, gapParamsCore, future30yParamsCore } from './gap-math.js';
+import { interpolateYield, syntheticCoupon, bracketWeights, bracketWeightsN, gapParamsCore, scaleGapParams, future30yParamsCore } from './gap-math.js';
 import { findSpikes, evenSpread, MIN_SHAPE_POINTS, inferShapeValue } from './shape-math.js';
 import { getGapYears, UPPER_BRACKET_YEAR, upperBracketBond, sizeLadder, selectLadderBonds, fundedYearAmount, rmdCappedRemainingCoupons, latestRemainingCouponDate, selectFuture30yCovers, future30yRebalances, future30yInterestByYear, gapRebalances, gapInterestByYear, future30yLimit, syntheticYearAmounts } from './ladder-core.js';
 import { localDate, fmtDate, fmtDateLong, toDateStr } from './date-util.js';
@@ -1931,16 +1931,33 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
   const heldGapExcessByYear = {};
   for (const l of heldGapLegs) heldGapExcessByYear[l.year] = (heldGapExcessByYear[l.year] ?? 0) + l.qty;
   const _beforeGapUsesImplied = dara === null && !daraByYear && heldImpliedGap != null;
-  const gapParamsBefore = _beforeGapUsesImplied ? heldImpliedGap.gapParams : _sl.gapParams;
-  const gapRebalancesBefore = gapYears.length > 0
-    ? gapRebalances({
-        gapParams: gapParamsBefore,
-        lowerBracketBond: tipsMarketData.get(gapActiveCusip), upperBracketBond: tipsMarketData.get(brackets.upperCUSIP),
-        retained: heldGapLegs.filter(l => l.key === 'retained').map(l => ({ bond: tipsMarketData.get(l.cusip), qty0: l.qty })),
-        refCPI, bondHolidays,
-        lowerQty0: heldGapLegs.find(l => l.key === 'active')?.qty ?? 0, upperQty0: heldGapLegs.find(l => l.key === 'upper')?.qty ?? 0,
-      })
-    : null;
+  const _gapRebalancesOf = (gapParams) => gapRebalances({
+    gapParams,
+    lowerBracketBond: tipsMarketData.get(gapActiveCusip), upperBracketBond: tipsMarketData.get(brackets.upperCUSIP),
+    retained: heldGapLegs.filter(l => l.key === 'retained').map(l => ({ bond: tipsMarketData.get(l.cusip), qty0: l.qty })),
+    refCPI, bondHolidays,
+    lowerQty0: heldGapLegs.find(l => l.key === 'active')?.qty ?? 0, upperQty0: heldGapLegs.find(l => l.key === 'upper')?.qty ?? 0,
+  });
+  let gapParamsBefore = _beforeGapUsesImplied ? heldImpliedGap.gapParams : _sl.gapParams;
+  let gapRebalancesBefore = gapYears.length > 0 ? _gapRebalancesOf(gapParamsBefore) : null;
+  // Before is what the holdings pay (3.0 §Before and the gap year rebalances): nothing is bought to reach the duration match, so the
+  // Simulated Outstanding Future 10Y TIPS are the share of the sized quantities that the Excess TIPS held pays for. With none held there
+  // are none, and no interest or Net Cash is credited. The Excess TIPS held is what the file declares, or what a loaded DARA plan leaves
+  // beyond the funded need of the bracket year.
+  if (!_beforeGapUsesImplied && gapRebalancesBefore?.conversions?.length) {
+    const c0 = gapRebalancesBefore.conversions[0];
+    const heldOf = (key) => heldGapLegs.find(l => l.key === key)?.qty ?? 0;
+    const retainedHeld = heldGapLegs.filter(l => l.key === 'retained');
+    const matchCost = c0.lowerQtyAfter * c0.lowerCostPerBond + c0.upperQtyAfter * c0.upperCostPerBond
+      + retainedHeld.reduce((s, l, i) => s + (c0.retainedQtyAfter?.[i] ?? 0) * (c0.retainedCostPerBond?.[i] ?? 0), 0);
+    const paidCost = Math.min(heldOf('active'), c0.lowerQtyAfter) * c0.lowerCostPerBond + Math.min(heldOf('upper'), c0.upperQtyAfter) * c0.upperCostPerBond
+      + retainedHeld.reduce((s, l, i) => s + (c0.retainedQtyAfter?.[i] ?? 0) * (c0.retainedCostPerBond?.[i] ?? 0), 0);
+    const share = matchCost > 0 ? paidCost / matchCost : 1;
+    if (share < 1) {
+      gapParamsBefore = scaleGapParams(gapParamsBefore, share);
+      gapRebalancesBefore = _gapRebalancesOf(gapParamsBefore);
+    }
+  }
   const { simulated: gapSimulatedInterestBefore, excess: gapExcessInterestBefore, netCash: gapNetCashBefore } = gapRebalancesBefore
     ? gapInterestByYear({
         rebalances: gapRebalancesBefore,

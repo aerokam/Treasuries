@@ -158,6 +158,19 @@ export function bracketExcessQtys(totalCost, lowerWeight, upperWeight, lowerCost
 //   • rebalance derives it from holdings/targets (the actual TIPS above the gap years).
 // Everything here — anchors, synthetic construction, qty formula, cost-weighted avg
 // duration — is identical for both. Returns { avgDuration, totalCost, breakdown, anchors }.
+// The gap parameters with every Synthetic TIPS quantity (and the interest of the later ones that the earlier years count as LMI)
+// reduced to the share `f` of what was sized: the Before state of a holder whose Excess TIPS pays for only that share
+// (3.0 §Before and the gap year rebalances). `f` = 1 returns the parameters unchanged.
+export function scaleGapParams(gapParams, f) {
+  if (!gapParams || !(f < 1)) return gapParams;
+  const share = Math.max(0, f);
+  const breakdown = (gapParams.breakdown ?? []).map(g => {
+    const qty = Math.max(0, Math.round(g.qty * share));
+    return { ...g, qty, qtyExact: g.qtyExact * share, laterMatInt: g.laterMatInt * share, cost: qty * g.costPerBond, annualInt: qty * 1000 * g.synCpn };
+  });
+  return { ...gapParams, breakdown, totalCost: breakdown.reduce((s, g) => s + g.cost, 0) };
+}
+
 export function gapParamsCore({ gapYears, tipsMarketData, settlementDate, dara, daraByYear = null, lmiAboveByYear = {}, pliCreditByGapYear = {} }) {
   if (!gapYears || gapYears.length === 0) return { avgDuration: 0, totalCost: 0, breakdown: [] };
   const minGapYear = Math.min(...gapYears);
