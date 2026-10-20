@@ -2001,6 +2001,15 @@ console.log('\nparseParamsBlock — #params line');
   assert('params PLI=false', pOff?.preLadderInterest, false);
   assert('params maturityPref=last', pOff?.maturityPref, 'last');
 
+  // The picks of Select maturities (2.1 §`#params` row): written as year:cusip|cusip entries, read back as a Map; a year with no pick is `year:`.
+  const pPicks = parseParamsBlock(['#params,preLadderInterest=false,maturityPref=select,maturityPicks=2027:912828V49|91282CEJ6;2028:9128283R9;2029:,couponPref=lower']);
+  assert('params maturityPref=select with picks', pPicks?.maturityPref, 'select');
+  assert('params picks of a year', pPicks?.maturityPicks?.get(2027)?.join(), '912828V49,91282CEJ6');
+  assert('params picks of a second year', pPicks?.maturityPicks?.get(2028)?.join(), '9128283R9');
+  assert('params a year with no pick is an empty list', pPicks?.maturityPicks?.get(2029)?.length, 0);
+  assert('params picks do not disturb the key after them', pPicks?.couponPref, 'lower');
+  assert('params select without picks reads as last', parseParamsBlock(['#params,maturityPref=select'])?.maturityPref, 'last');
+
   // No #params line (broker/legacy) → null, so import falls back to UI/inference.
   assert('no #params line → null', parseParamsBlock(['cusip,qty', '91282CLE9,10']), null);
 

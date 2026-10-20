@@ -652,7 +652,16 @@ export function parseParamsBlock(rawLines) {
       const [k, v] = kv.split('=').map(s => s.trim());
       if (!k) continue;
       if (/^preladderinterest$/i.test(k)) out.preLadderInterest = /^(true|1|yes|on)$/i.test(v);
-      else if (/^maturitypref$/i.test(k)) out.maturityPref = /^(first|semiannual|all)$/i.test(v) ? v.toLowerCase() : 'last';
+      else if (/^maturitypref$/i.test(k)) out.maturityPref = /^(first|semiannual|all|select)$/i.test(v) ? v.toLowerCase() : 'last';
+      // The picks of Select maturities: `year:cusip|cusip;year:cusip`, a year with no pick written as `year:` (2.1 §`#params` row).
+      else if (/^maturitypicks$/i.test(k)) {
+        const picks = new Map();
+        for (const part of (v ?? '').split(';')) {
+          const [y, cs] = part.split(':');
+          if (/^\d{4}$/.test((y ?? '').trim())) picks.set(+y, (cs ?? '').split('|').map(s => s.trim()).filter(Boolean));
+        }
+        if (picks.size) out.maturityPicks = picks;
+      }
       else if (/^couponpref$/i.test(k)) out.couponPref = /^lower$/i.test(v) ? 'lower' : 'higher';
       // `rmdCashOverride` is the superseded key for the same figure, read as an alias so files
       // written before Available Cash went ladder-wide keep working (4.2.2 Parse DARA plan and parameters).
@@ -661,6 +670,8 @@ export function parseParamsBlock(rawLines) {
       // The Ref CPI date the file's DARA values are denominated at (3.0 §DARA Reference Date).
       else if (/^refcpidate$/i.test(k)) { if (/^\d{4}-\d{2}-\d{2}$/.test(v)) out.refCpiDate = v; }
     }
+    // Select maturities without its picks is a file written before the picks were saved: it reads as Last to mature.
+    if (out.maturityPref === 'select' && !out.maturityPicks) out.maturityPref = 'last';
     return Object.keys(out).length > 0 ? out : null;
   }
   return null;

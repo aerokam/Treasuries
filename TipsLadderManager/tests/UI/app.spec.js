@@ -2396,6 +2396,39 @@ test('Maturity preference and Coupon preference round-trip through the DARA-plan
   await expect(page.locator('#build-coupon')).toHaveValue('lower');
 });
 
+// The picks of Select maturities ride in the same row (2.1 §`#params` row), so a plan saved with picks restores them.
+test('Select maturities picks round-trip through the DARA-plan file', async ({ page }) => {
+  test.setTimeout(30_000);
+  await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 4_000 });
+  await page.locator('#build-maturity').selectOption('select');
+  const boxes = page.locator('#maturity-picker-body input[type=checkbox]');
+  await expect(boxes.first()).toBeAttached();
+  const checkedBefore = await page.locator('#maturity-picker-body input[type=checkbox]:checked').evaluateAll(els => els.map(e => e.value).sort());
+  expect(checkedBefore.length).toBeGreaterThan(0);
+  await page.locator('#maturity-picker-apply').click();
+
+  const downloadPromise = page.waitForEvent('download');
+  await chooseMenu(page, 'export-menu', 'dara-plan');
+  const download = await downloadPromise;
+  const planPath = test.info().outputPath('maturity-picks-dara-plan.csv');
+  await download.saveAs(planPath);
+  const planText = readFileSync(planPath, 'utf8');
+  expect(planText).toContain('maturityPref=select');
+  expect(planText).toContain('maturityPicks=');
+
+  await page.reload();
+  await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 4_000 });
+  await expect(page.locator('#build-maturity')).not.toHaveValue('select');
+
+  await chooseMenu(page, 'import-menu', 'dara-plan');
+  await page.locator('#dara-plan-import-file').setInputFiles(planPath);
+  await expect(page.locator('#build-maturity')).toHaveValue('select');
+  await page.locator('#build-maturity').dispatchEvent('change');
+  await expect(boxes.first()).toBeAttached();
+  const checkedAfter = await page.locator('#maturity-picker-body input[type=checkbox]:checked').evaluateAll(els => els.map(e => e.value).sort());
+  expect(checkedAfter).toEqual(checkedBefore);
+});
+
 // Cash Flow Calendar amounts are penny-precise (unlike the rest of the app's whole-dollar
 // formatting) — the calendar exists specifically to compare against real brokerage transactions.
 test('Cash Flow Calendar: amounts show to the penny, for exact comparison against broker values', async ({ page }) => {
