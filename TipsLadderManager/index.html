@@ -758,11 +758,11 @@ document.getElementById('help-btn').addEventListener('click', () => {
 
 // Coupon pick only matters when a same-month two-issue collision can occur — never true for
 // 'last' (the duplicate months, Jan/Apr, are never the latest month in their year). Pops up
-// alongside Maturity pick for 'first'/'semiannual'/'all'; stays hidden (and irrelevant) for 'last'
-// and for Rebalance mode entirely.
+// alongside Maturity pick for 'first'/'semiannual'/'all', in Build and in Rebalance; stays hidden
+// (and irrelevant) for 'last' and 'select'.
 function _updateCouponFieldVisibility() {
   const pref = document.getElementById('build-maturity').value;
-  const show = currentMode === 'build' && pref !== 'last' && pref !== 'select';
+  const show = pref !== 'last' && pref !== 'select';
   document.getElementById('field-build-coupon').style.display = show ? '' : 'none';
   _syncYearFieldsForMaturityPref();
 }
@@ -3999,6 +3999,7 @@ document.getElementById('run-btn').addEventListener('click', async () => {
         firstYearOverride: picked ? picked.firstYear : parseInt(document.getElementById('rebal-first-year').value),
         preLadderInterest: document.getElementById('pre-ladder-interest').checked,
         maturityPref: document.getElementById('build-maturity').value,
+        couponPref: document.getElementById('build-coupon').value,
         yearOverrides: _yearMaturityOverrides,
         allocationPolicy: _allocationPolicy,
         yearRankOverrides: _yearRankOverrides,

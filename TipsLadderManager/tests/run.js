@@ -3091,6 +3091,12 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
       assert('Equal split, Oct held and the need grown: Apr is bought', (qtyDeltaFor(grown, APR27) ?? 0) > 0, true);
       assert('Equal split, Oct held and the need grown: the Jan issue is bought', (qtyDeltaFor(grown, NEWJAN) ?? 0) > 0, true);
       assert('Equal split, Oct held and the need grown: Oct does not sell', (qtyDeltaFor(grown, OCT27) ?? 0) >= 0, true);
+      // The Coupon preference selects the one issue of the month (2.0 §Maturity Selection Within a Funded Year): Lower keeps the January issue held.
+      for (const [couponPref, bought, notBought] of [['lower', JAN27, NEWJAN], ['higher', NEWJAN, null]]) {
+        const { details: cp } = runAlloc({ dara: scaledMedian, holdings: [{ cusip: JAN27, qty: 5 }, { cusip: OCT27, qty: 5 }], tipsMarketData, refCPI, settlementDate, daraByYear: new Map([[Y, scaledMedian * 3]]), maturityPref: 'all', couponPref });
+        assert(`Equal split, couponPref ${couponPref}: the January issue it selects is in the year`, cp.some(d => d.cusip === bought && d.fundedYear === Y && d.qtyAfter > 0), true);
+        assert(`Equal split, couponPref ${couponPref}: the other January issue is not bought`, notBought === null || (cp.find(d => d.cusip === notBought && d.fundedYear === Y)?.qtyAfter ?? 0) - (cp.find(d => d.cusip === notBought && d.fundedYear === Y)?.qtyBefore ?? 0) <= 0, true);
+      }
     }
   }
 }

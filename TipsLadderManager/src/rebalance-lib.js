@@ -683,7 +683,7 @@ export function parseParamsBlock(rawLines) {
 // `flat = true` makes the in-scope solve target a SINGLE flat DARA across every in-scope rung
 // (even real income — the liability-matching use case) instead of the proportionally-scaled
 // natural-ARA shape; the binary search then finds the one flat level that self-finances the segment.
-export function inferScaledDARAFromPortfolio({ daraMap, median: _median, holdings: holdingsRaw, tipsMarketData, refCPI, settlementDate, bracketMode = '2bracket', lastYearOverride = null, firstYearOverride = null, preLadderInterest = false, scopeYears = null, fixedDaraByYear = null, pinnedDaraByYear = null, flat = false, bondHolidays = new Set(), availableCash = 0, rmdCouponMode = 'all', tradeDate = settlementDate, maturityPref = 'last', allocationPolicy = 'equal', yearRankOverrides = null, yearOverrides = null, correctCoverIncome = true }) {
+export function inferScaledDARAFromPortfolio({ daraMap, median: _median, holdings: holdingsRaw, tipsMarketData, refCPI, settlementDate, bracketMode = '2bracket', lastYearOverride = null, firstYearOverride = null, preLadderInterest = false, scopeYears = null, fixedDaraByYear = null, pinnedDaraByYear = null, flat = false, bondHolidays = new Set(), availableCash = 0, rmdCouponMode = 'all', tradeDate = settlementDate, maturityPref = 'last', couponPref = 'higher', allocationPolicy = 'equal', yearRankOverrides = null, yearOverrides = null, correctCoverIncome = true }) {
   // Cover-year income correction (skipped when the map is already a stated per-year plan rather
   // than one recovered from holdings — `correctCoverIncome: false`; the plan states each year's
   // true DARA, so adding these terms to it would count that income twice):
@@ -807,7 +807,7 @@ export function inferScaledDARAFromPortfolio({ daraMap, median: _median, holding
     const mid = Math.floor((lo + hi) / 2);
     let result;
     try {
-      result = runRebalance({ dara: mid, bracketMode, holdings: holdingsRaw, tipsMarketData, refCPI, settlementDate, daraByYear: buildMap(mid), lastYearOverride, firstYearOverride, preLadderInterest, bondHolidays, availableCash, rmdCouponMode, tradeDate, maturityPref, allocationPolicy, yearRankOverrides, yearOverrides });
+      result = runRebalance({ dara: mid, bracketMode, holdings: holdingsRaw, tipsMarketData, refCPI, settlementDate, daraByYear: buildMap(mid), lastYearOverride, firstYearOverride, preLadderInterest, bondHolidays, availableCash, rmdCouponMode, tradeDate, maturityPref, couponPref, allocationPolicy, yearRankOverrides, yearOverrides });
     } catch (e) {
       if (e && e.daraTooLowYear != null && sweepable(e.daraTooLowYear)) lo = mid + 1;
       else hi = mid - 1;
@@ -822,7 +822,7 @@ export function inferScaledDARAFromPortfolio({ daraMap, median: _median, holding
   return { scaledMedian: foundDARA, scaledMap };
 }
 
-export function runRebalance({ dara, bracketMode = '2bracket', holdings: holdingsRaw, tipsMarketData, refCPI, settlementDate, daraByYear = null, lastYearOverride = null, preLadderInterest = false, firstYearOverride = null, maturityPref = 'last', allocationPolicy = 'equal', yearRankOverrides = null, yearOverrides = null, bondHolidays = new Set(), availableCash = 0, rmdCouponMode = 'all', tradeDate = settlementDate }) {
+export function runRebalance({ dara, bracketMode = '2bracket', holdings: holdingsRaw, tipsMarketData, refCPI, settlementDate, daraByYear = null, lastYearOverride = null, preLadderInterest = false, firstYearOverride = null, maturityPref = 'last', couponPref = 'higher', allocationPolicy = 'equal', yearRankOverrides = null, yearOverrides = null, bondHolidays = new Set(), availableCash = 0, rmdCouponMode = 'all', tradeDate = settlementDate }) {
   const settleDateStr  = toDateStr(settlementDate);
   const settleDateDisp = fmtDate(settlementDate);
 
@@ -1055,7 +1055,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
   // interest distribution (zeroing + partial credit), gap parameters, and the Future 30Y
   // rebalances. Rebalance's diff machinery below targets these canonical values, so a
   // build→rebalance round-trip produces zero trades.
-  const _canon = selectLadderBonds({ tipsMarketData, firstYear, lastYear, settlementDate, maturityPref, yearOverrides });
+  const _canon = selectLadderBonds({ tipsMarketData, firstYear, lastYear, settlementDate, maturityPref, couponPref, yearOverrides });
   const _slArgs = {
     dara: DARA, daraByYear, firstYear, lastYear, optionalYears: optionalRungYears,
     rangeYears: _canon.rangeYears, gapYears: _canon.gapYears, future30yYears: _canon.future30yYears,
@@ -2646,7 +2646,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
       i = j;
     }
   }
-  return { results, HDR, summary: { settleDateDisp, refCPI, DARA, daraByYearResolved, inferredDARA, daraIsInferred: dara === null, settlementYear, availableCash, rmdCouponMode, firstYear, lastYear, derivedFirstYear, rungCount, gapYears, future30yYears, brackets, lowerWeight, upperWeight, costDeltaSum, costForNewRungs, gapCoverageSurplus, gapParams, bracketMode, lowerDuration, upperDuration, newLowerYear, newLowerCUSIP, newLowerMaturity, newLowerDuration, newLowerWeight3, origLowerWeight, retainedLegs, bracketFellBack3to2, bracketSolveReason, retainedExcessCostBefore, retainedBracketSold, beforeLowerWeight, beforeUpperWeight, beforeNewLowerWeight, afterLowerWeight, afterUpperWeight, afterNewLowerWeight, totalPreviousExcessCost, totalExcessCost, araByYear, future30yLowerYear, future30yUpperYear, future30yLowerCoverCUSIP: future30yLowerCoverBond?.cusip, future30yUpperCoverCUSIP: future30yUpperCoverBond?.cusip, future30yParams, future30yLowerDuration, future30yUpperDuration, future30yUpperWeight, future30yLowerWeight, future30yUpperExQty, future30yLowerExQty, future30yFellBack, future30yCoverReason, future30yLowerMonth, future30yUpperMonth, future30ySimulatedInterestByYear, future30yCoverInterestByYear, future30yNetCashByYear, future30yRebalances: _sl.future30yRebalances, future30yRebalancesBefore, future30ySimulatedInterestBefore, future30yCoverInterestBefore, future30yNetCashBefore, heldCoverExcessByYear, gapRebalances: gapRebalancesAfter, gapRebalancesBefore, gapSimulatedInterestByYear, gapExcessInterestByYear, gapNetCashByYear, gapSimulatedInterestBefore, gapExcessInterestBefore, gapNetCashBefore, heldGapExcessByYear, preLadderGapPool, future30yAnchorBond: _canon.future30yAnchorBond, syntheticYearAmounts: syntheticYearAmounts({ gapParams, future30yParams }), syntheticYearAmountsBefore: syntheticYearAmounts({ gapParams: gapParamsBefore, future30yParams: future30yParamsBefore }), preLadderInterest, maturityPref, preLadderYears: _sl.preLadderYears, preLadderPool, preLadderCouponPool, preLadderFuture30yPool, preLadderNetCashPool, zeroedFundedYears: [...zeroedFundedYears].sort((a, b) => a - b), weightedAvgDuration, weightedAvgYield, weightedAvgSaYield }, details };
+  return { results, HDR, summary: { settleDateDisp, refCPI, DARA, daraByYearResolved, inferredDARA, daraIsInferred: dara === null, settlementYear, availableCash, rmdCouponMode, firstYear, lastYear, derivedFirstYear, rungCount, gapYears, future30yYears, brackets, lowerWeight, upperWeight, costDeltaSum, costForNewRungs, gapCoverageSurplus, gapParams, bracketMode, lowerDuration, upperDuration, newLowerYear, newLowerCUSIP, newLowerMaturity, newLowerDuration, newLowerWeight3, origLowerWeight, retainedLegs, bracketFellBack3to2, bracketSolveReason, retainedExcessCostBefore, retainedBracketSold, beforeLowerWeight, beforeUpperWeight, beforeNewLowerWeight, afterLowerWeight, afterUpperWeight, afterNewLowerWeight, totalPreviousExcessCost, totalExcessCost, araByYear, future30yLowerYear, future30yUpperYear, future30yLowerCoverCUSIP: future30yLowerCoverBond?.cusip, future30yUpperCoverCUSIP: future30yUpperCoverBond?.cusip, future30yParams, future30yLowerDuration, future30yUpperDuration, future30yUpperWeight, future30yLowerWeight, future30yUpperExQty, future30yLowerExQty, future30yFellBack, future30yCoverReason, future30yLowerMonth, future30yUpperMonth, future30ySimulatedInterestByYear, future30yCoverInterestByYear, future30yNetCashByYear, future30yRebalances: _sl.future30yRebalances, future30yRebalancesBefore, future30ySimulatedInterestBefore, future30yCoverInterestBefore, future30yNetCashBefore, heldCoverExcessByYear, gapRebalances: gapRebalancesAfter, gapRebalancesBefore, gapSimulatedInterestByYear, gapExcessInterestByYear, gapNetCashByYear, gapSimulatedInterestBefore, gapExcessInterestBefore, gapNetCashBefore, heldGapExcessByYear, preLadderGapPool, future30yAnchorBond: _canon.future30yAnchorBond, syntheticYearAmounts: syntheticYearAmounts({ gapParams, future30yParams }), syntheticYearAmountsBefore: syntheticYearAmounts({ gapParams: gapParamsBefore, future30yParams: future30yParamsBefore }), preLadderInterest, maturityPref, couponPref, preLadderYears: _sl.preLadderYears, preLadderPool, preLadderCouponPool, preLadderFuture30yPool, preLadderNetCashPool, zeroedFundedYears: [...zeroedFundedYears].sort((a, b) => a - b), weightedAvgDuration, weightedAvgYield, weightedAvgSaYield }, details };
 }
 
 // Execute a rebalance with shape-preserving self-financing FUNDING (3.0 §Funding the rebalance).
@@ -2687,12 +2687,12 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
 export function runFundedRebalance({
   dara, bracketMode = '2bracket', holdings, tipsMarketData, refCPI, settlementDate,
   daraByYear = null, daraPlanUnedited = false, daraPlanIsStated = false,
-  lastYearOverride = null, firstYearOverride = null, preLadderInterest = false, maturityPref = 'last',
+  lastYearOverride = null, firstYearOverride = null, preLadderInterest = false, maturityPref = 'last', couponPref = 'higher',
   allocationPolicy = 'equal', yearRankOverrides = null, yearOverrides = null, bondHolidays = new Set(),
   availableCash = 0, rmdCouponMode = 'all', tradeDate = settlementDate,
 }) {
   const base = { dara, bracketMode, holdings, tipsMarketData, refCPI, settlementDate,
-    lastYearOverride, firstYearOverride, preLadderInterest, maturityPref,
+    lastYearOverride, firstYearOverride, preLadderInterest, maturityPref, couponPref,
     allocationPolicy, yearRankOverrides, yearOverrides, bondHolidays, availableCash, rmdCouponMode, tradeDate };
   let result = runRebalance({ ...base, daraByYear });
   // A structural gap year in range is not, by itself, evidence this ladder means to bridge it
@@ -2717,7 +2717,7 @@ export function runFundedRebalance({
         daraMap, holdings, tipsMarketData, refCPI, settlementDate,
         bracketMode, lastYearOverride, firstYearOverride, preLadderInterest, flat: false, bondHolidays,
         availableCash, rmdCouponMode, tradeDate,
-        maturityPref, allocationPolicy, yearRankOverrides, yearOverrides, correctCoverIncome: true,
+        maturityPref, couponPref, allocationPolicy, yearRankOverrides, yearOverrides, correctCoverIncome: true,
       });
       result = runRebalance({ ...base, dara: scaledMedian, daraByYear: scaledMap });
     } catch {
