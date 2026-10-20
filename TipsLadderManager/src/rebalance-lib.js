@@ -70,6 +70,8 @@ function identifyBrackets(gapYears, holdings, yearInfo, tipsMarketData, araByYea
     if (y >= LOWEST_LOWER_BRACKET_YEAR && y < minGapYear && totalQty > 0) {
       // Metric: Excess ARA. The bracket is the TIPS with the most spare capacity (ARA >> DARA).
       const excess = (araByYear[y] || 0) - DARA;
+      // A year whose ARA does not exceed the DARA holds no spare capacity, so it is not a retained lower bracket.
+      if (!(excess > 0)) continue;
       if (excess > maxExcess || (excess === maxExcess && totalQty > (cusipTotals.get(lowerCUSIP) || -1))) {
         maxExcess = excess; lowerCUSIP = cusip; lowerYear = y; lowerMaturity = bond.maturity;
       }
