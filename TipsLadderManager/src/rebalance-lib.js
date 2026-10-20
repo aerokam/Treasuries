@@ -1420,6 +1420,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
   const buySellTargets = {};
   const nonTargetSells = {};
   const postRebalQtyMap = {};
+  const freshLevelByYear = {};   // ordinary year -> candidates not held that the Equal split buys into
   const fundedCUSIPByYear = {};   // bracket year -> its maturityPref-resolved funded CUSIP (may equal buySellTargets[year].targetCUSIP)
   // RMD Options 'last' mode: the pool-wide latest remaining coupon date, over every bond the
   // canonical TARGET ladder holds above the settlement year — the "After" state's own pool
@@ -1624,6 +1625,17 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
           .filter(r => r.held && r.cusip !== targetCUSIP && !sameYearRetainedFinal.has(r.cusip))
           .reverse()
           .map(r => yi.holdings.find(h => h.cusip === r.cusip));
+        // Equal split: a candidate not held is a member of the levelled set with value 0, so it takes a purchase
+        // beside the target (3.0 §Target CUSIP resolution). A year override replaces the policy and adds none.
+        if (!isBracket && allocationPolicy === 'equal' && !(yearRankOverrides?.get(year)?.length)) {
+          for (const r of yearRank) {
+            if (r.held || r.cusip === targetCUSIP || droppedCusips.has(r.cusip)) continue;
+            const fb = tipsMarketData.get(r.cusip);
+            if (!fb?.maturity) continue;
+            piMap[r.cusip] = calculatePIPerBond(r.cusip, fb.maturity, refCPI, tipsMarketData);
+            nonTarget.push({ cusip: r.cusip, qty: 0, maturity: fb.maturity, year });
+          }
+        }
         let curPI = yi.holdings.reduce((s, h) => s + h.qty * piMap[h.cusip], 0)
                   - (targetUnpicked ? targetCurrentQty : targetExcessHeld) * piMap[targetCUSIP];
         // A same-maturity-year retained maturity outside the picks sells its funded contribution.
@@ -1701,6 +1713,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
             ? targetFundedHeld  // frozen at its existing funded coverage; the shortfall goes to fundedCUSIP below
             : Math.max(0, targetFundedHeld + targetFundedDelta);
         for (const h of nonTarget) {
+          if (h.qty === 0 && postRebalQtyMap[h.cusip] > 0) (freshLevelByYear[year] ??= []).push(h.cusip);
           if (postRebalQtyMap[h.cusip] !== h.qty) {
             const b = tipsMarketData.get(h.cusip);
             const c = (b?.price ?? 0) / 100 * (calcIndexRatio(refCPI, b?.datedDateRefCpi ?? refCPI, NO_ROUNDING)) * 1000;
@@ -1818,6 +1831,15 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
         const ir4 = calcIndexRatio(refCPI, _flmi.datedDateRefCpi || refCPI, TREASURY_ROUNDING);
         rebuildLaterMatInt += postRebalQtyMap[fundedCUSIP] * ir4 * 1000 * _flmi.coupon;
         rebuildLaterMatIntRemaining += postRebalQtyMap[fundedCUSIP] * ir4 * 1000 * _flmi.coupon / 2 * rmdCappedRemainingCoupons(_flmi.maturity, settlementDate, bondHolidays, rmdCouponMode, tradeDate, _rmdLastDateAfter);
+      }
+    }
+    // The same for each candidate the Equal split bought into that was not held.
+    for (const fc of freshLevelByYear[year] ?? []) {
+      const _glmi = tipsMarketData.get(fc);
+      if (_glmi) {
+        const ir5 = calcIndexRatio(refCPI, _glmi.datedDateRefCpi || refCPI, TREASURY_ROUNDING);
+        rebuildLaterMatInt += postRebalQtyMap[fc] * ir5 * 1000 * _glmi.coupon;
+        rebuildLaterMatIntRemaining += postRebalQtyMap[fc] * ir5 * 1000 * _glmi.coupon / 2 * rmdCappedRemainingCoupons(_glmi.maturity, settlementDate, bondHolidays, rmdCouponMode, tradeDate, _rmdLastDateAfter);
       }
     }
     // The Excess TIPS and the Cover Excess are not carried in the running LMI: their interest is
@@ -2049,6 +2071,16 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
           holdingsAfter.push({ cusip: _fc5, maturityMonth: _m5 - 1, maturityYear: _tb5.maturity.getFullYear(), qty: qF5, principalPerBond: _ap5, nPeriods: _m5 < 7 ? 1 : 2, coupon: _tb5.coupon ?? 0 });
         }
       }
+    }
+    for (const fc of freshLevelByYear[year] ?? []) {
+      const tbL = tipsMarketData.get(fc);
+      if (!tbL?.maturity) continue;
+      const apL = 1000 * calcIndexRatio(refCPI, tbL.datedDateRefCpi ?? refCPI, TREASURY_ROUNDING);
+      const mL = tbL.maturity.getMonth() + 1;
+      const qL = postRebalQtyMap[fc];
+      pA += qL * apL;
+      cA += qL * apL * tbL.coupon * (mL < 7 ? 0.5 : 1.0);
+      holdingsAfter.push({ cusip: fc, maturityMonth: mL - 1, maturityYear: tbL.maturity.getFullYear(), qty: qL, principalPerBond: apL, nPeriods: mL < 7 ? 1 : 2, coupon: tbL.coupon ?? 0 });
     }
     const simAfter   = (year >= firstYear && year <= lastYear) ? (future30ySimulatedInterestByYear.get(year) ?? 0) : 0;
     const coverAfter = (year >= firstYear && year <= lastYear) ? (future30yCoverInterestByYear.get(year) ?? 0) : 0;
@@ -2376,7 +2408,8 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
   // bracket year's funded need onto a maturity it never held before, distinct from targetCUSIP
   // (the excess row, handled above). Pure funded contribution, no excess (3.0 §Target CUSIP
   // resolution) — otherwise the same "vanishing rung" gap the targetCUSIP loop above exists for.
-  for (const [bYearStr, fc] of Object.entries(fundedCUSIPByYear)) {
+  const freshBuyPairs = [...Object.entries(fundedCUSIPByYear), ...Object.entries(freshLevelByYear).flatMap(([y, cs]) => cs.map(c => [y, c]))];
+  for (const [bYearStr, fc] of freshBuyPairs) {
     const bYear = parseInt(bYearStr);
     const bst = buySellTargets[bYear];
     if (!bst || !fc || fc === bst.targetCUSIP) continue;          // not diverged

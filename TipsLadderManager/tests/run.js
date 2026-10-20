@@ -3072,6 +3072,26 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
       assert(`Select maturities, ${label}: the held Apr TIPS outside the picks is sold in full`, qtyDeltaFor(details, APR27), -aprHeld);
       assert(`Select maturities, ${label}: the picked TIPS do not sell`, qtyDeltaFor(details, JAN27) >= 0 && qtyDeltaFor(details, OCT27) >= 0, true);
     }
+    // (6) Equal split: a candidate not held is a member of the levelled set with value 0, so a year that buys
+    // buys into every candidate (3.0 §Target CUSIP resolution), as a Build splits the need across them (2.0 §Multi-TIPS Funded-Year Split).
+    {
+      const NEWJAN = 'ALLOCNEW';   // the Jan issue with the higher coupon is the January candidate
+      const candidates = [NEWJAN, APR27, OCT27];
+      for (const [label, o] of [
+        ['maturityPref all', { maturityPref: 'all' }],
+        ['maturityPref select, every TIPS of the year picked', { maturityPref: 'select', yearOverrides: new Map([[Y, candidates]]) }],
+      ]) {
+        const { details } = runAlloc({ dara: scaledMedian, holdings: [], tipsMarketData, refCPI, settlementDate, daraByYear: baseDaraMap, ...o });
+        for (const c of candidates) assert(`Equal split, nothing held, ${label}: ${c} is bought`, (qtyDeltaFor(details, c) ?? 0) > 0, true);
+        const vals = candidates.map(c => qtyDeltaFor(details, c) * 1000 * (details.find(d => d.cusip === c && d.fundedYear === Y).paymentIndexRatio));
+        assert(`Equal split, nothing held, ${label}: the principal of the candidates is within a TIPS of equal`, Math.max(...vals) - Math.min(...vals) <= 1000 * 1.2 * 2, true);
+      }
+      // One candidate held and the need grown: the purchase goes to the candidates not held first.
+      const { details: grown } = runAlloc({ dara: scaledMedian, holdings: [{ cusip: OCT27, qty: 5 }], tipsMarketData, refCPI, settlementDate, daraByYear: new Map([[Y, scaledMedian * 3]]), maturityPref: 'all' });
+      assert('Equal split, Oct held and the need grown: Apr is bought', (qtyDeltaFor(grown, APR27) ?? 0) > 0, true);
+      assert('Equal split, Oct held and the need grown: the Jan issue is bought', (qtyDeltaFor(grown, NEWJAN) ?? 0) > 0, true);
+      assert('Equal split, Oct held and the need grown: Oct does not sell', (qtyDeltaFor(grown, OCT27) ?? 0) >= 0, true);
+    }
   }
 }
 
