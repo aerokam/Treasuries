@@ -2368,6 +2368,34 @@ test('Available Cash and coupon mode round-trip through the DARA-plan file', asy
   await expect(pop.locator('input[name="rmd-coupon-mode"]:checked')).toHaveValue('none');
 });
 
+// The DARA-plan file carries every Construction Parameter (2.1 §Standalone DARA-plan file), so the Maturity preference and the
+// Coupon preference set before the export are set again by the import, without being chosen a second time.
+test('Maturity preference and Coupon preference round-trip through the DARA-plan file', async ({ page }) => {
+  test.setTimeout(30_000);
+  await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 4_000 });
+  await page.locator('#build-maturity').selectOption('all');
+  await page.locator('#build-coupon').selectOption('lower');
+
+  const downloadPromise = page.waitForEvent('download');
+  await chooseMenu(page, 'export-menu', 'dara-plan');
+  const download = await downloadPromise;
+  const planPath = test.info().outputPath('construction-params-dara-plan.csv');
+  await download.saveAs(planPath);
+  const planText = readFileSync(planPath, 'utf8');
+  expect(planText).toContain('maturityPref=all');
+  expect(planText).toContain('couponPref=lower');
+  expect(planText).toMatch(/preLadderInterest=(true|false)/);
+
+  await page.reload();
+  await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 4_000 });
+  await expect(page.locator('#build-maturity')).not.toHaveValue('all');
+
+  await chooseMenu(page, 'import-menu', 'dara-plan');
+  await page.locator('#dara-plan-import-file').setInputFiles(planPath);
+  await expect(page.locator('#build-maturity')).toHaveValue('all');
+  await expect(page.locator('#build-coupon')).toHaveValue('lower');
+});
+
 // Cash Flow Calendar amounts are penny-precise (unlike the rest of the app's whole-dollar
 // formatting) — the calendar exists specifically to compare against real brokerage transactions.
 test('Cash Flow Calendar: amounts show to the penny, for exact comparison against broker values', async ({ page }) => {

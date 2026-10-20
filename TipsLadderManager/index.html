@@ -1298,7 +1298,7 @@ function _exportCusipQty() {
   // per year; couponPref breaks same-month two-issue ties). Persisted so a re-import reconstructs
   // the exact target without relying on UI state.
   if (summary) {
-    rows.push(`#params,preLadderInterest=${summary.preLadderInterest ? 'true' : 'false'},maturityPref=${summary.maturityPref ?? 'last'},couponPref=${summary.couponPref ?? 'higher'},refCpiDate=${_defaultRefCpiDateStr},availableCash=${Math.round(summary.availableCash ?? 0)},rmdCouponMode=${summary.rmdCouponMode ?? 'all'}`);
+    rows.push(_constructionParamsRow(summary));
   }
 
   const filename = `cusip-qty-${new Date().toISOString().split('T')[0]}.csv`;
@@ -2866,20 +2866,34 @@ function _renderBeforeStatePreview() {
 // carries a desired plan across a FRESH broker re-upload (Vanguard/Fidelity/Schwab), which never
 // has per-year DARA of its own to read — re-importing our own CUSIP/Qty export only reproduces a
 // plan exactly when re-importing that SAME export.
+// The `#params` row of the Holdings Export and of the DARA Plan File: one builder, one key order (2.1 §`#params` row).
+function _constructionParamsRow({ preLadderInterest, maturityPref, couponPref, availableCash, rmdCouponMode }) {
+  return `#params,preLadderInterest=${preLadderInterest ? 'true' : 'false'},maturityPref=${maturityPref ?? 'last'},couponPref=${couponPref ?? 'higher'},refCpiDate=${_defaultRefCpiDateStr},availableCash=${Math.round(availableCash ?? 0)},rmdCouponMode=${rmdCouponMode ?? 'all'}`;
+}
+// The controls an imported `#params` row sets. The file is authoritative on load; the holder may change a control afterward.
+function _applyImportedConstructionParams(params) {
+  if (!params) return;
+  if (params.preLadderInterest != null) document.getElementById('pre-ladder-interest').checked = params.preLadderInterest;
+  if (params.maturityPref) document.getElementById('build-maturity').value = params.maturityPref;
+  if (params.couponPref) document.getElementById('build-coupon').value = params.couponPref;
+  _updateCouponFieldVisibility();
+  _updateAllocPolicyLock();
+  _updateMaturityOptionLabel('Select maturities…');
+  _maturityListOpenPending = false;
+}
 function _exportDaraPlan() {
   if (!_daraByYearStore.size) { setStatus('Nothing to export — no per-year DARA to save yet.', true); return; }
   const lines = ['#fundedYear,dara'];
   for (const [y, v] of [..._daraByYearStore.entries()].sort((a, b) => a[0] - b[0])) lines.push(`${y},${Math.round(v)}`);
-  // Available Cash + coupon counting (2.0 §Available Cash) — only when non-default, so a plan saved
-  // without ever touching either round-trips as a plain #fundedYear,dara file, unchanged from before this feature.
-  // The basis date always rides along: bare DARA numbers are meaningless without the Ref CPI date
-  // they were stated at (3.0 §DARA Reference Date).
-  {
-    const parts = [`refCpiDate=${_defaultRefCpiDateStr}`];
-    if (_availableCash) parts.push(`availableCash=${Math.round(_availableCash)}`);
-    if (_rmdCouponMode !== 'all') parts.push(`rmdCouponMode=${_rmdCouponMode}`);
-    lines.push('#params,' + parts.join(','));
-  }
+  // Every Construction Parameter rides along, as in the Holdings Export (2.1 §`#params` row), so the plan alone restores the
+  // controls. The basis date is among them: bare DARA numbers are meaningless without the Ref CPI date they were stated at
+  // (3.0 §DARA Reference Date).
+  lines.push(_constructionParamsRow({
+    preLadderInterest: document.getElementById('pre-ladder-interest').checked,
+    maturityPref: document.getElementById('build-maturity').value,
+    couponPref: document.getElementById('build-coupon').value,
+    availableCash: _availableCash, rmdCouponMode: _rmdCouponMode,
+  }));
   const blob = new Blob([lines.join('\n') + '\n'], { type: 'text/csv' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -2911,6 +2925,7 @@ document.getElementById('dara-plan-import-file').addEventListener('change', asyn
 
   const yrs = [...daraMap.keys()].sort((a, b) => a - b);
   const vals = [...daraMap.values()].sort((a, b) => a - b);
+  _applyImportedConstructionParams(importedParams);
   _availableCash = importedParams?.availableCash ?? 0;
   _availableCashAuto = false;
   _rmdCouponMode = importedParams?.rmdCouponMode ?? 'all';
@@ -3137,18 +3152,7 @@ document.getElementById('holdings-file').addEventListener('change', async (e) =>
       // …and a #params line with the construction params DARA doesn't encode (PLI / maturityPref / couponPref).
       // File is authoritative on load; the user may override afterward (controls are read live at Run).
       currentImportedParams = parseParamsBlock(rawLines);
-      if (currentImportedParams) {
-        if (currentImportedParams.preLadderInterest != null)
-          document.getElementById('pre-ladder-interest').checked = currentImportedParams.preLadderInterest;
-        if (currentImportedParams.maturityPref)
-          document.getElementById('build-maturity').value = currentImportedParams.maturityPref;
-        if (currentImportedParams.couponPref)
-          document.getElementById('build-coupon').value = currentImportedParams.couponPref;
-        _updateCouponFieldVisibility();
-        _updateAllocPolicyLock();
-        _updateMaturityOptionLabel('Select maturities…');
-        _maturityListOpenPending = false;
-      }
+      _applyImportedConstructionParams(currentImportedParams);
       // Restate the file's DARA into the Ref CPI basis now in effect (3.0 §DARA Reference Date).
       currentImportedDaraByYear = _applyDaraBasis(currentImportedDaraByYear, currentImportedParams);
     } else if (acctNames.length === 1) {
