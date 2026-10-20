@@ -1583,8 +1583,13 @@ function _openMaturityPickerModal() {
     // this year (so opening the picker shows the portfolio as-is, per 3.0 §Within-Year Allocation
     // Policy — unchecking a held CUSIP is a deliberate sell, not a silent default), while Build
     // seeds from its own last run (nothing held yet to mirror).
+    // In Rebalance the checked boxes are the TIPS of the ladder shown: the quantities After once a Rebalance has run, otherwise
+    // the quantities held.
+    const ladderRows = isRebal ? (rebalDetails ?? []).filter(d => d.fundedYear === year && (d.qtyAfter ?? d.qtyBefore ?? 0) > 0) : [];
     const defaultCusips = isRebal
-      ? (currentHoldingsArray ?? []).filter(h => tipsMarketData.get(h.cusip)?.maturity?.getFullYear() === year).map(h => h.cusip)
+      ? (rebalanceRendered && ladderRows.length
+          ? ladderRows.map(d => d.cusip)
+          : (currentHoldingsArray ?? []).filter(h => tipsMarketData.get(h.cusip)?.maturity?.getFullYear() === year).map(h => h.cusip))
       : (buildDetails?.filter(d => d.fundedYear === year).map(d => d.cusip) ?? []);
     // An override key that IS present — even an empty array, an explicit "nothing" pick — wins
     // over the default; only a year with no key at all (never touched) falls back to the default.
@@ -1615,7 +1620,7 @@ function _openMaturityPickerModal() {
   document.getElementById('maturity-picker-body').innerHTML =
     '<table><tbody>' + headerRow + rowsHtml + '</tbody></table>';
   document.getElementById('maturity-picker-desc').textContent = isRebal
-    ? 'Checked boxes are what you hold today. Uncheck to sell, check a new box to buy into it. All/None above a column applies to that month across every year.'
+    ? 'Checked boxes are the TIPS of the ladder shown. Uncheck to sell, check a new box to buy into it. All/None above a column applies to that month across every year.'
     : "Pick which TIPS fill each funded year. A year left as-is keeps whatever it's currently holding. All/None above a column applies to that month across every year.";
   document.getElementById('maturity-picker-apply').textContent = isRebal ? 'Apply' : 'Apply & Build';
   document.getElementById('maturity-picker-overlay').style.display = 'block';

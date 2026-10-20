@@ -3149,6 +3149,9 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
   assert('Rebalance with all maturity months and nothing held in 2036: January is bought for the funded need', (rowIn(fromNothing, 'TEST36JAN')?.qtyAfter ?? 0) > 0, true);
   assert('Rebalance with all maturity months and nothing held in 2036: July is bought for the funded need', (rowIn(fromNothing, 'TEST36JUL')?.fundedYearQtyAfter ?? 0) > 0, true);
   assert('Rebalance with all maturity months and nothing held in 2036: the Excess TIPS are on July', (rowIn(fromNothing, 'TEST36JUL')?.excessQtyAfter ?? 0) > 0 && (rowIn(fromNothing, 'TEST36JAN')?.excessQtyAfter ?? 0) === 0, true);
+  const rows2036 = fromNothing.details.filter(d => d.fundedYear === 2036).map(d => d.cusip);
+  assert('Rebalance with all maturity months and nothing held in 2036: each TIPS of the year has one row', rows2036.length, new Set(rows2036).size);
+  assert('Rebalance with all maturity months and nothing held in 2036: the rows follow maturity order', rows2036.join(), 'TEST36JAN,TEST36JUL');
   const roundTrip = rebAll(bAll.details.filter(d => d.fundedYearQty + d.excessQty > 0).map(d => ({ cusip: d.cusip, qty: d.fundedYearQty + d.excessQty, excessQty: d.excessQty })));
   assert('Build with all maturity months, imported and rebalanced: the bracket year does not trade', roundTrip.details.filter(d => d.fundedYear === 2036).every(d => d.qtyAfter === d.qtyBefore), true);
 }
