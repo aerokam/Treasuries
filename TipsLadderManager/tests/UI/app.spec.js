@@ -2375,6 +2375,7 @@ test('Maturity preference and Coupon preference round-trip through the DARA-plan
   await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 4_000 });
   await page.locator('#build-maturity').selectOption('all');
   await page.locator('#build-coupon').selectOption('lower');
+  await page.locator('#rebal-alloc-policy').selectOption('saYield');
 
   const downloadPromise = page.waitForEvent('download');
   await chooseMenu(page, 'export-menu', 'dara-plan');
@@ -2384,6 +2385,7 @@ test('Maturity preference and Coupon preference round-trip through the DARA-plan
   const planText = readFileSync(planPath, 'utf8');
   expect(planText).toContain('maturityPref=all');
   expect(planText).toContain('couponPref=lower');
+  expect(planText).toContain('allocationPolicy=saYield');
   expect(planText).toMatch(/preLadderInterest=(true|false)/);
 
   await page.reload();
@@ -2394,6 +2396,26 @@ test('Maturity preference and Coupon preference round-trip through the DARA-plan
   await page.locator('#dara-plan-import-file').setInputFiles(planPath);
   await expect(page.locator('#build-maturity')).toHaveValue('all');
   await expect(page.locator('#build-coupon')).toHaveValue('lower');
+  await expect(page.locator('#rebal-alloc-policy')).toHaveValue('saYield');
+});
+
+// A Build splits the need of a year evenly across its maturities, so the plan it saves names the Equal split (2.1 §`#params` row).
+test('a Build with All maturity months saves the Equal split in the DARA-plan file', async ({ page }) => {
+  test.setTimeout(30_000);
+  await page.locator('.tab-btn[data-mode="build"]').click();
+  await page.locator('#build-maturity').selectOption('all');
+  const lastYearSel = page.locator('#last-year');
+  await lastYearSel.selectOption({ index: (await lastYearSel.locator('option').count()) - 1 });
+  await page.locator('#run-btn').click();
+  await expect(page.locator('#build-output')).toHaveCSS('display', 'block', { timeout: 4_000 });
+  const downloadPromise = page.waitForEvent('download');
+  await chooseMenu(page, 'export-menu', 'dara-plan');
+  const download = await downloadPromise;
+  const planPath = test.info().outputPath('build-all-dara-plan.csv');
+  await download.saveAs(planPath);
+  const planText = readFileSync(planPath, 'utf8');
+  expect(planText).toContain('maturityPref=all');
+  expect(planText).toContain('allocationPolicy=equal');
 });
 
 // The picks of Select maturities ride in the same row (2.1 §`#params` row), so a plan saved with picks restores them.

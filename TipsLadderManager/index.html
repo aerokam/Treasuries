@@ -1296,7 +1296,7 @@ function _exportCusipQty() {
   // per year; couponPref breaks same-month two-issue ties). Persisted so a re-import reconstructs
   // the exact target without relying on UI state.
   if (summary) {
-    rows.push(_constructionParamsRow({ ...summary, maturityPref: document.getElementById('build-maturity').value === 'select' ? 'select' : summary.maturityPref, maturityPicks: _yearMaturityOverrides }));
+    rows.push(_constructionParamsRow({ ...summary, allocationPolicy: _effectiveAllocationPolicy(), maturityPref: document.getElementById('build-maturity').value === 'select' ? 'select' : summary.maturityPref, maturityPicks: _yearMaturityOverrides }));
   }
 
   const filename = `cusip-qty-${new Date().toISOString().split('T')[0]}.csv`;
@@ -2865,9 +2865,16 @@ function _renderBeforeStatePreview() {
 // has per-year DARA of its own to read — re-importing our own CUSIP/Qty export only reproduces a
 // plan exactly when re-importing that SAME export.
 // The `#params` row of the Holdings Export and of the DARA Plan File: one builder, one key order (2.1 §`#params` row).
-function _constructionParamsRow({ preLadderInterest, maturityPref, maturityPicks, couponPref, availableCash, rmdCouponMode }) {
+function _constructionParamsRow({ preLadderInterest, maturityPref, maturityPicks, couponPref, allocationPolicy, availableCash, rmdCouponMode }) {
   const picks = [...(maturityPicks ?? [])].sort((a, b) => a[0] - b[0]).map(([y, cs]) => `${y}:${cs.join('|')}`).join(';');
-  return `#params,preLadderInterest=${preLadderInterest ? 'true' : 'false'},maturityPref=${maturityPref ?? 'last'}${picks ? `,maturityPicks=${picks}` : ''},couponPref=${couponPref ?? 'higher'},refCpiDate=${_defaultRefCpiDateStr},availableCash=${Math.round(availableCash ?? 0)},rmdCouponMode=${rmdCouponMode ?? 'all'}`;
+  return `#params,preLadderInterest=${preLadderInterest ? 'true' : 'false'},maturityPref=${maturityPref ?? 'last'}${picks ? `,maturityPicks=${picks}` : ''},couponPref=${couponPref ?? 'higher'},allocationPolicy=${allocationPolicy ?? 'equal'},refCpiDate=${_defaultRefCpiDateStr},availableCash=${Math.round(availableCash ?? 0)},rmdCouponMode=${rmdCouponMode ?? 'all'}`;
+}
+// The Within-Year Allocation Policy a ladder was made with. Last to mature and First to mature fix Maturity order. Otherwise a Build splits
+// the need of a year evenly across its maturities, which is the Equal split, and a Rebalance has the policy of its control.
+function _effectiveAllocationPolicy() {
+  const pref = document.getElementById('build-maturity').value;
+  if (pref === 'last' || pref === 'first') return 'maturity';
+  return currentMode === 'build' ? 'equal' : _allocationPolicy;
 }
 // The controls an imported `#params` row sets. The file is authoritative on load; the holder may change a control afterward.
 function _applyImportedConstructionParams(params) {
@@ -2876,6 +2883,12 @@ function _applyImportedConstructionParams(params) {
   if (params.maturityPicks) _yearMaturityOverrides = new Map(params.maturityPicks);
   if (params.maturityPref) document.getElementById('build-maturity').value = params.maturityPref;
   if (params.couponPref) document.getElementById('build-coupon').value = params.couponPref;
+  if (params.allocationPolicy) {
+    _allocationPolicy = params.allocationPolicy;
+    document.getElementById('rebal-alloc-policy').value = params.allocationPolicy;
+    _yearRankOverrides.clear();
+    _updateAllocPolicyOptionLabel('Set priority order…');
+  }
   _updateCouponFieldVisibility();
   _updateAllocPolicyLock();
   _updateMaturityOptionLabel('Select maturities…');
@@ -2894,6 +2907,7 @@ function _exportDaraPlan() {
     maturityPref: document.getElementById('build-maturity').value,
     maturityPicks: _yearMaturityOverrides,
     couponPref: document.getElementById('build-coupon').value,
+    allocationPolicy: _effectiveAllocationPolicy(),
     availableCash: _availableCash, rmdCouponMode: _rmdCouponMode,
   }));
   const blob = new Blob([lines.join('\n') + '\n'], { type: 'text/csv' });

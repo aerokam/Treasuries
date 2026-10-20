@@ -2009,6 +2009,9 @@ console.log('\nparseParamsBlock — #params line');
   assert('params a year with no pick is an empty list', pPicks?.maturityPicks?.get(2029)?.length, 0);
   assert('params picks do not disturb the key after them', pPicks?.couponPref, 'lower');
   assert('params select without picks reads as last', parseParamsBlock(['#params,maturityPref=select'])?.maturityPref, 'last');
+  assert('params allocationPolicy=saYield', parseParamsBlock(['#params,allocationPolicy=saYield'])?.allocationPolicy, 'saYield');
+  assert('params allocationPolicy=equal', parseParamsBlock(['#params,couponPref=lower,allocationPolicy=EQUAL'])?.allocationPolicy, 'equal');
+  assert('params an unknown allocationPolicy is ignored', parseParamsBlock(['#params,allocationPolicy=bogus,couponPref=lower'])?.allocationPolicy, undefined);
 
   // No #params line (broker/legacy) → null, so import falls back to UI/inference.
   assert('no #params line → null', parseParamsBlock(['cusip,qty', '91282CLE9,10']), null);

@@ -663,6 +663,7 @@ export function parseParamsBlock(rawLines) {
         if (picks.size) out.maturityPicks = picks;
       }
       else if (/^couponpref$/i.test(k)) out.couponPref = /^lower$/i.test(v) ? 'lower' : 'higher';
+      else if (/^allocationpolicy$/i.test(k)) { if (/^(equal|maturity|sayield)$/i.test(v)) out.allocationPolicy = /^sayield$/i.test(v) ? 'saYield' : v.toLowerCase(); }
       // `rmdCashOverride` is the superseded key for the same figure, read as an alias so files
       // written before Available Cash went ladder-wide keep working (4.2.2 Parse DARA plan and parameters).
       else if (/^(availablecash|rmdcashoverride)$/i.test(k)) { const n = parseFloat(v); if (!isNaN(n) && n >= 0) out.availableCash = n; }
