@@ -1528,7 +1528,10 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
     // The excess CUSIP outside the picks funds nothing: the picked TIPS carry the funded need of the year (3.0 §Target CUSIP resolution).
     const targetUnpicked = isBracket && picked.size > 0 && targetCUSIP != null && !picked.has(targetCUSIP);
     const fundedRank = isBracket && picked.size ? yearRank.filter(r => picked.has(r.cusip)) : yearRank;
-    const fundedCUSIP = (isBracket && (maturityPref !== 'last' || targetUnpicked))
+    // A bracket year with several candidates under the Equal split levels its funded need across them like an ordinary year; the
+    // Excess TIPS stay on targetCUSIP (3.0 §Target CUSIP resolution).
+    const bracketEqual = isBracket && allocationPolicy === 'equal' && !(yearRankOverrides?.get(year)?.length) && (_canon.yearTipsListMap[year]?.length ?? 0) > 1;
+    const fundedCUSIP = (isBracket && (bracketEqual ? targetUnpicked : (maturityPref !== 'last' || targetUnpicked)))
       ? (fundedRank[0]?.cusip ?? targetCUSIP)
       : targetCUSIP;
     fundedCUSIPByYear[year] = fundedCUSIP;
@@ -1627,7 +1630,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
           .map(r => yi.holdings.find(h => h.cusip === r.cusip));
         // Equal split: a candidate not held is a member of the levelled set with value 0, so it takes a purchase
         // beside the target (3.0 §Target CUSIP resolution). A year override replaces the policy and adds none.
-        if (!isBracket && allocationPolicy === 'equal' && !(yearRankOverrides?.get(year)?.length)) {
+        if ((!isBracket || bracketEqual) && allocationPolicy === 'equal' && !(yearRankOverrides?.get(year)?.length)) {
           for (const r of yearRank) {
             if (r.held || r.cusip === targetCUSIP || droppedCusips.has(r.cusip)) continue;
             const fb = tipsMarketData.get(r.cusip);
@@ -1657,12 +1660,13 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
         }
         const yearPIHeld = curPI;
         const yearFalls = needed < yearPIHeld, yearRises = needed > yearPIHeld;
-        const isEqualLevel = !isBracket && allocationPolicy === 'equal' && nonTarget.length > 0;
+        const isEqualLevel = (!isBracket || bracketEqual) && allocationPolicy === 'equal' && nonTarget.length > 0;
         if (isEqualLevel) {
           // Equal split levels rather than drains in fixed order -- see levelValues (3.0 §Within-
           // Year Allocation Policy). Pool is the target plus whatever's currently held besides it;
           // a candidate held by neither stays untouched, same as before.
-          const poolValues = new Map([[targetCUSIP, targetFundedHeld * piMap[targetCUSIP]],
+          // An excess CUSIP outside the picks funds nothing, so it is not in the set.
+          const poolValues = new Map([...(targetUnpicked ? [] : [[targetCUSIP, targetFundedHeld * piMap[targetCUSIP]]]),
             ...nonTarget.map(h => [h.cusip, h.qty * piMap[h.cusip]])]);
           const leveled = levelValues(poolValues, needed);
           for (const h of nonTarget) {
@@ -1750,7 +1754,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
             ? Math.max(0, Math.round((bracketExcessTargetCost[fundedCUSIP] || 0) / fCostPerBond))
             : 0;
           // A retained maturity already holds its excess share inside fundedCurrentQty: only its funded holding is the base.
-          const fundedBaseQty = fundedIsRetained ? Math.min(fundedCurrentQty, sameYearRetainedNeed.get(fundedCUSIP) ?? 0) : fundedCurrentQty;
+          const fundedBaseQty = fundedIsRetained ? Math.min(fundedCurrentQty, sameYearRetainedNeed.get(fundedCUSIP) ?? 0) : (postRebalQtyMap[fundedCUSIP] ?? fundedCurrentQty);
           const fundedFinalQty = fundedBaseQty + fundedGrowthQty + retainedExcessQty;
           postRebalQtyMap[fundedCUSIP] = fundedFinalQty;
           if (fundedFinalQty !== fundedCurrentQty) {
@@ -1825,7 +1829,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
     }
     // Same guard for a diverged fundedCUSIP (a fresh buy into a maturity maturityPref picked that
     // wasn't already held) — it never appears in yi.holdings, so the accumulation loop above skips it.
-    if (fundedCUSIP && fundedCUSIP !== targetCUSIP && !yi.holdings.some(h => h.cusip === fundedCUSIP) && (postRebalQtyMap[fundedCUSIP] ?? 0) > 0) {
+    if (fundedCUSIP && fundedCUSIP !== targetCUSIP && !yi.holdings.some(h => h.cusip === fundedCUSIP) && (postRebalQtyMap[fundedCUSIP] ?? 0) > 0 && !(freshLevelByYear[year] ?? []).includes(fundedCUSIP)) {
       const _flmi = tipsMarketData.get(fundedCUSIP);
       if (_flmi) {
         const ir4 = calcIndexRatio(refCPI, _flmi.datedDateRefCpi || refCPI, TREASURY_ROUNDING);
@@ -2057,7 +2061,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
     // Same, for a diverged fundedCUSIP (maturityPref bought a maturity this year didn't already
     // hold) — pure funded contribution, no excess, since only targetCUSIP ever carries excess.
     { const _fc5 = fundedCUSIPByYear[year];
-      if (_fc5 && _fc5 !== buySellTargets[year]?.targetCUSIP && !yearInfo[year]?.holdings.some(h => h.cusip === _fc5) && (postRebalQtyMap[_fc5] ?? 0) > 0) {
+      if (_fc5 && _fc5 !== buySellTargets[year]?.targetCUSIP && !yearInfo[year]?.holdings.some(h => h.cusip === _fc5) && (postRebalQtyMap[_fc5] ?? 0) > 0 && !(freshLevelByYear[year] ?? []).includes(_fc5)) {
         const _tb5 = tipsMarketData.get(_fc5);
         if (_tb5?.maturity) {
           const _ir5 = calcIndexRatio(refCPI, _tb5.datedDateRefCpi ?? refCPI, TREASURY_ROUNDING);
@@ -2408,7 +2412,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
   // bracket year's funded need onto a maturity it never held before, distinct from targetCUSIP
   // (the excess row, handled above). Pure funded contribution, no excess (3.0 §Target CUSIP
   // resolution) — otherwise the same "vanishing rung" gap the targetCUSIP loop above exists for.
-  const freshBuyPairs = [...Object.entries(fundedCUSIPByYear), ...Object.entries(freshLevelByYear).flatMap(([y, cs]) => cs.map(c => [y, c]))];
+  const freshBuyPairs = [...new Map([...Object.entries(fundedCUSIPByYear), ...Object.entries(freshLevelByYear).flatMap(([y, cs]) => cs.map(c => [y, c]))].map(pr => [pr.join('|'), pr])).values()];
   for (const [bYearStr, fc] of freshBuyPairs) {
     const bYear = parseInt(bYearStr);
     const bst = buySellTargets[bYear];

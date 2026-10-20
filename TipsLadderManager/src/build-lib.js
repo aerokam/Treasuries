@@ -73,7 +73,7 @@ export function runBuild({ dara, firstYear: firstYearOpt, lastYear, tipsMarketDa
     const yearDara = daraByYear?.get(year) ?? dara;
     const rungs = corrRungs[year] ?? [{ ...bondCalcs(repBond, refCPI), bond: repBond, coupon: repBond.coupon ?? 0, qty: corrFYQty[year] ?? 0 }];
 
-    // Year excess (gap / future-30Y). Bracket years hold a single TIPS, so the excess rides row 0.
+    // Year excess (gap / future-30Y). The excess rides the row of the representative TIPS.
     const gapExQty    = year === lowerYear ? lowerExQty : year === upperYear ? upperExQty : 0;
     const future30yExQty = year === future30yLowerYear ? future30yLowerExQty : year === future30yUpperYear ? future30yUpperExQty : 0;
     const excessQty   = gapExQty + future30yExQty;
@@ -136,9 +136,11 @@ export function runBuild({ dara, firstYear: firstYearOpt, lastYear, tipsMarketDa
       const rungCost = r.qty * cpb_i;
       const mDuration = calculateMDuration(settlementDate, r.bond.maturity, r.bond.coupon ?? 0, r.bond.yield ?? 0);
       const first = j === 0;
-      const rowExcessQty = first ? excessQty : 0;
+      // The excess rides the representative TIPS (the latest of the year), which is where it is priced.
+      const carriesExcess = r.bond.cusip === repBond.cusip;
+      const rowExcessQty = carriesExcess ? excessQty : 0;
       const totQty = r.qty + rowExcessQty;
-      totalBuyCost += rungCost + (first ? excessQty * cpbRep : 0);
+      totalBuyCost += rungCost + (carriesExcess ? excessQty * cpbRep : 0);
       results.push([
         r.bond.cusip,           // 0: CUSIP
         fmtDate(r.bond.maturity), // 1: Maturity
@@ -193,7 +195,7 @@ export function runBuild({ dara, firstYear: firstYearOpt, lastYear, tipsMarketDa
         excessQty: rowExcessQty,
         excessPrincipalTotal: rowExcessQty * 1000 * irRep,
         excessOwnRungInt: rowExcessQty * 1000 * irRep * (repBond.coupon ?? 0) * (repBond.maturity.getMonth() + 1 < 7 ? 0.5 : 1.0),
-        excessCost: (first && isBracket) ? excessQty * cpbRep : 0,
+        excessCost: (carriesExcess && isBracket) ? excessQty * cpbRep : 0,
         mDuration,
       });
     });

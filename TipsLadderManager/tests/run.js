@@ -3134,6 +3134,23 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
   assert('synthetic coupon is the eighth at or below its yield', g38.synCpn <= g38.synYld && g38.synYld - g38.synCpn < 0.00125, true);
   assert('synthetic prices below par when its coupon sits below its yield', g38.synPrice < 100, true);
   assert('gap cost is priced off the synthetic, not par', Math.round(g38.cost), Math.round(g38.qty * 1000 * g38.synPrice / 100));
+  // A bracket year with several candidates (Maturity preference All maturity months, Equal split): the funded need is split across
+  // the candidates like any funded year, and the Excess TIPS are on the latest 10-year (the lower bracket), in Build and in Rebalance.
+  const bAll = runBuild({ dara: 40000, firstYear: 2035, lastYear: 2040, tipsMarketData: map, refCPI, settlementDate, maturityPref: 'all', couponPref: 'higher' });
+  const rowIn = (r, c) => r.details.find(d => d.cusip === c);
+  assert('Build with all maturity months: the Excess TIPS of the bracket year are on the July maturity', (rowIn(bAll, 'TEST36JUL')?.excessQty ?? 0) > 0, true);
+  assert('Build with all maturity months: the January maturity of the bracket year holds no Excess TIPS', rowIn(bAll, 'TEST36JAN')?.excessQty ?? 0, 0);
+  assert('Build with all maturity months: both maturities of the bracket year fund it', (rowIn(bAll, 'TEST36JAN')?.fundedYearQty ?? 0) > 0 && (rowIn(bAll, 'TEST36JUL')?.fundedYearQty ?? 0) > 0, true);
+  const rebAll = (holdings) => runRebalance({
+    dara: 40000, bracketMode: '3bracket', holdings, tipsMarketData: map, refCPI, settlementDate, daraByYear: new Map(bAll.summary.daraByYearResolved),
+    firstYearOverride: 2035, lastYearOverride: 2040, maturityPref: 'all',
+  });
+  const fromNothing = rebAll([{ cusip: 'TEST35JUL', qty: 1, excessQty: 0 }]);
+  assert('Rebalance with all maturity months and nothing held in 2036: January is bought for the funded need', (rowIn(fromNothing, 'TEST36JAN')?.qtyAfter ?? 0) > 0, true);
+  assert('Rebalance with all maturity months and nothing held in 2036: July is bought for the funded need', (rowIn(fromNothing, 'TEST36JUL')?.fundedYearQtyAfter ?? 0) > 0, true);
+  assert('Rebalance with all maturity months and nothing held in 2036: the Excess TIPS are on July', (rowIn(fromNothing, 'TEST36JUL')?.excessQtyAfter ?? 0) > 0 && (rowIn(fromNothing, 'TEST36JAN')?.excessQtyAfter ?? 0) === 0, true);
+  const roundTrip = rebAll(bAll.details.filter(d => d.fundedYearQty + d.excessQty > 0).map(d => ({ cusip: d.cusip, qty: d.fundedYearQty + d.excessQty, excessQty: d.excessQty })));
+  assert('Build with all maturity months, imported and rebalanced: the bracket year does not trade', roundTrip.details.filter(d => d.fundedYear === 2036).every(d => d.qtyAfter === d.qtyBefore), true);
 }
 
 // ── Test: same-maturity-year retained TIPS is recognized on its own, independent of whether a
