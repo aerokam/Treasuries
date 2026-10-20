@@ -771,7 +771,7 @@ Some values are true only until Treasury issues more TIPS. Left inline as approx
 
 1. **Specs state the rule, not the value.** A value appears only as illustration, marked with the date it was true.
 2. **The volatile values live here**, each with the event that changes it — not scattered as inline approximations across 2.0, 3.0 and app help text.
-3. **A test derives each value from live data and asserts it matches this table.** Issuance drift then fails a test instead of rotting unnoticed. This is verifying redundancy (two independent derivations, gated by an assertion), not a duplicated definition.
+3. **A test derives each value from live data and asserts it matches this table.** Issuance drift then fails a test instead of rotting unnoticed. This is verifying redundancy (two independent derivations, gated by an assertion), not a duplicated definition. The test is `TipsLadderManager/tests/run.js` "DD §5.1 issuance-dependent values". It covers every row that states a value: Multi-maturity boundary, Longest issued maturity year, and the three numbers in the Maturity-month pattern row, which it reads in the shape `quarterly ≤~YYYY, Jan/Jul ≤~YYYY, Feb YYYY+`. A row that reads "derived from market data each run" states no value and has no assertion.
 
 | Value | Rule | As of 2026-08-25 | Changes when |
 |---|---|---|---|
