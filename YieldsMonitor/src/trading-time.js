@@ -163,12 +163,30 @@ export function createTradingTimeScale(Chart) {
       if (!s || value === null) return super.getDecimalForValue(value);
       return (toTradingTime(value) - s.a) / (s.b - s.a);
     }
+    // The pan of chartjs-plugin-zoom reads the two edges of the shifted window with two calls of
+    // getValueForPixel, one width of pixels apart, and then keeps the window's span in real time,
+    // which on this axis is not the span that was drawn. The pair is kept so that the pan handler
+    // can set the window the two calls described (see takePanWindow).
+    #recent = null;
+    #panWindow = null;
+    #note(pixel, value) {
+      const prev = this.#recent;
+      this.#recent = { pixel, value };
+      if (prev && Math.abs(pixel - prev.pixel - this.width) < 1.5) this.#panWindow = { min: prev.value, max: value };
+    }
+    takePanWindow() {
+      const w = this.options.compact ? this.#panWindow : null;
+      this.#panWindow = null;
+      return w;
+    }
     getValueForPixel(pixel) {
       const s = this.options.compact ? this.#span() : null;
       if (!s) return super.getValueForPixel(pixel);
       const offsets = this._offsets;
       const pos = this.getDecimalForPixel(pixel) / offsets.factor - offsets.end;
-      return fromTradingTime(s.a + pos * (s.b - s.a));
+      const value = fromTradingTime(s.a + pos * (s.b - s.a));
+      this.#note(pixel, value);
+      return value;
     }
     buildTicks() {
       // The parent's pass also sets the scale's offsets, so it always runs; its ticks are used

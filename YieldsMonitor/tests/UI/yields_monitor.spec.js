@@ -93,7 +93,8 @@ test.describe('Yields Monitor Regression Tests', () => {
     await page.locator('.tab-btn[data-tab="yieldcurves"]').click();
     const [start, end] = await labels();
     expect(start).toMatch(/, 08:00–08:30 ET$/);
-    expect(end).toMatch(/, 17:00–17:05 ET$/);
+    // a day still open has no close: its end label is the time of the last point
+    expect(end).toMatch(/, (17:00–17:05|[0-9]{2}:[0-9]{2}) ET$/);
 
     await page.locator('.tab-btn[data-tab="timeseries"]').click();
     await page.locator('#hideNonTrading').uncheck();
@@ -122,6 +123,27 @@ test.describe('Yields Monitor Regression Tests', () => {
 
     await page.locator('.tab-btn[data-tab="timeseries"]').click();
     await expect(page.locator('#yield-US10Y')).toHaveText(/^\d+\.\d{3}%$/);
+  });
+
+  test('A pan on the compact axis moves the window by the width dragged', async ({ page }) => {
+    await page.locator('.range-btn[data-range="10D"]').click();
+    await expect(page.locator('#fetchStatus')).toContainText('TIPS latest:');
+    const canvas = page.locator('canvas#chart-US10Y');
+    const edge = () => canvas.evaluate((c) => { const x = Chart.getChart(c).scales.x; return { min: x.min, left: x.left, at: x.getPixelForValue(x.min) }; });
+    const before = await edge();
+    const box = await canvas.boundingBox();
+    const cx = box.x + box.width / 2, cy = box.y + box.height / 2;
+    await page.mouse.move(cx, cy);
+    await page.mouse.down();
+    let dragged = 0;
+    for (const dx of [20, 20, 20, 20, 20, 20]) {
+      dragged += dx;
+      await page.mouse.move(cx + dragged, cy, { steps: 4 });
+    }
+    await page.mouse.up();
+    // the former left edge sits as far right of the new left edge as the drag was long, wherever weekends fall
+    const px = await canvas.evaluate((c, min) => { const x = Chart.getChart(c).scales.x; return x.getPixelForValue(min) - x.left; }, before.min);
+    expect(Math.abs(px - dragged)).toBeLessThan(20);
   });
 
   test('Hide non-trading hours applies to the Custom range and keeps its daily-only points', async ({ page }) => {
