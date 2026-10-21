@@ -3,7 +3,7 @@
 // broker bid/ask spreads. See YieldCurves/knowledge/3.4_Fit_Spot_Yield_Curves.md.
 //
 // Loads the same R2 inputs the browser app loads (YieldsFromFedInvestPrices.csv,
-// RefCpiNsaSa.csv, BondHolidaysSifma.csv, FidelityTreasuriesTips.csv) and reuses the same
+// RefCpiNsaSa.csv, BondHolidaysSifma.csv, MarketQuotes.csv) and reuses the same
 // fitting math the app uses — shared/src/spot-curve.js — rather than a second copy
 // (Single Source of Truth, projects/CLAUDE.md §2a).
 //
@@ -29,9 +29,9 @@ import { parseCsv } from '../../shared/src/csv.js';
 import { localDate, toIsoDate, nextBusinessDay, parseHolidaySet } from '../../shared/src/settlement.js';
 import { classifyByCusipRoot, isStrip } from '../../shared/src/treasury-cusip.js';
 import {
-  parseFidelityDownloadDate, fidelityDownloadDateIso,
-  parseFidelityTipsRows, parseFidelityNominalRows,
-} from '../../shared/src/fidelity-parse.js';
+  parseDownloadDate, downloadDateIso,
+  parseTipsQuotes, parseTreasuryQuotes,
+} from '../../shared/src/market-quotes.js';
 import {
   spotCurveFit, calculateSAO, zToSA, unionGridTerms,
   TREASURIES_SPOT_FIT, TIPS_SPOT_FIT, TIPS_SA_SPOT_FIT,
@@ -41,7 +41,7 @@ const R2_BASE_URL = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev';
 const YIELDS_CSV_URL = `${R2_BASE_URL}/Treasuries/YieldsFromFedInvestPrices.csv`;
 const REF_CPI_CSV_URL = `${R2_BASE_URL}/TIPS/RefCpiNsaSa.csv`;
 const HOLIDAYS_CSV_URL = `${R2_BASE_URL}/misc/BondHolidaysSifma.csv`;
-const FIDELITY_URL = `${R2_BASE_URL}/Treasuries/FidelityTreasuriesTips.csv`;
+const MARKET_QUOTES_URL = `${R2_BASE_URL}/Treasuries/MarketQuotes.csv`;
 
 const DRY = process.argv.includes('--dry');
 
@@ -111,14 +111,14 @@ function buildGridRows(fits, source) {
 async function main() {
   console.log(`Starting Spot Yield Curves update at ${new Date().toISOString()}`);
 
-  const [yieldsText, refCpiText, holidayText, fidRes] = await Promise.all([
+  const [yieldsText, refCpiText, holidayText, quotesRes] = await Promise.all([
     fetch(YIELDS_CSV_URL, { cache: 'no-cache' }).then(r => { if (!r.ok) throw new Error(`Yields fetch failed: ${r.status}`); return r.text(); }),
     fetch(REF_CPI_CSV_URL, { cache: 'no-cache' }).then(r => { if (!r.ok) throw new Error(`RefCPI fetch failed: ${r.status}`); return r.text(); }),
     fetch(HOLIDAYS_CSV_URL, { cache: 'no-cache' }).then(r => { if (!r.ok) throw new Error(`Holidays fetch failed: ${r.status}`); return r.text(); }),
-    fetch(FIDELITY_URL, { cache: 'no-cache' }),
+    fetch(MARKET_QUOTES_URL, { cache: 'no-cache' }),
   ]);
-  if (!fidRes.ok) throw new Error(`Fidelity fetch failed: ${fidRes.status}`);
-  const fidText = await fidRes.text();
+  if (!quotesRes.ok) throw new Error(`Market quotes fetch failed: ${quotesRes.status}`);
+  const quotesText = await quotesRes.text();
 
   // YieldsFromFedInvestPrices.csv: row 1 = settlement date, row 2 = header, rows 3+ = data.
   const yieldsLines = yieldsText.split(/\r?\n/).filter(l => l.trim());
@@ -130,15 +130,15 @@ async function main() {
   const holidaySet = parseHolidaySet(parseCsv(holidayText, false));
   console.log(`FedInvest settlement ${fedSettleStr}: ${rawTipsData.length} TIPS, ${rawNominalsData.length} nominal rows.`);
 
-  // Market (Fidelity) settlement — trade date in the file + T+1, same as the app's marketSettleIso().
-  const downloadDateStr = parseFidelityDownloadDate(fidText);
-  if (!downloadDateStr) throw new Error('Fidelity file has no "Date downloaded" footer.');
-  const downloadIso = fidelityDownloadDateIso(downloadDateStr);
+  // Market settlement — trade date in the file + T+1, same as the app's marketSettleIso().
+  const downloadDateStr = parseDownloadDate(quotesText);
+  if (!downloadDateStr) throw new Error('Market quotes has no Download Date line.');
+  const downloadIso = downloadDateIso(downloadDateStr);
   const brokerSettleStr = toIsoDate(nextBusinessDay(localDate(downloadIso), holidaySet));
   console.log(`Market settlement (T+1): ${brokerSettleStr}`);
 
   const priceMap = new Map();
-  for (const r of parseFidelityTipsRows(fidText)) {
+  for (const r of parseTipsQuotes(quotesText)) {
     if (isNaN(r.askPrice)) continue;
     priceMap.set(r.cusip, r);
   }
@@ -146,9 +146,10 @@ async function main() {
   // Both yields come from the quoted price at the market settlement date, calculated by the
   // same shared parser src/app.js uses, so the published figures and the ones the app shows
   // are one method (3.1_Parse_Sources_And_Calculate_Yields.md#parse-market-quotes).
-  // parseFidelityNominalRows already drops TIPS rows on its own via the Product column, so
+  // parseTreasuryQuotes already drops TIPS rows on its own via the type column, so
   // this script adds no FedInvest cross-reference to gate on.
-  const fidNominalBondsAll = parseFidelityNominalRows(fidText, {
+  // The parser stamps each quote with the market settlement date it was priced at.
+  const mktNominalBondsAll = parseTreasuryQuotes(quotesText, {
     settleIso: brokerSettleStr,
     onUnknownCusip: cusip => console.warn(`  Unrecognized CUSIP root, tagged Unclassified: ${cusip}`),
   });
@@ -158,10 +159,10 @@ async function main() {
   // its fitting universe here, same as S1's fitting inputs (knowledge/DATA_DICTIONARY.md#s13).
   // Unclassified gets the same treatment: its cash-flow structure is unknown (that's what the
   // tag means), so it can't be fit as a plain coupon bond either.
-  const fidNominalBonds = fidNominalBondsAll.filter(b => !isStrip(b.cusip) && b.cusipType !== 'Unclassified');
-  console.log(`Market: ${priceMap.size} TIPS quotes, ${fidNominalBondsAll.length} nominal quotes `
-    + `(${fidNominalBondsAll.filter(b => isStrip(b.cusip)).length} STRIPS, `
-    + `${fidNominalBondsAll.filter(b => b.cusipType === 'Unclassified').length} Unclassified).`);
+  const mktNominalBonds = mktNominalBondsAll.filter(b => !isStrip(b.cusip) && b.cusipType !== 'Unclassified');
+  console.log(`Market: ${priceMap.size} TIPS quotes, ${mktNominalBondsAll.length} nominal quotes `
+    + `(${mktNominalBondsAll.filter(b => isStrip(b.cusip)).length} STRIPS, `
+    + `${mktNominalBondsAll.filter(b => b.cusipType === 'Unclassified').length} Unclassified).`);
 
   // ── Processed bonds, per source ──────────────────────────────────────────────
   const fedTips = saYieldsFromTipsYields(tipsYieldsFromPrices(rawTipsData, priceMap, false, brokerSettleStr), refCpiData);
@@ -174,10 +175,6 @@ async function main() {
   // and in case that ever changes — classifyByCusipRoot tags STRIPS Type correctly either way.
   const fedNominalBondsAll = treasuryYieldsFromPrices(rawNominalsData);
   const fedNominalBonds = fedNominalBondsAll.filter(b => !isStrip(b.cusip));
-  // The parser already stamps each quote with the market settlement date it was priced at.
-  const mktNominalBondsAll = fidNominalBondsAll;
-  const mktNominalBonds = fidNominalBonds;
-
   // ── Spot curves: the fit options are shared/src/spot-curve.js's TREASURIES_SPOT_FIT,
   // TIPS_SPOT_FIT and TIPS_SA_SPOT_FIT, the same ones src/app.js draws. ───────────────
   const fits = {

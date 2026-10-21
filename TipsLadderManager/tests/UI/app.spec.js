@@ -1,6 +1,6 @@
 // E2E regression tests — guards against GUI breakage (inop buttons, broken table render, drill popups)
 // Run: npx playwright test
-// Mocks EVERY R2 fetch (YieldsFromFedInvestPrices.csv, FidelityTreasuriesTips.csv,
+// Mocks EVERY R2 fetch (YieldsFromFedInvestPrices.csv, MarketQuotes.csv,
 // RefCPI.csv, TipsRef.csv, YieldsSaSao.csv, BondHolidaysSifma.csv) via page.route() in beforeEach below, fulfilled with the file's current R2 content (r2Text, fetched once per run; nothing market-related is committed);
 // the test browser has no live network egress in a sandboxed session, so an unmocked R2 URL fails with
 // "Failed to fetch" (this is by design, not flakiness; well-known, see TESTING.md §Mock every R2 fetch).
@@ -51,16 +51,15 @@ async function yieldsWithTodaySettlement() {
   return lines.join('\n');
 }
 
-// Fidelity CSV with the "Date downloaded" footer replaced by today's actual date (not T+1 —
+// Market quotes with the Download Date replaced by today's actual date (not T+1 —
 // the app derives T+1 itself from this date, same as a real download would settle T+1 from
 // today).
-async function fidelityWithTodayDownloadDate() {
-  const raw = await r2Text('Treasuries/FidelityTreasuriesTips.csv');
+async function marketQuotesWithTodayDownloadDate() {
+  const raw = await r2Text('Treasuries/MarketQuotes.csv');
   const now = new Date();
   const mo = String(now.getMonth() + 1).padStart(2, '0');
   const dy = String(now.getDate()).padStart(2, '0');
-  const footer = `Date downloaded   ${mo}/${dy}/${now.getFullYear()} 12:00 PM`;
-  return raw.replace(/Date downloaded.*$/m, footer);
+  return raw.replace(/^[^\n]*/, `${now.getFullYear()}-${mo}-${dy} 12:00`);
 }
 
 // Holdings CSV for rebalance tests (Format 3: cusip,qty) — single canonical copy in data/
@@ -72,8 +71,8 @@ let SY = 0;
 // The default First Year derived from today's quotes with the helper the app itself uses.
 async function defaultFirstYearFromQuotes() {
   const tips = new Map();
-  for (const f of parseCsvRows(await r2Text('Treasuries/FidelityTreasuriesTips.csv'), false)) {
-    if (f[0] === 'TIPS') tips.set(f[2], { maturity: localDate(f[6]) });
+  for (const f of parseCsvRows(await r2Text('Treasuries/MarketQuotes.csv'), false)) {
+    if (f[0] === 'TIPS') tips.set(f[1], { maturity: localDate(f[2]) });
   }
   return defaultFirstYear(tips, localDate(await computeSettleDateStr()));
 }
@@ -86,9 +85,8 @@ async function gapYears(page) {
 
 async function maturityYears() {
   const years = new Map();
-  // The description holds commas inside its quotes, so this goes through the shared CSV parser.
-  for (const f of parseCsvRows(await r2Text('Treasuries/FidelityTreasuriesTips.csv'), false)) {
-    if (f[0] === 'TIPS') years.set(f[2], Number(f[6].slice(0, 4)));
+  for (const f of parseCsvRows(await r2Text('Treasuries/MarketQuotes.csv'), false)) {
+    if (f[0] === 'TIPS') years.set(f[1], Number(f[2].slice(0, 4)));
   }
   return years;
 }
@@ -139,8 +137,8 @@ test.beforeEach(async ({ page }) => {
   SY = await defaultFirstYearFromQuotes();
   await page.route('**/Treasuries/YieldsFromFedInvestPrices.csv', r =>
     r.fulfill({ body: yieldsBody, contentType: 'text/csv' }));
-  await page.route('**/Treasuries/FidelityTreasuriesTips.csv', async r =>
-    r.fulfill({ body: await fidelityWithTodayDownloadDate(), contentType: 'text/csv' }));
+  await page.route('**/Treasuries/MarketQuotes.csv', async r =>
+    r.fulfill({ body: await marketQuotesWithTodayDownloadDate(), contentType: 'text/csv' }));
   await page.route('**/TIPS/RefCPI.csv', async r =>
     r.fulfill({ body: await r2Text('TIPS/RefCPI.csv'), contentType: 'text/csv' }));
   await page.route('**/TIPS/TipsRef.csv', async r =>
@@ -796,8 +794,8 @@ test('build: deselecting the first year entirely moves the ladder\'s real first 
 test('build: Select maturities does not offer a TIPS maturing within EXCLUDE_MATURING_WITHIN_MONTHS months', async ({ page }) => {
   test.setTimeout(20_000);
   const tips = new Map();
-  for (const f of parseCsvRows(await r2Text('Treasuries/FidelityTreasuriesTips.csv'), false)) {
-    if (f[0] === 'TIPS') tips.set(f[2], { cusip: f[2], maturity: localDate(f[6]) });
+  for (const f of parseCsvRows(await r2Text('Treasuries/MarketQuotes.csv'), false)) {
+    if (f[0] === 'TIPS') tips.set(f[1], { cusip: f[1], maturity: localDate(f[2]) });
   }
   const settle = localDate(await computeSettleDateStr());
   const beyond = new Set(tipsMaturingAfterExclusion(tips, settle).map(b => b.cusip));

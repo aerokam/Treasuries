@@ -3,7 +3,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import puppeteer from "puppeteer";
 import { parseCsv } from "../../shared/src/csv.js";
-import { fidPriceField } from "../../shared/src/fidelity-parse.js";
+import { parseTipsQuotes } from "../../shared/src/market-quotes.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.join(__dirname, "..", "data");
@@ -19,7 +19,7 @@ const USER_AGENT =
 
 const FUND_NAMES = { SCHP: "Schwab U.S. TIPS ETF" };
 
-const FIDELITY_URL = "https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/FidelityTreasuriesTips.csv";
+const MARKET_QUOTES_URL = "https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/MarketQuotes.csv";
 
 // Schwab's cash-sweep vehicle for SCHP is the same State Street "SSC
 // GOVERNMENT MM GVMXX" fund PIMCO sweeps LTPZ's cash into — its file gives a
@@ -91,23 +91,22 @@ function mmddyyyyToIso(mmddyyyy) {
   return m ? `${m[3]}-${m[1]}-${m[2]}` : "";
 }
 
-async function loadFidelityTipsPriceMap() {
-  const res = await fetch(FIDELITY_URL);
-  if (!res.ok) throw new Error(`Failed to fetch ${FIDELITY_URL}: HTTP ${res.status}`);
-  const rows = parseCsv(await res.text());
+async function loadTipsPriceMap() {
+  const res = await fetch(MARKET_QUOTES_URL);
+  if (!res.ok) throw new Error(`Failed to fetch ${MARKET_QUOTES_URL}: HTTP ${res.status}`);
   const map = new Map();
-  for (const r of rows) {
-    if ((r.Product || "").toLowerCase() !== "tips") continue;
-    const maturity = r["Maturity date"];
-    const coupon = Number(r.Coupon);
-    const rawAskPrice = Number(fidPriceField(r["Ask price/Quantity (min)"]));
+  for (const q of parseTipsQuotes(await res.text())) {
+    const maturity = q.maturity;
+    // Market quotes states the coupon as a decimal; Schwab's holdings export states percent.
+    const coupon = Number((q.coupon * 100).toFixed(6));
+    const rawAskPrice = q.askPrice;
     if (!maturity || Number.isNaN(coupon) || !rawAskPrice) continue;
     // SCHP's Quantity is already inflation-adjusted (current) face value, not
     // original par (confirmed by cross-checking against the fund's own
     // abbreviated Market Value display) — so Market Value uses the Ask price,
     // not the Adjusted ask price, or the inflation adjustment would be
     // counted twice.
-    map.set(`${maturity}|${coupon}`, { cusip: r.Cusip, rawAskPrice });
+    map.set(`${maturity}|${coupon}`, { cusip: q.cusip, rawAskPrice });
   }
   return map;
 }
@@ -138,7 +137,7 @@ function buildRows(rawRows, priceMap) {
     if (name === GVMXX_NAME) {
       // Money-market sweep vehicle: NAV is ~$1/share, so Quantity is already
       // dollar-denominated — no price adjustment applies (and none is
-      // available; it isn't a Treasury/TIPS security in the Fidelity source).
+      // available; it isn't a Treasury/TIPS security in Market quotes).
       rows.push({
         CUSIP: GVMXX_CUSIP,
         "Holding Name": name,
@@ -160,7 +159,7 @@ function buildRows(rawRows, priceMap) {
     const coupon = Number(r["Coupon Rate"]);
     const match = priceMap.get(`${isoMaturity}|${coupon}`);
     if (!match) {
-      console.warn(`No Fidelity price match for ${name} maturing ${isoMaturity} @ ${coupon}% — CUSIP/Market Value left blank`);
+      console.warn(`No Market quotes match for ${name} maturing ${isoMaturity} @ ${coupon}% — CUSIP/Market Value left blank`);
     }
 
     rows.push({
@@ -207,7 +206,7 @@ export async function updateSchwabHoldings(tickers) {
     if (ticker !== "SCHP") throw new Error(`Unknown Schwab ticker ${ticker}`);
 
     console.log(`\n=== Fetching ${ticker} ===`);
-    const [{ csvText, html }, priceMap] = await Promise.all([fetchHoldingsCsvText(), loadFidelityTipsPriceMap()]);
+    const [{ csvText, html }, priceMap] = await Promise.all([fetchHoldingsCsvText(), loadTipsPriceMap()]);
     const rawRows = parseCsv(extractDataLines(csvText));
     const rows = buildRows(rawRows, priceMap);
     console.log(`${ticker}: ${rows.length} holdings`);

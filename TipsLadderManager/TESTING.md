@@ -13,7 +13,7 @@ run time (`r2Text` in `app.spec.js`, `tests/market-fixture.js` for `run.js`), ne
 committed to the repo. A committed copy can only age: a committed `RefCPI.csv` ran out the day
 settlement passed its last row, and a committed quotes file lacked every bond issued after the copy
 was taken (e.g. the TIPS maturing July 2036). Two values are rewritten on top of the live data, since
-a test run is not itself a download day: the Fidelity download date becomes today (it drives
+a test run is not itself a download day: the Download Date becomes today (it drives
 settlement), and the first line of the FedInvest file becomes the settlement date.
 
 Consequence: the test suite needs live network access to R2, and the UI-test browser sandbox has none —
@@ -26,7 +26,7 @@ and stops being true the moment that stops holding.
 <a id="mock-every-r2-fetch"></a>
 ## Mock every R2 fetch
 
-The `beforeEach` of `tests/UI/app.spec.js` mocks every R2 fetch that `market-data.js` makes, with `page.route()`, and fulfills each with the current R2 content of that file, fetched once per run by the test process (`r2Text`). The files are `YieldsFromFedInvestPrices.csv`, `FidelityTreasuriesTips.csv`, `RefCPI.csv`, `TipsRef.csv`, `YieldsSaSao.csv` and `BondHolidaysSifma.csv`. No fixture file is committed ([Live market data, never a committed snapshot](#live-market-data-never-a-committed-snapshot)).
+The `beforeEach` of `tests/UI/app.spec.js` mocks every R2 fetch that `market-data.js` makes, with `page.route()`, and fulfills each with the current R2 content of that file, fetched once per run by the test process (`r2Text`). The files are `YieldsFromFedInvestPrices.csv`, `MarketQuotes.csv`, `RefCPI.csv`, `TipsRef.csv`, `YieldsSaSao.csv` and `BondHolidaysSifma.csv`. No fixture file is committed ([Live market data, never a committed snapshot](#live-market-data-never-a-committed-snapshot)).
 
 The UI-test browser has no live network egress in a sandboxed session, which is a property of that kind of sandbox and not an outage. `curl` from the same machine reaches R2, and a browser does not. An unmocked R2 URL does not fail alone: `fetchAuxTipsData()`, `fetchTipsData()` and `fetchFidelityTipsData()` use `Promise.all`, which rejects with "Failed to fetch" and shows "Failed to load market data: Failed to fetch" in the UI. The `beforeEach` waits for `#run-btn` to become enabled, so every test in the file times out, and not only the tests of the new field. The symptom looks like an R2 outage or a CORS problem, and the cause is a missing mock.
 

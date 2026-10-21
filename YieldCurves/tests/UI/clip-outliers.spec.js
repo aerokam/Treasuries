@@ -9,10 +9,8 @@ import { test, expect } from '@playwright/test';
 //
 // With clip OFF, extreme notes pull bounds.min to 1.5 → bounds.min < 2.1.
 //
-// Fidelity CSV covers the 30 normal notes + 20 bonds (same CUSIPs as FedInvest)
+// Market quotes covers the 30 normal notes + 20 bonds (same CUSIPs as FedInvest)
 // so the Market source activates and the Spreads button becomes enabled.
-// Fidelity yields are in PERCENTAGE form (e.g., "4.000" for 4%) as required
-// by parseFidelityNominals which divides by 100 internally.
 
 const SETTLE = '2026-03-25';
 
@@ -20,7 +18,7 @@ function makeFedOutlierCsv() {
   const rows = [
     SETTLE,
     'type,cusip,maturity,coupon,datedDateCpi,price,yield',
-    // 2 extreme-low notes (1.5%, 2.0%) — no Fidelity counterpart. Note root
+    // 2 extreme-low notes (1.5%, 2.0%) — no Market quotes counterpart. Note root
     // (912828) with suffixes above the 000-029 range used by normal notes below.
     'MARKET BASED NOTE,912828900,2027-01-15,0.01500,,100.000,0.01500',
     'MARKET BASED NOTE,912828901,2028-01-15,0.02000,,100.000,0.02000',
@@ -29,7 +27,7 @@ function makeFedOutlierCsv() {
     'TIPS,912828S50,2026-07-15,0.00125,239.70132,101.4375,0.000',
     'TIPS,91282CDC2,2026-10-15,0.00125,273.25771,100.96875,0.000',
   ];
-  // 30 normal notes (4.00–4.58%) — CUSIPs match Fidelity below. Note root (912828).
+  // 30 normal notes (4.00–4.58%) — CUSIPs match Market quotes below. Note root (912828).
   for (let i = 0; i < 30; i++) {
     const y = (0.0400 + i * 0.0002).toFixed(5);
     const cusip = `912828${String(i).padStart(3, '0')}`;
@@ -37,7 +35,7 @@ function makeFedOutlierCsv() {
     const matMonth = i % 2 === 0 ? '01' : '07';
     rows.push(`MARKET BASED NOTE,${cusip},${matYear}-${matMonth}-15,${y},,100.000,${y}`);
   }
-  // 20 bonds (4.60–5.17%) — CUSIPs match Fidelity below. Bond root (912810).
+  // 20 bonds (4.60–5.17%) — CUSIPs match Market quotes below. Bond root (912810).
   for (let i = 0; i < 20; i++) {
     const y = (0.0460 + i * 0.0003).toFixed(5);
     const cusip = `912810${String(i).padStart(3, '0')}`;
@@ -46,46 +44,32 @@ function makeFedOutlierCsv() {
   return rows.join('\n');
 }
 
-// Fidelity yields must be in PERCENTAGE form (parseFidelityNominals divides by 100).
-// Type is classified from the CUSIP root (912828/91282C = Note, 912810 = Bond, 912797 = Bill),
-// not from the description text — description here is just flavor text and isn't parsed.
-function makeFidCombinedCsv() {
-  const HDR = 'Product,Description,Cusip|State,Coupon,Frequency,Maturity date,Call protected,'
-    + "Moody's/S&P rating,Yield,Bid price/Quantity (min),Adjusted bid price,Inflation factor,"
-    + 'Ask price/Quantity (min),Adjusted ask price,Ask yield to worst,Ask yield to sink,'
-    + 'Ask yield to maturity,3rd party price,Depth of book,Attributes,';
-  const rows = [HDR];
+// Market quotes states the coupon as a decimal and prices at par, so each yield equals its coupon.
+// Type is classified from the CUSIP root (912828/91282C = Note, 912810 = Bond, 912797 = Bill).
+function makeMarketQuotesCsv() {
+  const rows = ['2026-03-25 08:27', 'type,cusip,maturity,coupon,askPrice,bidPrice,adjAskPrice,adjBidPrice'];
   for (let i = 0; i < 30; i++) {
-    const yDec   = 0.0400 + i * 0.0002;
-    const yPct   = (yDec * 100).toFixed(3);
-    const bidPct = ((yDec + 0.0001) * 100).toFixed(3);
-    const coupon = (yDec * 100).toFixed(3);
+    const coupon = (0.0400 + i * 0.0002).toFixed(5);
     const cusip  = `912828${String(i).padStart(3, '0')}`;
     const yr     = 2029 + Math.floor(i / 2);
     const mo     = i % 2 === 0 ? '01' : '07';
-    rows.push(`Treasury,"US TREAS NOTE ${yPct}% ${mo}/15/${yr}",${cusip},${coupon},semi-annually,${yr}-${mo}-15,Yes,AA1/ --,${bidPct},99.900/1000(1000),--,--,100.000/1000(1000),--,${yPct},--,${yPct},--,--,CP`);
+    rows.push(`Treasury,${cusip},${yr}-${mo}-15,${coupon},100,99.9,,`);
   }
   for (let i = 0; i < 20; i++) {
-    const yDec   = 0.0460 + i * 0.0003;
-    const yPct   = (yDec * 100).toFixed(3);
-    const bidPct = ((yDec + 0.0001) * 100).toFixed(3);
-    const coupon = (yDec * 100).toFixed(3);
+    const coupon = (0.0460 + i * 0.0003).toFixed(5);
     const cusip  = `912810${String(i).padStart(3, '0')}`;
     const yr     = 2057 + i * 2;
-    rows.push(`Treasury,"US TREAS BDS ${yPct}% 01/15/${yr}",${cusip},${coupon},semi-annually,${yr}-01-15,Yes,AA1/ --,${bidPct},99.900/1000(1000),--,--,100.000/1000(1000),--,${yPct},--,${yPct},--,--,CP`);
+    rows.push(`Treasury,${cusip},${yr}-01-15,${coupon},100,99.9,,`);
   }
   // TIPS for broker price overlay
-  rows.push('TIPS,"US TREAS TIPS 0.125% 04/15/2026",91282CCA7,0.125,semi-annually,2026-04-15,Yes,AA1/ --,-1.019,100.062/6000(100),124.011839,1.23935,100.132/6000(100),124.098594,-2.274,--,-2.274,--,--,"CP, IE"');
-  rows.push('TIPS,"US TREAS TIPS 0.125% 07/15/2026",912828S50,0.125,semi-annually,2026-07-15,Yes,AA1/ --,-3.842,101.231/6000(100),137.263162,1.35594,101.284/6000(100),137.335026,-4.011,--,-4.011,--,--,"CP, IE"');
-  rows.push('TIPS,"US TREAS TIPS 0.125% 10/15/2026",91282CDC2,0.125,semi-annually,2026-10-15,Yes,AA1/ --,-1.095,100.680/6000(100),119.751812,1.18943,100.738/6000(100),119.820799,-1.197,--,-1.197,--,--,"CP, IE"');
-  // Download-date footer, as the real export carries it: the quote settles T+1 from this date
-  // (2026-03-26), and both quoted sides are priced to that date.
-  rows.push('Date downloaded   03/25/2026 08:27 AM');
+  rows.push('TIPS,91282CCA7,2026-04-15,0.00125,100.132,100.062,124.098594,124.011839');
+  rows.push('TIPS,912828S50,2026-07-15,0.00125,101.284,101.231,137.335026,137.263162');
+  rows.push('TIPS,91282CDC2,2026-10-15,0.00125,100.738,100.68,119.820799,119.751812');
   return rows.join('\n');
 }
 
 const FED_OUTLIER_CSV = makeFedOutlierCsv();
-const FID_COMBINED_CSV = makeFidCombinedCsv();
+const MARKET_QUOTES_CSV = makeMarketQuotesCsv();
 
 const REF_CPI_CSV = [
   'Ref CPI Date,Ref CPI NSA,Ref CPI SA,SA Factor',
@@ -105,7 +89,7 @@ async function setupRoutes(page) {
   await page.route('**/TIPS/RefCpiNsaSa.csv',                      r => r.fulfill({ status: 200, contentType: 'text/csv', body: REF_CPI_CSV }));
   await page.route('**/misc/BondHolidaysSifma.csv',                       r => r.fulfill({ status: 200, contentType: 'text/csv', body: HOLIDAYS_CSV }));
   await page.route('**/TIPS/GswTipsCurve.json', r => r.fulfill({ status: 404, body: '' }));  // GSW overlay: force snapshot fallback in tests
-  await page.route('**/Treasuries/FidelityTreasuriesTips.csv',            r => r.fulfill({ status: 200, contentType: 'text/csv', body: FID_COMBINED_CSV }));
+  await page.route('**/Treasuries/MarketQuotes.csv',            r => r.fulfill({ status: 200, contentType: 'text/csv', body: MARKET_QUOTES_CSV }));
 }
 
 // Y values are stored as percentage (e.g. 4.0 = 4.0%). Extreme notes have Y = 1.5 and 2.0.
@@ -138,9 +122,9 @@ async function assertCheckboxUnchecked(page) {
   await expect(page.locator('#clipOutliers')).not.toBeChecked();
 }
 
-// Navigate to Treasuries tab, wait for FedInvest (52 rows) + Fidelity (Spreads button enabled).
+// Navigate to Treasuries tab, wait for FedInvest (52 rows) + Market quotes (Spreads button enabled).
 // 52 = 2 extreme notes + 30 normal notes + 20 bonds (all from FedInvest).
-// After Fidelity loads, table stays at 52 (Fidelity CUSIPs are a subset of FedInvest).
+// After Market quotes load, table stays at 52 (their CUSIPs are a subset of FedInvest).
 async function loadTreasuries(page) {
   await setupRoutes(page);
   await page.goto('./');
@@ -446,10 +430,7 @@ function makeBillsOutlierCsv() {
   return rows.join('\n');
 }
 
-const FID_EMPTY_CSV = 'Product,Description,Cusip|State,Coupon,Frequency,Maturity date,Call protected,'
-  + "Moody's/S&P rating,Yield,Bid price/Quantity (min),Adjusted bid price,Inflation factor,"
-  + 'Ask price/Quantity (min),Adjusted ask price,Ask yield to worst,Ask yield to sink,'
-  + 'Ask yield to maturity,3rd party price,Depth of book,Attributes,';
+const MARKET_QUOTES_EMPTY_CSV = '2026-03-25 08:27\ntype,cusip,maturity,coupon,askPrice,bidPrice,adjAskPrice,adjBidPrice';
 
 const BILLS_OUTLIER_CSV = makeBillsOutlierCsv();
 
@@ -459,9 +440,9 @@ test.describe('Clip Outliers — Bills outlier regression', () => {
     await page.route('**/TIPS/RefCpiNsaSa.csv',                      r => r.fulfill({ status: 200, contentType: 'text/csv', body: REF_CPI_CSV }));
     await page.route('**/misc/BondHolidaysSifma.csv',                       r => r.fulfill({ status: 200, contentType: 'text/csv', body: HOLIDAYS_CSV }));
     await page.route('**/TIPS/GswTipsCurve.json', r => r.fulfill({ status: 404, body: '' }));  // GSW overlay: force snapshot fallback in tests
-    await page.route('**/Treasuries/FidelityTreasuriesTips.csv',            r => r.fulfill({ status: 200, contentType: 'text/csv', body: FID_EMPTY_CSV }));
+    await page.route('**/Treasuries/MarketQuotes.csv',            r => r.fulfill({ status: 200, contentType: 'text/csv', body: MARKET_QUOTES_EMPTY_CSV }));
     await page.goto('./');
-    // FedInvest defaults off and Fidelity is empty in this fixture, so it's the only source.
+    // FedInvest defaults off and Market quotes is empty in this fixture, so it's the only source.
     await page.check('#chkTipsFed');
     await expect(page.locator('#saTable tbody tr')).toHaveCount(3, { timeout: 10000 });
     await page.click('[data-tab="treasuries"]');

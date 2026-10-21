@@ -13,28 +13,28 @@ import { saYieldsFromTipsYields } from '../../shared/src/sa-yields.js';
 import { calculateSAO } from '../../shared/src/spot-curve.js';
 import { parseCsv } from '../../shared/src/csv.js';
 import { localDate, toIsoDate, nextBusinessDay, parseHolidaySet } from '../../shared/src/settlement.js';
-import { parseFidelityDownloadDate, fidelityDownloadDateIso, parseFidelityTipsRows } from '../../shared/src/fidelity-parse.js';
+import { parseDownloadDate, downloadDateIso, parseTipsQuotes } from '../../shared/src/market-quotes.js';
 
 const R2_BASE_URL = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev';
-const FIDELITY_TIPS_URL = `${R2_BASE_URL}/Treasuries/FidelityTreasuriesTips.csv`;
+const MARKET_QUOTES_URL = `${R2_BASE_URL}/Treasuries/MarketQuotes.csv`;
 const REF_CPI_URL = `${R2_BASE_URL}/TIPS/RefCpiNsaSa.csv`;
 const HOLIDAYS_URL = `${R2_BASE_URL}/misc/BondHolidaysSifma.csv`;
 
 async function main() {
   console.log(`Starting Market SA/SAO Yield update at ${new Date().toISOString()}`);
 
-  // Fetch Fidelity TIPS
-  console.log(`Fetching market data from ${FIDELITY_TIPS_URL}...`);
-  const fidRes = await fetch(FIDELITY_TIPS_URL);
-  if (!fidRes.ok) throw new Error(`Failed to fetch Fidelity TIPS: ${fidRes.status}`);
-  const fidText = await fidRes.text();
-  
-  // Extract download date from footer
-  const downloadDateStr = parseFidelityDownloadDate(fidText);
+  // Fetch Market quotes (S7)
+  console.log(`Fetching market data from ${MARKET_QUOTES_URL}...`);
+  const quotesRes = await fetch(MARKET_QUOTES_URL);
+  if (!quotesRes.ok) throw new Error(`Failed to fetch Market quotes: ${quotesRes.status}`);
+  const quotesText = await quotesRes.text();
+
+  // Download Date from the first line
+  const downloadDateStr = parseDownloadDate(quotesText);
   if (!downloadDateStr) {
-    console.log("Warning: Could not find download date in Fidelity TIPS footer. Using today.");
+    console.log("Warning: Could not find the Download Date in Market quotes. Using today.");
   }
-  const downloadDate = downloadDateStr ? localDate(fidelityDownloadDateIso(downloadDateStr)) : new Date();
+  const downloadDate = downloadDateStr ? localDate(downloadDateIso(downloadDateStr)) : new Date();
 
   // Fetch Holidays for T+1 settlement
   console.log(`Fetching holidays from ${HOLIDAYS_URL}...`);
@@ -56,7 +56,7 @@ async function main() {
 
   // Parse Bonds — the same TIPS row parser the YieldCurves app reads this store with, then the
   // same two calculations: the TIPS yields (3.1.7) and the SA Yield (3.2).
-  const quotesByCusip = new Map(parseFidelityTipsRows(fidText)
+  const quotesByCusip = new Map(parseTipsQuotes(quotesText)
     .filter(r => r.maturity && !isNaN(r.askPrice))
     .map(r => [r.cusip, r]));
   const processed = saYieldsFromTipsYields(

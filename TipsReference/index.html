@@ -517,7 +517,7 @@ async function loadData() {
     var d = await loadMarketData();
     bondHolidays = d.bondHolidays;
     refCpiRows = d.refCpiRows;
-    // Trade = the data's as-of/"today" date (Fidelity's download date; for the dormant
+    // Trade = the data's as-of/"today" date (the Download Date; for the dormant
     // FedInvest cross-check path, settleDateStr doubles as this — see loadMarketData()).
     // Settlement = T+1, source-dependent (3.1_Data_Pipeline.md §4.0).
     priceDateStr = d.tradeDateStr;

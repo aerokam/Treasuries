@@ -698,7 +698,7 @@ function aggregateRungs(rungs) {
 // yet PAID as of `tradeDate` ("today" — the same reference the Cash Flow Calendar uses, 5.0
 // §Cash Flow Calendar "Cutoff: today, not the settlement/Ref CPI date"). 0, 1, or 2. Deliberately
 // NOT settlementDate itself: settlementDate is T+1 from today (a hypothetical new trade's
-// settlement, matching FedInvest/Fidelity data), so a coupon rolled to pay on Aug 17 is still
+// settlement, matching FedInvest and Market quotes data), so a coupon rolled to pay on Aug 17 is still
 // "not yet paid" as of settlementDate Aug 18 even though the cash was actually received today —
 // comparing against settlementDate instead of today excluded a coupon on the very day it paid.
 // `tradeDate` defaults to `settlementDate` for callers that don't distinguish the two (tests,

@@ -17,7 +17,7 @@ import { handleChartKeydown, setupAxisWheelZoom, snapYBounds, snapYAfterZoom } f
 import { initDatePicker } from '../../shared/src/date-picker.js';
 import { calendarTimeAxis } from '../../shared/src/chart-time-axis.js';
 import { isStrip } from '../../shared/src/treasury-cusip.js';
-import { parseFidelityDownloadDate, fidelityDownloadDateIso, parseFidelityTipsRows, parseFidelityNominalRows } from '../../shared/src/fidelity-parse.js';
+import { parseDownloadDate, downloadDateIso, parseTipsQuotes, parseTreasuryQuotes } from '../../shared/src/market-quotes.js';
 
 console.log("YieldCurves app.js loading...");
 
@@ -25,7 +25,7 @@ const R2_BASE_URL = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev';
 const YIELDS_CSV_URL = `${R2_BASE_URL}/Treasuries/YieldsFromFedInvestPrices.csv`;
 const REF_CPI_CSV_URL = `${R2_BASE_URL}/TIPS/RefCpiNsaSa.csv`;
 const HOLIDAYS_CSV_URL = `${R2_BASE_URL}/misc/BondHolidaysSifma.csv`;
-const FIDELITY_URL = `${R2_BASE_URL}/Treasuries/FidelityTreasuriesTips.csv`;
+const MARKET_QUOTES_URL = `${R2_BASE_URL}/Treasuries/MarketQuotes.csv`;
 const GSW_TIPS_CURVE_URL = `${R2_BASE_URL}/TIPS/GswTipsCurve.json`;   // { date, beta0..beta3, tau1, tau2 } — updateGswTipsCurve.js
 
 // The GSW reference line is an analysis aid, not an end-user feature — the published curve
@@ -69,15 +69,15 @@ let rawNominalsData = null;
 let rawRefCpiData = null;
 let holidaySet = new Set();
 let brokerPrices = null;
-let brokerDownloadDate = null;    // download date string from Fidelity TIPS CSV footer
-let fidelityNominalsData = null;  // processed bond objects from Fidelity CSV
-let fidelityNominalsDate = null;  // download date string extracted from CSV footer
+let brokerDownloadDate = null;    // Download Date of Market quotes (S7), 'YYYY-MM-DD HH:MM'
+let marketNominalsData = null;  // processed bond objects from Market quotes (S7)
+let marketNominalsDate = null;  // Download Date of Market quotes (S7), 'YYYY-MM-DD HH:MM'
 let gswTipsCurve = null;          // { date, beta0..beta3, tau1, tau2 } — GSW fitted TIPS curve, R2 (weekly)
 let nominalsShowStrips = false;
 // Starts false/hidden -- the checkbox and this flag only turn on together, at load, when an
-// unrecognized CUSIP root actually occurs (see the fidelityNominalsData assignment in init()).
+// unrecognized CUSIP root actually occurs (see the marketNominalsData assignment in init()).
 // It exists so that can't go unnoticed; a permanent checkbox nobody ever needs would be worse,
-// not better, at that job (easy to become blind to). See shared/src/fidelity-parse.js#parseFidelityNominalRows.
+// not better, at that job (easy to become blind to). See shared/src/market-quotes.js#parseTreasuryQuotes.
 let nominalsShowUnclassified = false;
 let nominalsClipOutliers = true;
 let beiClipOutliers = true;
@@ -107,18 +107,18 @@ window._currentBonds = [];
 let tipsTableFed = null, tipsTableBroker = null;
 
 // --- Helpers ---
-// Parse "MM/DD/YYYY HH:MM AM/PM" (Fidelity footer) → Date (date part only)
-function parseFidelityDateStr(s) {
-  return localDate(fidelityDownloadDateIso(s));
+// Parse the Download Date "YYYY-MM-DD HH:MM" → Date (date part only)
+function parseDownloadDateStr(s) {
+  return localDate(downloadDateIso(s));
 }
 
-// Settlement date for market (Fidelity) quotes — TIPS and nominals alike: the trade date
-// in the Fidelity file plus one bond trading day (T+1). DATA_DICTIONARY.md#settlement-date.
+// Settlement date for Market quotes — TIPS and nominals alike: the trade date
+// in the file (its Download Date) plus one bond trading day (T+1). DATA_DICTIONARY.md#settlement-date.
 // `downloadDate` lets a caller that holds the file's own footer date (the parser, which runs
 // before the module-level dates are assigned) settle from it; omitted, the assigned dates are used.
 function marketSettleIso(downloadDate) {
-  const d = downloadDate ?? (brokerDownloadDate || fidelityNominalsDate);
-  return d ? toIsoDate(nextBusinessDay(parseFidelityDateStr(d), holidaySet)) : null;
+  const d = downloadDate ?? (brokerDownloadDate || marketNominalsDate);
+  return d ? toIsoDate(nextBusinessDay(parseDownloadDateStr(d), holidaySet)) : null;
 }
 
 // ── Date range input helpers ──────────────────────────────────────────────────
@@ -155,16 +155,14 @@ function ttmLabel(ms) {
   return `${Math.round(days / 365.25)}y`;
 }
 
-// Broker timestamp "MM/DD/YYYY HH:MM AM/PM" is Fidelity's stamp of the local
-// system clock, which on this machine is Pacific. Convert to Eastern (+3h,
-// always exact since PT/ET share the same US DST schedule) and drop the year.
+// The Download Date "YYYY-MM-DD HH:MM" is the local system clock of the machine that downloaded
+// the quotes, which is Pacific. Convert to Eastern (+3h, always exact since PT/ET share the
+// same US DST schedule) and drop the year.
 function fmtBrokerTime(s) {
   if (!s) return s;
-  const [datePart, timePart, ampm] = s.split(' ');
-  const [mo, dy, yr] = datePart.split('/').map(Number);
-  let [hh, mm] = timePart.split(':').map(Number);
-  if (ampm === 'PM' && hh !== 12) hh += 12;
-  if (ampm === 'AM' && hh === 12) hh = 0;
+  const [datePart, timePart] = s.split(' ');
+  const [yr, mo, dy] = datePart.split('-').map(Number);
+  const [hh, mm] = timePart.split(':').map(Number);
   const dt = new Date(yr, mo - 1, dy, hh, mm);
   dt.setHours(dt.getHours() + 3);
   let h2 = dt.getHours();
@@ -416,16 +414,16 @@ async function parseGswParameters(res) {
 }
 
 // spec: 3.1_Parse_Sources_And_Calculate_Yields.md#parse-market-quotes (3.1.2)
-// Every TIPS row the export itself carries (parseFidelityTipsRows already limits these to the
-// export's own Product = TIPS rows) is kept, provided it has an ask price.
+// Every TIPS Quote (parseTipsQuotes limits these to the rows of type TIPS) is kept, provided it
+// has an ask price.
 function parseMarketQuotes(text) {
-  const { bonds, downloadDate } = parseFidelityNominals(text, marketSettleIso(parseFidelityDownloadDate(text)));
+  const { bonds, downloadDate } = parseMarketNominals(text, marketSettleIso(parseDownloadDate(text)));
   const tipsPrices = new Map();
-  parseFidelityTipsRows(text).forEach(r => {
+  parseTipsQuotes(text).forEach(r => {
     if (isNaN(r.askPrice)) return;
     tipsPrices.set(r.cusip, r);
   });
-  return { nominals: bonds, nominalsDate: downloadDate, tipsPrices, tipsDate: parseFidelityDownloadDate(text) };
+  return { nominals: bonds, nominalsDate: downloadDate, tipsPrices, tipsDate: parseDownloadDate(text) };
 }
 
 async function init() {
@@ -434,11 +432,11 @@ async function init() {
   
   try {
     console.log("Fetching market data...");
-    const [yieldsRes, refCpiRes, holidayRes, fidRes, gswRes] = await Promise.all([
+    const [yieldsRes, refCpiRes, holidayRes, quotesRes, gswRes] = await Promise.all([
       fetch(YIELDS_CSV_URL, { cache: 'no-cache' }).then(r => { console.log("Yields fetched"); return r; }).catch(e => ({ ok: false, error: e })),
       fetch(REF_CPI_CSV_URL, { cache: 'no-cache' }).then(r => { console.log("RefCPI fetched"); return r; }).catch(e => ({ ok: false, error: e })),
       fetch(HOLIDAYS_CSV_URL, { cache: 'no-cache' }).then(r => { console.log("Holidays fetched"); return r; }).catch(e => ({ ok: false, error: e })),
-      fetch(FIDELITY_URL, { cache: 'no-cache' }).then(r => { console.log("Fidelity fetched"); return r; }).catch(e => ({ ok: false, error: e })),
+      fetch(MARKET_QUOTES_URL, { cache: 'no-cache' }).then(r => { console.log("Market quotes fetched"); return r; }).catch(e => ({ ok: false, error: e })),
       fetch(GSW_TIPS_CURVE_URL, { cache: 'no-cache' }).then(r => { console.log("GSW curve fetched"); return r; }).catch(e => ({ ok: false, error: e })),
     ]);
 
@@ -466,22 +464,22 @@ async function init() {
     holidaySet = parseBondHolidays(holidayText);
     console.log(`Holiday set populated with ${holidaySet.size} dates.`);
 
-    if (fidRes.ok) {
-      const fidText = await fidRes.text();
-      const quotes = parseMarketQuotes(fidText);
+    if (quotesRes.ok) {
+      const quotesText = await quotesRes.text();
+      const quotes = parseMarketQuotes(quotesText);
 
       // Nominals (Treasuries)
       const bonds = quotes.nominals;
       if (bonds.length > 0) {
-        fidelityNominalsData = bonds;
-        fidelityNominalsDate = quotes.nominalsDate;
-        const chkFid = document.getElementById('chkFidelity');
-        chkFid.disabled = false;
-        chkFid.checked = true;
-        console.log(`Loaded ${bonds.length} Fidelity Treasuries (${quotes.nominalsDate})`);
+        marketNominalsData = bonds;
+        marketNominalsDate = quotes.nominalsDate;
+        const chkMq = document.getElementById('chkMarket');
+        chkMq.disabled = false;
+        chkMq.checked = true;
+        console.log(`Loaded ${bonds.length} Market Treasuries (${quotes.nominalsDate})`);
         // The Unclassified checkbox only exists to surface a CUSIP root shared/src/
         // treasury-cusip.js doesn't recognise -- shown, and checked, only when one actually
-        // occurs (see shared/src/fidelity-parse.js#parseFidelityNominalRows). Setting the flag
+        // occurs (see shared/src/market-quotes.js#parseTreasuryQuotes). Setting the flag
         // and the checkbox together, only in this branch, keeps them consistent: no world
         // where the checkbox is hidden but still counts as "on" for the Ask-column/range logic.
         const hasUnclassified = bonds.some(b => b.type === 'MARKET BASED UNCLASSIFIED');
@@ -501,11 +499,11 @@ async function init() {
         const chkBroker = document.getElementById('chkTipsBroker');
         chkBroker.disabled = false;
         chkBroker.checked = true;
-        console.log(`Loaded ${priceMap.size} Fidelity TIPS prices (${brokerDownloadDate})`);
+        console.log(`Loaded ${priceMap.size} Market TIPS prices (${brokerDownloadDate})`);
         updateModeToggle();
       }
     } else {
-      console.warn('Fidelity data not available on R2');
+      console.warn('Market quotes not available on R2');
     }
 
     const onRangeChange = () => { savedZoom[activeTab] = null; processAndRender(); };
@@ -604,17 +602,17 @@ function switchTab(tab) {
 }
 
 // Works with text from file upload or R2 fetch. The row parse and both yield calculations
-// live in shared/src/fidelity-parse.js#parseFidelityNominalRows, which the acquisition script
+// live in shared/src/market-quotes.js#parseTreasuryQuotes, which the acquisition script
 // that writes S13/S15 imports too, so neither can move onto a different method (§2a).
-// parseFidelityNominalRows already drops TIPS rows on its own via the Product column, so this
+// parseTreasuryQuotes already drops TIPS rows on its own via the type column, so this
 // app adds no FedInvest cross-reference to gate on. What stays here is the S1 type vocabulary
 // the rest of the app filters on.
-function parseFidelityNominals(text, settleIso = null) {
-  const bonds = parseFidelityNominalRows(text, {
+function parseMarketNominals(text, settleIso = null) {
+  const bonds = parseTreasuryQuotes(text, {
     settleIso,
     onUnknownCusip: cusip => console.warn(`Unrecognized CUSIP root, tagged Unclassified: ${cusip}`),
   }).map(b => ({ ...b, type: CUSIP_TYPE_TO_MARKET_BASED[b.cusipType] }));
-  return { bonds, downloadDate: parseFidelityDownloadDate(text) };
+  return { bonds, downloadDate: parseDownloadDate(text) };
 }
 
 // The Treasuries the spot curve of 3.4 is fitted to: every Bill, Note and Bond. A STRIPS and an
@@ -625,9 +623,9 @@ const treasuriesSpotSet = bonds => bonds.filter(b => !isStrip(b.cusip) && b.type
 function processAndRenderNominals() {
   const statusEl = document.getElementById('status');
   const showFed = document.getElementById('chkFedInvest').checked;
-  const showFid = document.getElementById('chkFidelity').checked && !!fidelityNominalsData;
+  const showMq = document.getElementById('chkMarket').checked && !!marketNominalsData;
 
-  if (!showFed && !showFid) { statusEl.textContent = ''; if (chart) { chart.destroy(); chart = null; } return; }
+  if (!showFed && !showMq) { statusEl.textContent = ''; if (chart) { chart.destroy(); chart = null; } return; }
 
   try {
     // FedInvest rows settle on the price date itself (T=0); market quotes settle T+1.
@@ -640,9 +638,9 @@ function processAndRenderNominals() {
         .sort((a, b) => a.maturityDate - b.maturityDate);
     }
 
-    let fidProcessed = null;
-    if (showFid) {
-      fidProcessed = fidelityNominalsData.filter(r => nominalsTypeFilters.has(r.type) || (nominalsShowStrips && isStrip(r.cusip)) || (nominalsShowUnclassified && r.type === 'MARKET BASED UNCLASSIFIED'));
+    let mqProcessed = null;
+    if (showMq) {
+      mqProcessed = marketNominalsData.filter(r => nominalsTypeFilters.has(r.type) || (nominalsShowStrips && isStrip(r.cusip)) || (nominalsShowUnclassified && r.type === 'MARKET BASED UNCLASSIFIED'));
     }
 
     // Full coupon+bill set for the spot fit — independent of the Bills/Notes/Bonds
@@ -651,25 +649,25 @@ function processAndRenderNominals() {
     // is excluded the same way STRIPS is: its true cash-flow structure is unknown, so it
     // cannot be fit as a plain coupon bond.
     let fedSpotSet = showFed ? treasuriesSpotSet(rawNominalsData) : null;
-    let fidSpotSet = showFid ? treasuriesSpotSet(fidelityNominalsData) : null;
+    let mqSpotSet = showMq ? treasuriesSpotSet(marketNominalsData) : null;
 
-    // Filter STRIPS unless user opts in (already handled by the initial filter above for performance, but we keep the fidProcessed part consistent)
+    // Filter STRIPS unless user opts in (already handled by the initial filter above for performance, but we keep the mqProcessed part consistent)
     if (!nominalsShowStrips) {
       if (fedProcessed) fedProcessed = fedProcessed.filter(b => !isStrip(b.cusip));
-      if (fidProcessed) fidProcessed = fidProcessed.filter(b => !isStrip(b.cusip));
+      if (mqProcessed) mqProcessed = mqProcessed.filter(b => !isStrip(b.cusip));
     }
     // Filter Unclassified unless user opts in (mirrors the STRIPS block above; performance
     // note above applies here too)
     if (!nominalsShowUnclassified) {
       if (fedProcessed) fedProcessed = fedProcessed.filter(b => b.type !== 'MARKET BASED UNCLASSIFIED');
-      if (fidProcessed) fidProcessed = fidProcessed.filter(b => b.type !== 'MARKET BASED UNCLASSIFIED');
+      if (mqProcessed) mqProcessed = mqProcessed.filter(b => b.type !== 'MARKET BASED UNCLASSIFIED');
     }
 
     // Initial default: the range spans whatever is checked by default (Bills/Notes/Bonds).
     // Checking something new later expands the range to fit it (see expandRangeToInclude in
     // the change handler below) — it never shrinks on its own; only unchecking something, or
     // typing a narrower range by hand, reduces what's shown.
-    const allBonds = [...(fedProcessed || []), ...(fidProcessed || [])].sort((a, b) => a.maturityDate - b.maturityDate);
+    const allBonds = [...(fedProcessed || []), ...(mqProcessed || [])].sort((a, b) => a.maturityDate - b.maturityDate);
     const startEl = document.getElementById('startMaturity');
     const endEl = document.getElementById('endMaturity');
     if (!startEl.value && allBonds.length > 0) {
@@ -681,35 +679,35 @@ function processAndRenderNominals() {
     const endDate = parseIsoInput(endEl.value) || new Date(9999, 0);
     const inRange = b => b.maturityDate >= startDate && b.maturityDate <= endDate;
     const fedFiltered = fedProcessed ? fedProcessed.filter(inRange) : null;
-    const fidFiltered = fidProcessed ? fidProcessed.filter(inRange) : null;
+    const mqFiltered = mqProcessed ? mqProcessed.filter(inRange) : null;
 
-    // The Spot fit itself always uses the full, un-ranged set (fedSpotSet/fidSpotSet) — the
+    // The Spot fit itself always uses the full, un-ranged set (fedSpotSet/mqSpotSet) — the
     // Maturity Range only crops what gets drawn/listed from the resulting curve, exactly like
     // it crops the other security types' own points, via startTermY/endTermY below and via
     // the chart's own axis domain.
-    const refSettle = localDate(fedSpotSet?.[0]?.settlementDate || fidSpotSet?.[0]?.settlementDate);
+    const refSettle = localDate(fedSpotSet?.[0]?.settlementDate || mqSpotSet?.[0]?.settlementDate);
     const startTermY = refSettle ? termYears(refSettle, startDate) : -Infinity;
     const endTermY = refSettle ? termYears(refSettle, endDate) : Infinity;
 
-    if (fidFiltered) addTreasurySpreads(fidFiltered);
+    if (mqFiltered) addTreasurySpreads(mqFiltered);
 
-    if (spreadModeActive && fidFiltered) {
-      renderSpreadCharts(fidFiltered, 'treasuries');
-      renderSpreadTable(fidFiltered, 'treasuries');
+    if (spreadModeActive && mqFiltered) {
+      renderSpreadCharts(mqFiltered, 'treasuries');
+      renderSpreadTable(mqFiltered, 'treasuries');
     } else {
-      renderNominalsTable(fedFiltered, fidFiltered, fedSpotSet, fidSpotSet, startTermY, endTermY);
-      renderNominalsChart(fedFiltered, fidFiltered, fedSpotSet, fidSpotSet);
+      renderNominalsTable(fedFiltered, mqFiltered, fedSpotSet, mqSpotSet, startTermY, endTermY);
+      renderNominalsChart(fedFiltered, mqFiltered, fedSpotSet, mqSpotSet);
     }
 
     const treaFedSettle = rawNominalsData?.[0]?.settlementDate;
     document.getElementById('treaFedMeta').textContent = showFed && treaFedSettle ? isoToMDY(treaFedSettle) : '';
-    if (showFid && fidelityNominalsDate) {
-      document.getElementById('treaMktMeta').textContent = `${fmtBrokerTime(fidelityNominalsDate)} ET · settle ${isoToMDY(mktSettle)} (T+1)`;
+    if (showMq && marketNominalsDate) {
+      document.getElementById('treaMktMeta').textContent = `${fmtBrokerTime(marketNominalsDate)} ET · settle ${isoToMDY(mktSettle)} (T+1)`;
     } else {
       document.getElementById('treaMktMeta').textContent = '';
     }
     document.getElementById('treaFedCount').textContent = showFed ? (fedFiltered?.length || 0) : '';
-    document.getElementById('treaMktCount').textContent = showFid ? (fidFiltered?.length || 0) : '';
+    document.getElementById('treaMktCount').textContent = showMq ? (mqFiltered?.length || 0) : '';
     statusEl.textContent = '';
     statusEl.className = '';
   } catch (err) {
@@ -719,10 +717,10 @@ function processAndRenderNominals() {
   }
 }
 
-function renderNominalsTable(fedBonds, fidBonds, fedSpotBonds, fidSpotBonds, startTermY, endTermY) {
+function renderNominalsTable(fedBonds, mqBonds, fedSpotBonds, mqSpotBonds, startTermY, endTermY) {
   const theadRow = document.querySelector('#nominalsTable thead tr');
   const tbody = document.getElementById('nominalsTableBody');
-  const bothActive = fedBonds && fidBonds;
+  const bothActive = fedBonds && mqBonds;
   const shortType = t => t === 'MARKET BASED BILL' ? 'Bill' : t === 'MARKET BASED NOTE' ? 'Note' : t === 'MARKET BASED BOND' ? 'Bond' : t === 'MARKET BASED UNCLASSIFIED' ? 'Unclassified' : 'STRIPS';
   const fmtMat = s => isoToMDY(s);
   const fmtYld = y => (y != null && !isNaN(y)) ? (y * 100).toFixed(3) + '%' : '—';
@@ -751,11 +749,11 @@ function renderNominalsTable(fedBonds, fidBonds, fedSpotBonds, fidSpotBonds, sta
       <th>Price (Fed/Mkt)</th>
       ${curveHeaderHtml}`;
     const fedMap = new Map(fedBonds.map(b => [b.cusip, b]));
-    const fidMap = new Map(fidBonds.map(b => [b.cusip, b]));
+    const mqMap = new Map(mqBonds.map(b => [b.cusip, b]));
     const getV = b => nominalsSort.col === 'cusip' ? b.cusip : nominalsSort.col === 'coupon' ? b.coupon : b.maturityDate;
-    const merged = [...new Set([...fedMap.keys(), ...fidMap.keys()])].map(cusip => {
-      const fed = fedMap.get(cusip), fid = fidMap.get(cusip), ref = fed || fid;
-      return { ...ref, fedPrice: fed?.price ?? NaN, fidPrice: fid?.price ?? NaN, fedYield: fed?.yield ?? null, fidYield: fid?.yield ?? null };
+    const merged = [...new Set([...fedMap.keys(), ...mqMap.keys()])].map(cusip => {
+      const fed = fedMap.get(cusip), mq = mqMap.get(cusip), ref = fed || mq;
+      return { ...ref, fedPrice: fed?.price ?? NaN, mqPrice: mq?.price ?? NaN, fedYield: fed?.yield ?? null, mqYield: mq?.yield ?? null };
     }).sort(makeCmp(getV));
     tbody.innerHTML = merged.map(b => `
       <tr>
@@ -763,11 +761,11 @@ function renderNominalsTable(fedBonds, fidBonds, fedSpotBonds, fidSpotBonds, sta
         <td>${b.cusip}</td>
         <td>${shortType(b.type)}</td>
         <td>${((b.coupon || 0) * 100).toFixed(3)}%</td>
-        <td>${isNaN(b.fedPrice) ? '—' : b.fedPrice.toFixed(3)} / ${isNaN(b.fidPrice) ? '—' : b.fidPrice.toFixed(3)}</td>
-        ${curveCols.map(c => `<td>${c.key === 'ask' ? `${fmtYld(b.fedYield)} / ${fmtYld(b.fidYield)}` : '—'}</td>`).join('')}
+        <td>${isNaN(b.fedPrice) ? '—' : b.fedPrice.toFixed(3)} / ${isNaN(b.mqPrice) ? '—' : b.mqPrice.toFixed(3)}</td>
+        ${curveCols.map(c => `<td>${c.key === 'ask' ? `${fmtYld(b.fedYield)} / ${fmtYld(b.mqYield)}` : '—'}</td>`).join('')}
       </tr>`).join('');
   } else {
-    const bonds = fedBonds || fidBonds;
+    const bonds = fedBonds || mqBonds;
     theadRow.innerHTML = `
       <th data-sort="maturity"${sortCls('maturity')}>Maturity</th>
       <th data-sort="cusip"${sortCls('cusip')}>CUSIP</th>
@@ -790,7 +788,7 @@ function renderNominalsTable(fedBonds, fidBonds, fedSpotBonds, fidSpotBonds, sta
 
   // Spot curve rows — the fitted zero-coupon Treasury curve (same fit the chart draws),
   // appended after the security rows since a curve point has a Term but no CUSIP to sort by.
-  // The fit itself always uses the full fedSpotBonds/fidSpotBonds (never range-restricted —
+  // The fit itself always uses the full fedSpotBonds/mqSpotBonds (never range-restricted —
   // Spot is independent of the Maturity Range the same way it is independent of the security
   // type checkboxes); the Range only crops which resulting terms are listed here, the same
   // way it crops the other security types' own rows.
@@ -807,7 +805,7 @@ function renderNominalsTable(fedBonds, fidBonds, fedSpotBonds, fidSpotBonds, sta
       }
     };
     addCurve(fedSpotBonds, 'fed');
-    addCurve(fidSpotBonds, 'mkt');
+    addCurve(mqSpotBonds, 'mkt');
     const fmt = v => v != null ? v.toFixed(3) + '%' : '—';
     tbody.innerHTML += [...curveByTerm.values()].sort((a, b) => a.term - b.term).map(({ term, fed, mkt }) => {
       const cells = curveCols.map((c, i) => i === spotColIdx
@@ -818,19 +816,19 @@ function renderNominalsTable(fedBonds, fidBonds, fedSpotBonds, fidSpotBonds, sta
   }
 }
 
-function renderNominalsChart(fedBonds, fidBonds, fedSpotBonds, fidSpotBonds) {
+function renderNominalsChart(fedBonds, mqBonds, fedSpotBonds, mqSpotBonds) {
   const ctx = document.getElementById('yieldChart').getContext('2d');
-  const allBonds = [...(fedBonds || []), ...(fidBonds || [])];
-  const haveSpotInput = (fedSpotBonds && fedSpotBonds.length) || (fidSpotBonds && fidSpotBonds.length);
+  const allBonds = [...(fedBonds || []), ...(mqBonds || [])];
+  const haveSpotInput = (fedSpotBonds && fedSpotBonds.length) || (mqSpotBonds && mqSpotBonds.length);
   if (allBonds.length === 0 && !haveSpotInput) { if (chart) { chart.destroy(); chart = null; } return; }
 
   const now = Date.now();
   const toPoint = xAxisMode === 'ttm'
     ? b => ({ x: (b.maturityDate.getTime() - now) / (7 * 86400000), y: parseFloat((b.yield * 100).toFixed(3)) })
     : b => ({ x: b.maturityDate.getTime(), y: parseFloat((b.yield * 100).toFixed(3)) });
-  const bothShown = fedBonds && fidBonds;
+  const bothShown = fedBonds && mqBonds;
 
-  // FedInvest: cool blues/purple (dotted) — Fidelity: warm orange/red/teal (solid)
+  // FedInvest: cool blues/purple (dotted) — Market: warm orange/red/teal (solid)
   const seriesDef = [];
   if (fedBonds) {
     const sfx = bothShown ? ' (FedInvest)' : '';
@@ -842,14 +840,14 @@ function renderNominalsChart(fedBonds, fidBonds, fedSpotBonds, fidSpotBonds) {
       { label: `Unclassified${sfx}`, data: fedBonds.filter(b => b.type === 'MARKET BASED UNCLASSIFIED').map(toPoint), color: '#b45309', r: 1, w: 2.2, dash: [4, 4] }
     );
   }
-  if (fidBonds) {
+  if (mqBonds) {
     const sfx = bothShown ? ' (Market)' : '';
     seriesDef.push(
-      { label: `Bills${sfx}`,  data: fidBonds.filter(b => b.type === 'MARKET BASED BILL' && !isStrip(b.cusip)).map(toPoint), color: '#f97316', r: 1, w: 1.5, dash: [] },
-      { label: `Notes${sfx}`,  data: fidBonds.filter(b => b.type === 'MARKET BASED NOTE' && !isStrip(b.cusip)).map(toPoint), color: '#dc2626', r: 1, w: 2.5, dash: [] },
-      { label: `Bonds${sfx}`,  data: fidBonds.filter(b => b.type === 'MARKET BASED BOND' && !isStrip(b.cusip)).map(toPoint), color: '#059669', r: 1, w: 2.5, dash: [] },
-      { label: `STRIPS${sfx}`, data: fidBonds.filter(b => isStrip(b.cusip)).map(toPoint), color: '#78350f', r: 1, w: 2.2, dash: [] },
-      { label: `Unclassified${sfx}`, data: fidBonds.filter(b => b.type === 'MARKET BASED UNCLASSIFIED').map(toPoint), color: '#eab308', r: 1, w: 2.2, dash: [] }
+      { label: `Bills${sfx}`,  data: mqBonds.filter(b => b.type === 'MARKET BASED BILL' && !isStrip(b.cusip)).map(toPoint), color: '#f97316', r: 1, w: 1.5, dash: [] },
+      { label: `Notes${sfx}`,  data: mqBonds.filter(b => b.type === 'MARKET BASED NOTE' && !isStrip(b.cusip)).map(toPoint), color: '#dc2626', r: 1, w: 2.5, dash: [] },
+      { label: `Bonds${sfx}`,  data: mqBonds.filter(b => b.type === 'MARKET BASED BOND' && !isStrip(b.cusip)).map(toPoint), color: '#059669', r: 1, w: 2.5, dash: [] },
+      { label: `STRIPS${sfx}`, data: mqBonds.filter(b => isStrip(b.cusip)).map(toPoint), color: '#78350f', r: 1, w: 2.2, dash: [] },
+      { label: `Unclassified${sfx}`, data: mqBonds.filter(b => b.type === 'MARKET BASED UNCLASSIFIED').map(toPoint), color: '#eab308', r: 1, w: 2.2, dash: [] }
     );
   }
 
@@ -861,10 +859,10 @@ function renderNominalsChart(fedBonds, fidBonds, fedSpotBonds, fidSpotBonds) {
   // Its own colour, distinct from the per-bond lines.
   const yToX = yearsToX(now);
   if (document.getElementById('showTsySpot').checked) {
-    const bothSpot = fedSpotBonds && fedSpotBonds.length && fidSpotBonds && fidSpotBonds.length;
+    const bothSpot = fedSpotBonds && fedSpotBonds.length && mqSpotBonds && mqSpotBonds.length;
     const nomCurveSrc = [];
     if (fedSpotBonds && fedSpotBonds.length) nomCurveSrc.push({ bonds: fedSpotBonds, sfx: bothSpot ? ' (FedInvest)' : '', color: '#0f172a' });
-    if (fidSpotBonds && fidSpotBonds.length) nomCurveSrc.push({ bonds: fidSpotBonds, sfx: bothSpot ? ' (Market)' : '',    color: '#b45309' });
+    if (mqSpotBonds && mqSpotBonds.length) nomCurveSrc.push({ bonds: mqSpotBonds, sfx: bothSpot ? ' (Market)' : '',    color: '#b45309' });
     for (const { bonds, sfx, color } of nomCurveSrc) {
       const grid = spotCurveGrid(bonds, { ...TREASURIES_SPOT_FIT, yToX });
       if (grid) seriesDef.push({ label: `Spot${sfx}`, data: grid, color, w: 2.5, dash: [], curve: true, r: 0, markerR: 2 });
@@ -1515,7 +1513,7 @@ function rescaleToVisible(chart) {
 function processAndRenderBei() {
   const statusEl = document.getElementById('status');
 
-  if (!brokerPrices || !fidelityNominalsData) {
+  if (!brokerPrices || !marketNominalsData) {
     statusEl.textContent = 'BEI requires market-quote TIPS and nominal data.';
     statusEl.className = '';
     if (chart) { chart.destroy(); chart = null; }
@@ -1529,7 +1527,7 @@ function processAndRenderBei() {
     const smoothed = calculateSAO(tips);
     tips.forEach((b, i) => { b.saoYield = smoothed[i]; });
 
-    const nominalCandidates = fidelityNominalsData.filter(b => b.type !== 'MARKET BASED STRIPS' && b.type !== 'MARKET BASED UNCLASSIFIED');
+    const nominalCandidates = marketNominalsData.filter(b => b.type !== 'MARKET BASED STRIPS' && b.type !== 'MARKET BASED UNCLASSIFIED');
     if (nominalCandidates.length === 0) {
       statusEl.textContent = 'No market nominal data available for BEI.';
       if (chart) { chart.destroy(); chart = null; }
@@ -1552,7 +1550,7 @@ function processAndRenderBei() {
     // curve the TIPS tab draws, at every Term where both exist -- a true same-horizon
     // breakeven at every point, unlike the per-bond closest-maturity match above.
     const yToX = yearsToX(Date.now());
-    const nomFit = spotCurveFit(treasuriesSpotSet(fidelityNominalsData), TREASURIES_SPOT_FIT);
+    const nomFit = spotCurveFit(treasuriesSpotSet(marketNominalsData), TREASURIES_SPOT_FIT);
     const saFit = spotCurveFit(tips, TIPS_SA_SPOT_FIT);
     const spotBei = spotBreakevenAcrossTerms(nomFit, saFit);
     const spotBeiGrid = spotBei && spotBei.map(({ t, bei }) => ({ x: yToX(t), y: parseFloat(bei.toFixed(3)) }));
@@ -1721,7 +1719,7 @@ function renderBeiTable(bonds) {
 
 function updateModeToggle() {
   const isBei = activeTab === 'bei';
-  const hasMarket = activeTab === 'tips' ? !!brokerPrices : !!fidelityNominalsData;
+  const hasMarket = activeTab === 'tips' ? !!brokerPrices : !!marketNominalsData;
   const spreadBtn = document.querySelector('#chart-mode-tabs .tab-btn[data-mode="spread"]');
   if (!spreadBtn) return;
   // BEI has no bid/ask-spread concept — always disabled there, regardless of Market data.
@@ -2235,13 +2233,13 @@ function preserveZoom() {
 // corresponding checkbox (only if that counterpart's data has loaded).
 const CHECKBOX_MIRROR = {
   chkTipsFed: 'chkFedInvest', chkFedInvest: 'chkTipsFed',
-  chkTipsBroker: 'chkFidelity', chkFidelity: 'chkTipsBroker',
+  chkTipsBroker: 'chkMarket', chkMarket: 'chkTipsBroker',
 };
 function mirrorCheckbox(id) {
   const counterpart = document.getElementById(CHECKBOX_MIRROR[id]);
   if (!counterpart.disabled) counterpart.checked = document.getElementById(id).checked;
 }
-['chkTipsFed', 'chkTipsBroker', 'chkFedInvest', 'chkFidelity'].forEach(id => {
+['chkTipsFed', 'chkTipsBroker', 'chkFedInvest', 'chkMarket'].forEach(id => {
   document.getElementById(id).addEventListener('change', () => {
     mirrorCheckbox(id);
     preserveZoom();
@@ -2351,10 +2349,10 @@ function recomputeRangeFromChecked() {
   const typeMatches = r => nominalsTypeFilters.has(r.type) || (nominalsShowStrips && isStrip(r.cusip)) || (nominalsShowUnclassified && r.type === 'MARKET BASED UNCLASSIFIED');
   const candidates = [];
   if (rawNominalsData) candidates.push(...rawNominalsData.filter(typeMatches));
-  if (fidelityNominalsData) candidates.push(...fidelityNominalsData.filter(typeMatches));
+  if (marketNominalsData) candidates.push(...marketNominalsData.filter(typeMatches));
   if (document.getElementById('showTsySpot').checked) {
     if (rawNominalsData) candidates.push(...rawNominalsData.filter(r => !isStrip(r.cusip) && r.type !== 'MARKET BASED UNCLASSIFIED'));
-    if (fidelityNominalsData) candidates.push(...fidelityNominalsData.filter(r => !isStrip(r.cusip) && r.type !== 'MARKET BASED STRIPS' && r.type !== 'MARKET BASED UNCLASSIFIED'));
+    if (marketNominalsData) candidates.push(...marketNominalsData.filter(r => !isStrip(r.cusip) && r.type !== 'MARKET BASED STRIPS' && r.type !== 'MARKET BASED UNCLASSIFIED'));
   }
   if (candidates.length === 0) { startEl.value = ''; endEl.value = ''; return; }
   const minB = candidates.reduce((a, b) => a.maturityDate <= b.maturityDate ? a : b);

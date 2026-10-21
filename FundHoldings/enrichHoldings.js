@@ -3,13 +3,15 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { calculateDuration, termYears, calcMktWtdAvg } from "../shared/src/bond-math.js";
 import { parseCsv } from "../shared/src/csv.js";
+import { parseTreasuryQuotes } from "../shared/src/market-quotes.js";
+import { toIsoDate } from "../shared/src/settlement.js";
 import { upload } from "../shared/upload.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.join(__dirname, "data");
 
 const YIELDS_SA_SAO_URL = "https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/TIPS/YieldsSaSao.csv";
-const FIDELITY_URL = "https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/FidelityTreasuriesTips.csv";
+const MARKET_QUOTES_URL = "https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/MarketQuotes.csv";
 
 async function fetchCsv(url) {
   const res = await fetch(url);
@@ -22,16 +24,23 @@ function parseDate(isoDate) {
   return new Date(y, m - 1, d);
 }
 
-async function loadYieldSources() {
-  const [tipsRows, fidRows] = await Promise.all([
+async function fetchText(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Failed to fetch ${url}: HTTP ${res.status}`);
+  return res.text();
+}
+
+async function loadYieldSources(settle) {
+  const [tipsRows, quotesText] = await Promise.all([
     fetchCsv(YIELDS_SA_SAO_URL),
-    fetchCsv(FIDELITY_URL)
+    fetchText(MARKET_QUOTES_URL)
   ]);
 
   const tipsByCusip = new Map(tipsRows.map(r => [r.cusip, r]));
-  // FIDELITY_URL is a combined file (Treasury + TIPS rows); nominals are the non-TIPS rows.
+  // MARKET_QUOTES_URL is a combined file (Treasury + TIPS rows); nominals are the non-TIPS rows,
+  // each with its ask yield calculated from its ask price at the settlement date.
   const nominalByCusip = new Map(
-    fidRows.filter(r => (r.Product || "").toLowerCase() !== "tips").map(r => [r.Cusip, r])
+    parseTreasuryQuotes(quotesText, { settleIso: toIsoDate(settle) }).map(b => [b.cusip, b])
   );
   return { tipsByCusip, nominalByCusip };
 }
@@ -80,8 +89,8 @@ function enrichRow(row, settle, { tipsByCusip, nominalByCusip }) {
     enriched["SA Yield"] = Number(tips.sa_yield);
     enriched["SAO Yield"] = Number(tips.sao_yield);
   } else if (nominal) {
-    askYield = Number(nominal["Ask yield to maturity"]) / 100;
-    coupon = Number(nominal.Coupon) / 100;
+    askYield = nominal.yield;
+    coupon = nominal.coupon;
     enriched["Ask Yield"] = askYield;
   }
 
@@ -174,9 +183,9 @@ function buildFundCsv(ticker, enriched, meta) {
 export async function enrichHoldingsFile(ticker) {
   const filename = path.join(DATA_DIR, `${ticker}-Raw.csv`);
   const rows = parseCsv(fs.readFileSync(filename, "utf8"));
-  const sources = await loadYieldSources();
   const settle = new Date();
   settle.setHours(0, 0, 0, 0);
+  const sources = await loadYieldSources(settle);
 
   const enriched = rows.map(r => enrichRow(r, settle, sources));
   const meta = JSON.parse(fs.readFileSync(path.join(DATA_DIR, "FundMeta.json"), "utf8"))[ticker] ?? {};

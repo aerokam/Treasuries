@@ -5,14 +5,14 @@
 // pick a source, which is the one thing it cannot get right by construction. Installing this shim
 // and calling loadMarketData() gives a test exactly the rows, dates, and source the app gets.
 
-// The Fidelity download date drives the settlement date, so it is rewritten to today: fixtures
-// carry a fixed historical footer, and tests assert against a settlement date derived from now
-// (so excluded-bond behavior matches reality). Same rewrite the E2E suite performs.
-export function fidelityWithTodayDownloadDate(raw) {
+// The Download Date drives the settlement date, so it is rewritten to today: fixtures carry a
+// fixed historical first line, and tests assert against a settlement date derived from now (so
+// excluded-bond behavior matches reality). Same rewrite the E2E suite performs.
+export function marketQuotesWithTodayDownloadDate(raw) {
   const now = new Date();
   const mo = String(now.getMonth() + 1).padStart(2, '0');
   const dy = String(now.getDate()).padStart(2, '0');
-  return raw.replace(/Date downloaded.*$/m, `Date downloaded   ${mo}/${dy}/${now.getFullYear()} 12:00 PM`);
+  return raw.replace(/^[^\n]*/, `${now.getFullYear()}-${mo}-${dy} 12:00`);
 }
 
 // FedInvest's fixture carries its own settlement date on line 1; keep it in step with today too,
@@ -27,7 +27,7 @@ export function fedInvestWithTodaySettlement(raw, settleDateStr) {
 // mirrored in this repo: the quote files, SA yields, Ref CPI, TIPS reference data and holiday calendar
 // are kept current by the pipeline and the monthly jobs, and a committed copy only ever ages.
 // Two values are rewritten on top of the live files, since a test run is not a download day: the
-// Fidelity download date becomes today (it drives settlement), and FedInvest's first line is the
+// Download Date becomes today (it drives settlement), and FedInvest's first line is the
 // settlement date the caller passes.
 export function installFixtureFetch({ settleDateStr } = {}) {
   const realFetch = globalThis.fetch;
@@ -36,7 +36,7 @@ export function installFixtureFetch({ settleDateStr } = {}) {
     const res = await realFetch(url, { cache: 'no-cache' });
     if (!res.ok) return res;
     let body = await res.text();
-    if (name === 'FidelityTreasuriesTips.csv') body = fidelityWithTodayDownloadDate(body);
+    if (name === 'MarketQuotes.csv') body = marketQuotesWithTodayDownloadDate(body);
     if (name === 'YieldsFromFedInvestPrices.csv' && settleDateStr) body = fedInvestWithTodaySettlement(body, settleDateStr);
     return { ok: true, status: 200, async text() { return body; } };
   };

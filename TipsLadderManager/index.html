@@ -865,7 +865,7 @@ let tipsMarketData = null, refCpiRows = null, settlementDate = null, tipsRefMap 
 let _tradeDateStr = null, _settleDateStr = null; // Trade = "today" (asOfDate); Settle = T+1 (or T for dormant FedInvest)
 let _bondHolidays = null;
 
-// Market (Fidelity) ask prices/yields are the only source surfaced to users. FedInvest
+// Market quotes ask prices/yields are the only source surfaced to users. FedInvest
 // stays available as a dormant cross-check path (matches tipsladder.com) via
 // Which source the app prices from is decided once, inside data.js's loadMarketData()
 // (3.1_Data_Pipeline.md §4.0). No UI control exposes the choice, and nothing here makes it.
