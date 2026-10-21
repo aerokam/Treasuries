@@ -158,12 +158,18 @@ Register-CmdTask "YieldsFromFedInvestPrices" `
 
 # TreasuryAuctions  -  11:35am ET [PT: 8:35am] and 1:05pm ET [PT: 10:05am]
 # Treasury auction close times are 11:30am ET and 1:00pm ET; run 5 min after each.
+# TreasuryDirect states an auction's results 3.1 to 15.5 min after the close (E15 in the
+# Data Dictionary), so each trigger repeats every 10 min for 25 min: runs at 5, 15 and 25 min.
+$auctionTriggers = foreach ($at in "8:35am", "10:05am") {
+    $t = New-ScheduledTaskTrigger -Weekly -DaysOfWeek $Weekdays -At $at
+    $t.Repetition = (New-ScheduledTaskTrigger -Once -At $at `
+        -RepetitionInterval (New-TimeSpan -Minutes 10) `
+        -RepetitionDuration (New-TimeSpan -Minutes 25)).Repetition
+    $t
+}
 Register-NodeTask "TreasuryAuctions" `
-    "Fetch Treasury auction results from FiscalData, upload Auctions.csv" `
-    @(
-        (New-ScheduledTaskTrigger -Weekly -DaysOfWeek $Weekdays -At "8:35am"),
-        (New-ScheduledTaskTrigger -Weekly -DaysOfWeek $Weekdays -At "10:05am")
-    ) `
+    "Fetch Treasury auction results from FiscalData and TreasuryDirect, upload Auctions.csv" `
+    $auctionTriggers `
     "scripts/getAuctions.js"
 
 # TipsRef  -  Weekdays 8:35am and 10:05am PT (same cadence as TreasuryAuctions,
