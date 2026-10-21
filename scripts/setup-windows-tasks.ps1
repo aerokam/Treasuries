@@ -273,6 +273,16 @@ Register-CmdTask "MarketQuotesCatchup" `
     "$ProjectDir\YieldCurves\scripts\run-market-quotes-catchup.cmd" `
     -LogonType Interactive
 
+# LocalBackup  -  every 5 minutes from registration
+# Copies the files .gitignore lists under "Local-only" into the private sibling repository
+# Treasuries-local and pushes when any changed (scripts/syncLocalBackup.js). .env is never
+# copied. Interactive, so it needs no elevation and runs while the user is logged on.
+Register-DataTask "LocalBackup" `
+    "Back up the gitignored local files to the private Treasuries-local repository" `
+    @(New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 5) -RepetitionDuration (New-TimeSpan -Days 9999)) `
+    $NodeExe "scripts/syncLocalBackup.js" `
+    -LogonType Interactive
+
 # Yield Curves fit (S13/S14/S15) is NOT independently scheduled — it has no standalone
 # trigger. It runs chained from inside run-market-quotes.cmd (called by MarketQuotes, above)
 # and inside run-fedinvest.cmd (called by YieldsFromFedInvestPrices, above), each on
