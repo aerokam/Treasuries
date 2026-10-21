@@ -667,7 +667,7 @@ function level2Ingestion() {
     { name: ['FiscalData'], href: DD + 'e3', jobs: ['1.4', '1.6'] },
     { name: ['BLS'], href: DD + 'e4', jobs: ['1.9', '1.12'] },
     { name: ['CNBC'], href: DD + 'e5', jobs: ['1.7', '1.8'] },
-    { name: ['Fidelity', 'Fixed Income'], href: DD + 'e6', jobs: ['1.2'] },
+    { name: ['Market quotes', 'source'], href: DD + 'e6', jobs: ['1.2'] },
     { name: ['Fund providers', '(E7-E12)'], href: DD + 'fund-holdings', jobs: ['1.14'] },
     { name: ['Federal Reserve', 'FEDS 2008-05'], href: DD + 'e13', jobs: ['1.15'] },
     { name: ['Treasury Tentative', 'Auction Schedule'], href: DD + 'e14', jobs: ['1.5'] },
@@ -1016,7 +1016,7 @@ function level3TipsLadderManagerLoadMarketData() {
   const modules = [
     { id: 'm2', name: ['settlement.js'], href: M('m2') },
     { id: 'm3', name: ['bond-math.js'], href: M('m3') },
-    { id: 'm4', name: ['fidelity-', 'parse.js'], href: M('m4') },
+    { id: 'm4', name: ['market-', 'quotes.js'], href: M('m4') },
     { id: 'm1', name: ['csv.js'], href: M('m1') },
   ];
   const S = a => V('TipsLadderManager/knowledge/4.1_Load_Market_Data.md' + (a ? '#' + a : ''));

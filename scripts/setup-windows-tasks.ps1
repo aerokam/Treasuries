@@ -130,8 +130,6 @@ $legacy = @(
     'RefCPI', 'RefCpiRefresh',
     # CPI History variants
     'FetchCpiHistory', 'CpiHistoryRefresh',
-    # Fidelity variants
-    'FidelityDownload-Morning', 'FidelityDownload-Midday', 'FidelityDownload-Close',
     # CpiTasks variants
     'RefreshCpiTasks', 'Update CPI release schedule'
 )
@@ -238,48 +236,48 @@ Register-NodeTask "GswTipsCurve" `
     @(New-ScheduledTaskTrigger -Daily -At "7:15am") `
     "YieldCurves/scripts/updateGswTipsCurve.js"
 
-# FidelityQuotes  -  8:05am ET [PT: 5:05am]
+# MarketQuotes  -  8:05am ET [PT: 5:05am]
 # Runs before market open, when the user is often not logged on yet — S4U so it runs
 # regardless. No visible window: if the automated MFA path (SMS code read from Phone
 # Link) needs a manual step nobody's there to do, it fails and dumps state to
-# logs/mfa-debug/; FidelityQuotesCatchup below is the visible retry.
-Register-CmdTask "FidelityQuotes" `
-    "Download Fidelity broker quotes (TIPS + Treasuries) before market open, upload FidelityTips.csv + FidelityTreasuries.csv" `
+# logs/mfa-debug/; MarketQuotesCatchup below is the visible retry.
+Register-CmdTask "MarketQuotes" `
+    "Download broker quotes (TIPS + Treasuries) before market open, upload MarketQuotes.csv" `
     @(New-ScheduledTaskTrigger -Weekly -DaysOfWeek $Weekdays -At "5:05am") `
-    "$ProjectDir\YieldCurves\scripts\run-fidelity.cmd"
+    "$ProjectDir\YieldCurves\scripts\run-market-quotes.cmd"
 
-# FidelityQuotesDaytime  -  12:35pm ET [PT: 9:35am], 5:05pm ET [PT: 2:05pm]
+# MarketQuotesDaytime  -  12:35pm ET [PT: 9:35am], 5:05pm ET [PT: 2:05pm]
 # Runs during hours the user is normally at the desk — Interactive so the Chrome window
 # is visible on their desktop, giving them something to act on if the automated MFA
 # path (SMS code read from Phone Link) falls through to the manual-wait fallback.
-Register-CmdTask "FidelityQuotesDaytime" `
-    "Download Fidelity broker quotes (TIPS + Treasuries) midday and at close, upload FidelityTips.csv + FidelityTreasuries.csv; runs visibly so a manual MFA step can be completed" `
+Register-CmdTask "MarketQuotesDaytime" `
+    "Download broker quotes (TIPS + Treasuries) midday and at close, upload MarketQuotes.csv; runs visibly so a manual MFA step can be completed" `
     @(
         (New-ScheduledTaskTrigger -Weekly -DaysOfWeek $Weekdays -At "9:35am"),
         (New-ScheduledTaskTrigger -Weekly -DaysOfWeek $Weekdays -At "2:05pm")
     ) `
-    "$ProjectDir\YieldCurves\scripts\run-fidelity.cmd" `
+    "$ProjectDir\YieldCurves\scripts\run-market-quotes.cmd" `
     -LogonType Interactive
 
-# FidelityQuotesCatchup  -  2 min after logon
-# Safety net for FidelityQuotes (the invisible 5:05am run): if it was missed or failed
+# MarketQuotesCatchup  -  2 min after logon
+# Safety net for MarketQuotes (the invisible 5:05am run): if it was missed or failed
 # today (PC off, or a manual MFA step nobody was there to complete), this runs the
 # download once as soon as the user logs back on. No-ops when today's data is already
-# on R2 (see fidelityCatchupIfStale.js). Interactive so the just-opened desktop session
+# on R2 (see marketQuotesCatchupIfStale.js). Interactive so the just-opened desktop session
 # makes the window visible, giving the user a real shot at a manual MFA step.
 $catchupTrigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
 $catchupTrigger.Delay = 'PT2M'
-Register-CmdTask "FidelityQuotesCatchup" `
-    "Logon safety net: run the Fidelity download once if today's data is still missing from R2; runs visibly so a manual MFA step can be completed" `
+Register-CmdTask "MarketQuotesCatchup" `
+    "Logon safety net: run the broker quotes download once if today's data is still missing from R2; runs visibly so a manual MFA step can be completed" `
     @($catchupTrigger) `
-    "$ProjectDir\YieldCurves\scripts\run-fidelity-catchup.cmd" `
+    "$ProjectDir\YieldCurves\scripts\run-market-quotes-catchup.cmd" `
     -LogonType Interactive
 
 # Yield Curves fit (S13/S14/S15) is NOT independently scheduled — it has no standalone
-# trigger. It runs chained from inside run-fidelity.cmd (called by FidelityQuotes, above)
+# trigger. It runs chained from inside run-market-quotes.cmd (called by MarketQuotes, above)
 # and inside run-fedinvest.cmd (called by YieldsFromFedInvestPrices, above), each on
 # success only, via YieldCurves/scripts/run-yield-curves.cmd. Both are its actual inputs
-# (FidelityTreasuriesTips.csv and YieldsFromFedInvestPrices.csv), so it re-fits whenever
+# (MarketQuotes.csv and YieldsFromFedInvestPrices.csv), so it re-fits whenever
 # either one actually changed rather than on its own fixed clock.
 
 # LockProbe  -  Weekdays 11:00am PT [ET: 2:00pm], hourly for 18h (through overnight).

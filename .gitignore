@@ -47,3 +47,15 @@ research/*/data/
 
 
 TipsLadderManager/tests/_sim_run.js
+
+# Local-only: acquisition of Market quotes (S7). Never committed; see knowledge/Data_Pipeline_Local.md
+YieldCurves/scripts/marketQuotesDownload.js
+YieldCurves/scripts/marketQuotesFromExport.js
+YieldCurves/scripts/marketQuotesCatchupIfStale.js
+YieldCurves/scripts/uploadMarketQuotes.js
+YieldCurves/scripts/readPhoneLinkOtp.ps1
+YieldCurves/scripts/run-market-quotes.cmd
+YieldCurves/scripts/run-market-quotes-catchup.cmd
+YieldCurves/tests/fixtures/local/
+shared/tests/local/
+knowledge/Data_Pipeline_Local.md

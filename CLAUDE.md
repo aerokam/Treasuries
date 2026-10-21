@@ -241,9 +241,9 @@ npx serve .               # Serve locally (run from root of Treasuries repo)
 
 ### Data Infrastructure (R2)
 
-R2 file manifest, update schedule, and ownership are specified in the repo-root `knowledge/Data_Pipeline.md` and `knowledge/DATA_DICTIONARY.md` §2.0 (covers `Treasuries/YieldsFromFedInvestPrices.csv`, `Treasuries/FidelityTreasuriesTips.csv`, `TIPS/RefCpiNsaSa.csv`, `TIPS/YieldsSaSao.csv`, `misc/BondHolidaysSifma.csv`). Do not restate here.
+R2 file manifest, update schedule, and ownership are specified in the repo-root `knowledge/Data_Pipeline.md` and `knowledge/DATA_DICTIONARY.md` §2.0 (covers `Treasuries/YieldsFromFedInvestPrices.csv`, `Treasuries/MarketQuotes.csv`, `TIPS/RefCpiNsaSa.csv`, `TIPS/YieldsSaSao.csv`, `misc/BondHolidaysSifma.csv`). Do not restate here.
 
-### Fidelity Download Flow
+### Market Quotes Download Flow
 
 Specified in the repo-root `knowledge/Data_Pipeline_Local.md` (gitignored — do not reference publicly per that file's own note).
 

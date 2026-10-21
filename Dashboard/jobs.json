@@ -1,11 +1,11 @@
 [
   {
-    "id": "fidelity-download",
-    "label": "Fidelity Download",
-    "cmd": "YieldCurves\\scripts\\run-fidelity.cmd",
+    "id": "quotes-download",
+    "label": "Market Quotes Download",
+    "cmd": "YieldCurves\\scripts\\run-market-quotes.cmd",
     "cwd": ".",
     "apps": ["yieldcurves"],
-    "windowsTaskNames": ["FidelityQuotes"]
+    "windowsTaskNames": ["MarketQuotes"]
   },
   {
     "id": "fedinvest-download",
@@ -15,9 +15,9 @@
     "apps": ["yieldcurves"]
   },
   {
-    "id": "upload-fidelity",
-    "label": "Upload Fidelity to R2",
-    "cmd": "node YieldCurves/scripts/uploadFidelityDownload.js",
+    "id": "upload-quotes",
+    "label": "Upload Market Quotes to R2",
+    "cmd": "node YieldCurves/scripts/uploadMarketQuotes.js",
     "cwd": ".",
     "apps": ["yieldcurves"]
   },
