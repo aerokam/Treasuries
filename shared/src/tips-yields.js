@@ -17,7 +17,7 @@ import { localDate } from './settlement.js';
 
 // tipsRows        S1's TIPS rows, each carrying cusip, coupon, maturity, price and the
 //                 settlementDate of the file it came from
-// quotesByCusip   S7's TIPS quotes by CUSIP (the rows of fidelity-parse.js#parseFidelityTipsRows),
+// quotesByCusip   S7's TIPS quotes by CUSIP (the rows of market-quotes.js#parseTipsQuotes),
 //                 or null when the quoted source is not shown
 // isBroker        true to price each security from its market quote, false to price it from S1
 // marketSettleIso the settlement date the market quotes are stated at, 'YYYY-MM-DD', from
@@ -26,7 +26,7 @@ import { localDate } from './settlement.js';
 //
 // A security is dropped when it has no price on the side being priced, no settlement date, or an
 // ask yield that cannot be calculated -- the same rule
-// fidelity-parse.js#parseFidelityNominalRows applies to a nominal Treasury row. A market quote
+// market-quotes.js#parseTreasuryQuotes applies to a nominal Treasury row. A market quote
 // with no bid price, or whose bid yield cannot be calculated, keeps its ask yield and has a bid
 // yield of NaN. The adjusted ask and bid prices of a market quote pass through as quoted; for a
 // FedInvest row they are NaN.

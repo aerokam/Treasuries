@@ -8,13 +8,13 @@
 // (fetchCpiHistory, fetchRefCpi) -- two data.js files, one of them shared, invites exactly the
 // wrong-file mistake this move is meant to prevent.
 //
-// Exports: parseCsv, fetchTipsData, fetchFidelityTipsData, loadMarketData, nextBondTradingDay,
+// Exports: parseCsv, fetchTipsData, fetchMarketQuotesData, loadMarketData, nextBondTradingDay,
 // lookupRefCpi (re-exported from shared/src/ref-cpi.js)
 
 // Ref CPI lookup is defined once in shared/src/ref-cpi.js (no-redundancy directive,
 // projects/CLAUDE.md §2a). Re-exported here so existing `from './market-data.js'` imports resolve.
 export { lookupRefCpi } from './ref-cpi.js';
-import { parseFidelityTipsRows, parseFidelityDownloadDate, fidelityDownloadDateIso } from './fidelity-parse.js';
+import { parseTipsQuotes, parseDownloadDate, downloadDateIso } from './market-quotes.js';
 import { yieldFromPrice } from './bond-math.js';
 import { localDate, toIsoDate, nextBusinessDay, parseHolidaySet } from './settlement.js';
 import { parseCsv as parseCsvRows } from './csv.js';
@@ -56,7 +56,7 @@ export function parseTipsRefRows(text) {
 }
 
 // Fetches RefCPI.csv, TipsRef.csv, YieldsSaSao.csv, and BondHolidaysSifma.csv from R2 --
-// shared by both fetchTipsData() (FedInvest) and fetchFidelityTipsData() (Fidelity) so the
+// shared by both fetchTipsData() (FedInvest) and fetchMarketQuotesData() (Market quotes) so the
 // parsing isn't duplicated between the two sources (projects/CLAUDE.md §2a).
 // Throws on HTTP errors for RefCPI/TipsRef/YieldsSaSao; holidays are optional (3s timeout).
 async function fetchAuxTipsData() {
@@ -127,16 +127,15 @@ export async function fetchTipsData() {
   return { yieldsRows, refCpiRows, tipsRefRows, saSaoRows, bondHolidays };
 }
 
-// Fetches FidelityTreasuriesTips.csv from R2 (ask price; yield is computed from that price
-// via the shared yieldFromPrice(), not read from Fidelity's own quoted yield column -- verified
-// more accurate than Fidelity's own figure, see 3.1_Data_Pipeline.md). datedDateRefCpi comes from
-// TipsRef.csv (Fidelity's export doesn't carry it). Settlement is T+1 from Fidelity's download
-// date (real broker trade settlement), unlike FedInvest's T=0 (1.1_Download_FedInvest_Prices.md
+// Fetches MarketQuotes.csv from R2 (ask price; yield is computed from that price via the shared
+// yieldFromPrice(), see 3.1_Data_Pipeline.md). datedDateRefCpi comes from TipsRef.csv (Market
+// quotes does not carry it). Settlement is T+1 from the Download Date (real broker trade
+// settlement), unlike FedInvest's T=0 (1.1_Download_FedInvest_Prices.md
 // #determine-settlement-date) -- see 3.1_Data_Pipeline.md "Settlement Date Conventions".
 // Returns the same shape as fetchTipsData(): { yieldsRows, refCpiRows, tipsRefRows, bondHolidays }
 // Throws on HTTP errors.
 //
-// Returns both `asOfDate` (the raw Fidelity download date -- "today", analogous to
+// Returns both `asOfDate` (the Download Date -- "today", analogous to
 // FedInvest's own settlementDate row) and each yieldsRow's `settlementDate` (asOfDate's
 // T+1, used for the yield/duration math). Callers deriving a "next trading day from
 // today" default (e.g. the Trade Ticket's Ref CPI date) must use `asOfDate`, not
@@ -145,7 +144,7 @@ export async function fetchTipsData() {
 // FedInvest is dormant, kept as a cross-check path; flip this to 'fedinvest' to use it.
 // Nothing outside this module chooses a source: every caller goes through loadMarketData(), so a
 // script cannot silently price off the dormant source while the app prices off the live one.
-const YIELD_SOURCE = 'fidelity';
+const YIELD_SOURCE = 'market';
 
 // The one entry point for market data. Returns the raw rows plus the dates whose derivation is
 // source-dependent, so no caller has to know -- or can get wrong -- which source is active.
@@ -153,11 +152,11 @@ const YIELD_SOURCE = 'fidelity';
 // rebalance-lib.js): this module is a leaf and does not import an orchestrator
 // (TipsLadderManager knowledge/4.0_Computation_Modules.md §Module Dependency Graph).
 export async function loadMarketData() {
-  const d = YIELD_SOURCE === 'fedinvest' ? await fetchTipsData() : await fetchFidelityTipsData();
+  const d = YIELD_SOURCE === 'fedinvest' ? await fetchTipsData() : await fetchMarketQuotesData();
   const { yieldsRows, refCpiRows, tipsRefRows, saSaoRows, bondHolidays, asOfDate } = d;
   const settleDateStr = yieldsRows[0]?.settlementDate;
   if (!settleDateStr) throw new Error('No market data returned for source: ' + YIELD_SOURCE);
-  // FedInvest's settleDateStr IS "today" (T), so trade === settle there; Fidelity's is already
+  // FedInvest's settleDateStr IS "today" (T), so trade === settle there; Market quotes' is already
   // T+1, so its "today"/trade reference is the download date.
   const tradeDateStr = YIELD_SOURCE === 'fedinvest' ? settleDateStr : asOfDate;
   return {
@@ -170,22 +169,22 @@ export async function loadMarketData() {
   };
 }
 
-export async function fetchFidelityTipsData() {
-  const [fidRes, aux] = await Promise.all([
-    fetch(BASE_URL + '/FidelityTreasuriesTips.csv', { cache: 'no-cache' }),
+export async function fetchMarketQuotesData() {
+  const [quotesRes, aux] = await Promise.all([
+    fetch(BASE_URL + '/MarketQuotes.csv', { cache: 'no-cache' }),
     fetchAuxTipsData(),
   ]);
-  if (!fidRes.ok) throw new Error('FidelityTreasuriesTips.csv: HTTP ' + fidRes.status);
+  if (!quotesRes.ok) throw new Error('MarketQuotes.csv: HTTP ' + quotesRes.status);
   const { refCpiRows, tipsRefRows, saSaoRows, bondHolidays } = aux;
   const tipsRefByCusip = new Map(tipsRefRows.map(r => [r.cusip, r]));
 
-  const fidText = await fidRes.text();
-  const asOfDate = fidelityDownloadDateIso(parseFidelityDownloadDate(fidText));
-  if (!asOfDate) throw new Error('FidelityTreasuriesTips.csv: no "Date downloaded" footer found');
+  const quotesText = await quotesRes.text();
+  const asOfDate = downloadDateIso(parseDownloadDate(quotesText));
+  if (!asOfDate) throw new Error('MarketQuotes.csv: no Download Date line found');
   const settlementDate = nextBondTradingDay(asOfDate, bondHolidays);
   const settlementDateObj = localDate(settlementDate);
 
-  const yieldsRows = parseFidelityTipsRows(fidText).map(r => {
+  const yieldsRows = parseTipsQuotes(quotesText).map(r => {
     const ref = tipsRefByCusip.get(r.cusip);
     const maturity = r.maturity || ref?.maturity;
     const maturityDateObj = localDate(maturity);
