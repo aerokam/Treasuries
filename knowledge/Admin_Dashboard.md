@@ -57,7 +57,7 @@ Vanilla JavaScript with no build step. It loads `/api/status` on open and every 
 | Pipeline | R2 key | Job IDs | Feeds | Stale after |
 |---|---|---|---|---|
 | FedInvest daily prices | `Treasuries/YieldsFromFedInvestPrices.csv` | `fedinvest-download` | All yield curves | 24 h |
-| Broker quotes — Treasury + TIPS | `Treasuries/FidelityTreasuriesTips.csv` | `fidelity-download`, `upload-fidelity` | Market tab (nominals + TIPS) | 24 h |
+| Broker quotes — Treasury + TIPS | `Treasuries/MarketQuotes.csv` | `quotes-download`, `upload-quotes` | Market tab (nominals + TIPS) | 24 h |
 | CPI seasonal adjustment factors | `TIPS/RefCpiNsaSa.csv` | `update-ref-cpi-nsa-sa` | CPI overlay | 720 h |
 | SIFMA bond market holidays | `misc/BondHolidaysSifma.csv` | none | Business-day calculations | 8,760 h |
 

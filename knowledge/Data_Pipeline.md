@@ -15,7 +15,7 @@ All data enters the system from these external entities. Click the **Drill-down 
 | **E3** | **FiscalData** | Auction results & TIPS metadata | REST API | [E3 Schema](./DATA_DICTIONARY.md#e3) |
 | **E4** | **BLS** | Monthly CPI-U (NSA/SA) factors | REST API | [E4 Schema](./DATA_DICTIONARY.md#e4) |
 | **E5** | **CNBC** | Real-time market yields | GraphQL | [E5 Schema](./DATA_DICTIONARY.md#e5) |
-| **E6** | **Fidelity** | Broker ask/bid quotes | Automated Download | [E6 Schema](./DATA_DICTIONARY.md#e6) |
+| **E6** | **Market quotes source** | Broker ask/bid quotes | Automated Download | [E6 Schema](./DATA_DICTIONARY.md#e6) |
 | **E7** | **Vanguard Advisors** | Fund holdings, expense ratio, 30-Day SEC yield | REST API | [E7 Schema](./DATA_DICTIONARY.md#e7) |
 | **E8** | **fminvest.com** | Fund holdings, expense ratio, 30-Day SEC yield | REST API + page scrape | [E8 Schema](./DATA_DICTIONARY.md#e8) |
 | **E9** | **PIMCO** | Fund holdings, expense ratio, 30-Day SEC yield | REST API (xlsx export) | [E9 Schema](./DATA_DICTIONARY.md#e9) |
@@ -35,9 +35,9 @@ These jobs run on the host machine via Windows Task Scheduler.
 | Task Name | Schedule | Script | Primary Output |
 |---|---|---|---|
 | **YieldsFromFedInvestPrices** | Weekdays 10:05am PT, retries every 10 min up to 12 times (2h) if the day's prices are not yet posted | `scripts/getYieldsFedInvest.js` (via `YieldCurves/scripts/run-fedinvest.cmd`) | `Treasuries/YieldsFromFedInvestPrices.csv` ([S1](./DATA_DICTIONARY.md#s1)) |
-| **FidelityQuotes** | Weekdays 5:05am PT | `YieldCurves/scripts/run-fidelity.cmd` → `fidelityDownload.js` → `uploadFidelityDownload.js`, which chains `updateSaSaoYields.js` on a successful upload | `Treasuries/FidelityTreasuriesTips.csv` ([S7](./DATA_DICTIONARY.md#s7), combined Treasury + TIPS), then `TIPS/YieldsSaSao.csv` ([S10](./DATA_DICTIONARY.md#s10)) |
-| **FidelityQuotesDaytime** | Weekdays 9:35am and 2:05pm PT | the same `run-fidelity.cmd`, run interactively so a manual MFA step can be completed | the same as FidelityQuotes |
-| **FidelityQuotesCatchup** | 2 minutes after logon | `YieldCurves/scripts/run-fidelity-catchup.cmd` → `fidelityCatchupIfStale.js`, which runs the download once when today's [S7](./DATA_DICTIONARY.md#s7) is missing from R2 | the same as FidelityQuotes |
+| **MarketQuotes** | Weekdays 5:05am PT | a local script, not in the repository, which chains `updateSaSaoYields.js` on a successful upload | `Treasuries/MarketQuotes.csv` ([S7](./DATA_DICTIONARY.md#s7), combined Treasury + TIPS), then `TIPS/YieldsSaSao.csv` ([S10](./DATA_DICTIONARY.md#s10)) |
+| **MarketQuotesDaytime** | Weekdays 9:35am and 2:05pm PT | the same local script, run interactively so a manual MFA step can be completed | the same as MarketQuotes |
+| **MarketQuotesCatchup** | 2 minutes after logon | a local script, not in the repository, which runs the download once when today's [S7](./DATA_DICTIONARY.md#s7) is missing from R2 | the same as MarketQuotes |
 | **TreasuryAuctions** | Weekdays 8:35/10:05am PT | `scripts/getAuctions.js` | `Treasuries/Auctions.csv` ([S5](./DATA_DICTIONARY.md#s5)) |
 | **TreasuryAuctions-TentativeSchedule** | 8:35am PT daily for 21 days from each of the next two Quarterly Refunding dates (the first Wednesday of February, May, August and November), and on the first of the current month and the next three | `scripts/updateTentativeSchedule.js` | `Treasuries/Tentative-Auction-Schedule.xml` ([S9](./DATA_DICTIONARY.md#s9)) |
 | **TreasuryAuctions-TentativeSchedule-Refresh** | 6:00am PT on the first day of the next January, April, July or October | `scripts/setup-tentative-schedule-task.ps1`, which re-registers the two tasks above with the trigger window rolled forward | none |
@@ -50,7 +50,7 @@ These jobs run on the host machine via Windows Task Scheduler.
 | **SaFactors** | Daily 6:35am PT | `YieldCurves/scripts/updateRefCpi.js`, which chains `fetchCpiBls.js` → `calcRefCpi.js` → `updateSaSaoYields.js` unconditionally | `bls/CPI.csv` ([S17](./DATA_DICTIONARY.md#s17)), `RefCpiNsaSa.csv` ([S4](./DATA_DICTIONARY.md#s4)), then `TIPS/YieldsSaSao.csv` ([S10](./DATA_DICTIONARY.md#s10)) again |
 | **FundHoldings** | Daily 6:40am PT | `FundHoldings/updateAllHoldings.js`, then `FundHoldings/enrichHoldings.js` | `FundHoldings/<TICKER>.csv` ([S11](./DATA_DICTIONARY.md#s11)) |
 | **GswTipsCurve** | Daily 7:15am PT | `YieldCurves/scripts/updateGswTipsCurve.js` | `TIPS/GswTipsCurve.json` (GSW Svensson params — [S12](./DATA_DICTIONARY.md#s12)) |
-| *(no task)* | Chained after BOTH inputs it depends on: `FidelityQuotes` (3x daily on weekdays, via `run-fidelity.cmd`) and `YieldsFromFedInvestPrices` (1x daily on weekdays, via `run-fedinvest.cmd`), each calling `run-yield-curves.cmd` on success. No standalone trigger. | `YieldCurves/scripts/updateSpotYieldCurves.js` (via `YieldCurves/scripts/run-yield-curves.cmd`) | `Treasuries/YieldCurves.csv` ([S13](./DATA_DICTIONARY.md#s13)), `Treasuries/BreakevenInflation.csv` ([S14](./DATA_DICTIONARY.md#s14)), `Treasuries/BidAskSpreads.csv` ([S15](./DATA_DICTIONARY.md#s15)) |
+| *(no task)* | Chained after BOTH inputs it depends on: `MarketQuotes` (3x daily on weekdays) and `YieldsFromFedInvestPrices` (1x daily on weekdays, via `run-fedinvest.cmd`), each calling `run-yield-curves.cmd` on success. No standalone trigger. | `YieldCurves/scripts/updateSpotYieldCurves.js` (via `YieldCurves/scripts/run-yield-curves.cmd`) | `Treasuries/YieldCurves.csv` ([S13](./DATA_DICTIONARY.md#s13)), `Treasuries/BreakevenInflation.csv` ([S14](./DATA_DICTIONARY.md#s14)), `Treasuries/BidAskSpreads.csv` ([S15](./DATA_DICTIONARY.md#s15)) |
 | **CpiHistory** | 5:35am PT (8:35am ET) on each BLS release date | `scripts/fetchCpiHistory.js` (`run-cpi-history.cmd`) | `bls/CPI_history.csv` |
 | **RefCpi** | 6:30am PT (9:30am ET) on each BLS release date, retries every 30 min up to 12 times (6h) if TreasuryDirect hasn't caught up | `scripts/fetchRefCpi.js --append` (`run-ref-cpi.cmd`) — merges new dates into the existing full-history file rather than rebuilding it; see [Ref CPI (S3)](./DATA_DICTIONARY.md#s3) | `TIPS/RefCPI.csv` |
 

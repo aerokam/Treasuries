@@ -127,7 +127,7 @@ internal consistency with the wave shown on slides 3–5. FAR (1.25% Apr-2028)
 - **State facts plainly; do not massage language to your style.** No invented
   phrasing, titles, or framing. Use the user's words and the sources' words.
 - **No possessives on security types** ("TIPS's", "a Note's"). Reword around.
-- **Never name the data vendor** ("Fidelity") in user-visible copy — "market
+- **Never name the data vendor** in user-visible copy — "market
   prices" / "market yields".
 - **BLS / spec term names verbatim.**
 - **`note()` SVG captions do not wrap** — a line wider than the 900-unit viewBox

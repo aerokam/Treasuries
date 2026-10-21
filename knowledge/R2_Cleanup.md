@@ -59,7 +59,7 @@ The data stores of the bucket, with their R2 keys, are in [Data Dictionary §2.0
 *app*, but it is a deliberate **public resource** — published so people can pull market
 SA/SAO TIPS yields into their own spreadsheets. The upload in
 `YieldCurves/scripts/updateSaSaoYields.js` has been restored and the file is written
-to `TIPS/YieldsSaSao.csv` on every Fidelity broker-quote run. Do not remove it.
+to `TIPS/YieldsSaSao.csv` on every broker-quote run. Do not remove it.
 
 **Superseded 2026-09-13:** the claim that no app reads it was true when written and is not
 true now. Three consumers read `TIPS/YieldsSaSao.csv`: TipsLadderManager takes `sa_yield`
@@ -69,7 +69,7 @@ it rather than the object itself. It is both a public resource and an input to t
 See [S10](./DATA_DICTIONARY.md#s10).
 
 Separately, that run was logging `Exited with code 1` even on success: the script wrote
-its progress via `console.error`, and `run-fidelity.cmd`'s `2>&1` pipe makes PowerShell 5.1
+its progress via `console.error`, and the quote download wrapper's `2>&1` pipe makes PowerShell 5.1
 wrap any native stderr as a `NativeCommandError` and flip the exit code. Progress logging
 was moved to `console.log` (stdout); `console.error` + `exit(1)` is now reserved for real
 failures only.
@@ -78,30 +78,27 @@ failures only.
 
 ## Correction (2026-07-19)
 
-`fidelityDownload.js` was changed (~2026-06-23) to download one combined
-`FidelityTreasuriesTips.csv` (Treasury + TIPS rows in a single export, split by a
-`Product` column) instead of two separate files, and `uploadFidelityDownload.js` was
-updated to upload only the combined file to `Treasuries/FidelityTreasuriesTips.csv`.
-The old R2 keys `Treasuries/FidelityTreasuries.csv` and `Treasuries/FidelityTips.csv`
-stopped being written at that point, but several consumers kept reading them directly
+The broker quote download was changed (~2026-06-23) to download one combined
+file (Treasury + TIPS rows in a single export, split by a
+`Product` column) instead of two separate files, and the upload was
+updated to upload only the combined file. The two old per-product R2 keys under
+`Treasuries/` stopped being written at that point, but several consumers kept reading them directly
 and were never repointed at the combined file:
 
 - **Admin Dashboard** (`Dashboard/server.js`, `Dashboard/index.html`) — two pipeline
   rows/nodes (`broker-nominals`/`S7a`, `broker-tips`/`S7b`) monitored the dead keys, so
   the dashboard silently showed ~1-month-stale data instead of flagging staleness (the
-  keys still existed in R2 from before the cutover, just frozen). Consolidated to one
-  `broker-quotes`/`S7` pipeline pointing at `Treasuries/FidelityTreasuriesTips.csv`.
+  keys still existed in R2 from before the cutover, just frozen). consolidated to one
+  `broker-quotes`/`S7` pipeline pointing at the combined file.
 - **FundHoldings** (`FundHoldings/enrichHoldings.js`) — fetched
-  `Treasuries/FidelityTreasuries.csv` directly for nominal Ask Yield/Coupon enrichment,
+  the old nominal per-product key directly for nominal Ask Yield/Coupon enrichment,
   so nominal fund holdings (e.g. VBIL) were enriched from a frozen June 23 snapshot for
   about a month. Repointed at the combined file, filtering to non-TIPS rows by `Product`.
 
 `YieldCurves/src/app.js` itself was already reading the combined file correctly — it was
 not affected.
 
-**Old keys to delete** (superseded, no longer written by any script):
-- `Treasuries/FidelityTreasuries.csv`
-- `Treasuries/FidelityTips.csv`
+**Old keys to delete** (superseded, no longer written by any script): the two old per-product broker quote files under `Treasuries/`.
 
 See [DATA_DICTIONARY.md#s7](./DATA_DICTIONARY.md#s7) and [DATA_DICTIONARY.md#s7](./DATA_DICTIONARY.md#s7) for the current combined-file schema.
 
@@ -143,13 +140,13 @@ Every live writer already used the plural prefix (`updateYieldsHistory.js`, `arc
 
 The `console.error` → `console.log` workaround from the 2026-06-01 correction above only relocated
 one call site (`updateSaSaoYields.js`'s progress logging); it didn't remove the underlying cause,
-and the same class of bug recurred at a second site — `fidelityDownload.js`'s handled MFA fallback
+and the same class of bug recurred at a second site — the quote download script's handled MFA fallback
 (`console.error('Automated MFA handling failed, falling back to manual wait...')` inside a caught
-`try`/`catch`, not a real failure). Every recent `FidelityQuotes` run hit this path and was logged
-as `Exited with code 1`, which made `run-fidelity.cmd` skip its chained `run-yield-curves.cmd` step
+`try`/`catch`, not a real failure). Every recent `MarketQuotes` run hit this path and was logged
+as `Exited with code 1`, which made the quote download wrapper skip its chained `run-yield-curves.cmd` step
 even though the download and upload had succeeded.
 
-Fixed at the source instead of the call site: `run-fidelity.cmd` piped `node` through
+Fixed at the source instead of the call site: the quote download wrapper piped `node` through
 `powershell -Command "& node ... 2>&1 | Tee-Object ..."`, and PowerShell 5.1 wraps a native
 command's redirected stderr into `NativeCommandError` objects, which flips `powershell.exe`'s own
 exit code to 1 regardless of what `node` actually exited with. Replaced with plain cmd-level

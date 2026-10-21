@@ -40,4 +40,4 @@ Follow these steps to verify that the navigation, rendering and drill-down featu
 ## 5. Ingestion Pipeline
 - [ ] Open **Data Pipeline** from the Spec Index.
 - [ ] **Ownership**: Verify that §2.0 lists the ingestion jobs as `[LOCAL]` Windows tasks and names no other scheduler.
-- [ ] **Fidelity Status**: Verify the Fidelity quotes appear as local Windows tasks.
+- [ ] **Market Quotes Status**: Verify the market quotes tasks appear as local Windows tasks.

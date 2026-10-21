@@ -55,16 +55,15 @@ caller's spec.
 
 ---
 
-## <a id="m4"></a>fidelity-parse.js (M4)
-**File**: `shared/src/fidelity-parse.js`
-**Purpose**: Parses Fidelity's combined Treasury+TIPS export ([Market quotes (S7)](./DATA_DICTIONARY.md#s7)) — the row-shape and field-cleanup logic every consumer of that source shares, so which CUSIPs are kept, which settlement date the quote is stated at, and what to do with a dropped row stays with each caller.
+## <a id="m4"></a>market-quotes.js (M4)
+**File**: `shared/src/market-quotes.js`
+**Purpose**: Parses the combined Treasury and TIPS rows of [Market quotes (S7)](./DATA_DICTIONARY.md#s7) — the row-shape logic every consumer of that store shares, so which CUSIPs are kept, which settlement date the quote is stated at, and what to do with a dropped row stays with each caller.
 **Exports**:
-- `parseFidelityTipsRows(text)` — one row per TIPS CUSIP, Fidelity's quoted fields.
-- `parseFidelityNominalRows(text, { settleIso, onUnknownCusip })` — one row per non-TIPS CUSIP (Bills, Notes, Bonds and STRIPS alike), both yields calculated from the quoted ask/bid price rather than read from Fidelity's stated yields.
-- `parseFidelityDownloadDate(text)` / `fidelityDownloadDateIso(dateStr)` — the `"Date downloaded"` footer, parsed and normalized to ISO.
-- `cleanFidelityField(val)`, `fidPriceField(raw)`, `fidParseMaturity(s)` — field-shape helpers for Fidelity's CSV quirks.
+- `parseTipsQuotes(text)` — one row per TIPS CUSIP, with its quoted prices.
+- `parseTreasuryQuotes(text, { settleIso, onUnknownCusip })` — one row per non-TIPS CUSIP (Bills, Notes, Bonds and STRIPS alike), both yields calculated from the quoted ask and bid price.
+- `parseDownloadDate(text)` / `downloadDateIso(stamp)` — the Download Date on the first line, and its date part as ISO.
 
-**Called by**: [4.1.1 Fetch and parse market quotes](../TipsLadderManager/knowledge/4.1_Load_Market_Data.md#fetch-and-parse-market-quotes) (TipsLadderManager, `parseFidelityTipsRows`) and [3.1.2 Parse market quotes](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#parse-market-quotes) (YieldCurves, both row parsers, for the app and for the acquisition job that writes [Yield curves (S13)](./DATA_DICTIONARY.md#s13)).
+**Called by**: [4.1.1 Fetch and parse market quotes](../TipsLadderManager/knowledge/4.1_Load_Market_Data.md#fetch-and-parse-market-quotes) (TipsLadderManager, `parseTipsQuotes`) and [3.1.2 Parse market quotes](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#parse-market-quotes) (YieldCurves, both row parsers, for the app and for the acquisition job that writes [Yield curves (S13)](./DATA_DICTIONARY.md#s13)).
 
 ---
 
