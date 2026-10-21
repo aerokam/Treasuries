@@ -1,6 +1,6 @@
 // Turns the raw quote download into Market quotes (S7) and uploads it. The raw download never
-// leaves this machine: only the columns S7 states are kept, and the raw file is deleted once its
-// derived file is on R2.
+// leaves this machine: only the columns S7 states are kept, and the raw file stays in the
+// downloads folder, where the next download overwrites it.
 //
 // spec: knowledge/1.2_Download_Market_Quotes.md
 import fs from 'fs';
@@ -49,7 +49,6 @@ if (tipsRowCount < MIN_TIPS_ROWS) {
 
 console.log(`Uploading Market quotes (downloaded ${derived.stamp}, ${tipsRowCount} TIPS rows, ${derived.treasuryCount} Treasury rows) -> ${R2_KEY}`);
 await uploadToR2(R2_KEY, derived.text);
-fs.unlinkSync(rawPath);
 
 const { execSync } = await import('child_process');
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
