@@ -2,6 +2,7 @@
 import { existsSync, readFileSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { mergeAuctionRows, fillFromTreasuryDirect, TD_COLUMNS } from '../shared/src/auction-results.js';
 const _envPath = resolve(dirname(fileURLToPath(import.meta.url)), '../.env');
 if (existsSync(_envPath)) {
   readFileSync(_envPath, 'utf8').split('\n').forEach(line => {
@@ -14,12 +15,15 @@ if (existsSync(_envPath)) {
 //
 // First run (no existing file): fetches all auctions since 1980-01-01.
 // Subsequent runs: fetches last 30 days, merges by cusip+auction_date (new data wins).
+// Every run then fills the columns FiscalData has not yet stated from TreasuryDirect (last 30 days).
 //
 // Scheduled at 11:35 AM ET and 1:05 PM ET on weekdays (after comp close at 11:30 AM and 1:00 PM ET).
 
 const FISCALDATA_URL = 'https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v1/accounting/od/auctions_query';
 const R2_KEY = 'Treasuries/Auctions.csv';
 const R2_BASE_URL = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev';
+const TREASURYDIRECT_URL = 'https://www.treasurydirect.gov/TA_WS/securities/auctioned';
+const WINDOW_DAYS = 30;
 
 // ── R2 upload ─────────────────────────────────────────────────────────────────
 async function uploadToR2(key, body) {
@@ -75,23 +79,6 @@ function toCSV(headers, rows) {
   ].join('\n') + '\n';
 }
 
-// ── Merge ─────────────────────────────────────────────────────────────────────
-function mergeRows(existing, incoming) {
-  const key = r => `${r.cusip}|${r.auction_date}`;
-  const map = new Map(existing.map(r => [key(r), r]));
-  let added = 0;
-  for (const r of incoming) {
-    if (!map.has(key(r))) added++;
-    map.set(key(r), r); // incoming wins (authoritative source)
-  }
-  console.error(`Merge: ${added} new rows added (${incoming.length} fetched, ${existing.length} existing)`);
-  return Array.from(map.values()).sort((a, b) => {
-    if (b.auction_date > a.auction_date) return 1;
-    if (b.auction_date < a.auction_date) return -1;
-    return (a.security_term || '').localeCompare(b.security_term || '');
-  });
-}
-
 // Union of two header arrays, preserving order
 function unionHeaders(h1, h2) {
   const seen = new Set(h1);
@@ -119,6 +106,13 @@ async function fetchAuctions(sinceDate) {
   return { headers, rows };
 }
 
+// ── TreasuryDirect fetch ──────────────────────────────────────────────────────
+async function fetchTreasuryDirect(days) {
+  const r = await fetch(`${TREASURYDIRECT_URL}?format=json&days=${days}`);
+  if (!r.ok) throw new Error(`TreasuryDirect HTTP ${r.status}`);
+  return r.json();
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 async function main() {
   // Try to load existing data from R2
@@ -133,7 +127,7 @@ async function main() {
     console.error(`Loaded ${existingRows.length} existing rows from R2`);
     // Fetch last 30 days to catch new auctions
     const d = new Date();
-    d.setDate(d.getDate() - 30);
+    d.setDate(d.getDate() - WINDOW_DAYS);
     sinceDate = d.toISOString().substring(0, 10);
   } else {
     console.error('No existing file found — seeding from 1980-01-01');
@@ -144,9 +138,20 @@ async function main() {
   if (newRows.length === 0 && existingRows.length === 0)
     throw new Error('No auction data retrieved and no existing data — aborting');
 
-  const headers = unionHeaders(existingHeaders, newHeaders);
-  const merged = mergeRows(existingRows, newRows);
-  const csvBody = toCSV(headers, merged);
+  const headers = unionHeaders(unionHeaders(existingHeaders, newHeaders), TD_COLUMNS);
+  const { rows: merged, added } = mergeAuctionRows(existingRows, newRows);
+  console.error(`Merge: ${added} new rows added (${newRows.length} fetched, ${existingRows.length} existing)`);
+
+  let tdRows = [];
+  try {
+    tdRows = await fetchTreasuryDirect(WINDOW_DAYS);
+  } catch (err) {
+    console.error(`TreasuryDirect unavailable, writing FiscalData rows only: ${err.message}`);
+  }
+  const { rows: filledRows, filled, added: tdAdded } = fillFromTreasuryDirect(merged, headers, tdRows);
+  console.error(`TreasuryDirect: ${tdRows.length} auctions read, ${filled} rows filled, ${tdAdded} rows added`);
+
+  const csvBody = toCSV(headers, filledRows);
   await uploadToR2('Treasuries/Auctions.csv', csvBody);
 }
 

@@ -22,6 +22,7 @@ All data enters the system from these external entities. Click the **Drill-down 
 | **E10** | **Schwab Asset Management** | Fund holdings, expense ratio, 30-Day SEC yield | Headless-browser CSV download | [E10 Schema](./DATA_DICTIONARY.md#e10) |
 | **E11** | **BondBloxx** | Fund holdings, expense ratio, 30-Day SEC yield | Product-page scrape | [E11 Schema](./DATA_DICTIONARY.md#e11) |
 | **E12** | **BlackRock iShares** | Fund holdings, expense ratio, 30-Day SEC yield | REST API (CSV) + page scrape | [E12 Schema](./DATA_DICTIONARY.md#e12) |
+| **E15** | **TreasuryDirect** | Auction results (the columns [1.4](./1.4_Fetch_Auction_Results.md#treasurydirect) maps) | REST API | [E15 Schema](./DATA_DICTIONARY.md#e15) |
 
 ---
 
