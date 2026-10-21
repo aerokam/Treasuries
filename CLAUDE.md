@@ -144,6 +144,19 @@ scoped push is done). Same steps either way:
 Never instead rewind `main` to the pushed commit and replay the rest afterward — that rewrites the
 branch other sessions are committing on.
 
+The commits a scoped push copied stay in local `main` under their old SHAs, so
+`git rev-list origin/main..main` keeps counting them (148 by 2026-10-20) although their content is
+on origin. Two rules follow:
+
+- **Report what is unpushed by content, not by commit count.** `node scripts/tidy-main.js` lists
+  the files whose content differs from `origin/main`; those files are the unpushed work. Quote that
+  to the developer, not the commit count.
+- **When no file differs and nothing is staged, run `node scripts/tidy-main.js --apply`.** It saves
+  the current `main` as a branch and moves `main` to `origin/main` (`git reset --soft`, so
+  uncommitted edits stay). It refuses while any content is unpushed, while anything is staged, or
+  off `main`, so it is the one exception to the no-rewind rule above. Run it after a scoped push
+  when `ListAgents` shows no other session holding unpushed commits.
+
 ### Ports
 
 - **8080** — the developer's own dev server on the primary checkout. Never start, kill, or restart
