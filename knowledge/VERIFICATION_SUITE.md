@@ -5,7 +5,7 @@ Follow these steps to verify that the navigation, rendering and drill-down featu
 ## 1. Context Diagram & Top-Level Navigation
 - [ ] Open `http://localhost:8080/knowledge/DFD_LEVEL0`.
 - [ ] **Top Header**: Verify the only link above the diagram is the **Portal** back link. Everything else is reached by drilling into the diagram, or from the Spec Index below it.
-- [ ] **Diagram Shape**: Verify one process circle, **0 Treasury Investors Portal**, with the fourteen external entities and the **User** around it. Every flow arrow carries a label, and no data store is drawn at this level.
+- [ ] **Diagram Shape**: Verify one process circle, **0 Treasury Investors Portal**, with the fifteen external entities and the **User** around it. Every flow arrow carries a label, and no data store is drawn at this level.
 - [ ] **Spec Index**: Click **TipsLadderManager**.
     - *Expected*: Opens the rendered overview in the viewer.
 - [ ] **Back Navigation**: From inside the viewer, click **← KNOWLEDGE MAP**.

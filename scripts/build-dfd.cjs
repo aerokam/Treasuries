@@ -418,7 +418,7 @@ function level1() {
       '  Process 1 explodes at Level 2 into those jobs, one per store it writes.',
       '  The stores are drawn as one shape. Level 1 answers which app reads what rather than which file, and the shape opens the full list.',
       '  Three of those files are read by no app: YieldCurves.csv, BreakevenInflation.csv and BidAskSpreads.csv. They are written for the user to pull into a spreadsheet, so their flow goes to the user rather than to a process.',
-      '  External entities are not redrawn at this level. Their fourteen flows are drawn against each entity on the <a href="DFD_LEVEL0.html">context diagram</a> and enter here as one flow.',
+      '  External entities are not redrawn at this level. Their flows are drawn against each entity on the <a href="DFD_LEVEL0.html">context diagram</a> and enter here as one flow.',
       '  The app column reproduces the portal index: the same three sections in the same order, and the same apps in the same order inside each.',
       '  Every app has the same pair of flows with the user, labelled once at the top. The user is drawn once, as a tall shape, so no flow to it crosses another.'].join(NL)
   });
@@ -664,6 +664,7 @@ function level2Ingestion() {
   const entities = [
     { name: ['FedInvest'], href: DD + 'e1', jobs: ['1.1'] },
     { name: ['TreasuryDirect', 'SecIndex'], href: DD + 'e2', jobs: ['1.13'] },
+    { name: ['TreasuryDirect'], href: DD + 'e15', jobs: ['1.4'] },
     { name: ['FiscalData'], href: DD + 'e3', jobs: ['1.4', '1.6'] },
     { name: ['BLS'], href: DD + 'e4', jobs: ['1.9', '1.12'] },
     { name: ['CNBC'], href: DD + 'e5', jobs: ['1.7', '1.8'] },
@@ -821,6 +822,7 @@ function level2Ingestion() {
     notes: ['  One process per scheduled job: the external entity it reads (if any), and the store it writes.',
       '  1.3, 1.10 and 1.11 read no external source: they calculate from what the retrieving jobs have stored. 1.1, 1.2 and 1.14 read both an external source and one or more stores.',
       '  An entity feeding two jobs (FiscalData, BLS, CNBC) is drawn once, with a separately labelled flow to each — the same source, not two sources. FiscalData\'s two flows here match its two flows in the Data Dictionary; BLS\'s and CNBC\'s two jobs each read the same flow independently.',
+      '  1.4 reads two entities, FiscalData and TreasuryDirect, for the one flow <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#auction-results">auction results</a>.',
       '  E7 through E12 are drawn as one box: the six fund-holdings providers, each with its own entry in the <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md">Data Dictionary</a>, are otherwise identical in shape from this diagram\'s point of view — one job reads all six.',
       '  1.1 explodes at <a href="DFD_LEVEL3_INGEST_FEDINVEST.html">Level 3</a>; every other job drills straight to its own process spec, which names its schedule and script path in turn, or to <a href="viewer.html#/md/knowledge/Data_Pipeline.md">Data Pipeline</a> for the schedule table across every job at once.'].join(NL)
   });

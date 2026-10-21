@@ -2,7 +2,7 @@
 
 **Endpoint:** `https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v1/accounting/od/auctions_query` of [FiscalData (E3)](./DATA_DICTIONARY.md#e3). It requires no authentication. Every value is returned as a string, and a missing value is the string `null`.
 
-[Fetch auction results (1.4)](./1.4_Fetch_Auction_Results.md) reads it, and [Auction results (S5)](./DATA_DICTIONARY.md#s5) holds what it returns. Measured 2026-10-17, the endpoint states 114 fields and S5 has the same 114 columns.
+[Fetch auction results (1.4)](./1.4_Fetch_Auction_Results.md) reads it, and [Auction results (S5)](./DATA_DICTIONARY.md#s5) holds what it returns, with a column FiscalData states as `null` filled from [TreasuryDirect (E15)](./DATA_DICTIONARY.md#e15) where [1.4](./1.4_Fetch_Auction_Results.md#treasurydirect) maps it. Measured 2026-10-17, the endpoint states 114 fields and S5 has the same 114 columns.
 
 ---
 
