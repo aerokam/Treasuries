@@ -125,8 +125,14 @@ approves working off `main` first, per the exception above), and pushing one ses
 past other sessions' unpushed ones (no approval needed beyond the push itself — this is just how a
 scoped push is done). Same steps either way:
 
-1. `git worktree add ../Treasuries-ship -b ship-<desc> origin/main` — a fresh checkout at the last
-   pushed commit, so the rest of `main` is not in it.
+0. `git fetch origin`, then `git merge-base --is-ancestor <sha> origin/main` for each of the
+   session's commits. Another session's plain `git push origin main` ships every unpushed commit on
+   `main`, so a commit may already be on origin; then there is nothing to ship and steps 1-3 are
+   skipped (a duplicate cherry-pick of it is rejected as non-fast-forward at best).
+1. `git worktree list`, then `git worktree add ../Treasuries-ship-<desc> -b ship-<desc> origin/main` —
+   a fresh checkout at the last pushed commit, so the rest of `main` is not in it. The path carries
+   `<desc>`: several sessions ship at once, and a shared path sends one session's cherry-picks into
+   another's worktree.
 2. Build the fix there and commit it, or `git cherry-pick <sha> <sha> …` the session's own commits
    onto it, oldest first. Verify (the developer gives a fix worked on its own a port; a cherry-pick
    of already-verified commits usually does not need re-testing).
@@ -139,7 +145,9 @@ scoped push is done). Same steps either way:
    run while any session has files staged, which is the normal state of this checkout. The tree is
    unchanged, so staged and unstaged work is untouched; if a commit lands on `main` in between,
    `--ff-only` refuses rather than losing it.
-5. `git worktree remove ../Treasuries-ship` and `git branch -d ship-<desc>`.
+5. `git worktree remove ../Treasuries-ship-<desc>` and `git branch -d ship-<desc>` (`-D` when the
+   push was skipped because step 0 found the commits already on origin). Delete only the worktree
+   and branch this session created.
 
 Never instead rewind `main` to the pushed commit and replay the rest afterward — that rewrites the
 branch other sessions are committing on.
