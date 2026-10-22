@@ -4,7 +4,7 @@
 import { bondCalcs, calculateMDuration, yieldFromPrice, calcMktWtdAvg } from '../../shared/src/bond-math.js';
 import { indexRatio as calcIndexRatio, TREASURY_ROUNDING, NO_ROUNDING } from '../../shared/src/ref-cpi.js';
 export { yieldFromPrice };
-import { interpolateYield, syntheticCoupon, bracketWeights, bracketWeightsN, gapParamsCore, scaleGapParams, future30yParamsCore } from './gap-math.js';
+import { interpolateYield, syntheticCoupon, bracketWeights, bracketWeightsN, gapParamsCore, scaleSimulatedParams, future30yParamsCore } from './gap-math.js';
 import { findSpikes, evenSpread, MIN_SHAPE_POINTS, inferShapeValue } from './shape-math.js';
 import { getGapYears, UPPER_BRACKET_YEAR, upperBracketBond, sizeLadder, selectLadderBonds, fundedYearAmount, rmdCappedRemainingCoupons, latestRemainingCouponDate, selectFuture30yCovers, future30yRebalances, future30yInterestByYear, gapRebalances, gapInterestByYear, future30yLimit, syntheticYearAmounts } from './ladder-core.js';
 import { localDate, fmtDate, fmtDateLong, toDateStr } from './date-util.js';
@@ -1902,8 +1902,21 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
     heldCoverExcessByYear[cy] = Math.max(0, held - (bracketTargetFundedYearQtyBefore[cy] ?? held));
   }
   const _beforeUsesImplied = dara === null && !daraByYear && heldImplied != null;
-  const future30yParamsBefore = _beforeUsesImplied ? heldImplied.future30yParams : future30yParams;
-  const future30yRebalancesBefore = _beforeUsesImplied ? heldImplied.rebalances : _sl.future30yRebalances;
+  let future30yParamsBefore = _beforeUsesImplied ? heldImplied.future30yParams : future30yParams;
+  let future30yRebalancesBefore = _beforeUsesImplied ? heldImplied.rebalances : _sl.future30yRebalances;
+  // Before is what the holdings pay (3.0 §Before and the Future 30Y rebalances), as for the gap years: nothing is bought to reach the
+  // duration match, so the Simulated Outstanding Future 30Y TIPS are the share of the sized quantities that the Cover Excess held pays for.
+  if (!_beforeUsesImplied && future30yRebalancesBefore?.conversions?.length) {
+    const c0 = future30yRebalancesBefore.conversions[0];
+    const heldLower = heldCoverExcessByYear[future30yLowerYear] ?? 0, heldUpper = heldCoverExcessByYear[future30yUpperYear] ?? 0;
+    const matchCost = c0.lowerQtyAfter * c0.lowerCostPerBond + c0.upperQtyAfter * c0.upperCostPerBond;
+    const paidCost = Math.min(heldLower, c0.lowerQtyAfter) * c0.lowerCostPerBond + Math.min(heldUpper, c0.upperQtyAfter) * c0.upperCostPerBond;
+    const share = matchCost > 0 ? paidCost / matchCost : 1;
+    if (share < 1) {
+      future30yParamsBefore = scaleSimulatedParams(future30yParamsBefore, share);
+      future30yRebalancesBefore = future30yRebalances({ future30yParams: future30yParamsBefore, lowerCoverBond: future30yLowerCoverBond, upperCoverBond: future30yUpperCoverBond, refCPI, bondHolidays, lowerQty0: heldLower, upperQty0: heldUpper });
+    }
+  }
   const { simulated: future30ySimulatedInterestBefore, cover: future30yCoverInterestBefore, netCash: future30yNetCashBefore } = future30yInterestByYear({
     rebalances: future30yRebalancesBefore, lowerCoverBond: future30yLowerCoverBond, upperCoverBond: future30yUpperCoverBond,
     refCPI, settlementDate, firstFuture30yYear: future30yYears.length ? Math.min(...future30yYears) : null,
@@ -1954,7 +1967,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
       + retainedHeld.reduce((s, l, i) => s + (c0.retainedQtyAfter?.[i] ?? 0) * (c0.retainedCostPerBond?.[i] ?? 0), 0);
     const share = matchCost > 0 ? paidCost / matchCost : 1;
     if (share < 1) {
-      gapParamsBefore = scaleGapParams(gapParamsBefore, share);
+      gapParamsBefore = scaleSimulatedParams(gapParamsBefore, share);
       gapRebalancesBefore = _gapRebalancesOf(gapParamsBefore);
     }
   }

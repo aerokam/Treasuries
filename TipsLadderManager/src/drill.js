@@ -154,8 +154,7 @@ export function buildPreLadderPoolDrill(summary, plCreditForYear) {
 // The three Future 30Y amounts credited to a funded year (2.0 §Future 30Y Simulated Outstanding TIPS
 // §Interest credited to a funded year) as popup rows: the interest of the Simulated Outstanding Future
 // 30Y TIPS, the interest of the Cover Excess and the Net Cash. `sign` prefixes the value ('−' where
-// the popup subtracts it from DARA). The Net Cash row shows whenever it is not 0: in Before it can be
-// negative, when less Cover Excess is held before the first issue date than the duration match sets.
+// the popup subtracts it from DARA). The Net Cash row shows whenever it is not 0.
 // The gap years' three amounts (2.0 §Gap Year Simulated Outstanding TIPS §Interest credited to a funded year)
 // come first: the interest of the Simulated Outstanding Future 10Y TIPS, the interest of the Excess TIPS and the
 // Net Cash. The one Net Cash row carries the Net Cash of both kinds when a ladder has gap years and Future 30Y years.

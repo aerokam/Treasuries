@@ -3180,6 +3180,36 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
   assert('Build with all maturity months, imported and rebalanced: the bracket year does not trade', roundTrip.details.filter(d => d.fundedYear === 2036).every(d => d.qtyAfter === d.qtyBefore), true);
 }
 
+// ── Test: Future 30Y rebalances — Before shows what the Cover Excess held pays (3.0 §Before and the Future 30Y rebalances) ──
+{
+  console.log('\nFuture 30Y rebalances — Before with less Cover Excess held');
+  const SY = FIRST_YEAR, DARA = 40000;
+  const lastYear = maxLastYear({ tipsMarketData, settlementDate, refCPI, bondHolidays });
+  const { details: bD, summary: bS } = runBuild({ dara: DARA, firstYear: SY, lastYear, tipsMarketData, refCPI, settlementDate, bondHolidays });
+  const coverYears = new Set([bS.future30yLowerYear, bS.future30yUpperYear]);
+  const heldFor = (share) => bD.map(d => {
+    const ex = coverYears.has(d.fundedYear) ? Math.floor(d.excessQty * share) : d.excessQty;
+    return { cusip: d.cusip, qty: d.fundedYearQty + ex, excessQty: ex };
+  }).filter(h => h.qty > 0);
+  const rebalanceWith = (holdings) => runRebalance({ dara: DARA, bracketMode: '3bracket', holdings, tipsMarketData, refCPI, settlementDate, bondHolidays,
+    daraByYear: new Map(bS.daraByYearResolved), firstYearOverride: SY, lastYearOverride: lastYear }).summary;
+  const sumAbs = (m) => [...m.values()].reduce((s, v) => s + Math.abs(v), 0);
+  const simQty = (cs) => cs.reduce((s, c) => s + c.simulatedQty, 0);
+
+  const full = rebalanceWith(heldFor(1));
+  assert('all the Cover Excess held: Before sizes the Simulated Outstanding Future 30Y TIPS as a build does', simQty(full.future30yRebalancesBefore.conversions), simQty(bS.future30yRebalances.conversions));
+
+  const half = rebalanceWith(heldFor(0.5));
+  const hb = half.future30yRebalancesBefore.conversions, bc = bS.future30yRebalances.conversions;
+  assert('half the Cover Excess held: Before has fewer Simulated Outstanding Future 30Y TIPS than a build, and some', simQty(hb) < simQty(bc) && simQty(hb) > 0, true);
+  assert('half the Cover Excess held: Before does not buy the Cover Excess not held', hb[0].lowerQtyAfter < bc[0].lowerQtyAfter && hb[0].upperQtyAfter <= bc[0].upperQtyAfter, true);
+  assert('half the Cover Excess held: After credits what a build credits', Math.abs(sumAbs(half.future30yCoverInterestByYear) - sumAbs(bS.future30yCoverInterestByYear)) < 0.01, true);
+
+  const none = rebalanceWith(heldFor(0));
+  assert('no Cover Excess held: Before credits no Simulated Outstanding Future 30Y TIPS interest', sumAbs(none.future30ySimulatedInterestBefore), 0);
+  assert('no Cover Excess held: Before credits no Net Cash', sumAbs(none.future30yNetCashBefore), 0);
+  assert('no Cover Excess held: Before shows no Amount for a Future 30Y year', bS.future30yYears.every(y => none.syntheticYearAmountsBefore[y]?.amount === 0), true);
+}
 // ── Test: the retained lower bracket of a file with no DARA plan follows the shape of the ladder ──────
 // The Per-Year DARA derived from the holdings is the curve at a spike year and the ARA elsewhere, so only a spike year has an Excess ARA
 // above 0 (3.0 §Per-Year DARA from Portfolio step 3; §Retained Maturities step 2).
