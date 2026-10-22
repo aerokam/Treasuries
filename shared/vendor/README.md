@@ -12,3 +12,5 @@ Third-party scripts the apps load from this folder instead of a CDN. All are MIT
 | `marked.min.js` | [marked](https://www.npmjs.com/package/marked) | 15.0.12 | Taxation of Treasuries, Primer beta, knowledge viewer |
 
 Each file is the distribution file the package's jsDelivr URL serves for that version.
+
+`scripts/checkVendorUpdates.js` compares the versions in this table with the latest npm releases and with npm's security advisories; the `VendorUpdateCheck` scheduled task runs it every Monday.

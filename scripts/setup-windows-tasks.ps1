@@ -291,6 +291,17 @@ Register-DataTask "LocalBackup" `
     $NodeExe "scripts/syncLocalBackup.js" `
     -LogonType Interactive
 
+# VendorUpdateCheck  -  Mondays 11:00am PT
+# Compares the libraries in shared/vendor with the latest versions npm publishes and with its
+# security advisories (scripts/checkVendorUpdates.js). Writes logs/vendor-update-report.txt
+# only when a library is behind or has an advisory; the memory index tells each session to
+# apply it. Interactive, so it needs no elevation.
+Register-DataTask "VendorUpdateCheck" `
+    "Check the vendored libraries for newer versions and security advisories" `
+    @(New-ScheduledTaskTrigger -Weekly -DaysOfWeek Monday -At "11:00am") `
+    $NodeExe "scripts/checkVendorUpdates.js" `
+    -LogonType Interactive
+
 # Yield Curves fit (S13/S14/S15) is NOT independently scheduled — it has no standalone
 # trigger. It runs chained from inside run-market-quotes.cmd (called by MarketQuotes, above)
 # and inside run-fedinvest.cmd (called by YieldsFromFedInvestPrices, above), each on
