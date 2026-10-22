@@ -49,6 +49,48 @@ export const TD_COLUMNS = TD_TO_S5.map(([, col]) => col);
 // FiscalData writes a missing value as the string `null`; a cell the script never filled is empty.
 export const isNull = v => v == null || v === '' || v === 'null';
 
+// An auction is missing results when its row holds `null` in total_accepted, its auction date is within
+// the last MISSING_WINDOW_DAYS days, and its competitive close has passed. A row with no
+// closing_time_comp is due from the next date.
+export const MISSING_WINDOW_DAYS = 30;
+
+// The competitive closes, in minutes after midnight ET: 11:30 AM and 1:00 PM.
+export const CLOSE_MINUTES = [11 * 60 + 30, 13 * 60];
+const FIRST_TRY_MINUTES = 10;
+
+// The date (YYYY-MM-DD) and minutes after midnight in New York at `d`.
+export function easternNow(d = new Date()) {
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  }).formatToParts(d).map(x => [x.type, x.value]));
+  return { date: `${p.year}-${p.month}-${p.day}`, minutes: Number(p.hour) * 60 + Number(p.minute) };
+}
+
+// A run is a first try when it starts less than 10 minutes after a competitive close.
+export const isFirstTry = now => CLOSE_MINUTES.some(c => now.minutes >= c && now.minutes < c + FIRST_TRY_MINUTES);
+
+const closeMinutes = s => {
+  const m = /^(\d\d?):(\d\d) (AM|PM)$/.exec(s || '');
+  return m ? (Number(m[1]) % 12 + (m[3] === 'PM' ? 12 : 0)) * 60 + Number(m[2]) : null;
+};
+
+const shiftDate = (date, days) => {
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().substring(0, 10);
+};
+
+export function missingResults(rows, now) {
+  const since = shiftDate(now.date, -MISSING_WINDOW_DAYS);
+  return rows.filter(r => {
+    if (!isNull(r.total_accepted) || r.auction_date < since || r.auction_date > now.date) return false;
+    if (r.auction_date < now.date) return true;
+    const close = closeMinutes(r.closing_time_comp);
+    return close !== null && now.minutes >= close;
+  });
+}
+
 const rowKey = r => `${r.cusip}|${r.auction_date}`;
 
 const byAuctionDateThenTerm = (a, b) => {

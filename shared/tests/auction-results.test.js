@@ -9,7 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { TD_TO_S5, mergeAuctionRows, fillFromTreasuryDirect, isNull } from '../src/auction-results.js';
+import { TD_TO_S5, mergeAuctionRows, fillFromTreasuryDirect, isNull, missingResults, isFirstTry, easternNow } from '../src/auction-results.js';
 
 const fixture = JSON.parse(readFileSync(new URL('./auction-results.fixture.json', import.meta.url), 'utf8'));
 const byKey = key => fixture.auctions.find(a => a.key === key);
@@ -110,4 +110,54 @@ test('a fetched row with a new key is added', () => {
   const { rows, added } = mergeAuctionRows([], [{ cusip: 'B', auction_date: '2026-10-20', security_term: '6-Week' }]);
   assert.equal(added, 1);
   assert.equal(rows.length, 1);
+});
+
+const at = (date, h, m) => ({ date, minutes: h * 60 + m });
+const row = (auction_date, total_accepted, closing_time_comp) => ({ cusip: 'X', auction_date, total_accepted, closing_time_comp });
+
+test('an auction dated before today with null total_accepted is missing results, until it is filled', () => {
+  const s5 = byKey(UNPOSTED).s5;
+  const now = at('2026-10-21', 8, 0);
+  assert.equal(missingResults([s5], now).length, 1);
+  const { rows } = fillFromTreasuryDirect([{ ...s5 }], headers, [byKey(UNPOSTED).td]);
+  assert.equal(missingResults(rows, now).length, 0);
+});
+
+test('an auction dated today is missing results from its competitive close, and not before', () => {
+  const r = row('2026-10-22', 'null', '11:30 AM');
+  assert.equal(missingResults([r], at('2026-10-22', 11, 29)).length, 0);
+  assert.equal(missingResults([r], at('2026-10-22', 11, 30)).length, 1);
+  const pm = row('2026-10-22', 'null', '01:00 PM');
+  assert.equal(missingResults([pm], at('2026-10-22', 12, 59)).length, 0);
+  assert.equal(missingResults([pm], at('2026-10-22', 13, 5)).length, 1);
+});
+
+test('an auction dated today with no closing time is not missing results until the next date', () => {
+  const r = row('2026-10-22', 'null', 'null');
+  assert.equal(missingResults([r], at('2026-10-22', 15, 0)).length, 0);
+  assert.equal(missingResults([r], at('2026-10-23', 0, 0)).length, 1);
+});
+
+test('an auction dated after today, over 30 days ago, or with total_accepted stated is not missing results', () => {
+  const now = at('2026-10-22', 15, 0);
+  assert.equal(missingResults([row('2026-10-23', 'null', '11:30 AM')], now).length, 0);
+  assert.equal(missingResults([row('2026-09-22', 'null', '11:30 AM')], now).length, 1);
+  assert.equal(missingResults([row('2026-09-21', 'null', '11:30 AM')], now).length, 0);
+  assert.equal(missingResults([row('2026-10-19', '101701941200', '11:30 AM')], now).length, 0);
+});
+
+test('a run is a first try when it starts less than 10 minutes after a competitive close', () => {
+  assert.equal(isFirstTry(at('d', 11, 29)), false);
+  assert.equal(isFirstTry(at('d', 11, 30)), true);
+  assert.equal(isFirstTry(at('d', 11, 35)), true);
+  assert.equal(isFirstTry(at('d', 11, 39)), true);
+  assert.equal(isFirstTry(at('d', 11, 40)), false);
+  assert.equal(isFirstTry(at('d', 13, 5)), true);
+  assert.equal(isFirstTry(at('d', 13, 15)), false);
+});
+
+test('easternNow gives New York time across daylight saving', () => {
+  assert.deepEqual(easternNow(new Date('2026-10-22T15:35:00Z')), { date: '2026-10-22', minutes: 11 * 60 + 35 });
+  assert.deepEqual(easternNow(new Date('2027-01-15T16:35:00Z')), { date: '2027-01-15', minutes: 11 * 60 + 35 });
+  assert.deepEqual(easternNow(new Date('2026-10-22T03:00:00Z')), { date: '2026-10-21', minutes: 23 * 60 });
 });
