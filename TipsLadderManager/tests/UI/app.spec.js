@@ -855,9 +855,11 @@ test('rebalance: Select maturities picks determine the effective range there too
 // Rebalance with Pre-Ladder Interest: the Pre-Ladder Interest popup states the years before the first funded year, and the amount it applied to the year is the Pre-ladder credit the Amount popup shows (Available Cash is a separate line).
 test('rebalance: the Pre-Ladder Interest popup agrees with the Pre-ladder credit of the Amount popup', async ({ page }) => {
   await page.locator('#pre-ladder-interest').check();
+  // Two years before the first funded year: the year after the settlement year is a whole year of interest whatever the date, where the settlement year counts only the coupons still to arrive.
+  await page.locator('#rebal-first-year').selectOption(String(SY + 2));
   await page.locator('#run-btn').click();
   await expect(page.locator('#simple-table')).toBeVisible({ timeout: 4_000 });
-  await page.locator('#simple-table tr.fy-group-header').first().locator('td[data-col="amtAfter"]').click();
+  await page.locator('#simple-table tr.fy-group-header[data-fy="' + (SY + 2) + '"]').locator('td[data-col="amtAfter"]').click();
   const creditRow = page.locator('#drill-content tr', { hasText: 'Pre-ladder credit' }).first();
   const credit = (await creditRow.locator('td').last().innerText()).trim();
   await page.locator('.drill-l3[data-l3="plcpool"]').first().click();

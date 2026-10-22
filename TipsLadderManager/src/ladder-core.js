@@ -927,7 +927,11 @@ export function sizeLadder({
 
   if (preLadderYears > 0) {
     const totalAnnualInt = Object.values(prelim).reduce((s, p) => s + p.annualInterest, 0);
-    preLadderCouponPool = preLadderYears * totalAnnualInt;
+    // The settlement year counts only the coupons still to arrive (2.0 §Settlement-year LMI is remaining coupons only): a coupon already
+    // paid is not interest received before the ladder starts. Every later year before the first funded year counts the full annual interest.
+    const settlementYearInt = Object.values(prelim).reduce((s, p) => s + p.rungs.reduce((q, r) => q + r.qty * r.pir * 1000 * r.coupon / 2
+      * rmdCappedRemainingCoupons(r.bond.maturity, settlementDate, bondHolidays, rmdCouponMode, tradeDate, _lastCouponDate), 0), 0);
+    preLadderCouponPool = (preLadderYears - 1) * totalAnnualInt + settlementYearInt;
     for (let y = settlementYear; y < firstYear; y++) {
       preLadderFuture30yPool += future30yInterest(y);
       preLadderGapPool += (gapEstimate?.simulated.get(y) ?? 0) + (gapEstimate?.excess.get(y) ?? 0);

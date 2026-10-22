@@ -129,7 +129,7 @@ export function buildPreLadderPoolDrill(summary, plCreditForYear) {
   const total        = summary?.preLadderPool ?? (couponPool + future30yPool + gapPool + netCashPool);
   const years        = summary?.preLadderYears ?? 0;
   const rows = [
-    { label: 'Pre-ladder coupon interest', note: years + ' yr \xd7 annual ladder coupon income', value: fm(couponPool) },
+    { label: 'Pre-ladder coupon interest', note: years + ' yr: the coupons still to arrive in the settlement year, the annual ladder coupon income in each later year', value: fm(couponPool) },
   ];
   if (gapPool > 0) {
     rows.push({ label: 'Pre-ladder interest from the Simulated Outstanding Future 10Y TIPS and the Excess TIPS', note: 'coupons of the Simulated Outstanding Future 10Y TIPS and of the Excess TIPS paid before the ladder starts', value: fm(gapPool) });

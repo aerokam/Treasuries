@@ -3180,6 +3180,20 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
   assert('Build with all maturity months, imported and rebalanced: the bracket year does not trade', roundTrip.details.filter(d => d.fundedYear === 2036).every(d => d.qtyAfter === d.qtyBefore), true);
 }
 
+// ── Test: Pre-Ladder Interest of the settlement year counts the coupons still to arrive (2.0 §Pre-Ladder Interest) ──
+{
+  console.log('\nPre-Ladder Interest — the settlement year counts remaining coupons only');
+  const SYR = settlementDate.getFullYear();
+  const pliBuild = (tradeDate) => runBuild({ dara: 40000, firstYear: SYR + 1, lastYear: SYR + 8, tipsMarketData, refCPI, settlementDate, preLadderInterest: true, bondHolidays, tradeDate }).summary;
+  // After the last coupon of the settlement year has paid, the first funded year being the next year leaves nothing received before it.
+  const lateYear = pliBuild(localDate(SYR + '-12-31'));
+  assert('after the last coupon of the settlement year: the pre-ladder coupon interest is 0', lateYear.preLadderCouponPool, 0);
+  assert('after the last coupon of the settlement year: the Pre-Ladder Interest is 0', lateYear.preLadderPool, 0);
+  assert('after the last coupon of the settlement year: no funded year is zeroed', lateYear.zeroedFundedYears.length, 0);
+  // Before any coupon of the settlement year has paid, every coupon of the year still arrives.
+  const earlyYear = pliBuild(localDate(SYR + '-01-02'));
+  assert('before the first coupon of the settlement year: the pre-ladder coupon interest is the full annual interest', earlyYear.preLadderCouponPool > 0, true);
+}
 // ── Test: Future 30Y rebalances — Before shows what the Cover Excess held pays (3.0 §Before and the Future 30Y rebalances) ──
 {
   console.log('\nFuture 30Y rebalances — Before with less Cover Excess held');
