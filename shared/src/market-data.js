@@ -108,11 +108,19 @@ export async function fetchTipsData() {
   if (!yieldsRes.ok) throw new Error('YieldsFromFedInvestPrices.csv: HTTP ' + yieldsRes.status);
   const { refCpiRows, tipsRefRows, saSaoRows, bondHolidays } = aux;
 
-  // YieldsFromFedInvestPrices.csv: row 1 = settlement date, row 2 = header, rows 3+ = data
-  const yieldsText = await yieldsRes.text();
-  const yieldsLines = yieldsText.trim().split('\n');
-  const settlementDate = yieldsLines[0].trim();
-  const yieldsRows = parseCsvRows(yieldsLines.slice(1).join('\n'))
+  const yieldsRows = parseFedInvestTipsRows(await yieldsRes.text());
+
+  return { yieldsRows, refCpiRows, tipsRefRows, saSaoRows, bondHolidays };
+}
+
+// Parses a file in the composition of FedInvest prices (S1): row 1 = settlement date, row 2 =
+// header, rows 3+ = data. Keeps the TIPS rows. One implementation for the live S1 and for the file
+// of a past trading day (scripts/getFedInvestPricesForDate.js), so Explore reads a past day the way
+// the dormant source reads today.
+export function parseFedInvestTipsRows(text) {
+  const lines = text.trim().split('\n');
+  const settlementDate = lines[0].trim();
+  return parseCsvRows(lines.slice(1).join('\n'))
     .filter(r => r.type === 'TIPS')
     .map(r => ({
       settlementDate,
@@ -123,8 +131,6 @@ export async function fetchTipsData() {
       price:    parseFloat(r.price)  || null,
       yield:    parseFloat(r.yield)  || null,
     }));
-
-  return { yieldsRows, refCpiRows, tipsRefRows, saSaoRows, bondHolidays };
 }
 
 // Fetches MarketQuotes.csv from R2 (ask price; yield is computed from that price via the shared

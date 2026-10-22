@@ -345,8 +345,8 @@ function cellHtml(col, v, ri, drillKey) {
   return '<td' + attr + align + '>' + esc(s) + '</td>';
 }
 
-export function renderTable({ details, mode, summary, daraByYear = null, flaggedYears = null }) {
-  const cols = COLS.filter(c => mode === 'rebal' ? !c.buildOnly : !c.rebalOnly);
+export function renderTable({ details, mode, summary, daraByYear = null, flaggedYears = null, hideKeys = [] }) {
+  const cols = COLS.filter(c => (mode === 'rebal' ? !c.buildOnly : !c.rebalOnly) && !hideKeys.includes(c.key));
 
   const headerHTML = '<thead><tr>' +
     cols.map(c => '<th data-col="' + c.key + '">' + (c.headerHTML || esc(c.label)) + '</th>').join('') +

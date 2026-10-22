@@ -36,6 +36,21 @@
   /* ── Form card ── */
   .form-card { width: fit-content; min-width: 845px; background: var(--portal-card-bg); border: 1px solid var(--portal-header-bg); border-radius: 0 0 8px 8px; padding: 10px 24px 8px; color: var(--portal-card-text); box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.4); position: relative; transition: width 0.2s ease-out; }
 
+  /* ── Explore picker ── */
+  #explore-picker { display: flex; gap: 16px; align-items: stretch; padding-bottom: 8px; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.12); }
+  #explore-chart { flex: none; background: rgba(0,0,0,0.18); border-radius: 4px; }
+  #explore-chart text { fill: var(--portal-card-text); font-size: 9px; opacity: .8; }
+  #explore-chart .grid { stroke: rgba(255,255,255,0.12); stroke-width: 1; }
+  #explore-chips { display: flex; flex-wrap: wrap; gap: 8px; align-content: flex-start; }
+  .explore-chip { text-align: left; padding: 5px 8px; border: 1px solid rgba(255,255,255,0.25); border-radius: 4px; background: var(--portal-header-bg); color: var(--portal-text-on-dark); cursor: pointer; font-size: 11px; line-height: 1.3; }
+  .explore-chip:hover { border-color: #fff; }
+  .explore-chip.selected { border-color: #fff; box-shadow: inset 0 0 0 1px #fff; background: var(--tab-active-bg); }
+  .explore-chip .chip-head { font-weight: 700; font-size: 12px; display: flex; align-items: center; gap: 5px; margin-bottom: 2px; }
+  .explore-chip .swatch { width: 10px; height: 3px; border-radius: 1px; display: inline-block; }
+  .explore-chip table { border-collapse: collapse; }
+  .explore-chip th { font-weight: 400; opacity: .7; padding: 0 5px 0 0; text-align: right; }
+  .explore-chip td { padding: 0 5px 0 0; text-align: right; font-variant-numeric: tabular-nums; }
+
   /* Selection toolbar's Set DARA / Infer DARA / Clear buttons (#selection-toolbar, 3.0 §Per-Rung
      DARA Selection). */
   .plan-btn { padding: 3px 8px; font-size: 11px; font-weight: 700; border: 1px solid var(--tab-active-bg); border-radius: 4px; background: var(--portal-header-bg); color: var(--portal-card-text); cursor: pointer; white-space: nowrap; }
@@ -518,12 +533,18 @@
     <div class="tab-group">
       <button class="tab-btn active" data-mode="rebalance">Rebalance</button>
       <button class="tab-btn" data-mode="build">Build</button>
+      <button class="tab-btn" data-mode="explore">Explore</button>
     </div>
     <div class="tab-bar-right">
       <button id="help-btn" title="Help" class="help-btn">Help</button>
     </div>
   </div>
   <div class="form-card">
+    <!-- Explore only: the historical yield curves to choose from -->
+    <div id="explore-picker" style="display:none">
+      <svg id="explore-chart" viewBox="0 0 400 140" width="400" height="140" role="img" aria-label="TIPS yield curves of the dates offered"></svg>
+      <div id="explore-chips"></div>
+    </div>
     <!-- Row 1: Import/Export, DARA, Years, Available cash -->
     <div class="card-inputs">
       <input type="file" id="holdings-file" accept=".csv" class="visually-hidden-file">
@@ -712,7 +733,8 @@ import { showPopup, hidePopup } from './src/popup.js';
 import { makeDraggableResizable } from './src/modal.js';
 import { rankForYear } from './src/allocation-policy.js';
 import { accruedInterest, bondCalcs, couponSchedule } from '../shared/src/bond-math.js';
-import { loadMarketData, lookupRefCpi, nextBondTradingDay } from '../shared/src/market-data.js';
+import { loadMarketData, lookupRefCpi, nextBondTradingDay, parseFedInvestTipsRows } from '../shared/src/market-data.js';
+import { termYears } from '../shared/src/bond-math.js';
 import { indexRatio, NO_ROUNDING } from '../shared/src/ref-cpi.js';
 import { actualPaymentDate } from '../shared/src/settlement.js';
 window.lookupRefCpi = lookupRefCpi;
@@ -861,6 +883,38 @@ document.getElementById('help-overlay').addEventListener('click', e => {
 });
 
 // ─── Load data CSVs ───────────────────────────────────────────────────────────
+// First and Last Year choices for the market now loaded (tipsMarketData, settlementDate): Build's
+// and Explore's.
+function _populateYearSelects() {
+  // The ladder's years start at the first year with a TIPS maturing after the excluded months (DD §5.1 Default First Year).
+  const bfsYears = [...new Set(tipsMaturingAfterExclusion(tipsMarketData, settlementDate).map(b => b.maturity.getFullYear()))].sort((a, b) => a - b);
+  const _bfsMinY = bfsYears[0], _bfsMaxY = bfsYears[bfsYears.length - 1];
+  const _bfsGapYears = new Set(getGapYears(tipsMarketData));
+
+  const lastYearSel = document.getElementById('last-year');
+  while (lastYearSel.options.length > 1) lastYearSel.remove(1);
+  // The ladder's last year at most: the longest issued maturity year + the Maximum Future 30Y Rungs (DD §5.1).
+  for (let y = _bfsMinY, _maxLY = maxLastYear({ tipsMarketData, settlementDate, bondHolidays: _bondHolidays }); y <= _maxLY; y++) {
+    const opt = document.createElement('option'); opt.value = y;
+    opt.textContent = _bfsGapYears.has(y) ? `${y} (gap)` : y > _bfsMaxY ? `${y} (Future 30Y)` : String(y);
+    lastYearSel.appendChild(opt);
+  }
+  // The longest-dated issued TIPS maturity: the last year the ladder can hold a real bond in,
+  // and the anchor of the Future 30Y Synthetic TIPS (2.0 §Future 30Y Rungs).
+  lastYearSel.value = _bfsMaxY;
+
+  const firstYearSel = document.getElementById('first-year');
+  while (firstYearSel.options.length > 1) firstYearSel.remove(1);
+  // Include gap years so the ladder can start inside the gap years.
+  const _bfsFirstYearOptions = [...new Set([...bfsYears, ..._bfsGapYears])].sort((a, b) => a - b);
+  _bfsFirstYearOptions.forEach(y => {
+    const opt = document.createElement('option'); opt.value = y;
+    opt.textContent = _bfsGapYears.has(y) ? `${y} (gap)` : String(y);
+    firstYearSel.appendChild(opt);
+  });
+  firstYearSel.value = defaultFirstYear(tipsMarketData, settlementDate) ?? '';
+}
+
 let tipsMarketData = null, refCpiRows = null, settlementDate = null, tipsRefMap = null;
 let _tradeDateStr = null, _settleDateStr = null; // Trade = "today" (asOfDate); Settle = T+1 (or T for dormant FedInvest)
 let _bondHolidays = null;
@@ -884,35 +938,11 @@ async function loadData() {
     _bondHolidays = bondHolidays;
     tipsMarketData = buildTipsMarketData(yieldsRows, saYieldByCusip);
 
-    // The ladder's years start at the first year with a TIPS maturing after the excluded months (DD §5.1 Default First Year).
-    const bfsYears = [...new Set(tipsMaturingAfterExclusion(tipsMarketData, settlementDate).map(b => b.maturity.getFullYear()))].sort((a, b) => a - b);
-    const _bfsMinY = bfsYears[0], _bfsMaxY = bfsYears[bfsYears.length - 1];
-    const _bfsGapYears = new Set(getGapYears(tipsMarketData));
-
-    const lastYearSel = document.getElementById('last-year');
-    while (lastYearSel.options.length > 1) lastYearSel.remove(1);
-    // The ladder's last year at most: the longest issued maturity year + the Maximum Future 30Y Rungs (DD §5.1).
-    for (let y = _bfsMinY, _maxLY = maxLastYear({ tipsMarketData, settlementDate, bondHolidays: _bondHolidays }); y <= _maxLY; y++) {
-      const opt = document.createElement('option'); opt.value = y;
-      opt.textContent = _bfsGapYears.has(y) ? `${y} (gap)` : y > _bfsMaxY ? `${y} (Future 30Y)` : String(y);
-      lastYearSel.appendChild(opt);
-    }
-    // The longest-dated issued TIPS maturity: the last year the ladder can hold a real bond in,
-    // and the anchor of the Future 30Y Synthetic TIPS (2.0 §Future 30Y Rungs).
-    lastYearSel.value = _bfsMaxY;
-
-    const firstYearSel = document.getElementById('first-year');
-    while (firstYearSel.options.length > 1) firstYearSel.remove(1);
-    // Include gap years so the ladder can start inside the gap years.
-    const _bfsFirstYearOptions = [...new Set([...bfsYears, ..._bfsGapYears])].sort((a, b) => a - b);
-    _bfsFirstYearOptions.forEach(y => {
-      const opt = document.createElement('option'); opt.value = y;
-      opt.textContent = _bfsGapYears.has(y) ? `${y} (gap)` : String(y);
-      firstYearSel.appendChild(opt);
-    });
-    firstYearSel.value = defaultFirstYear(tipsMarketData, settlementDate) ?? '';
+    _populateYearSelects();
 
     _staticInfoSuffix = yieldsRows.length + ' TIPS: <a class="info-link tips-ref-link">Ref</a> <a class="info-link tips-mkt-link">Mkt</a>';
+    _marketToday = { key: 'today', label: 'Today', tipsMarketData, settlementDate, settleDateStr, tradeDateStr,
+                     refCpiDateStr: defaultRefCpiDateStr, staticInfoSuffix: _staticInfoSuffix };
     _buildRows();
     
     document.getElementById('run-btn').disabled = false;
@@ -1035,9 +1065,13 @@ let _rebalFuture30yDurationRows = null, _buildFuture30yDurationRows = null;
 
 document.querySelectorAll('.tab-bar .tab-btn').forEach(btn => {
   btn.addEventListener('click', () => {
-    const mode = btn.dataset.mode;
-    if (mode === currentMode) return;
+    // Explore is Build's interface and output (currentMode stays 'build') with the market of the chosen date.
+    const wantExplore = btn.dataset.mode === 'explore';
+    const mode = wantExplore ? 'build' : btn.dataset.mode;
+    if (mode === currentMode && wantExplore === exploreActive) return;
+    const modeChanged = mode !== currentMode;
     currentMode = mode;
+    _setExploreActive(wantExplore);
     if (document.getElementById('help-overlay').style.display !== 'none') _syncHelpModalMode();
 
     document.querySelectorAll('.tab-bar .tab-btn').forEach(b => b.classList.remove('active'));
@@ -1046,7 +1080,9 @@ document.querySelectorAll('.tab-bar .tab-btn').forEach(btn => {
     const isRebalance = mode === 'rebalance';
     const daraEl = document.getElementById('dara');
     daraEl.step        = '1000';
-    if (isRebalance) {
+    if (!modeChanged) {
+      // Build <-> Explore: the same per-mode state stays in place
+    } else if (isRebalance) {
       _daraBuild = daraEl.value;
       _daraByYearStoreBuild = _daraByYearStore; _daraByYearPanelDefaultBuild = _daraByYearPanelDefault;
       _daraLoadedSnapshotBuild = _daraLoadedSnapshot;
@@ -2515,7 +2551,7 @@ function renderBuildOutput({ results, HDR, summary, details }) {
     buildDetails = details;
   buildSummary  = summary;
 
-  const { headerHTML: bHdr, bodyHTML: bBody, tfootHTML: bFoot } = renderTable({ details, mode: 'build', summary, daraByYear: _daraByYearStore, flaggedYears: _bracketAutoCapYears });
+  const { headerHTML: bHdr, bodyHTML: bBody, tfootHTML: bFoot } = renderTable({ details, mode: 'build', summary, daraByYear: _daraByYearStore, flaggedYears: _bracketAutoCapYears, hideKeys: exploreActive ? ['saYield'] : [] });
   const _prevBuildExpandState = _captureExpandedState(tableEl);
   tableEl.innerHTML = bHdr + bBody + bFoot;
   _restoreOrDefaultGroupsExpanded(tableEl, _prevBuildExpandState);
@@ -4269,7 +4305,7 @@ async function _showTipsRefModal(type) {
 
   let html = '<thead><tr><th>CUSIP</th><th>Maturity</th><th>Coupon</th>';
   if (type === 'Ref') html += '<th style="text-align:left">Dated Date</th><th>Dated Date Ref CPI</th>';
-  else html += '<th>Price</th><th>Index Ratio</th><th>Adj Price</th><th>Yield</th><th>SA Yield</th>';
+  else html += '<th>Price</th><th>Index Ratio</th><th>Adj Price</th><th>Yield</th>' + (exploreActive ? '' : '<th>SA Yield</th>');
   html += '</tr></thead><tbody>';
 
   const R = ' style="text-align:right"';
@@ -4287,7 +4323,7 @@ async function _showTipsRefModal(type) {
       html += '<td' + R + '>' + (ir != null ? ir.toFixed(9) : '—') + '</td>';
       html += '<td' + R + '>' + (adjPrice != null ? adjPrice.toFixed(3) : '—') + '</td>';
       html += '<td' + R + '>' + (r.yield * 100).toFixed(3) + '%</td>';
-      html += '<td' + R + '>' + (r.saYield != null ? (r.saYield * 100).toFixed(3) + '%' : '—') + '</td>';
+      if (!exploreActive) html += '<td' + R + '>' + (r.saYield != null ? (r.saYield * 100).toFixed(3) + '%' : '—') + '</td>';
     }
     html += '</tr>';
   }
@@ -4315,6 +4351,144 @@ function _clearOutput() {
   document.getElementById('cash-flow-overlay').style.display = 'none';
   _cfOpenBucket = null;
   hidePopup();
+}
+
+// ─── Explore (prototype) ─────────────────────────────────────────────────────
+// Build in the market of a past trading day: that day's FedInvest prices (T+0, files written by
+// scripts/getFedInvestPricesForDate.js), that day's Ref CPI, that day as the settlement date, and
+// only the TIPS outstanding that day.
+const EXPLORE_DATES = ['2023-10-25', '2024-09-17', '2025-01-13', '2025-09-11', '2026-10-05'];
+const EXPLORE_COLORS = ['#ffffff', '#f59e0b', '#38bdf8', '#a78bfa', '#34d399', '#f472b6'];
+const EXPLORE_TERMS = [5, 10, 20, 30];
+let exploreActive = false;
+let _marketToday = null;
+let _exploreMarkets = null;        // Map: ISO date -> market
+let _exploreSelected = 'today';
+let _exploreLoading = null;
+
+function _marketFromRows(iso, rows) {
+  const md = buildTipsMarketData(rows);
+  return { key: iso, label: _fmtMDY(iso), tipsMarketData: md, settlementDate: localDate(iso),
+           settleDateStr: iso, tradeDateStr: iso, refCpiDateStr: iso,
+           staticInfoSuffix: rows.length + ' TIPS: <a class="info-link tips-ref-link">Ref</a> <a class="info-link tips-mkt-link">Mkt</a>' };
+}
+
+// The yield of each TIPS against its term from the market's settlement date, shortest first.
+function _curveOf(m) {
+  return [...m.tipsMarketData.values()]
+    .filter(r => r.yield != null)
+    .map(r => ({ term: termYears(m.settlementDate, r.maturity), yield: r.yield * 100 }))
+    .filter(p => p.term >= 0.5)
+    .sort((a, b) => a.term - b.term);
+}
+
+// Linear between the two TIPS either side of the term; a term up to a year past the longest TIPS
+// takes the longest TIPS' yield.
+function _yieldAtTerm(curve, t) {
+  if (!curve.length || t < curve[0].term) return null;
+  const last = curve[curve.length - 1];
+  if (t > last.term) return t - last.term <= 1 ? last.yield : null;
+  for (let i = 1; i < curve.length; i++) {
+    if (curve[i].term >= t) {
+      const a = curve[i - 1], b = curve[i];
+      return b.term === a.term ? b.yield : a.yield + (b.yield - a.yield) * (t - a.term) / (b.term - a.term);
+    }
+  }
+  return null;
+}
+
+async function _loadExploreMarkets() {
+  if (_exploreMarkets) return;
+  if (!_exploreLoading) {
+    _exploreLoading = Promise.all(EXPLORE_DATES.map(async iso => {
+      const res = await fetch('./data/explore/YieldsFromFedInvestPrices-' + iso + '.csv');
+      if (!res.ok) throw new Error('Prices of ' + iso + ': HTTP ' + res.status);
+      return [iso, _marketFromRows(iso, parseFedInvestTipsRows(await res.text()))];
+    })).then(entries => { _exploreMarkets = new Map(entries); });
+  }
+  await _exploreLoading;
+}
+
+function _exploreList() {
+  return [_marketToday, ...(_exploreMarkets ? EXPLORE_DATES.map(d => _exploreMarkets.get(d)) : [])].filter(Boolean);
+}
+
+function _renderExplorePicker() {
+  const list = _exploreList();
+  const curves = list.map(_curveOf);
+  // chart
+  const W = 400, H = 140, L = 34, R = 8, T = 8, B = 20;
+  const ys = curves.flat().map(p => p.yield);
+  const yMin = Math.floor(Math.min(...ys) * 2) / 2, yMax = Math.ceil(Math.max(...ys) * 2) / 2;
+  const X = t => L + (W - L - R) * t / 30;
+  const Y = v => T + (H - T - B) * (1 - (v - yMin) / ((yMax - yMin) || 1));
+  let svg = '';
+  for (let v = yMin; v <= yMax + 1e-9; v += 0.5) {
+    svg += '<line class="grid" x1="' + L + '" x2="' + (W - R) + '" y1="' + Y(v) + '" y2="' + Y(v) + '"/><text x="' + (L - 4) + '" y="' + (Y(v) + 3) + '" text-anchor="end">' + v.toFixed(1) + '%</text>';
+  }
+  for (let t = 0; t <= 30; t += 5) svg += '<text x="' + X(t) + '" y="' + (H - 6) + '" text-anchor="middle">' + t + '</text>';
+  const order = list.map((m, i) => i).sort((a, b) => (list[a].key === _exploreSelected) - (list[b].key === _exploreSelected));
+  for (const i of order) {
+    const sel = list[i].key === _exploreSelected;
+    svg += '<polyline fill="none" stroke="' + EXPLORE_COLORS[i] + '" stroke-width="' + (sel ? 2.2 : 1.1) + '" opacity="' + (sel ? 1 : 0.65) + '" points="' +
+      curves[i].map(p => X(p.term).toFixed(1) + ',' + Y(p.yield).toFixed(1)).join(' ') + '"/>';
+  }
+  document.getElementById('explore-chart').innerHTML = svg;
+  // chips
+  document.getElementById('explore-chips').innerHTML = list.map((m, i) => {
+    const cells = EXPLORE_TERMS.map(t => { const v = _yieldAtTerm(curves[i], t); return '<td>' + (v == null ? '—' : v.toFixed(2) + '%') + '</td>'; }).join('');
+    return '<button type="button" class="explore-chip' + (m.key === _exploreSelected ? ' selected' : '') + '" data-key="' + m.key + '">' +
+      '<div class="chip-head"><span class="swatch" style="background:' + EXPLORE_COLORS[i] + '"></span>' + (m.key === 'today' ? 'Today' : m.label) + '</div>' +
+      '<table><tr>' + EXPLORE_TERMS.map(t => '<th>' + t + 'y</th>').join('') + '</tr><tr>' + cells + '</tr></table></button>';
+  }).join('');
+}
+
+document.getElementById('explore-chips').addEventListener('click', e => {
+  const chip = e.target.closest('.explore-chip');
+  if (chip) _selectExploreMarket(chip.dataset.key);
+});
+
+// Points the app's market globals at one market and re-derives what hangs off them.
+function _useMarket(m) {
+  tipsMarketData = m.tipsMarketData; settlementDate = m.settlementDate;
+  _settleDateStr = m.settleDateStr; _tradeDateStr = m.tradeDateStr; _defaultRefCpiDateStr = m.refCpiDateStr;
+  _staticInfoSuffix = m.staticInfoSuffix;
+  _populateYearSelects();
+  _buildRows();
+}
+
+function _clearBuildResult() {
+  buildRendered = false; buildDetails = null; buildSummary = null;
+  _buildDurationRows = null; _buildFuture30yDurationRows = null;
+  tableEl.innerHTML = '';
+}
+
+// A chosen date reruns the build at once; the DARA stays as typed.
+function _selectExploreMarket(key) {
+  const m = key === 'today' ? _marketToday : _exploreMarkets?.get(key);
+  if (!m) return;
+  _exploreSelected = key;
+  _useMarket(m);
+  _renderExplorePicker();
+  renderDaraByYearPanel();
+  setStatus('');
+  try { _runBuildFromForm(); } catch (err) { setStatus(err.message, true); }
+  updateDaraInput();
+}
+
+async function _setExploreActive(on) {
+  exploreActive = on;
+  document.getElementById('explore-picker').style.display = on ? 'flex' : 'none';
+  document.getElementById('avg-sa-yld-display').style.display = on ? 'none' : '';
+  if (on) {
+    try { await _loadExploreMarkets(); } catch (err) { setStatus(err.message, true); }
+    _renderExplorePicker();
+  } else if (_exploreSelected !== 'today') {
+    // Back to Build (or Rebalance): today's market, and no result priced on another day.
+    _exploreSelected = 'today';
+    _useMarket(_marketToday);
+    _clearBuildResult();
+  }
 }
 
 loadData();
