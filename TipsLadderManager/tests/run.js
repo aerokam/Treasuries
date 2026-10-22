@@ -3180,6 +3180,29 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
   assert('Build with all maturity months, imported and rebalanced: the bracket year does not trade', roundTrip.details.filter(d => d.fundedYear === 2036).every(d => d.qtyAfter === d.qtyBefore), true);
 }
 
+// ── Test: the retained lower bracket of a file with no DARA plan follows the shape of the ladder ──────
+// The Per-Year DARA derived from the holdings is the curve at a spike year and the ARA elsewhere, so only a spike year has an Excess ARA
+// above 0 (3.0 §Per-Year DARA from Portfolio step 3; §Retained Maturities step 2).
+{
+  console.log('\nRetained lower bracket from the shape of the ladder (no DARA plan)');
+  const built = runBuild({ dara: 15000, firstYear: 2027, lastYear: 2036, tipsMarketData, refCPI, settlementDate, maturityPref: 'last', bondHolidays });
+  const rebalanceFrom = (spikeYear) => {
+    const held = built.details.map(d => ({ cusip: d.cusip, qty: d.fundedYearQty + (d.excessQty ?? 0) }));
+    if (spikeYear) held.find(h => tipsMarketData.get(h.cusip).maturity.getFullYear() === spikeYear).qty *= 4;
+    const rawARA = computePortfolioARAByYear(held, tipsMarketData, refCPI, { firstYear: 2027, lastYear: 2040 });
+    const { daraMap } = derivePerYearDara(rawARA, getGapYearBracketCandidates(tipsMarketData, 2040), new Set(getGapYears(tipsMarketData)), true);
+    for (const [y, v] of daraMap) daraMap.set(y, Math.round(v));
+    return runFundedRebalance({ dara: 15000, bracketMode: '3bracket', holdings: held, tipsMarketData, refCPI, settlementDate, daraByYear: daraMap, daraPlanUnedited: true,
+      lastYearOverride: 2040, firstYearOverride: 2027, maturityPref: 'last', bondHolidays });
+  };
+  const flat = rebalanceFrom(null);
+  assert('a ladder with no spike has no retained lower bracket: the lower bracket is the active lower bracket', flat.summary.brackets.lowerYear, flat.summary.newLowerYear);
+  assert('a ladder with no spike has no retained maturity', (flat.summary.retainedLegs ?? []).length, 0);
+  for (const y of [2032, 2034]) {
+    const spiked = rebalanceFrom(y);
+    assert('a spike in ' + y + ' makes ' + y + ' the retained lower bracket', spiked.summary.brackets.lowerYear, y);
+  }
+}
 // ── Test: same-maturity-year retained TIPS is recognized on its own, independent of whether a
 // separate, older bracket YEAR is also retained — and an already-correct reload is a no-op ────────
 // 2.0 §Retained Bracket Excess ("independently, any OTHER held CUSIP sharing the active lower
