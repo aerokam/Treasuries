@@ -48,7 +48,6 @@ External sources are read by scheduled jobs (process 1 on Level 1), which write 
 | [Treasury_CUSIP_Reference.md](./Treasury_CUSIP_Reference.md) | CUSIP structure and lookup reference |
 | [VERIFICATION_SUITE.md](./VERIFICATION_SUITE.md) | Manual checks of the knowledge map and viewer |
 | [Testing.md](./Testing.md) | Automated test suites per app and which ones run before a push |
-| [Admin_Dashboard.md](./Admin_Dashboard.md) | Local monitoring dashboard for pipeline health |
 
 ---
 

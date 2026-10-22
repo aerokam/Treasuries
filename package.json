@@ -8,7 +8,6 @@
     "YieldCurves"
   ],
   "scripts": {
-    "dashboard": "node Dashboard/server.js",
     "test:Unit:TipsLadderManager": "npm run test:Unit:TipsLadderManager -w TipsLadderManager",
     "test:UI:TipsLadderManager": "playwright test -c TipsLadderManager/playwright.config.js",
     "test:UI:TipsLadderManager:SampleHoldings": "playwright test -c TipsLadderManager/playwright.config.js --grep @SampleHoldings",
@@ -21,7 +20,6 @@
     "test:Unit:CpiExplorer": "node --test \"CpiExplorer/tests/Unit/*.test.js\""
   },
   "dependencies": {
-    "express": "^4.21.2",
     "marked": "^17.0.5",
     "puppeteer": "^25.4.0",
     "xlsx": "^0.18.5"
