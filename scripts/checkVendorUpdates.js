@@ -24,6 +24,10 @@ function listed() {
   return rows;
 }
 
+// Packages whose file is large enough that each committed version adds noticeably to the
+// repository; for these only a security advisory is reported, not a newer version.
+const ADVISORY_ONLY = new Set(['mermaid']);
+
 const major = v => Number(v.split('.')[0]);
 const newer = (a, b) => {
   const x = a.split('.').map(Number), y = b.split('.').map(Number);
@@ -52,6 +56,7 @@ async function check() {
   if (!rows.length) throw new Error(`no libraries found in ${README}`);
   const lines = [];
   for (const r of rows) {
+    if (ADVISORY_ONLY.has(r.name)) continue;
     const latest = await latestOf(r.name);
     if (newer(latest, r.version)) {
       lines.push(`${r.name} ${r.version} -> ${latest}${major(latest) > major(r.version) ? ' (new major version: ask before updating)' : ''}`);
