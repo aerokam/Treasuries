@@ -1428,6 +1428,35 @@ test('round-trip: build to the last Future 30Y year → export CUSIP/Qty → imp
   expect(Math.abs(netCash), 'round-trip net cash must be ~0').toBeLessThan(2000);
 });
 
+// A Rebalance of a ladder with no retained lower bracket has one lower bracket year: its group header names it the
+// Lower bracket year, not a Retained lower bracket year.
+test('rebalance of a built ladder: the lower bracket year is not called a Retained lower bracket year', async ({ page }) => {
+  test.setTimeout(30_000);
+  await page.locator('.tab-btn[data-mode="build"]').click();
+  const lastYearSel = page.locator('#last-year');
+  await lastYearSel.selectOption({ index: (await lastYearSel.locator('option').count()) - 1 });
+  await page.locator('#dara').fill('40000');
+  await page.locator('#run-btn').click();
+  await expect(page.locator('#build-output')).toHaveCSS('display', 'block', { timeout: 4_000 });
+  const downloadPromise = page.waitForEvent('download');
+  await chooseMenu(page, 'export-menu', 'cusip-qty');
+  const download = await downloadPromise;
+  const csvPath = test.info().outputPath('lower-bracket-label.csv');
+  await download.saveAs(csvPath);
+
+  await page.locator('.tab-btn[data-mode="rebalance"]').click();
+  await page.locator('#holdings-file').setInputFiles(csvPath);
+  await page.locator('#dara').fill('40000');
+  await page.locator('#run-btn').click();
+  await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 6_000 });
+
+  const roles = await page.locator('#simple-table .bracket-tip-target').evaluateAll(els =>
+    els.map(e => decodeURIComponent(e.getAttribute('data-tip-html')).replace(/<[^>]*>/g, ' ').trim().split(':')[0]));
+  expect(roles, 'no Retained lower bracket year without a retained lower bracket').not.toContain('Retained lower bracket year');
+  expect(roles).toContain('Lower bracket year');
+  expect(roles).toContain('Upper bracket year');
+});
+
 // ── The gap year amounts in a funded year's Amount (2.0 §Gap Year Simulated Outstanding TIPS §Interest credited to a funded year) ──
 // A funded year before the first gap year is credited with the interest of the Simulated Outstanding Future 10Y TIPS, the
 // interest of the Excess TIPS and the Net Cash of the issue dates in its year, each its own line in the Amount popup; the lines

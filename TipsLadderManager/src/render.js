@@ -154,6 +154,9 @@ function bracketRoleLabel(fy, groupRows, mode, summary) {
   if (mode === 'rebal') {
     const b = summary.brackets || {};
     if (summary.bracketMode === '3bracket' && summary.newLowerYear != null) {
+      // A retained lower bracket year is one that differs from the active lower bracket year; when the two coincide
+      // there is only the lower bracket year.
+      if (fy === summary.newLowerYear && fy === b.lowerYear) return 'Lower bracket year';
       if (fy === b.lowerYear)        return 'Retained lower bracket year';
       if (fy === summary.newLowerYear) return 'Active lower bracket year';
       if (fy === b.upperYear)        return 'Upper bracket year';
