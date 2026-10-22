@@ -2,7 +2,7 @@
 // into the sibling private repository Treasuries-local (same relative paths), then commits and
 // pushes when anything changed. .env is never copied.
 //
-// Run by the LocalBackup scheduled task every 5 minutes (scripts/setup-windows-tasks.ps1).
+// Run by the LocalBackup scheduled task daily (scripts/setup-windows-tasks.ps1).
 import fs from 'fs';
 import path from 'path';
 import { execFileSync } from 'child_process';
