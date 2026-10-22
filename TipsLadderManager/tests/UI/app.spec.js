@@ -151,6 +151,9 @@ test.beforeEach(async ({ page }) => {
   await page.goto('./');
   // Wait for data load: run button must be enabled
   await expect(page.locator('#run-btn')).not.toBeDisabled({ timeout: 4_000 });
+  // The run button is enabled before the startup preload of the sample holdings and their DARA plan
+  // has finished; a test that uploads its own file in that window races it.
+  await expect(page.locator('html')).toHaveAttribute('data-startup-loaded', 'true', { timeout: 4_000 });
 });
 
 // A TIPS maturing within EXCLUDE_MATURING_WITHIN_MONTHS months of the Settlement Date is not counted: the First Year choices and the default start at

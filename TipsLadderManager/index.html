@@ -929,16 +929,20 @@ async function loadData() {
           const dt = new DataTransfer(); dt.items.add(file);
           fileInput.files = dt.files;
           fileInput.dispatchEvent(new Event('change'));
+          // The 'change' handler has taken its token by now; a later upload takes a newer one, and
+          // the sample DARA plan below must not land on top of that upload.
+          const preloadToken = _holdingsLoadToken;
           // Chain the matching sample DARA plan once the holdings load has actually finished
           // setting up the per-year panel (_panelYearRange) -- the 'change' handler above is async
           // and dispatchEvent doesn't wait for it, so poll briefly rather than race it.
           for (let i = 0; i < 100 && !_panelYearRange; i++) await new Promise(r => setTimeout(r, 50));
-          if (_panelYearRange) {
+          if (_panelYearRange && _holdingsLoadToken === preloadToken) {
             let planPath = './data/SampleDaraPlan.csv';
             let planRes = await fetch(planPath);
             if (!planRes.ok) { planPath = 'data/SampleDaraPlan.csv'; planRes = await fetch(planPath); }
-            if (planRes.ok) {
+            if (planRes.ok && _holdingsLoadToken === preloadToken) {
               const planBlob = await planRes.blob();
+              if (_holdingsLoadToken !== preloadToken) return;
               const planFile = new File([planBlob], 'SampleDaraPlan.csv', { type: 'text/csv' });
               const planDt = new DataTransfer(); planDt.items.add(planFile);
               const planInput = document.getElementById('dara-plan-import-file');
@@ -952,6 +956,10 @@ async function loadData() {
   } catch (err) {
     console.error('loadData() failed:', err);
     setStatus('Market data failed to load. Try reloading the page in a few minutes.', true);
+  } finally {
+    // Startup is over once the sample holdings and their DARA plan are in (or were skipped); the UI
+    // tests wait for this before they touch the page.
+    document.documentElement.dataset.startupLoaded = 'true';
   }
 }
 
