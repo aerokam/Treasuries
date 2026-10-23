@@ -10,6 +10,7 @@ memory/
 data/*
 !data/SampleHoldings.csv
 !data/SampleDaraPlan.csv
+!data/explore/
 # Wrangler local state
 .wrangler/
 tips-data-worker/.wrangler/
