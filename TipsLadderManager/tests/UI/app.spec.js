@@ -2848,7 +2848,11 @@ for (const { kind, dara, pli } of [{ kind: 'gap', dara: '80000', pli: true }, { 
       expect(shown, why('the numbers end with the quotient and the Quantity: ' + q.numbers)).not.toBeNull();
       expect(Math.abs(quotient - Number(shown[1])), why('the quotient agrees with the displayed inputs')).toBeLessThan(0.01);
       const qtyVal = moneyOf(q.value);
-      expect(qtyVal, why('Quantity is the rounded quotient, not below 0')).toBe(Math.max(0, Math.round(Number(shown[1]))));
+      // The quotient is shown to 2 decimals, so 30.4958 reads 30.50 and rounds to 30: the Quantity is the integer the
+      // numbers state, and that integer is within half a unit (plus the 0.01 display tolerance) of the quotient.
+      const statedQty = shown[2] != null ? Number(shown[2]) : 0;
+      expect(qtyVal, why('Quantity is the rounded quotient, not below 0')).toBe(statedQty);
+      expect(Math.abs(Math.max(0, quotient) - statedQty), why('the stated Quantity is the quotient rounded to a whole TIPS')).toBeLessThanOrEqual(0.51);
       qtyByYear.set(year, qtyVal);
 
       // Cost per TIPS = (Price / 100) x Index Ratio x 1,000, from the displayed Price and Index Ratio.
