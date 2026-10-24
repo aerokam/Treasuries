@@ -1070,8 +1070,10 @@ document.querySelectorAll('.tab-bar .tab-btn').forEach(btn => {
     const mode = wantExplore ? 'build' : btn.dataset.mode;
     if (mode === currentMode && wantExplore === exploreActive) return;
     const modeChanged = mode !== currentMode;
+    const wasExplore = exploreActive;
+    if (wasExplore && !wantExplore) _leaveExploreState(_setExploreActive);
     currentMode = mode;
-    _setExploreActive(wantExplore);
+    if (wantExplore) _setExploreActive(true);
     if (document.getElementById('help-overlay').style.display !== 'none') _syncHelpModalMode();
 
     document.querySelectorAll('.tab-bar .tab-btn').forEach(b => b.classList.remove('active'));
@@ -1134,7 +1136,7 @@ document.querySelectorAll('.tab-bar .tab-btn').forEach(btn => {
     // both modes now that Rebalance's target side reads it too (rebalance-lib.js allocationPolicy
     // B) -- previously Build-only. Value + per-year picks are swapped per-mode above, same as every
     // other control on this card.
-    document.getElementById('build-maturity').value = isRebalance ? _maturityPrefRebal : _maturityPrefBuild;
+    if (modeChanged) document.getElementById('build-maturity').value = isRebalance ? _maturityPrefRebal : _maturityPrefBuild;
     _updateMaturityOptionLabel('Select maturities…');
     _maturityListOpenPending = false;
     if (isRebalance) _closeMaturityPickerModal();
@@ -1156,7 +1158,7 @@ document.querySelectorAll('.tab-bar .tab-btn').forEach(btn => {
     // now-visible First/Last Year pair (set just above) when that mode is mid-Select-maturities.
     _updateCouponFieldVisibility();
     _updateAllocPolicyLock();
-
+    const seededExplore = wantExplore && !wasExplore && _enterExploreState();
 
     _syncAvailableCashInput();
     document.getElementById('run-btn').textContent = isRebalance ? 'Rebalance Ladder' : 'Build Ladder';
@@ -1193,6 +1195,7 @@ document.querySelectorAll('.tab-bar .tab-btn').forEach(btn => {
     if (_defaultRefCpiDateStr) _buildRows();
     setStatus('');
     renderDaraByYearPanel();
+    if (seededExplore) { try { _runBuildFromForm(); } catch (err) { setStatus(err.message, true); } }
   });
 });
 
@@ -4017,6 +4020,7 @@ function _runBuildFromForm() {
 // ─── Run handler ──────────────────────────────────────────────────────────────
 document.getElementById('run-btn').addEventListener('click', async () => {
   setStatus('');
+  _noteRun();
 
   try {
     if (currentMode === 'build') {
@@ -4469,6 +4473,7 @@ function _selectExploreMarket(key) {
   if (!m) return;
   _exploreSelected = key;
   _useMarket(m);
+  _setYearSelects(_exploreWantYears?.first, _exploreWantYears?.last);
   _renderExplorePicker();
   renderDaraByYearPanel();
   setStatus('');
@@ -4484,12 +4489,111 @@ async function _setExploreActive(on) {
     try { await _loadExploreMarkets(); } catch (err) { setStatus(err.message, true); }
     _renderExplorePicker();
   } else if (_exploreSelected !== 'today') {
-    // Back to Build (or Rebalance): today's market, and no result priced on another day.
+    // Back to Build (or Rebalance): today's market.
     _exploreSelected = 'today';
     _useMarket(_marketToday);
-    _clearBuildResult();
   }
 }
+
+// ─── Explore starts from the last run (this page load only) ──────────────────
+// The form Explore starts from is the form of the most recent Rebalance Ladder or Build Ladder click,
+// whichever came last; Rebalance counts only once a holdings or DARA plan file other than the sample
+// has been loaded. Build's own form and result are set aside while Explore is on screen and put back
+// when it is left.
+let _lastRun = null, _runSeq = 0;           // { mode, snap, seq } of the last such click
+let _buildStash = null;                     // Build's form and result while Explore is on screen
+let _exploreState = null;                   // Explore's form while it is not on screen
+let _exploreSeededSeq = 0;                  // the run Explore last started from
+let _exploreWantYears = null;               // { first, last } to keep when a date is chosen
+
+function _yearOf(id) { return parseInt(document.getElementById(id).value) || null; }
+
+// The settings a run uses, as they stand on the tab on screen.
+function _captureForm() {
+  const rebal = currentMode === 'rebalance';
+  let firstYear = _yearOf(rebal ? 'rebal-first-year' : 'first-year');
+  let lastYear = _yearOf(rebal ? 'rebal-last-year' : 'last-year');
+  if (rebal && _daraByYearStore.size) {
+    const ys = [..._daraByYearStore.keys()];
+    firstYear = Math.min(...ys); lastYear = Math.max(...ys);
+  }
+  return {
+    dara: document.getElementById('dara').value,
+    store: new Map(_daraByYearStore), panelDefault: _daraByYearPanelDefault,
+    loadedSnapshot: _daraLoadedSnapshot ? new Map(_daraLoadedSnapshot) : null,
+    manualYears: new Set(_daraManualYears), bracketAutoCap: new Set(_bracketAutoCapYears),
+    maturityPref: document.getElementById('build-maturity').value,
+    overrides: new Map([..._yearMaturityOverrides].map(([y, c]) => [y, [...c]])),
+    coupon: document.getElementById('build-coupon').value,
+    preLadder: document.getElementById('pre-ladder-interest').checked,
+    firstYear, lastYear,
+  };
+}
+
+// First and Last Year where the market in use has that year; otherwise the market's own default stays.
+function _setYearSelects(first, last) {
+  for (const [id, y] of [['first-year', first], ['last-year', last]]) {
+    const el = document.getElementById(id);
+    if (y != null && [...el.options].some(o => +o.value === y)) el.value = String(y);
+  }
+}
+
+// Puts a captured form on the Build-side controls (the tab on screen is Build or Explore).
+function _applyForm(s) {
+  document.getElementById('dara').value = s.dara;
+  _daraByYearStore = new Map(s.store); _daraByYearPanelDefault = s.panelDefault;
+  _daraLoadedSnapshot = s.loadedSnapshot ? new Map(s.loadedSnapshot) : null;
+  _daraManualYears = new Set(s.manualYears); _bracketAutoCapYears = new Set(s.bracketAutoCap);
+  _yearMaturityOverrides = new Map([...s.overrides].map(([y, c]) => [y, [...c]]));
+  document.getElementById('build-maturity').value = s.maturityPref;
+  document.getElementById('build-coupon').value = s.coupon;
+  document.getElementById('pre-ladder-interest').checked = s.preLadder;
+  _setYearSelects(s.firstYear, s.lastYear);
+  _updateMaturityOptionLabel('Select maturities…');
+  _updateCouponFieldVisibility();
+}
+
+// Rebalance counts once a holdings or DARA plan file the user chose is loaded; the sample files the
+// page loads at start do not.
+function _rebalanceHasLoadedFiles() {
+  const h = document.getElementById('holdings-file').files[0];
+  const p = document.getElementById('dara-plan-import-file').files[0];
+  return !!currentHoldingsArray && ((h && h.name !== 'SampleHoldings.csv') || (p && p.name !== 'SampleDaraPlan.csv'));
+}
+
+function _noteRun() {
+  if (exploreActive) return;
+  if (currentMode === 'rebalance' && !_rebalanceHasLoadedFiles()) return;
+  _lastRun = { mode: currentMode, snap: _captureForm(), seq: ++_runSeq };
+}
+
+// Returns true when Explore starts from a run (its result is then built at once).
+function _enterExploreState() {
+  _buildStash = { form: _captureForm(), built: buildRendered };
+  if (_lastRun && _lastRun.seq !== _exploreSeededSeq) {
+    _exploreSeededSeq = _lastRun.seq;
+    _applyForm(_lastRun.snap);
+    _exploreWantYears = { first: _lastRun.snap.firstYear, last: _lastRun.snap.lastYear };
+    _clearBuildResult();
+    return true;
+  }
+  if (_exploreState) { _applyForm(_exploreState); _clearBuildResult(); return _exploreState.built; }
+  return false;
+}
+
+// Leaving Explore: its form is kept, today's market and Build's form and result come back.
+function _leaveExploreState(setExploreActive) {
+  _exploreState = { ..._captureForm(), built: buildRendered };
+  setExploreActive(false);
+  if (_buildStash) {
+    _applyForm(_buildStash.form);
+    if (_buildStash.built) _runBuildFromForm(); else _clearBuildResult();
+  }
+}
+
+['first-year', 'last-year'].forEach(id => document.getElementById(id).addEventListener('change', () => {
+  if (exploreActive) _exploreWantYears = { ...(_exploreWantYears || {}), [id === 'first-year' ? 'first' : 'last']: _yearOf(id) };
+}));
 
 loadData();
 </script>
