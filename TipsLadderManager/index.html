@@ -4472,8 +4472,9 @@ function _selectExploreMarket(key) {
   const m = key === 'today' ? _marketToday : _exploreMarkets?.get(key);
   if (!m) return;
   _exploreSelected = key;
+  _exploreShape ??= _shapeFrom(_yearOf('first-year'), _yearOf('last-year'));
   _useMarket(m);
-  _setYearSelects(_exploreWantYears?.first, _exploreWantYears?.last);
+  _applyShape(_exploreShape);
   _renderExplorePicker();
   renderDaraByYearPanel();
   setStatus('');
@@ -4504,7 +4505,7 @@ let _lastRun = null, _runSeq = 0;           // { mode, snap, seq } of the last s
 let _buildStash = null;                     // Build's form and result while Explore is on screen
 let _exploreState = null;                   // Explore's form while it is not on screen
 let _exploreSeededSeq = 0;                  // the run Explore last started from
-let _exploreWantYears = null;               // { first, last } to keep when a date is chosen
+let _exploreShape = null;                   // { count, lastOffset } to keep when a date is chosen
 
 function _yearOf(id) { return parseInt(document.getElementById(id).value) || null; }
 
@@ -4536,6 +4537,26 @@ function _setYearSelects(first, last) {
     const el = document.getElementById(id);
     if (y != null && [...el.options].some(o => +o.value === y)) el.value = String(y);
   }
+}
+
+// The number of funded years, and the Last Year's distance from the settlement year, of the ladder shown.
+function _shapeFrom(first, last) {
+  return first != null && last != null && last >= first
+    ? { count: last - first + 1, lastOffset: last - settlementDate.getFullYear() } : null;
+}
+
+// In the market in use: the Last Year is the latest year offered that is no later than the same distance
+// from the settlement year, and the First Year is the earliest year offered that leaves the same number of
+// funded years; where the market offers no such year, its default stays.
+function _applyShape(shape) {
+  if (!shape) return;
+  const offered = id => [...document.getElementById(id).options].map(o => parseInt(o.value)).filter(Number.isFinite);
+  const lastTarget = settlementDate.getFullYear() + shape.lastOffset;
+  const last = offered('last-year').filter(y => y <= lastTarget).pop();
+  if (last == null) return;
+  const firstTarget = last - shape.count + 1;
+  const first = offered('first-year').find(y => y >= firstTarget && y <= last);
+  _setYearSelects(first, last);
 }
 
 // Puts a captured form on the Build-side controls (the tab on screen is Build or Explore).
@@ -4570,10 +4591,11 @@ function _noteRun() {
 // Returns true when Explore starts from a run (its result is then built at once).
 function _enterExploreState() {
   _buildStash = { form: _captureForm(), built: buildRendered };
+  _exploreShape = null;
   if (_lastRun && _lastRun.seq !== _exploreSeededSeq) {
     _exploreSeededSeq = _lastRun.seq;
     _applyForm(_lastRun.snap);
-    _exploreWantYears = { first: _lastRun.snap.firstYear, last: _lastRun.snap.lastYear };
+    _exploreShape = _shapeFrom(_lastRun.snap.firstYear, _lastRun.snap.lastYear);
     _clearBuildResult();
     return true;
   }
@@ -4592,7 +4614,7 @@ function _leaveExploreState(setExploreActive) {
 }
 
 ['first-year', 'last-year'].forEach(id => document.getElementById(id).addEventListener('change', () => {
-  if (exploreActive) _exploreWantYears = { ...(_exploreWantYears || {}), [id === 'first-year' ? 'first' : 'last']: _yearOf(id) };
+  if (exploreActive) _exploreShape = _shapeFrom(_yearOf('first-year'), _yearOf('last-year'));
 }));
 
 loadData();
