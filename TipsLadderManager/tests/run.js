@@ -3084,6 +3084,30 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
       assert(`Select maturities, ${label}: the held Apr TIPS outside the picks is sold in full`, qtyDeltaFor(details, APR27), -aprHeld);
       assert(`Select maturities, ${label}: the picked TIPS do not sell`, qtyDeltaFor(details, JAN27) >= 0 && qtyDeltaFor(details, OCT27) >= 0, true);
     }
+    // (7) Equal split where every TIPS of the year is held below its Build quantity: Rebalance ends on the quantities Build gives, whichever TIPS is
+    // held least, because the latest-maturing TIPS takes the rounding remainder in both (3.0 §Target CUSIP resolution; 2.0 §Multi-TIPS Funded-Year Split).
+    // Swept over the need and over every mix of small holdings, since the two only part ways where the rounding of the shares falls on different TIPS.
+    {
+      const candidates = ['ALLOCNEW', APR27, OCT27];
+      const picks = new Map([[Y, candidates]]);
+      const heldSteps = [0, 1, 4, 7];
+      for (const mult of [2.4, 2.7, 3, 3.3, 3.6]) {
+        const dara = Math.round(scaledMedian * mult);
+        const dm = new Map([[Y, dara]]);
+        const built = runBuild({ dara, firstYear: Y, lastYear: Y, tipsMarketData, refCPI, settlementDate, daraByYear: dm, maturityPref: 'last', yearOverrides: picks });
+        const buildQty = c => built.details.find(d => d.cusip === c && d.fundedYear === Y)?.fundedYearQty ?? 0;
+        const misses = [];
+        let runs = 0;
+        for (const j of heldSteps) for (const a of heldSteps) for (const o of heldSteps) {
+          const held = [['ALLOCNEW', j], [APR27, a], [OCT27, o]].filter(([, q]) => q > 0).map(([cusip, qty]) => ({ cusip, qty }));
+          const { details } = runAlloc({ dara, holdings: held, tipsMarketData, refCPI, settlementDate, daraByYear: dm, maturityPref: 'select', yearOverrides: picks });
+          runs++;
+          const ends = candidates.map(c => details.find(d => d.cusip === c && d.fundedYear === Y)?.qtyAfter ?? 0);
+          if (candidates.some((c, k) => ends[k] !== buildQty(c))) misses.push(`held ${j}/${a}/${o} ends ${ends.join('/')}`);
+        }
+        assert(`Equal split, need x${mult}: all ${runs} mixes of small holdings end on the Build quantities ${candidates.map(buildQty).join('/')}${misses.length ? ' (' + misses.slice(0, 3).join('; ') + ')' : ''}`, misses.length, 0);
+      }
+    }
     // (6) Equal split: a candidate not held is a member of the levelled set with value 0, so a year that buys
     // buys into every candidate (3.0 §Target CUSIP resolution), as a Build splits the need across them (2.0 §Multi-TIPS Funded-Year Split).
     {

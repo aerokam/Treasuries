@@ -1675,6 +1675,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
         const yearPIHeld = curPI;
         const yearFalls = needed < yearPIHeld, yearRises = needed > yearPIHeld;
         const isEqualLevel = (!isBracket || bracketEqual) && allocationPolicy === 'equal' && nonTarget.length > 0;
+        let targetEqualQty = null;    // targetCUSIP's funded quantity when another TIPS of the year takes the Equal split's remainder
         if (isEqualLevel) {
           // Equal split levels rather than drains in fixed order -- see levelValues (3.0 §Within-
           // Year Allocation Policy). Pool is the target plus whatever's currently held besides it;
@@ -1683,12 +1684,28 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
           const poolValues = new Map([...(targetUnpicked ? [] : [[targetCUSIP, targetFundedHeld * piMap[targetCUSIP]]]),
             ...nonTarget.map(h => [h.cusip, h.qty * piMap[h.cusip]])]);
           const leveled = levelValues(poolValues, needed);
+          // Rounding each maturity to whole TIPS must not turn the leveling into a trade against the year's direction.
+          const inDirection = (qty, heldQty) => yearFalls ? Math.min(qty, heldQty) : yearRises ? Math.max(qty, heldQty) : heldQty;
+          // In an ordinary year the latest-maturing TIPS of the set takes the rounding remainder, as the last TIPS of a Build
+          // does (2.0 §Multi-TIPS Funded-Year Split), so the split is the Build's wherever no held quantity prevents it.
+          // A bracket year keeps the remainder on targetCUSIP.
+          const maturityMs = c => tipsMarketData.get(c)?.maturity?.getTime?.() ?? 0;
+          const remainderCusip = isBracket ? targetCUSIP
+            : [...poolValues.keys()].reduce((a, b) => maturityMs(b) > maturityMs(a) ? b : a);
           for (const h of nonTarget) {
-            let newQty = Math.max(0, Math.round(leveled.get(h.cusip) / piMap[h.cusip]));
-            // Rounding each maturity to whole TIPS must not turn the leveling into a trade against the year's direction.
-            if (yearFalls) newQty = Math.min(newQty, h.qty); else if (yearRises) newQty = Math.max(newQty, h.qty); else newQty = h.qty;
+            if (h.cusip === remainderCusip) continue;
+            const newQty = inDirection(Math.max(0, Math.round(leveled.get(h.cusip) / piMap[h.cusip])), h.qty);
             curPI -= (h.qty - newQty) * piMap[h.cusip];
             postRebalQtyMap[h.cusip] = newQty;
+          }
+          if (remainderCusip !== targetCUSIP) {
+            // targetCUSIP is sized like the others, and the remainder lands on the nonTarget TIPS that matures last.
+            targetEqualQty = inDirection(Math.max(0, Math.round(leveled.get(targetCUSIP) / piMap[targetCUSIP])), targetFundedHeld);
+            curPI += (targetEqualQty - targetFundedHeld) * piMap[targetCUSIP];
+            const last = nonTarget.find(h => h.cusip === remainderCusip);
+            const lastQty = inDirection(Math.max(0, last.qty + Math.round((needed - curPI) / piMap[last.cusip])), last.qty);
+            curPI -= (last.qty - lastQty) * piMap[last.cusip];
+            postRebalQtyMap[last.cusip] = lastQty;
           }
         } else {
           // Strict fixed-order drain: a CUSIP must be sold down to zero before the next-ranked one
@@ -1725,7 +1742,9 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
         // The residual after the other maturities have been sized lands on targetCUSIP, in the year's direction only.
         let targetFundedDelta = Math.round(diff / piMap[targetCUSIP]);
         if (yearFalls) targetFundedDelta = Math.min(0, targetFundedDelta); else if (yearRises) targetFundedDelta = Math.max(0, targetFundedDelta); else targetFundedDelta = 0;
-        tFundedYearQty = (diff < 0 && nonTargetStillHeld)
+        tFundedYearQty = targetEqualQty != null
+          ? targetEqualQty
+          : (diff < 0 && nonTargetStillHeld)
           ? targetFundedHeld
           : wantsRedirect
             ? targetFundedHeld  // frozen at its existing funded coverage; the shortfall goes to fundedCUSIP below
