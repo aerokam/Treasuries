@@ -1,19 +1,19 @@
 # Largest Changes in the 30-Year TIPS Yield
 
 Measured changes in the [Yield](../../knowledge/DATA_DICTIONARY.md#yield) of the 30-Year TIPS, symbol `US30YTIPS` in [Yields Monitor](../README.md), between consecutive closes, between Friday closes, and over 5 trading days.
-**Basis of every figure:** [Yield history (S6)](../../knowledge/DATA_DICTIONARY.md#s6) as read from R2 on 2026-10-24, symbol `US30YTIPS`, the last point dated 2026-10-22 (3.062%). Changes are in basis points (bp, 1 bp = 0.01 percentage point), the Yield at the end date less the Yield at the start date.
+**Basis of every figure:** [Yield history (S6)](../../knowledge/DATA_DICTIONARY.md#s6) as read from R2 on 2026-10-24, symbol `US30YTIPS`, whose last point is dated 2026-10-22 (3.062%), and the close of 2026-10-23 (3.087%) read from CNBC's daily feeds on 2026-10-25. Changes are in basis points (bp, 1 bp = 0.01 percentage point), the Yield at the end date less the Yield at the start date.
 
 ## 1. Data
 
 - **Close basis.** Each point is the daily close of CNBC's daily chart-bar feeds, the benchmark close at about 15:00 ET, and not the 17:05 ET session close ([Close Price Investigation](../knowledge/Close_Price_Investigation.md)). A change between two such closes differs from a change between two 17:05 ET closes. On 2026-10-22 the first is −12.0 bp (3.182% to 3.062%). The second is −10.0 bp (3.156% at 17:05 ET on 2026-10-21 to 3.056% at 17:03 ET on 2026-10-22, the last bar of the archived snapshot).
 - **Resolution.** S6 holds the symbol at daily resolution from 2023-03-23, at weekly resolution from 2016-07-08 to 2023-03-17, each weekly point dated that week's Friday, and at coarser resolution before 2016-07-08 ([1.7 Update yield history](../../knowledge/1.7_Update_Yield_History.md)). Section 2 therefore covers 2023-03-24 onward, Section 4 covers 2023-03-30 onward, and Section 3 covers 2016-07-15 onward.
 - **Saturday-dated points.** S6 holds a Saturday-dated point for each week from 2023-03-25 through 2025-09-13, 117 points in all, each beside a Friday point of the same week that differs from it by up to 4.6 bp. Those points are excluded, so each week has the one Friday point.
-- **Latest week.** The close of Friday 2026-10-23 is not in S6 until the next run of the YieldsHistory task after it has closed, so the latest Friday-to-Friday change is the week ending 2026-10-16. The week of 2026-10-19 is incomplete and is not a Friday-to-Friday change.
+- **Close of 2026-10-23.** S6 holds no point for 2026-10-23: the YieldsHistory task drops the current Eastern-time day, and its next run is 2026-10-26. The daily feeds (`1M`, `3M` and `6M`) hold two bars dated 2026-10-23 on 2026-10-25, 3.0870 and 3.099%. The first is the benchmark close and the second the session close, the two-bar state that [Close Price Investigation §8](../knowledge/Close_Price_Investigation.md) records for a Friday until the market reopens on Sunday. The benchmark bar, 3.087%, is used, and the `1D` feed's 14:59 ET bar of 2026-10-23 reads 3.0870 as well. This one point is not read from S6.
 - **Holidays.** A week whose Friday is a [Bond Holiday](../../knowledge/DATA_DICTIONARY.md#bond-holiday) ends at its last trading day: 2024-03-28, 2025-04-17, 2025-07-03, 2026-07-02.
 
 ## 2. Largest changes between consecutive closes
 
-903 changes, 2023-03-24 to 2026-10-22. Root mean square: 4.1 bp. A change whose start date is a Friday or the day before a Bond Holiday spans the weekend or the holiday.
+904 changes, 2023-03-24 to 2026-10-23. Root mean square: 4.1 bp. A change whose start date is a Friday or the day before a Bond Holiday spans the weekend or the holiday.
 
 **Largest decreases**
 
@@ -55,12 +55,12 @@ Measured changes in the [Yield](../../knowledge/DATA_DICTIONARY.md#yield) of the
 | 14 | 2024-07-01 Mon | 2024-06-28 Fri | +10.2 | 2.216 → 2.318 |
 | 15 | 2024-06-07 Fri | 2024-06-06 Thu | +10.1 | 2.139 → 2.240 |
 
-- 2026-10-22 ranks 4th of 903 changes by decrease: −12.0 bp, 2.9 times the root mean square.
+- 2026-10-22 ranks 4th of 904 changes by decrease: −12.0 bp, 2.9 times the root mean square.
 - The 15 largest decreases fall in 2023 (9), 2024 (2), 2025 (2) and 2026 (2). The 15 largest increases fall in 2023 (6), 2024 (6), 2025 (2) and 2026 (1).
 
 ## 3. Largest changes between Friday closes
 
-536 weeks, 2016-07-15 to 2026-10-16, each week's change between the closes of consecutive weeks. Root mean square: 9.2 bp. The weeks do not overlap. Several of the weeks below start or end at a negative Yield, and a change in bp is not scaled to the level of the Yield.
+537 weeks, 2016-07-15 to 2026-10-23, each week's change between the closes of consecutive weeks. Root mean square: 9.2 bp. The weeks do not overlap. Several of the weeks below start or end at a negative Yield, and a change in bp is not scaled to the level of the Yield.
 
 **Largest decreases**
 
@@ -102,9 +102,11 @@ Measured changes in the [Yield](../../knowledge/DATA_DICTIONARY.md#yield) of the
 | 14 | 2018-10-05 Fri | 2018-09-28 Fri | +17.5 | 1.056 → 1.231 |
 | 15 | 2022-09-02 Fri | 2022-08-26 Fri | +17.0 | 0.863 → 1.033 |
 
+- The week ending 2026-10-23 changes by −9.1 bp (3.178% to 3.087%), ranking 60th of 537 weeks by decrease. The week ending 2026-10-16 ranks 14th.
+
 ## 4. Largest changes over 5 trading days
 
-899 changes, each between the close 5 trading days before the end date and the close on the end date, 2023-03-30 to 2026-10-22. Root mean square: 8.7 bp. The windows overlap, so one move appears in several adjacent ranks.
+900 changes, each between the close 5 trading days before the end date and the close on the end date, 2023-03-30 to 2026-10-23. Root mean square: 8.7 bp. The windows overlap, so one move appears in several adjacent ranks.
 
 **Largest decreases**
 
@@ -146,4 +148,4 @@ Measured changes in the [Yield](../../knowledge/DATA_DICTIONARY.md#yield) of the
 | 14 | 2024-04-16 Tue | 2024-04-09 Tue | +21.1 | 2.184 → 2.395 |
 | 15 | 2024-12-13 Fri | 2024-12-06 Fri | +19.9 | 2.134 → 2.333 |
 
-- The window ending 2026-10-22 starts 2026-10-15 and changes by −12.3 bp (3.185% to 3.062%), ranking 49th of 899 changes by decrease.
+- The window ending 2026-10-22 starts 2026-10-15 and changes by −12.3 bp (3.185% to 3.062%), ranking 49th of 900 changes by decrease.
