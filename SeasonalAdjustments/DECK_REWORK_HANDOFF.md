@@ -80,7 +80,7 @@ Between current slide 2 and current slide 3:
 - There is **no official or third-party daily SA Ref CPI** — we construct it.
   "Available from several sources" applies only to the **monthly** SA CPI (BLS
   API, FRED `CPIAUCSL`, the annual revised-seasonal-indexes XLSX).
-- The ingestion spec (`knowledge/Data_Pipeline.md`,
+- The ingestion spec (`knowledge/1.9_Fetch_Monthly_CPI.md`, `knowledge/1.10_Interpolate_Daily_Ref_CPI_NSA_And_SA.md`,
   `YieldCurves/knowledge/3.2_Adjust_For_Seasonality.md`) is being refined by the
   user in a separate session — **do not fix it here.**
 

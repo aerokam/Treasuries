@@ -33,7 +33,18 @@ External sources are read by scheduled jobs (process 1 on Level 1), which write 
 - The sources and their fields: [Data Dictionary §1.0](./DATA_DICTIONARY.md#1.0-external-entities-e).
 - The stores, with R2 keys and live previews: [Data Dictionary §2.0](./DATA_DICTIONARY.md#2.0-data-stores-s).
 - Which app reads which store: [Level 1](/knowledge/DFD_LEVEL1) and the Level 2 diagram of each app.
-- The ingestion jobs, with schedules, scripts and outputs: [Data_Pipeline.md](./Data_Pipeline.md).
+- The ingestion jobs: [Level 2 Ingestion](/knowledge/DFD_LEVEL2_INGESTION) and the process specs 1.1 to 1.15 it links. Each job's schedule is registered in `scripts/setup-windows-tasks.ps1`, and in `scripts/setup-tentative-schedule-task.ps1` for the tentative auction schedule.
+
+<a id="r2-read-access"></a>
+### 2.1 R2 Read Access (CORS)
+
+Every app reads the bucket by a browser `fetch()` from `pub-ba11062b177640459f72e0a88d0261ae.r2.dev`. A bucket has no CORS policy until one is configured, and a browser rejects a cross-origin read from a bucket with none. The policy of this bucket is set in the Cloudflare dashboard (R2, the bucket, Settings, CORS Policy); no file in this repository manages it. It allows three origins, each matched literally:
+
+- `http://localhost:8080`, the dev server on the primary checkout
+- `http://localhost:8081`, the dev server on a worktree
+- `https://aerokam.github.io`, production
+
+Measured 2026-10-26 by sending each origin in an `Origin` header and reading `Access-Control-Allow-Origin`: the three above are echoed, and `http://127.0.0.1:8080` and `http://localhost:8082` receive no header. A page served from any other origin, `127.0.0.1` and any other `localhost` port included, therefore fails every R2 read. Serve pages from `localhost`, never `127.0.0.1`. A third concurrent dev server needs its origin added to the policy first.
 
 ---
 
@@ -42,7 +53,6 @@ External sources are read by scheduled jobs (process 1 on Level 1), which write 
 | Document | Scope |
 |----------|-------|
 | [DATA_DICTIONARY.md](./DATA_DICTIONARY.md) | Canonical definitions for all terms, entities, stores (with R2 keys and live previews), and formulas |
-| [Data_Pipeline.md](./Data_Pipeline.md) | Ingestion job schedules and ownership |
 | [Bond_Basics.md](./Bond_Basics.md) | Foundational fixed-income concepts |
 | [TIPS_Basics.md](./TIPS_Basics.md) | TIPS mechanics and index ratio arithmetic |
 | [Treasury_CUSIP_Reference.md](./Treasury_CUSIP_Reference.md) | CUSIP structure and lookup reference |

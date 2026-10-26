@@ -126,7 +126,7 @@ async function fetchPrices() {
 // this run has nothing to write and should exit cleanly with no retry (bond holiday, or the
 // page has no `Prices For:` line yet — weekend or before FedInvest posts). Sets
 // process.exitCode = 1 (no throw) so the caller's retry-on-failure task scheduling
-// (Data_Pipeline.md §2.0) picks the run back up later when the page still shows a stale date.
+// (scripts/setup-windows-tasks.ps1) picks the run back up later when the page still shows a stale date.
 async function determineSettlementDate(today, holidaySet) {
   if (holidaySet.has(today)) {
     console.error(`Bond market holiday (${today}) — no FedInvest prices today.`);

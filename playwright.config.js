@@ -5,7 +5,7 @@ import { defineConfig } from '@playwright/test';
 // configs (their own timeouts and base paths).
 //
 // localhost, not 127.0.0.1: only localhost:8080 is on the R2 CORS allowlist
-// (knowledge/Data_Pipeline.md §3.1), so from 127.0.0.1 every unmocked R2 read fails.
+// (knowledge/Portal.md §2.1), so from 127.0.0.1 every unmocked R2 read fails.
 export default defineConfig({
   timeout: 30_000,
   use: {

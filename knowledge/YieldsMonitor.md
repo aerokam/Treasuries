@@ -25,4 +25,4 @@ Yields Monitor is process 2 on [Level 1](/knowledge/DFD_LEVEL1). Its [Level 2 di
 - [Visual Standards](../YieldsMonitor/knowledge/Visual_Standards.md): the pan, zoom and rescale rules of every chart.
 - [API Mapping](../YieldsMonitor/knowledge/API_Mapping.md): the CNBC endpoints and `timeRange` parameters each UI range maps to.
 - [Close Price Investigation](../YieldsMonitor/knowledge/Close_Price_Investigation.md): the evidence behind the 17:05 ET session close and CNBC's own ~3 PM daily-close basis.
-- [Data Pipeline](./Data_Pipeline.md): the scheduled jobs that write the data stores.
+- [Level 2 Ingestion](/knowledge/DFD_LEVEL2_INGESTION): the scheduled jobs that write the data stores.

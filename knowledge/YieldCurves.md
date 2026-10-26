@@ -27,4 +27,4 @@ Yield Curves is process 3 on [Level 1](/knowledge/DFD_LEVEL1). Its [Level 2 diag
 - [Canty (2009)](../YieldCurves/knowledge/Canty.md): the paper the seasonal adjustment is derived from.
 - [Seasonal Factor Drift](../YieldCurves/knowledge/Seasonal_Factor_Drift.md): the measurement behind the [Credibility Factor](./DATA_DICTIONARY.md#credibility-factor).
 - [SAO Residual Analysis](../YieldCurves/knowledge/SAO_Residual_Analysis.md): the evidence for the other adjustment.
-- [Data Pipeline](./Data_Pipeline.md): the scheduled jobs that write the data stores.
+- [Level 2 Ingestion](/knowledge/DFD_LEVEL2_INGESTION): the scheduled jobs that write the data stores.

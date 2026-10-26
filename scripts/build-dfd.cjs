@@ -813,7 +813,7 @@ function level2Ingestion() {
   readLines.forEach(ln => drawLine(P, ln));
   entities.forEach(e => P.push(entityShape(EX, e.y, EW, EH, e.href, e.name)));
   order.forEach((k, i) => P.push(storeShape(SX, sy(i), SW, stores[k][1], stores[k][0])));
-  jobs.forEach((j, i) => P.push(procShape(JX, jy(i), JR, j.href || V('knowledge/Data_Pipeline.md'), j.id, j.name)));
+  jobs.forEach((j, i) => P.push(procShape(JX, jy(i), JR, j.href, j.id, j.name)));
   P.push('</svg>');
 
   return page({
@@ -824,7 +824,7 @@ function level2Ingestion() {
       '  An entity feeding two jobs (FiscalData, BLS, CNBC) is drawn once, with a separately labelled flow to each — the same source, not two sources. FiscalData\'s two flows here match its two flows in the Data Dictionary; BLS\'s and CNBC\'s two jobs each read the same flow independently.',
       '  1.4 reads two entities, FiscalData and TreasuryDirect, for the one flow <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#auction-results">auction results</a>.',
       '  E7 through E12 are drawn as one box: the six fund-holdings providers, each with its own entry in the <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md">Data Dictionary</a>, are otherwise identical in shape from this diagram\'s point of view — one job reads all six.',
-      '  1.1 explodes at <a href="DFD_LEVEL3_INGEST_FEDINVEST.html">Level 3</a>; every other job drills straight to its own process spec, which names its schedule and script path in turn, or to <a href="viewer.html#/md/knowledge/Data_Pipeline.md">Data Pipeline</a> for the schedule table across every job at once.'].join(NL)
+      '  1.1 explodes at <a href="DFD_LEVEL3_INGEST_FEDINVEST.html">Level 3</a>; every other job drills straight to its own process spec, which names the script that implements it and the script that registers its schedule.'].join(NL)
   });
 }
 
