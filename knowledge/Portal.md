@@ -76,4 +76,4 @@ Most apps have a `knowledge/` subdirectory with their own process specs and calc
 | TaxationOfTreasuries | [Foundation](../TaxationOfTreasuries/docs/TaxationOfTreasuries_Foundation.md) · [Treasury Bills](../TaxationOfTreasuries/docs/TaxationOfTreasuryBills.md) · [Notes & Bonds](../TaxationOfTreasuries/docs/TaxationOfTreasuryNotesAndBonds.md) · [TIPS OID Reference](../TaxationOfTreasuries/docs/TIPS_OID_Tax_Reference.md) |
 | FundHoldings | [Overview](./FundHoldings.md) · [Level 2](./DFD_LEVEL2_FUNDHOLDINGS.html) |
 | Primer | [Overview](./Primer.md) · [Level 2](./DFD_LEVEL2_PRIMER.html) · [1.0 Primer](../Primer/knowledge/1.0_Primer.md) |
-| SeasonalAdjustments | [1.0 Seasonal Adjustments Explorer](../SeasonalAdjustments/knowledge/1.0_SeasonalAdjustments_Explorer.md) |
+| SeasonalAdjustments | [Overview](./SeasonalAdjustments.md) · [Level 2](./DFD_LEVEL2_SEASONALADJUSTMENTS.html) · [1.0 Seasonal Adjustments Explorer](../SeasonalAdjustments/knowledge/1.0_SeasonalAdjustments_Explorer.md) |

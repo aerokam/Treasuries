@@ -190,12 +190,12 @@ function entityShape(x, y, w, h, href, lines) {
     ...shown.map((ln, k) => `    <text class="e-name" x="${x + w / 2}" y="${top + h / 2 + (k - (shown.length - 1) / 2) * 16 + 5}">${esc(ln)}</text>`),
     `  </a>`].join(NL);
 }
-function storeShape(x, y, w, href, name) {
+function storeShape(x, y, w, href, name, plain) {
   return [`  <a class="store" href="${href}">`,
     `    <rect x="${x}" y="${y - 20}" width="${w}" height="40" fill="transparent" stroke="none"/>`,
     `    <line x1="${x}" y1="${y - 20}" x2="${x + w}" y2="${y - 20}"/>`,
     `    <line x1="${x}" y1="${y + 20}" x2="${x + w}" y2="${y + 20}"/>`,
-    `    <text class="s-name" x="${x + w / 2}" y="${y + 5}">${esc(name + idSuffix(href))}</text>`, `  </a>`].join(NL);
+    `    <text class="s-name" x="${x + w / 2}" y="${y + 5}">${esc(name + (plain ? '' : idSuffix(href)))}</text>`, `  </a>`].join(NL);
 }
 // caption, when given, is written beneath the circle: the portal name of an app.
 function procShape(cx, cy, r, href, id, lines, caption) {
@@ -308,7 +308,7 @@ function level1() {
     { key: 'ce', cat: 'reference', name: ['CPI', 'Explorer'], spec: 'DFD_LEVEL2_CPIEXPLORER.html', reads: ['refcpi', 'cpihist'] },
     { key: 'ym', cat: 'workflow', name: ['Yields', 'Monitor'], spec: 'DFD_LEVEL2_YIELDSMONITOR.html', reads: ['tipsref', 'nsasa', 'hol', 'yhist', 'ia'] },
     { key: 'yc', cat: 'workflow', name: ['Yield', 'Curves'], spec: 'DFD_LEVEL2_YIELDCURVES.html', reads: ['fedinv', 'nsasa', 'quotes', 'gsw', 'hol'] },
-    { key: 'sa', cat: 'educational', name: ['Seasonal', 'Adjustments'], spec: V('SeasonalAdjustments/knowledge/1.0_SeasonalAdjustments_Explorer.md'), reads: ['nsasa', 'hol'] },
+    { key: 'sa', cat: 'educational', name: ['Seasonal', 'Adjustments'], spec: 'DFD_LEVEL2_SEASONALADJUSTMENTS.html', reads: [] },
     { key: 'fh', cat: 'reference', name: ['Fund', 'Holdings'], spec: 'DFD_LEVEL2_FUNDHOLDINGS.html', reads: ['funds'] },
     { key: 'ta', cat: 'reference', name: ['Treasury', 'Auctions'], spec: 'DFD_LEVEL2_TREASURYAUCTIONS.html', reads: ['auctions', 'tent'] },
     { key: 'tx', cat: 'reference', name: ['Taxation of', 'Treasuries'], spec: V('TaxationOfTreasuries/docs/TaxationOfTreasuries_Foundation.md'), reads: [] },
@@ -363,6 +363,7 @@ function level1() {
   // One trunk out of the store, fanning to each app.
   P.push(`  <path class="flow" d="M ${SX + SW + 5} ${mid} L ${JX} ${mid}"/>`);
   apps.forEach((a, j) => {
+    if (!a.reads.length) return;
     const ty = ay(j), [x2, y2] = toCircle(JX, mid, AX, ty, AR);
     P.push(flow(JX, mid, x2, y2, { obstacles: OBS }));
   });
@@ -421,6 +422,7 @@ function level1() {
       '  The stores are drawn as one shape. Level 1 answers which app reads what rather than which file, and the shape opens the full list.',
       '  Three of those files are read by no app: YieldCurves.csv, BreakevenInflation.csv and BidAskSpreads.csv. They are written for the user to pull into a spreadsheet, so their flow goes to the user rather than to a process.',
       '  External entities are not redrawn at this level. Their flows are drawn against each entity on the <a href="DFD_LEVEL0.html">context diagram</a> and enter here as one flow.',
+      '  Taxation of Treasuries and Seasonal Adjustments read no store, so no flow reaches them from it: the first reads nothing, and the second reads two snapshot files kept in the app.',
       '  The app column reproduces the portal index: the same three sections in the same order, and the same apps in the same order inside each.',
       '  Every app has the same pair of flows with the user, labelled once at the top. The user is drawn once, as a tall shape, so no flow to it crosses another.'].join(NL)
   });
@@ -1532,6 +1534,54 @@ function level2Primer() {
   });
 }
 
+// ── Level 2: Seasonal Adjustments ───────────────────────────────────────────
+const KSA = 'SeasonalAdjustments/knowledge/';
+function level2SeasonalAdjustments() {
+  // The two snapshot files are kept in the app and are drawn here only: no job writes them.
+  const stores = [
+    { id: 'ysao', name: 'SA and SAO yields snapshot', href: DS('s10') },
+    { id: 'rcpi', name: 'Ref CPI NSA and SA snapshot', href: DS('s4') },
+  ];
+  const procs = [
+    { id: '11.1', name: ['Load', 'snapshot'], href: V(KSA + '11.1_Load_Snapshot.md'), reads: ['ysao', 'rcpi'], out: { '11.2': ['SAO yields', 'SA factors'] } },
+    { id: '11.2', name: ['Render', 'pages'], href: V(KSA + '11.2_Render_Pages.md'), reads: [], out: {} },
+  ];
+  const SX = 40, SW = 215, PR = 58, UX = 1190, UW = 145;
+  const sy = i => 290 + i * 130;
+  const px = { '11.1': 460, '11.2': 920 };
+  const py = { '11.1': 355, '11.2': 355 };
+  const H = 700, W = 1360;
+  const OBS = procs.map(q => ({ x: px[q.id], y: py[q.id], r: PR }));
+  const LBL = [];
+  const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 2 for Seasonal Adjustments: two processes reading two snapshot files kept in the app. No process writes a data store.">`, marker()];
+  const sIdx = Object.fromEntries(stores.map((s, i) => [s.id, i]));
+  procs.forEach(p => p.reads.forEach(id => {
+    const y = sy(sIdx[id]), [x2, y2] = toCircle(SX + SW + 5, y, px[p.id], py[p.id], PR);
+    P.push(flow(SX + SW + 5, y, x2, y2, { obstacles: OBS }));
+  }));
+  P.push(internalFlows(procs, px, py, PR, OBS, LBL));
+  const others = id => OBS.filter(o => !(o.x === px[id] && o.y === py[id]));
+  P.push(flow(px['11.2'] + PR + 3, py['11.2'] - 8, UX - 5, py['11.2'] - 8, { obstacles: others('11.2') }));
+  P.push(labelAt((px['11.2'] + PR + UX) / 2, py['11.2'] - 22, 'charts and tables', 'middle'));
+  P.push(flow(UX - 5, py['11.2'] + 34, px['11.2'] + PR + 3, py['11.2'] + 20, { obstacles: others('11.2') }));
+  P.push(labelAt((px['11.2'] + PR + UX) / 2, py['11.2'] + 54, 'view selections', 'middle'));
+  P.push(flow(px['11.1'] + 30, py['11.1'] + PR - 6, UX - 5, 560, { obstacles: others('11.1') }));
+  P.push(labelAt(800, 540, 'charts and tables', 'middle'));
+  P.push(`  <g class="entity"><rect x="${UX}" y="100" width="${UW}" height="${H - 180}" rx="3"/><text class="e-name" x="${UX + UW / 2}" y="${H / 2}">User</text></g>`);
+  stores.forEach((s, i) => P.push(storeShape(SX, sy(i), SW, s.href, s.name, true)));
+  procs.forEach(p => P.push(procShape(px[p.id], py[p.id], PR, p.href, p.id, p.name)));
+  P.push('</svg>');
+
+  return page({
+    title: 'Seasonal Adjustments — Level 2', h1: 'Level 2 &mdash; Seasonal Adjustments', maxWidth: W,
+    up: 'DFD_LEVEL1.html', upLabel: 'Level 1',
+    spec: V('knowledge/SeasonalAdjustments.md'), specLabel: 'Seasonal Adjustments specs', svg: P.join(NL),
+    notes: ['  <b>No process here writes a data store.</b> Every flow ends at the user and is gone when the page closes.',
+      '  The two snapshot files are copies of <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s10">SA and SAO yields (S10)</a> and <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s4">Ref CPI NSA and SA (S4)</a>, kept in the app and drawn on this diagram only. No job writes them, and the app reads no R2 store.',
+      '  11.1 also states the footer, as <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#charts-and-tables">charts and tables</a>, to the user.'].join(NL)
+  });
+}
+
 const outputs = [
   ['knowledge/DFD_LEVEL1.html', level1()],
   ['knowledge/DFD_LEVEL2_INGESTION.html', level2Ingestion()],
@@ -1551,6 +1601,7 @@ const outputs = [
   ['knowledge/DFD_LEVEL2_CPIEXPLORER.html', level2CpiExplorer()],
   ['knowledge/DFD_LEVEL2_TIPSREFERENCE.html', level2TipsReference()],
   ['knowledge/DFD_LEVEL2_PRIMER.html', level2Primer()],
+  ['knowledge/DFD_LEVEL2_SEASONALADJUSTMENTS.html', level2SeasonalAdjustments()],
 ];
 if (unlinked.size) {
   console.log(String.fromCharCode(10) + "flow labels with no Data Dictionary entry:");

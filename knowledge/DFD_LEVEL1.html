@@ -206,10 +206,8 @@
   <path class="flow" d="M 750.0 909.0 Q 794.4 812.1 866.7 733.9" marker-end="url(#a1)"/>
   <path class="flow" d="M 750.0 909.0 Q 794.3 877.2 846.3 860.8" marker-end="url(#a1)"/>
   <path class="flow" d="M 750.0 909.0 Q 802.0 925.4 846.3 957.2" marker-end="url(#a1)"/>
-  <path class="flow" d="M 750.0 909.0 Q 822.4 987.2 866.7 1084.1" marker-end="url(#a1)"/>
   <path class="flow" d="M 750.0 909.0 Q 762.8 1089.1 877.7 1228.3" marker-end="url(#a1)"/>
   <path class="flow" d="M 750.0 909.0 Q 735.6 1186.0 884.7 1420.0" marker-end="url(#a1)"/>
-  <path class="flow" d="M 750.0 909.0 Q 568.0 1291.5 887.7 1569.3" marker-end="url(#a1)"/>
   <text class="flow-label" x="705" y="897" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#reference-data"><tspan class="lk">reference data</tspan></a></text>
   <path class="flow" d="M 830.0 15.0 Q 863.4 70.8 877.7 134.3" marker-end="url(#a1)"/>
   <text class="flow-label" x="830" y="40" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#market-yields"><tspan class="lk">market yields</tspan></a></text>
@@ -310,7 +308,7 @@
     <text class="p-name" x="900" y="1479">Portal</text>
     <text class="p-name" x="900" y="1495">Primer</text>
   </a>
-  <a class="process" href="viewer.html#/md/SeasonalAdjustments/knowledge/1.0_SeasonalAdjustments_Explorer.md">
+  <a class="process" href="DFD_LEVEL2_SEASONALADJUSTMENTS.html">
     <circle cx="900" cy="1628" r="60"/>
     <text class="p-id" x="900" y="1608">11</text>
     <text class="p-name" x="900" y="1629">Seasonal</text>
@@ -325,6 +323,7 @@
   The stores are drawn as one shape. Level 1 answers which app reads what rather than which file, and the shape opens the full list.
   Three of those files are read by no app: YieldCurves.csv, BreakevenInflation.csv and BidAskSpreads.csv. They are written for the user to pull into a spreadsheet, so their flow goes to the user rather than to a process.
   External entities are not redrawn at this level. Their flows are drawn against each entity on the <a href="DFD_LEVEL0.html">context diagram</a> and enter here as one flow.
+  Taxation of Treasuries and Seasonal Adjustments read no store, so no flow reaches them from it: the first reads nothing, and the second reads two snapshot files kept in the app.
   The app column reproduces the portal index: the same three sections in the same order, and the same apps in the same order inside each.
   Every app has the same pair of flows with the user, labelled once at the top. The user is drawn once, as a tall shape, so no flow to it crosses another.
 </p>

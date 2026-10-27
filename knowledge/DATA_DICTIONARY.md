@@ -861,11 +861,12 @@ Some values are true only until Treasury issues more TIPS. Left inline as approx
   - *CPI Explorer: `{ Source } + Display_Mode + ( Rolling_Window_Months ) + Start_Date + End_Date + ( Log_Scale )` — the series shown; the display mode; the months of the rolling window; the date range; and whether the vertical axis is logarithmic.*
   - *TIPS Reference: `Ref_CPI_Date + Sort + { Typed_Filter } + { Calendar_Date_Range } + Outstanding_Only` — the date of the Ref CPI the Index Ratio and coupons use; the sorted column and its direction; the typed column filters; the calendar date ranges; and whether only outstanding TIPS show.*
   - *Portal Primer: `Page + { Calculator_Entry }` — the page of the deck shown; and the entries of the calculator on it.*
+  - *Seasonal Adjustments: `Page` — the page of the deck shown.*
 - <a id="axis-scales"></a>**Axis Scales** = `Horizontal_Axis_Range + Vertical_Axis_Range`
   *The ranges of the two chart axes: the horizontal axis in calendar dates or in [Term](#term), and the vertical axis in yield, floored by any [IQR Clip](#iqr-clip).*
 - <a id="drill-request"></a>**Drill Request** = `@CUSIP + Figure`
   *The security and the figure a user picks in a table, to see how the figure was calculated.*
-- <a id="charts-and-tables"></a>**Charts and Tables** = *The views drawn for the user: the chart and the table of the selected tab, or the spread charts and table in spread mode, in Yield Curves; the equivalent time-series, yield-curve-snapshot or breakeven-inflation view, in Yields Monitor; the table of the active tab, in Treasury Auctions; the table of the selected fund, in Fund Holdings; the chart of the selected series, in CPI Explorer; the table and its header, in TIPS Reference; the page of the deck and the calculator it mounts, in Portal Primer.*
+- <a id="charts-and-tables"></a>**Charts and Tables** = *The views drawn for the user: the chart and the table of the selected tab, or the spread charts and table in spread mode, in Yield Curves; the equivalent time-series, yield-curve-snapshot or breakeven-inflation view, in Yields Monitor; the table of the active tab, in Treasury Auctions; the table of the selected fund, in Fund Holdings; the chart of the selected series, in CPI Explorer; the table and its header, in TIPS Reference; the page of the deck and the calculator it mounts, in Portal Primer; the page of the deck, in Seasonal Adjustments.*
 
 ### 6.4 Yields Monitor
 
