@@ -131,7 +131,9 @@ $legacy = @(
     # CPI History variants
     'FetchCpiHistory', 'CpiHistoryRefresh',
     # CpiTasks variants
-    'RefreshCpiTasks', 'Update CPI release schedule'
+    'RefreshCpiTasks', 'Update CPI release schedule',
+    # Close-price investigation probes (findings in YieldsMonitor/knowledge/Close_Price_Investigation.md)
+    'CloseProbe', 'LockProbe'
 )
 foreach ($name in $legacy) {
     if (Get-ScheduledTask -TaskName $name -ErrorAction SilentlyContinue) {
@@ -207,18 +209,6 @@ Register-NodeTask "IntradayArchive" `
     "Archive raw CNBC 1D+5D intraday feeds per symbol to R2 yields-history/intraday-raw" `
     @(New-ScheduledTaskTrigger -Weekly -DaysOfWeek $Weekdays -At "2:05pm") `
     "YieldsMonitor/scripts/archiveIntraday.js"
-
-# CloseProbe  -  Weekdays starting 2:05pm PT [ET: 5:05pm], repeating every 15 min for 1 hour
-# Temporary investigation: logs the last 1D bar of US10YTIPS at 17:05/17:20/17:35/17:50/18:05
-# ET to pin down when the 17:05 consolidation print reliably posts. Retire once known.
-$probeTrigger = New-ScheduledTaskTrigger -Weekly -DaysOfWeek $Weekdays -At "2:05pm"
-$probeTrigger.Repetition = (New-ScheduledTaskTrigger -Once -At "2:05pm" `
-    -RepetitionInterval (New-TimeSpan -Minutes 15) `
-    -RepetitionDuration (New-TimeSpan -Hours 1)).Repetition
-Register-NodeTask "CloseProbe" `
-    "Probe: log US10YTIPS last 1D bar every 15min after close to find when 17:05 print posts" `
-    @($probeTrigger) `
-    "YieldsMonitor/scripts/probeClose.js"
 
 # SaFactors  -  Daily 6:35am PT
 Register-NodeTask "SaFactors" `
@@ -308,21 +298,6 @@ Register-DataTask "VendorUpdateCheck" `
 # success only, via YieldCurves/scripts/run-yield-curves.cmd. Both are its actual inputs
 # (MarketQuotes.csv and YieldsFromFedInvestPrices.csv), so it re-fits whenever
 # either one actually changed rather than on its own fixed clock.
-
-# LockProbe  -  Weekdays 11:00am PT [ET: 2:00pm], hourly for 18h (through overnight).
-# Temporary investigation (Close_Price_Investigation.md §8): each hour logs the last 7 daily
-# (6M-feed) bars by date for US10YTIPS + US10Y vs the live 1D value. The just-completed day's
-# bar tracks live until CNBC revises it to the ~3PM benchmark; the run where that date's value
-# snaps to the benchmark and stops moving pins the revision time. Starting at 2pm ET (before
-# the ~14:59 benchmark snap) ensures we catch the transition live, not just the aftermath.
-$lockTrigger = New-ScheduledTaskTrigger -Weekly -DaysOfWeek $Weekdays -At "11:00am"
-$lockTrigger.Repetition = (New-ScheduledTaskTrigger -Once -At "2:00pm" `
-    -RepetitionInterval (New-TimeSpan -Hours 1) `
-    -RepetitionDuration (New-TimeSpan -Hours 18)).Repetition
-Register-NodeTask "LockProbe" `
-    "Track the just-completed day's daily bar hourly overnight to pin when CNBC revises it to the ~3PM benchmark" `
-    @($lockTrigger) `
-    "YieldsMonitor/scripts/probeLock.js"
 
 # ---------------------------------------------------------------------------
 # CPI release date tasks  -  date-specific triggers fetched live from R2

@@ -119,15 +119,12 @@ Rationale:
 | `scripts/dumpFeed.js <sym> <1D\|5D>` | dump a raw feed with ET-annotated bars |
 | `scripts/archiveIntraday.js` | daily immutable raw 1D+5D snapshot per symbol → R2 `yields-history/intraday-raw/{sym}/{YYYYMMDD}.json` (task `IntradayArchive`, 17:05 ET) |
 | `scripts/analyzeCloseWindow.js <sym>` | per-day close-window structure from an archived snapshot |
-| `scripts/probeClose.js <sym>` | log last `1D` bar over time → `yields-history/close-probe/{sym}.csv` (task `CloseProbe`, 17:05+15min×1h) to pin when the 17:05 bar posts |
-| `scripts/probeLock.js` | hourly overnight, log the last 5 daily (`6M`) bars **by date** vs live `1D` for US10YTIPS+US10Y → `yields-history/lock-probe/lock-probe.csv` (task `LockProbe`, 17:00 ET +1h×18h) to pin the **overnight revision time** — when a completed day's bar flips from live-tracked to the ~3PM benchmark (§8). Per-date keying survives the ~01:00 ET rollover and the feed's intermittent dropping of recent days (§5). |
-| `scripts/analyzeLock.js` | read `lock-probe.csv` and report, per completed day, the **lock time** (earliest run after which that day's bar value never changes) + a live→frozen timeline. Run after an overnight `LockProbe` collection. |
 | `scripts/compareDailyVsIntraday.js <sym>` | compare daily-feed close vs intraday 15:00/16:00/16:59/17:05 (Section 3) |
 
 ## 8. Open items
 
-- Confirm exact CNBC daily-close time (our 5D-grid match says ~3:00pm; Treasury is ~3:30pm; Tradeweb 3/4pm). Sub-bp distinction; the `close-probe`/archive can refine over time.
-- **Pin the overnight REVISION time** — `LockProbe` task runs hourly 2PM–8AM ET weekdays. Findings so far:
+- Confirm exact CNBC daily-close time (our 5D-grid match says ~3:00pm; Treasury is ~3:30pm; Tradeweb 3/4pm). Sub-bp distinction; the intraday archive can refine over time.
+- **Overnight REVISION time.** Findings, from an hourly collection 2PM–8AM ET on weekdays:
   - **Benchmark snap: 14:59 ET** — confirmed across June 10, 11, 12 (3 consecutive days). Both US10YTIPS and US10Y locked to their finalized daily close value exactly at the 14:59 ET minute bar in the 1D intraday archive.
   - **Two-bar phenomenon**: after ~17:00 ET the `6M` feed temporarily returns two bars for the just-closed date — benchmark (correct, first) + session-close ghost (second). Last-write-wins means session close overwrites if processed during this window.
   - **Convergence**: the two-bar state collapses to a single (benchmark) bar at ~01:00 ET next morning (Mon–Thu) when the overnight session opens and a new current-day bar is created, displacing the ghost. **Friday: no convergence until Sunday ~18:30 ET market reopen.**
