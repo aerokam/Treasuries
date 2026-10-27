@@ -3127,6 +3127,12 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
       assert('Equal split, Oct held and the need grown: Apr is bought', (qtyDeltaFor(grown, APR27) ?? 0) > 0, true);
       assert('Equal split, Oct held and the need grown: the Jan issue is bought', (qtyDeltaFor(grown, NEWJAN) ?? 0) > 0, true);
       assert('Equal split, Oct held and the need grown: Oct does not sell', (qtyDeltaFor(grown, OCT27) ?? 0) >= 0, true);
+      // Every row of the year that carries its Amount lists every TIPS the year ends holding, the fresh buys and the held alike:
+      // the Amount After drill reads these, so a list of the fresh buy alone shows rows that do not add to the Amount.
+      const endsHeld = grown.filter(d => d.fundedYear === Y && d.qtyAfter > 0).map(d => d.cusip + ':' + d.qtyAfter).sort().join();
+      for (const d of grown.filter(d => d.fundedYear === Y && d.araAfterTotal != null)) {
+        assert(`Equal split, Oct held and the need grown: the ${d.cusip} row's Amount After lists every TIPS the year ends holding`, (d.araAfterHoldings ?? []).filter(h => h.qty > 0).map(h => h.cusip + ':' + h.qty).sort().join(), endsHeld);
+      }
       // The Coupon preference selects the one issue of the month (2.0 §Maturity Selection Within a Funded Year): Lower keeps the January issue held.
       for (const [couponPref, bought, notBought] of [['lower', JAN27, NEWJAN], ['higher', NEWJAN, null]]) {
         const { details: cp } = runAlloc({ dara: scaledMedian, holdings: [{ cusip: JAN27, qty: 5 }, { cusip: OCT27, qty: 5 }], tipsMarketData, refCPI, settlementDate, daraByYear: new Map([[Y, scaledMedian * 3]]), maturityPref: 'all', couponPref });

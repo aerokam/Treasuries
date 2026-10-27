@@ -2417,6 +2417,8 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
     const irForSyn = calcIndexRatio(refCPI, bondForSyn?.datedDateRefCpi ?? refCPI, TREASURY_ROUNDING);
     const excessLMI = excessSoldYear(bYear) ? 0 : exA * 1000 * irForSyn * (bondForSyn?.coupon ?? 0);
     
+    // The year's one breakdown, the same the year's last held row carries: this fresh buy is only one of its TIPS, and the drill lists all of them.
+    const bdS = postARABreakdown[bYear], bbS = beforeARABreakdown[bYear];
     const holdingsAfterSyn = [{ 
       cusip: bst.targetCUSIP, maturityMonth: m - 1, maturityYear: tb.maturity.getFullYear(), 
       qty: bst.targetFundedYearQty, principalPerBond: 1000 * pir, nPeriods: m < 7 ? 1 : 2, coupon: tb.coupon ?? 0 
@@ -2436,12 +2438,12 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
       fundedYearQtyDelta: bst.targetFundedYearQty, excessQtyDelta: exA,
       excessLMI_Before: 0, excessLMI_After: excessLMI,
       araBeforeTotal: araB, araAfterTotal: araA,
-      araBeforePrincipal: 0, araBeforeOwnCoupon: 0, araBeforeLaterMatInt: lmiBefore,
-      araBeforeHoldings: [],
-      araAfterPrincipal: bst.targetFundedYearQty * 1000 * pir,
-      araAfterOwnCoupon: bst.targetFundedYearQty * 1000 * pir * tb.coupon * (m < 7 ? 0.5 : 1.0),
-      araAfterLaterMatInt: yearLaterMatIntSnapshot[bYear] ?? 0,
-      araAfterHoldings: holdingsAfterSyn,
+      araBeforePrincipal: bbS ? bbS.principal : 0, araBeforeOwnCoupon: bbS ? bbS.ownCoupon : 0, araBeforeLaterMatInt: bbS ? bbS.laterMatInt : lmiBefore,
+      araBeforeHoldings: bbS ? bbS.holdings : [],
+      araAfterPrincipal: bdS ? bdS.principal : bst.targetFundedYearQty * 1000 * pir,
+      araAfterOwnCoupon: bdS ? bdS.ownCoupon : bst.targetFundedYearQty * 1000 * pir * tb.coupon * (m < 7 ? 0.5 : 1.0),
+      araAfterLaterMatInt: bdS ? bdS.laterMatInt : yearLaterMatIntSnapshot[bYear] ?? 0,
+      araAfterHoldings: bdS ? bdS.holdings : holdingsAfterSyn,
       preLadderCreditForYear: postARABreakdown[bYear]?.pliCredit ?? 0,
       preLadderCreditForYearBefore: beforeARABreakdown[bYear]?.pliCredit ?? 0,
       future30ySimulatedInterest:       postARABreakdown[bYear]?.future30ySimulatedInterest ?? 0,
@@ -2496,6 +2498,8 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
     const araA = postARAByYear[bYear] ?? 0;
     const rowDARA = daraByYear?.get(bYear) ?? DARA;
 
+    // The year's one breakdown, the same the year's last held row carries: this fresh buy is only one of its TIPS, and the drill lists all of them.
+    const bdS = postARABreakdown[bYear], bbS = beforeARABreakdown[bYear];
     const holdingsAfterSyn = [{
       cusip: fc, maturityMonth: m - 1, maturityYear: tb.maturity.getFullYear(),
       qty: ns.newQty, principalPerBond: 1000 * pir, nPeriods: m < 7 ? 1 : 2, coupon: tb.coupon ?? 0
@@ -2514,12 +2518,12 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
       fundedYearQtyDelta: ns.newQty, excessQtyDelta: 0,
       excessLMI_Before: 0, excessLMI_After: 0,
       araBeforeTotal: araB, araAfterTotal: araA,
-      araBeforePrincipal: 0, araBeforeOwnCoupon: 0, araBeforeLaterMatInt: lmiBefore,
-      araBeforeHoldings: [],
-      araAfterPrincipal: ns.newQty * 1000 * pir,
-      araAfterOwnCoupon: ns.newQty * 1000 * pir * tb.coupon * (m < 7 ? 0.5 : 1.0),
-      araAfterLaterMatInt: yearLaterMatIntSnapshot[bYear] ?? 0,
-      araAfterHoldings: holdingsAfterSyn,
+      araBeforePrincipal: bbS ? bbS.principal : 0, araBeforeOwnCoupon: bbS ? bbS.ownCoupon : 0, araBeforeLaterMatInt: bbS ? bbS.laterMatInt : lmiBefore,
+      araBeforeHoldings: bbS ? bbS.holdings : [],
+      araAfterPrincipal: bdS ? bdS.principal : ns.newQty * 1000 * pir,
+      araAfterOwnCoupon: bdS ? bdS.ownCoupon : ns.newQty * 1000 * pir * tb.coupon * (m < 7 ? 0.5 : 1.0),
+      araAfterLaterMatInt: bdS ? bdS.laterMatInt : yearLaterMatIntSnapshot[bYear] ?? 0,
+      araAfterHoldings: bdS ? bdS.holdings : holdingsAfterSyn,
       preLadderCreditForYear: postARABreakdown[bYear]?.pliCredit ?? 0,
       preLadderCreditForYearBefore: beforeARABreakdown[bYear]?.pliCredit ?? 0,
       future30ySimulatedInterest:       postARABreakdown[bYear]?.future30ySimulatedInterest ?? 0,
