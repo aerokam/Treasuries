@@ -253,7 +253,7 @@ R2 file manifest is specified in the repo-root `knowledge/DATA_DICTIONARY.md` §
 
 ### Market Quotes Download Flow
 
-Specified in the repo-root `knowledge/Data_Pipeline_Local.md` (gitignored — do not reference publicly per that file's own note).
+Specified in the repo-root `knowledge/Local_Operations.md` (gitignored — do not reference publicly per that file's own note).
 
 ### Windows / Tooling Note
 

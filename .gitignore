@@ -43,8 +43,8 @@ research/*/data/
 
 TipsLadderManager/tests/_sim_run.js
 
-# Local-only: the site-specific part of acquiring Market quotes (S7). Never committed; see knowledge/Data_Pipeline_Local.md
+# Local-only: the site-specific part of acquiring Market quotes (S7). Never committed; see knowledge/Local_Operations.md
 YieldCurves/scripts/quoteSource.local.js
 YieldCurves/tests/fixtures/local/
 shared/tests/local/
-knowledge/Data_Pipeline_Local.md
+knowledge/Local_Operations.md
