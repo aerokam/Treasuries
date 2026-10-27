@@ -71,6 +71,7 @@ const TERMS = {
   'live quotes': 'live-quotes', 'upcoming auctions': 'upcoming-auctions', 'yield series': 'yield-series', 'day change': 'day-change',
   'TIPS market data': 'tips-market-data',
   'SA yield series': 'sa-yield-series',
+  'CPI series': 'cpi-series',
   'Holdings File': 'holdings-file', 'DARA Plan File': 'dara-plan-file',
   'per-year DARA': 'per-year-dara',
   'holdings': 'holdings', 'DARA plan': 'dara-plan',
@@ -303,7 +304,7 @@ function level1() {
     { key: 'lm', cat: 'workflow', name: ['Ladder', 'Manager'], spec: 'DFD_LEVEL2_TIPSLADDERMANAGER.html', reads: ['quotes', 'tipsref', 'refcpi', 'sasao', 'hol'] },
     { key: 'tr', cat: 'reference', name: ['TIPS', 'Reference'], spec: V('TipsReference/knowledge/1.0_TIPS_Reference.md'), reads: ['tipsref', 'refcpi', 'sasao', 'hol'] },
     { key: 'pr', cat: 'educational', name: ['Portal', 'Primer'], spec: V('Primer/knowledge/1.0_Primer.md'), reads: ['fedinv', 'tipsref', 'refcpi'] },
-    { key: 'ce', cat: 'reference', name: ['CPI', 'Explorer'], spec: V('CpiExplorer/knowledge/1.0_Overview.md'), reads: ['refcpi', 'cpihist'] },
+    { key: 'ce', cat: 'reference', name: ['CPI', 'Explorer'], spec: 'DFD_LEVEL2_CPIEXPLORER.html', reads: ['refcpi', 'cpihist'] },
     { key: 'ym', cat: 'workflow', name: ['Yields', 'Monitor'], spec: 'DFD_LEVEL2_YIELDSMONITOR.html', reads: ['tipsref', 'nsasa', 'hol', 'yhist', 'ia'] },
     { key: 'yc', cat: 'workflow', name: ['Yield', 'Curves'], spec: 'DFD_LEVEL2_YIELDCURVES.html', reads: ['fedinv', 'nsasa', 'quotes', 'gsw', 'hol'] },
     { key: 'sa', cat: 'educational', name: ['Seasonal', 'Adjustments'], spec: V('SeasonalAdjustments/knowledge/1.0_SeasonalAdjustments_Explorer.md'), reads: ['nsasa', 'hol'] },
@@ -1367,6 +1368,57 @@ function level2FundHoldings() {
   });
 }
 
+// ── Level 2: CPI Explorer ───────────────────────────────────────────────────
+const KCE = 'CpiExplorer/knowledge/';
+function level2CpiExplorer() {
+  const stores = [
+    { id: 'cpihist', name: 'CPI history', href: DS('s8') },
+    { id: 'refcpi', name: 'Ref CPI', href: DS('s3') },
+  ];
+  const procs = [
+    { id: '7.1', name: ['Load CPI', 'data'], href: V(KCE + '7.1_Load_CPI_Data.md'), reads: ['cpihist', 'refcpi'],
+      out: { '7.2': ['monthly CPI-U', 'daily Ref CPI'], '7.3': ['monthly CPI-U', 'daily Ref CPI'] } },
+    { id: '7.2', name: ['Calculate', 'CPI series'], href: V(KCE + '7.2_Calculate_CPI_Series.md'), reads: [], out: { '7.3': ['CPI series'] } },
+    { id: '7.3', name: ['Render CPI', 'chart'], href: V(KCE + '7.3_Render_CPI_Chart.md'), reads: [], out: {} },
+  ];
+  const SX = 40, SW = 215, PR = 58, UX = 1190, UW = 145;
+  const sy = i => 250 + i * 130;
+  const px = { '7.1': 440, '7.2': 720, '7.3': 970 };
+  const py = { '7.1': 315, '7.2': 520, '7.3': 315 };
+  const H = 700, W = 1360;
+  const OBS = procs.map(q => ({ x: px[q.id], y: py[q.id], r: PR }));
+  const LBL = [];
+  const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 2 for CPI Explorer: three processes reading two data stores. No process writes a data store.">`, marker()];
+  const sIdx = Object.fromEntries(stores.map((s, i) => [s.id, i]));
+  procs.forEach(p => p.reads.forEach(id => {
+    const y = sy(sIdx[id]), [x2, y2] = toCircle(SX + SW + 5, y, px[p.id], py[p.id], PR);
+    P.push(flow(SX + SW + 5, y, x2, y2, { obstacles: OBS }));
+  }));
+  P.push(internalFlows(procs, px, py, PR, OBS, LBL));
+  const others = id => OBS.filter(o => !(o.x === px[id] && o.y === py[id]));
+  P.push(flow(px['7.3'] + PR + 3, py['7.3'], UX - 5, py['7.3'], { obstacles: others('7.3') }));
+  P.push(labelAt((px['7.3'] + PR + UX) / 2, py['7.3'] - 14, 'charts and tables', 'middle'));
+  P.push(flow(UX - 5, py['7.3'] + 70, px['7.3'] + PR - 6, py['7.3'] + 40, { obstacles: others('7.3') }));
+  P.push(labelAt((px['7.3'] + PR + UX) / 2, py['7.3'] + 82, 'view selections', 'middle'));
+  P.push(flow(UX - 5, py['7.2'], px['7.2'] + PR + 3, py['7.2'], { obstacles: others('7.2') }));
+  P.push(labelAt((px['7.2'] + PR + UX) / 2, py['7.2'] - 12, 'view selections', 'middle'));
+  P.push(flow(px['7.1'] + 20, py['7.1'] - PR + 4, UX - 5, 170, { obstacles: others('7.1') }));
+  P.push(labelAt(800, 205, 'charts and tables', 'middle'));
+  P.push(`  <g class="entity"><rect x="${UX}" y="100" width="${UW}" height="${H - 180}" rx="3"/><text class="e-name" x="${UX + UW / 2}" y="${H / 2}">User</text></g>`);
+  stores.forEach((s, i) => P.push(storeShape(SX, sy(i), SW, s.href, s.name)));
+  procs.forEach(p => P.push(procShape(px[p.id], py[p.id], PR, p.href, p.id, p.name)));
+  P.push('</svg>');
+
+  return page({
+    title: 'CPI Explorer — Level 2', h1: 'Level 2 &mdash; CPI Explorer', maxWidth: W,
+    up: 'DFD_LEVEL1.html', upLabel: 'Level 1',
+    spec: V('knowledge/CpiExplorer.md'), specLabel: 'CPI Explorer specs', svg: P.join(NL),
+    notes: ['  <b>No process here writes a data store.</b> Every flow ends at the user and is gone when the page closes.',
+      '  7.1 sends its rows to 7.3 as well as to 7.2: 7.3 bounds the date range by the extent of all three series. 7.1 also states the data status, as <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#charts-and-tables">charts and tables</a>, to the user.',
+      '  <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#cpi-series">CPI series</a> is defined in the Data Dictionary &sect;6.6.'].join(NL)
+  });
+}
+
 const outputs = [
   ['knowledge/DFD_LEVEL1.html', level1()],
   ['knowledge/DFD_LEVEL2_INGESTION.html', level2Ingestion()],
@@ -1383,6 +1435,7 @@ const outputs = [
   ['knowledge/DFD_LEVEL3_TLM_REBALANCE.html', level3TipsLadderManagerRebalance()],
   ['knowledge/DFD_LEVEL2_TREASURYAUCTIONS.html', level2TreasuryAuctions()],
   ['knowledge/DFD_LEVEL2_FUNDHOLDINGS.html', level2FundHoldings()],
+  ['knowledge/DFD_LEVEL2_CPIEXPLORER.html', level2CpiExplorer()],
 ];
 if (unlinked.size) {
   console.log(String.fromCharCode(10) + "flow labels with no Data Dictionary entry:");
