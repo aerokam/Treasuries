@@ -6,14 +6,17 @@
 
 ## Data flow diagram
 
-Treasury Auctions is process 5 on [Level 1](/knowledge/DFD_LEVEL1). It reads [Auction results (S5)](./DATA_DICTIONARY.md#s5) and [Tentative auction schedule (S9)](./DATA_DICTIONARY.md#s9) from R2, and [Upcoming Auctions](./DATA_DICTIONARY.md#upcoming-auctions) from [FiscalData (E3)](./DATA_DICTIONARY.md#e3) directly.
+Treasury Auctions is process 5 on [Level 1](/knowledge/DFD_LEVEL1), and [Level 2](/knowledge/DFD_LEVEL2_TREASURYAUCTIONS) draws its four processes. It reads [Auction results (S5)](./DATA_DICTIONARY.md#s5) and [Tentative auction schedule (S9)](./DATA_DICTIONARY.md#s9) from R2, and [Upcoming Auctions](./DATA_DICTIONARY.md#upcoming-auctions) from [FiscalData (E3)](./DATA_DICTIONARY.md#e3) directly.
 
 ## Specs
 
 | Spec | What it specifies |
 |---|---|
-| [Data and Views](../TreasuryAuctions/knowledge/Data_And_Views.md) | What the page loads and the rows and columns of each tab, including how an upcoming auction is flagged TIPS. |
-| [Filtering and Columns](../TreasuryAuctions/knowledge/1.0_Filtering_And_Columns.md) | Column formats, typed filters, calendar date ranges, sorting, the column chooser and column widths. |
+| [5.1 Load auction data](../TreasuryAuctions/knowledge/5.1_Load_Auction_Data.md) | What the page fetches and passes on, and the status it shows. |
+| [5.2 Render Historical Auctions](../TreasuryAuctions/knowledge/5.2_Render_Historical_Auctions.md) | The views, their rows and default columns, and the row cap. |
+| [5.3 Render Upcoming Auctions](../TreasuryAuctions/knowledge/5.3_Render_Upcoming_Auctions.md) | The rows and columns of the tab, including how an upcoming auction is flagged TIPS. |
+| [5.4 Render Tentative Schedule](../TreasuryAuctions/knowledge/5.4_Render_Tentative_Schedule.md) | The rows and columns of the tab. |
+| [Filtering and Columns](../TreasuryAuctions/knowledge/Filtering_And_Columns.md) | Column formats, typed filters, calendar date ranges, sorting, the column chooser and column widths. |
 
 ## Reference specs
 

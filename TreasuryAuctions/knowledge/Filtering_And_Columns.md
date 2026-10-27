@@ -1,8 +1,8 @@
-# 1.0 Filtering and Columns
+# Filtering and Columns
 
 **Implemented by:** `TreasuryAuctions/src/app.js` (`detectFmt`, `fmtVal`, `autoMaskDateFilter`, `rowMatchesFilters`, `wireFilterInputs`, `getActiveRows`, `renderTable`, `renderTentative`, `initResizing`)
 
-The Historical Auctions table and the Tentative Schedule table format their values, filter their rows and sort them by the rules below. The tables and their rows are specified in [Data and Views](./Data_And_Views.md).
+The Historical Auctions table and the Tentative Schedule table format their values, filter their rows and sort them by the rules below. The Historical Auctions table is specified in [Render Historical Auctions (5.2)](./5.2_Render_Historical_Auctions.md) and the Tentative Schedule table in [Render Tentative Schedule (5.4)](./5.4_Render_Tentative_Schedule.md).
 
 <a id="column-formats"></a>
 ## Column Formats
@@ -57,7 +57,7 @@ The Historical Auctions table and the Tentative Schedule table format their valu
 
 The sidebar of the Historical Auctions tab lists every column of S5 for the selected view.
 
-- List first the default columns of the view ([Data and Views](./Data_And_Views.md#historical-auctions)), then the other columns in the order of S5.
+- List first the default columns of the view ([Render Historical Auctions](./5.2_Render_Historical_Auctions.md#historical-auctions)), then the other columns in the order of S5.
 - Show a column in the table when its box is checked. Clear the box, or click the ✕ in the column header, to hide it.
 - Reorder a column by dragging its list entry or its header onto another.
 - Narrow the list to the columns whose label or field name contains the text typed in the search box.

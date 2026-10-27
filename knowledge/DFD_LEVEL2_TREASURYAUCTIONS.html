@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Treasury Auctions — Level 2</title>
+<style>
+  :root {
+    --bg: #0d0d1a;
+    --border: #2a2a4a;
+    --text: #c0c8e0;
+    --accent: #7070cc;
+    --entity: #1a1a2e;
+    --process: #1a2a4e;
+    --store: #1a2e1a;
+    --flow: #55558c;
+    --flow-text: #8b93b8;
+    --font: 'Segoe UI', system-ui, sans-serif;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    margin: 0;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+  }
+
+  .nav-header {
+    width: 100%;
+    max-width: 1200px;
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 50px;
+    padding: 25px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 30px;
+  }
+  .nav-header a {
+    color: var(--accent);
+    text-decoration: none;
+    font-size: 1.2rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .nav-header a:hover { color: #aaaaff; text-decoration: underline; }
+  .nav-header a.portal-link { font-size: 11px; font-weight: 700; color: #475569; background: #e2e8f0; border: 1px solid #cbd5e1; border-radius: 4px; padding: 2px 10px; text-decoration: none; letter-spacing: 0.02em; text-transform: none; }
+  .nav-header a.portal-link:hover { background: #1e293b; color: #ffffff; border-color: #1e293b; text-decoration: none; }
+
+  h1 {
+    font-size: 1.5rem;
+    font-weight: 300;
+    letter-spacing: 2px;
+    color: var(--accent);
+    margin: 0 0 25px;
+    text-align: center;
+  }
+
+  .diagram { width: 100%; max-width: 1400px; }
+  .diagram svg { width: 100%; height: auto; display: block; }
+
+  /* Shapes */
+  .entity rect {
+    fill: var(--entity);
+    stroke: var(--border);
+    stroke-width: 1;
+  }
+  .entity:hover rect { stroke: var(--accent); }
+  .entity .e-name { fill: #c8d0ea; font-size: 13.5px; }
+  .entity:hover .e-name { fill: #ffffff; }
+
+  .process circle {
+    fill: var(--process);
+    stroke: var(--accent);
+    stroke-width: 2;
+  }
+  .process:hover circle { stroke: #aaaaff; filter: drop-shadow(0 0 12px rgba(112,112,204,0.6)); }
+  .process .p-id { fill: #8fa0d8; font-size: 12px; letter-spacing: 1px; }
+  .process .p-name { fill: #eef0ff; font-size: 15px; font-weight: 600; }
+
+  /* A module: a shared code file called by two or more sibling processes. A square was
+     tried and rejected — a rectangle is already the entity shape, and two rectangular
+     categories on one diagram invites confusing a module for an entity. A circle in this
+     distinct color reads as "process-like, but not a pipeline step of this diagram"
+     instead (DFD_Worklist.md §2.0, knowledge/SharedModules.md). Reuses the process id
+     label class (.p-id) since that role is identical. */
+  .module circle {
+    fill: #3a2e1a;
+    stroke: #cc9a40;
+    stroke-width: 2;
+  }
+  .module:hover circle { stroke: #ffcc66; filter: drop-shadow(0 0 12px rgba(204,154,64,0.6)); }
+  .module .m-name { fill: #eef0ff; font-size: 11.5px; font-weight: 600; }
+
+  a.entity, a.process, a.module { cursor: pointer; text-decoration: none; }
+  a text, g.entity text { text-anchor: middle; font-family: var(--font); }
+
+  /* Flows */
+  .flow { stroke: var(--flow); stroke-width: 1.6; fill: none; }
+  .flow-label {
+    fill: var(--flow-text);
+    font-size: 13px;
+    font-family: var(--font);
+    stroke: var(--bg);
+    stroke-width: 5;
+    paint-order: stroke;
+    stroke-linejoin: round;
+  }
+
+  .legend text { fill: #6f78a0; font-size: 12px; font-family: var(--font); }
+  .legend rect.sw { fill: var(--entity); stroke: var(--border); }
+  .legend circle.sw { fill: var(--process); stroke: var(--accent); stroke-width: 1.5; }
+
+  .notes {
+    max-width: 900px;
+    margin-top: 30px;
+    font-size: 0.8rem;
+    color: #7a83aa;
+    line-height: 1.7;
+    text-align: center;
+  }
+  .notes a { color: var(--accent); }
+
+  .index {
+    max-width: 980px;
+    margin: 45px 0 20px;
+    border-top: 1px solid var(--border);
+    padding-top: 25px;
+  }
+  .index h2 {
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #666699;
+    margin: 0 0 6px;
+    text-align: center;
+  }
+  .index p { font-size: 0.8rem; color: #7a83aa; text-align: center; margin: 0 0 20px; line-height: 1.6; }
+  .index-group { margin-bottom: 14px; display: flex; flex-wrap: wrap; gap: 10px; align-items: baseline; justify-content: center; }
+  .index-group .g-label { font-size: 0.7rem; letter-spacing: 1.5px; text-transform: uppercase; color: #666699; font-weight: 700; width: 100%; text-align: center; }
+  .index-group a {
+    color: var(--text);
+    text-decoration: none;
+    font-size: 0.85rem;
+    border: 1px solid var(--border);
+    background: var(--entity);
+    border-radius: 4px;
+    padding: 5px 12px;
+  }
+  .index-group a:hover { border-color: var(--accent); color: #ffffff; }
+  .flow-label a { cursor: pointer; }
+  tspan.lk { fill: #a8b2e0; text-decoration: underline; text-decoration-style: dotted; }
+  .flow-label a:hover tspan.lk { fill: #ffffff; }
+</style>
+<style>
+  .cat-band { fill-opacity: 0.13; stroke-opacity: 0.55; stroke-width: 1.5; }
+  .cat-label { font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.85; }
+  .store line { stroke: #4a8a4a; stroke-width: 2; }
+  .store:hover line { stroke: #7ada7a; }
+  .store .s-name { fill: #a8e6a8; font-size: 13px; }
+  a.store { cursor: pointer; text-decoration: none; }
+  .process .p-name { font-size: 12.5px; }
+  .process .p-app { fill: #c8d0ea; font-size: 12px; font-style: italic; text-anchor: middle; }
+  .flow-label { font-size: 12px; }
+  .flow-label a { cursor: pointer; }
+  tspan.lk { fill: #a8b2e0; text-decoration: underline; text-decoration-style: dotted; }
+  .flow-label a:hover tspan.lk { fill: #ffffff; }
+  .nav-header .spec-link { margin-left: auto; }
+  .diagram { max-width: 1360px; }
+</style>
+</head>
+<body>
+
+<div class="nav-header">
+  <a href="../" class="portal-link">&#8592; Portal</a>
+  <a href="DFD_LEVEL1.html">&#8593; Level 1</a>
+  <a href="viewer.html#/md/knowledge/TreasuryAuctions.md" class="spec-link">&#9776; Treasury Auctions specs</a>
+</div>
+
+<h1>Level 2 &mdash; Treasury Auctions</h1>
+
+<div class="diagram">
+<svg viewBox="0 0 1360 800" role="img" aria-label="Level 2 for Treasury Auctions: four processes reading two data stores and one external entity directly. No process writes a data store.">
+  <defs><marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#55558c"/></marker></defs>
+  <path class="flow" d="M 260.0 170.0 Q 374.0 211.6 469.3 286.8" marker-end="url(#a1)"/>
+  <path class="flow" d="M 260.0 460.0 Q 355.3 384.9 469.3 343.2" marker-end="url(#a1)"/>
+  <path class="flow" d="M 260.0 315.0 Q 361.0 298.8 462.0 315.0" marker-end="url(#a1)"/>
+  <text class="flow-label" x="295" y="305"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#upcoming-auctions"><tspan class="lk">upcoming auctions</tspan></a></text>
+  <path class="flow" d="M 574.5 295.2 Q 711.6 219.2 865.5 189.8" marker-end="url(#a1)"/>
+  <text class="flow-label" x="807" y="189" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#auction-results"><tspan class="lk">auction results</tspan></a></text>
+  <path class="flow" d="M 580.9 307.5 Q 729.0 315.0 867.4 368.4" marker-end="url(#a1)"/>
+  <text class="flow-label" x="820" y="337" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#upcoming-auctions"><tspan class="lk">upcoming auctions</tspan></a></text>
+  <path class="flow" d="M 576.7 327.1 Q 724.9 334.6 863.3 387.9" marker-end="url(#a1)"/>
+  <text class="flow-label" x="815" y="356" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#auction-results"><tspan class="lk">auction results</tspan></a></text>
+  <path class="flow" d="M 572.6 346.6 Q 720.7 354.1 859.1 407.5" marker-end="url(#a1)"/>
+  <text class="flow-label" x="762" y="399" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#tentative-auction-schedule"><tspan class="lk">tentative auction schedule</tspan></a></text>
+  <path class="flow" d="M 565.6 350.9 Q 739.5 447.8 874.4 594.1" marker-end="url(#a1)"/>
+  <text class="flow-label" x="831" y="531" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#tentative-auction-schedule"><tspan class="lk">tentative auction schedule</tspan></a></text>
+  <path class="flow" d="M 981.0 170.0 Q 1083.0 153.7 1185.0 170.0" marker-end="url(#a1)"/>
+  <path class="flow" d="M 981.0 400.0 Q 1083.0 383.7 1185.0 400.0" marker-end="url(#a1)"/>
+  <path class="flow" d="M 981.0 630.0 Q 1083.0 613.7 1185.0 630.0" marker-end="url(#a1)"/>
+  <text class="flow-label" x="1084" y="156" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#charts-and-tables"><tspan class="lk">charts and tables</tspan></a></text>
+  <path class="flow" d="M 1185.0 204.0 Q 1081.9 213.3 981.0 190.0" marker-end="url(#a1)"/>
+  <text class="flow-label" x="1084" y="222" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#view-selections"><tspan class="lk">view selections</tspan></a></text>
+  <path class="flow" d="M 1185.0 664.0 Q 1081.9 673.3 981.0 650.0" marker-end="url(#a1)"/>
+  <text class="flow-label" x="1084" y="682" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#view-selections"><tspan class="lk">view selections</tspan></a></text>
+  <g class="entity"><rect x="1190" y="100" width="145" height="620" rx="3"/><text class="e-name" x="1262.5" y="400">User</text></g>
+  <a class="store" href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s5">
+    <rect x="40" y="150" width="215" height="40" fill="transparent" stroke="none"/>
+    <line x1="40" y1="150" x2="255" y2="150"/>
+    <line x1="40" y1="190" x2="255" y2="190"/>
+    <text class="s-name" x="147.5" y="175">Auction results (S5)</text>
+  </a>
+  <a class="entity" href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#e3">
+    <rect x="40" y="289" width="215" height="52" rx="3"/>
+    <text class="e-name" x="147.5" y="320">FiscalData (E3)</text>
+  </a>
+  <a class="store" href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s9">
+    <rect x="40" y="440" width="215" height="40" fill="transparent" stroke="none"/>
+    <line x1="40" y1="440" x2="255" y2="440"/>
+    <line x1="40" y1="480" x2="255" y2="480"/>
+    <text class="s-name" x="147.5" y="465">Tentative auction schedule (S9)</text>
+  </a>
+  <a class="process" href="viewer.html#/md/TreasuryAuctions/knowledge/5.1_Load_Auction_Data.md">
+    <circle cx="520" cy="315" r="58"/>
+    <text class="p-id" x="520" y="295">5.1</text>
+    <text class="p-name" x="520" y="316">Load</text>
+    <text class="p-name" x="520" y="332">auction data</text>
+  </a>
+  <a class="process" href="viewer.html#/md/TreasuryAuctions/knowledge/5.2_Render_Historical_Auctions.md">
+    <circle cx="920" cy="170" r="58"/>
+    <text class="p-id" x="920" y="142">5.2</text>
+    <text class="p-name" x="920" y="163">Render</text>
+    <text class="p-name" x="920" y="179">Historical</text>
+    <text class="p-name" x="920" y="195">Auctions</text>
+  </a>
+  <a class="process" href="viewer.html#/md/TreasuryAuctions/knowledge/5.3_Render_Upcoming_Auctions.md">
+    <circle cx="920" cy="400" r="58"/>
+    <text class="p-id" x="920" y="372">5.3</text>
+    <text class="p-name" x="920" y="393">Render</text>
+    <text class="p-name" x="920" y="409">Upcoming</text>
+    <text class="p-name" x="920" y="425">Auctions</text>
+  </a>
+  <a class="process" href="viewer.html#/md/TreasuryAuctions/knowledge/5.4_Render_Tentative_Schedule.md">
+    <circle cx="920" cy="630" r="58"/>
+    <text class="p-id" x="920" y="602">5.4</text>
+    <text class="p-name" x="920" y="623">Render</text>
+    <text class="p-name" x="920" y="639">Tentative</text>
+    <text class="p-name" x="920" y="655">Schedule</text>
+  </a>
+</svg>
+</div>
+
+<p class="notes">
+  <b>No process here writes a data store.</b> Every flow ends at 5.2, 5.3 or 5.4 and is gone when the page closes.
+  <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#e3">FiscalData (E3)</a> is drawn as a box, in the store column: the app reads its <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#upcoming-auctions">upcoming auctions</a> live, with no acquisition job between (see <a href="viewer.html#/md/knowledge/DFD_Worklist.md">DFD_Worklist.md</a> &sect;4.0).
+  5.3 reads the auction results and the tentative auction schedule from 5.1 to flag an upcoming auction as a TIPS auction.
+  5.2 and 5.4 apply the typed filters and the sort of <a href="viewer.html#/md/TreasuryAuctions/knowledge/Filtering_And_Columns.md">Filtering and Columns</a>.
+</p>
+
+</body>
+</html>

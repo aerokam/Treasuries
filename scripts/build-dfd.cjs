@@ -308,7 +308,7 @@ function level1() {
     { key: 'yc', cat: 'workflow', name: ['Yield', 'Curves'], spec: 'DFD_LEVEL2_YIELDCURVES.html', reads: ['fedinv', 'nsasa', 'quotes', 'gsw', 'hol'] },
     { key: 'sa', cat: 'educational', name: ['Seasonal', 'Adjustments'], spec: V('SeasonalAdjustments/knowledge/1.0_SeasonalAdjustments_Explorer.md'), reads: ['nsasa', 'hol'] },
     { key: 'fh', cat: 'reference', name: ['Fund', 'Holdings'], spec: V('FundHoldings/knowledge/1.0_FundHoldings.md'), reads: ['funds'] },
-    { key: 'ta', cat: 'reference', name: ['Treasury', 'Auctions'], spec: V('knowledge/TreasuryAuctions.md'), reads: ['auctions', 'tent'] },
+    { key: 'ta', cat: 'reference', name: ['Treasury', 'Auctions'], spec: 'DFD_LEVEL2_TREASURYAUCTIONS.html', reads: ['auctions', 'tent'] },
     { key: 'tx', cat: 'reference', name: ['Taxation of', 'Treasuries'], spec: V('TaxationOfTreasuries/docs/TaxationOfTreasuries_Foundation.md'), reads: [] },
   ];
   barycentre(stores, apps);
@@ -1263,6 +1263,65 @@ function level3TipsLadderManagerRebalance() {
 }
 
 // ── emit ────────────────────────────────────────────────────────────────────
+// ── Level 2: Treasury Auctions ──────────────────────────────────────────────
+const KTA = 'TreasuryAuctions/knowledge/';
+function level2TreasuryAuctions() {
+  const stores = [
+    { id: 'auctions', name: 'Auction results', href: DS('s5') },
+    { id: 'fiscal', entity: true, name: ['FiscalData'], href: DD + 'e3' },
+    { id: 'tent', name: 'Tentative auction schedule', href: DS('s9') },
+  ];
+  const procs = [
+    { id: '5.1', name: ['Load', 'auction data'], href: V(KTA + '5.1_Load_Auction_Data.md'), reads: ['auctions', 'tent'],
+      out: { '5.2': ['auction results'], '5.3': ['upcoming auctions', 'auction results', 'tentative auction schedule'], '5.4': ['tentative auction schedule'] } },
+    { id: '5.2', name: ['Render', 'Historical', 'Auctions'], href: V(KTA + '5.2_Render_Historical_Auctions.md'), reads: [], out: {} },
+    { id: '5.3', name: ['Render', 'Upcoming', 'Auctions'], href: V(KTA + '5.3_Render_Upcoming_Auctions.md'), reads: [], out: {} },
+    { id: '5.4', name: ['Render', 'Tentative', 'Schedule'], href: V(KTA + '5.4_Render_Tentative_Schedule.md'), reads: [], out: {} },
+  ];
+  const SX = 40, SW = 215, EH = 52, PR = 58, UX = 1190, UW = 145;
+  const sy = i => 170 + i * 145;
+  const px = { '5.1': 520, '5.2': 920, '5.3': 920, '5.4': 920 };
+  const py = { '5.1': 315, '5.2': 170, '5.3': 400, '5.4': 630 };
+  const H = 800, W = 1360;
+  const OBS = procs.map(q => ({ x: px[q.id], y: py[q.id], r: PR }));
+  const LBL = [];
+  const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 2 for Treasury Auctions: four processes reading two data stores and one external entity directly. No process writes a data store.">`, marker()];
+  const sIdx = Object.fromEntries(stores.map((s, i) => [s.id, i]));
+  procs.forEach(p => p.reads.forEach(id => {
+    const y = sy(sIdx[id]), [x2, y2] = toCircle(SX + SW + 5, y, px[p.id], py[p.id], PR);
+    P.push(flow(SX + SW + 5, y, x2, y2, { obstacles: OBS }));
+  }));
+  // FiscalData is drawn as a box, in the column of the stores, as Yields Monitor draws CNBC:
+  // no acquisition job stands between it and the app. See DFD_Worklist.md §4.0.
+  const fy = sy(sIdx.fiscal);
+  const [f2, f3] = toCircle(SX + SW + 5, fy, px['5.1'], py['5.1'], PR);
+  P.push(flow(SX + SW + 5, fy, f2, f3, { obstacles: OBS.filter(o => !(o.x === px['5.1'] && o.y === py['5.1'])) }));
+  P.push(labelAt(SX + SW + 40, fy - 10, 'upcoming auctions'));
+  P.push(internalFlows(procs, px, py, PR, OBS, LBL));
+  ['5.2', '5.3', '5.4'].forEach(id => {
+    P.push(flow(px[id] + PR + 3, py[id], UX - 5, py[id], { obstacles: OBS.filter(o => !(o.x === px[id] && o.y === py[id])) }));
+  });
+  P.push(labelAt((px['5.2'] + PR + UX) / 2, py['5.2'] - 14, 'charts and tables', 'middle'));
+  ['5.2', '5.4'].forEach(id => {
+    P.push(flow(UX - 5, py[id] + 34, px[id] + PR + 3, py[id] + 20, { obstacles: OBS.filter(o => !(o.x === px[id] && o.y === py[id])) }));
+    P.push(labelAt((px[id] + PR + UX) / 2, py[id] + 52, 'view selections', 'middle'));
+  });
+  P.push(`  <g class="entity"><rect x="${UX}" y="100" width="${UW}" height="${H - 180}" rx="3"/><text class="e-name" x="${UX + UW / 2}" y="${H / 2}">User</text></g>`);
+  stores.forEach((s, i) => P.push(s.entity ? entityShape(SX, sy(i), SW, EH, s.href, s.name) : storeShape(SX, sy(i), SW, s.href, s.name)));
+  procs.forEach(p => P.push(procShape(px[p.id], py[p.id], PR, p.href, p.id, p.name)));
+  P.push('</svg>');
+
+  return page({
+    title: 'Treasury Auctions — Level 2', h1: 'Level 2 &mdash; Treasury Auctions', maxWidth: W,
+    up: 'DFD_LEVEL1.html', upLabel: 'Level 1',
+    spec: V('knowledge/TreasuryAuctions.md'), specLabel: 'Treasury Auctions specs', svg: P.join(NL),
+    notes: ['  <b>No process here writes a data store.</b> Every flow ends at 5.2, 5.3 or 5.4 and is gone when the page closes.',
+      '  <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#e3">FiscalData (E3)</a> is drawn as a box, in the store column: the app reads its <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#upcoming-auctions">upcoming auctions</a> live, with no acquisition job between (see <a href="viewer.html#/md/knowledge/DFD_Worklist.md">DFD_Worklist.md</a> &sect;4.0).',
+      '  5.3 reads the auction results and the tentative auction schedule from 5.1 to flag an upcoming auction as a TIPS auction.',
+      '  5.2 and 5.4 apply the typed filters and the sort of <a href="viewer.html#/md/TreasuryAuctions/knowledge/Filtering_And_Columns.md">Filtering and Columns</a>.'].join(NL)
+  });
+}
+
 const outputs = [
   ['knowledge/DFD_LEVEL1.html', level1()],
   ['knowledge/DFD_LEVEL2_INGESTION.html', level2Ingestion()],
@@ -1277,6 +1336,7 @@ const outputs = [
   ['knowledge/DFD_LEVEL3_TLM_IMPORT.html', level3TipsLadderManagerImport()],
   ['knowledge/DFD_LEVEL3_TLM_BUILD.html', level3TipsLadderManagerBuild()],
   ['knowledge/DFD_LEVEL3_TLM_REBALANCE.html', level3TipsLadderManagerRebalance()],
+  ['knowledge/DFD_LEVEL2_TREASURYAUCTIONS.html', level2TreasuryAuctions()],
 ];
 if (unlinked.size) {
   console.log(String.fromCharCode(10) + "flow labels with no Data Dictionary entry:");
