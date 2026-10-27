@@ -71,7 +71,7 @@ const TERMS = {
   'live quotes': 'live-quotes', 'upcoming auctions': 'upcoming-auctions', 'yield series': 'yield-series', 'day change': 'day-change',
   'TIPS market data': 'tips-market-data',
   'SA yield series': 'sa-yield-series',
-  'CPI series': 'cpi-series',
+  'CPI series': 'cpi-series', 'TIPS reference rows': 'tips-reference-rows',
   'Holdings File': 'holdings-file', 'DARA Plan File': 'dara-plan-file',
   'per-year DARA': 'per-year-dara',
   'holdings': 'holdings', 'DARA plan': 'dara-plan',
@@ -302,7 +302,7 @@ function level1() {
   // Each app is named as the portal names it.
   const apps = [
     { key: 'lm', cat: 'workflow', name: ['Ladder', 'Manager'], spec: 'DFD_LEVEL2_TIPSLADDERMANAGER.html', reads: ['quotes', 'tipsref', 'refcpi', 'sasao', 'hol'] },
-    { key: 'tr', cat: 'reference', name: ['TIPS', 'Reference'], spec: V('TipsReference/knowledge/1.0_TIPS_Reference.md'), reads: ['tipsref', 'refcpi', 'sasao', 'hol'] },
+    { key: 'tr', cat: 'reference', name: ['TIPS', 'Reference'], spec: 'DFD_LEVEL2_TIPSREFERENCE.html', reads: ['quotes', 'tipsref', 'refcpi', 'hol'] },
     { key: 'pr', cat: 'educational', name: ['Portal', 'Primer'], spec: V('Primer/knowledge/1.0_Primer.md'), reads: ['fedinv', 'tipsref', 'refcpi'] },
     { key: 'ce', cat: 'reference', name: ['CPI', 'Explorer'], spec: 'DFD_LEVEL2_CPIEXPLORER.html', reads: ['refcpi', 'cpihist'] },
     { key: 'ym', cat: 'workflow', name: ['Yields', 'Monitor'], spec: 'DFD_LEVEL2_YIELDSMONITOR.html', reads: ['tipsref', 'nsasa', 'hol', 'yhist', 'ia'] },
@@ -1419,6 +1419,64 @@ function level2CpiExplorer() {
   });
 }
 
+// ── Level 2: TIPS Reference ─────────────────────────────────────────────────
+const KTR = 'TipsReference/knowledge/';
+function level2TipsReference() {
+  const stores = [
+    { id: 'tipsref', name: 'TIPS reference data', href: DS('s2') },
+    { id: 'quotes', name: 'Market quotes', href: DS('s7') },
+    { id: 'refcpi', name: 'Ref CPI', href: DS('s3') },
+    { id: 'hol', name: 'Bond holidays', href: DS('s16') },
+  ];
+  const procs = [
+    { id: '6.1', name: ['Load', 'TIPS data'], href: V(KTR + '6.1_Load_TIPS_Data.md'), reads: ['tipsref', 'quotes', 'refcpi', 'hol'],
+      out: { '6.2': ['TIPS reference rows', 'daily Ref CPI', 'bond holidays', 'settlement date'], '6.3': ['download date', 'settlement date'] } },
+    { id: '6.2', name: ['Calculate', 'index ratios', 'and coupons'], href: V(KTR + '6.2_Calculate_Index_Ratios_And_Coupons.md'), reads: [],
+      out: { '6.3': ['TIPS reference rows'] } },
+    { id: '6.3', name: ['Render', 'TIPS table'], href: V(KTR + '6.3_Render_TIPS_Table.md'), reads: [], out: { '6.4': ['TIPS reference rows'] } },
+    { id: '6.4', name: ['Export', 'TIPS table'], href: V(KTR + '6.4_Export_TIPS_Table.md'), reads: [], out: {} },
+  ];
+  const SX = 40, SW = 215, PR = 58, UX = 1190, UW = 145;
+  const sy = i => 160 + i * 130;
+  const px = { '6.1': 450, '6.2': 740, '6.3': 960, '6.4': 960 };
+  const py = { '6.1': 400, '6.2': 190, '6.3': 400, '6.4': 650 };
+  const H = 800, W = 1360;
+  const OBS = procs.map(q => ({ x: px[q.id], y: py[q.id], r: PR }));
+  const LBL = [];
+  const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 2 for TIPS Reference: four processes reading four data stores. No process writes a data store.">`, marker()];
+  const sIdx = Object.fromEntries(stores.map((s, i) => [s.id, i]));
+  procs.forEach(p => p.reads.forEach(id => {
+    const y = sy(sIdx[id]), [x2, y2] = toCircle(SX + SW + 5, y, px[p.id], py[p.id], PR);
+    P.push(flow(SX + SW + 5, y, x2, y2, { obstacles: OBS }));
+  }));
+  P.push(internalFlows(procs, px, py, PR, OBS, LBL));
+  const others = id => OBS.filter(o => !(o.x === px[id] && o.y === py[id]));
+  P.push(flow(UX - 5, py['6.2'] - 20, px['6.2'] + PR + 3, py['6.2'] - 20, { obstacles: others('6.2') }));
+  P.push(labelAt((px['6.2'] + PR + UX) / 2, py['6.2'] - 28, 'view selections', 'middle'));
+  P.push(flow(px['6.2'] + PR + 3, py['6.2'] + 22, UX - 5, py['6.2'] + 22, { obstacles: others('6.2') }));
+  P.push(labelAt((px['6.2'] + PR + UX) / 2, py['6.2'] + 42, 'charts and tables', 'middle'));
+  P.push(flow(px['6.3'] + PR + 3, py['6.3'] - 10, UX - 5, py['6.3'] - 10, { obstacles: others('6.3') }));
+  P.push(labelAt((px['6.3'] + PR + UX) / 2, py['6.3'] - 24, 'charts and tables', 'middle'));
+  P.push(flow(UX - 5, py['6.3'] + 36, px['6.3'] + PR + 3, py['6.3'] + 20, { obstacles: others('6.3') }));
+  P.push(labelAt((px['6.3'] + PR + UX) / 2, py['6.3'] + 58, 'view selections', 'middle'));
+  P.push(flow(px['6.4'] + PR + 3, py['6.4'], UX - 5, py['6.4'], { obstacles: others('6.4') }));
+  P.push(labelAt((px['6.4'] + PR + UX) / 2, py['6.4'] - 14, 'TIPS reference rows', 'middle'));
+  P.push(`  <g class="entity"><rect x="${UX}" y="100" width="${UW}" height="${H - 180}" rx="3"/><text class="e-name" x="${UX + UW / 2}" y="${H / 2}">User</text></g>`);
+  stores.forEach((s, i) => P.push(storeShape(SX, sy(i), SW, s.href, s.name)));
+  procs.forEach(p => P.push(procShape(px[p.id], py[p.id], PR, p.href, p.id, p.name)));
+  P.push('</svg>');
+
+  return page({
+    title: 'TIPS Reference — Level 2', h1: 'Level 2 &mdash; TIPS Reference', maxWidth: W,
+    up: 'DFD_LEVEL1.html', upLabel: 'Level 1',
+    spec: V('knowledge/TipsReference.md'), specLabel: 'TIPS Reference specs', svg: P.join(NL),
+    notes: ['  <b>No process here writes a data store.</b> Every flow ends at the user and is gone when the page closes.',
+      '  6.1 calls the function that <a href="DFD_LEVEL2_TIPSLADDERMANAGER.html">Ladder Manager</a> also calls to read market data. That function also fetches <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s10">SA and SAO yields (S10)</a>, which this app does not use, so no flow from S10 is drawn.',
+      '  6.4 writes the rows of the table to a csv file the user saves.',
+      '  <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#tips-reference-rows">TIPS reference rows</a> is defined in the Data Dictionary &sect;6.7.'].join(NL)
+  });
+}
+
 const outputs = [
   ['knowledge/DFD_LEVEL1.html', level1()],
   ['knowledge/DFD_LEVEL2_INGESTION.html', level2Ingestion()],
@@ -1436,6 +1494,7 @@ const outputs = [
   ['knowledge/DFD_LEVEL2_TREASURYAUCTIONS.html', level2TreasuryAuctions()],
   ['knowledge/DFD_LEVEL2_FUNDHOLDINGS.html', level2FundHoldings()],
   ['knowledge/DFD_LEVEL2_CPIEXPLORER.html', level2CpiExplorer()],
+  ['knowledge/DFD_LEVEL2_TIPSREFERENCE.html', level2TipsReference()],
 ];
 if (unlinked.size) {
   console.log(String.fromCharCode(10) + "flow labels with no Data Dictionary entry:");
