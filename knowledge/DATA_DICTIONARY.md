@@ -19,7 +19,7 @@
 
 **C** &nbsp; [Cash Flow Calendar](#cash-flow-calendar) &middot; [Charts and Tables](#charts-and-tables) &middot; [clean price](#price) *(see Price)* &middot; [CNBC (E5)](#e5) &middot; [Construction Parameters](#construction-parameters) &middot; [Cost per TIPS](#cost-per-tips) &middot; [Coupon Rate](#coupon-rate) &middot; [Cover Excess](#cover-excess) &middot; [cover maturity](#cover-year-tips) *(see Cover Year TIPS)* &middot; [Cover Weight](#cover-weight) &middot; [Cover Year](#cover-year) &middot; [Cover Year TIPS](#cover-year-tips) &middot; [CPI CAGR](#cpi-cagr) &middot; [CPI Change (Month-over-Month)](#cpi-change-mom) &middot; [CPI Change (Point-to-Point)](#cpi-change-p2p) &middot; [CPI Change (Year-over-Year)](#cpi-change-yoy) &middot; [CPI history (S8)](#s8) &middot; [CPI Series](#cpi-series) &middot; [CPI-U NSA](#cpi-nsa) &middot; [CPI-U SA](#cpi-sa) &middot; [Credibility Factor](#credibility-factor) &middot; [CUSIP](#cusip)
 
-**D** &nbsp; [DAA](#daa) &middot; [Daily Ref CPI](#daily-ref-cpi) &middot; [DARA](#dara) &middot; [DARA Plan](#dara-plan) &middot; [DARA Plan File](#dara-plan-file) &middot; [Dated Date](#dated-date) &middot; [Day Change](#day-change) &middot; [Download Date](#download-date) &middot; [Downloaded Data Sets](#downloaded-data-sets) &middot; [Drill Popup](#drill-popup) &middot; [Drill Request](#drill-request) &middot; [Duration](#duration) &middot; [Duration Matching](#duration-matching)
+**D** &nbsp; [DAA](#daa) &middot; [Daily Ref CPI](#daily-ref-cpi) &middot; [DARA](#dara) &middot; [DARA Plan](#dara-plan) &middot; [DARA Plan File](#dara-plan-file) &middot; [Dated Date](#dated-date) &middot; [Day Change](#day-change) &middot; [Deck Content](#deck-content) &middot; [Deck Pages](#deck-pages) &middot; [Download Date](#download-date) &middot; [Downloaded Data Sets](#downloaded-data-sets) &middot; [Drill Popup](#drill-popup) &middot; [Drill Request](#drill-request) &middot; [Duration](#duration) &middot; [Duration Matching](#duration-matching)
 
 **E** &nbsp; [Excess TIPS](#excess-tips)
 
@@ -860,11 +860,12 @@ Some values are true only until Treasury issues more TIPS. Left inline as approx
   - *Fund Holdings: `Ticker + Sort + { Column_Width }` — the fund tab; the sorted column and its direction; and the column widths.*
   - *CPI Explorer: `{ Source } + Display_Mode + ( Rolling_Window_Months ) + Start_Date + End_Date + ( Log_Scale )` — the series shown; the display mode; the months of the rolling window; the date range; and whether the vertical axis is logarithmic.*
   - *TIPS Reference: `Ref_CPI_Date + Sort + { Typed_Filter } + { Calendar_Date_Range } + Outstanding_Only` — the date of the Ref CPI the Index Ratio and coupons use; the sorted column and its direction; the typed column filters; the calendar date ranges; and whether only outstanding TIPS show.*
+  - *Portal Primer: `Page + { Calculator_Entry }` — the page of the deck shown; and the entries of the calculator on it.*
 - <a id="axis-scales"></a>**Axis Scales** = `Horizontal_Axis_Range + Vertical_Axis_Range`
   *The ranges of the two chart axes: the horizontal axis in calendar dates or in [Term](#term), and the vertical axis in yield, floored by any [IQR Clip](#iqr-clip).*
 - <a id="drill-request"></a>**Drill Request** = `@CUSIP + Figure`
   *The security and the figure a user picks in a table, to see how the figure was calculated.*
-- <a id="charts-and-tables"></a>**Charts and Tables** = *The views drawn for the user: the chart and the table of the selected tab, or the spread charts and table in spread mode, in Yield Curves; the equivalent time-series, yield-curve-snapshot or breakeven-inflation view, in Yields Monitor; the table of the active tab, in Treasury Auctions; the table of the selected fund, in Fund Holdings; the chart of the selected series, in CPI Explorer; the table and its header, in TIPS Reference.*
+- <a id="charts-and-tables"></a>**Charts and Tables** = *The views drawn for the user: the chart and the table of the selected tab, or the spread charts and table in spread mode, in Yield Curves; the equivalent time-series, yield-curve-snapshot or breakeven-inflation view, in Yields Monitor; the table of the active tab, in Treasury Auctions; the table of the selected fund, in Fund Holdings; the chart of the selected series, in CPI Explorer; the table and its header, in TIPS Reference; the page of the deck and the calculator it mounts, in Portal Primer.*
 
 ### 6.4 Yields Monitor
 
@@ -917,3 +918,10 @@ Some values are true only until Treasury issues more TIPS. Left inline as approx
 
 - <a id="tips-reference-rows"></a>**TIPS Reference Rows** = `{ @CUSIP + Maturity_Date + Coupon_Rate + Dated_Date + Ref_CPI_dated + ( Price + Yield + Term + Duration ) + ( Index_Ratio + Adjusted_Price + Next_Coupon ) }`
   *One row for each TIPS in [TIPS reference data (S2)](#s2), with the quote of [Market quotes (S7)](#s7) where it has one. [6.1](../TipsReference/knowledge/6.1_Load_TIPS_Data.md) states the first part and [6.2](../TipsReference/knowledge/6.2_Calculate_Index_Ratios_And_Coupons.md) adds the second: the [Index Ratio](#index-ratio) and [Adjusted Price](#adjusted-price) at the Ref CPI Date, and the next coupon date with its Index Ratio and the coupon paid on $1,000 of par.*
+
+### 6.8 Portal Primer
+
+- <a id="deck-pages"></a>**Deck Pages** = `{ @Page_Id + Chapter + Title + { Block } }`
+  *The pages of [Deck content](#deck-content), in the order the file states, each with its chapter, its title and its blocks of text.*
+- <a id="deck-content"></a>**Deck Content**, `Primer/content/deck.md`
+  *The file of the Portal Primer that holds the order, the chapter, the title and the text of every page. It is kept in the app, and no job writes it.*

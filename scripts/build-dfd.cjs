@@ -72,6 +72,7 @@ const TERMS = {
   'TIPS market data': 'tips-market-data',
   'SA yield series': 'sa-yield-series',
   'CPI series': 'cpi-series', 'TIPS reference rows': 'tips-reference-rows',
+  'deck pages': 'deck-pages',
   'Holdings File': 'holdings-file', 'DARA Plan File': 'dara-plan-file',
   'per-year DARA': 'per-year-dara',
   'holdings': 'holdings', 'DARA plan': 'dara-plan',
@@ -303,7 +304,7 @@ function level1() {
   const apps = [
     { key: 'lm', cat: 'workflow', name: ['Ladder', 'Manager'], spec: 'DFD_LEVEL2_TIPSLADDERMANAGER.html', reads: ['quotes', 'tipsref', 'refcpi', 'sasao', 'hol'] },
     { key: 'tr', cat: 'reference', name: ['TIPS', 'Reference'], spec: 'DFD_LEVEL2_TIPSREFERENCE.html', reads: ['quotes', 'tipsref', 'refcpi', 'hol'] },
-    { key: 'pr', cat: 'educational', name: ['Portal', 'Primer'], spec: V('Primer/knowledge/1.0_Primer.md'), reads: ['fedinv', 'tipsref', 'refcpi'] },
+    { key: 'pr', cat: 'educational', name: ['Portal', 'Primer'], spec: 'DFD_LEVEL2_PRIMER.html', reads: ['fedinv', 'tipsref', 'refcpi'] },
     { key: 'ce', cat: 'reference', name: ['CPI', 'Explorer'], spec: 'DFD_LEVEL2_CPIEXPLORER.html', reads: ['refcpi', 'cpihist'] },
     { key: 'ym', cat: 'workflow', name: ['Yields', 'Monitor'], spec: 'DFD_LEVEL2_YIELDSMONITOR.html', reads: ['tipsref', 'nsasa', 'hol', 'yhist', 'ia'] },
     { key: 'yc', cat: 'workflow', name: ['Yield', 'Curves'], spec: 'DFD_LEVEL2_YIELDCURVES.html', reads: ['fedinv', 'nsasa', 'quotes', 'gsw', 'hol'] },
@@ -1477,6 +1478,60 @@ function level2TipsReference() {
   });
 }
 
+// ── Level 2: Portal Primer ──────────────────────────────────────────────────
+const KPR = 'Primer/knowledge/';
+function level2Primer() {
+  const stores = [
+    { id: 'deck', name: 'Deck content', href: DD + 'deck-content' },
+    { id: 'fedinv', name: 'FedInvest prices', href: DS('s1') },
+    { id: 'tipsref', name: 'TIPS reference data', href: DS('s2') },
+    { id: 'refcpi', name: 'Ref CPI', href: DS('s3') },
+  ];
+  const procs = [
+    { id: '10.1', name: ['Load', 'deck'], href: V(KPR + '10.1_Load_Deck.md'), reads: ['deck'], out: { '10.4': ['deck pages'] } },
+    { id: '10.2', name: ['Load', 'market data'], href: V(KPR + '10.2_Load_Market_Data.md'), reads: ['fedinv', 'tipsref', 'refcpi'],
+      out: { '10.3': ['TIPS prices', 'Treasury prices', 'daily Ref CPI', 'TIPS reference data', 'settlement date'] } },
+    { id: '10.3', name: ['Run', 'calculators'], href: V(KPR + '10.3_Run_Calculators.md'), reads: [], out: {} },
+    { id: '10.4', name: ['Render', 'deck pages'], href: V(KPR + '10.4_Render_Deck_Pages.md'), reads: [], out: {} },
+  ];
+  const SX = 40, SW = 215, PR = 58, UX = 1190, UW = 145;
+  const sy = i => [190, 380, 510, 640][i];
+  const px = { '10.1': 460, '10.2': 460, '10.3': 920, '10.4': 920 };
+  const py = { '10.1': 190, '10.2': 510, '10.3': 520, '10.4': 230 };
+  const H = 800, W = 1360;
+  const OBS = procs.map(q => ({ x: px[q.id], y: py[q.id], r: PR }));
+  const LBL = [];
+  const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 2 for Portal Primer: four processes reading three data stores and the deck content kept in the app. No process writes a data store.">`, marker()];
+  const sIdx = Object.fromEntries(stores.map((s, i) => [s.id, i]));
+  procs.forEach(p => p.reads.forEach(id => {
+    const y = sy(sIdx[id]), [x2, y2] = toCircle(SX + SW + 5, y, px[p.id], py[p.id], PR);
+    P.push(flow(SX + SW + 5, y, x2, y2, { obstacles: OBS }));
+  }));
+  P.push(internalFlows(procs, px, py, PR, OBS, LBL));
+  const others = id => OBS.filter(o => !(o.x === px[id] && o.y === py[id]));
+  ['10.3', '10.4'].forEach(id => {
+    P.push(flow(px[id] + PR + 3, py[id] - 8, UX - 5, py[id] - 8, { obstacles: others(id) }));
+    P.push(labelAt((px[id] + PR + UX) / 2, py[id] - 22, 'charts and tables', 'middle'));
+    P.push(flow(UX - 5, py[id] + 34, px[id] + PR + 3, py[id] + 20, { obstacles: others(id) }));
+    P.push(labelAt((px[id] + PR + UX) / 2, py[id] + 54, 'view selections', 'middle'));
+  });
+  P.push(flow(px['10.2'] + 40, py['10.2'] + PR - 6, UX - 5, 700, { obstacles: others('10.2') }));
+  P.push(labelAt(820, 690, 'charts and tables', 'middle'));
+  P.push(`  <g class="entity"><rect x="${UX}" y="100" width="${UW}" height="${H - 180}" rx="3"/><text class="e-name" x="${UX + UW / 2}" y="${H / 2}">User</text></g>`);
+  stores.forEach((s, i) => P.push(storeShape(SX, sy(i), SW, s.href, s.name)));
+  procs.forEach(p => P.push(procShape(px[p.id], py[p.id], PR, p.href, p.id, p.name)));
+  P.push('</svg>');
+
+  return page({
+    title: 'Portal Primer — Level 2', h1: 'Level 2 &mdash; Portal Primer', maxWidth: W,
+    up: 'DFD_LEVEL1.html', upLabel: 'Level 1',
+    spec: V('knowledge/Primer.md'), specLabel: 'Portal Primer specs', svg: P.join(NL),
+    notes: ['  <b>No process here writes a data store.</b> Every flow ends at the user and is gone when the page closes.',
+      '  <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#deck-content">Deck content</a> is a file kept in the app, drawn as a store of this diagram only; no job writes it.',
+      '  10.2 also states its source line, as <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#charts-and-tables">charts and tables</a>, to the user.'].join(NL)
+  });
+}
+
 const outputs = [
   ['knowledge/DFD_LEVEL1.html', level1()],
   ['knowledge/DFD_LEVEL2_INGESTION.html', level2Ingestion()],
@@ -1495,6 +1550,7 @@ const outputs = [
   ['knowledge/DFD_LEVEL2_FUNDHOLDINGS.html', level2FundHoldings()],
   ['knowledge/DFD_LEVEL2_CPIEXPLORER.html', level2CpiExplorer()],
   ['knowledge/DFD_LEVEL2_TIPSREFERENCE.html', level2TipsReference()],
+  ['knowledge/DFD_LEVEL2_PRIMER.html', level2Primer()],
 ];
 if (unlinked.size) {
   console.log(String.fromCharCode(10) + "flow labels with no Data Dictionary entry:");
