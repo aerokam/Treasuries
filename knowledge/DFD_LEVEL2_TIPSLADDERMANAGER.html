@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>TipsLadderManager — Level 2 (draft)</title>
+<title>TipsLadderManager — Level 2</title>
 <style>
   :root {
     --bg: #0d0d1a;
@@ -184,114 +184,154 @@
   <a href="viewer.html#/md/knowledge/TipsLadderManager.md" class="spec-link">&#9776; TipsLadderManager overview</a>
 </div>
 
-<h1>Level 2 &mdash; TipsLadderManager (draft)</h1>
+<h1>Level 2 &mdash; TipsLadderManager</h1>
 
 <div class="diagram">
-<svg viewBox="0 0 1450 900" role="img" aria-label="Level 2 draft for TipsLadderManager: five processes reading five data stores, an imported file and typed parameters from the user. No process writes a data store.">
+<svg viewBox="0 0 1450 1000" role="img" aria-label="Level 2 for TipsLadderManager: six processes reading five data stores and the Explore price files kept in the app, an imported file and typed parameters from the user. No process writes a data store.">
   <defs><marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#55558c"/></marker></defs>
-  <path class="flow" d="M 260.0 150.0 Q 355.1 263.1 410.2 400.3" marker-end="url(#a1)"/>
-  <path class="flow" d="M 260.0 300.0 Q 336.8 345.6 395.4 412.9" marker-end="url(#a1)"/>
-  <path class="flow" d="M 260.0 450.0 Q 321.0 440.2 382.0 450.0" marker-end="url(#a1)"/>
-  <path class="flow" d="M 260.0 600.0 Q 318.7 532.7 395.4 487.1" marker-end="url(#a1)"/>
-  <path class="flow" d="M 260.0 750.0 Q 315.1 612.9 410.2 499.7" marker-end="url(#a1)"/>
-  <path class="flow" d="M 482.6 410.7 Q 557.1 316.0 657.4 249.3" marker-end="url(#a1)"/>
-  <text class="flow-label" x="630" y="294" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#tips-market-data"><tspan class="lk">TIPS market data</tspan></a></text>
-  <path class="flow" d="M 496.5 436.7 Q 687.5 358.2 893.5 343.3" marker-end="url(#a1)"/>
-  <text class="flow-label" x="817" y="337" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#tips-market-data"><tspan class="lk">TIPS market data</tspan></a></text>
-  <path class="flow" d="M 493.6 472.1 Q 708.3 522.8 896.4 637.9" marker-end="url(#a1)"/>
-  <text class="flow-label" x="832" y="585" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#tips-market-data"><tspan class="lk">TIPS market data</tspan></a></text>
-  <path class="flow" d="M 752.3 235.1 Q 830.6 258.4 897.7 304.9" marker-end="url(#a1)"/>
-  <text class="flow-label" x="878" y="276" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#dara-plan"><tspan class="lk">DARA plan</tspan></a></text>
-  <path class="flow" d="M 736.9 255.8 Q 861.6 414.7 930.6 604.4" marker-end="url(#a1)"/>
-  <text class="flow-label" x="914" y="529" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#holdings"><tspan class="lk">holdings</tspan></a></text>
-  <path class="flow" d="M 719.4 265.6 Q 844.1 424.4 913.1 614.2" marker-end="url(#a1)"/>
-  <text class="flow-label" x="877" y="564" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#dara-plan"><tspan class="lk">DARA plan</tspan></a></text>
-  <path class="flow" d="M 966.8 385.5 Q 979.3 411.2 983.2 439.5" marker-end="url(#a1)"/>
-  <text class="flow-label" x="992" y="423" text-anchor="middle">build result</text>
-  <path class="flow" d="M 957.3 601.6 Q 961.1 573.3 973.6 547.6" marker-end="url(#a1)"/>
-  <text class="flow-label" x="980" y="572" text-anchor="middle">before-state preview</text>
-  <path class="flow" d="M 976.4 607.4 Q 980.3 579.1 992.7 553.4" marker-end="url(#a1)"/>
-  <text class="flow-label" x="994" y="591" text-anchor="middle">rebalance result</text>
-  <path class="flow" d="M 1235.0 220.0 Q 996.5 258.2 758.0 220.0" marker-end="url(#a1)"/>
-  <text class="flow-label" x="999" y="236" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#holdings-file"><tspan class="lk">Holdings File</tspan></a></text>
-  <path class="flow" d="M 1235.0 200.0 Q 996.5 238.2 758.0 200.0" marker-end="url(#a1)"/>
-  <text class="flow-label" x="999" y="192" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#dara-plan-file"><tspan class="lk">DARA Plan File</tspan></a></text>
-  <path class="flow" d="M 1235.0 320.0 Q 1121.5 338.2 1008.0 320.0" marker-end="url(#a1)"/>
-  <text class="flow-label" x="1124" y="312" text-anchor="middle">ladder parameters</text>
-  <path class="flow" d="M 1235.0 650.0 Q 1121.5 668.2 1008.0 650.0" marker-end="url(#a1)"/>
-  <text class="flow-label" x="1124" y="642" text-anchor="middle">ladder parameters</text>
-  <path class="flow" d="M 1058.0 485.0 Q 1146.5 470.8 1235.0 485.0" marker-end="url(#a1)"/>
-  <text class="flow-label" x="1149" y="477" text-anchor="middle">ladder table</text>
-  <path class="flow" d="M 1058.0 505.0 Q 1146.5 490.8 1235.0 505.0" marker-end="url(#a1)"/>
-  <text class="flow-label" x="1149" y="521" text-anchor="middle">ladder export</text>
-  <g class="entity"><rect x="1240" y="80" width="145" height="740" rx="3"/><text class="e-name" x="1312.5" y="450">User</text></g>
-  <a class="store" href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s7">
+  <path class="flow" d="M 260.0 290.0 Q 351.7 389.0 407.8 511.7" marker-end="url(#a1)"/>
+  <path class="flow" d="M 260.0 430.0 Q 334.2 467.4 393.0 526.0" marker-end="url(#a1)"/>
+  <path class="flow" d="M 260.0 570.0 Q 320.5 556.8 382.1 563.2" marker-end="url(#a1)"/>
+  <path class="flow" d="M 260.0 710.0 Q 318.7 642.7 395.4 597.1" marker-end="url(#a1)"/>
+  <path class="flow" d="M 260.0 850.0 Q 315.4 717.7 409.4 609.3" marker-end="url(#a1)"/>
+  <path class="flow" d="M 260.0 150.0 Q 447.7 97.7 642.4 106.5" marker-end="url(#a1)"/>
+  <path class="flow" d="M 489.6 529.9 Q 600.1 248.9 900.4 280.1" marker-end="url(#a1)"/>
+  <text class="flow-label" x="793" y="267" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#tips-market-data"><tspan class="lk">TIPS market data</tspan></a></text>
+  <path class="flow" d="M 493.3 583.0 Q 708.9 637.7 896.7 757.0" marker-end="url(#a1)"/>
+  <text class="flow-label" x="833" y="703" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#tips-market-data"><tspan class="lk">TIPS market data</tspan></a></text>
+  <path class="flow" d="M 497.3 538.0 Q 723.0 493.7 951.3 522.0" marker-end="url(#a1)"/>
+  <text class="flow-label" x="869" y="500" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#tips-market-data"><tspan class="lk">TIPS market data</tspan></a></text>
+  <path class="flow" d="M 498.0 558.0 Q 723.7 513.7 952.0 542.0" marker-end="url(#a1)"/>
+  <text class="flow-label" x="870" y="520" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#daily-ref-cpi"><tspan class="lk">daily Ref CPI</tspan></a></text>
+  <path class="flow" d="M 498.7 578.0 Q 724.4 533.7 952.7 562.0" marker-end="url(#a1)"/>
+  <text class="flow-label" x="870" y="540" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#bond-holiday"><tspan class="lk">bond holidays</tspan></a></text>
+  <path class="flow" d="M 468.5 509.5 Q 541.3 313.8 671.5 150.5" marker-end="url(#a1)"/>
+  <text class="flow-label" x="617" y="202" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#tips-market-data"><tspan class="lk">TIPS market data</tspan></a></text>
+  <path class="flow" d="M 749.7 370.2 Q 817.8 313.0 900.3 279.8" marker-end="url(#a1)"/>
+  <text class="flow-label" x="877" y="314" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#dara-plan"><tspan class="lk">DARA plan</tspan></a></text>
+  <path class="flow" d="M 740.2 443.0 Q 856.0 569.6 926.5 726.0" marker-end="url(#a1)"/>
+  <text class="flow-label" x="909" y="662" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#holdings"><tspan class="lk">holdings</tspan></a></text>
+  <path class="flow" d="M 723.5 454.0 Q 839.3 580.6 909.8 737.0" marker-end="url(#a1)"/>
+  <text class="flow-label" x="886" y="724" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#dara-plan"><tspan class="lk">DARA plan</tspan></a></text>
+  <path class="flow" d="M 752.9 423.9 Q 862.4 453.7 957.1 516.1" marker-end="url(#a1)"/>
+  <text class="flow-label" x="927" y="482" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#holdings"><tspan class="lk">holdings</tspan></a></text>
+  <path class="flow" d="M 961.8 306.8 Q 994.1 392.1 998.2 483.2" marker-end="url(#a1)"/>
+  <text class="flow-label" x="1007" y="445" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#build-result"><tspan class="lk">build result</tspan></a></text>
+  <path class="flow" d="M 954.4 721.3 Q 960.1 655.0 986.2 593.8" marker-end="url(#a1)"/>
+  <text class="flow-label" x="988" y="631" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#before-state-preview"><tspan class="lk">before-state preview</tspan></a></text>
+  <path class="flow" d="M 973.8 726.2 Q 979.5 659.9 1005.6 598.7" marker-end="url(#a1)"/>
+  <text class="flow-label" x="1001" y="656" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#rebalance-result"><tspan class="lk">rebalance result</tspan></a></text>
+  <path class="flow" d="M 998.2 483.2 Q 965.9 397.9 961.8 306.8" marker-end="url(#a1)"/>
+  <text class="flow-label" x="953" y="339" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#ladder-parameters"><tspan class="lk">ladder parameters</tspan></a></text>
+  <path class="flow" d="M 995.9 596.3 Q 990.2 662.5 964.1 723.7" marker-end="url(#a1)"/>
+  <text class="flow-label" x="983" y="701" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#ladder-parameters"><tspan class="lk">ladder parameters</tspan></a></text>
+  <path class="flow" d="M 754.9 121.3 Q 837.4 154.4 905.4 211.6" marker-end="url(#a1)"/>
+  <text class="flow-label" x="886" y="179" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#tips-market-data"><tspan class="lk">TIPS market data</tspan></a></text>
+  <path class="flow" d="M 744.6 138.4 Q 827.1 171.5 895.1 228.7" marker-end="url(#a1)"/>
+  <text class="flow-label" x="842" y="214" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#ladder-parameters"><tspan class="lk">ladder parameters</tspan></a></text>
+  <path class="flow" d="M 1235.0 412.0 Q 996.5 450.2 758.0 412.0" marker-end="url(#a1)"/>
+  <text class="flow-label" x="999" y="426" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#holdings-file"><tspan class="lk">Holdings File</tspan></a></text>
+  <path class="flow" d="M 1235.0 388.0 Q 996.5 426.2 758.0 388.0" marker-end="url(#a1)"/>
+  <text class="flow-label" x="999" y="402" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#dara-plan-file"><tspan class="lk">DARA Plan File</tspan></a></text>
+  <path class="flow" d="M 1235.0 250.0 Q 1121.5 268.2 1008.0 250.0" marker-end="url(#a1)"/>
+  <text class="flow-label" x="1124" y="264" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#ladder-parameters"><tspan class="lk">ladder parameters</tspan></a></text>
+  <path class="flow" d="M 1235.0 780.0 Q 1121.5 798.2 1008.0 780.0" marker-end="url(#a1)"/>
+  <text class="flow-label" x="1124" y="794" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#ladder-parameters"><tspan class="lk">ladder parameters</tspan></a></text>
+  <path class="flow" d="M 1235.0 110.0 Q 996.5 148.2 758.0 110.0" marker-end="url(#a1)"/>
+  <text class="flow-label" x="999" y="124" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#view-selections"><tspan class="lk">view selections</tspan></a></text>
+  <path class="flow" d="M 758.0 90.0 Q 996.5 51.8 1235.0 90.0" marker-end="url(#a1)"/>
+  <text class="flow-label" x="999" y="84" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#charts-and-tables"><tspan class="lk">charts and tables</tspan></a></text>
+  <path class="flow" d="M 1235.0 592.0 Q 1151.5 605.4 1068.0 592.0" marker-end="url(#a1)"/>
+  <text class="flow-label" x="1154" y="606" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#view-selections"><tspan class="lk">view selections</tspan></a></text>
+  <path class="flow" d="M 1068.0 504.0 Q 1151.5 490.6 1235.0 504.0" marker-end="url(#a1)"/>
+  <text class="flow-label" x="1154" y="498" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#ladder-table"><tspan class="lk">ladder table</tspan></a></text>
+  <path class="flow" d="M 1068.0 528.0 Q 1151.5 514.6 1235.0 528.0" marker-end="url(#a1)"/>
+  <text class="flow-label" x="1154" y="522" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#trade-ticket"><tspan class="lk">trade ticket</tspan></a></text>
+  <path class="flow" d="M 1068.0 552.0 Q 1151.5 538.6 1235.0 552.0" marker-end="url(#a1)"/>
+  <text class="flow-label" x="1154" y="546" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#cash-flow-calendar"><tspan class="lk">cash flow calendar</tspan></a></text>
+  <path class="flow" d="M 1068.0 576.0 Q 1151.5 562.6 1235.0 576.0" marker-end="url(#a1)"/>
+  <text class="flow-label" x="1154" y="570" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#ladder-export"><tspan class="lk">ladder export</tspan></a></text>
+  <g class="entity"><rect x="1240" y="40" width="145" height="920" rx="3"/><text class="e-name" x="1312.5" y="500">User</text></g>
+  <a class="store" href="viewer.html#/md/TipsLadderManager/knowledge/4.6_Explore_Past_Markets.md">
     <rect x="40" y="130" width="215" height="40" fill="transparent" stroke="none"/>
     <line x1="40" y1="130" x2="255" y2="130"/>
     <line x1="40" y1="170" x2="255" y2="170"/>
-    <text class="s-name" x="147.5" y="155">Market quotes (S7)</text>
+    <text class="s-name" x="147.5" y="155">Explore price files</text>
+  </a>
+  <a class="store" href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s7">
+    <rect x="40" y="270" width="215" height="40" fill="transparent" stroke="none"/>
+    <line x1="40" y1="270" x2="255" y2="270"/>
+    <line x1="40" y1="310" x2="255" y2="310"/>
+    <text class="s-name" x="147.5" y="295">Market quotes (S7)</text>
   </a>
   <a class="store" href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s2">
-    <rect x="40" y="280" width="215" height="40" fill="transparent" stroke="none"/>
-    <line x1="40" y1="280" x2="255" y2="280"/>
-    <line x1="40" y1="320" x2="255" y2="320"/>
-    <text class="s-name" x="147.5" y="305">TIPS reference data (S2)</text>
+    <rect x="40" y="410" width="215" height="40" fill="transparent" stroke="none"/>
+    <line x1="40" y1="410" x2="255" y2="410"/>
+    <line x1="40" y1="450" x2="255" y2="450"/>
+    <text class="s-name" x="147.5" y="435">TIPS reference data (S2)</text>
   </a>
   <a class="store" href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s3">
-    <rect x="40" y="430" width="215" height="40" fill="transparent" stroke="none"/>
-    <line x1="40" y1="430" x2="255" y2="430"/>
-    <line x1="40" y1="470" x2="255" y2="470"/>
-    <text class="s-name" x="147.5" y="455">Ref CPI (S3)</text>
+    <rect x="40" y="550" width="215" height="40" fill="transparent" stroke="none"/>
+    <line x1="40" y1="550" x2="255" y2="550"/>
+    <line x1="40" y1="590" x2="255" y2="590"/>
+    <text class="s-name" x="147.5" y="575">Ref CPI (S3)</text>
   </a>
   <a class="store" href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s10">
-    <rect x="40" y="580" width="215" height="40" fill="transparent" stroke="none"/>
-    <line x1="40" y1="580" x2="255" y2="580"/>
-    <line x1="40" y1="620" x2="255" y2="620"/>
-    <text class="s-name" x="147.5" y="605">SA and SAO yields (S10)</text>
+    <rect x="40" y="690" width="215" height="40" fill="transparent" stroke="none"/>
+    <line x1="40" y1="690" x2="255" y2="690"/>
+    <line x1="40" y1="730" x2="255" y2="730"/>
+    <text class="s-name" x="147.5" y="715">SA and SAO yields (S10)</text>
   </a>
   <a class="store" href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s16">
-    <rect x="40" y="730" width="215" height="40" fill="transparent" stroke="none"/>
-    <line x1="40" y1="730" x2="255" y2="730"/>
-    <line x1="40" y1="770" x2="255" y2="770"/>
-    <text class="s-name" x="147.5" y="755">Bond holidays (S16)</text>
+    <rect x="40" y="830" width="215" height="40" fill="transparent" stroke="none"/>
+    <line x1="40" y1="830" x2="255" y2="830"/>
+    <line x1="40" y1="870" x2="255" y2="870"/>
+    <text class="s-name" x="147.5" y="855">Bond holidays (S16)</text>
   </a>
   <a class="process" href="DFD_LEVEL3_TLM_LOAD.html">
-    <circle cx="440" cy="450" r="58"/>
-    <text class="p-id" x="440" y="430">4.1</text>
-    <text class="p-name" x="440" y="451">Load market</text>
-    <text class="p-name" x="440" y="467">data</text>
+    <circle cx="440" cy="560" r="58"/>
+    <text class="p-id" x="440" y="540">4.1</text>
+    <text class="p-name" x="440" y="561">Load market</text>
+    <text class="p-name" x="440" y="577">data</text>
   </a>
   <a class="process" href="DFD_LEVEL3_TLM_IMPORT.html">
-    <circle cx="700" cy="210" r="58"/>
-    <text class="p-id" x="700" y="190">4.2</text>
-    <text class="p-name" x="700" y="211">Import holdings</text>
-    <text class="p-name" x="700" y="227">and DARA plan</text>
+    <circle cx="700" cy="400" r="58"/>
+    <text class="p-id" x="700" y="380">4.2</text>
+    <text class="p-name" x="700" y="401">Import holdings</text>
+    <text class="p-name" x="700" y="417">and DARA plan</text>
   </a>
   <a class="process" href="DFD_LEVEL3_TLM_BUILD.html">
-    <circle cx="950" cy="330" r="58"/>
-    <text class="p-id" x="950" y="310">4.3</text>
-    <text class="p-name" x="950" y="331">Build</text>
-    <text class="p-name" x="950" y="347">ladder</text>
+    <circle cx="950" cy="250" r="58"/>
+    <text class="p-id" x="950" y="230">4.3</text>
+    <text class="p-name" x="950" y="251">Build</text>
+    <text class="p-name" x="950" y="267">ladder</text>
   </a>
   <a class="process" href="DFD_LEVEL3_TLM_REBALANCE.html">
-    <circle cx="950" cy="660" r="58"/>
-    <text class="p-id" x="950" y="640">4.4</text>
-    <text class="p-name" x="950" y="661">Rebalance</text>
-    <text class="p-name" x="950" y="677">ladder</text>
+    <circle cx="950" cy="780" r="58"/>
+    <text class="p-id" x="950" y="760">4.4</text>
+    <text class="p-name" x="950" y="781">Rebalance</text>
+    <text class="p-name" x="950" y="797">ladder</text>
   </a>
-  <a class="process" href="viewer.html#/md/TipsLadderManager/knowledge/5.0_UI_Schema.md">
-    <circle cx="1000" cy="495" r="58"/>
-    <text class="p-id" x="1000" y="475">4.5</text>
-    <text class="p-name" x="1000" y="496">Render</text>
-    <text class="p-name" x="1000" y="512">and export</text>
+  <a class="process" href="DFD_LEVEL3_TLM_RENDER.html">
+    <circle cx="1010" cy="540" r="58"/>
+    <text class="p-id" x="1010" y="520">4.5</text>
+    <text class="p-name" x="1010" y="541">Render</text>
+    <text class="p-name" x="1010" y="557">and export</text>
+  </a>
+  <a class="process" href="viewer.html#/md/TipsLadderManager/knowledge/4.6_Explore_Past_Markets.md">
+    <circle cx="700" cy="100" r="58"/>
+    <text class="p-id" x="700" y="80">4.6</text>
+    <text class="p-name" x="700" y="101">Explore</text>
+    <text class="p-name" x="700" y="117">past markets</text>
   </a>
 </svg>
 </div>
 
 <p class="notes">
-  <b>Draft, mapped directly onto today's code — not yet a finished decomposition.</b> See <a href="viewer.html#/md/knowledge/DFD_Worklist.md">DFD_Worklist.md</a> item 27 for the open questions and findings behind this diagram.
+  <b>No process here writes a data store.</b> Every flow ends at the user and is gone when the page closes, except the files the Export menu writes.
   4.1 reads Market quotes (S7), the live default; FedInvest prices (S1) is the same module's dormant fallback and is not drawn.
-  Flow labels here have no Data Dictionary entry yet — naming them for real is spec work.
+  The Explore price files are kept in the app and drawn on this diagram only: no job writes them. Explore builds with the interface and the output of Build, so 4.6 feeds 4.3.
+  Build and Rebalance are separate processes with separate interfaces; the code they share is in the <a href="viewer.html#/md/knowledge/SharedModules.md">shared modules</a>.
 </p>
 
 </body>

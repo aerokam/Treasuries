@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TipsLadderManager 4.5 — Level 3</title>
+<style>
+  :root {
+    --bg: #0d0d1a;
+    --border: #2a2a4a;
+    --text: #c0c8e0;
+    --accent: #7070cc;
+    --entity: #1a1a2e;
+    --process: #1a2a4e;
+    --store: #1a2e1a;
+    --flow: #55558c;
+    --flow-text: #8b93b8;
+    --font: 'Segoe UI', system-ui, sans-serif;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    margin: 0;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+  }
+
+  .nav-header {
+    width: 100%;
+    max-width: 1200px;
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 50px;
+    padding: 25px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 30px;
+  }
+  .nav-header a {
+    color: var(--accent);
+    text-decoration: none;
+    font-size: 1.2rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .nav-header a:hover { color: #aaaaff; text-decoration: underline; }
+  .nav-header a.portal-link { font-size: 11px; font-weight: 700; color: #475569; background: #e2e8f0; border: 1px solid #cbd5e1; border-radius: 4px; padding: 2px 10px; text-decoration: none; letter-spacing: 0.02em; text-transform: none; }
+  .nav-header a.portal-link:hover { background: #1e293b; color: #ffffff; border-color: #1e293b; text-decoration: none; }
+
+  h1 {
+    font-size: 1.5rem;
+    font-weight: 300;
+    letter-spacing: 2px;
+    color: var(--accent);
+    margin: 0 0 25px;
+    text-align: center;
+  }
+
+  .diagram { width: 100%; max-width: 1400px; }
+  .diagram svg { width: 100%; height: auto; display: block; }
+
+  /* Shapes */
+  .entity rect {
+    fill: var(--entity);
+    stroke: var(--border);
+    stroke-width: 1;
+  }
+  .entity:hover rect { stroke: var(--accent); }
+  .entity .e-name { fill: #c8d0ea; font-size: 13.5px; }
+  .entity:hover .e-name { fill: #ffffff; }
+
+  .process circle {
+    fill: var(--process);
+    stroke: var(--accent);
+    stroke-width: 2;
+  }
+  .process:hover circle { stroke: #aaaaff; filter: drop-shadow(0 0 12px rgba(112,112,204,0.6)); }
+  .process .p-id { fill: #8fa0d8; font-size: 12px; letter-spacing: 1px; }
+  .process .p-name { fill: #eef0ff; font-size: 15px; font-weight: 600; }
+
+  /* A module: a shared code file called by two or more sibling processes. A square was
+     tried and rejected — a rectangle is already the entity shape, and two rectangular
+     categories on one diagram invites confusing a module for an entity. A circle in this
+     distinct color reads as "process-like, but not a pipeline step of this diagram"
+     instead (DFD_Worklist.md §2.0, knowledge/SharedModules.md). Reuses the process id
+     label class (.p-id) since that role is identical. */
+  .module circle {
+    fill: #3a2e1a;
+    stroke: #cc9a40;
+    stroke-width: 2;
+  }
+  .module:hover circle { stroke: #ffcc66; filter: drop-shadow(0 0 12px rgba(204,154,64,0.6)); }
+  .module .m-name { fill: #eef0ff; font-size: 11.5px; font-weight: 600; }
+
+  a.entity, a.process, a.module { cursor: pointer; text-decoration: none; }
+  a text, g.entity text { text-anchor: middle; font-family: var(--font); }
+
+  /* Flows */
+  .flow { stroke: var(--flow); stroke-width: 1.6; fill: none; }
+  .flow-label {
+    fill: var(--flow-text);
+    font-size: 13px;
+    font-family: var(--font);
+    stroke: var(--bg);
+    stroke-width: 5;
+    paint-order: stroke;
+    stroke-linejoin: round;
+  }
+
+  .legend text { fill: #6f78a0; font-size: 12px; font-family: var(--font); }
+  .legend rect.sw { fill: var(--entity); stroke: var(--border); }
+  .legend circle.sw { fill: var(--process); stroke: var(--accent); stroke-width: 1.5; }
+
+  .notes {
+    max-width: 900px;
+    margin-top: 30px;
+    font-size: 0.8rem;
+    color: #7a83aa;
+    line-height: 1.7;
+    text-align: center;
+  }
+  .notes a { color: var(--accent); }
+
+  .index {
+    max-width: 980px;
+    margin: 45px 0 20px;
+    border-top: 1px solid var(--border);
+    padding-top: 25px;
+  }
+  .index h2 {
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #666699;
+    margin: 0 0 6px;
+    text-align: center;
+  }
+  .index p { font-size: 0.8rem; color: #7a83aa; text-align: center; margin: 0 0 20px; line-height: 1.6; }
+  .index-group { margin-bottom: 14px; display: flex; flex-wrap: wrap; gap: 10px; align-items: baseline; justify-content: center; }
+  .index-group .g-label { font-size: 0.7rem; letter-spacing: 1.5px; text-transform: uppercase; color: #666699; font-weight: 700; width: 100%; text-align: center; }
+  .index-group a {
+    color: var(--text);
+    text-decoration: none;
+    font-size: 0.85rem;
+    border: 1px solid var(--border);
+    background: var(--entity);
+    border-radius: 4px;
+    padding: 5px 12px;
+  }
+  .index-group a:hover { border-color: var(--accent); color: #ffffff; }
+  .flow-label a { cursor: pointer; }
+  tspan.lk { fill: #a8b2e0; text-decoration: underline; text-decoration-style: dotted; }
+  .flow-label a:hover tspan.lk { fill: #ffffff; }
+</style>
+<style>
+  .cat-band { fill-opacity: 0.13; stroke-opacity: 0.55; stroke-width: 1.5; }
+  .cat-label { font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.85; }
+  .store line { stroke: #4a8a4a; stroke-width: 2; }
+  .store:hover line { stroke: #7ada7a; }
+  .store .s-name { fill: #a8e6a8; font-size: 13px; }
+  a.store { cursor: pointer; text-decoration: none; }
+  .process .p-name { font-size: 12.5px; }
+  .process .p-app { fill: #c8d0ea; font-size: 12px; font-style: italic; text-anchor: middle; }
+  .flow-label { font-size: 12px; }
+  .flow-label a { cursor: pointer; }
+  tspan.lk { fill: #a8b2e0; text-decoration: underline; text-decoration-style: dotted; }
+  .flow-label a:hover tspan.lk { fill: #ffffff; }
+  .nav-header .spec-link { margin-left: auto; }
+  .diagram { max-width: 1500px; }
+</style>
+</head>
+<body>
+
+<div class="nav-header">
+  <a href="../" class="portal-link">&#8592; Portal</a>
+  <a href="DFD_LEVEL2_TIPSLADDERMANAGER.html">&#8593; Level 2 — TipsLadderManager</a>
+</div>
+
+<h1>Level 3 &mdash; TipsLadderManager 4.5 Render and export</h1>
+
+<div class="diagram">
+<svg viewBox="0 0 1500 1060" role="img" aria-label="Level 3: TipsLadderManager 4.5, drawing the result of the mode on screen as a ladder table, popups, a trade ticket and a cash flow calendar, and writing it out.">
+  <defs><marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#55558c"/></marker></defs>
+  <path class="flow" d="M 60.0 60.0 Q 218.9 73.8 365.7 136.4" marker-end="url(#a1)"/>
+  <text class="flow-label" x="66" y="54"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#build-result"><tspan class="lk">build result</tspan></a>  ←  4.3</text>
+  <path class="flow" d="M 60.0 105.0 Q 215.3 99.7 364.4 143.1" marker-end="url(#a1)"/>
+  <text class="flow-label" x="66" y="99"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#before-state-preview"><tspan class="lk">before-state preview</tspan></a>  ←  4.4</text>
+  <path class="flow" d="M 60.0 150.0 Q 212.0 125.7 364.0 150.0" marker-end="url(#a1)"/>
+  <text class="flow-label" x="66" y="144"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#rebalance-result"><tspan class="lk">rebalance result</tspan></a>  ←  4.4</text>
+  <path class="flow" d="M 60.0 195.0 Q 209.2 151.6 364.4 156.9" marker-end="url(#a1)"/>
+  <text class="flow-label" x="66" y="189"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#view-selections"><tspan class="lk">view selections</tspan></a>  ←  User</text>
+  <path class="flow" d="M 60.0 340.0 Q 216.4 341.0 364.8 390.8" marker-end="url(#a1)"/>
+  <text class="flow-label" x="66" y="334"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#build-result"><tspan class="lk">build result</tspan></a>  ←  4.3</text>
+  <path class="flow" d="M 60.0 385.0 Q 213.0 367.0 364.0 397.7" marker-end="url(#a1)"/>
+  <text class="flow-label" x="66" y="379"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#rebalance-result"><tspan class="lk">rebalance result</tspan></a>  ←  4.4</text>
+  <path class="flow" d="M 60.0 430.0 Q 210.1 393.0 364.2 404.7" marker-end="url(#a1)"/>
+  <text class="flow-label" x="66" y="424"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#tips-market-data"><tspan class="lk">TIPS market data</tspan></a>  ←  4.1</text>
+  <path class="flow" d="M 60.0 540.0 Q 220.7 562.3 366.4 633.6" marker-end="url(#a1)"/>
+  <text class="flow-label" x="66" y="534"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#holdings"><tspan class="lk">holdings</tspan></a>  ←  4.2</text>
+  <path class="flow" d="M 60.0 585.0 Q 216.8 588.1 364.9 640.0" marker-end="url(#a1)"/>
+  <text class="flow-label" x="66" y="579"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#rebalance-result"><tspan class="lk">rebalance result</tspan></a>  ←  4.4</text>
+  <path class="flow" d="M 60.0 630.0 Q 213.4 614.1 364.1 646.9" marker-end="url(#a1)"/>
+  <text class="flow-label" x="66" y="624"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#tips-market-data"><tspan class="lk">TIPS market data</tspan></a>  ←  4.1</text>
+  <path class="flow" d="M 60.0 675.0 Q 210.4 640.1 364.1 653.9" marker-end="url(#a1)"/>
+  <text class="flow-label" x="66" y="669"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#daily-ref-cpi"><tspan class="lk">daily Ref CPI</tspan></a>  ←  4.1</text>
+  <path class="flow" d="M 60.0 720.0 Q 207.8 665.9 365.0 660.7" marker-end="url(#a1)"/>
+  <text class="flow-label" x="66" y="714"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#bond-holiday"><tspan class="lk">bond holidays</tspan></a>  ←  4.1</text>
+  <path class="flow" d="M 60.0 765.0 Q 214.5 755.4 364.3 794.6" marker-end="url(#a1)"/>
+  <text class="flow-label" x="66" y="759"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#build-result"><tspan class="lk">build result</tspan></a>  ←  4.3</text>
+  <path class="flow" d="M 60.0 805.0 Q 211.7 778.6 364.0 800.8" marker-end="url(#a1)"/>
+  <text class="flow-label" x="66" y="799"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#rebalance-result"><tspan class="lk">rebalance result</tspan></a>  ←  4.4</text>
+  <path class="flow" d="M 60.0 890.0 Q 215.6 886.8 364.5 932.3" marker-end="url(#a1)"/>
+  <text class="flow-label" x="66" y="884"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#build-result"><tspan class="lk">build result</tspan></a>  ←  4.3</text>
+  <path class="flow" d="M 60.0 925.0 Q 213.0 907.0 364.0 937.7" marker-end="url(#a1)"/>
+  <text class="flow-label" x="66" y="919"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#rebalance-result"><tspan class="lk">rebalance result</tspan></a>  ←  4.4</text>
+  <path class="flow" d="M 60.0 960.0 Q 210.7 927.2 364.1 943.1" marker-end="url(#a1)"/>
+  <text class="flow-label" x="66" y="954"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#per-year-dara"><tspan class="lk">per-year DARA</tspan></a>  ←  4.2</text>
+  <path class="flow" d="M 60.0 995.0 Q 208.6 947.4 364.6 948.5" marker-end="url(#a1)"/>
+  <text class="flow-label" x="66" y="989"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#construction-parameters"><tspan class="lk">construction parameters</tspan></a>  ←  4.2</text>
+  <path class="flow" d="M 476.0 150.0 Q 820.0 95.0 1164.0 150.0" marker-end="url(#a1)"/>
+  <text class="flow-label" x="1040" y="120" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#ladder-table"><tspan class="lk">ladder table</tspan></a></text>
+  <path class="flow" d="M 942.1 271.6 Q 1047.5 203.9 1168.7 172.4" marker-end="url(#a1)"/>
+  <path class="flow" d="M 930.1 485.2 Q 1033.3 318.5 1183.4 192.4" marker-end="url(#a1)"/>
+  <path class="flow" d="M 921.9 699.6 Q 1017.6 427.7 1193.3 199.2" marker-end="url(#a1)"/>
+  <path class="flow" d="M 855.2 300.3 Q 671.9 374.3 474.6 387.5" marker-end="url(#a1)"/>
+  <path class="flow" d="M 855.4 508.8 Q 657.2 491.7 474.3 413.6" marker-end="url(#a1)"/>
+  <path class="flow" d="M 862.5 713.4 Q 641.6 604.6 465.7 432.4" marker-end="url(#a1)"/>
+  <path class="flow" d="M 863.2 317.6 Q 687.9 498.9 464.8 616.4" marker-end="url(#a1)"/>
+  <path class="flow" d="M 855.6 532.0 Q 673.1 614.2 474.1 635.4" marker-end="url(#a1)"/>
+  <path class="flow" d="M 854.8 731.5 Q 659.2 726.3 475.0 660.3" marker-end="url(#a1)"/>
+  <path class="flow" d="M 476.0 149.0 Q 979.0 -22.4 1488.0 130.0" marker-end="url(#a1)"/>
+  <text class="flow-label" x="1484" y="124" text-anchor="end"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#ladder-table"><tspan class="lk">ladder table</tspan></a>  →  User</text>
+  <path class="flow" d="M 475.9 146.3 Q 976.6 32.2 1488.0 80.0" marker-end="url(#a1)"/>
+  <text class="flow-label" x="1484" y="74" text-anchor="end"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#ladder-parameters"><tspan class="lk">ladder parameters</tspan></a>  →  4.3 and 4.4</text>
+  <path class="flow" d="M 476.0 800.0 Q 982.0 536.9 1488.0 800.0" marker-end="url(#a1)"/>
+  <text class="flow-label" x="1484" y="794" text-anchor="end"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#ladder-export"><tspan class="lk">ladder export</tspan></a>  →  User</text>
+  <path class="flow" d="M 476.0 940.0 Q 982.0 859.0 1488.0 940.0" marker-end="url(#a1)"/>
+  <text class="flow-label" x="1484" y="934" text-anchor="end"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#ladder-export"><tspan class="lk">ladder export</tspan></a>  →  User</text>
+  <path class="flow" d="M 476.0 400.0 Q 982.0 319.0 1488.0 400.0" marker-end="url(#a1)"/>
+  <text class="flow-label" x="1484" y="394" text-anchor="end"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#trade-ticket"><tspan class="lk">trade ticket</tspan></a>  →  User</text>
+  <path class="flow" d="M 476.0 650.0 Q 982.0 569.0 1488.0 650.0" marker-end="url(#a1)"/>
+  <text class="flow-label" x="1484" y="644" text-anchor="end"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#cash-flow-calendar"><tspan class="lk">cash flow calendar</tspan></a>  →  User</text>
+  <a class="process" href="viewer.html#/md/TipsLadderManager/knowledge/4.5_Render_And_Export.md#render-ladder-table">
+    <circle cx="420" cy="150" r="56"/>
+    <text class="p-id" x="420" y="130">4.5.1</text>
+    <text class="p-name" x="420" y="151">Render</text>
+    <text class="p-name" x="420" y="167">ladder table</text>
+  </a>
+  <a class="process" href="viewer.html#/md/TipsLadderManager/knowledge/4.5_Render_And_Export.md#show-drill-popups">
+    <circle cx="1220" cy="150" r="56"/>
+    <text class="p-id" x="1220" y="130">4.5.2</text>
+    <text class="p-name" x="1220" y="151">Show drill</text>
+    <text class="p-name" x="1220" y="167">popups</text>
+  </a>
+  <a class="process" href="viewer.html#/md/TipsLadderManager/knowledge/4.5_Render_And_Export.md#show-trade-ticket">
+    <circle cx="420" cy="400" r="56"/>
+    <text class="p-id" x="420" y="380">4.5.3</text>
+    <text class="p-name" x="420" y="401">Show trade</text>
+    <text class="p-name" x="420" y="417">ticket</text>
+  </a>
+  <a class="process" href="viewer.html#/md/TipsLadderManager/knowledge/4.5_Render_And_Export.md#show-cash-flow-calendar">
+    <circle cx="420" cy="650" r="56"/>
+    <text class="p-id" x="420" y="630">4.5.4</text>
+    <text class="p-name" x="420" y="651">Show cash flow</text>
+    <text class="p-name" x="420" y="667">calendar</text>
+  </a>
+  <a class="process" href="viewer.html#/md/TipsLadderManager/knowledge/4.5_Render_And_Export.md#export-ladder-table">
+    <circle cx="420" cy="800" r="56"/>
+    <text class="p-id" x="420" y="780">4.5.5</text>
+    <text class="p-name" x="420" y="801">Export</text>
+    <text class="p-name" x="420" y="817">ladder table</text>
+  </a>
+  <a class="process" href="viewer.html#/md/TipsLadderManager/knowledge/4.5_Render_And_Export.md#export-holdings-and-dara-plan">
+    <circle cx="420" cy="940" r="56"/>
+    <text class="p-id" x="420" y="920">4.5.6</text>
+    <text class="p-name" x="420" y="941">Export holdings</text>
+    <text class="p-name" x="420" y="957">and DARA plan</text>
+  </a>
+  <a class="module" href="viewer.html#/md/knowledge/SharedModules.md#m6">
+    <circle cx="900" cy="290" r="46"/>
+    <text class="p-id" x="900" y="276">M6</text>
+    <text class="m-name" x="900" y="293">drill.js</text>
+  </a>
+  <a class="module" href="viewer.html#/md/knowledge/SharedModules.md#m7">
+    <circle cx="900" cy="520" r="46"/>
+    <text class="p-id" x="900" y="506">M7</text>
+    <text class="m-name" x="900" y="523">popup.js</text>
+  </a>
+  <a class="module" href="viewer.html#/md/knowledge/SharedModules.md#m8">
+    <circle cx="900" cy="740" r="46"/>
+    <text class="p-id" x="900" y="726">M8</text>
+    <text class="m-name" x="900" y="743">modal.js</text>
+  </a>
+</svg>
+</div>
+
+<p class="notes">
+  4.5.2, 4.5.3 and 4.5.4 each show a popup or a modal, so each calls the three shared modules; the amber circles are <a href="viewer.html#/md/knowledge/SharedModules.md">shared modules</a>, not process steps.
+  The popups, the trade ticket and the cash flow calendar end at the user, as do the Ladder Table and the exports.
+</p>
+
+</body>
+</html>

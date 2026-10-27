@@ -73,6 +73,9 @@ const TERMS = {
   'SA yield series': 'sa-yield-series',
   'CPI series': 'cpi-series', 'TIPS reference rows': 'tips-reference-rows',
   'deck pages': 'deck-pages',
+  'ladder parameters': 'ladder-parameters', 'build result': 'build-result', 'before-state preview': 'before-state-preview',
+  'rebalance result': 'rebalance-result', 'ladder table': 'ladder-table', 'ladder export': 'ladder-export',
+  'trade ticket': 'trade-ticket', 'construction parameters': 'construction-parameters', 'cash flow calendar': 'cash-flow-calendar',
   'Holdings File': 'holdings-file', 'DARA Plan File': 'dara-plan-file',
   'per-year DARA': 'per-year-dara',
   'holdings': 'holdings', 'DARA plan': 'dara-plan',
@@ -936,12 +939,12 @@ function level3IngestFedInvest() {
   });
 }
 
-// ── Level 2: TipsLadderManager (draft — maps directly onto today's code and data
-// flows; not yet a designed decomposition. See DFD_Worklist.md for the open questions
-// this draft is meant to surface: whether Build and Rebalance stay two processes,
-// and how a user-supplied CSV file should be modeled.) ─────────────────────────────
+// ── Level 2: TipsLadderManager ──────────────────────────────────────────────
+// Mapped onto the code: each process is what the code does, and each flow is what it passes.
+// 4.5 explodes at Level 3; 4.1 to 4.4 explode at their own.
 function level2TipsLadderManager() {
   const stores = [
+    { id: 'explore', name: 'Explore price files', href: V('TipsLadderManager/knowledge/4.6_Explore_Past_Markets.md'), plain: true },
     { id: 'quotes', name: 'Market quotes', href: DS('s7') },
     { id: 'tipsref', name: 'TIPS reference data', href: DS('s2') },
     { id: 'refcpi', name: 'Ref CPI', href: DS('s3') },
@@ -950,62 +953,146 @@ function level2TipsLadderManager() {
   ];
   const procs = [
     { id: '4.1', name: ['Load market', 'data'], href: 'DFD_LEVEL3_TLM_LOAD.html', reads: ['quotes', 'tipsref', 'refcpi', 'sasao', 'hol'],
-      out: { '4.2': ['TIPS market data'], '4.3': ['TIPS market data'], '4.4': ['TIPS market data'] } },
+      out: { '4.3': ['TIPS market data'], '4.4': ['TIPS market data'], '4.5': ['TIPS market data', 'daily Ref CPI', 'bond holidays'], '4.6': ['TIPS market data'] } },
     { id: '4.2', name: ['Import holdings', 'and DARA plan'], href: 'DFD_LEVEL3_TLM_IMPORT.html', reads: [],
-      out: { '4.3': ['DARA plan'], '4.4': ['holdings', 'DARA plan'] } },
+      out: { '4.3': ['DARA plan'], '4.4': ['holdings', 'DARA plan'], '4.5': ['holdings'] } },
     { id: '4.3', name: ['Build', 'ladder'], href: 'DFD_LEVEL3_TLM_BUILD.html', reads: [], out: { '4.5': ['build result'] } },
     { id: '4.4', name: ['Rebalance', 'ladder'], href: 'DFD_LEVEL3_TLM_REBALANCE.html', reads: [], out: { '4.5': ['before-state preview', 'rebalance result'] } },
-    { id: '4.5', name: ['Render', 'and export'], href: V('TipsLadderManager/knowledge/5.0_UI_Schema.md'), reads: [], out: {} },
+    { id: '4.5', name: ['Render', 'and export'], href: 'DFD_LEVEL3_TLM_RENDER.html', reads: [], out: { '4.3': ['ladder parameters'], '4.4': ['ladder parameters'] } },
+    { id: '4.6', name: ['Explore', 'past markets'], href: V('TipsLadderManager/knowledge/4.6_Explore_Past_Markets.md'), reads: ['explore'],
+      out: { '4.3': ['TIPS market data', 'ladder parameters'] } },
   ];
   const SX = 40, SW = 215, PR = 58, UX = 1240, UW = 145;
-  const sy = i => 150 + i * 150;
-  const px = { '4.1': 440, '4.2': 700, '4.3': 950, '4.4': 950, '4.5': 1000 };
-  const py = { '4.1': 450, '4.2': 210, '4.3': 330, '4.4': 660, '4.5': 495 };
-  const H = 900, W = 1450;
+  const sy = i => 150 + i * 140;
+  const px = { '4.1': 440, '4.2': 700, '4.3': 950, '4.4': 950, '4.5': 1010, '4.6': 700 };
+  const py = { '4.1': 560, '4.2': 400, '4.3': 250, '4.4': 780, '4.5': 540, '4.6': 100 };
+  const H = 1000, W = 1450;
   const OBS = procs.map(q => ({ x: px[q.id], y: py[q.id], r: PR }));
   const LBL = [];
-  const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 2 draft for TipsLadderManager: five processes reading five data stores, an imported file and typed parameters from the user. No process writes a data store.">`, marker()];
+  const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 2 for TipsLadderManager: six processes reading five data stores and the Explore price files kept in the app, an imported file and typed parameters from the user. No process writes a data store.">`, marker()];
   const sIdx = Object.fromEntries(stores.map((s, i) => [s.id, i]));
   procs.forEach(p => p.reads.forEach(id => {
     const y = sy(sIdx[id]), [x2, y2] = toCircle(SX + SW + 5, y, px[p.id], py[p.id], PR);
     P.push(flow(SX + SW + 5, y, x2, y2, { obstacles: OBS }));
   }));
   P.push(internalFlows(procs, px, py, PR, OBS, LBL));
-  // The user supplies a holdings file to 4.2, and typed run parameters directly to both
-  // 4.3 and 4.4 — this app has no single rendering process that is the user's only point
-  // of contact, unlike Yield Curves or Yields Monitor. Three inbound flows and one
-  // outbound, all against one tall User box, rather than the single in/out pair seen
-  // elsewhere.
-  const flowToUser = (id, label, above) => {
-    const [x1, y1] = fromCircle(px[id], py[id], PR, UX, py[id]);
-    const yy = py[id] + (above ? -10 : 10);
-    P.push(flow(x1, yy, UX - 5, yy, { obstacles: OBS.filter(o => !(o.x === px[id] && o.y === py[id])) }));
-    P.push(labelAt((x1 + UX) / 2, yy + (above ? -8 : 16), label, 'middle'));
+  // The user supplies a holdings file and a DARA plan file to 4.2, ladder parameters to 4.3 and 4.4,
+  // a date to 4.6, and clicks in 4.5; 4.5 and 4.6 draw to the user.
+  const others = id => OBS.filter(o => !(o.x === px[id] && o.y === py[id]));
+  const flowToUser = (id, label, dy) => {
+    const [x1] = fromCircle(px[id], py[id], PR, UX, py[id]);
+    const yy = py[id] + dy;
+    P.push(flow(x1, yy, UX - 5, yy, { obstacles: others(id) }));
+    P.push(labelAt((x1 + UX) / 2, yy - 6, label, 'middle'));
   };
-  const flowFromUser = (id, label, above) => {
-    const [x2, y2] = toCircle(UX - 5, py[id], px[id], py[id], PR);
-    const yy = py[id] + (above ? -10 : 10);
-    P.push(flow(UX - 5, yy, x2, yy, { obstacles: OBS.filter(o => !(o.x === px[id] && o.y === py[id])) }));
-    P.push(labelAt((x2 + UX) / 2, yy + (above ? -8 : 16), label, 'middle'));
+  const flowFromUser = (id, label, dy) => {
+    const [x2] = toCircle(UX - 5, py[id], px[id], py[id], PR);
+    const yy = py[id] + dy;
+    P.push(flow(UX - 5, yy, x2, yy, { obstacles: others(id) }));
+    P.push(labelAt((x2 + UX) / 2, yy + 14, label, 'middle'));
   };
-  flowFromUser('4.2', 'Holdings File', false);
-  flowFromUser('4.2', 'DARA Plan File', true);
-  flowFromUser('4.3', 'ladder parameters', true);
-  flowFromUser('4.4', 'ladder parameters', true);
-  flowToUser('4.5', 'ladder table', true);
-  flowToUser('4.5', 'ladder export', false);
-  P.push(`  <g class="entity"><rect x="${UX}" y="80" width="${UW}" height="${H - 160}" rx="3"/><text class="e-name" x="${UX + UW / 2}" y="${H / 2}">User</text></g>`);
-  stores.forEach((s, i) => P.push(storeShape(SX, sy(i), SW, s.href, s.name)));
+  flowFromUser('4.2', 'Holdings File', 12);
+  flowFromUser('4.2', 'DARA Plan File', -12);
+  flowFromUser('4.3', 'ladder parameters', 0);
+  flowFromUser('4.4', 'ladder parameters', 0);
+  flowFromUser('4.6', 'view selections', 10);
+  flowToUser('4.6', 'charts and tables', -10);
+  flowFromUser('4.5', 'view selections', 52);
+  flowToUser('4.5', 'ladder table', -36);
+  flowToUser('4.5', 'trade ticket', -12);
+  flowToUser('4.5', 'cash flow calendar', 12);
+  flowToUser('4.5', 'ladder export', 36);
+  P.push(`  <g class="entity"><rect x="${UX}" y="40" width="${UW}" height="${H - 80}" rx="3"/><text class="e-name" x="${UX + UW / 2}" y="${H / 2}">User</text></g>`);
+  stores.forEach((s, i) => P.push(storeShape(SX, sy(i), SW, s.href, s.name, s.plain)));
   procs.forEach(p => P.push(procShape(px[p.id], py[p.id], PR, p.href, p.id, p.name)));
   P.push('</svg>');
 
   return page({
-    title: 'TipsLadderManager — Level 2 (draft)', h1: 'Level 2 &mdash; TipsLadderManager (draft)', maxWidth: W,
+    title: 'TipsLadderManager — Level 2', h1: 'Level 2 &mdash; TipsLadderManager', maxWidth: W,
     up: 'DFD_LEVEL1.html', upLabel: 'Level 1',
     spec: V('knowledge/TipsLadderManager.md'), specLabel: 'TipsLadderManager overview', svg: P.join(NL),
-    notes: ['  <b>Draft, mapped directly onto today\'s code — not yet a finished decomposition.</b> See <a href="viewer.html#/md/knowledge/DFD_Worklist.md">DFD_Worklist.md</a> item 27 for the open questions and findings behind this diagram.',
+    notes: ['  <b>No process here writes a data store.</b> Every flow ends at the user and is gone when the page closes, except the files the Export menu writes.',
       '  4.1 reads Market quotes (S7), the live default; FedInvest prices (S1) is the same module\'s dormant fallback and is not drawn.',
-      '  Flow labels here have no Data Dictionary entry yet — naming them for real is spec work.'].join(NL)
+      '  The Explore price files are kept in the app and drawn on this diagram only: no job writes them. Explore builds with the interface and the output of Build, so 4.6 feeds 4.3.',
+      '  Build and Rebalance are separate processes with separate interfaces; the code they share is in the <a href="viewer.html#/md/knowledge/SharedModules.md">shared modules</a>.'].join(NL)
+  });
+}
+
+// ── Level 3: TipsLadderManager 4.5 ──────────────────────────────────────────
+function level3TipsLadderManagerRender() {
+  const S = a => V('TipsLadderManager/knowledge/4.5_Render_And_Export.md' + (a ? '#' + a : ''));
+  const M = a => V('knowledge/SharedModules.md' + (a ? '#' + a : ''));
+  const modules = [
+    { id: 'm6', name: ['drill.js'], href: M('m6') },
+    { id: 'm7', name: ['popup.js'], href: M('m7') },
+    { id: 'm8', name: ['modal.js'], href: M('m8') },
+  ];
+  const procs = [
+    { id: '4.5.1', name: ['Render', 'ladder table'], href: S('render-ladder-table'), calls: [], out: { '4.5.2': ['ladder table'] } },
+    { id: '4.5.2', name: ['Show drill', 'popups'], href: S('show-drill-popups'), calls: ['m6', 'm7', 'm8'], out: {} },
+    { id: '4.5.3', name: ['Show trade', 'ticket'], href: S('show-trade-ticket'), calls: ['m6', 'm7', 'm8'], out: {} },
+    { id: '4.5.4', name: ['Show cash flow', 'calendar'], href: S('show-cash-flow-calendar'), calls: ['m6', 'm7', 'm8'], out: {} },
+    { id: '4.5.5', name: ['Export', 'ladder table'], href: S('export-ladder-table'), calls: [], out: {} },
+    { id: '4.5.6', name: ['Export holdings', 'and DARA plan'], href: S('export-holdings-and-dara-plan'), calls: [], out: {} },
+  ];
+  const PR = 56, MR = 46, W = 1500, H = 1060;
+  const px = { '4.5.1': 420, '4.5.2': 1220, '4.5.3': 420, '4.5.4': 420, '4.5.5': 420, '4.5.6': 420 };
+  const py = { '4.5.1': 150, '4.5.2': 150, '4.5.3': 400, '4.5.4': 650, '4.5.5': 800, '4.5.6': 940 };
+  const mx = { m6: 900, m7: 900, m8: 900 };
+  const my = { m6: 290, m7: 520, m8: 740 };
+  const OBS = [...Object.keys(px).map(id => ({ x: px[id], y: py[id], r: PR })), ...modules.map(m => ({ x: mx[m.id], y: my[m.id], r: MR }))];
+  const LBL = [];
+  const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 3: TipsLadderManager 4.5, drawing the result of the mode on screen as a ladder table, popups, a trade ticket and a cash flow calendar, and writing it out.">`, marker()];
+  const inFlow = (id, y, label) => {
+    const [x2, y2] = toCircle(60, y, px[id], py[id], PR);
+    P.push(flow(60, y, x2, y2, { obstacles: OBS.filter(o => !(o.x === px[id] && o.y === py[id])) }));
+    P.push(labelAt(66, y - 6, label));
+  };
+  inFlow('4.5.1', 60, 'build result  ←  4.3');
+  inFlow('4.5.1', 105, 'before-state preview  ←  4.4');
+  inFlow('4.5.1', 150, 'rebalance result  ←  4.4');
+  inFlow('4.5.1', 195, 'view selections  ←  User');
+  inFlow('4.5.3', 340, 'build result  ←  4.3');
+  inFlow('4.5.3', 385, 'rebalance result  ←  4.4');
+  inFlow('4.5.3', 430, 'TIPS market data  ←  4.1');
+  inFlow('4.5.4', 540, 'holdings  ←  4.2');
+  inFlow('4.5.4', 585, 'rebalance result  ←  4.4');
+  inFlow('4.5.4', 630, 'TIPS market data  ←  4.1');
+  inFlow('4.5.4', 675, 'daily Ref CPI  ←  4.1');
+  inFlow('4.5.4', 720, 'bond holidays  ←  4.1');
+  inFlow('4.5.5', 765, 'build result  ←  4.3');
+  inFlow('4.5.5', 805, 'rebalance result  ←  4.4');
+  inFlow('4.5.6', 890, 'build result  ←  4.3');
+  inFlow('4.5.6', 925, 'rebalance result  ←  4.4');
+  inFlow('4.5.6', 960, 'per-year DARA  ←  4.2');
+  inFlow('4.5.6', 995, 'construction parameters  ←  4.2');
+  P.push(internalFlows(procs, px, py, PR, OBS, LBL));
+  procs.forEach(p => (p.calls || []).forEach(id => {
+    const [x1, y1] = fromCircle(mx[id], my[id], MR, px[p.id], py[p.id]);
+    const [x2, y2] = toCircle(x1, y1, px[p.id], py[p.id], PR);
+    const others = OBS.filter(o => !(o.x === mx[id] && o.y === my[id]) && !(o.x === px[p.id] && o.y === py[p.id]));
+    P.push(flow(x1, y1, x2, y2, { obstacles: others }));
+  }));
+  const outFlow = (id, y, label) => {
+    const [ox, oy] = fromCircle(px[id], py[id], PR, W - 12, y);
+    P.push(flow(ox, oy, W - 12, y, { obstacles: OBS.filter(o => !(o.x === px[id] && o.y === py[id])) }));
+    P.push(labelAt(W - 16, y - 6, label, 'end'));
+  };
+  outFlow('4.5.1', 130, 'ladder table  →  User');
+  outFlow('4.5.1', 80, 'ladder parameters  →  4.3 and 4.4');
+  outFlow('4.5.5', 800, 'ladder export  →  User');
+  outFlow('4.5.6', 940, 'ladder export  →  User');
+  outFlow('4.5.3', 400, 'trade ticket  →  User');
+  outFlow('4.5.4', 650, 'cash flow calendar  →  User');
+  procs.forEach(p => P.push(procShape(px[p.id], py[p.id], PR, p.href, p.id, p.name)));
+  modules.forEach(m => P.push(moduleShape(mx[m.id], my[m.id], MR, m.href, m.id.toUpperCase(), m.name)));
+  P.push('</svg>');
+
+  return page({
+    title: 'TipsLadderManager 4.5 — Level 3', h1: 'Level 3 &mdash; TipsLadderManager 4.5 Render and export', maxWidth: W,
+    up: 'DFD_LEVEL2_TIPSLADDERMANAGER.html', upLabel: 'Level 2 — TipsLadderManager', svg: P.join(NL),
+    notes: ['  4.5.2, 4.5.3 and 4.5.4 each show a popup or a modal, so each calls the three shared modules; the amber circles are <a href="' + M() + '">shared modules</a>, not process steps.',
+      '  The popups, the trade ticket and the cash flow calendar end at the user, as do the Ladder Table and the exports.'].join(NL)
   });
 }
 
@@ -1077,7 +1164,7 @@ function level3TipsLadderManagerLoadMarketData() {
 
   return page({
     title: 'TipsLadderManager 4.1 — Level 3', h1: 'Level 3 &mdash; TipsLadderManager 4.1 Load market data', maxWidth: W,
-    up: 'DFD_LEVEL2_TIPSLADDERMANAGER.html', upLabel: 'Level 2 — TipsLadderManager (draft)', svg: P.join(NL),
+    up: 'DFD_LEVEL2_TIPSLADDERMANAGER.html', upLabel: 'Level 2 — TipsLadderManager', svg: P.join(NL),
     notes: ['  4.1.2 Fetch and parse FedInvest prices is specified but not drawn: a real, dormant code path, never selected in production, so it is not part of this diagram\'s active flow — see the spec\'s own note.',
       '  The amber circles are shared modules (<a href="' + M() + '">SharedModules.md</a>), not process steps of this diagram.',
       '  See <a href="viewer.html#/md/knowledge/DFD_Worklist.md">DFD_Worklist.md</a> item 27 for what this pass found and logged.'].join(NL)
@@ -1133,7 +1220,7 @@ function level3TipsLadderManagerImport() {
 
   return page({
     title: 'TipsLadderManager 4.2 — Level 3', h1: 'Level 3 &mdash; TipsLadderManager 4.2 Import holdings and DARA plan', maxWidth: W,
-    up: 'DFD_LEVEL2_TIPSLADDERMANAGER.html', upLabel: 'Level 2 — TipsLadderManager (draft)', svg: P.join(NL),
+    up: 'DFD_LEVEL2_TIPSLADDERMANAGER.html', upLabel: 'Level 2 — TipsLadderManager', svg: P.join(NL),
     notes: ['  Renamed from the Level 2 draft\'s "Import holdings": two distinct uploads (Holdings File, DARA Plan File), not one undifferentiated file.',
       '  See <a href="viewer.html#/md/knowledge/DFD_Worklist.md">DFD_Worklist.md</a> item 27 for what this pass found and logged, including a real code duplicate.'].join(NL)
   });
@@ -1190,7 +1277,7 @@ function level3TipsLadderManagerBuild() {
 
   return page({
     title: 'TipsLadderManager 4.3 — Level 3', h1: 'Level 3 &mdash; TipsLadderManager 4.3 Build ladder', maxWidth: W,
-    up: 'DFD_LEVEL2_TIPSLADDERMANAGER.html', upLabel: 'Level 2 — TipsLadderManager (draft)', svg: P.join(NL),
+    up: 'DFD_LEVEL2_TIPSLADDERMANAGER.html', upLabel: 'Level 2 — TipsLadderManager', svg: P.join(NL),
     notes: ['  M5 (ladder-core.js)\'s own sizing algorithm is specified at 2.0 TIPS Ladders, not in SharedModules.md or here — see DFD_Worklist.md item 27.',
       '  Built in tandem with 4.4 Rebalance ladder, since both call the same shared sizing engine (ladder-core.js, M5) rather than each carrying its own copy.',
       '  The amber circles are shared modules (<a href="' + M() + '">SharedModules.md</a>), not process steps of this diagram.'].join(NL)
@@ -1259,7 +1346,7 @@ function level3TipsLadderManagerRebalance() {
 
   return page({
     title: 'TipsLadderManager 4.4 — Level 3', h1: 'Level 3 &mdash; TipsLadderManager 4.4 Rebalance ladder', maxWidth: W,
-    up: 'DFD_LEVEL2_TIPSLADDERMANAGER.html', upLabel: 'Level 2 — TipsLadderManager (draft)', svg: P.join(NL),
+    up: 'DFD_LEVEL2_TIPSLADDERMANAGER.html', upLabel: 'Level 2 — TipsLadderManager', svg: P.join(NL),
     notes: ['  4.4.1 and 4.4.2 both run at file-load time, independently of each other and of Run; 4.4.3 runs only on Rebalance Ladder.',
       '  Built in tandem with 4.3 Build ladder, since both call the same shared sizing engine (ladder-core.js, M5) rather than each carrying its own copy.',
       '  The amber circles are shared modules (<a href="' + M() + '">SharedModules.md</a>), not process steps of this diagram.'].join(NL)
@@ -1596,6 +1683,7 @@ const outputs = [
   ['knowledge/DFD_LEVEL3_TLM_IMPORT.html', level3TipsLadderManagerImport()],
   ['knowledge/DFD_LEVEL3_TLM_BUILD.html', level3TipsLadderManagerBuild()],
   ['knowledge/DFD_LEVEL3_TLM_REBALANCE.html', level3TipsLadderManagerRebalance()],
+  ['knowledge/DFD_LEVEL3_TLM_RENDER.html', level3TipsLadderManagerRender()],
   ['knowledge/DFD_LEVEL2_TREASURYAUCTIONS.html', level2TreasuryAuctions()],
   ['knowledge/DFD_LEVEL2_FUNDHOLDINGS.html', level2FundHoldings()],
   ['knowledge/DFD_LEVEL2_CPIEXPLORER.html', level2CpiExplorer()],
