@@ -130,7 +130,7 @@ function isoDate(s) {
   return m ? `${m[3]}-${m[1]}-${m[2]}` : s;
 }
 
-// Layout and averaging rules: knowledge/1.0_FundHoldings.md §File Layout and §Display.
+// Layout and averaging rules: knowledge/1.14_Enrich_Fund_Holdings.md §File Layout and FundHoldings/knowledge/9.2_Render_Fund_Holdings.md.
 function buildFundCsv(ticker, enriched, meta) {
   const hasSaSao = enriched.some(r => r["SA Yield"] !== "");
   const cols = hasSaSao ? TABLE_COLS : TABLE_COLS.filter(c => c !== "SA Yield" && c !== "SAO Yield");

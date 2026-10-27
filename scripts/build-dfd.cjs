@@ -307,7 +307,7 @@ function level1() {
     { key: 'ym', cat: 'workflow', name: ['Yields', 'Monitor'], spec: 'DFD_LEVEL2_YIELDSMONITOR.html', reads: ['tipsref', 'nsasa', 'hol', 'yhist', 'ia'] },
     { key: 'yc', cat: 'workflow', name: ['Yield', 'Curves'], spec: 'DFD_LEVEL2_YIELDCURVES.html', reads: ['fedinv', 'nsasa', 'quotes', 'gsw', 'hol'] },
     { key: 'sa', cat: 'educational', name: ['Seasonal', 'Adjustments'], spec: V('SeasonalAdjustments/knowledge/1.0_SeasonalAdjustments_Explorer.md'), reads: ['nsasa', 'hol'] },
-    { key: 'fh', cat: 'reference', name: ['Fund', 'Holdings'], spec: V('FundHoldings/knowledge/1.0_FundHoldings.md'), reads: ['funds'] },
+    { key: 'fh', cat: 'reference', name: ['Fund', 'Holdings'], spec: 'DFD_LEVEL2_FUNDHOLDINGS.html', reads: ['funds'] },
     { key: 'ta', cat: 'reference', name: ['Treasury', 'Auctions'], spec: 'DFD_LEVEL2_TREASURYAUCTIONS.html', reads: ['auctions', 'tent'] },
     { key: 'tx', cat: 'reference', name: ['Taxation of', 'Treasuries'], spec: V('TaxationOfTreasuries/docs/TaxationOfTreasuries_Foundation.md'), reads: [] },
   ];
@@ -1322,6 +1322,51 @@ function level2TreasuryAuctions() {
   });
 }
 
+// ── Level 2: Fund Holdings ──────────────────────────────────────────────────
+const KFH = 'FundHoldings/knowledge/';
+function level2FundHoldings() {
+  const stores = [{ id: 'funds', name: 'Fund holdings', href: DS('s11') }];
+  const procs = [
+    { id: '9.1', name: ['Load fund', 'holdings'], href: V(KFH + '9.1_Load_Fund_Holdings.md'), reads: ['funds'], out: { '9.2': ['fund holdings'] } },
+    { id: '9.2', name: ['Render fund', 'holdings'], href: V(KFH + '9.2_Render_Fund_Holdings.md'), reads: [], out: {} },
+  ];
+  const SX = 40, SW = 215, PR = 58, UX = 1190, UW = 145;
+  const sy = () => 400;
+  const px = { '9.1': 520, '9.2': 920 };
+  const py = { '9.1': 400, '9.2': 400 };
+  const H = 800, W = 1360;
+  const OBS = procs.map(q => ({ x: px[q.id], y: py[q.id], r: PR }));
+  const LBL = [];
+  const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 2 for Fund Holdings: two processes reading one data store. No process writes a data store.">`, marker()];
+  procs.forEach(p => p.reads.forEach(() => {
+    const [x2, y2] = toCircle(SX + SW + 5, sy(), px[p.id], py[p.id], PR);
+    P.push(flow(SX + SW + 5, sy(), x2, y2, { obstacles: OBS }));
+  }));
+  P.push(internalFlows(procs, px, py, PR, OBS, LBL));
+  const others = id => OBS.filter(o => !(o.x === px[id] && o.y === py[id]));
+  P.push(flow(px['9.2'] + PR + 3, py['9.2'], UX - 5, py['9.2'], { obstacles: others('9.2') }));
+  P.push(labelAt((px['9.2'] + PR + UX) / 2, py['9.2'] - 14, 'charts and tables', 'middle'));
+  P.push(flow(px['9.1'] + 40, py['9.1'] - PR + 6, UX - 5, 210, { obstacles: others('9.1') }));
+  P.push(labelAt(820, 232, 'charts and tables', 'middle'));
+  P.push(flow(UX - 5, py['9.2'] + 40, px['9.2'] + PR + 3, py['9.2'] + 20, { obstacles: others('9.2') }));
+  P.push(labelAt((px['9.2'] + PR + UX) / 2, py['9.2'] + 62, 'view selections', 'middle'));
+  P.push(flow(UX - 5, 640, px['9.1'] + 30, py['9.1'] + PR - 6, { obstacles: others('9.1') }));
+  P.push(labelAt(820, 600, 'view selections', 'middle'));
+  P.push(`  <g class="entity"><rect x="${UX}" y="100" width="${UW}" height="${H - 180}" rx="3"/><text class="e-name" x="${UX + UW / 2}" y="${H / 2}">User</text></g>`);
+  stores.forEach(s => P.push(storeShape(SX, sy(), SW, s.href, s.name)));
+  procs.forEach(p => P.push(procShape(px[p.id], py[p.id], PR, p.href, p.id, p.name)));
+  P.push('</svg>');
+
+  return page({
+    title: 'Fund Holdings — Level 2', h1: 'Level 2 &mdash; Fund Holdings', maxWidth: W,
+    up: 'DFD_LEVEL1.html', upLabel: 'Level 1',
+    spec: V('knowledge/FundHoldings.md'), specLabel: 'Fund Holdings specs', svg: P.join(NL),
+    notes: ['  <b>No process here writes a data store.</b> Every flow ends at the user and is gone when the page closes.',
+      '  <a href="viewer.html#/md/knowledge/1.14_Enrich_Fund_Holdings.md">1.14</a> writes <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s11">Fund holdings (S11)</a>; no process of this app reads an external source.',
+      '  9.1 states the fund above the table, so it also sends <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#charts-and-tables">charts and tables</a> to the user.'].join(NL)
+  });
+}
+
 const outputs = [
   ['knowledge/DFD_LEVEL1.html', level1()],
   ['knowledge/DFD_LEVEL2_INGESTION.html', level2Ingestion()],
@@ -1337,6 +1382,7 @@ const outputs = [
   ['knowledge/DFD_LEVEL3_TLM_BUILD.html', level3TipsLadderManagerBuild()],
   ['knowledge/DFD_LEVEL3_TLM_REBALANCE.html', level3TipsLadderManagerRebalance()],
   ['knowledge/DFD_LEVEL2_TREASURYAUCTIONS.html', level2TreasuryAuctions()],
+  ['knowledge/DFD_LEVEL2_FUNDHOLDINGS.html', level2FundHoldings()],
 ];
 if (unlinked.size) {
   console.log(String.fromCharCode(10) + "flow labels with no Data Dictionary entry:");

@@ -212,7 +212,7 @@
   - *Holdings table: a header row and one row per holding, `CUSIP`, `Description`, `Maturity Date`, `Coupon`, `% of Fund`, `Market Value`, `Ask Yield`, `SA Yield` and `SAO Yield` for a fund with TIPS holdings, `Term (w)` or `Term (y)`, `Duration (y)`.*
   - *Total row: no header; `Total / Wtd Avg` in `Description`.*
 
-  *Column detail: [FundHoldings 1.0 §File Layout](../FundHoldings/knowledge/1.0_FundHoldings.md#file-layout).*
+  *Column detail: [1.14 §File Layout](./1.14_Enrich_Fund_Holdings.md#file-layout).*
 
 - <a id="s12"></a>**GSW curve parameters (S12)**, `GswTipsCurve.json` = `@date + beta0 + beta1 + beta2 + beta3 + tau1 + tau2`
   *R2 key `TIPS/GswTipsCurve.json` ([View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/TIPS/GswTipsCurve.json)). The latest published row of the Federal Reserve's Gürkaynak-Sack-Wright fitted TIPS real yield curve (FEDS 2008-05) from [Federal Reserve FEDS 2008-05 (E13)](#e13): the six Svensson parameters and the observation date, nothing evaluated.*
@@ -857,11 +857,12 @@ Some values are true only until Treasury issues more TIPS. Left inline as approx
   - *Yield Curves: `Tab + ( Spread_Mode ) + { Source } + { Series } + Maturity_Range + Horizontal_Axis_Mode + IQR_Clip_Setting` — the Treasuries, TIPS or breakeven tab; spread mode; the sources and series shown; the range of maturities; calendar or term on the horizontal axis; and whether the [IQR Clip](#iqr-clip) applies.*
   - *Yields Monitor: `Range + ( Custom_Start_Date + Custom_End_Date ) + { Symbol } + Tab + Show_Quoted + Show_SA + Sync_Zoom_And_Pan + Lock_Right + Hide_Non_Trading_Hours` — the preset or Custom time range; the symbols checked; the active tab; whether the quoted and/or seasonally adjusted line is shown; and the Sync Zoom & Pan, Lock Right and Hide non-trading hours checkboxes.*
   - *Treasury Auctions: `Tab + View + { Typed_Filter } + { Calendar_Date_Range } + Sort + { Shown_Column } + { Column_Width }` — the active tab; the view of the Historical Auctions tab (All, Bills, Notes & Bonds or TIPS); the typed column filters; the calendar date ranges; the sorted column and its direction; the columns shown, in their order; and the column widths.*
+  - *Fund Holdings: `Ticker + Sort + { Column_Width }` — the fund tab; the sorted column and its direction; and the column widths.*
 - <a id="axis-scales"></a>**Axis Scales** = `Horizontal_Axis_Range + Vertical_Axis_Range`
   *The ranges of the two chart axes: the horizontal axis in calendar dates or in [Term](#term), and the vertical axis in yield, floored by any [IQR Clip](#iqr-clip).*
 - <a id="drill-request"></a>**Drill Request** = `@CUSIP + Figure`
   *The security and the figure a user picks in a table, to see how the figure was calculated.*
-- <a id="charts-and-tables"></a>**Charts and Tables** = *The views drawn for the user: the chart and the table of the selected tab, or the spread charts and table in spread mode, in Yield Curves; the equivalent time-series, yield-curve-snapshot or breakeven-inflation view, in Yields Monitor; the table of the active tab, in Treasury Auctions.*
+- <a id="charts-and-tables"></a>**Charts and Tables** = *The views drawn for the user: the chart and the table of the selected tab, or the spread charts and table in spread mode, in Yield Curves; the equivalent time-series, yield-curve-snapshot or breakeven-inflation view, in Yields Monitor; the table of the active tab, in Treasury Auctions; the table of the selected fund, in Fund Holdings.*
 
 ### 6.4 Yields Monitor
 
