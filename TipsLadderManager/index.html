@@ -306,8 +306,8 @@
 
     <p><b>5. Click Rebalance Ladder.</b> The app runs the rebalancing calculations and populates the <b>After</b> and <b>Delta</b> columns with the results; <b>Net Cash</b> (sells minus buys — negative means a net purchase) and average yield/duration stats also appear in the form card's bottom rows.</p>
     <ul style="margin:0 0 10px 20px;padding:0">
-      <li><a href="../knowledge/viewer.html#/md/TipsLadderManager/knowledge/5.0_UI_Schema.md#trade-ticket" target="_blank" style="color:#2563eb;text-decoration:none;"><b>Trade Ticket</b></a> lists the buys and sells the rebalance recommends, with cost and accrued interest per CUSIP.</li>
-      <li><a href="../knowledge/viewer.html#/md/TipsLadderManager/knowledge/5.0_UI_Schema.md#cash-flow-calendar" target="_blank" style="color:#2563eb;text-decoration:none;"><b>Cash Flow</b></a> shows when your held TIPS actually pay you, and how much, by date.</li>
+      <li><a href="../knowledge/viewer.html#/md/TipsLadderManager/knowledge/4.5.3_Show_Trade_Ticket.md#trade-ticket" target="_blank" style="color:#2563eb;text-decoration:none;"><b>Trade Ticket</b></a> lists the buys and sells the rebalance recommends, with cost and accrued interest per CUSIP.</li>
+      <li><a href="../knowledge/viewer.html#/md/TipsLadderManager/knowledge/4.5.4_Show_Cash_Flow_Calendar.md#cash-flow-calendar" target="_blank" style="color:#2563eb;text-decoration:none;"><b>Cash Flow</b></a> shows when your held TIPS actually pay you, and how much, by date.</li>
       <li><b>Gap Dur</b> (and <b>Future 30Y Dur</b>, once the ladder extends past the longest issued maturity year) shows the duration match with your ladder's own numbers.</li>
       <li><b>Avg Mod Dur</b>, <b>Avg Yld</b>, and <b>Avg SA Yld</b> each show the market-value-weighted breakdown behind the portfolio figure: every holding's own value and market value, and the total.</li>
       <li><b>Export → Ladder CSV / Holdings</b> become available (the latter is re-importable for your next rebalance).</li>
@@ -420,7 +420,7 @@
   </div>
 </div>
 
-<!-- Coupon Counting popover (2.0 §Settlement-Year Coupon Treatment; 5.0 §Coupon Counting link) -->
+<!-- Coupon Counting popover (2.0 §Settlement-Year Coupon Treatment; 4.5.1 §Coupon Counting link) -->
 <div id="rmd-options-popover" class="menu-dropdown" hidden style="position:fixed;min-width:230px;max-width:280px;padding:10px 12px;font-size:12px;color:var(--portal-text-main)">
   <div style="font-weight:700;margin-bottom:8px" id="rmd-options-title">Coupon Counting</div>
   <div style="font-size:10px;font-weight:800;text-transform:uppercase;color:#64748b;margin-bottom:2px">Count remaining coupons</div>
@@ -1331,7 +1331,7 @@ function _exportCusipQty() {
   // Append the durable per-year DARA intent (every year incl. gap + future-30Y) as a metadata
   // block. On re-import this is honored directly so the ladder reproduces exactly — no DARA
   // inference, no last-year inference. Backward-compatible: old parsers skip these lines.
-  // See 2.1 Export (CusipQty Export + #fundedYear,dara block).
+  // See 4.5.6 Export holdings and DARA plan (CusipQty Export + #fundedYear,dara block).
   const summary = currentMode === 'build' ? buildSummary : rebalSummary;
   const daraByYearResolved = summary?.daraByYearResolved;
   if (daraByYearResolved && daraByYearResolved.size > 0) {
@@ -2066,7 +2066,7 @@ document.getElementById('trade-ticket-copy').addEventListener('click', () => {
   });
 });
 
-// ─── Cash Flow Calendar (5.0 §Cash Flow Calendar) ────────────────────────────
+// ─── Cash Flow Calendar (4.5.4 §Cash Flow Calendar) ────────────────────────────
 // Every held TIPS's actual coupon dates (from today forward) plus its principal
 // repayment date, independent of ladder/funded-year construction — a fact about
 // the current portfolio, not a DARA-sizing quantity.
@@ -2077,7 +2077,7 @@ const _fmtLongDate = fmtDateLong; // src/date-util.js — single source, shared 
 function _isoDate(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
 
 // A coupon dated on a weekend/holiday is actually paid the next bond trading day, so the event
-// must stay on the calendar (still "unpaid") through that day (5.0 §Cash Flow Calendar).
+// must stay on the calendar (still "unpaid") through that day (4.5.4 §Cash Flow Calendar).
 // Single source: shared/src/settlement.js actualPaymentDate() — also used by the settlement-year remaining-
 // coupon LMI logic in ladder-core.js/rebalance-lib.js, so the two stay in agreement.
 function _actualPaymentDate(d) {
@@ -2087,7 +2087,7 @@ function _actualPaymentDate(d) {
 // One coupon payment's per-bond value on its own payment date. The Ref CPI series is published
 // ~2 months ahead of the settlement date, so a payment usually already has its own published
 // Ref CPI — use that when present, else fall back to the active Ref CPI, same as every other
-// Amount figure in this app (5.0 §Cash Flow Calendar). Shared by the Cash Flow Calendar (payments
+// Amount figure in this app (4.5.4 §Cash Flow Calendar). Shared by the Cash Flow Calendar (payments
 // still to come) and the settlement-year received-coupon total (payments already made), so the two
 // can never value the same payment differently.
 function _couponEventCalc(bond, d, activeRc, activeDateIso) {
@@ -2339,7 +2339,7 @@ function _afterRebalHoldings() {
   return [...byCusip].map(([cusip, qty]) => ({ cusip, qty }));
 }
 
-// Build has no "before" holdings (2.1 §help: "Build a TIPS ladder from scratch, with no existing
+// Build has no "before" holdings ("Build a TIPS ladder from scratch, with no existing
 // holdings") — the Cash Flow Calendar in Build mode always shows the just-built ladder itself, the
 // same per-CUSIP quantity (fundedYearQty + excessQty) already shown in the build table, summed in
 // case a CUSIP spans more than one row (multi-TIPS-per-year, or a bracket row's excess).
@@ -2907,12 +2907,12 @@ function _renderBeforeStatePreview() {
 }
 
 // ─── Standalone DARA-plan file (export/import) ───────────────────────────────
-// The portable persistence path for a desired per-year DARA shape (2.1 §Standalone DARA-plan
+// The portable persistence path for a desired per-year DARA shape (4.5.6 §Standalone DARA-plan
 // file): just funded year -> DARA, no CUSIP rows, no segments. This is the only mechanism that
 // carries a desired plan across a FRESH broker re-upload (Vanguard/Fidelity/Schwab), which never
 // has per-year DARA of its own to read — re-importing our own CUSIP/Qty export only reproduces a
 // plan exactly when re-importing that SAME export.
-// The `#params` row of the Holdings Export and of the DARA Plan File: one builder, one key order (2.1 §`#params` row).
+// The `#params` row of the Holdings Export and of the DARA Plan File: one builder, one key order (4.5.6 §`#params` row).
 function _constructionParamsRow({ preLadderInterest, maturityPref, maturityPicks, couponPref, allocationPolicy, availableCash, rmdCouponMode }) {
   const picks = [...(maturityPicks ?? [])].sort((a, b) => a[0] - b[0]).map(([y, cs]) => `${y}:${cs.join('|')}`).join(';');
   return `#params,preLadderInterest=${preLadderInterest ? 'true' : 'false'},maturityPref=${maturityPref ?? 'last'}${picks ? `,maturityPicks=${picks}` : ''},couponPref=${couponPref ?? 'higher'},allocationPolicy=${allocationPolicy ?? 'equal'},refCpiDate=${_defaultRefCpiDateStr},availableCash=${Math.round(availableCash ?? 0)},rmdCouponMode=${rmdCouponMode ?? 'all'}`;
@@ -2947,7 +2947,7 @@ function _exportDaraPlan() {
   if (!_daraByYearStore.size) { setStatus('Nothing to export — no per-year DARA to save yet.', true); return; }
   const lines = ['#fundedYear,dara'];
   for (const [y, v] of [..._daraByYearStore.entries()].sort((a, b) => a[0] - b[0])) lines.push(`${y},${Math.round(v)}`);
-  // Every Construction Parameter rides along, as in the Holdings Export (2.1 §`#params` row), so the plan alone restores the
+  // Every Construction Parameter rides along, as in the Holdings Export (4.5.6 §`#params` row), so the plan alone restores the
   // controls. The basis date is among them: bare DARA numbers are meaningless without the Ref CPI date they were stated at
   // (3.0 §DARA Reference Date).
   lines.push(_constructionParamsRow({
@@ -4165,7 +4165,7 @@ document.addEventListener('click', e => {
     const details = currentMode === 'build' ? buildDetails : rebalDetails;
     const summary = currentMode === 'build' ? buildSummary : rebalSummary;
     // A gap year's or Future 30Y year's Amount sits on a group header row with no TIPS row behind it;
-    // its popup reads the year's entry from the summary (5.0 §Popup Routing).
+    // its popup reads the year's entry from the summary (4.5.2 §Popup Routing).
     const drillYear = drill.dataset.year != null ? parseInt(drill.dataset.year, 10) : null;
     const d = drillYear != null
       ? (colKey === 'yearAmountBefore' ? summary?.syntheticYearAmountsBefore : summary?.syntheticYearAmounts)?.[drillYear]

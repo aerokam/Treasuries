@@ -40,13 +40,13 @@ function costPerTipsRow(d) {
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 // A bracket row links to its own weight drill rather than carrying hover text: the nested popup
-// is draggable, resizable, and its content can be selected and copied (5.0 §Nested (Level-3)
+// is draggable, resizable, and its content can be selected and copied (4.5.2 §Nested (Level-3)
 // drills).
 function wtLink(which, inner) {
   return '<span class="drill-l3" data-l3="bracketwt-' + which + '" style="cursor:pointer;text-decoration:underline dotted #94a3b8;">' + inner + '</span>';
 }
 
-// A link to the calculation of a number (a nested drill, 5.0 §Nested (Level-3) drills).
+// A link to the calculation of a number (a nested drill, 4.5.2 §Nested (Level-3) drills).
 function l3Link(key, text) {
   return '<span class="drill-l3" data-l3="' + key + '" style="cursor:pointer;text-decoration:underline dotted #94a3b8;">' + text + '</span>';
 }
@@ -189,7 +189,7 @@ function creditedOf(d, isBef = false) {
 const creditedTotal = (c) => c.sim + c.cov + c.net + c.gapSim + c.gapExc + c.gapNet;
 
 // Amount of a gap year or a Future 30Y year, on that year's group header row (2.0 §Amount of a Gap
-// Year and a Future 30Y Year; 5.0 §Popup Routing). `a` is one entry of summary.syntheticYearAmounts.
+// Year and a Future 30Y Year; 4.5.2 §Popup Routing). `a` is one entry of summary.syntheticYearAmounts.
 function syntheticYearAmountRows(a) {
   const isGap = a.kind === 'gap';
   const pi    = a.qty * a.piPerBond;
@@ -678,7 +678,7 @@ export function buildIndexRatioDrill(d, kind) {
   ];
 }
 
-// ─── Trade Ticket popups (5.0 §Trade Ticket) ──────────────────────────────────
+// ─── Trade Ticket popups (4.5.3 §Trade Ticket) ──────────────────────────────────
 // r: { price, indexRatio, costPerBond, coupon, A, E, accruedPerBond, qty,
 //      cost, accruedInterest, totalCost } — built per-row in index.html.
 // "Cost" (not "Principal") deliberately — Principal already means the inflation-adjusted
@@ -719,7 +719,7 @@ export function buildTradeTicketTotalDrill(r, label) {
   ];
 }
 
-// ─── Cash Flow Calendar: per-date breakdown (5.0 §Cash Flow Calendar) ─────────
+// ─── Cash Flow Calendar: per-date breakdown (4.5.4 §Cash Flow Calendar) ─────────
 // bucket: { date, coupon, principal, events: [{ cusip, type, amount, qty, refCPI, datedDateRefCpi, indexRatio, principalPerBond, coupon, isActual, refCpiDateDisplay }] }
 // Ref CPI is a single national series, not per-bond, so every event sharing this date shares the
 // same refCPI/isActual/refCpiDateDisplay — shown once at the top rather than repeated per line.
@@ -935,7 +935,7 @@ function bracketLabels(summary, mode) {
 }
 
 // Level-3 drill for one bracket weight, opened from a bracket row in the Gap Dur popup
-// (5.0 §Nested (Level-3) drills, key `bracketwt-<which>`). Every term is named in full so the
+// (4.5.2 §Nested (Level-3) drills, key `bracketwt-<which>`). Every term is named in full so the
 // formula reads without a legend: a weight says weight, a duration says duration, and each names
 // the bracket it belongs to. Values appear at the precision the popup shows them at, so the
 // substitution can be checked against the rows it came from.
@@ -1263,7 +1263,7 @@ function fmtDate(d) {
   return MONTHS[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear();
 }
 
-// Shared body for the Macaulay-duration walk (5.0 §Duration Disclosure Standards): coupon-date
+// Shared body for the Macaulay-duration walk (4.5.2 §Duration Disclosure Standards): coupon-date
 // schedule, day-count fractions (E/DSC/w), per-period cash flows/PVs, Macaulay sum, then
 // Modified duration. `durDetail`/`dur` come straight from gap-math.js's breakdown entry
 // (calculateDurationDetail, shared/src/bond-math.js) — never recomputed here.
@@ -1289,7 +1289,7 @@ function macaulayWalkRows(durDetail, dur) {
   return rows;
 }
 
-// The year rows of the list in the Gap Dur and Future 30Y Dur popups (5.0 §Duration Disclosure
+// The year rows of the list in the Gap Dur and Future 30Y Dur popups (4.5.2 §Duration Disclosure
 // Standards). Each year shows its Modified Duration in the row of the year, then its Quantity, Cost per
 // TIPS and Cost, every formula with its variable names first and then the numbers. LMI, P+I per TIPS and
 // the pre-ladder credit are links to their calculations; the Modified Duration and the row of the year
@@ -1360,7 +1360,7 @@ function synthYearListRows(kind, params, heading) {
   ];
 }
 
-// Level-3 drill for the P+I of one synthetic Gap-year TIPS (5.0 §Nested (Level-3) drills,
+// Level-3 drill for the P+I of one synthetic Gap-year TIPS (4.5.2 §Nested (Level-3) drills,
 // key `gappi-<year>`). Gap-year synthetic TIPS always carry a Feb maturity, which falls in the
 // Jan–Jun bucket and so receives exactly one coupon payment in the maturity year (TIPS_Basics.md
 // §Last-Year Interest) — half the annual synthetic coupon rate shown in the Gap Year Duration drill.
@@ -1381,7 +1381,7 @@ export function buildSyntheticPIDrill(summary, year, kind = 'gap') {
   ];
 }
 
-// Level-3 drill for the LMI of one synthetic Gap-year TIPS (5.0 §Nested (Level-3) drills,
+// Level-3 drill for the LMI of one synthetic Gap-year TIPS (4.5.2 §Nested (Level-3) drills,
 // key `gaplmi-<year>`). Splits the year's LMI into synthetic coupon from longer gap years already
 // sized in this sweep (each reconstructable from `gapParams.breakdown`, itself drillable via
 // `gapdur-<year>`) and coupon from TIPS maturing after 2039 (funded years, bracket
@@ -1429,7 +1429,7 @@ export function buildFuture30yLMIDrill(summary, year) {
   return rows;
 }
 
-// Level-3 drill for one synthetic Gap-year TIPS's duration (5.0 §Nested (Level-3) drills,
+// Level-3 drill for one synthetic Gap-year TIPS's duration (4.5.2 §Nested (Level-3) drills,
 // key `gapdur-<year>`). Shows the yield interpolation, the synthetic coupon derived from it,
 // and the full Macaulay/Modified duration walk — everything `calcGapParams`'s breakdown entry
 // already carries (gap-math.js gapParamsCore), nothing recomputed.
@@ -1454,7 +1454,7 @@ export function buildGapYearDurationDrill(summary, year) {
   ];
 }
 
-// Level-3 drill for one synthetic Future 30Y TIPS's duration (5.0 §Nested (Level-3) drills,
+// Level-3 drill for one synthetic Future 30Y TIPS's duration (4.5.2 §Nested (Level-3) drills,
 // key `f30dur-<year>`). Unlike Gap years, Future 30Y years have no upper anchor to interpolate
 // against — every year is priced flat off the same anchor bond (gap-math.js future30yParamsCore).
 export function buildFuture30yYearDurationDrill(summary, year) {

@@ -653,7 +653,7 @@ export function parseParamsBlock(rawLines) {
       if (!k) continue;
       if (/^preladderinterest$/i.test(k)) out.preLadderInterest = /^(true|1|yes|on)$/i.test(v);
       else if (/^maturitypref$/i.test(k)) out.maturityPref = /^(first|semiannual|all|select)$/i.test(v) ? v.toLowerCase() : 'last';
-      // The picks of Select maturities: `year:cusip|cusip;year:cusip`, a year with no pick written as `year:` (2.1 §`#params` row).
+      // The picks of Select maturities: `year:cusip|cusip;year:cusip`, a year with no pick written as `year:` (4.5.6 §`#params` row).
       else if (/^maturitypicks$/i.test(k)) {
         const picks = new Map();
         for (const part of (v ?? '').split(';')) {
@@ -680,7 +680,7 @@ export function parseParamsBlock(rawLines) {
 
 // BEST-EFFORT per-year DARA recovery for files that carry NO explicit DARA (broker imports,
 // legacy Format-5 exports, tipsladder Format-4). Our own current exports carry an explicit
-// `#fundedYear,dara` block (see 2.1 Export) and bypass this entirely — for those the
+// `#fundedYear,dara` block (see 4.5.6 Export holdings and DARA plan) and bypass this entirely — for those the
 // round-trip is exact by construction. This path only estimates a self-financing per-year
 // DARA from the held quantities, which is inherently lossy where build hid the DARA (e.g.
 // PLI-zeroed years) — hence "best effort".
@@ -2695,7 +2695,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
   const HDR = ['CUSIP','Qty','Maturity','FY','Principal','Interest','ARA','Cost','Target Qty','Qty Delta','Target Cost','Cost Delta','ARA (Before)','ARA-DARA Before','ARA (After)','ARA-DARA After','Excess ARA Before','Excess ARA After','Incoming LMI','Excess Interest','Funded PI'];
 
   // Resolved per-year DARA for EVERY year in [firstYear, lastYear] (incl. gap + future-30Y).
-  // Persisted on export as the `#fundedYear,dara` block so a re-import is exact. See 2.1 Export.
+  // Persisted on export as the `#fundedYear,dara` block so a re-import is exact. See 4.5.6 Export holdings and DARA plan.
   const daraByYearResolved = new Map();
   for (let y = firstYear; y <= lastYear; y++) daraByYearResolved.set(y, daraByYear?.get(y) ?? DARA);
 

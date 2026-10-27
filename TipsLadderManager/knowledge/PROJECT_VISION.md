@@ -27,7 +27,7 @@ Both calculate the same quantities from the same formulas and differ only in the
 ### 4. Progressive disclosure
 - The main table shows the values the user acts on.
 - A popup, one click from a cell, shows the calculation chain of that cell.
-- A second-level popup, one click from a popup row, shows a component of the chain, such as a duration calculation ([UI Schema (5.0)](./5.0_UI_Schema.md)).
+- A second-level popup, one click from a popup row, shows a component of the chain, such as a duration calculation ([4.5.2 Show drill popups](./4.5.2_Show_Drill_Popups.md)).
 
 ---
 
@@ -36,15 +36,15 @@ Both calculate the same quantities from the same formulas and differ only in the
 The `knowledge/` directory is the spec layer. Lower-numbered specs are the foundation of higher-numbered ones:
 
 - **1.0** [Bond Ladders](./1.0_Bond_Ladders.md), which requires [Bond Basics](../../knowledge/Bond_Basics.md)
-- **2.0** [TIPS Ladders](./2.0_TIPS_Ladders.md), with **2.1** [Export](./2.1_Export.md); requires [TIPS Basics](../../knowledge/TIPS_Basics.md)
+- **2.0** [TIPS Ladders](./2.0_TIPS_Ladders.md); requires [TIPS Basics](../../knowledge/TIPS_Basics.md)
 - **3.0** [TIPS Ladder Rebalancing](./3.0_TIPS_Ladder_Rebalancing.md), with **3.1** [Data Pipeline](./3.1_Data_Pipeline.md)
-- **4.0** [Computation Modules](./4.0_Computation_Modules.md), with **4.1** to **4.4**, one spec for each process
-- **5.0** [UI Schema](./5.0_UI_Schema.md) and **6.0** [UI Layout](./6.0_UI_Layout.md)
+- **4.0** [Computation Modules](./4.0_Computation_Modules.md), with **4.1** to **4.6**, one spec for each process
+- **6.0** [UI Layout](./6.0_UI_Layout.md)
 
 The terms are defined once, in the [Data Dictionary](../../knowledge/DATA_DICTIONARY.md). The [Technical Reference](./TECHNICAL_REFERENCE.md) maps them to code symbols.
 
 A new displayed value is specified in the appropriate spec first and then implemented. The chain from the screen to the code:
 
 ```
-UI display → popup row (5.0) → spec section (2.0, 3.0 or 4.x) → code symbol (Technical Reference) → implementation
+UI display → popup row (4.5.2) → spec section (2.0, 3.0 or 4.x) → code symbol (Technical Reference) → implementation
 ```

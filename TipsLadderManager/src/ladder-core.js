@@ -431,7 +431,7 @@ export function maxLastYear({ tipsMarketData, settlementDate, refCPI = 1, bondHo
 
 // ─── Amount of a gap year and a Future 30Y year ─────────────────────────────────
 // Spec: 2.0 §Amount of a Gap Year and a Future 30Y Year. Shown on the year's group header row,
-// in Build and in Rebalance, before and after (5.0 §Sub-Row Logic).
+// in Build and in Rebalance, before and after (4.5.1 §Sub-Row Logic).
 //   gap year       — P+I of its Simulated Outstanding Future 10Y TIPS (same quantity, coupon and
 //                    maturity as its Synthetic TIPS) + the LMI that sized its quantity down (the full
 //                    annual coupons of the later gap years, the actual TIPS above and the pre-ladder
@@ -714,7 +714,7 @@ export function remainingCouponPaymentsThisYear(maturity, settlementDate, bondHo
   // Walk from a few days before tradeDate, not from tradeDate itself: a coupon scheduled just
   // before today but rolled past a weekend/holiday hasn't actually been paid yet, and
   // couponSchedule(tradeDate, ...) would otherwise skip its (pre-tradeDate) raw date entirely.
-  // Mirrors index.html's buildCashFlowData() walk-back. 5.0 §Cash Flow Calendar.
+  // Mirrors index.html's buildCashFlowData() walk-back. 4.5.4 §Cash Flow Calendar.
   const walkFrom = new Date(tradeDate); walkFrom.setDate(walkFrom.getDate() - 10);
   return couponSchedule(walkFrom, maturity)
     .map(d => actualPaymentDate(d, bondHolidays))

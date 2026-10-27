@@ -79,9 +79,9 @@ caller's spec.
 ## <a id="m6"></a>drill.js (M6)
 **File**: `TipsLadderManager/src/drill.js`
 **Purpose**: The builders of the content of every popup that shows how a figure was calculated: the drill popups of the ladder table, of the trade ticket and of the cash flow calendar.
-**Exports**: `buildDrillHTML`, `buildDurationPopupRows`, `buildTradeTicketCostDrill`, `buildTradeTicketAccruedDrill`, `buildTradeTicketTotalDrill`, `buildCashFlowDateDrill`, `buildCashFlowEventDrill` and the rest of its exports; [5.0 §Popup Routing](../TipsLadderManager/knowledge/5.0_UI_Schema.md#popup-routing) states which routes to which.
+**Exports**: `buildDrillHTML`, `buildDurationPopupRows`, `buildTradeTicketCostDrill`, `buildTradeTicketAccruedDrill`, `buildTradeTicketTotalDrill`, `buildCashFlowDateDrill`, `buildCashFlowEventDrill` and the rest of its exports; [4.5.2 §Popup Routing](../TipsLadderManager/knowledge/4.5.2_Show_Drill_Popups.md#popup-routing) states which routes to which.
 
-**Called by**: [4.5.2 Show drill popups](../TipsLadderManager/knowledge/4.5_Render_And_Export.md#show-drill-popups), [4.5.3 Show trade ticket](../TipsLadderManager/knowledge/4.5_Render_And_Export.md#show-trade-ticket) and [4.5.4 Show cash flow calendar](../TipsLadderManager/knowledge/4.5_Render_And_Export.md#show-cash-flow-calendar).
+**Called by**: [4.5.2 Show drill popups](../TipsLadderManager/knowledge/4.5.2_Show_Drill_Popups.md), [4.5.3 Show trade ticket](../TipsLadderManager/knowledge/4.5.3_Show_Trade_Ticket.md) and [4.5.4 Show cash flow calendar](../TipsLadderManager/knowledge/4.5.4_Show_Cash_Flow_Calendar.md).
 
 ---
 
@@ -90,7 +90,7 @@ caller's spec.
 **Purpose**: The popup that opens beside a clicked figure, with a title, a breadcrumb back to the popup it came from, and an optional toggle.
 **Exports**: `showPopup(anchorEl, title, rowsOrBuilder, breadcrumb, initialToggleVal)`, `hidePopup()`.
 
-**Called by**: [4.5.2 Show drill popups](../TipsLadderManager/knowledge/4.5_Render_And_Export.md#show-drill-popups), [4.5.3 Show trade ticket](../TipsLadderManager/knowledge/4.5_Render_And_Export.md#show-trade-ticket) and [4.5.4 Show cash flow calendar](../TipsLadderManager/knowledge/4.5_Render_And_Export.md#show-cash-flow-calendar).
+**Called by**: [4.5.2 Show drill popups](../TipsLadderManager/knowledge/4.5.2_Show_Drill_Popups.md), [4.5.3 Show trade ticket](../TipsLadderManager/knowledge/4.5.3_Show_Trade_Ticket.md) and [4.5.4 Show cash flow calendar](../TipsLadderManager/knowledge/4.5.4_Show_Cash_Flow_Calendar.md).
 
 ---
 
@@ -99,4 +99,4 @@ caller's spec.
 **Purpose**: The frame that makes a modal draggable by its title and resizable from its edges and corners.
 **Exports**: `makeDraggableResizable(modalEl, dragHandleEl, { minWidth, minHeight })`.
 
-**Called by**: [4.5.2 Show drill popups](../TipsLadderManager/knowledge/4.5_Render_And_Export.md#show-drill-popups) (the TIPS Ref and Mkt popup), [4.5.3 Show trade ticket](../TipsLadderManager/knowledge/4.5_Render_And_Export.md#show-trade-ticket) and [4.5.4 Show cash flow calendar](../TipsLadderManager/knowledge/4.5_Render_And_Export.md#show-cash-flow-calendar).
+**Called by**: [4.5.2 Show drill popups](../TipsLadderManager/knowledge/4.5.2_Show_Drill_Popups.md) (the TIPS Ref and Mkt popup), [4.5.3 Show trade ticket](../TipsLadderManager/knowledge/4.5.3_Show_Trade_Ticket.md) and [4.5.4 Show cash flow calendar](../TipsLadderManager/knowledge/4.5.4_Show_Cash_Flow_Calendar.md).

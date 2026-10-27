@@ -211,7 +211,7 @@ export function gapParamsCore({ gapYears, tipsMarketData, settlementDate, dara, 
     const piPerBond = 1000 + 1000 * synCpn * 0.5;
     const yearDara = daraByYear?.get(year) ?? dara;
     // qtyExact is the quotient before rounding and before the floor at 0, kept so the Gap Year
-    // Duration drill shows the same number the rounding acted on (5.0 §Quantity, cost and duration in one section).
+    // Duration drill shows the same number the rounding acted on (4.5.2 §Quantity, cost and duration in one section).
     const qtyExact = (yearDara - laterMatInt - (pliCreditByGapYear[year] ?? 0)) / piPerBond;
     const qty = Math.max(0, Math.round(qtyExact));
     // Priced as a security issued today off its own yield and coupon, not assumed to be par:

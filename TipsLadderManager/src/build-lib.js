@@ -211,7 +211,7 @@ export function runBuild({ dara, firstYear: firstYearOpt, lastYear, tipsMarketDa
 
   // Resolved per-year DARA for EVERY year in [firstYear, lastYear] (incl. gap + future-30Y
   // years that have no TIPS row). This is the durable build intent the export persists as the
-  // `#fundedYear,dara` block, so a re-import reproduces the ladder exactly. See 2.1 Export.
+  // `#fundedYear,dara` block, so a re-import reproduces the ladder exactly. See 4.5.6 Export holdings and DARA plan.
   const daraByYearResolved = new Map();
   for (let y = firstYear; y <= lastYear; y++) daraByYearResolved.set(y, daraByYear?.get(y) ?? dara);
 

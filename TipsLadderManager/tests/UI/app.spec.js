@@ -20,7 +20,7 @@ import { localDate } from '../../src/date-util.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
-// The Coupons link is on the settlement year's row only (5.0 §Coupon Counting link). With no TIPS maturing in the settlement year
+// The Coupons link is on the settlement year's row only (4.5.1 §Coupon Counting link). With no TIPS maturing in the settlement year
 // in today's quotes, the Rebalance ladder has no such row, and the tests of that link have nothing to act on.
 const NO_SETTLEMENT_YEAR_ROW = 'no TIPS in the quotes matures in the settlement year, so the ladder has no settlement-year row to carry the Coupons link';
 
@@ -1502,7 +1502,7 @@ test('build: a funded year before the first gap year shows the gap year amounts 
 
 // ── Amount of a gap year and a Future 30Y year (2.0 §Amount of a Gap Year and a Future 30Y Year) ──
 // The group header row of each gap year and Future 30Y year carries the Amount, drillable; the excess
-// sub-rows carry none (5.0 §Sub-Row Logic).
+// sub-rows carry none (4.5.1 §Sub-Row Logic).
 test('build: gap year and Future 30Y year rows show a drillable Amount; excess rows show none', async ({ page }) => {
   test.setTimeout(20_000);
   await page.locator('.tab-btn[data-mode="build"]').click();
@@ -1527,7 +1527,7 @@ test('build: gap year and Future 30Y year rows show a drillable Amount; excess r
     await expect(page.locator('#drill-content')).toContainText(y === gap[0] ? 'Simulated Outstanding Future 10Y TIPS' : 'Simulated Outstanding Future 30Y TIPS');
     if (y === gap[0]) await expect(page.locator('#drill-content'), 'the Amount of a gap year reads its Simulated Outstanding Future 10Y TIPS, not a Synthetic TIPS').not.toContainText('Synthetic');
     await expect(page.locator('#drill-content')).toContainText('DARA');
-    // The Quantity line points to the duration match popup and names no pass (5.0 §Popup Routing).
+    // The Quantity line points to the duration match popup and names no pass (4.5.2 §Popup Routing).
     const popupName = y === gap[0] ? 'duration' : 'future30yDuration';
     const popupTitle = y === gap[0] ? 'Gap Dur' : 'Future 30Y Dur';
     const qtyLine = page.locator('#drill-content tr', { hasText: 'Quantity' }).first();
@@ -1551,7 +1551,7 @@ test('build: gap year and Future 30Y year rows show a drillable Amount; excess r
   }
 });
 
-// ── Expand glyph only where there is something to expand (5.0 §Funded Year Group Header Row) ──
+// ── Expand glyph only where there is something to expand (4.5.1 §Funded Year Group Header Row) ──
 // A gap year and a Future 30Y year hold no TIPS rows, so their group header rows show no ▼/▶; a year
 // with TIPS rows keeps it.
 test('build: gap year and Future 30Y year rows show no expand glyph; years with TIPS rows keep it', async ({ page }) => {
@@ -2188,7 +2188,7 @@ test('build: Set DARA over a selected range works; Infer DARA never renders in B
     els => els.slice(0, 3).map(e => e.dataset.year)
   );
   // Left-edge position: years[0] is the settlement year, whose row also carries the RMD Options
-  // link (5.0 §RMD Options) — a default-centroid click can land on it instead of selecting the row.
+  // link (4.5.1 §RMD Options) — a default-centroid click can land on it instead of selecting the row.
   // delay: 650 holds past the 600ms select threshold (3.0 §Selecting rungs) — a quick click now
   // only toggles expand/collapse, it no longer selects.
   await page.locator(`#build-table tr.fy-group-header[data-fy="${years[0]}"]`).click({ position: { x: 10, y: 8 }, delay: 650 });
@@ -2212,7 +2212,7 @@ test('mode toggle: switching Build <-> Rebalance clears the active selection', a
   const year = await page.locator('#build-table .fy-dara-input[data-year]').first().getAttribute('data-year');
   // Click near the row's left edge (the expand triangle/year label), not its default centroid —
   // the settlement year's row also carries the DARA input and (when it's the settlement year, as
-  // it is here since `year` is the FIRST funded year) the "RMD Options" link (5.0 §RMD Options),
+  // it is here since `year` is the FIRST funded year) the "RMD Options" link (4.5.1 §RMD Options),
   // either of which would swallow a click landing on them via their own stopPropagation.
   // delay: 650 holds past the 600ms select threshold (3.0 §Selecting rungs) — a quick click now
   // only toggles expand/collapse, it no longer selects.
@@ -2273,7 +2273,7 @@ test('build: a blanked per-year DARA field builds that rung at 0, not the scalar
   }, rungYear), { timeout: 4_000 }).toBe('0');
 });
 
-// Coupon Counting (2.0 §Settlement-Year Coupon Treatment; 5.0 §Funded Year Group Header Row): the
+// Coupon Counting (2.0 §Settlement-Year Coupon Treatment; 4.5.1 §Funded Year Group Header Row): the
 // settlement year's group header row — and only that row — carries a "Coupons" link opening a small
 // popover for the settlement-year coupon-count mode.
 //
@@ -2353,7 +2353,7 @@ test('Coupon Counting: hovering the link shows an explainer without opening the 
 });
 
 // RMD Options persist through the same standalone DARA-plan file the DARA-by-year shape already
-// uses (2.1 §Standalone DARA-plan file `#params` line) — no separate file/mechanism.
+// uses (4.5.6 §Standalone DARA-plan file `#params` line) — no separate file/mechanism.
 // Rebalance mode: Available Cash lives there alone, so a plan carrying it has to be written and
 // read back there.
 test('Available Cash and coupon mode round-trip through the DARA-plan file', async ({ page }) => {
@@ -2400,7 +2400,7 @@ test('Available Cash and coupon mode round-trip through the DARA-plan file', asy
   await expect(pop.locator('input[name="rmd-coupon-mode"]:checked')).toHaveValue('none');
 });
 
-// The DARA-plan file carries every Construction Parameter (2.1 §Standalone DARA-plan file), so the Maturity preference and the
+// The DARA-plan file carries every Construction Parameter (4.5.6 §Standalone DARA-plan file), so the Maturity preference and the
 // Coupon preference set before the export are set again by the import, without being chosen a second time.
 test('Maturity preference and Coupon preference round-trip through the DARA-plan file', async ({ page }) => {
   test.setTimeout(30_000);
@@ -2431,7 +2431,7 @@ test('Maturity preference and Coupon preference round-trip through the DARA-plan
   await expect(page.locator('#rebal-alloc-policy')).toHaveValue('saYield');
 });
 
-// A Build splits the need of a year evenly across its maturities, so the plan it saves names the Equal split (2.1 §`#params` row).
+// A Build splits the need of a year evenly across its maturities, so the plan it saves names the Equal split (4.5.6 §`#params` row).
 test('a Build with All maturity months saves the Equal split in the DARA-plan file', async ({ page }) => {
   test.setTimeout(30_000);
   await page.locator('.tab-btn[data-mode="build"]').click();
@@ -2450,7 +2450,7 @@ test('a Build with All maturity months saves the Equal split in the DARA-plan fi
   expect(planText).toContain('allocationPolicy=equal');
 });
 
-// The picks of Select maturities ride in the same row (2.1 §`#params` row), so a plan saved with picks restores them.
+// The picks of Select maturities ride in the same row (4.5.6 §`#params` row), so a plan saved with picks restores them.
 test('Select maturities picks round-trip through the DARA-plan file', async ({ page }) => {
   test.setTimeout(30_000);
   await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 4_000 });
@@ -2759,7 +2759,7 @@ test('build: gap-years-only ladder lists funded years in ascending order, bracke
   expect(years).toContain(gap[gap.length - 1] + 1);
 });
 
-// ── Year rows of the Gap Dur and Future 30Y Dur popups (5.0 §Duration Disclosure Standards) ──
+// ── Year rows of the Gap Dur and Future 30Y Dur popups (4.5.2 §Duration Disclosure Standards) ──
 // The list of years shows each year's Modified Duration in the row of the year and calculates its Quantity, Cost per TIPS and Cost in the list itself;
 // there is no separate breakdown section. Every year is checked against a recomputation from the numbers the
 // rows display, never against a literal, and its Quantity against the Amount popup of the same year.
@@ -3015,7 +3015,7 @@ test('plain file with one unknown CUSIP shows the skipped CUSIP message in #stat
   await expect(page.locator('#status')).not.toHaveClass(/error/);
 });
 
-// ── Index Ratio decimals in drills (5.0 §Index Ratio decimals in drills) ──────
+// ── Index Ratio decimals in drills (4.5.2 §Index Ratio decimals in drills) ──────
 // Nine decimals where the Index Ratio feeds Cost per TIPS, Accrued Interest or sale proceeds (unrounded);
 // five where it feeds Inflation-Adjusted Principal per TIPS, a coupon or a principal payment (Treasury's rule). Each row must
 // reproduce its result from the numbers shown.

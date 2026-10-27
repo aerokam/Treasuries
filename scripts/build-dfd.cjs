@@ -1020,7 +1020,7 @@ function level2TipsLadderManager() {
 
 // ── Level 3: TipsLadderManager 4.5 ──────────────────────────────────────────
 function level3TipsLadderManagerRender() {
-  const S = a => V('TipsLadderManager/knowledge/4.5_Render_And_Export.md' + (a ? '#' + a : ''));
+  const S = f => V('TipsLadderManager/knowledge/' + f);
   const M = a => V('knowledge/SharedModules.md' + (a ? '#' + a : ''));
   const modules = [
     { id: 'm6', name: ['drill.js'], href: M('m6') },
@@ -1028,12 +1028,12 @@ function level3TipsLadderManagerRender() {
     { id: 'm8', name: ['modal.js'], href: M('m8') },
   ];
   const procs = [
-    { id: '4.5.1', name: ['Render', 'ladder table'], href: S('render-ladder-table'), calls: [], out: { '4.5.2': ['ladder table'] } },
-    { id: '4.5.2', name: ['Show drill', 'popups'], href: S('show-drill-popups'), calls: ['m6', 'm7', 'm8'], out: {} },
-    { id: '4.5.3', name: ['Show trade', 'ticket'], href: S('show-trade-ticket'), calls: ['m6', 'm7', 'm8'], out: {} },
-    { id: '4.5.4', name: ['Show cash flow', 'calendar'], href: S('show-cash-flow-calendar'), calls: ['m6', 'm7', 'm8'], out: {} },
-    { id: '4.5.5', name: ['Export', 'ladder table'], href: S('export-ladder-table'), calls: [], out: {} },
-    { id: '4.5.6', name: ['Export holdings', 'and DARA plan'], href: S('export-holdings-and-dara-plan'), calls: [], out: {} },
+    { id: '4.5.1', name: ['Render', 'ladder table'], href: S('4.5.1_Render_Ladder_Table.md'), calls: [], out: { '4.5.2': ['ladder table'] } },
+    { id: '4.5.2', name: ['Show drill', 'popups'], href: S('4.5.2_Show_Drill_Popups.md'), calls: ['m6', 'm7', 'm8'], out: {} },
+    { id: '4.5.3', name: ['Show trade', 'ticket'], href: S('4.5.3_Show_Trade_Ticket.md'), calls: ['m6', 'm7', 'm8'], out: {} },
+    { id: '4.5.4', name: ['Show cash flow', 'calendar'], href: S('4.5.4_Show_Cash_Flow_Calendar.md'), calls: ['m6', 'm7', 'm8'], out: {} },
+    { id: '4.5.5', name: ['Export', 'ladder table'], href: S('4.5.5_Export_Ladder_Table.md'), calls: [], out: {} },
+    { id: '4.5.6', name: ['Export holdings', 'and DARA plan'], href: S('4.5.6_Export_Holdings_And_DARA_Plan.md'), calls: [], out: {} },
   ];
   const PR = 56, MR = 46, W = 1500, H = 1060;
   const px = { '4.5.1': 420, '4.5.2': 1220, '4.5.3': 420, '4.5.4': 420, '4.5.5': 420, '4.5.6': 420 };

@@ -16,7 +16,7 @@ Ladder Manager is process 4 on [Level 1](/knowledge/DFD_LEVEL1). Its [Level 2 di
 | 4.2 | [Import holdings and DARA plan](../TipsLadderManager/knowledge/4.2_Import_Holdings_And_DARA_Plan.md) | Reads the [Holdings File](./DATA_DICTIONARY.md#holdings-file) and the [DARA Plan File](./DATA_DICTIONARY.md#dara-plan-file) that the Import menu offers. |
 | 4.3 | [Build ladder](../TipsLadderManager/knowledge/4.3_Build_Ladder.md) | Builds a TIPS Ladder from a [DARA](./DATA_DICTIONARY.md#dara), a First Year and a Last Year. |
 | 4.4 | [Rebalance ladder](../TipsLadderManager/knowledge/4.4_Rebalance_Ladder.md) | Computes the trades that bring the holdings to the ladder, as [TIPS Ladder Rebalancing (3.0)](../TipsLadderManager/knowledge/3.0_TIPS_Ladder_Rebalancing.md) states. There is one rebalance. |
-| 4.5 | [Render and export](../TipsLadderManager/knowledge/4.5_Render_And_Export.md) | Draws the build and rebalance results, with the popups, the trade ticket and the cash flow calendar, and writes the Export menu files; [UI Schema (5.0)](../TipsLadderManager/knowledge/5.0_UI_Schema.md) and [Export (2.1)](../TipsLadderManager/knowledge/2.1_Export.md) state the detail. |
+| 4.5 | [Render and export](../TipsLadderManager/knowledge/4.5_Render_And_Export.md) | Draws the build and rebalance results, with the popups, the trade ticket and the cash flow calendar, and writes the Export menu files; one spec for each of its six processes. |
 | 4.6 | [Explore past markets](../TipsLadderManager/knowledge/4.6_Explore_Past_Markets.md) | Builds in the market of a past trading day (prototype). |
 
 ## Foundations

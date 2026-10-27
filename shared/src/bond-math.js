@@ -44,7 +44,7 @@ export function _nextCouponAfter(settle, mature) {
 
 // Full Macaulay-duration workings: coupon-date walk, day-count fractions, per-period cash
 // flows/PVs. calculateDuration/calculateMDuration are thin wrappers over this — single source
-// for both the final number and any UI that needs to show how it was derived (5.0 §Nested
+// for both the final number and any UI that needs to show how it was derived (4.5.2 §Nested
 // (Level-3) drills, gap/Future 30Y synthetic-duration drill-downs).
 // Returns null if inputs are degenerate (settlement >= maturity, yld <= -2, or no coupon dates).
 export function calculateDurationDetail(settlement, maturity, coupon, yld) {
@@ -141,7 +141,7 @@ function addSemiannualPeriods(date, n, matureDay) {
 
 // ─── Coupon payment schedule ──────────────────────────────────────────────────
 // All coupon dates from `settle` (inclusive) through `maturity` (inclusive) — the final
-// entry is also the principal repayment date. Spec: 5.0 §Cash Flow Calendar.
+// entry is also the principal repayment date. Spec: 4.5.4 §Cash Flow Calendar.
 export function couponSchedule(settle, maturity) {
   const nextCpn = _nextCouponOnOrAfter(settle, maturity);
   if (!nextCpn) return [];

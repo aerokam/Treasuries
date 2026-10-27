@@ -702,7 +702,7 @@ coverExcessCost_c = Future 30Y total cost × coverWeight_c
 
 <a id="cash-flow-calendar"></a>
 ### Cash Flow Calendar
-`Cash_Flow_Calendar` = *When a portfolio’s current holdings pay, and how much, by date. Independent of funded years, DARA, brackets, gaps and covers: a fact about the held CUSIPs and quantities rather than a ladder-construction result (5.0 §Cash Flow Calendar).*
+`Cash_Flow_Calendar` = *When a portfolio’s current holdings pay, and how much, by date. Independent of funded years, DARA, brackets, gaps and covers: a fact about the held CUSIPs and quantities rather than a ladder-construction result (4.5.4 §Cash Flow Calendar).*
 
 ---
 
@@ -922,7 +922,7 @@ Some values are true only until Treasury issues more TIPS. Left inline as approx
 - <a id="ladder-table"></a>**Ladder Table** = `{ Funded_Year_Group + { TIPS_Row } } + Totals_Row`
   *The table of the ladder shown, in Build or in Rebalance: the rows of the [Build Result](#build-result), or of the [Before-State Preview](#before-state-preview) and the [Rebalance Result](#rebalance-result), grouped by funded year, each group under a header row, with the totals row.*
 - <a id="ladder-export"></a>**Ladder Export** = `[ Ladder_CSV | Holdings_Export | DARA_Plan_File ]`
-  *A csv file the Export menu writes: the ladder table as shown, the [Holdings Export](#holdings-export-format) of the ladder, or the [DARA Plan File](#dara-plan-file). [2.1](../TipsLadderManager/knowledge/2.1_Export.md) specifies each.*
+  *A csv file the Export menu writes: the ladder table as shown, the [Holdings Export](#holdings-export-format) of the ladder, or the [DARA Plan File](#dara-plan-file). [4.5.6](../TipsLadderManager/knowledge/4.5.6_Export_Holdings_And_DARA_Plan.md#params-row) specifies each.*
 
 ### 6.6 CPI Explorer
 

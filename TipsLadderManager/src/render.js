@@ -37,7 +37,7 @@ export const COLS = [
     value: d => d.saYield, subValue: d => d.saYield,
     headerHTML: '<span style="visibility:hidden">.</span><br><span style="font-weight:normal;opacity:0.7">SA Yield</span>' },
   // Rebalance-only
-  // Excess sub-rows show no Amount (5.0 §Sub-Row Logic): the Amount of a gap year or a Future 30Y
+  // Excess sub-rows show no Amount (4.5.1 §Sub-Row Logic): the Amount of a gap year or a Future 30Y
   // year is on that year's group header row (summary.syntheticYearAmounts, renderGroupHeader). The
   // pre-Run Before-State Preview alone still sets excessAmtBefore on a flagged bracket candidate's
   // row (3.0 §Before-State Preview and Bracket-Year Excess Detection), and its sub-row shows that.
@@ -230,7 +230,7 @@ function daraInputHTML(fy, daraByYear, flaggedYears, gapSet, future30ySet) {
 }
 
 // Hover explainer for the Coupon Counting link — same [data-tip-html]/#bracket-tooltip mechanism the
-// funded-year bracket label uses (5.0 §Funded Year Group Header Row), applied directly to the link
+// funded-year bracket label uses (4.5.1 §Funded Year Group Header Row), applied directly to the link
 // itself rather than a separate icon, matching how the bracket label is both the content and the
 // hover target with no dedicated "?" affordance of its own.
 function rmdOptionsTipHTML() {
@@ -295,7 +295,7 @@ function renderGroupHeader(cols, fy, rows, isBracketGroup, mode, summary, daraBy
   for (const col of valueCols) {
     let agg = null, drillKey = null, drillRi = null;
     // A gap year or a Future 30Y year holds no TIPS row; its Amount comes from the summary and its
-    // drill is keyed by year (2.0 §Amount of a Gap Year and a Future 30Y Year; 5.0 §Popup Routing).
+    // drill is keyed by year (2.0 §Amount of a Gap Year and a Future 30Y Year; 4.5.2 §Popup Routing).
     const synthetic = col.fyLevel && rows.length === 0 ? syntheticYearAmountFor(summary, col.key, fy) : null;
     if (synthetic) {
       html += `<td class="drillable" data-year="${fy}" data-col="${SYNTHETIC_DRILL_KEY[col.key]}" style="text-align:right">${esc(fmtCell(synthetic.amount, col.fmt))}</td>`;

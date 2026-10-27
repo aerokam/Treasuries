@@ -1078,7 +1078,7 @@ console.log('\nBuild — RMD Options (settlement-year remaining-coupon LMI)');
 // ── Test: remainingCouponPaymentsThisYear — trade date (today) vs settlementDate (T+1) cutoff ──
 // A coupon due Saturday Aug 15 is paid on Monday Aug 17 (actualPaymentDate). A payment dated today is
 // paid today: maturity proceeds and coupons are in the account on the payment date, so on Aug 17 the
-// coupon is no longer a remaining coupon. The cutoff is today (5.0 §Cash Flow Calendar), not
+// coupon is no longer a remaining coupon. The cutoff is today (4.5.4 §Cash Flow Calendar), not
 // settlementDate, which is T+1: on Friday Aug 14, settlement is Monday Aug 17, and a cutoff at
 // settlementDate would drop a coupon that has not yet been paid.
 console.log('\nremainingCouponPaymentsThisYear — trade date vs settlementDate (T+1) cutoff');
@@ -2001,7 +2001,7 @@ console.log('\nparseParamsBlock — #params line');
   assert('params PLI=false', pOff?.preLadderInterest, false);
   assert('params maturityPref=last', pOff?.maturityPref, 'last');
 
-  // The picks of Select maturities (2.1 §`#params` row): written as year:cusip|cusip entries, read back as a Map; a year with no pick is `year:`.
+  // The picks of Select maturities (4.5.6 §`#params` row): written as year:cusip|cusip entries, read back as a Map; a year with no pick is `year:`.
   const pPicks = parseParamsBlock(['#params,preLadderInterest=false,maturityPref=select,maturityPicks=2027:912828V49|91282CEJ6;2028:9128283R9;2029:,couponPref=lower']);
   assert('params maturityPref=select with picks', pPicks?.maturityPref, 'select');
   assert('params picks of a year', pPicks?.maturityPicks?.get(2027)?.join(), '912828V49,91282CEJ6');
@@ -3662,7 +3662,7 @@ console.log('\nFuture 30Y Dur popup — cost-weighted average, computed match, c
 }
 
 // The list of years in the Gap Dur and Future 30Y Dur popups calculates each year's Quantity, Cost per TIPS and
-// Cost in the list itself (5.0 §Duration Disclosure Standards). Every number is read from the year's breakdown
+// Cost in the list itself (4.5.2 §Duration Disclosure Standards). Every number is read from the year's breakdown
 // entry, and each is checked here against a second derivation that does not use the code under test: the Quantity
 // from the quotient before rounding, the Cost per TIPS from the Price, the Index Ratio and the DD formula, the
 // LMI of a Future 30Y year from the annual interest of the later years, the Quantity against the Amount popup's

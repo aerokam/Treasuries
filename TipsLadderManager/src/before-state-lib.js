@@ -200,7 +200,7 @@ function heldQtyCostByYear(holdings, tipsMarketData, refCPI) {
 // no duration matching, no engine call whatsoever. After-side fields (araAfterTotal,
 // fundedYearQtyAfter, excessQtyAfter, fundedYearQtyDelta, excessQtyDelta, ...) are simply never
 // set, so render.js's existing null-safe formatting renders those columns blank
-// (5.0 §COLS Schema, fyLevel/drillCond null handling already supports this — no render.js change
+// (4.5.1 §COLS Schema, fyLevel/drillCond null handling already supports this — no render.js change
 // needed for the "hide After columns pre-Run" behavior itself).
 //
 // `daraByYear` (optional Map<year, number>) supplies the CURRENT per-year DARA store so a flagged
@@ -254,7 +254,7 @@ export function computeBeforeState({ holdings, tipsMarketData, refCPI, firstYear
       continue;
     }
 
-    // Popup breakdown for the Amount Before drill (5.0 §Popup Routing `amtBefore`; drill.js reads
+    // Popup breakdown for the Amount Before drill (4.5.2 §Popup Routing `amtBefore`; drill.js reads
     // `d.araBeforeHoldings` / `d.araBeforeLaterMatInt` off whichever row the group header's
     // fyLevel aggregation picks — build it once per year and attach to every row in the group so
     // it's there regardless of which row ends up "first").
@@ -281,7 +281,7 @@ export function computeBeforeState({ holdings, tipsMarketData, refCPI, firstYear
     const araBeforeLaterMatInt = rawARA - ownSum;
 
     // Flagged-year funded/excess qty & cost split (3.0 §Before-State Preview "Qty Before / Cost
-    // Before split for a flagged year"; 5.0 §Bracket-Year Excess Flag). Only a flagged year's split
+    // Before split for a flagged year"; 4.5.1 §Bracket-Year Excess Flag). Only a flagged year's split
     // differs from the plain "full held qty is the funded figure" rule every other year uses — the
     // SAME LMI-based DARA→qty conversion this app already uses for empty rungs (3.0 §Intentional
     // empty rungs: `round((DARA − LMI) / piPerBond)`), applied against the flagged CUSIP's own
