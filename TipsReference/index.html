@@ -166,7 +166,7 @@
 // Ref CPI logic is imported from the single shared home (no-redundancy directive,
 // projects/CLAUDE.md §2a) — never copied inline. lookupRefCpi is exact-date match
 // (null beyond the published range; no snap-back).
-import { lookupRefCpi, indexRatio, TREASURY_ROUNDING } from '../shared/src/ref-cpi.js';
+import { lookupRefCpi, indexRatio, TREASURY_ROUNDING, NO_ROUNDING } from '../shared/src/ref-cpi.js';
 // Duration + coupon-date helpers from the single shared bond-math home (no inline copies).
 import { calculateDuration, calculateMDuration, termYears, accruedInterestAdjusted, _nextCouponOnOrAfter } from '../shared/src/bond-math.js';
 // Shared date picker (the canonical native type=date; projects/CLAUDE.md §2a).
@@ -288,7 +288,9 @@ function recomputeWithRefCpi(dateStr) {
     // selected Ref CPI Date.
     var rowCpi = isMatured ? lookupRefCpi(refCpiRows, r.maturity) : cpi;
     r.indexRatio = indexRatio(rowCpi, r.datedDateRefCpi, TREASURY_ROUNDING);
-    r.adjPrice = (r.indexRatio != null && r.price != null) ? r.price * r.indexRatio : null;
+    // Adj Price is a broker's adjusted price, which does not round the Index Ratio (DD Index Ratio).
+    var adjIR = indexRatio(rowCpi, r.datedDateRefCpi, NO_ROUNDING);
+    r.adjPrice = (adjIR != null && r.price != null) ? r.price * adjIR : null;
 
     // Cpn Date / Cpn Date IR / Adj Cpn/$1K: if today is the effective (weekend/holiday-rolled)
     // payment date of this bond's next-or-final coupon, show that realized payment
