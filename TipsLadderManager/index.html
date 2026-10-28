@@ -732,7 +732,7 @@ import { buildDrillHTML, buildDurationPopupRows, buildWeightedDurationPopupRows,
 import { showPopup, hidePopup } from './src/popup.js';
 import { makeDraggableResizable } from './src/modal.js';
 import { rankForYear } from './src/allocation-policy.js';
-import { accruedInterest, bondCalcs, couponSchedule } from '../shared/src/bond-math.js';
+import { accruedInterest, accruedInterestAdjusted, bondCalcs, couponSchedule } from '../shared/src/bond-math.js';
 import { loadMarketData, lookupRefCpi, nextBondTradingDay, parseFedInvestTipsRows } from '../shared/src/market-data.js';
 import { termYears } from '../shared/src/bond-math.js';
 import { indexRatio, NO_ROUNDING } from '../shared/src/ref-cpi.js';
@@ -1949,7 +1949,9 @@ function _ttRowCost(d, qty) {
   const { accrued, A, E } = bond?.maturity
     ? accruedInterest(d.coupon ?? 0, ttSettlementDate, bond.maturity)
     : { accrued: 0, A: 0, E: 0 };
-  const accruedPerBond = accrued / 100 * (d.indexRatio ?? 0) * 1000;
+  const accruedPerBond = bond?.maturity
+    ? accruedInterestAdjusted(d.coupon ?? 0, ttSettlementDate, bond.maturity, lookupRefCpi(refCpiRows, _defaultRefCpiDateStr), bond.datedDateRefCpi) ?? 0
+    : 0;
   const cost = qty * (d.costPerBond ?? 0);
   const rowAccruedInterest = qty * accruedPerBond;
   return {

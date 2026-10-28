@@ -3016,8 +3016,8 @@ test('plain file with one unknown CUSIP shows the skipped CUSIP message in #stat
 });
 
 // ── Index Ratio decimals in drills (4.5.2 §Index Ratio decimals in drills) ──────
-// Nine decimals where the Index Ratio feeds Cost per TIPS, Accrued Interest or sale proceeds (unrounded);
-// five where it feeds Inflation-Adjusted Principal per TIPS, a coupon or a principal payment (Treasury's rule). Each row must
+// Nine decimals where the Index Ratio feeds Cost per TIPS or sale proceeds (unrounded);
+// five where it feeds Inflation-Adjusted Principal per TIPS, a coupon, a principal payment or Accrued Interest (Treasury's rule). Each row must
 // reproduce its result from the numbers shown.
 async function labelValueRows(scope) {
   return scope.locator('tr').evaluateAll(trs => trs.map(tr => {

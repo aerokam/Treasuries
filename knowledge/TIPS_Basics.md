@@ -93,9 +93,9 @@ costPerBond = price/100 × indexRatio × 1,000
 ```
 
 **[Accrued Interest](./DATA_DICTIONARY.md#accrued-interest-adjusted):**
-Extends [Bond Basics §Accrued Interest](./Bond_Basics.md) the same way Inflation-Adjusted Principal extends [Par](./DATA_DICTIONARY.md#par): take the nominal accrued interest per $100 par (Actual/Actual day count, the A/E convention of Yield Calculation Conventions and Duration below) and apply the Index Ratio.
+Extends [Bond Basics §Accrued Interest](./Bond_Basics.md) the same way Inflation-Adjusted Principal extends [Par](./DATA_DICTIONARY.md#par): take the nominal accrued interest per $100 par (Actual/Actual day count, the A/E convention of Yield Calculation Conventions and Duration below) and apply the Index Ratio, rounded as [Inflation-Adjusted Principal](./DATA_DICTIONARY.md#inflation-adjusted-principal) states, because Treasury rounds the Index Ratio in every calculation that depends on it.
 ```
-accruedPerBond = accruedInterestNominal / 100 × indexRatio × 1,000   // real dollars per bond
+accruedPerBond = round5(accruedInterestNominal / 100 × indexRatio × 1,000)   // real dollars per bond, to 5 decimal places
 ```
 Total settlement cost to acquire a TIPS = Cost per TIPS + Accrued Interest.
 

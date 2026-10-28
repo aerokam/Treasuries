@@ -474,7 +474,7 @@ For nominal Treasuries, 31 CFR §356.2 applies: *"Dated date means the date from
 ### Index Ratio
 `Index_Ratio` = `Ref_CPI_settle / Ref_CPI_dated`
 
-*Not rounded. [Inflation-Adjusted Principal](#inflation-adjusted-principal) uses it truncated to six decimal places, then rounded to five.*
+*Treasury truncates the Index Ratio to six decimal places and rounds it to five in every calculation it makes ([31 CFR 356 Appendix B](./31_CFR_356_Definitions_And_Formulas.md)), so every amount that depends on Treasury uses it so rounded: the [Inflation-Adjusted Principal](#inflation-adjusted-principal), the principal and interest payments, and, by inference, the [Accrued Interest (Adjusted)](#accrued-interest-adjusted). Brokers do not round it in the adjusted prices they state, so the [Adjusted Price](#adjusted-price) and the [Cost per TIPS](#cost-per-tips) use it unrounded.*
 
 <a id="inflation-adjusted-principal"></a>
 ### Inflation-Adjusted Principal
