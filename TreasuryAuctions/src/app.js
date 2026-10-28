@@ -5,13 +5,13 @@ import { createDateRangeFilter } from '../../shared/src/date-range-filter.js';
 const R2_CSV_URL = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/Auctions.csv';
 
 const UPCOMING_BASE_URL =
-  'https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v1/accounting/od/upcoming_auctions' +
-  '?format=csv&fields=cusip,announcemt_date,auction_date,issue_date,security_term,security_type,reopening' +
-  '&sort=announcemt_date,auction_date';
+  'https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v1/accounting/od/upcoming_auctions_v2' +
+  '?format=csv&fields=cusip,announcemt_date,comp_auction_close_date,issue_date,security_term,security_type,reopening' +
+  '&sort=announcemt_date,comp_auction_close_date';
 
 function upcomingUrl() {
   const today = new Date().toISOString().substring(0, 10);
-  return `${UPCOMING_BASE_URL}&filter=auction_date:gte:${today}`;
+  return `${UPCOMING_BASE_URL}&filter=comp_auction_close_date:gte:${today}`;
 }
 
 // ── Default column sets per view ──────────────────────────────────────────────
@@ -22,23 +22,23 @@ function upcomingUrl() {
 const DEFAULT_COLS = {
   bills: [
     'cusip', 'security_term', 'original_security_term', 'maturity_date',
-    'auction_date', 'issue_date', 'high_investment_rate', 'high_price',
+    'comp_auction_close_date', 'issue_date', 'investment_rate', 'high_price',
   ],
   notesbonds: [
     'cusip', 'security_term', 'original_security_term', 'maturity_date',
-    'auction_date', 'issue_date', 'high_yield', 'int_rate', 'high_price',
-    'inflation_index_security',
+    'comp_auction_close_date', 'issue_date', 'high_yield', 'int_rate', 'high_price',
+    'inflation_protected',
   ],
   tips: [
     'cusip', 'security_term', 'original_security_term', 'maturity_date',
-    'auction_date', 'issue_date', 'dated_date', 'high_yield', 'int_rate',
+    'comp_auction_close_date', 'issue_date', 'dated_date', 'high_yield', 'int_rate',
     'unadj_price', 'index_ratio_on_issue_date', 'adj_price',
-    'ref_cpi_on_dated_date', 'ref_cpi_on_issue_date',
+    'ref_cpi_on_orig_dated_date', 'ref_cpi_on_issue_date',
   ],
   all: [
-    'cusip', 'security_type', 'inflation_index_security', 'security_term',
-    'original_security_term', 'maturity_date', 'auction_date', 'issue_date',
-    'high_yield', 'int_rate', 'high_investment_rate', 'high_price',
+    'cusip', 'security_type', 'inflation_protected', 'security_term',
+    'original_security_term', 'maturity_date', 'comp_auction_close_date', 'issue_date',
+    'high_yield', 'int_rate', 'investment_rate', 'high_price',
   ],
 };
 
@@ -46,36 +46,32 @@ const DEFAULT_COLS = {
 const VIEW_FILTER = {
   all:       null,
   bills:     r => r.security_type === 'Bill',
-  notesbonds:r => r.security_type !== 'Bill' && r.inflation_index_security !== 'Yes',
-  tips:      r => r.inflation_index_security === 'Yes',
+  notesbonds:r => r.security_type !== 'Bill' && r.inflation_protected !== 'Yes',
+  tips:      r => r.inflation_protected === 'Yes',
 };
 
 // ── Pretty column labels ──────────────────────────────────────────────────────
 const FIELD_LABELS = {
   cusip: 'CUSIP', security_type: 'Type', security_term: 'Term',
   announcemt_date: 'Announced', dated_date: 'Dated Date',
-  auction_date: 'Auction Date', issue_date: 'Issue Date',
+  comp_auction_close_date: 'Auction Date', issue_date: 'Issue Date',
   maturity_date: 'Maturity', original_security_term: 'Orig Term',
-  int_rate: 'Coupon', high_investment_rate: 'High Inv Rate',
+  int_rate: 'Coupon', investment_rate: 'High Inv Rate',
   high_yield: 'High Yield', low_yield: 'Low Yield',
-  avg_med_yield: 'Avg/Med Yield', avg_med_investment_rate: 'Avg/Med Inv Rate',
-  high_price: 'High Price', low_price: 'Low Price', avg_med_price: 'Avg/Med Price',
-  accrued_int_per1000: 'Accrued/$1K', reopening: 'Reopen',
-  inflation_index_security: 'TIPS', closing_time_comp: 'Close Time (Comp)',
-  closing_time_noncomp: 'Close Time (Noncomp)',
+  high_price: 'High Price', low_price: 'Low Price', reopening: 'Reopen',
+  inflation_protected: 'TIPS', comp_auction_close_time: 'Close Time (Comp)',
+  noncomp_auction_close_time: 'Close Time (Noncomp)',
   unadj_price: 'Unadj Price', adj_price: 'Adj Price',
-  offering_amt: 'Offering Amt', adj_accrued_int_per1000: 'Adj Accrued/$1K',
-  ref_cpi_on_dated_date: 'Ref CPI (Dated)', ref_cpi_on_issue_date: 'Ref CPI (Issue)',
+  offering_amt: 'Offering Amt',
+  ref_cpi_on_orig_dated_date: 'Ref CPI (Dated)', ref_cpi_on_issue_date: 'Ref CPI (Issue)',
   index_ratio_on_issue_date: 'Index Ratio',
   bid_to_cover_ratio: 'Bid/Cover',
-  comp_accepted: 'Comp Accepted', comp_tendered: 'Comp Tendered',
-  noncomp_accepted: 'Noncomp Accepted', noncomp_tendered: 'Noncomp Tendered',
-  total_accepted: 'Total Accepted', total_tendered: 'Total Tendered',
-  primary_dealer_accepted: 'Primary Dealer Acc', primary_dealer_tendered: 'Primary Dealer Ten',
-  direct_bidder_accepted: 'Direct Bidder Acc', direct_bidder_tendered: 'Direct Bidder Ten',
-  indirect_bidder_accepted: 'Indirect Bidder Acc', indirect_bidder_tendered: 'Indirect Bidder Ten',
+  subtot_comp_inside_awrd: 'Comp Accepted', subtot_comp_inside_recog: 'Comp Tendered',
+  grand_total_par_awarded: 'Total Accepted', grand_total_par_recog: 'Total Tendered',
+  prim_deal_comp_par_awarded: 'Primary Dealer Acc', prim_deal_comp_par_recog: 'Primary Dealer Ten',
+  dir_bid_comp_par_awarded: 'Direct Bidder Acc', dir_bid_comp_par_recog: 'Direct Bidder Ten',
+  indir_bid_comp_par_awarded: 'Indirect Bidder Acc', indir_bid_comp_par_recog: 'Indirect Bidder Ten',
   frn_index_determination_date: 'FRN Index Date', frn_index_determination_rate: 'FRN Index Rate',
-  lut_dt: 'Last Updated',
 };
 
 function fieldLabel(f) {
@@ -99,10 +95,10 @@ function detectFmt(f) {
   if (f === 'bid_to_cover_ratio') return 'num2';
   if (f.includes('ratio')) return 'num5';
   if (f.endsWith('_date') || f.endsWith('_dt')) return 'date';
+  if (['amt', 'amount', 'awarded', 'awrd', 'recog', 'accepted', 'tendered'].some(w => f.includes(w))) return 'amt';
+  if (['pct', 'threshold', 'increm'].some(w => f.includes(w))) return null;
   if (f.includes('_rate') || f.includes('_yield')) return 'pct3';
-  if (f.includes('price')) return 'num6';
-  if (f.includes('accrued')) return 'num6';
-  if (f.includes('amt') || f.includes('accepted') || f.includes('tendered')) return 'amt';
+  if (f.includes('price') || f.includes('accrued')) return 'num6';
   return null;
 }
 
@@ -498,7 +494,7 @@ function renderBody(cols) {
   const tbody = document.getElementById('mainTbody');
   let band = 0, lastDate = null;
   tbody.innerHTML = displayRows.map(r => {
-    const d = r.auction_date || '';
+    const d = r.comp_auction_close_date || '';
     if (d !== lastDate) { lastDate = d; band = 1 - band; }
     const cls = band === 1 ? ' class="row-band-b"' : '';
     return `<tr${cls}>${cols.map(f => {
@@ -544,11 +540,11 @@ function renderUpcoming(csvText) {
   // Cross-reference with Tentative Schedule and the CUSIPs of past TIPS auctions to identify TIPS.
   // A reopening states a different security_term than the Tentative Schedule, but carries the CUSIP of the original issue.
   const tipsCusips = new Set(
-    allData.filter(a => a.inflation_index_security === 'Yes' && a.cusip).map(a => a.cusip)
+    allData.filter(a => a.inflation_protected === 'Yes' && a.cusip).map(a => a.cusip)
   );
-  const extendedHeaders = [...headers, 'inflation_index_security'];
+  const extendedHeaders = [...headers, 'inflation_protected'];
   rows.forEach(r => {
-    const rDate = (r.auction_date || '').trim();
+    const rDate = (r.comp_auction_close_date || '').trim();
     const rTerm = (r.security_term || '').toLowerCase().trim();
     const isActuallyTips = (r.security_type || '').toLowerCase().includes('tips');
     const isKnownTipsCusip = !!r.cusip && tipsCusips.has(r.cusip);
@@ -559,20 +555,20 @@ function renderUpcoming(csvText) {
       return tDate === rDate && tTerm === rTerm && t.tips === 'Yes';
     });
 
-    r.inflation_index_security = (isActuallyTips || isTentativeTips || isKnownTipsCusip) ? 'Yes' : 'No';
+    r.inflation_protected = (isActuallyTips || isTentativeTips || isKnownTipsCusip) ? 'Yes' : 'No';
   });
 
   thead.innerHTML = extendedHeaders.map(f => `<th>${fieldLabel(f)}</th>`).join('');
   let band = 0, lastDate = null;
   tbody.innerHTML = rows.map(r => {
-    const d = r.auction_date || '';
+    const d = r.comp_auction_close_date || '';
     if (d !== lastDate) { lastDate = d; band = 1 - band; }
     const cls = band === 1 ? ' class="row-band-b"' : '';
     return `<tr${cls}>${extendedHeaders.map(f => {
       const val = r[f];
       const fmt = detectFmt(f);
       let cellClass = '';
-      if (f === 'inflation_index_security' && val === 'Yes') {
+      if (f === 'inflation_protected' && val === 'Yes') {
         cellClass = ' style="color:#059669;font-weight:600;"';
       }
       return `<td${cellClass}>${fmtVal(val, fmt)}</td>`;

@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 test('Historical table headers are sticky vertically and first column is sticky horizontally', async ({ page }) => {
   // Mock the CSV data
   await page.route('**/Auctions.csv', route => {
-    let csv = 'cusip,security_type,security_term,announcemt_date,dated_date,auction_date,issue_date,maturity_date,int_rate,high_yield,high_price\n';
+    let csv = 'cusip,security_type,security_term,announcemt_date,dated_date,comp_auction_close_date,issue_date,maturity_date,int_rate,high_yield,high_price\n';
     for (let i = 0; i < 200; i++) {
       csv += `CUSIP${i},Bill,${i % 10} Day,2026-01-01,2026-01-01,2026-01-01,2026-01-01,2026-02-01,0.0${i},0.0${i},100.00\n`;
     }
@@ -11,7 +11,7 @@ test('Historical table headers are sticky vertically and first column is sticky 
   });
 
   await page.route('**/upcoming_auctions**', route => {
-    route.fulfill({ status: 200, contentType: 'text/csv', body: 'cusip,announcemt_date,auction_date,issue_date,security_term,security_type,reopening\nC123,2026-04-01,2026-04-05,2026-04-07,13-Week,Bill,No' });
+    route.fulfill({ status: 200, contentType: 'text/csv', body: 'cusip,announcemt_date,comp_auction_close_date,issue_date,security_term,security_type,reopening\nC123,2026-04-01,2026-04-05,2026-04-07,13-Week,Bill,No' });
   });
 
   await page.goto('/TreasuryAuctions/');

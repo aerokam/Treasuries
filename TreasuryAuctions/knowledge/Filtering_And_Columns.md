@@ -15,9 +15,10 @@ The Historical Auctions table and the Tentative Schedule table format their valu
   | is `bid_to_cover_ratio` | 2 decimal places |
   | contains `ratio` | 5 decimal places |
   | ends with `_date` or `_dt` | mm/dd/yyyy |
+  | contains `amt`, `amount`, `awarded`, `awrd`, `recog`, `accepted` or `tendered` | the number with thousands separators |
+  | contains `pct`, `threshold` or `increm` | as stored |
   | contains `_rate` or `_yield` | 3 decimal places followed by % |
   | contains `price` or `accrued` | 6 decimal places |
-  | contains `amt`, `accepted` or `tendered` | the number with thousands separators |
   | any other | as stored |
 
 - Show a value that is not a number as stored. Show an empty value as blank.

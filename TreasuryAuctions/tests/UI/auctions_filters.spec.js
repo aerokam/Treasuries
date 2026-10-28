@@ -1,10 +1,10 @@
 import { test, expect } from '@playwright/test';
 
 // Every fetch the page makes is mocked: Auctions.csv and the Tentative schedule XML (R2), and the
-// upcoming_auctions feed (FiscalData).
+// upcoming_auctions_v2 feed (FiscalData).
 
 const AUCTIONS_CSV = [
-  'cusip,security_type,security_term,auction_date,issue_date,maturity_date,inflation_index_security,high_yield',
+  'cusip,security_type,security_term,comp_auction_close_date,issue_date,maturity_date,inflation_protected,high_yield',
   'HIST0001,Note,10-Year,2026-10-08,2026-10-15,2036-10-15,No,4.100',
   'HIST0002,Note,5-Year,2026-10-15,2026-10-20,2031-10-20,No,3.900',
   'HIST0003,Note,2-Year,2026-10-15,2026-10-20,2028-10-20,No,3.700',
@@ -12,7 +12,7 @@ const AUCTIONS_CSV = [
   'TIPSCUS1,Note,10-Year,2026-07-16,2026-07-31,2036-07-15,Yes,1.900',
 ].join('\n') + '\n';
 
-const UPCOMING_HEADER = 'cusip,announcemt_date,auction_date,issue_date,security_term,security_type,reopening';
+const UPCOMING_HEADER = 'cusip,announcemt_date,comp_auction_close_date,issue_date,security_term,security_type,reopening';
 const UPCOMING_CSV = [
   UPCOMING_HEADER,
   // TIPS reopening: term differs from the Tentative schedule, CUSIP is that of a TIPS in Auctions.csv
