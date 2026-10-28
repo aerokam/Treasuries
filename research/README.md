@@ -11,5 +11,8 @@ existing one here if it resurfaces.
 
 ## Index
 
+- [auction-results-source](auction-results-source/README.md) — which source states the auction
+  results S5 holds: `auctions_query`, `treasury_securities_auctions_v2` or TreasuryDirect.
+  Result: v2 and TreasuryDirect state one field set; v2's delay after the close is open.
 - [tips-deflation-floor](tips-deflation-floor/README.md) — has any TIPS matured with an index
   ratio below 1.0. Result: no. Output: `TIPS/TipsIndexRatioAtMaturity.csv` in R2.
