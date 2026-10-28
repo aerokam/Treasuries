@@ -1,6 +1,6 @@
 # Migration of Auction results (S5) to the treasury_securities_auctions_v2 field names
 
-**Premise:** [FiscalData (E3)](../../knowledge/DATA_DICTIONARY.md#e3) stays the source of [Auction results (S5)](../../knowledge/DATA_DICTIONARY.md#s5); one set of column names, the `treasury_securities_auctions_v2` names, for every row; no value S5 holds is lost. The findings behind each step are in [README.md](README.md), and the field-by-field mapping is [field-map.csv](field-map.csv).
+**Premise:** [FiscalData (E3)](../../knowledge/DATA_DICTIONARY.md#e3) stays the source of [Auction results (S5)](../../knowledge/DATA_DICTIONARY.md#s5); one set of column names, the `treasury_securities_auctions_v2` names, for every row; no value of a column the new table names is lost. The findings behind each step are in [README.md](README.md), and the field-by-field mapping is [field-map.csv](field-map.csv).
 
 **S5 today** (measured 2026-10-28): 11,162 rows, 1980-01-02 to 2026-10-28, 114 columns under the `auctions_query` names. `treasury_securities_auctions_v2` states 367 auctions from 2025-12-29, so it cannot replace the history: S5 is the only store that holds the auctions before 2025-12-29, and it stays the only one.
 
@@ -16,10 +16,10 @@
 
 ## Steps
 
-1. **Copy S5 as it is.** Write `Treasuries/Auctions.csv` to a dated R2 key and to a local file. Every later step can be rerun from that copy.
+1. **Copy S5 as it is.** Write `Treasuries/Auctions.csv` to a dated R2 object and to a local file. Every later step can be rerun from that copy.
 2. **Write the conversion once, in `shared/src/auction-results.js`.** One function turns an old-named row into a new-named row, using [field-map.csv](field-map.csv):
    - 55 same-name columns and 41 renamed columns: copy the value.
-   - `*_per100` and `*_per1000`: write the amount to the one new column and the face amount (100 or 1000) to its `*_per_amt` column.
+   - `*_per100` and `*_per1000`: write the amount to the one new column and the face amount (100 or 1000) to its per-amount column. `accrued_int_per100` and `accrued_int_per1000` become `accrued_int`, `adj_accrued_int_per1000` becomes `adj_accrued_int` and `unadj_accrued_int_per1000` becomes `unadj_accrued_int`, and the three share the one column `accrued_int_per_amount`. A reader of an amount divides by its per-amount column and multiplies by the face amount it wants.
    - `allocation_pctage`: write it to the rate, yield or discount margin column, by which of `high_rate`, `high_yield` and `high_discnt_margin` the row states.
    - each `avg_med_*`: write it to the median column when `pricing_method` is `Single-Price`, to the average column otherwise.
    - `security_term_day_month` and `security_term_week_year`: write the number to the day, month, week or year column its unit names.
@@ -33,7 +33,7 @@
    - for the old rows with `noncomp_accepted` stated, total less competitive, FIMA and SOMA awarded equals it, so dropping the column loses nothing.
    Stop here for review of the audit.
 5. **Read all 367 auctions of the new table once and merge them over the converted rows.** The new table's value replaces the converted value where it states one; the converted value stays where the new table states `null` (the close times, 365 of 367). This adds the 67 columns the old table never had to the auctions from 2025-12-29, and adds the auctions announced and not yet held. Auctions before 2025-12-29 keep `null` in those columns, because no source states them.
-6. **Columns with no new name.** `comp_tenders_accepted`, `first_int_payment_date`, `tint_cusip_1`, `tint_cusip_2` and `treas_retail_accepted` hold values for the old auctions and have no field in the new table. They stay as columns under their old names, `null` for every auction from 2025-12-29, so no value is lost. (Decision 2.)
+6. **Columns with no new name are dropped.** `comp_tenders_accepted`, `first_int_payment_date`, `tint_cusip_1`, `tint_cusip_2` and `treas_retail_accepted` hold values for the old auctions and have no field in the new table. No app, job or test reads them (searched 2026-10-28). Their values stay in the copy of step 1 and not in S5. (Decision 2, ruled.)
 7. **Change the ingestion job ([1.4](../../knowledge/1.4_Fetch_Auction_Results.md)).**
    - Read the new table for the auctions of the last N days (decision 1) on every run, and merge by CUSIP and auction date, so FiscalData's later corrections to a recent auction are taken.
    - Drop the read from 1980. The new table cannot supply it, so a missing S5 is an error to restore from the copy of step 1.
@@ -45,7 +45,7 @@
 
 ## Decisions
 
-1. **N, the number of days the job re-reads.** Today's job reads 30. FiscalData has corrected nothing yet that we can see, so there is no measured basis for a longer period; 30 days keeps today's value.
-2. **The 5 columns with no new name:** keep under their old names (step 6), or drop. Keeping loses nothing.
-3. **TreasuryDirect:** keep the fill until the new table's delay is measured on 2026-10-29, or remove it now.
-4. **Publish without a mismatch between app and file:** write the converted S5 to a new R2 key and point the app at it (no moment when the app and the file disagree; the old key is deleted afterwards), or replace `Treasuries/Auctions.csv` and push the app within minutes of each other.
+1. **N, the number of days the job re-reads:** 30, as today. Ruled.
+2. **The 5 columns with no new name:** dropped (step 6). Ruled.
+3. **TreasuryDirect:** open. The developer expects it is not needed. 1.4 added the fill because the old table stated no results for days after a close (measured 2026-10-21), which the endpoint freeze does not explain, so the new table's delay (the Open item of the README) decides it.
+4. **Publish without a mismatch between app and file:** write the converted S5 to a new R2 object and point the app at it (no moment when the app and the file disagree; the old object is deleted afterwards), or replace the object `Treasuries/Auctions.csv` and push the app within minutes of each other. Open.
