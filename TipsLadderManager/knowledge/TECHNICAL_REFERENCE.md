@@ -66,3 +66,17 @@ For drill-down purposes, the code splits ARA into components:
 - `d.araAfterPrincipal`: (Quantity * Adjusted Principal)
 - `d.araAfterOwnCoupon`: the [Last-Year Interest](../../knowledge/DATA_DICTIONARY.md#last-year-interest) of the Quantity
 - `d.araAfterLaterMatInt`: Sum of LMI from already-processed rungs.
+
+## Names in `build-lib.js` and `rebalance-lib.js`
+
+`build-lib.js` and `rebalance-lib.js` use one name per concept:
+
+| Concept | Name |
+|---|---|
+| Lower bracket year modified duration | `lowerDuration` |
+| Upper bracket year modified duration | `upperDuration` |
+| Lower [Bracket Weight](../../knowledge/DATA_DICTIONARY.md#bracket-weight) | `lowerWeight` |
+| Upper Bracket Weight | `upperWeight` |
+| [Funded Year](../../knowledge/DATA_DICTIONARY.md#funded-year) quantity | `fundedYearQty` |
+| [Cost per TIPS](../../knowledge/DATA_DICTIONARY.md#cost-per-tips) | `costPerBond` |
+| [Excess TIPS](../../knowledge/DATA_DICTIONARY.md#excess-tips) quantity | `excessQty` |

@@ -23,7 +23,7 @@ Ladder Manager is process 4 on [Level 1](/knowledge/DFD_LEVEL1). Its [Level 2 di
 
 - [Bond Ladders (1.0)](../TipsLadderManager/knowledge/1.0_Bond_Ladders.md): the concepts of any ladder, nominal or TIPS.
 - [TIPS Ladders (2.0)](../TipsLadderManager/knowledge/2.0_TIPS_Ladders.md): Build, with the Gap Years and the Future 30Y years.
-- [Computation Modules (4.0)](../TipsLadderManager/knowledge/4.0_Computation_Modules.md): the functions the processes call.
+- [Shared Modules](./SharedModules.md): the functions that more than one process calls.
 - [Data Pipeline (3.1)](../TipsLadderManager/knowledge/3.1_Data_Pipeline.md): the sources `loadMarketData()` chooses between.
 - [Bond Basics](./Bond_Basics.md) and [TIPS Basics](./TIPS_Basics.md): the formulas shared by every app.
 

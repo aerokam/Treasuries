@@ -1,6 +1,6 @@
 // bond-math.js — Core financial math for TIPS and nominal Treasuries.
 // Pure per-unit calculations ($1,000 face value).
-// Spec: ../knowledge/TIPS_Basics.md, knowledge/4.0_Computation_Modules.md §bond-math.js
+// Spec: ../knowledge/TIPS_Basics.md, knowledge/SharedModules.md §M3
 
 import { indexRatio as calcIndexRatio, TREASURY_ROUNDING, NO_ROUNDING } from './ref-cpi.js';
 
@@ -106,7 +106,7 @@ export function cashflowSchedule(settlement, maturity, coupon) {
 }
 
 // ─── Per-unit quantities ($1,000 face) ──────────────────────────────────────
-// Spec: 2.1 TIPS Basics, TipsLadderManager/knowledge/4.0_Computation_Modules.md §bondCalcs
+// Spec: 2.1 TIPS Basics, knowledge/SharedModules.md §bondCalcs
 // security: { coupon, datedDateRefCpi, price, maturity: Date }
 // indexRatio is unrounded and prices what is traded (costPerBond). paymentIndexRatio is the
 // Index Ratio under Treasury's rule and gives the amounts Treasury pays or calculates
@@ -182,7 +182,7 @@ export function termYears(settle, maturity) {
 }
 
 // ─── Accrued interest (actual/actual day count) ───────────────────────────────
-// Spec: 1.0 Bond Basics §Accrued Interest, 4.0 Computation Modules §accruedInterest
+// Spec: 1.0 Bond Basics §Accrued Interest, SharedModules M3 §accruedInterest
 // Prorates the current coupon period by days elapsed since the last coupon date.
 // Returns accrued interest per $100 par (nominal — no index ratio applied), plus
 // the day-count components (A = days since last coupon, E = days in period).

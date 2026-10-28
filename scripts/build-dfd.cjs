@@ -1278,7 +1278,7 @@ function level3TipsLadderManagerBuild() {
   return page({
     title: 'TipsLadderManager 4.3 — Level 3', h1: 'Level 3 &mdash; TipsLadderManager 4.3 Build ladder', maxWidth: W,
     up: 'DFD_LEVEL2_TIPSLADDERMANAGER.html', upLabel: 'Level 2 — TipsLadderManager', svg: P.join(NL),
-    notes: ['  M5 (ladder-core.js)\'s own sizing algorithm is specified at 2.0 TIPS Ladders, not in SharedModules.md or here — see DFD_Worklist.md item 27.',
+    notes: ['  M5 (ladder-core.js) is specified in <a href="' + M('m5') + '">SharedModules.md</a>, and the rules it applies in 2.0 TIPS Ladders.',
       '  Built in tandem with 4.4 Rebalance ladder, since both call the same shared sizing engine (ladder-core.js, M5) rather than each carrying its own copy.',
       '  The amber circles are shared modules (<a href="' + M() + '">SharedModules.md</a>), not process steps of this diagram.'].join(NL)
   });
@@ -1291,17 +1291,19 @@ function level3TipsLadderManagerRebalance() {
   const modules = [
     { id: 'm5', name: ['ladder-', 'core.js'], href: M('m5') },
     { id: 'm3', name: ['bond-math.js'], href: M('m3') },
+    { id: 'm9', name: ['gap-math.js'], href: M('m9') },
+    { id: 'm10', name: ['shape-math.js'], href: M('m10') },
   ];
   const procs = [
-    { id: '4.4.1', name: ['Derive per-year', 'DARA from', 'holdings or', 'DARA plan'], href: S('derive-per-year-dara-from-holdings-or-dara-plan'), calls: [], out: { '4.4.3': ['per-year DARA'] } },
-    { id: '4.4.2', name: ['Preview before-', 'state'], href: S('preview-before-state'), calls: [], out: {} },
-    { id: '4.4.3', name: ['Rebalance the', 'ladder'], href: S('rebalance-the-ladder'), calls: ['m5', 'm3'], out: {} },
+    { id: '4.4.1', name: ['Derive per-year', 'DARA from', 'holdings or', 'DARA plan'], href: S('derive-per-year-dara-from-holdings-or-dara-plan'), calls: ['m10'], out: { '4.4.3': ['per-year DARA'] } },
+    { id: '4.4.2', name: ['Preview before-', 'state'], href: S('preview-before-state'), calls: ['m10'], out: {} },
+    { id: '4.4.3', name: ['Rebalance the', 'ladder'], href: S('rebalance-the-ladder'), calls: ['m5', 'm3', 'm9', 'm10'], out: {} },
   ];
-  const PR = 62, MR = 50, UX = 60, UW = 145, W = 1180, H = 640;
+  const PR = 62, MR = 50, UX = 60, UW = 145, W = 1180, H = 820;
   const px = { '4.4.1': 400, '4.4.2': 680, '4.4.3': 400 };
   const py = { '4.4.1': 150, '4.4.2': 330, '4.4.3': 500 };
-  const mx = { m5: 980, m3: 980 };
-  const my = { m5: 440, m3: 580 };
+  const mx = { m5: 980, m3: 980, m9: 980, m10: 980 };
+  const my = { m10: 230, m5: 450, m3: 590, m9: 730 };
   const OBS = [...Object.keys(px).map(id => ({ x: px[id], y: py[id], r: PR })), ...modules.map(m => ({ x: mx[m.id], y: my[m.id], r: MR }))];
   const LBL = [];
   const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 3: TipsLadderManager 4.4, deriving per-year DARA and a before-state preview from holdings, then rebalancing against the shared sizing engine.">`, marker()];

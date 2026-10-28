@@ -1,5 +1,5 @@
 // ladder-core.js — Shared ladder sizing pipeline used by BOTH build and rebalance.
-// Spec: 2.0 TIPS Ladders §Algorithm; 3.0 §Phase 4; 4.0 §build-lib.js.
+// Spec: 2.0 TIPS Ladders §Algorithm; 3.0 §Phase 4; SharedModules M5.
 //
 // `sizeLadder` is a PURE function: (per-year DARA + bonds + options) → target ladder
 // (funded qty + excess per year, plus the params/pool fields callers render). It contains
@@ -162,7 +162,7 @@ export function sizeFuture30yCover({
 
 // ─── Simulated Outstanding TIPS: the rebalances at the issue dates ──────────────
 // Spec: 2.0 §Future 30Y Simulated Outstanding TIPS and §Gap Year Simulated Outstanding TIPS, one
-// rule with two parameter sets (4.0 §build-lib.js / rebalance-lib.js). Each Future 30Y year's TIPS is
+// rule with two parameter sets (SharedModules M5 §Gap Year Simulated Outstanding TIPS). Each Future 30Y year's TIPS is
 // issued on the last trading day of February, 30 years before its maturity year; each gap year's on
 // the last trading day of January, 10 years before. The conversions are taken in order, earliest
 // issue date first. Each conversion is a rebalance measured on the issue date: the Synthetic TIPS

@@ -1,11 +1,11 @@
 // gap-math.js — Gap year analysis, bracket sizing, and ladder sweep helpers
-// Spec: knowledge/4.0_Computation_Modules.md §gap-math.js
+// Spec: knowledge/SharedModules.md §M9
 // Math reference: knowledge/3.0_TIPS_Ladder_Rebalancing.md Phase 2, Phase 3, Phase 4
 
 import { calculateDurationDetail, priceFromYield } from '../../shared/src/bond-math.js';
 
 // ─── Yield interpolation ──────────────────────────────────────────────────────
-// Spec: 4.0 Phase 2, 3.0 Synthetic TIPS Construction
+// Spec: SharedModules M9, 3.0 Synthetic TIPS Construction
 export function interpolateYield(anchorBefore, anchorAfter, targetDate) {
   if (!anchorBefore || !anchorAfter || !targetDate) return NaN;
   const y1 = parseFloat(anchorBefore.yield);
@@ -14,7 +14,7 @@ export function interpolateYield(anchorBefore, anchorAfter, targetDate) {
 }
 
 // ─── Synthetic coupon ─────────────────────────────────────────────────────────
-// Spec: 4.0 Phase 2, 3.0 Synthetic TIPS Construction. MAX(0.125%, the eighth at or below the yield).
+// Spec: SharedModules M9, 3.0 Synthetic TIPS Construction. MAX(0.125%, the eighth at or below the yield).
 // Counted in whole eighths (yield × 800) with a tolerance far below any quoted yield's precision:
 // in floating point 0.03625 × 100 / 0.125 is 28.999999999999996, so a plain FLOOR dropped one eighth
 // at exactly 3.625% and 7.25%. Dividing the whole count by 800 gives the double nearest the eighth.
@@ -29,7 +29,7 @@ export function syntheticCoupon(yld) {
 }
 
 // ─── Bracket weights ──────────────────────────────────────────────────────────
-// Spec: 4.0 Phase 3c
+// Spec: SharedModules M9
 // Weights are shares of the block cost, so neither can go negative or above 1. If the target
 // duration falls outside [lowerDuration, upperDuration] — e.g. a deep-discount, near-zero-coupon
 // cover durations-out past a higher-coupon block average — clamp to the nearer cover
@@ -142,7 +142,7 @@ export function bracketWeightsN({ retained = [], dActive, dUpper, dGap, totalBlo
 }
 
 // ─── Bracket excess quantities ────────────────────────────────────────────────
-// Spec: 4.0 Phase 3c, 4.0 Named Quantities excessQtyAfter
+// Spec: SharedModules M9, 3.0 Named Quantities excessQtyAfter
 export function bracketExcessQtys(totalCost, lowerWeight, upperWeight, lowerCostPerBond, upperCostPerBond) {
   return {
     lowerExQty: lowerCostPerBond > 0 ? Math.round(totalCost * lowerWeight / lowerCostPerBond) : 0,
