@@ -1,0 +1,189 @@
+old field (auctions_query),relation,v2 field(s),overlap check (auctions where both state a value),TreasuryDirect field,v2 against TreasuryDirect,note
+record_date,same name,record_date,352 of 352 equal,,v2 only,
+cusip,same name,cusip,352 of 352 equal,cusip,same,
+security_type,same name,security_type,352 of 352 equal,securityType,same,
+security_term,same name,security_term,352 of 352 equal,securityTerm,"differs in 1 of 179 auctions: v2 null 0, TreasuryDirect null 0, both stated and unequal 1",
+auction_date,renamed,comp_auction_close_date,352 of 352 equal,competitiveAuctionCloseDate,same,"v2 also states noncomp_auction_close_date, equal in every auction compared"
+issue_date,same name,issue_date,352 of 352 equal,issueDate,same,
+maturity_date,same name,maturity_date,352 of 352 equal,maturityDate,same,
+price_per100,renamed,high_price,347 of 347 equal,highPrice,same,"the old table states this value twice, as price_per100 and high_price; v2 states it once"
+accrued_int_per100,reshaped,accrued_int + accrued_int_per_amount,see note,accruedInterest + accruedInterestPerAmount,,v2 states one amount and the face amount it is per
+accrued_int_per1000,reshaped,accrued_int + accrued_int_per_amount,see note,accruedInterest + accruedInterestPerAmount,,v2 states one amount and the face amount it is per
+adj_accrued_int_per1000,reshaped,adj_accrued_int + accrued_int_per_amount,see note,adjustedAccruedInterest + accruedInterestPerAmount,,v2 states one amount and the face amount it is per
+adj_price,same name,adj_price,9 of 9 equal,adjustedPrice,same,
+allocation_pctage,reshaped,allotted_pctage_high_rate + allotted_pctage_high_yield + allotted_pct_hi_discnt_margin,see note,allottedAtHighRatePercentage + allottedAtHighYieldPercentage + allottedAtHighDiscountMarginPercentage,,"one old column is three in v2: by rate (Bills), yield (Notes, Bonds, TIPS) or discount margin (FRN)"
+allocation_pctage_decimals,renamed,allotted_high_pctage_decimals,352 of 352 equal,allottedAtHighPercentageDecimals,same,
+announcemtd_cusip,same name,announcemtd_cusip,1 of 1 equal,announcedAsCusip,same,
+announcemt_date,same name,announcemt_date,352 of 352 equal,announcementDate,same,
+auction_format,renamed,pricing_method,352 of 352 equal,pricingMethod,same,"case differs in 5 of 352 auctions (Single-Price, Single-price)"
+avg_med_discnt_rate,reshaped,med_rate + avg_rate,see note,medianRate + averageRate,,"one old column is two in v2: the median for a single-price auction, the average for a multiple-price auction"
+avg_med_investment_rate,renamed,avg_investment_rate,no auction states both,averageInvestmentRate,not stated in the overlap,no auction in the overlap states it
+avg_med_price,renamed,avg_price,no auction states both,averagePrice,not stated in the overlap,no auction in the overlap states it
+avg_med_discnt_margin,reshaped,med__discnt_margin + avg_discnt_margin,see note,medianDiscountMargin + averageDiscountMargin,,"one old column is two in v2: the median for a single-price auction, the average for a multiple-price auction"
+avg_med_yield,reshaped,med_yield + avg_yield,see note,medianYield + averageYield,,"one old column is two in v2: the median for a single-price auction, the average for a multiple-price auction"
+back_dated,renamed,dated_date_diff_issue_date,86 of 86 equal,datedDateDifferentFromIssueDate,same,
+back_dated_date,renamed,dated_date,57 of 57 equal,datedDate,same,old states it only where the dated date differs from the issue date
+bid_to_cover_ratio,same name,bid_to_cover_ratio,347 of 347 equal,bidToCoverRatio,same,
+callable,same name,callable,86 of 86 equal,callable,same,
+call_date,renamed,eligible_call_date,no auction states both,eligibleToCallDate,not stated in the overlap,no auction in the overlap states it
+called_date,same name,called_date,no auction states both,calledDate,not stated in the overlap,
+cash_management_bill_cmb,renamed,cash_management_bill,350 of 350 equal,cashManagementBill,same,
+closing_time_comp,renamed,comp_auction_close_time,no auction states both,competitiveAuctionCloseTime,"differs in 177 of 179 auctions: v2 null 177, TreasuryDirect null 0, both stated and unequal 0",v2 states it for 2 of 367 auctions; the old table states it for every auction
+closing_time_noncomp,renamed,noncomp_auction_close_time,no auction states both,noncompetitiveAuctionCloseTime,"differs in 177 of 179 auctions: v2 null 177, TreasuryDirect null 0, both stated and unequal 0",v2 states it for 2 of 367 auctions; the old table states it for every auction
+comp_accepted,renamed,subtot_comp_inside_awrd,347 of 347 equal,subtotalCompetitiveParAwardedInsideOfOfferingAmount,same,inside of the offering amount
+comp_bid_decimals,same name,comp_bid_decimals,352 of 352 equal,competitiveBidDecimals,same,
+comp_tendered,renamed,subtot_comp_inside_recog,347 of 347 equal,subtotalCompetitiveParRecognizedInsideOfOfferingAmount,same,inside of the offering amount
+comp_tenders_accepted,dropped in v2,,,,,states Yes in every auction; no v2 field states it
+corpus_cusip,same name,corpus_cusip,77 of 77 equal,corpusCusip,same,
+cpi_base_reference_period,same name,cpi_base_reference_period,9 of 10 equal,cpiBaseReferencePeriod,same,
+currently_outstanding,same name,currently_outstanding,214 of 214 equal,currentlyOutstanding,same,
+dated_date,same name,dated_date,86 of 86 equal,datedDate,same,
+direct_bidder_accepted,renamed,dir_bid_comp_par_awarded,347 of 347 equal,directBiddersCompetitiveParAwarded,same,
+direct_bidder_tendered,renamed,dir_bid_comp_par_recog,347 of 347 equal,directBiddersCompetitiveParRecognized,same,
+est_pub_held_mat_by_type_amt,renamed,private_holdings,352 of 352 equal,privateHoldings,same,the old label says publicly held and the v2 label says privately held; the values are equal
+fima_included,same name,fima_included,352 of 352 equal,fimaCompetitiveInsideOfOfferingAmount,same,
+fima_noncomp_accepted,renamed,fima_noncomp_par_awarded,347 of 347 equal,fimaNoncompetitiveParAwarded,same,"awarded and recognized are equal in every auction compared, so the labels decide"
+fima_noncomp_tendered,renamed,fima_noncomp_par_recog,347 of 347 equal,fimaNoncompetitiveParRecognized,same,"awarded and recognized are equal in every auction compared, so the labels decide"
+first_int_period,renamed,first_int_payment_length,86 of 86 equal,firstInterestPaymentLength,same,"the old definition says a date; the values are Normal, Long and Short"
+first_int_payment_date,dropped in v2,,,,,the old table states the date; v2 and TreasuryDirect state only the length
+floating_rate,same name,floating_rate,349 of 349 equal,floatingRate,same,
+frn_index_determination_date,same name,frn_index_determination_date,9 of 9 equal,indexDeterminationDate,same,
+frn_index_determination_rate,same name,frn_index_determination_rate,9 of 9 equal,indexDeterminationRate,same,
+high_discnt_rate,renamed,high_rate,263 of 263 equal,highRate,same,
+high_investment_rate,renamed,investment_rate,263 of 263 equal,investmentRate,same,
+high_price,same name,high_price,347 of 347 equal,highPrice,same,
+high_discnt_margin,same name,high_discnt_margin,9 of 9 equal,highDiscountMargin,same,
+high_yield,same name,high_yield,75 of 75 equal,highYield,same,
+index_ratio_on_issue_date,same name,index_ratio_on_issue_date,10 of 10 equal,indexRatioOnIssueDate,same,
+indirect_bidder_accepted,renamed,indir_bid_comp_par_awarded,347 of 347 equal,indirectBiddersCompetitiveParAwarded,same,
+indirect_bidder_tendered,renamed,indir_bid_comp_par_recog,347 of 347 equal,indirectBiddersCompetitiveParRecognized,same,
+int_payment_frequency,same name,int_payment_frequency,349 of 349 equal,frequencyOfInterestPayments,same,
+int_rate,same name,int_rate,76 of 76 equal,interestRate,same,
+low_discnt_rate,renamed,low_rate,263 of 263 equal,lowRate,same,
+low_investment_rate,same name,low_investment_rate,no auction states both,lowInvestmentRate,not stated in the overlap,
+low_price,same name,low_price,no auction states both,lowPrice,not stated in the overlap,
+low_discnt_margin,same name,low_discnt_margin,9 of 9 equal,lowDiscountMargin,same,
+low_yield,same name,low_yield,75 of 75 equal,lowYield,same,
+mat_date,renamed,maturing_date,352 of 352 equal,maturingDate,same,"equal to the issue date in every auction compared, so the labels decide"
+max_comp_award,same name,max_comp_award,352 of 352 equal,maximumCompetitiveAward,same,
+max_noncomp_award,same name,max_noncomp_award,352 of 352 equal,maximumNoncompetitiveAward,same,
+max_single_bid,same name,max_single_bid,9 of 9 equal,maximumRecognizedBidAtASingleDiscountMargin,same,
+min_bid_amt,same name,min_bid_amt,352 of 352 equal,minimumToBidAmount,same,
+min_strip_amt,same name,min_strip_amt,77 of 77 equal,minimumAmountRequiredForStrips,same,
+min_to_issue,renamed,min_to_issue_amt,352 of 352 equal,minimumToIssueAmount,same,"constant in the overlap, so the labels decide"
+multiples_to_bid,renamed,multiples_to_bid_amt,352 of 352 equal,multipleToBidAmount,same,"constant in the overlap, so the labels decide"
+multiples_to_issue,renamed,multiples_to_issue_amt,352 of 352 equal,multipleToIssueAmount,same,"constant in the overlap, so the labels decide"
+nlp_exclusion_amt,same name,nlp_exclusion_amt,352 of 352 equal,nlpExclusionAmount,same,
+nlp_reporting_threshold,same name,nlp_reporting_threshold,352 of 352 equal,nlpReportingThreshold,same,
+noncomp_accepted,derived,grand_total_par_awarded + subtot_comp_inside_awrd + fima_noncomp_par_awarded + soma_noncomp_par_awarded,see note,grandTotalParAwarded + subtotalCompetitiveParAwardedInsideOfOfferingAmount + fimaNoncompetitiveParAwarded + somaNoncompetitiveParAwarded,,"no v2 field states it; it equals total less competitive, FIMA and SOMA awarded"
+noncomp_tenders_accepted,renamed,noncomp_bids_accepted,352 of 352 equal,noncompetitiveBidsAccepted,same,"constant in the overlap, so the labels decide"
+offering_amt,same name,offering_amt,352 of 352 equal,offeringAmount,same,
+original_cusip,renamed,announcemtd_cusip,1 of 1 equal,announcedAsCusip,same,one auction in the overlap states it
+original_dated_date,same name,original_dated_date,33 of 33 equal,originalDatedDate,same,
+original_issue_date,same name,original_issue_date,215 of 215 equal,originalIssueDate,same,
+original_security_term,same name,original_security_term,352 of 352 equal,originalSecurityTerm,same,
+pdf_filenm_announcemt,same name,pdf_filenm_announcemt,352 of 352 equal,treasuryOfferingAnnouncementPressReleaseFileName,same,
+pdf_filenm_comp_results,same name,pdf_filenm_comp_results,347 of 347 equal,treasuryAuctionResultsPressReleaseFileName,same,
+pdf_filenm_noncomp_results,same name,pdf_filenm_noncomp_results,5 of 5 equal,treasuryNoncompetitiveAuctionResultsPressReleaseFileName,"differs in 162 of 179 auctions: v2 null 162, TreasuryDirect null 0, both stated and unequal 0",
+primary_dealer_accepted,renamed,prim_deal_comp_par_awarded,347 of 347 equal,primaryDealersCompetitiveParAwarded,same,
+primary_dealer_tendered,renamed,prim_deal_comp_par_recog,347 of 347 equal,primaryDealersCompetitiveParRecognized,same,
+ref_cpi_on_dated_date,renamed,ref_cpi_on_orig_dated_date,10 of 10 equal,referenceCpiOnOriginalDatedDate,same,
+ref_cpi_on_issue_date,same name,ref_cpi_on_issue_date,10 of 10 equal,referenceCpiOnIssueDate,same,
+reopening,same name,reopening,352 of 352 equal,reopening,same,
+security_term_day_month,reshaped,security_term_day + security_term_month,see note,securityTermDay + securityTermMonth,,"old states 56-Day, v2 states 56 in a day column or a month column"
+security_term_week_year,reshaped,security_term_week + security_term_year,see note,securityTermWeek + securityTermYear,,"old states 6-Week, v2 states 6 in a week column or a year column"
+series,same name,series,86 of 86 equal,series,same,
+soma_accepted,renamed,soma_noncomp_par_awarded,347 of 347 equal,somaNoncompetitiveParAwarded,same,"awarded and recognized are equal in every auction compared, so the labels decide"
+soma_holdings,same name,soma_holdings,352 of 352 equal,somaHoldings,same,
+soma_included,renamed,soma_inside_amt,352 of 352 equal,somaInsideOfOfferingAmount,same,
+soma_tendered,renamed,soma_noncomp_par_recog,347 of 347 equal,somaNoncompetitiveParRecognized,same,"awarded and recognized are equal in every auction compared, so the labels decide"
+spread,same name,spread,9 of 9 equal,spread,same,
+std_int_payment_per1000,reshaped,std_int_payment + std_int_payment_per_amt,see note,standardInterestPayment + standardInterestPaymentPerAmount,,v2 states one amount and the face amount it is per
+strippable,same name,strippable,86 of 86 equal,strippable,same,
+tiin_conversion_factor_per1000,reshaped,tiin_conversion_factor + tiin_convers_factor_per_amt,see note,tiinConversionFactor + tiinConversionFactorPerAmount,,v2 states one factor and the face amount it is per
+total_accepted,renamed,grand_total_par_awarded,347 of 347 equal,grandTotalParAwarded,same,
+total_tendered,renamed,grand_total_par_recog,347 of 347 equal,grandTotalParRecognized,same,
+treas_retail_accepted,dropped in v2,,,retailNoncompetitiveParAwarded,,TreasuryDirect states it as retailNoncompetitiveParAwarded
+treas_retail_tenders_accepted,renamed,retail_bids_accepted,352 of 352 equal,treasuryRetailBidsAccepted,same,"constant in the overlap, so the labels decide"
+unadj_accrued_int_per1000,reshaped,unadj_accrued_int + accrued_int_per_amount,see note,unadjustedAccruedInterest + accruedInterestPerAmount,,v2 states one amount and the face amount it is per
+unadj_price,same name,unadj_price,9 of 9 equal,unadjustedPrice,same,
+xml_filenm_announcemt,same name,xml_filenm_announcemt,352 of 352 equal,treasuryOfferingAnnouncementXmlFileName,same,
+xml_filenm_comp_results,same name,xml_filenm_comp_results,347 of 347 equal,treasuryAuctionResultsXmlFileName,same,
+inflation_index_security,renamed,inflation_protected,349 of 349 equal,inflationProtected,same,
+tint_cusip_1,dropped in v2,,,,,neither v2 nor TreasuryDirect states it
+tint_cusip_2,dropped in v2,,,,,neither v2 nor TreasuryDirect states it
+pdf_filenm_spec_announcemt,same name,pdf_filenm_spec_announcemt,3 of 3 equal,treasurySpecialAnnouncementFileName,"differs in 38 of 38 auctions: v2 null 35, TreasuryDirect null 3, both stated and unequal 0",
+(none),new in v2,security_desc,,securityDescription,same,
+(none),new in v2,noncomp_auction_close_date,,noncompetitiveAuctionCloseDate,same,
+(none),new in v2,price_per_amt,,pricePerAmount,same,
+(none),new in v2,xml_filenm_noncomp_results,,treasuryNoncompetitiveAuctionResultsXmlFileName,same,
+(none),new in v2,adj_currently_outstanding,,adjustedCurrentlyOutstanding,not stated in the overlap,
+(none),new in v2,announcemtd_corpus_cusip,,announcedAsCorpusCusip,not stated in the overlap,
+(none),new in v2,announcemtd_orig_dated_date,,announcedAsOriginalDatedDate,not stated in the overlap,
+(none),new in v2,announcemtd_orig_issue_date,,announcedAsOriginalIssueDate,not stated in the overlap,
+(none),new in v2,announcemtd_reopening,,announcedAsReopening,not stated in the overlap,
+(none),new in v2,announcemtd_security_desc,,announcedAsSecurityDescription,not stated in the overlap,
+(none),new in v2,announcemtd_security_type,,announcedAsSecurityType,not stated in the overlap,
+(none),new in v2,comp_apprx_amt_remaining,,approximateAmountRemainingForCompetitiveBids,same,
+(none),new in v2,comp_bid_expression,,competitiveBidExpression,same,
+(none),new in v2,comp_discnt_margin_bid_increm,,competitiveDiscountMarginBidIncrements,same,
+(none),new in v2,comp_rate_bid_increments,,competitiveRateBidIncrements,same,
+(none),new in v2,comp_yield_bid_increments,,competitiveYieldBidIncrements,same,
+(none),new in v2,dir_bid_noncomp_par_awarded,,directBiddersNoncompetitiveParAwarded,same,
+(none),new in v2,dir_bid_noncomp_par_recog,,directBiddersNoncompetitiveParRecognized,same,
+(none),new in v2,direct_ppt_bids_accepted,,directParticipantBidsAccepted,same,
+(none),new in v2,direct_ppt_inside_amt,,directParticipantsInsideOfOfferingAmount,same,
+(none),new in v2,fima_comp_bids_accepted,,fimaCompetitiveBidsAccepted,same,
+(none),new in v2,fima_noncomp_bids_accepted,,fimaNoncompetitiveBidsAccepted,same,
+(none),new in v2,fima_noncomp_inside_amt,,fimaNoncompetitiveInsideOfOfferingAmount,same,
+(none),new in v2,announcemtd_index_ratio,,indexRatioOnAnnouncementDate,not stated in the overlap,
+(none),new in v2,indir_bid_noncomp_par_awarded,,indirectBiddersNoncompetitiveParAwarded,same,
+(none),new in v2,indir_bid_noncomp_recog,,indirectBiddersNoncompetitiveParRecognized,same,
+(none),new in v2,indirct_ppt_bids_accepted,,indirectParticipantBidsAccepted,same,
+(none),new in v2,indirct_ppt_inside_amt,,indirectParticipantsInsideOfOfferingAmount,same,
+(none),new in v2,long_short_first_int_payment,,longOrShortFirstInterestPayment,not stated in the overlap,
+(none),new in v2,long_short_first_int_pmt_amt,,longOrShortFirstInterestPaymentPerAmount,not stated in the overlap,
+(none),new in v2,low_discnt_margin_threshold,,lowDiscountMarginThreshold,same,
+(none),new in v2,low_rate_threshold,,lowRateThreshold,same,
+(none),new in v2,low_yield_threshold,,lowYieldThreshold,same,
+(none),new in v2,maturing_securities_type,,maturingSecuritiesType,same,
+(none),new in v2,max_recog_single_rate_bid,,maximumRecognizedBidAtASingleRate,"differs in 1 of 90 auctions: v2 null 1, TreasuryDirect null 0, both stated and unequal 0",
+(none),new in v2,max_recog_single_yield_bid,,maximumRecognizedBidAtASingleYield,same,
+(none),new in v2,med__discnt_margin_threshold,,medianDiscountMarginThreshold,same,
+(none),new in v2,med_rate_threshold,,medianRateThreshold,same,
+(none),new in v2,med_yield_threshold,,medianYieldThreshold,same,
+(none),new in v2,prim_deal_bids_accepted,,primaryDealerBidsAccepted,same,
+(none),new in v2,prim_deal_inside,,primaryDealersInsideOfOfferingAmount,same,
+(none),new in v2,prim_deal_noncomp_par_awarded,,primaryDealersNoncompetitiveParAwarded,same,
+(none),new in v2,prim_deal_noncomp_recog,,primaryDealersNoncompetitiveParRecognized,same,
+(none),new in v2,announcemtd_ref_cpi,,referenceCpiOnAnnouncementDate,not stated in the overlap,
+(none),new in v2,retail_noncomp_par_recog,,retailNoncompetitiveParRecognized,same,
+(none),new in v2,soma_bids_accepted,,somaBidsAccepted,same,
+(none),new in v2,subtot_comp_outside_awrd,,subtotalCompetitiveParAwardedOutsideOfOfferingAmount,same,
+(none),new in v2,subtot_comp_outside_recog,,subtotalCompetitiveParRecognizedOutsideOfOfferingAmount,same,
+(none),new in v2,subtot_noncomp_inside_awrd,,subtotalNoncompetitiveParAwardedInsideOfOfferingAmount,same,
+(none),new in v2,subtot_noncomp_outside_awrd,,subtotalNoncompetitiveParAwardedOutsideOfOfferingAmount,same,
+(none),new in v2,subtot_noncomp_inside_recog,,subtotalNoncompetitiveParRecognizedInsideOfOfferingAmount,same,
+(none),new in v2,subtot_noncomp_outside_recog,,subtotalNoncompetitiveParRecognizedOutsideOfOfferingAmount,same,
+(none),new in v2,technique,,technique,same,
+(none),new in v2,t_dir_bid_noncomp_recog,,tentativeDirectBiddersNoncompetitiveParRecognized,same,
+(none),new in v2,t_fima_noncomp_par_recog,,tentativeFimaNoncompetitiveParRecognized,same,
+(none),new in v2,t_indir_bid_noncomp_recog,,tentativeIndirectBiddersNoncompetitiveParRecognized,same,
+(none),new in v2,t_prim_dealer_noncomp_recog,,tentativePrimaryDealersNoncompetitiveParRecognized,same,
+(none),new in v2,t_retail_noncomp_par_recog,,tentativeRetailNoncompetitiveParRecognized,same,
+(none),new in v2,t_soma_noncomp_par_recog,,tentativeSomaNoncompetitiveParRecognized,same,
+(none),new in v2,tsubtot_noncomp_inside_recog,,tentativeSubtotalNoncompetitiveParRecognizedInsideOfOfferingAmount,same,
+(none),new in v2,tsubtot_noncomp_outside_recog,,tentativeSubtotalNoncompetitiveParRecognizedOutsideOfOfferingAmount,same,
+(none),new in v2,total_mkt_amt_outstanding,,totalMarketableAmountOutstanding,same,
+(none),new in v2,total_par_inside_awarded,,totalParAwardedInsideOfOfferingAmount,same,
+(none),new in v2,total_par_outside_awarded,,totalParAwardedOutsideOfOfferingAmount,same,
+(none),new in v2,total_par_inside_recog,,totalParRecognizedInsideOfOfferingAmount,same,
+(none),new in v2,total_par_outside_recog,,totalParRecognizedOutsideOfOfferingAmount,same,
+(none),new in v2,retail_inside_amt,,treasuryRetailInsideOfOfferingAmount,same,
+(none),TreasuryDirect only,(none),,competitiveAuctionCloseDateYear,,
+(none),TreasuryDirect only,(none),,daysIssueToMaturity,,
+(none),TreasuryDirect only,(none),,noncompetitiveAuctionCloseDateYear,,
+(none),TreasuryDirect only,(none),,retailNoncompetitiveParAwarded,,
+(none),TreasuryDirect only,(none),,type,,
+(none),TreasuryDirect only,(none),,unadjustedCurrentlyOutstanding,,
+(none),TreasuryDirect only,(none),,updatedTimestamp,,
