@@ -91,27 +91,30 @@ export function missingResults(rows, now) {
   });
 }
 
-const rowKey = r => `${r.cusip}|${r.auction_date}`;
+const rowKey = (r, dateColumn = 'auction_date') => `${r.cusip}|${r[dateColumn]}`;
 
-const byAuctionDateThenTerm = (a, b) => {
-  if (b.auction_date > a.auction_date) return 1;
-  if (b.auction_date < a.auction_date) return -1;
+const byDateThenTerm = dateColumn => (a, b) => {
+  if (b[dateColumn] > a[dateColumn]) return 1;
+  if (b[dateColumn] < a[dateColumn]) return -1;
   return (a.security_term || '').localeCompare(b.security_term || '');
 };
+const byAuctionDateThenTerm = byDateThenTerm('auction_date');
 
 // A fetched row replaces the existing row of the same key, except in a column where the
 // fetched value is null and the existing value is not: that column keeps the existing value.
-export function mergeAuctionRows(existing, incoming) {
-  const map = new Map(existing.map(r => [rowKey(r), r]));
+// `dateColumn` is the column that holds the auction date: auction_date, or comp_auction_close_date in S5 under the new names.
+export function mergeAuctionRows(existing, incoming, dateColumn = 'auction_date') {
+  const map = new Map(existing.map(r => [rowKey(r, dateColumn), r]));
   let added = 0;
   for (const r of incoming) {
-    const old = map.get(rowKey(r));
-    if (!old) { added++; map.set(rowKey(r), r); continue; }
+    const key = rowKey(r, dateColumn);
+    const old = map.get(key);
+    if (!old) { added++; map.set(key, r); continue; }
     const merged = { ...r };
     for (const col of Object.keys(old)) if (isNull(merged[col]) && !isNull(old[col])) merged[col] = old[col];
-    map.set(rowKey(r), merged);
+    map.set(key, merged);
   }
-  return { rows: Array.from(map.values()).sort(byAuctionDateThenTerm), added };
+  return { rows: Array.from(map.values()).sort(byDateThenTerm(dateColumn)), added };
 }
 
 // TreasuryDirect states a date as YYYY-MM-DDT00:00:00; S5 holds YYYY-MM-DD.

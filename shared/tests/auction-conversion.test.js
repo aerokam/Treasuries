@@ -10,7 +10,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { convertOldRow, S5_COLUMNS, DROPPED_OLD_COLUMNS, isNull } from '../src/auction-results.js';
+import { convertOldRow, mergeAuctionRows, S5_COLUMNS, DROPPED_OLD_COLUMNS, isNull } from '../src/auction-results.js';
 
 const { pairs } = JSON.parse(readFileSync(new URL('./auction-conversion.fixture.json', import.meta.url), 'utf8'));
 
@@ -109,4 +109,17 @@ test('a close time is written with ET, and an apostrophe before a negative numbe
   assert.equal(row.comp_auction_close_time, '01:00 PM ET');
   assert.equal(row.low_discnt_margin, '-0.035000');
   assert.equal(flags.length, 1);
+});
+
+test('mergeAuctionRows on comp_auction_close_date: the new table wins, a null keeps the converted value, an auction not held is added', () => {
+  const key = { cusip: 'A', comp_auction_close_date: '2026-10-22' };
+  const converted = [{ ...key, security_term: '4-Week', comp_auction_close_time: '11:30 AM ET', grand_total_par_awarded: '1' }];
+  const incoming = [
+    { ...key, security_term: '4-Week', comp_auction_close_time: 'null', grand_total_par_awarded: '2' },
+    { cusip: 'B', comp_auction_close_date: '2026-10-29', security_term: '8-Week', grand_total_par_awarded: 'null' },
+  ];
+  const { rows, added } = mergeAuctionRows(converted, incoming, 'comp_auction_close_date');
+  assert.equal(added, 1);
+  assert.deepEqual(rows.map(r => r.cusip), ['B', 'A']);
+  assert.deepEqual([rows[1].comp_auction_close_time, rows[1].grand_total_par_awarded], ['11:30 AM ET', '2']);
 });

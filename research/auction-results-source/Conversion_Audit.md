@@ -19,6 +19,17 @@ The audit judges the conversion by [field-map.csv](field-map.csv), which names t
 
 [auction-conversion.test.js](../../shared/tests/auction-conversion.test.js) compares the converted rows with the new table's rows for the 356 auctions to 2026-10-22 that S5 and the new table both state (23,323 pairs of stated values). All agree, as text or as a number, except two differences between the sources: the case of `pricing_method` (`Single-Price` against `Single-price`, in 5 auctions) and `cpi_base_reference_period` (`1982-1984=100` against `1982-1984`, in 1 auction). The test found the one mapping error of the first field map: `max_single_bid` is three fields of the new table, not a same-name field.
 
+## Merge of the new table (Migration_Plan.md step 5)
+
+`merge-trial.mjs` reads all 367 auctions of the new table (2025-12-29 to 2026-10-29) and merges them over the converted rows with `mergeAuctionRows`, which takes the new table's value where it states one and keeps the converted value where it states `null`. It writes `data/Auctions_merged_trial.csv` (gitignored) and `data/merge-audit.txt`.
+
+1. **Rows.** 11,162 before, 11,165 after: 364 auctions merged into rows S5 held, 3 added (the 4-Week and 8-Week Bills and the 7-Year Note of 2026-10-29, announced and not held). Every S5 row dated from 2025-12-29 on is stated by the new table.
+2. **Values that differ.** One: `security_term` of the 17-Week Bill 912797XB8 (2026-10-28). S5 holds `17-Week`, filled from TreasuryDirect, and the new table states `119-Day`, so the merge writes `119-Day`.
+3. **New information.** 4,059 cells where S5 stated nothing and the new table states a value, most of them in the columns the old table never had.
+4. **Converted values kept.** 1,078 cells where the new table states `null` and S5 holds a value: the 704 close times, 347 `pdf_filenm_noncomp_results`, 16 `pdf_filenm_spec_announcemt`, and 3 `floating_rate`, 3 `int_payment_frequency`, 3 `inflation_protected` and 2 `cash_management_bill`.
+5. **Columns that state nothing in any row:** 12 (`adj_currently_outstanding`, `avg_discnt_margin`, `long_short_first_int_payment`, `long_short_first_int_pmt_amt` and the 8 `announcemtd_` columns of the originally announced security). The new table states them for no auction yet.
+6. **Rows without `grand_total_par_awarded`:** the 3 auctions of 2026-10-29 and the 4-Week Bill of 2001-09-11, which the old table also states without results.
+
 ## Formats the conversion keeps
 
 - **Numbers** keep the digits S5 holds (`5.125000`); the new table writes `5.125`. The auctions merged from the new table in step 5 take its form.
