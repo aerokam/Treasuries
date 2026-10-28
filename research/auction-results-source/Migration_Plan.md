@@ -31,7 +31,7 @@
    - for every old column, its count of stated values equals the count in the column or columns it became (a split column sums to the original);
    - the rows where a rule in step 2 does not apply, such as a row with both `accrued_int_per100` and `accrued_int_per1000`, a row with no pricing method, or a unit other than day, week, month or year;
    - for the old rows with `noncomp_accepted` stated, total less competitive, FIMA and SOMA awarded equals it, so dropping the column loses nothing.
-   Stop here for review of the audit.
+   Stop here for review of the audit. The audit of 2026-10-28 is [Conversion_Audit.md](Conversion_Audit.md).
 5. **Read all 367 auctions of the new table once and merge them over the converted rows.** The new table's value replaces the converted value where it states one; the converted value stays where the new table states `null` (the close times, 365 of 367). This adds the 65 columns the old table never had to the auctions from 2025-12-29, and adds the auctions announced and not yet held. Auctions before 2025-12-29 keep `null` in those columns, because no source states them.
 6. **Columns with no new name are dropped.** `comp_tenders_accepted`, `first_int_payment_date`, `tint_cusip_1`, `tint_cusip_2` and `treas_retail_accepted` hold values for the old auctions and have no field in the new table. No app, job or test reads them (searched 2026-10-28). Their values stay in the copy of step 1 and not in S5. (Decision 2, ruled.)
 7. **Change the ingestion job ([1.4](../../knowledge/1.4_Fetch_Auction_Results.md)).**

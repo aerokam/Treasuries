@@ -27,7 +27,8 @@ say(`1. Rows: ${old.length} before, ${converted.length} after. Distinct keys (CU
 // 2. Every stated value of every old column is in a column it became
 const map = parseCsv(fs.readFileSync(new URL('./field-map.csv', import.meta.url), 'utf8'));
 const [cOld, cRel, cNew] = Object.keys(map[0]);
-const destinations = new Map(map.filter(r => r[cOld] !== '(none)').map(r => [r[cOld], r[cNew] ? r[cNew].split(' + ') : []]));
+// A derived column (noncomp_accepted) is checked in 4, not by finding its value in a column it became.
+const destinations = new Map(map.filter(r => r[cOld] !== '(none)' && r[cRel] !== 'derived').map(r => [r[cOld], r[cNew] ? r[cNew].split(' + ') : []]));
 const numeric = v => Number.isFinite(Number(v)) && v.trim() !== '';
 const holds = (col, value, row, dests) => {
   const v = value.replace(/^'(?=-)/, '');
@@ -84,6 +85,6 @@ say(`4. noncomp_accepted, stated in ${old.filter(r => !isNull(r.noncomp_accepted
 say('');
 say('5. Old columns not carried: ' + DROPPED_OLD_COLUMNS.map(c => `${c} (stated in ${old.filter(r => !isNull(r[c])).length} rows)`).join(', '));
 const unaccounted = oldColumns.filter(c => !(destinations.get(c)?.length) && !DROPPED_OLD_COLUMNS.includes(c));
-say(`   Old columns in neither a destination of field-map.csv nor the list above: ${unaccounted.length ? unaccounted.join(', ') : 'none'}`);
+say(`   Old columns in neither a destination of field-map.csv, nor the list above, nor 4: ${unaccounted.length ? unaccounted.join(', ') : 'none'}`);
 
 fs.writeFileSync(new URL('conversion-audit.txt', dir), out.join('\n') + '\n');
