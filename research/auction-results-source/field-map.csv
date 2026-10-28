@@ -67,7 +67,7 @@ low_yield,same name,low_yield,75 of 75 equal,lowYield,same,
 mat_date,renamed,maturing_date,352 of 352 equal,maturingDate,same,"equal to the issue date in every auction compared, so the labels decide"
 max_comp_award,same name,max_comp_award,352 of 352 equal,maximumCompetitiveAward,same,
 max_noncomp_award,same name,max_noncomp_award,352 of 352 equal,maximumNoncompetitiveAward,same,
-max_single_bid,same name,max_single_bid,9 of 9 equal,maximumRecognizedBidAtASingleDiscountMargin,same,
+max_single_bid,reshaped,max_recog_single_rate_bid + max_recog_single_yield_bid + max_single_bid,see note,maximumRecognizedBidAtASingleRate + maximumRecognizedBidAtASingleYield + maximumRecognizedBidAtASingleDiscountMargin,,"one old column is three in v2: by rate (Bills), yield (Notes, Bonds, TIPS) or discount margin (FRN); v2 states max_single_bid for FRNs only"
 min_bid_amt,same name,min_bid_amt,352 of 352 equal,minimumToBidAmount,same,
 min_strip_amt,same name,min_strip_amt,77 of 77 equal,minimumAmountRequiredForStrips,same,
 min_to_issue,renamed,min_to_issue_amt,352 of 352 equal,minimumToIssueAmount,same,"constant in the overlap, so the labels decide"
@@ -147,8 +147,6 @@ pdf_filenm_spec_announcemt,same name,pdf_filenm_spec_announcemt,3 of 3 equal,tre
 (none),new in v2,low_rate_threshold,,lowRateThreshold,same,
 (none),new in v2,low_yield_threshold,,lowYieldThreshold,same,
 (none),new in v2,maturing_securities_type,,maturingSecuritiesType,same,
-(none),new in v2,max_recog_single_rate_bid,,maximumRecognizedBidAtASingleRate,"differs in 1 of 90 auctions: v2 null 1, TreasuryDirect null 0, both stated and unequal 0",
-(none),new in v2,max_recog_single_yield_bid,,maximumRecognizedBidAtASingleYield,same,
 (none),new in v2,med__discnt_margin_threshold,,medianDiscountMarginThreshold,same,
 (none),new in v2,med_rate_threshold,,medianRateThreshold,same,
 (none),new in v2,med_yield_threshold,,medianYieldThreshold,same,

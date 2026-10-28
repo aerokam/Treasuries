@@ -45,6 +45,7 @@ const R = {
   allocation_pctage: [['allotted_pctage_high_rate', 'allotted_pctage_high_yield', 'allotted_pct_hi_discnt_margin'], 'reshaped', 'one old column is three in v2: by rate (Bills), yield (Notes, Bonds, TIPS) or discount margin (FRN)'],
   allocation_pctage_decimals: [['allotted_high_pctage_decimals'], 'renamed', ''],
   auction_format: [['pricing_method'], 'renamed', 'case differs in 5 of 352 auctions (Single-Price, Single-price)'],
+  max_single_bid: [['max_recog_single_rate_bid', 'max_recog_single_yield_bid', 'max_single_bid'], 'reshaped', 'one old column is three in v2: by rate (Bills), yield (Notes, Bonds, TIPS) or discount margin (FRN); v2 states max_single_bid for FRNs only'],
   avg_med_discnt_rate: [['med_rate', 'avg_rate'], 'reshaped', 'one old column is two in v2: the median for a single-price auction, the average for a multiple-price auction'],
   avg_med_yield: [['med_yield', 'avg_yield'], 'reshaped', 'one old column is two in v2: the median for a single-price auction, the average for a multiple-price auction'],
   avg_med_discnt_margin: [['med__discnt_margin', 'avg_discnt_margin'], 'reshaped', 'one old column is two in v2: the median for a single-price auction, the average for a multiple-price auction'],

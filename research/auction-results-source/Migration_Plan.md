@@ -18,9 +18,9 @@
 
 1. **Copy S5 as it is.** Write `Treasuries/Auctions.csv` to a dated R2 object and to a local file. Every later step can be rerun from that copy.
 2. **Write the conversion once, in `shared/src/auction-results.js`.** One function turns an old-named row into a new-named row, using [field-map.csv](field-map.csv):
-   - 55 same-name columns and 41 renamed columns: copy the value.
+   - 54 same-name columns and 41 renamed columns: copy the value.
    - `*_per100` and `*_per1000`: write the amount to the one new column and the face amount (100 or 1000) to its per-amount column. `accrued_int_per100` and `accrued_int_per1000` become `accrued_int`, `adj_accrued_int_per1000` becomes `adj_accrued_int` and `unadj_accrued_int_per1000` becomes `unadj_accrued_int`, and the three share the one column `accrued_int_per_amount`. A reader of an amount divides by its per-amount column and multiplies by the face amount it wants.
-   - `allocation_pctage`: write it to the rate, yield or discount margin column, by which of `high_rate`, `high_yield` and `high_discnt_margin` the row states.
+   - `allocation_pctage` and `max_single_bid`: write each to the rate, yield or discount margin column, by which of `high_discnt_rate`, `high_yield` and `high_discnt_margin` the row states.
    - each `avg_med_*`: write it to the median column when `pricing_method` is `Single-Price`, to the average column otherwise.
    - `security_term_day_month` and `security_term_week_year`: write the number to the day, month, week or year column its unit names.
    - times: write `11:30 AM ET`, the form the new table states.
@@ -32,7 +32,7 @@
    - the rows where a rule in step 2 does not apply, such as a row with both `accrued_int_per100` and `accrued_int_per1000`, a row with no pricing method, or a unit other than day, week, month or year;
    - for the old rows with `noncomp_accepted` stated, total less competitive, FIMA and SOMA awarded equals it, so dropping the column loses nothing.
    Stop here for review of the audit.
-5. **Read all 367 auctions of the new table once and merge them over the converted rows.** The new table's value replaces the converted value where it states one; the converted value stays where the new table states `null` (the close times, 365 of 367). This adds the 67 columns the old table never had to the auctions from 2025-12-29, and adds the auctions announced and not yet held. Auctions before 2025-12-29 keep `null` in those columns, because no source states them.
+5. **Read all 367 auctions of the new table once and merge them over the converted rows.** The new table's value replaces the converted value where it states one; the converted value stays where the new table states `null` (the close times, 365 of 367). This adds the 65 columns the old table never had to the auctions from 2025-12-29, and adds the auctions announced and not yet held. Auctions before 2025-12-29 keep `null` in those columns, because no source states them.
 6. **Columns with no new name are dropped.** `comp_tenders_accepted`, `first_int_payment_date`, `tint_cusip_1`, `tint_cusip_2` and `treas_retail_accepted` hold values for the old auctions and have no field in the new table. No app, job or test reads them (searched 2026-10-28). Their values stay in the copy of step 1 and not in S5. (Decision 2, ruled.)
 7. **Change the ingestion job ([1.4](../../knowledge/1.4_Fetch_Auction_Results.md)).**
    - Read the new table for the auctions of the last N days (decision 1) on every run, and merge by CUSIP and auction date, so FiscalData's later corrections to a recent auction are taken.
