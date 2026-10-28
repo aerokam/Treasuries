@@ -48,4 +48,4 @@
 1. **N, the number of days the job re-reads:** 30, as today. Ruled.
 2. **The 5 columns with no new name:** dropped (step 6). Ruled.
 3. **TreasuryDirect:** open. The developer expects it is not needed. 1.4 added the fill because the old table stated no results for days after a close (measured 2026-10-21), which the endpoint freeze does not explain, so the new table's delay (the Open item of the README) decides it.
-4. **Publish without a mismatch between app and file:** write the converted S5 to a new R2 object and point the app at it (no moment when the app and the file disagree; the old object is deleted afterwards), or replace the object `Treasuries/Auctions.csv` and push the app within minutes of each other. Open.
+4. **Publish:** replace the object `Treasuries/Auctions.csv` and push the app within minutes of each other. The name does not change. The copy of step 1 restores the old file. Between the two, the old app reads a file whose columns are renamed. Ruled.
