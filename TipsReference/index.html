@@ -166,9 +166,9 @@
 // Ref CPI logic is imported from the single shared home (no-redundancy directive,
 // projects/CLAUDE.md §2a) — never copied inline. lookupRefCpi is exact-date match
 // (null beyond the published range; no snap-back).
-import { lookupRefCpi, indexRatio, TREASURY_ROUNDING, NO_ROUNDING } from '../shared/src/ref-cpi.js';
+import { lookupRefCpi, indexRatio, TREASURY_ROUNDING } from '../shared/src/ref-cpi.js';
 // Duration + coupon-date helpers from the single shared bond-math home (no inline copies).
-import { calculateDuration, calculateMDuration, termYears, accruedInterest, _nextCouponOnOrAfter } from '../shared/src/bond-math.js';
+import { calculateDuration, calculateMDuration, termYears, accruedInterestAdjusted, _nextCouponOnOrAfter } from '../shared/src/bond-math.js';
 // Shared date picker (the canonical native type=date; projects/CLAUDE.md §2a).
 import { initDatePicker } from '../shared/src/date-picker.js';
 // Shared date range filter manager (projects/CLAUDE.md §2a).
@@ -222,8 +222,7 @@ var COLS = [
     fmt: function(v) { return v != null ? v.toFixed(2) : '—'; } },
   { key: 'accruedInterest', label: 'Adj Accrued/$1K', align: 'right', sortType: 'num', wrapHeader: true,
     title: 'Accrued Interest (Adjusted) per 1,000 of par at the Settlement Date',
-    fmt: function(v) { return v != null ? v.toFixed(4) : '—'; },
-    exportFmt: function(v) { return v != null ? v.toFixed(6) : '—'; } },
+    fmt: function(v) { return v != null ? v.toFixed(5) : '—'; } },
   { key: 'nextCoupon',  cpnGroup: true, label: 'Cpn Date',             align: 'left',  sortType: 'str', isDate: true,
     title: 'Coupon payment date on or after the selected Ref CPI Date',
     fmt: function(v) { return v != null ? fmtDate(v) : '—'; } },
@@ -551,11 +550,9 @@ async function loadData() {
       var macDur = (matDate && ref.coupon != null && yields && yields.yield != null && !isNaN(yields.yield))
         ? calculateDuration(settlDate, matDate, ref.coupon, yields.yield) : null;
       // Accrued Interest (Adjusted) at the Settlement Date, as DD Accrued Interest (Adjusted) states it; none once matured.
-      var accrued = null;
-      if (matDate && matDate > settlDate && ref.coupon != null) {
-        var settleIR = indexRatio(lookupRefCpi(refCpiRows, settlementDateStr), ref.datedDateRefCpi, NO_ROUNDING);
-        if (settleIR != null) accrued = accruedInterest(ref.coupon, localDate(settlementDateStr), localDate(ref.maturity)).accrued / 100 * settleIR * 1000;
-      }
+      var accrued = (matDate && ref.coupon != null)
+        ? accruedInterestAdjusted(ref.coupon, localDate(settlementDateStr), localDate(ref.maturity), lookupRefCpi(refCpiRows, settlementDateStr), ref.datedDateRefCpi)
+        : null;
       var modDur = (macDur != null) ? calculateMDuration(settlDate, matDate, ref.coupon, yields.yield) : null;
       return {
         cusip:       ref.cusip,

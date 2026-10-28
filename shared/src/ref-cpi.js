@@ -68,6 +68,14 @@ function truncateThenRound(x, truncDp = 6, roundDp = 5) {
   return Math.round(nudge(truncated * roundFactor)) / roundFactor;
 }
 
+// Normal rounding (half up) to `dp` decimal places, with the same representation-noise nudge as
+// truncateThenRound. For the amounts 31 CFR §356 App. B rounds to five decimal places for a $1,000 par amount.
+export function roundHalfUp(x, dp) {
+  if (x == null) return x;
+  const f = 10 ** dp;
+  return Math.round(nudge(x * f)) / f;
+}
+
 // ─── Calculated (31 CFR §356 Appendix B) ─────────────────────────────────────
 // Ref CPI for a date by linear interpolation of a monthly CPI-U series.
 //   Ref CPI(month, 1)   = CPI-U(month − 3)
@@ -118,8 +126,8 @@ export function monthlyCpiMap(rows, valueKey = 'value') {
 //                      calculates. Use it for an amount Treasury pays or calculates: the
 //                      Inflation-Adjusted Principal and every amount derived from it.
 //   NO_ROUNDING        the ratio as the division gives it. Use it for an amount traded or accrued
-//                      in the market: Cost per TIPS, sale proceeds, Accrued Interest (Adjusted),
-//                      Adjusted Price.
+//                      in the market: Cost per TIPS, sale proceeds, Adjusted Price. (Accrued Interest
+//                      (Adjusted) uses TREASURY_ROUNDING: 31 CFR §356 App. B §I.D.4.)
 // Returns null when the settlement Ref CPI is missing or the dated date Ref CPI is missing or zero.
 export const TREASURY_ROUNDING = 'treasury';
 export const NO_ROUNDING = 'none';

@@ -2,7 +2,7 @@
 // Pure per-unit calculations ($1,000 face value).
 // Spec: ../knowledge/TIPS_Basics.md, knowledge/4.0_Computation_Modules.md §bond-math.js
 
-import { indexRatio as calcIndexRatio, TREASURY_ROUNDING, NO_ROUNDING } from './ref-cpi.js';
+import { indexRatio as calcIndexRatio, TREASURY_ROUNDING, NO_ROUNDING, roundHalfUp } from './ref-cpi.js';
 
 // ─── Calendar-day count ───────────────────────────────────────────────────────
 // Date objects here are local-midnight timestamps (`new Date(y, m, d)`). Diffing
@@ -196,6 +196,18 @@ export function accruedInterest(coupon, settle, mature) {
   const A = daysBetween(lastCoupon, settle);
   const semiCoupon = (coupon / 2) * 100;
   return { accrued: semiCoupon * (A / E), A, E, lastCoupon, nextCoupon };
+}
+
+// ─── Accrued Interest (Adjusted) per $1,000 par ───────────────────────────────
+// DATA_DICTIONARY.md#accrued-interest-adjusted. The accrued interest of accruedInterest() per $100 par,
+// times the Index Ratio at settlement (truncated to six decimal places, then rounded to five), on $1,000 par,
+// rounded to five decimal places (31 CFR §356 App. B §I.D.4: accrued interest is rounded to five decimal
+// places for a $1,000 par amount). Returns null at or after maturity, or when either Ref CPI is missing.
+export function accruedInterestAdjusted(coupon, settle, mature, settlementRefCpi, datedDateRefCpi) {
+  if (settle >= mature) return null;
+  const ir = calcIndexRatio(settlementRefCpi, datedDateRefCpi, TREASURY_ROUNDING);
+  if (ir == null) return null;
+  return roundHalfUp(accruedInterest(coupon, settle, mature).accrued / 100 * ir * 1000, 5);
 }
 
 // ─── Yield from price (actual/actual, matches Excel YIELD(...,2,1)) ───────────

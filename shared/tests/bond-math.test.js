@@ -9,7 +9,7 @@
 // YieldsMonitor's SA historical reconstruction sweeping settle across every calendar
 // day — and diverged from priceFromYield, which never had that special case).
 
-import { yieldFromPrice, priceFromYield, daysBetween, accruedInterest, calculateMDuration, bondCalcs } from '../src/bond-math.js';
+import { yieldFromPrice, priceFromYield, daysBetween, accruedInterest, accruedInterestAdjusted, calculateMDuration, bondCalcs } from '../src/bond-math.js';
 
 let pass = 0, fail = 0;
 const ok = (cond, msg) => { if (cond) { pass++; } else { fail++; console.error('  ✗ ' + msg); } };
@@ -152,6 +152,17 @@ function roundTrips(settle, mature, coupon, yld, tol = 1e-9) {
   // A Synthetic TIPS has no dated date Ref CPI of its own: Index Ratio 1 under both rules.
   const syn = bondCalcs({ price: 100, coupon: 0.02, maturity: new Date(2040, 0, 15) }, 334.14087);
   ok(syn.indexRatio === 1 && syn.paymentIndexRatio === 1 && syn.principalPerBond === 1000, 'bondCalcs: without a dated date Ref CPI the Index Ratio is 1 under both rules');
+}
+
+// accruedInterestAdjusted: 31 CFR 356 App. B §III worked example (3 5/8% TIPS due Jan 15, 2008, accrual from Jul 15, 1998,
+// 92 of 184 days): A_adj = 0.906250 x 1.01074 = 0.915983 per 100, so 9.15983 per $1,000 at five decimal places.
+{
+  const mat = new Date(2008, 0, 15), settle = new Date(1998, 9, 15);
+  const v = accruedInterestAdjusted(0.03625, settle, mat, 163.29032, 161.55484);
+  ok(v === 9.15983, `accruedInterestAdjusted: CFR example is 9.15983 (got ${v})`);
+  ok(accruedInterestAdjusted(0.03625, mat, mat, 163.29032, 161.55484) === null, 'accruedInterestAdjusted: null at maturity');
+  ok(accruedInterestAdjusted(0.03625, settle, mat, null, 161.55484) === null, 'accruedInterestAdjusted: null without the settlement Ref CPI');
+  ok(accruedInterestAdjusted(0.03625, new Date(2008, 0, 14), mat, 163.29032, 161.55484) !== null, 'accruedInterestAdjusted: a value the day before maturity');
 }
 
 console.log(`\n${fail === 0 ? 'PASS' : 'FAIL'} — ${pass} passed, ${fail} failed`);
