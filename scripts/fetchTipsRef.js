@@ -10,18 +10,24 @@ if (existsSync(_envPath)) {
   });
 }
 
-// Fetch per-bond dated date Ref CPI (ref_cpi_on_dated_date) for all TIPS from Treasury FiscalData
+// Fetch per-bond dated date Ref CPI (ref_cpi_on_orig_dated_date) for all TIPS from Treasury FiscalData
 // Usage: node fetchTipsRef.js [CUSIP]
-//   No arg  → prints all TIPS sorted by maturity
+//   No arg  → merges the TIPS of treasury_securities_auctions_v2 into TIPS/TipsRef.csv on R2
 //   CUSIP   → prints just that bond's dated date Ref CPI
+// Spec: knowledge/1.6_Fetch_TIPS_Reference_Data.md
 
-// auctions_query with reopening:eq:No gives one row per unique TIPS (~107 bonds).
-// Excludes reopenings so each CUSIP appears once with its original ref_cpi_on_dated_date.
-const URL = 'https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v1/accounting/od/auctions_query' +
+import { TIPS_REF_V2_FIELDS, tipsRefFromV2, mergeTipsRef, tipsRefCsv } from '../shared/src/tips-ref.js';
+import { parseCsv } from '../shared/src/csv.js';
+
+// reopening:eq:No gives one row per unique TIPS. v2 states only the auctions since 2025-12-29.
+const URL = 'https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v1/accounting/od/treasury_securities_auctions_v2' +
   '?format=json&sort=maturity_date' +
-  '&filter=inflation_index_security:eq:Yes,reopening:eq:No' +
-  '&fields=cusip,ref_cpi_on_dated_date,dated_date,maturity_date,security_term,int_rate' +
+  '&filter=inflation_protected:eq:Yes,reopening:eq:No' +
+  '&fields=' + TIPS_REF_V2_FIELDS.join(',') +
   '&page[number]=1&page[size]=150';
+
+const R2_BASE_URL = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev';
+const R2_KEY = 'TIPS/TipsRef.csv';
 
 async function uploadToR2(key, body) {
   const { S3Client, PutObjectCommand } = await import('@aws-sdk/client-s3');
@@ -52,24 +58,26 @@ async function fetchTipsRef() {
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
   const json = await res.json();
+  const rows = tipsRefFromV2(json.data);
+  console.error(`${json.data.length} records, ${rows.length} with an interest rate and dated date Ref CPI stated`);
+  return rows;
+}
 
-  return json.data.map(r => ({
-    cusip:       r.cusip,
-    maturity:    r.maturity_date,
-    datedDate:   r.dated_date,
-    coupon:      parseFloat(r.int_rate) / 100, // decimal (e.g. 0.00125)
-    datedDateRefCpi:     parseFloat(r.ref_cpi_on_dated_date),
-    term:        r.security_term,
-  }));
+// The rows already on R2: v2 does not state the TIPS auctioned before 2025-12-29.
+async function loadStored() {
+  const res = await fetch(`${R2_BASE_URL}/${R2_KEY}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status} reading the stored ${R2_KEY}; v2 alone cannot rebuild it`);
+  return parseCsv(await res.text());
 }
 
 async function main() {
   const arg = process.argv[2];
   const rows = await fetchTipsRef();
+  const stored = await loadStored();
 
   if (arg) {
     // Diagnostic lookup for a single CUSIP
-    const row = rows.find(r => r.cusip === arg.toUpperCase());
+    const row = mergeTipsRef(stored, rows).find(r => r.cusip === arg.toUpperCase());
     if (!row) {
       console.error(`CUSIP ${arg} not found.`);
       process.exit(1);
@@ -77,15 +85,13 @@ async function main() {
     console.log(`CUSIP:      ${row.cusip}`);
     console.log(`Maturity:   ${row.maturity}`);
     console.log(`Dated date: ${row.datedDate}`);
-    console.log(`Coupon:     ${(row.coupon * 100).toFixed(3)}%`);
-    console.log(`Dated Date Ref CPI: ${row.datedDateRefCpi.toFixed(5)}`);
+    console.log(`Coupon:     ${(Number(row.coupon) * 100).toFixed(3)}%`);
+    console.log(`Dated Date Ref CPI: ${Number(row.datedDateRefCpi).toFixed(5)}`);
   } else {
-    // Write TipsRef.csv to R2
-    const header = 'cusip,maturity,datedDate,coupon,datedDateRefCpi,term';
-    const lines = rows.map(r =>
-      `${r.cusip},${r.maturity},${r.datedDate},${r.coupon},${r.datedDateRefCpi},${r.term}`
-    );
-    const body = [header, ...lines].join('\n') + '\n';
+    // Merge into TipsRef.csv on R2
+    const merged = mergeTipsRef(stored, rows);
+    console.error(`${stored.length} stored rows, ${merged.length} after the merge`);
+    const body = tipsRefCsv(merged);
     await uploadToR2('TIPS/TipsRef.csv', body);
   }
 }
