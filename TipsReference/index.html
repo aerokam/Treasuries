@@ -193,7 +193,7 @@ var sortDir = 'asc';
 var filters = {};
 var dateRangeFilter = null;
 var showOutstanding = true; // default: hide matured TIPS (maturity < today)
-var cpnKnown = false; // true when some TIPS has an upcoming coupon with a known Cpn per 1,000
+var cpnKnown = false; // true when some TIPS has an upcoming coupon with a known Adj Cpn/$1K
 
 var COLS = [
   { key: 'cusip',      label: 'CUSIP',             align: 'left',  sortType: 'str',
@@ -220,7 +220,7 @@ var COLS = [
     fmt: function(v) { return v != null ? v.toFixed(2) : '—'; } },
   { key: 'modDuration', label: 'Mod Duration',        align: 'right', sortType: 'num',
     fmt: function(v) { return v != null ? v.toFixed(2) : '—'; } },
-  { key: 'accruedInterest', label: 'Accrued Interest per 1,000', align: 'right', sortType: 'num', wrapHeader: true,
+  { key: 'accruedInterest', label: 'Adj Accrued/$1K', align: 'right', sortType: 'num', wrapHeader: true,
     title: 'Accrued Interest (Adjusted) per 1,000 of par at the Settlement Date',
     fmt: function(v) { return v != null ? v.toFixed(4) : '—'; },
     exportFmt: function(v) { return v != null ? v.toFixed(6) : '—'; } },
@@ -229,7 +229,7 @@ var COLS = [
     fmt: function(v) { return v != null ? fmtDate(v) : '—'; } },
   { key: 'cpnDateIR',   cpnGroup: true, label: 'Cpn Date IR',        align: 'right', sortType: 'num', wrapHeader: true,
     fmt: function(v) { return v != null ? v.toFixed(5) : '—'; } },
-  { key: 'cpnPayment',  cpnGroup: true, label: 'Cpn per 1,000',        align: 'right', sortType: 'num', wrapHeader: true,
+  { key: 'cpnPayment',  cpnGroup: true, label: 'Adj Cpn/$1K',        align: 'right', sortType: 'num', wrapHeader: true,
     fmt: function(v) { return v != null ? v.toFixed(4) : '—'; },
     // Export at higher precision than the on-screen 4dp: coupon and Index Ratio (already
     // Treasury's own max precision, 5dp) are both exact, so cpnPayment is an exact decimal.
@@ -291,7 +291,7 @@ function recomputeWithRefCpi(dateStr) {
     r.indexRatio = indexRatio(rowCpi, r.datedDateRefCpi, TREASURY_ROUNDING);
     r.adjPrice = (r.indexRatio != null && r.price != null) ? r.price * r.indexRatio : null;
 
-    // Cpn Date / Cpn Date IR / Cpn per 1,000: if today is the effective (weekend/holiday-rolled)
+    // Cpn Date / Cpn Date IR / Adj Cpn/$1K: if today is the effective (weekend/holiday-rolled)
     // payment date of this bond's next-or-final coupon, show that realized payment
     // regardless of the globally selected Ref CPI Date — otherwise project the next
     // coupon on/after the selected date. A matured bond's final coupon coincides with
