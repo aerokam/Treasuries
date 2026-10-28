@@ -22,7 +22,7 @@ The numbers are the process numbers of [Level 1](/knowledge/DFD_LEVEL1), and the
 | 9 | Fund Holdings | [FundHoldings/](../FundHoldings/knowledge/) | Treasury and TIPS fund holdings by CUSIP, enriched with ask yield, SA and SAO yield, term and duration |
 | 10 | Portal Primer | [Primer/](../Primer/knowledge/) | A guided walkthrough of the portal, app by app, with the Treasury and TIPS terminology behind each screen |
 | 11 | Seasonal Adjustments | [SeasonalAdjustments/](../SeasonalAdjustments/knowledge/) | Slide deck on TIPS seasonal adjustment and the SA/SAO yield series |
-| | After-Tax TIPS Ladder Calculator *(third-party)* | https://motips.pythonanywhere.com/ | After-tax return calculator for TIPS ladders; linked from the portal because it complements the suite but is not a portal app |
+| | After-Tax TIPS Ladder Calculator *(third-party)* | https://mweinb.github.io/after-tax-tips/ | After-tax return calculator for TIPS ladders; linked from the portal because it complements the suite but is not a portal app |
 
 ---
 
