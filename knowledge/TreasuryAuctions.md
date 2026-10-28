@@ -20,4 +20,4 @@ Treasury Auctions is process 5 on [Level 1](/knowledge/DFD_LEVEL1), and [Level 2
 
 ## Reference specs
 
-- [FiscalData auctions_query Reference](./AuctionsQuery_Reference.md): the query parameters, operators and fields of the endpoint that [Fetch auction results (1.4)](./1.4_Fetch_Auction_Results.md) reads.
+- [FiscalData treasury_securities_auctions_v2 Reference](./AuctionsV2_Reference.md): the query parameters, operators and fields of the endpoint that [Fetch auction results (1.4)](./1.4_Fetch_Auction_Results.md) reads.

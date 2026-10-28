@@ -14,7 +14,7 @@ const response = await (await fetch(`${FD}/treasury_securities_auctions_v2?page[
 const v2 = response.data.map(r => Object.fromEntries(S5_COLUMNS.map(c => [c, isNull(r[c]) ? 'null' : String(r[c])])));
 const v2Unknown = Object.keys(response.data[0]).filter(c => !S5_COLUMNS.includes(c));
 
-const { rows: merged, added } = mergeAuctionRows(converted, v2, DATE);
+const { rows: merged, added } = mergeAuctionRows(converted, v2);
 
 const esc = v => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
 fs.writeFileSync(new URL('Auctions_merged_trial.csv', dir),

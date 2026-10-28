@@ -118,7 +118,7 @@ test('mergeAuctionRows on comp_auction_close_date: the new table wins, a null ke
     { ...key, security_term: '4-Week', comp_auction_close_time: 'null', grand_total_par_awarded: '2' },
     { cusip: 'B', comp_auction_close_date: '2026-10-29', security_term: '8-Week', grand_total_par_awarded: 'null' },
   ];
-  const { rows, added } = mergeAuctionRows(converted, incoming, 'comp_auction_close_date');
+  const { rows, added } = mergeAuctionRows(converted, incoming);
   assert.equal(added, 1);
   assert.deepEqual(rows.map(r => r.cusip), ['B', 'A']);
   assert.deepEqual([rows[1].comp_auction_close_time, rows[1].grand_total_par_awarded], ['11:30 AM ET', '2']);

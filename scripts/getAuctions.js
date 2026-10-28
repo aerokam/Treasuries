@@ -2,7 +2,8 @@
 import { existsSync, readFileSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { mergeAuctionRows, fillFromTreasuryDirect, missingResults, easternNow, isFirstTry, TD_COLUMNS } from '../shared/src/auction-results.js';
+import { parseCsv } from '../shared/src/csv.js';
+import { mergeAuctionRows, fillFromTreasuryDirect, rowFromNewTable, S5_COLUMNS } from '../shared/src/auction-results.js';
 const _envPath = resolve(dirname(fileURLToPath(import.meta.url)), '../.env');
 if (existsSync(_envPath)) {
   readFileSync(_envPath, 'utf8').split('\n').forEach(line => {
@@ -11,18 +12,17 @@ if (existsSync(_envPath)) {
   });
 }
 
-// Fetch all Treasury auction data from FiscalData (all fields), store in R2 as Auctions.csv.
+// Fetch the Treasury auctions of the last 30 days from FiscalData (all fields), merge them into the rows of
+// Auctions.csv in R2 by CUSIP and auction date (new data wins), fill what FiscalData states as null from
+// TreasuryDirect, and write Auctions.csv back when its rows changed.
 //
-// First run (no existing file): fetches all auctions since 1980-01-01.
-// Subsequent runs: fetches last 30 days, merges by cusip+auction_date (new data wins).
-// FiscalData is fetched on a first try (a run starting less than 10 minutes after a competitive close)
-// and on a repeat while an auction is missing results; TreasuryDirect is fetched only when an auction
-// is still missing results after the FiscalData merge. Rules: knowledge/1.4_Fetch_Auction_Results.md.
+// Auctions.csv must exist and hold the columns of treasury_securities_auctions_v2; a run that finds anything else
+// ends with an error and writes nothing. Rules: knowledge/1.4_Fetch_Auction_Results.md.
 //
 // Scheduled at 11:35 AM ET and 1:05 PM ET on weekdays (after comp close at 11:30 AM and 1:00 PM ET),
 // each repeated every 10 minutes for 25 minutes.
 
-const FISCALDATA_URL = 'https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v1/accounting/od/auctions_query';
+const FISCALDATA_URL = 'https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v1/accounting/od/treasury_securities_auctions_v2';
 const R2_KEY = 'Treasuries/Auctions.csv';
 const R2_BASE_URL = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev';
 const TREASURYDIRECT_URL = 'https://www.treasurydirect.gov/TA_WS/securities/auctioned';
@@ -46,32 +46,6 @@ async function uploadToR2(key, body) {
   console.error(`Wrote ${rows} rows → R2 bucket "${R2_BUCKET}", key "${key}"`);
 }
 
-// ── CSV parser ────────────────────────────────────────────────────────────────
-function parseCSV(text) {
-  const lines = text.trim().split('\n');
-  if (lines.length < 2) return { headers: [], rows: [] };
-  const headers = splitLine(lines[0]);
-  const rows = lines.slice(1).filter(l => l.trim()).map(line => {
-    const vals = splitLine(line);
-    const obj = {};
-    headers.forEach((h, i) => { obj[h] = vals[i] ?? ''; });
-    return obj;
-  });
-  return { headers, rows };
-}
-
-function splitLine(line) {
-  const out = [];
-  let cur = '', inQ = false;
-  for (const ch of line) {
-    if (ch === '"') inQ = !inQ;
-    else if (ch === ',' && !inQ) { out.push(cur.trim()); cur = ''; }
-    else cur += ch;
-  }
-  out.push(cur.trim());
-  return out;
-}
-
 // ── CSV writer ────────────────────────────────────────────────────────────────
 function toCSV(headers, rows) {
   const esc = v => (String(v).includes(',') || String(v).includes('"') || String(v).includes('\n'))
@@ -82,31 +56,24 @@ function toCSV(headers, rows) {
   ].join('\n') + '\n';
 }
 
-// Union of two header arrays, preserving order
-function unionHeaders(h1, h2) {
-  const seen = new Set(h1);
-  return [...h1, ...h2.filter(h => !seen.has(h))];
-}
-
 // ── FiscalData fetch ──────────────────────────────────────────────────────────
 const PAGE_SIZE = 10000; // FiscalData's max is 10000; larger values return HTTP 400
 
+// JSON, not CSV: FiscalData's CSV writes an apostrophe before a negative number.
 async function fetchAuctions(sinceDate) {
   // No &fields= param → returns all available columns
   console.error(`Fetching FiscalData auctions since ${sinceDate}...`);
-  let headers = [];
   const rows = [];
   for (let page = 1; ; page++) {
-    const url = `${FISCALDATA_URL}?format=csv&page[size]=${PAGE_SIZE}&page[number]=${page}&filter=auction_date:gte:${sinceDate}&sort=-auction_date,security_term`;
+    const url = `${FISCALDATA_URL}?page[size]=${PAGE_SIZE}&page[number]=${page}&filter=comp_auction_close_date:gte:${sinceDate}&sort=-comp_auction_close_date,security_term`;
     const r = await fetch(url);
     if (!r.ok) throw new Error(`FiscalData HTTP ${r.status}`);
-    const { headers: pageHeaders, rows: pageRows } = parseCSV(await r.text());
-    if (pageRows.length === 0) break;
-    headers = unionHeaders(headers, pageHeaders);
-    rows.push(...pageRows);
-    if (pageRows.length < PAGE_SIZE) break;
+    const { data } = await r.json();
+    if (data.length === 0) break;
+    rows.push(...data.map(rowFromNewTable));
+    if (data.length < PAGE_SIZE) break;
   }
-  return { headers, rows };
+  return rows;
 }
 
 // ── TreasuryDirect fetch ──────────────────────────────────────────────────────
@@ -118,68 +85,46 @@ async function fetchTreasuryDirect(days) {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 async function main() {
-  // Try to load existing data from R2
-  let existingHeaders = [];
-  let existingRows = [];
-  let existingText = '';
-  let sinceDate;
-
-  console.error('Checking for existing Auctions.csv in R2...');
+  console.error('Reading Auctions.csv from R2...');
   const existingRes = await fetch(`${R2_BASE_URL}/${R2_KEY}`);
-  if (existingRes.ok) {
-    existingText = await existingRes.text();
-    ({ headers: existingHeaders, rows: existingRows } = parseCSV(existingText));
-    console.error(`Loaded ${existingRows.length} existing rows from R2`);
-    // Fetch last 30 days to catch new auctions
-    const d = new Date();
-    d.setDate(d.getDate() - WINDOW_DAYS);
-    sinceDate = d.toISOString().substring(0, 10);
-  } else {
-    console.error('No existing file found — seeding from 1980-01-01');
-    sinceDate = '1980-01-01';
-  }
+  if (!existingRes.ok) throw new Error(`Auctions.csv not found in R2 (HTTP ${existingRes.status}); restore it from a copy, nothing is seeded`);
+  const existingText = await existingRes.text();
+  const existingHeaders = existingText.split(/\r?\n/, 1)[0].split(',');
+  const missing = S5_COLUMNS.filter(c => !existingHeaders.includes(c));
+  if (missing.length > 0) throw new Error(`Auctions.csv lacks the columns of treasury_securities_auctions_v2 (${missing.length} missing, the first ${missing.slice(0, 3).join(', ')}); nothing written`);
+  const existingRows = parseCsv(existingText);
+  console.error(`Loaded ${existingRows.length} existing rows from R2`);
 
-  const now = easternNow();
-  if (existingRows.length > 0 && !isFirstTry(now) && missingResults(existingRows, now).length === 0) {
-    console.error('Repeat run and no auction is missing results: nothing fetched');
-    return;
-  }
+  const d = new Date();
+  d.setDate(d.getDate() - WINDOW_DAYS);
+  const sinceDate = d.toISOString().substring(0, 10);
 
-  let newHeaders = [], newRows = [];
+  let newRows = [];
   try {
-    ({ headers: newHeaders, rows: newRows } = await fetchAuctions(sinceDate));
+    newRows = await fetchAuctions(sinceDate);
   } catch (err) {
-    if (existingRows.length === 0) throw err;
     console.error(`FiscalData unavailable: ${err.message}`);
   }
-  if (newRows.length === 0 && existingRows.length === 0)
-    throw new Error('No auction data retrieved and no existing data — aborting');
 
-  const headers = unionHeaders(unionHeaders(existingHeaders, newHeaders), TD_COLUMNS);
+  const headers = [...existingHeaders, ...newRows.flatMap(r => Object.keys(r)).filter((c, i, all) => !existingHeaders.includes(c) && all.indexOf(c) === i)];
   const { rows: merged, added } = mergeAuctionRows(existingRows, newRows);
   console.error(`Merge: ${added} new rows added (${newRows.length} fetched, ${existingRows.length} existing)`);
 
-  let finalRows = merged;
-  const missing = missingResults(merged, now);
-  if (missing.length > 0) {
-    console.error(`${missing.length} auctions are missing results after FiscalData; fetching TreasuryDirect`);
-    let tdRows = [];
-    try {
-      tdRows = await fetchTreasuryDirect(WINDOW_DAYS);
-    } catch (err) {
-      console.error(`TreasuryDirect unavailable, writing FiscalData rows only: ${err.message}`);
-    }
-    const fill = fillFromTreasuryDirect(merged, headers, tdRows);
-    finalRows = fill.rows;
-    console.error(`TreasuryDirect: ${tdRows.length} auctions read, ${fill.filled} rows filled, ${fill.added} rows added`);
+  let tdRows = [];
+  try {
+    tdRows = await fetchTreasuryDirect(WINDOW_DAYS);
+  } catch (err) {
+    console.error(`TreasuryDirect unavailable, writing FiscalData rows only: ${err.message}`);
   }
+  const fill = fillFromTreasuryDirect(merged, headers, tdRows);
+  console.error(`TreasuryDirect: ${tdRows.length} auctions read, ${fill.filled} rows filled, ${fill.added} rows added`);
 
-  const csvBody = toCSV(headers, finalRows);
+  const csvBody = toCSV(headers, fill.rows);
   if (csvBody === existingText.replace(/\r\n/g, '\n')) {
     console.error('Auctions.csv unchanged: not uploaded');
     return;
   }
-  await uploadToR2('Treasuries/Auctions.csv', csvBody);
+  await uploadToR2(R2_KEY, csvBody);
 }
 
 main().catch(err => { console.error(err); process.exit(1); });
