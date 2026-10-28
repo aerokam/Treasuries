@@ -17,7 +17,7 @@
 | Auctions stated | to 2026-10-22 | 367, from 2025-12-29, including auctions announced to 2026-10-29 | 250, from 2025-05-22 (the response is capped at 250 auctions) |
 | Field names | snake_case | snake_case; 59 of the 114 `auctions_query` names are renamed, reshaped, dropped or derived | camelCase |
 | Query | `filter`, `sort`, `page[size]` to 10,000, `format` json, csv, xml | the same | `days` only; `format` json only (xml and csv return HTTP 406) |
-| Lists of upcoming auctions | `upcoming_auctions` endpoint | the table lists announced auctions with `null` results | `announced` (250 auctions) and `upcoming` (6 auctions) endpoints, same 187 fields |
+| Lists of upcoming auctions | `upcoming_auctions` endpoint, latest announcement date 2026-10-22 | the table lists announced auctions with `null` results; the `upcoming_auctions_v2` endpoint is the replacement of `upcoming_auctions` | `announced` (250 auctions) and `upcoming` (6 auctions) endpoints, same 187 fields |
 | Results after the competitive close | measured 2026-10-21: `null` for days (1.4) | not measured: both 2026-10-28 results were stated 28 minutes after the close | `updatedTimestamp` median 4.0 minutes over 250 auctions |
 
 ### `auctions_query` against `treasury_securities_auctions_v2`
@@ -51,6 +51,15 @@ Over the 179 auctions in both, 153 paired fields are equal, 20 state nothing in 
 - `security_term`: both state a value and differ in 1 auction, the 17-Week Bill of 2026-10-28, which v2 states as `119-Day` and TreasuryDirect as `17-Week`. v2 states `17-Week` for 43 other 17-Week Bills.
 
 Wherever both state a value, the values are equal except in that one `security_term`.
+
+### Upcoming auctions
+
+5.1 reads `upcoming_auctions`, which FiscalData has replaced with `upcoming_auctions_v2` ("Treasury Securities Upcoming Auctions (Updated)").
+
+- **`upcoming_auctions` is frozen.** Its latest announcement date is 2026-10-22 and FiscalData lists its last update as 2026-10-16. Measured 2026-10-28, for auctions dated on or after that day it states 2, `upcoming_auctions_v2` states 6, and the `treasury_securities_auctions_v2` table states 5.
+- **`upcoming_auctions_v2` has the same 9 fields,** except that `auction_date` is `comp_auction_close_date`. Its offering amount is `null` for the 3 Bills announced on 2026-10-29.
+- **The upcoming list is a different set from the auctions table.** `upcoming_auctions_v2` states 3 auctions that the auctions table lacks: the 13-Week and 26-Week Bills of 2026-11-02 and the 6-Week Bill of 2026-11-03, none announced yet. The auctions table states the 2 auctions held on 2026-10-28, which `upcoming_auctions_v2` omits. So the Upcoming Auctions tab needs its own list.
+- **TreasuryDirect's `upcoming` states the same 6 auctions as `upcoming_auctions_v2`.**
 
 ### Authority and timing
 

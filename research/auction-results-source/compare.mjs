@@ -54,6 +54,24 @@ const lag = td.filter(r => day(r.updatedTimestamp) === day(r.competitiveAuctionC
   .map(r => minutes(r.updatedTimestamp) - closeMinutes(r.competitiveAuctionCloseTime)).sort((a, b) => a - b);
 console.log(`TreasuryDirect updatedTimestamp after the competitive close, auctions updated on their own date (${lag.length}): median ${lag[Math.floor(lag.length / 2)].toFixed(1)} min, max ${lag.at(-1).toFixed(1)} min`);
 
+// Upcoming auctions: the four lists, for auctions dated on or after the current UTC date (the filter 5.1 applies).
+const [upOld, upV2] = await Promise.all([
+  getJson(`${FD}/upcoming_auctions?page[size]=1000`),
+  getJson(`${FD}/upcoming_auctions_v2?page[size]=1000`),
+]);
+const upFrom = day(new Date().toISOString());
+const upKeys = (rows, date) => new Set(rows.filter(r => day(r[date]) >= upFrom).map(r => key(r.cusip, r[date])));
+const lists = {
+  'upcoming_auctions': upKeys(upOld.data, 'auction_date'),
+  'upcoming_auctions_v2': upKeys(upV2.data, 'comp_auction_close_date'),
+  'auctions v2 table': upKeys(v2rows, 'comp_auction_close_date'),
+  'TreasuryDirect upcoming': new Set(tdUpcoming.filter(r => day(r.competitiveAuctionCloseDate) >= upFrom).map(r => key(r.cusip, r.competitiveAuctionCloseDate))),
+};
+console.log(`Auctions dated ${upFrom} or later, by list: ${Object.entries(lists).map(([k, s]) => `${k} ${s.size}`).join(', ')}`);
+console.log(`upcoming_auctions: latest announcement date ${upOld.data.map(r => r.announcemt_date).sort().at(-1)}; upcoming_auctions_v2 fields ${Object.keys(upV2.data[0]).join(', ')}`);
+const same9 = [...lists['upcoming_auctions_v2']].every(k => lists['TreasuryDirect upcoming'].has(k)) && lists['upcoming_auctions_v2'].size === lists['TreasuryDirect upcoming'].size;
+console.log(`upcoming_auctions_v2 and TreasuryDirect upcoming state the same auctions: ${same9}; upcoming_auctions_v2 auctions the auctions v2 table lacks: ${[...lists['upcoming_auctions_v2']].filter(k => !lists['auctions v2 table'].has(k)).length}`);
+
 for (const [label, fmt] of [['xml', 'xml'], ['csv', 'csv']]) {
   const r = await fetch(`${TD}/auctioned?format=${fmt}&days=5`);
   console.log(`TreasuryDirect format=${label}: HTTP ${r.status}`);
