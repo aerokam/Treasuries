@@ -3210,6 +3210,27 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
   assert('Build with all maturity months, imported and rebalanced: the bracket year does not trade', roundTrip.details.filter(d => d.fundedYear === 2036).every(d => d.qtyAfter === d.qtyBefore), true);
 }
 
+// ── Test: Equal split in the active lower bracket's year when the earlier TIPS of the year holds no Excess TIPS ──
+// A TIPS of the year that holds no more than its own funded need holds no Excess TIPS, so it is an ordinary candidate that the Equal split
+// levels with the active lower bracket (3.0 §Target CUSIP resolution), not a retained maturity frozen at its held quantity.
+{
+  console.log('\nEqual split in the bracket year — the earlier TIPS of the year holds no Excess TIPS');
+  const rows = [
+    { cusip: 'TEST35JUL', maturity: '2035-07-15', coupon: 0.01875, datedDateRefCpi: 321.09758, price: 97.06,  yield: 0.0224 },
+    { cusip: 'TEST36JAN', maturity: '2036-01-15', coupon: 0.01875, datedDateRefCpi: 324.93471, price: 96.28,  yield: 0.0232 },
+    { cusip: 'TEST36JUL', maturity: '2036-07-15', coupon: 0.02375, datedDateRefCpi: 333.96974, price: 100.44, yield: 0.0233 },
+    { cusip: 'TEST40FEB', maturity: '2040-02-15', coupon: 0.02125, datedDateRefCpi: 216.1395,  price: 94.98,  yield: 0.0257 },
+  ];
+  const map = buildTipsMarketData(rows);
+  const held = [{ cusip: 'TEST35JUL', qty: 14 }, { cusip: 'TEST36JAN', qty: 2 }, { cusip: 'TEST36JUL', qty: 2 }, { cusip: 'TEST40FEB', qty: 5 }];
+  const r = runRebalance({ dara: 20000, bracketMode: '3bracket', holdings: held, tipsMarketData: map, refCPI, settlementDate, maturityPref: 'select',
+    yearOverrides: new Map([[2036, ['TEST36JAN', 'TEST36JUL']]]), allocationPolicy: 'equal' });
+  const jan = r.details.find(d => d.cusip === 'TEST36JAN'), jul = r.details.find(d => d.cusip === 'TEST36JUL');
+  assert('a bracket year whose earlier TIPS holds no Excess TIPS: the earlier TIPS is bought', jan.qtyAfter > jan.qtyBefore, true);
+  const piJan = jan.fundedYearQtyAfter * jan.principalPerBond, piJul = jul.fundedYearQtyAfter * jul.principalPerBond;
+  assert('a bracket year whose earlier TIPS holds no Excess TIPS: the funded values of the two TIPS are within one TIPS', Math.abs(piJan - piJul) <= Math.max(jan.principalPerBond, jul.principalPerBond) * 1.5, true);
+  assert('a bracket year whose earlier TIPS holds no Excess TIPS: it is not a retained maturity', (r.summary.retainedLegs ?? []).length, 0);
+}
 // ── Test: Pre-Ladder Interest of the settlement year counts the coupons still to arrive (2.0 §Pre-Ladder Interest) ──
 {
   console.log('\nPre-Ladder Interest — the settlement year counts remaining coupons only');

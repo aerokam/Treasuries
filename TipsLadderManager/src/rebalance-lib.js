@@ -1271,6 +1271,8 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
       const ownFundedNeedQty = h.excessQty != null
         ? Math.max(0, h.qty - h.excessQty)
         : (piOwn > 0 ? Math.max(0, Math.round((yDaraSameYear - laterMatIntBefore) / piOwn)) : 0);
+      // A holding that does not exceed its own funded need holds no excess, so it is an ordinary candidate of the year and is levelled with the others.
+      if (h.qty <= ownFundedNeedQty) continue;
       sameYearRetained.push({
         year: newLowerYear, cusip: h.cusip, maturity: b.maturity,
         duration: calculateMDuration(settlementDate, b.maturity, b.coupon ?? 0, b.yield ?? 0),
