@@ -48,7 +48,7 @@ Over the 179 auctions in both, 153 paired fields are equal, 20 state nothing in 
 - `pdf_filenm_noncomp_results`: v2 is `null` in 162 of 179.
 - `pdf_filenm_spec_announcemt`: of 38 auctions where either states a file name, v2 is `null` in 35 and TreasuryDirect in 3.
 - `max_recog_single_rate_bid`: v2 is `null` in 1 of 90. `security_term_week`: v2 is `null` in 1 of 89.
-- `security_term`: both state a value and differ in 1 auction, the 17-Week Bill of 2026-10-28, which v2 states as `119-Day` and TreasuryDirect as `17-Week`. v2 states `17-Week` for 43 other 17-Week Bills.
+- `security_term`: both state a value and the strings differ in 1 auction, the 17-Week Bill of 2026-10-28 (CUSIP 912797XB8), which v2 states as `119-Day` and TreasuryDirect as `17-Week`. The two are the same length, 119 days being 17 weeks. v2 states `17-Week` for 43 other 17-Week Bills, so a filter or grouping on `security_term` treats this bill as a different term.
 
 Wherever both state a value, the values are equal except in that one `security_term`.
 
