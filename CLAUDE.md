@@ -206,7 +206,7 @@ npx serve .
 
 ### Module Roles
 
-Module responsibilities and the dependency graph (bond-math.js, gap-math.js, ladder-math.js, ladder-core.js, rebalance-lib.js, build-lib.js) are specified in `knowledge/4.0_Computation_Modules.md`; `render.js`/`drill.js` in `knowledge/4.5.1_Render_Ladder_Table.md` and `knowledge/4.5.2_Show_Drill_Popups.md`. Do not restate them here.
+Module responsibilities (bond-math.js, gap-math.js, ladder-math.js, ladder-core.js, rebalance-lib.js, build-lib.js) are specified in `knowledge/SharedModules.md`; `render.js`/`drill.js` in `knowledge/4.5.1_Render_Ladder_Table.md` and `knowledge/4.5.2_Show_Drill_Popups.md`. Do not restate them here.
 
 - `src/modal.js` — `makeDraggableResizable(modalEl, dragHandleEl, opts)`, shared drag/resize frame for every modal (TipsRef, maturity picker). *(Not documented in any spec yet — flagged for review, see task report.)*
 

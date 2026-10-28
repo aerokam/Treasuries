@@ -1,4 +1,4 @@
-// market-data.js -- CSV fetch and parse for TIPS market data (4.0_Computation_Modules.md,
+// market-data.js -- CSV fetch and parse for TIPS market data (SharedModules.md,
 // TipsLadderManager/knowledge/3.1_Data_Pipeline.md).
 // Moved here from TipsLadderManager/src/data.js so TipsReference can share it too, per the
 // project-wide no-redundancy directive (projects/CLAUDE.md §2a) -- a source flip in YIELD_SOURCE
@@ -156,7 +156,7 @@ const YIELD_SOURCE = 'market';
 // source-dependent, so no caller has to know -- or can get wrong -- which source is active.
 // Callers build TIPS market data themselves via buildTipsMarketData (TipsLadderManager's
 // rebalance-lib.js): this module is a leaf and does not import an orchestrator
-// (TipsLadderManager knowledge/4.0_Computation_Modules.md §Module Dependency Graph).
+// (TipsLadderManager knowledge/3.1_Data_Pipeline.md).
 export async function loadMarketData() {
   const d = YIELD_SOURCE === 'fedinvest' ? await fetchTipsData() : await fetchMarketQuotesData();
   const { yieldsRows, refCpiRows, tipsRefRows, saSaoRows, bondHolidays, asOfDate } = d;

@@ -38,7 +38,7 @@ The `knowledge/` directory is the spec layer. Lower-numbered specs are the found
 - **1.0** [Bond Ladders](./1.0_Bond_Ladders.md), which requires [Bond Basics](../../knowledge/Bond_Basics.md)
 - **2.0** [TIPS Ladders](./2.0_TIPS_Ladders.md); requires [TIPS Basics](../../knowledge/TIPS_Basics.md)
 - **3.0** [TIPS Ladder Rebalancing](./3.0_TIPS_Ladder_Rebalancing.md), with **3.1** [Data Pipeline](./3.1_Data_Pipeline.md)
-- **4.0** [Computation Modules](./4.0_Computation_Modules.md), with **4.1** to **4.6**, one spec for each process
+- **4.1** to **4.6**, one spec for each process, with the [Shared Modules](../../knowledge/SharedModules.md) that more than one of them calls
 - **6.0** [UI Layout](./6.0_UI_Layout.md)
 
 The terms are defined once, in the [Data Dictionary](../../knowledge/DATA_DICTIONARY.md). The [Technical Reference](./TECHNICAL_REFERENCE.md) maps them to code symbols.

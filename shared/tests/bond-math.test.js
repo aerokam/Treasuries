@@ -137,7 +137,7 @@ function roundTrips(settle, mature, coupon, yld, tol = 1e-9) {
 
 // bondCalcs: the Index Ratio is unrounded and prices what is traded (Cost per TIPS); the payment
 // Index Ratio is Treasury's rule (truncate to six decimals, round to five) and gives the
-// Inflation-Adjusted Principal and everything derived from it (TipsLadderManager/knowledge/4.0 §bondCalcs).
+// Inflation-Adjusted Principal and everything derived from it (knowledge/SharedModules.md §bondCalcs).
 {
   // 334.14087 / 290.54829 = 1.150034999... : Treasury's rule gives 1.15004 (see ref-cpi.test.js)
   const bond = { price: 98.5, coupon: 0.02, datedDateRefCpi: 290.54829, maturity: new Date(2030, 6, 15) };

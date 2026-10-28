@@ -1420,7 +1420,7 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
   }
   // Every funded year credited with the interest of the Simulated Outstanding Future 30Y TIPS or of
   // the Cover Excess, or with Net Cash, is rebalanced, so the credit reduces its funded-year quantity and an Amount After
-  // above DARA is sold down (4.0 §build-lib.js / rebalance-lib.js — Future 30Y Simulated Outstanding TIPS).
+  // above DARA is sold down (SharedModules M5 §Future 30Y Simulated Outstanding TIPS).
   for (const y of [...future30ySimulatedInterestByYear.keys(), ...future30yCoverInterestByYear.keys(), ...future30yNetCashByYear.keys(),
                    ...gapSimulatedInterestByYear.keys(), ...gapExcessInterestByYear.keys(), ...gapNetCashByYear.keys()]) {
     if (y >= firstYear && y <= lastYear && !bracketYearSet.has(y) && !gapYearSet.has(y) && !future30yYearSet.has(y))

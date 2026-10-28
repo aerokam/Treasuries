@@ -120,7 +120,7 @@ function gapBreakdownRows(gapParams, dara) {
 /// Level-3 drill: composition of the pre-ladder pool — the coupon interest of the holdings, the
 // interest of the Simulated Outstanding Future 30Y TIPS and the Cover Excess, and the Net Cash, for
 // the years before the first funded year (2.0 §Future 30Y Simulated Outstanding TIPS §Interest credited
-// to a funded year; 4.0 §build-lib.js / rebalance-lib.js — Future 30Y Simulated Outstanding TIPS).
+// to a funded year; SharedModules M5 §Future 30Y Simulated Outstanding TIPS).
 export function buildPreLadderPoolDrill(summary, plCreditForYear) {
   const couponPool   = summary?.preLadderCouponPool ?? 0;
   const future30yPool = summary?.preLadderFuture30yPool ?? 0;
@@ -858,7 +858,7 @@ function renderDurationBeam(buckets, avgDur) {
     + '</div>';
 }
 
-// Portfolio Avg Mod Dur / Avg Yld / Avg SA Yld popups (4.0 §Weighted Modified Duration): each
+// Portfolio Avg Mod Dur / Avg Yld / Avg SA Yld popups (SharedModules M3 §Weighted Modified Duration): each
 // holding's own value (modified duration, or yield/SA yield from market data), weighted by market
 // value. `details` carries `mktValue` (single source, set alongside `mDuration`/`yield`/`saYield`
 // in build-lib.js / rebalance-lib.js) so no popup can ever drift from the number it explains.
