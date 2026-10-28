@@ -166,9 +166,9 @@
 // Ref CPI logic is imported from the single shared home (no-redundancy directive,
 // projects/CLAUDE.md §2a) — never copied inline. lookupRefCpi is exact-date match
 // (null beyond the published range; no snap-back).
-import { lookupRefCpi, indexRatio, TREASURY_ROUNDING } from '../shared/src/ref-cpi.js';
+import { lookupRefCpi, indexRatio, TREASURY_ROUNDING, NO_ROUNDING } from '../shared/src/ref-cpi.js';
 // Duration + coupon-date helpers from the single shared bond-math home (no inline copies).
-import { calculateDuration, calculateMDuration, termYears, _nextCouponOnOrAfter } from '../shared/src/bond-math.js';
+import { calculateDuration, calculateMDuration, termYears, accruedInterest, _nextCouponOnOrAfter } from '../shared/src/bond-math.js';
 // Shared date picker (the canonical native type=date; projects/CLAUDE.md §2a).
 import { initDatePicker } from '../shared/src/date-picker.js';
 // Shared date range filter manager (projects/CLAUDE.md §2a).
@@ -193,6 +193,7 @@ var sortDir = 'asc';
 var filters = {};
 var dateRangeFilter = null;
 var showOutstanding = true; // default: hide matured TIPS (maturity < today)
+var cpnKnown = false; // true when some TIPS has an upcoming coupon with a known Cpn $ / TIPS
 
 var COLS = [
   { key: 'cusip',      label: 'CUSIP',             align: 'left',  sortType: 'str',
@@ -219,12 +220,16 @@ var COLS = [
     fmt: function(v) { return v != null ? v.toFixed(2) : '—'; } },
   { key: 'modDuration', label: 'Mod Duration',        align: 'right', sortType: 'num',
     fmt: function(v) { return v != null ? v.toFixed(2) : '—'; } },
-  { key: 'nextCoupon',  label: 'Cpn Date',             align: 'left',  sortType: 'str', isDate: true,
+  { key: 'accruedInterest', label: 'Accrued Interest $ / TIPS', align: 'right', sortType: 'num', wrapHeader: true,
+    title: 'Accrued Interest (Adjusted) per $1,000 of par at the Settlement Date',
+    fmt: function(v) { return v != null ? v.toFixed(4) : '—'; },
+    exportFmt: function(v) { return v != null ? v.toFixed(6) : '—'; } },
+  { key: 'nextCoupon',  cpnGroup: true, label: 'Cpn Date',             align: 'left',  sortType: 'str', isDate: true,
     title: 'Coupon payment date on or after the selected Ref CPI Date',
     fmt: function(v) { return v != null ? fmtDate(v) : '—'; } },
-  { key: 'cpnDateIR',   label: 'Cpn Date IR',        align: 'right', sortType: 'num', wrapHeader: true,
+  { key: 'cpnDateIR',   cpnGroup: true, label: 'Cpn Date IR',        align: 'right', sortType: 'num', wrapHeader: true,
     fmt: function(v) { return v != null ? v.toFixed(5) : '—'; } },
-  { key: 'cpnPayment',  label: 'Cpn $ / TIPS',        align: 'right', sortType: 'num', wrapHeader: true,
+  { key: 'cpnPayment',  cpnGroup: true, label: 'Cpn $ / TIPS',        align: 'right', sortType: 'num', wrapHeader: true,
     fmt: function(v) { return v != null ? v.toFixed(4) : '—'; },
     // Export at higher precision than the on-screen 4dp: coupon and Index Ratio (already
     // Treasury's own max precision, 5dp) are both exact, so cpnPayment is an exact decimal.
@@ -233,6 +238,11 @@ var COLS = [
     // rounding error undetectable at any realistic holding size.
     exportFmt: function(v) { return v != null ? v.toFixed(6) : '—'; } },
 ];
+
+// The columns shown: the three Cpn columns only while some TIPS has a known upcoming coupon.
+function visibleCols() {
+  return COLS.filter(function(c) { return !c.cpnGroup || cpnKnown; });
+}
 
 // A maturity (or coupon) payment due on a weekend or SIFMA bond holiday is actually paid
 // on the next Treasury business day. Returns the date itself when it's already a business
@@ -310,7 +320,10 @@ function recomputeWithRefCpi(dateStr) {
       r.cpnRefCpi = null; r.cpnDateIR = null; r.cpnPayment = null;
     }
   });
+  cpnKnown = allRows.some(function(r) { return r.cpnPayment != null; });
+  if (!cpnKnown && COLS.some(function(c) { return c.cpnGroup && c.key === sortCol; })) { sortCol = 'maturity'; sortDir = 'asc'; }
   document.getElementById('meta-ref-cpi').textContent = cpi != null ? cpi.toFixed(5) : '—';
+  buildHeader();
   renderTable();
 }
 
@@ -331,6 +344,7 @@ function getFilteredSorted() {
     Object.entries(dateRangeFilter.getAllRanges()).forEach(function(entry) {
       var key = entry[0];
       var range = entry[1];
+      if (!visibleCols().some(function(c) { return c.key === key; })) return;
       if (range.from) {
         rows = rows.filter(function(r) { return (r[key] || '') >= range.from; });
       }
@@ -342,7 +356,7 @@ function getFilteredSorted() {
 
   Object.keys(filters).forEach(function(key) {
     var val = filters[key].toLowerCase();
-    var col = COLS.find(function(c) { return c.key === key; });
+    var col = visibleCols().find(function(c) { return c.key === key; });
     if (!col) return;
     rows = rows.filter(function(r) {
       return cellDisplay(r, col).toLowerCase().indexOf(val) !== -1;
@@ -403,7 +417,7 @@ function buildHeader() {
   headerRow.innerHTML = '';
   filterRow.innerHTML = '';
 
-  COLS.forEach(function(col) {
+  visibleCols().forEach(function(col) {
     var th = document.createElement('th');
     th.textContent = col.label;
     if (col.align === 'left') th.classList.add('left');
@@ -498,7 +512,7 @@ function renderTable() {
   var html = '';
   rows.forEach(function(r, i) {
     html += '<tr data-idx="' + i + '">';
-    COLS.forEach(function(col) {
+    visibleCols().forEach(function(col) {
       var cls = col.align === 'right' ? 'right' : '';
       if (col.key === 'cpnPayment' && r.cpnPayment != null) cls += (cls ? ' ' : '') + 'cpn-clickable';
       html += '<td' + (cls ? ' class="' + cls + '"' : '') + '>' + cellDisplay(r, col) + '</td>';
@@ -536,6 +550,12 @@ async function loadData() {
       var term = (matDate && matDate > settlDate) ? termYears(settlDate, matDate) : null;
       var macDur = (matDate && ref.coupon != null && yields && yields.yield != null && !isNaN(yields.yield))
         ? calculateDuration(settlDate, matDate, ref.coupon, yields.yield) : null;
+      // Accrued Interest (Adjusted) at the Settlement Date, as DD Accrued Interest (Adjusted) states it; none once matured.
+      var accrued = null;
+      if (matDate && matDate > settlDate && ref.coupon != null) {
+        var settleIR = indexRatio(lookupRefCpi(refCpiRows, settlementDateStr), ref.datedDateRefCpi, NO_ROUNDING);
+        if (settleIR != null) accrued = accruedInterest(ref.coupon, localDate(settlementDateStr), localDate(ref.maturity)).accrued / 100 * settleIR * 1000;
+      }
       var modDur = (macDur != null) ? calculateMDuration(settlDate, matDate, ref.coupon, yields.yield) : null;
       return {
         cusip:       ref.cusip,
@@ -550,6 +570,7 @@ async function loadData() {
         term:        term,
         macDuration: macDur,
         modDuration: modDur,
+        accruedInterest: accrued,
         nextCoupon:  null,
         cpnDateIR:   null,
         cpnPayment:  null,
@@ -589,7 +610,6 @@ async function loadData() {
       }
     });
 
-    buildHeader();
     recomputeWithRefCpi(settlementDateStr);
   } catch (err) {
     statusEl.textContent = err.message;
@@ -599,9 +619,10 @@ async function loadData() {
 
 document.getElementById('export-btn').addEventListener('click', function() {
   var rows = getFilteredSorted();
-  var headerLine = COLS.map(function(c) { return c.label; }).join(',');
+  var cols = visibleCols();
+  var headerLine = cols.map(function(c) { return c.label; }).join(',');
   var dataLines = rows.map(function(r) {
-    return COLS.map(function(col) {
+    return cols.map(function(col) {
       var v = col.exportFmt ? col.exportFmt(r[col.key]) : cellDisplay(r, col);
       return v.indexOf(',') !== -1 ? '"' + v + '"' : v;
     }).join(',');
