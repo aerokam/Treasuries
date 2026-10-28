@@ -17,6 +17,9 @@ export { localDate, fmtDate, fmtDateLong };
 // The floor of the holdings search range for the lower bracket. A design choice, not derived from market data
 // (DATA_DICTIONARY §5.1). Defined here once; before-state-lib.js imports it.
 export const LOWEST_LOWER_BRACKET_YEAR = 2032;
+// The share of its Expected Excess that a held year must reach to be a retained lower bracket. A design choice
+// (DATA_DICTIONARY §5.1); 3.0 §Retained Maturities.
+export const RETAINED_BRACKET_MIN_SHARE = 0.30;
 
 export function calculatePIPerBond(cusip, maturity, refCPI, tipsMarketData) {
   const bond = tipsMarketData.get(cusip);
@@ -45,7 +48,9 @@ export function buildTipsMarketData(yieldsRows, saYieldByCusip = null) {
   return map;
 }
 
-function identifyBrackets(gapYears, holdings, yearInfo, tipsMarketData, araByYear, DARA, firstYear = 0, daraByYear = null) {
+// expectedExcessARAOf(cusip, upperCUSIP), optional, returns the Expected Excess of the candidate as ARA (3.0 §Retained Maturities step 5),
+// or null when it cannot be worked out; without it a year with any Excess ARA above 0 is a candidate.
+function identifyBrackets(gapYears, holdings, yearInfo, tipsMarketData, araByYear, DARA, firstYear = 0, daraByYear = null, expectedExcessARAOf = null) {
   if (gapYears.length === 0) return { lowerCUSIP: null, lowerYear: null, lowerMaturity: null, upperCUSIP: null, upperYear: null, upperMaturity: null };
   const minGapYear = Math.min(...gapYears);
   const upperYear = UPPER_BRACKET_YEAR;
@@ -72,6 +77,9 @@ function identifyBrackets(gapYears, holdings, yearInfo, tipsMarketData, araByYea
       const excess = (araByYear[y] || 0) - (daraByYear?.get(y) ?? DARA);
       // A year whose ARA does not exceed the DARA of that year holds no spare capacity, so it is not a retained lower bracket.
       if (!(excess > 0)) continue;
+      // A few dollars over the DARA is not a spike: the excess has to reach its share of what a ladder built with this year as the lower bracket held there.
+      const expected = expectedExcessARAOf ? expectedExcessARAOf(cusip, upperCUSIP) : null;
+      if (expected != null && excess < RETAINED_BRACKET_MIN_SHARE * expected) continue;
       if (excess > maxExcess || (excess === maxExcess && totalQty > (cusipTotals.get(lowerCUSIP) || -1))) {
         maxExcess = excess; lowerCUSIP = cusip; lowerYear = y; lowerMaturity = bond.maturity;
       }
@@ -1122,7 +1130,24 @@ export function runRebalance({ dara, bracketMode = '2bracket', holdings: holding
   const gapParams = calculateGapParameters(gapYears, settlementDate, refCPI, tipsMarketData, DARA, holdings, lastYear, pliCreditByGapYear, daraByYear, zeroedFundedYears);
 
   const minGapYear = gapYears.length > 0 ? Math.min(...gapYears) : Infinity;
-  const brackets  = identifyBrackets(gapYears, holdings, yearInfo, tipsMarketData, araByYear, DARA, firstYear, daraByYear);
+  // Expected Excess of a candidate year as ARA: the lower bracket's share of the cost of the gap years of a ladder built when that year was the
+  // active lower bracket (every year after it up to the Upper Bracket year), at the P+I per TIPS over the Cost per TIPS of the candidate (3.0 §Retained Maturities step 5).
+  const expectedExcessARAOf = (cusip, upperCUSIP) => {
+    try {
+      const cand = tipsMarketData.get(cusip), upper = tipsMarketData.get(upperCUSIP);
+      if (!cand?.maturity || !upper?.maturity) return null;
+      const hypotheticalGapYears = [];
+      for (let y = cand.maturity.getFullYear() + 1; y < UPPER_BRACKET_YEAR; y++) hypotheticalGapYears.push(y);
+      if (hypotheticalGapYears.length === 0) return 0;
+      const gp = calculateGapParameters(hypotheticalGapYears, settlementDate, refCPI, tipsMarketData, DARA, holdings, lastYear, {}, daraByYear, zeroedFundedYears);
+      const dCand = calculateMDuration(settlementDate, cand.maturity, cand.coupon ?? 0, cand.yield ?? 0);
+      const dUpper = calculateMDuration(settlementDate, upper.maturity, upper.coupon ?? 0, upper.yield ?? 0);
+      const expectedCost = gp.totalCost * bracketWeights(dCand, dUpper, gp.avgDuration).lowerWeight;
+      const costPerBond = (cand.price ?? 0) / 100 * calcIndexRatio(refCPI, cand.datedDateRefCpi ?? refCPI, NO_ROUNDING) * 1000;
+      return costPerBond > 0 ? expectedCost / costPerBond * calculatePIPerBond(cusip, cand.maturity, refCPI, tipsMarketData) : null;
+    } catch { return null; }
+  };
+  const brackets  = identifyBrackets(gapYears, holdings, yearInfo, tipsMarketData, araByYear, DARA, firstYear, daraByYear, expectedExcessARAOf);
 
   // 2-bracket: lower bracket is always the canonical tipsMarketData lower (latest-maturing TIPS below
   // minGapYear). identifyBrackets may return an older year found via excess-ARA.

@@ -378,13 +378,14 @@ runFullRebalanceTest('SampleHoldings (richest IRA)', './data/SampleHoldings.csv'
     assertGapConversionsMatch(summary.gapRebalances.conversions, 'F4 After');
     assert('F4: a held bond older than the Active Lower Bracket is a retained leg of the conversions, and only then', summary.gapRebalancesBefore.conversions[0].retainedQtyBefore.length, heldLower.cusip === roles.activeLower.cusip ? 0 : 1);
 
-    // summary.brackets.lowerCUSIP is identifyBrackets' raw excess-ARA pick, which the file fixes at the held
-    // lower bracket. The canonical Active Lower Bracket (newLowerCUSIP) comes from the market data alone: the
+    // summary.brackets.lowerCUSIP is identifyBrackets' raw excess-ARA pick. The Excess ARA of the held lower bracket year here is about 3% of its Expected Excess,
+    // under RETAINED_BRACKET_MIN_SHARE, so the pick is not the held bond but the fallback, the Active Lower Bracket; the held bond is
+    // retained through the same-maturity-year source (3.0 §Retained Maturities). The canonical Active Lower Bracket (newLowerCUSIP) comes from the market data alone: the
     // latest-maturing TIPS before the gap (2.0 §Retained Bracket Excess; DD §Active Lower Bracket). When it is
     // the held bond itself nothing is retained and the weights reduce to the plain 2-bracket ones
     // (origLowerWeight 0). When a newer bond has been issued, the held bond is a retained maturity relative to
     // it and carries real duration-match weight, strictly between 0 and 1.
-    assert('F4: the raw lower bracket pick is the held lower bracket', summary.brackets.lowerCUSIP, heldLower.cusip);
+    assert('F4: an Excess ARA under its share of the Expected Excess is not a pick: the raw lower bracket is the Active Lower Bracket', summary.brackets.lowerCUSIP, roles.activeLower.cusip);
     assert('F4: newLowerCUSIP is the canonical Active Lower Bracket', summary.newLowerCUSIP, roles.activeLower.cusip);
     if (heldLower.cusip === roles.activeLower.cusip) {
       assert('F4: origLowerWeight is 0 (the held bond is itself the active lower bracket)', summary.origLowerWeight, 0);
@@ -3293,6 +3294,14 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
   const flat = rebalanceFrom(null);
   assert('a ladder with no spike has no retained lower bracket: the lower bracket is the active lower bracket', flat.summary.brackets.lowerYear, flat.summary.newLowerYear);
   assert('a ladder with no spike has no retained maturity', (flat.summary.retainedLegs ?? []).length, 0);
+  // One TIPS over a stated plan is not a spike: its Excess ARA is far under RETAINED_BRACKET_MIN_SHARE of the Expected Excess.
+  const planRows = built.details.map(d => ({ cusip: d.cusip, qty: d.fundedYearQty + (d.excessQty ?? 0) }));
+  const planRawARA = computePortfolioARAByYear(planRows, tipsMarketData, refCPI, { firstYear: 2027, lastYear: 2040 });
+  const statedPlan = new Map(Object.entries(planRawARA).map(([y, v]) => [+y, Math.round(v)]));
+  const oneOver = planRows.map(h => tipsMarketData.get(h.cusip).maturity.getFullYear() === 2032 ? { ...h, qty: h.qty + 1 } : h);
+  const oneOverRun = runFundedRebalance({ dara: 15000, bracketMode: '3bracket', holdings: oneOver, tipsMarketData, refCPI, settlementDate, daraByYear: statedPlan, daraPlanIsStated: true,
+    lastYearOverride: 2040, firstYearOverride: 2027, maturityPref: 'last', bondHolidays });
+  assert('one TIPS over the stated DARA of 2032 is not a retained lower bracket', oneOverRun.summary.brackets.lowerYear, oneOverRun.summary.newLowerYear);
   for (const y of [2032, 2034]) {
     const spiked = rebalanceFrom(y);
     assert('a spike in ' + y + ' makes ' + y + ' the retained lower bracket', spiked.summary.brackets.lowerYear, y);
