@@ -21,7 +21,7 @@ The field-by-field correspondence between the two tables, and with [TreasuryDire
 | `page[number]` | `page[number]=1` | Starts at 1. |
 | `page[size]` | `page[size]=10000` | 100 rows when omitted. A value above 10000 returns HTTP 400 (`Invalid Query Param`), so a larger result is read by increasing `page[number]`. |
 
-A name that is not a field of the table, in `fields`, `filter` or `sort`, returns HTTP 400.
+A name that is not a field of the table, in `fields`, `filter` or `sort`, returns HTTP 400. A request whose user agent names HeadlessChrome returns HTTP 500 without an `Access-Control-Allow-Origin` header, which a browser reports as a CORS error; the same request with an ordinary Chrome user agent returns 200 (measured 2026-10-28).
 
 ## Filter Operators
 

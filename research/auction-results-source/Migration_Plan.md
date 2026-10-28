@@ -4,6 +4,10 @@
 
 **S5 today** (measured 2026-10-28): 11,162 rows, 1980-01-02 to 2026-10-28, 114 columns under the `auctions_query` names. `treasury_securities_auctions_v2` states 367 auctions from 2025-12-29, so it cannot replace the history: S5 is the only store that holds the auctions before 2025-12-29, and it stays the only one.
 
+## Status
+
+2026-10-28: steps 1 to 8 and 10 are done and S5 is published under the new names (11,165 rows, 181 columns). The TipsRef job (step 9) was migrated by its own session and reads `treasury_securities_auctions_v2`. Decision 3 stays open: the TreasuryDirect fill is kept until the poll of 2026-10-29 measures the new table's delay.
+
 ## Consumers of the old names and endpoints
 
 | Consumer | Reads | Change |
