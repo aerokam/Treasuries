@@ -7,7 +7,7 @@ Follow these steps to verify that the navigation, rendering and drill-down featu
 - [ ] **Top Header**: Verify the only link above the diagram is the **Portal** back link. Everything else is reached by drilling into the diagram, or from the Spec Index below it.
 - [ ] **Diagram Shape**: Verify one process circle, **0 Treasury Investors Portal**, with the fifteen external entities and the **User** around it. Every flow arrow carries a label, and no data store is drawn at this level.
 - [ ] **Spec Index**: Click **TipsLadderManager**.
-    - *Expected*: Opens the rendered overview in the viewer.
+    - *Expected*: Opens the Level 2 diagram of TipsLadderManager.
 - [ ] **Back Navigation**: From inside the viewer, click **← KNOWLEDGE MAP**.
     - *Expected*: Returns to `/knowledge/DFD_LEVEL0` (the full visual map). The viewer should not attempt to render an HTML file — if the guard trips, it redirects automatically.
 - [ ] **Spec Index**: Click **Data Stores**.
@@ -33,8 +33,8 @@ Follow these steps to verify that the navigation, rendering and drill-down featu
     - *Expected*: The table disappears.
 
 ## 4. Anchor Handling (Inside YieldCurves)
-- [ ] Open the **YieldCurves** overview from the Spec Index.
-- [ ] **Process Click**: Click **Adjust for seasonality** in the Process specs table.
+- [ ] Open the **YieldCurves** Level 2 diagram from the Spec Index.
+- [ ] **Process Click**: Click the **3.2 Adjust for seasonality** process.
     - *Expected*: Navigates to the detailed `3.2_Adjust_For_Seasonality.md` document.
 
 ## 5. Ingestion Pipeline

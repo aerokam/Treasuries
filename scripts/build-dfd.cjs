@@ -1010,7 +1010,7 @@ function level2TipsLadderManager() {
   return page({
     title: 'TipsLadderManager — Level 2', h1: 'Level 2 &mdash; TipsLadderManager', maxWidth: W,
     up: 'DFD_LEVEL1.html', upLabel: 'Level 1',
-    spec: V('knowledge/TipsLadderManager.md'), specLabel: 'TipsLadderManager overview', svg: P.join(NL),
+    svg: P.join(NL),
     notes: ['  <b>No process here writes a data store.</b> Every flow ends at the user and is gone when the page closes, except the files the Export menu writes.',
       '  4.1 reads Market quotes (S7), the live default; FedInvest prices (S1) is the same module\'s dormant fallback and is not drawn.',
       '  The Explore price files are kept in the app and drawn on this diagram only: no job writes them. Explore builds with the interface and the output of Build, so 4.6 feeds 4.3.',
@@ -1407,7 +1407,7 @@ function level2TreasuryAuctions() {
   return page({
     title: 'Treasury Auctions — Level 2', h1: 'Level 2 &mdash; Treasury Auctions', maxWidth: W,
     up: 'DFD_LEVEL1.html', upLabel: 'Level 1',
-    spec: V('knowledge/TreasuryAuctions.md'), specLabel: 'Treasury Auctions specs', svg: P.join(NL),
+    svg: P.join(NL),
     notes: ['  <b>No process here writes a data store.</b> Every flow ends at 5.2, 5.3 or 5.4 and is gone when the page closes.',
       '  <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#e3">FiscalData (E3)</a> is drawn as a box, in the store column: the app reads its <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#upcoming-auctions">upcoming auctions</a> live, with no acquisition job between (see <a href="viewer.html#/md/knowledge/DFD_Worklist.md">DFD_Worklist.md</a> &sect;4.0).',
       '  5.3 reads the auction results and the tentative auction schedule from 5.1 to flag an upcoming auction as a TIPS auction.',
@@ -1453,7 +1453,7 @@ function level2FundHoldings() {
   return page({
     title: 'Fund Holdings — Level 2', h1: 'Level 2 &mdash; Fund Holdings', maxWidth: W,
     up: 'DFD_LEVEL1.html', upLabel: 'Level 1',
-    spec: V('knowledge/FundHoldings.md'), specLabel: 'Fund Holdings specs', svg: P.join(NL),
+    svg: P.join(NL),
     notes: ['  <b>No process here writes a data store.</b> Every flow ends at the user and is gone when the page closes.',
       '  <a href="viewer.html#/md/knowledge/1.14_Enrich_Fund_Holdings.md">1.14</a> writes <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s11">Fund holdings (S11)</a>; no process of this app reads an external source.',
       '  9.1 states the fund above the table, so it also sends <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#charts-and-tables">charts and tables</a> to the user.'].join(NL)
@@ -1504,7 +1504,7 @@ function level2CpiExplorer() {
   return page({
     title: 'CPI Explorer — Level 2', h1: 'Level 2 &mdash; CPI Explorer', maxWidth: W,
     up: 'DFD_LEVEL1.html', upLabel: 'Level 1',
-    spec: V('knowledge/CpiExplorer.md'), specLabel: 'CPI Explorer specs', svg: P.join(NL),
+    svg: P.join(NL),
     notes: ['  <b>No process here writes a data store.</b> Every flow ends at the user and is gone when the page closes.',
       '  7.1 sends its rows to 7.3 as well as to 7.2: 7.3 bounds the date range by the extent of all three series. 7.1 also states the data status, as <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#charts-and-tables">charts and tables</a>, to the user.',
       '  <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#cpi-series">CPI series</a> is defined in the Data Dictionary &sect;6.6.'].join(NL)
@@ -1561,7 +1561,7 @@ function level2TipsReference() {
   return page({
     title: 'TIPS Reference — Level 2', h1: 'Level 2 &mdash; TIPS Reference', maxWidth: W,
     up: 'DFD_LEVEL1.html', upLabel: 'Level 1',
-    spec: V('knowledge/TipsReference.md'), specLabel: 'TIPS Reference specs', svg: P.join(NL),
+    svg: P.join(NL),
     notes: ['  <b>No process here writes a data store.</b> Every flow ends at the user and is gone when the page closes.',
       '  6.1 calls the function that <a href="DFD_LEVEL2_TIPSLADDERMANAGER.html">Ladder Manager</a> also calls to read market data. That function also fetches <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s10">SA and SAO yields (S10)</a>, which this app does not use, so no flow from S10 is drawn.',
       '  6.4 writes the rows of the table to a csv file the user saves.',
@@ -1616,7 +1616,7 @@ function level2Primer() {
   return page({
     title: 'Portal Primer — Level 2', h1: 'Level 2 &mdash; Portal Primer', maxWidth: W,
     up: 'DFD_LEVEL1.html', upLabel: 'Level 1',
-    spec: V('knowledge/Primer.md'), specLabel: 'Portal Primer specs', svg: P.join(NL),
+    svg: P.join(NL),
     notes: ['  <b>No process here writes a data store.</b> Every flow ends at the user and is gone when the page closes.',
       '  <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#deck-content">Deck content</a> is a file kept in the app, drawn as a store of this diagram only; no job writes it.',
       '  10.2 also states its source line, as <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#charts-and-tables">charts and tables</a>, to the user.'].join(NL)
@@ -1664,7 +1664,7 @@ function level2SeasonalAdjustments() {
   return page({
     title: 'Seasonal Adjustments — Level 2', h1: 'Level 2 &mdash; Seasonal Adjustments', maxWidth: W,
     up: 'DFD_LEVEL1.html', upLabel: 'Level 1',
-    spec: V('knowledge/SeasonalAdjustments.md'), specLabel: 'Seasonal Adjustments specs', svg: P.join(NL),
+    svg: P.join(NL),
     notes: ['  <b>No process here writes a data store.</b> Every flow ends at the user and is gone when the page closes.',
       '  The two snapshot files are copies of <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s10">SA and SAO yields (S10)</a> and <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s4">Ref CPI NSA and SA (S4)</a>, kept in the app and drawn on this diagram only. No job writes them, and the app reads no R2 store.',
       '  11.1 also states the footer, as <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#charts-and-tables">charts and tables</a>, to the user.'].join(NL)
