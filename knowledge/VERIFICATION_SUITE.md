@@ -4,14 +4,10 @@ Follow these steps to verify that the navigation, rendering and drill-down featu
 
 ## 1. Context Diagram & Top-Level Navigation
 - [ ] Open `http://localhost:8080/knowledge/DFD_LEVEL0`.
-- [ ] **Top Header**: Verify the only link above the diagram is the **Portal** back link. Everything else is reached by drilling into the diagram, or from the Spec Index below it.
+- [ ] **Top Header**: Verify the only link above the diagram is the **Portal** back link. Everything else is reached by drilling into the diagram.
 - [ ] **Diagram Shape**: Verify one process circle, **0 Treasury Investors Portal**, with the fifteen external entities and the **User** around it. Every flow arrow carries a label, and no data store is drawn at this level.
-- [ ] **Spec Index**: Click **TipsLadderManager**.
-    - *Expected*: Opens the Level 2 diagram of TipsLadderManager.
 - [ ] **Back Navigation**: From inside the viewer, click **← KNOWLEDGE MAP**.
     - *Expected*: Returns to `/knowledge/DFD_LEVEL0` (the full visual map). The viewer should not attempt to render an HTML file — if the guard trips, it redirects automatically.
-- [ ] **Spec Index**: Click **Data Stores**.
-    - *Expected*: Opens `DATA_DICTIONARY.md` at §2.0 Data Stores in the viewer.
 - [ ] **Source Drilling**: Click **FedInvest** in the map.
     - *Expected*: Opens `DATA_DICTIONARY.md` at the E1 schema section, which states the `Prices For:` date and the eight columns of the price table.
 - [ ] **Process Drilling**: Click the **0 Treasury Investors Portal** circle.
@@ -26,18 +22,13 @@ Follow these steps to verify that the navigation, rendering and drill-down featu
     - *Expected*: Navigates to `DATA_DICTIONARY.md` and scrolls to the entry of that store. **NO RAW MD SHOULD BE VISIBLE.**
 
 ## 3. Data Inspection (CSV Previews)
-- [ ] Open **Data Stores** from the Spec Index of the Map.
+- [ ] Open `DATA_DICTIONARY.md` §2.0 Data Stores in the viewer.
 - [ ] **Preview Toggle**: Click **View Preview** in the entry of `YieldsFromFedInvestPrices.csv`.
     - *Expected*: A table with the first 10 rows appears.
 - [ ] **Toggle Off**: Click the **View Preview** link again.
     - *Expected*: The table disappears.
 
 ## 4. Anchor Handling (Inside YieldCurves)
-- [ ] Open the **YieldCurves** Level 2 diagram from the Spec Index.
+- [ ] Open the **YieldCurves** Level 2 diagram from Level 1.
 - [ ] **Process Click**: Click the **3.2 Adjust for seasonality** process.
     - *Expected*: Navigates to the detailed `3.2_Adjust_For_Seasonality.md` document.
-
-## 5. Ingestion Pipeline
-- [ ] Open **Data Pipeline** from the Spec Index.
-- [ ] **Ownership**: Verify that §2.0 lists the ingestion jobs as `[LOCAL]` Windows tasks and names no other scheduler.
-- [ ] **Market Quotes Status**: Verify the market quotes tasks appear as local Windows tasks.

@@ -127,34 +127,6 @@
   }
   .notes a { color: var(--accent); }
 
-  .index {
-    max-width: 980px;
-    margin: 45px 0 20px;
-    border-top: 1px solid var(--border);
-    padding-top: 25px;
-  }
-  .index h2 {
-    font-size: 0.8rem;
-    font-weight: 700;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    color: #666699;
-    margin: 0 0 6px;
-    text-align: center;
-  }
-  .index p { font-size: 0.8rem; color: #7a83aa; text-align: center; margin: 0 0 20px; line-height: 1.6; }
-  .index-group { margin-bottom: 14px; display: flex; flex-wrap: wrap; gap: 10px; align-items: baseline; justify-content: center; }
-  .index-group .g-label { font-size: 0.7rem; letter-spacing: 1.5px; text-transform: uppercase; color: #666699; font-weight: 700; width: 100%; text-align: center; }
-  .index-group a {
-    color: var(--text);
-    text-decoration: none;
-    font-size: 0.85rem;
-    border: 1px solid var(--border);
-    background: var(--entity);
-    border-radius: 4px;
-    padding: 5px 12px;
-  }
-  .index-group a:hover { border-color: var(--accent); color: #ffffff; }
   .flow-label a { cursor: pointer; }
   tspan.lk { fill: #a8b2e0; text-decoration: underline; text-decoration-style: dotted; }
   .flow-label a:hover tspan.lk { fill: #ffffff; }
@@ -315,71 +287,6 @@
   Click any shape to reach its spec: an external entity opens its field-level composition in the <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md">Data Dictionary</a>.
   Each flow is named by the one structure it holds. Click a flow name for its definition in <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#6.0-data-flows">Data Dictionary &sect;6.0</a>. FiscalData supplies two structures, so it has two flows. FiscalData and TreasuryDirect both supply auction results.
 </p>
-
-<div class="index">
-  <h2>Spec Index</h2>
-  <p>Every spec, grouped as the portal groups the apps. Drilling from process 0 reaches the same specs through <a href="DFD_LEVEL1.html">Level 1</a>.</p>
-
-  <div class="index-group">
-    <span class="g-label">Daily Workflow</span>
-    <a href="DFD_LEVEL2_TIPSLADDERMANAGER.html">TipsLadderManager</a>
-    <a href="DFD_LEVEL2_YIELDCURVES.html">YieldCurves</a>
-    <a href="DFD_LEVEL2_YIELDSMONITOR.html">YieldsMonitor</a>
-  </div>
-
-  <div class="index-group">
-    <span class="g-label">Reference</span>
-    <a href="DFD_LEVEL2_TREASURYAUCTIONS.html">TreasuryAuctions</a>
-    <a href="DFD_LEVEL2_TIPSREFERENCE.html">TipsReference</a>
-    <a href="DFD_LEVEL2_CPIEXPLORER.html">CpiExplorer</a>
-    <a href="viewer.html#/md/TaxationOfTreasuries/docs/TaxationOfTreasuries_Foundation.md">TaxationOfTreasuries</a>
-    <a href="DFD_LEVEL2_FUNDHOLDINGS.html">FundHoldings</a>
-  </div>
-
-  <div class="index-group">
-    <span class="g-label">Educational</span>
-    <a href="DFD_LEVEL2_PRIMER.html">Portal Primer</a>
-    <a href="DFD_LEVEL2_SEASONALADJUSTMENTS.html">SeasonalAdjustments</a>
-  </div>
-
-  <div class="index-group">
-    <span class="g-label">Shared Knowledge Base</span>
-    <a href="viewer.html#/md/knowledge/Bond_Basics.md">Bond Basics</a>
-    <a href="viewer.html#/md/knowledge/TIPS_Basics.md">TIPS Basics</a>
-    <a href="viewer.html#/md/knowledge/Treasury_CUSIP_Reference.md">Treasury CUSIP Reference</a>
-    <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md">Data Dictionary</a>
-    <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#2.0-data-stores-s">Data Stores</a>
-  </div>
-
-  <div class="index-group">
-    <span class="g-label">Ladder Specs</span>
-    <a href="viewer.html#/md/TipsLadderManager/knowledge/1.0_Bond_Ladders.md">1.0 Bond Ladders</a>
-    <a href="viewer.html#/md/TipsLadderManager/knowledge/2.0_TIPS_Ladders.md">2.0 TIPS Ladders</a>
-    <a href="viewer.html#/md/TipsLadderManager/knowledge/3.0_TIPS_Ladder_Rebalancing.md">3.0 Rebalancing</a>
-  </div>
-
-  <div class="index-group">
-    <span class="g-label">Yield Curves Specs</span>
-    <a href="viewer.html#/md/YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md">3.1 Parse sources and calculate yields</a>
-    <a href="viewer.html#/md/YieldCurves/knowledge/3.2_Adjust_For_Seasonality.md">3.2 Adjust for seasonality</a>
-    <a href="viewer.html#/md/YieldCurves/knowledge/3.3_Adjust_For_Other_Effects.md">3.3 Adjust for other effects</a>
-    <a href="viewer.html#/md/YieldCurves/knowledge/3.4_Fit_Spot_Yield_Curves.md">3.4 Fit spot yield curves</a>
-    <a href="viewer.html#/md/YieldCurves/knowledge/3.5_Calculate_Breakeven_Inflation.md">3.5 Calculate breakeven inflation</a>
-    <a href="viewer.html#/md/YieldCurves/knowledge/3.6_Calculate_Bid_And_Ask_Spreads.md">3.6 Calculate bid and ask spreads</a>
-    <a href="viewer.html#/md/YieldCurves/knowledge/3.7_Render_Charts_And_Tables.md">3.7 Render charts and tables</a>
-    <a href="viewer.html#/md/YieldCurves/knowledge/Visual_Standards.md">Visual Standards</a>
-  </div>
-
-  <div class="index-group">
-    <span class="g-label">Developer Only</span>
-    <a href="viewer.html#/md/knowledge/VERIFICATION_SUITE.md">Verify Setup</a>
-  </div>
-
-  <div class="index-group">
-    <span class="g-label">External Resources</span>
-    <a href="https://mweinb.github.io/after-tax-tips/" target="_blank" rel="noopener">After-Tax TIPS Ladder Calculator</a>
-  </div>
-</div>
 
 </body>
 </html>
