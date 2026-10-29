@@ -747,7 +747,11 @@ export function buildCashFlowDateDrill(bucket) {
 // calculated. The date's Ref CPI is already shown once above (buildCashFlowDateDrill) — this starts
 // from Dated date Ref CPI so nothing is repeated.
 export function buildCashFlowEventDrill(e) {
-  const rows = [
+  // A Synthetic TIPS (Synthetic tab, 4.5.4) has the fixed Index Ratio of the DD entry, so no Ref CPI rows.
+  const rows = e.synthetic ? [
+    { label: 'Index ratio', note: 'Synthetic TIPS', value: fd(e.paymentIndexRatio, 5) },
+    { label: 'Inflation-Adjusted Principal per TIPS', note: '1,000 \xd7 index ratio', value: fm2(e.principalPerBond) },
+  ] : [
     { label: 'Ref CPI', value: fd(e.refCPI, 5) },
     { label: 'Dated date Ref CPI', value: fd(e.datedDateRefCpi, 5) },
     { label: 'Index ratio', note: 'Ref CPI \xf7 Dated date Ref CPI', value: fd(e.paymentIndexRatio, 5) },

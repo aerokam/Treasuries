@@ -714,7 +714,7 @@ coverExcessCost_c = Future 30Y total cost × coverWeight_c
 
 <a id="cash-flow-calendar"></a>
 ### Cash Flow Calendar
-`Cash_Flow_Calendar` = *When a portfolio’s current holdings pay, and how much, by date. Independent of funded years, DARA, brackets, gaps and covers: a fact about the held CUSIPs and quantities rather than a ladder-construction result (4.5.4 §Cash Flow Calendar).*
+`Cash_Flow_Calendar` = *When a portfolio’s current holdings pay, and how much, by date. Independent of funded years, DARA, brackets, gaps and covers: a fact about the held CUSIPs and quantities rather than a ladder-construction result (4.5.4 §Cash Flow Calendar). The Synthetic tab is the exception: it replaces the [Excess TIPS](#excess-tips) with the [Synthetic TIPS](#synthetic-tips) of the [Gap Years](#gap-years) and Future 30Y years, which are never purchased (4.5.4 §Synthetic tab).*
 
 ---
 

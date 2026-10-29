@@ -2584,7 +2584,9 @@ test('build: Cash Flow Calendar shows the built ladder, not leftover Rebalance h
   await expect(page.locator('#cash-flow-btn')).toBeVisible();
   await page.locator('#cash-flow-btn').click();
   await expect(page.locator('#cash-flow-overlay')).toBeVisible();
-  await expect(page.locator('#cash-flow-toggle')).toBeHidden(); // Build has no Before/After
+  await expect(page.locator('#cash-flow-before-btn')).toBeHidden(); // Build has no Before/After
+  await expect(page.locator('#cash-flow-after-btn')).toBeHidden();
+  await expect(page.locator('#cash-flow-ladder-btn')).toHaveClass(/active/);
 
   // A full funded year's total cash flow should land near the $40,000 DARA the ladder was built
   // for — not near whatever SampleHoldings.csv happens to throw off.
@@ -2597,6 +2599,65 @@ test('build: Cash Flow Calendar shows the built ladder, not leftover Rebalance h
     totals.push(Number(text.replace(/[^0-9.-]/g, '')));
   }
   expect(Math.max(...totals)).toBeGreaterThan(30_000);
+});
+
+// Synthetic tab (4.5.4 §Synthetic tab): the Excess TIPS drop out and the Synthetic TIPS of the gap years
+// come in at Index Ratio 1.00000, so a Synthetic TIPS pays principal in whole multiples of 1,000.
+async function syntheticCsvLines(page) {
+  await page.locator('#cash-flow-synthetic-btn').click();
+  await expect(page.locator('#cash-flow-synthetic-btn')).toHaveClass(/active/);
+  const downloadPromise = page.waitForEvent('download');
+  await page.locator('#cash-flow-export').click();
+  const download = await downloadPromise;
+  const csvPath = test.info().outputPath('cash-flow-synthetic.csv');
+  await download.saveAs(csvPath);
+  return readFileSync(csvPath, 'utf8').trim().split('\n').slice(1).map(l => l.split(','));
+}
+
+test('Cash Flow Calendar: Synthetic tab replaces the Excess TIPS with Synthetic TIPS (Build)', async ({ page }) => {
+  test.setTimeout(20_000);
+  await page.locator('.tab-btn[data-mode="build"]').click();
+  await page.locator('#run-btn').click();
+  await expect(page.locator('#build-output')).toHaveCSS('display', 'block', { timeout: 4_000 });
+  await page.locator('#cash-flow-btn').click();
+  await expect(page.locator('#cash-flow-toggle')).toBeVisible();
+  await expect(page.locator('#cash-flow-synthetic-btn')).toHaveAttribute('title', /Synthetic TIPS/);
+
+  const ladderTotals = await page.locator('#cash-flow-content tr.cf-year-header td:last-child').allTextContents();
+  const rows = await syntheticCsvLines(page);
+  const synPrincipal = rows.filter(r => r[1].startsWith('Synthetic TIPS') && r[2] === 'principal');
+  expect(synPrincipal.length).toBeGreaterThan(0);
+  for (const r of synPrincipal) expect(Number(r[3]) % 1000).toBe(0);
+
+  await page.locator('#cash-flow-ladder-btn').click();
+  expect(await page.locator('#cash-flow-content tr.cf-year-header td:last-child').allTextContents()).toEqual(ladderTotals);
+});
+
+test('Cash Flow Calendar: Synthetic tab after a rebalance, event popup omits the Ref CPI rows', async ({ page }) => {
+  test.setTimeout(20_000);
+  await page.locator('#holdings-file').setInputFiles(HOLDINGS_PATH);
+  await page.locator('#run-btn').click();
+  await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 4_000 });
+  await page.locator('#cash-flow-btn').click();
+  await expect(page.locator('#cash-flow-synthetic-btn')).toBeVisible();
+
+  const rows = await syntheticCsvLines(page);
+  const synPrincipal = rows.filter(r => r[1].startsWith('Synthetic TIPS') && r[2] === 'principal');
+  expect(synPrincipal.length).toBeGreaterThan(0);
+  for (const r of synPrincipal) expect(Number(r[3]) % 1000).toBe(0);
+
+  // Open the Level-4 popup of a Synthetic TIPS event.
+  const year = synPrincipal[0][0].slice(0, 4);
+  const yearRow = page.locator(`#cash-flow-content tr.cf-year-header[data-cf-year="${year}"]`);
+  if ((await yearRow.getAttribute('data-expanded')) === 'false') await yearRow.click();
+  const dateCells = page.locator(`#cash-flow-content tr.cf-date-row[data-cf-year="${year}"] td.cf-date-cell:visible`);
+  const synEvent = page.locator('#shared-popup .cf-event-drill', { hasText: 'Synthetic TIPS' });
+  for (let i = 0; i < await dateCells.count() && !(await synEvent.count()); i++) await dateCells.nth(i).click();
+  await synEvent.first().click();
+  await expect(page.locator('#shared-popup-l3')).toContainText('Index ratio');
+  const popupText = await page.locator('#shared-popup-l3').textContent();
+  expect(popupText).toContain('1.00000');
+  expect(popupText).not.toContain('Dated date Ref CPI');
 });
 
 // ── Modal frame: resizing a popup ────────────────────────────────────────────
