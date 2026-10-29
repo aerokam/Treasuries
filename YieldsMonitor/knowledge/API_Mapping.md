@@ -53,7 +53,7 @@ The following symbols are currently supported and grouped by security type:
 
 ## R2 Historical Baseline
 
-Used for **10Y, ALL, and Custom** ranges. R2 CORS is live for this app's origins (`localhost:8080`, `localhost:8081`, production) — see [Portal §2.1](../../knowledge/Portal.md#r2-read-access) for the full CORS policy. The browser fetches `history.json` directly, no proxy needed.
+Used for **10Y, ALL, and Custom** ranges. R2 CORS is live for this app's origins (`localhost:8080`, `localhost:8081`, production) — see [R2 Read Access](../../knowledge/DATA_DICTIONARY.md#r2-read-access) for the full CORS policy. The browser fetches `history.json` directly, no proxy needed.
 
 - **Base URL**: `https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/yields-history/`
 - **File**: `history.json` — single nested object `{ "<SYMBOL>": [{x: timestamp, y: yield}, …], … }`

@@ -108,7 +108,7 @@ See [DATA_DICTIONARY.md#s7](./DATA_DICTIONARY.md#s7) and [DATA_DICTIONARY.md#s7]
 
 `TIPS/tentative_tips.json` was a derived JSON extract of TIPS-only entries from the Tentative Auction Schedule XML, generated and uploaded by `scripts/updateTentativeSchedule.js` alongside the full XML mirror. It was never read by any app: `TreasuryAuctions/src/app.js` declared a `TENTATIVE_TIPS_URL` constant pointing at it but never fetched it, instead cross-referencing TIPS status client-side from the full XML mirror's own `TIPS` field. Removed the JSON generation/upload from `updateTentativeSchedule.js`, the dead constant from `app.js`, and the R2 object.
 
-S9 in `DataStores.md` (since removed), [Portal.md](./Portal.md), and [DATA_DICTIONARY.md](./DATA_DICTIONARY.md#s9) previously pointed at this dead JSON file; it now correctly documents `TIPS/Tentative-Auction-Schedule.xml`, the file the app actually reads (which had no data-store entry of its own before this correction).
+S9 in `DataStores.md` (since removed), `Portal.md` (since removed), and [DATA_DICTIONARY.md](./DATA_DICTIONARY.md#s9) previously pointed at this dead JSON file; it now correctly documents `TIPS/Tentative-Auction-Schedule.xml`, the file the app actually reads (which had no data-store entry of its own before this correction).
 
 Also removed `TreasuryAuctions/data/Tentative-Auction-Schedule.xml` and `TreasuryAuctions/data/tentative_tips.json` from git tracking and added `TreasuryAuctions/data/` to `.gitignore`: these were the script's local staging copies written before upload, not consumed by any app — R2 is the sole source apps read at runtime.
 

@@ -171,8 +171,8 @@ on origin. Two rules follow:
   it.
 - **8081** — any branch or worktree, always this port, no exceptions and no session picking a
   different one. `npx serve . -p 8081` from the worktree root; the developer runs it.
-- More ports need the developer to widen the R2 CORS allowlist (repo-root
-  `knowledge/Portal.md` §2.1). Ask.
+- More ports need the developer to widen the R2 CORS allowlist (the R2 Read Access entry of the repo-root
+  `knowledge/DATA_DICTIONARY.md`). Ask.
 
 ## Tests
 

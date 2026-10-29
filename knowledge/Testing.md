@@ -34,7 +34,7 @@ The other apps have no suite. A suite is added for an app when that app is next 
 
 - TipsLadderManager and YieldCurves each have their own `playwright.config.js`, which their `test:UI` suites name with `-c`.
 - TreasuryAuctions, YieldsMonitor and KnowledgeMap are projects in the root `playwright.config.js`, one project per app.
-- UI suites load pages from `localhost:8080`, never `127.0.0.1:8080`. Only `localhost:8080` is on the R2 CORS allowlist ([Portal §2.1](./Portal.md#r2-read-access)), so from `127.0.0.1` every R2 read a test does not mock fails.
+- UI suites load pages from `localhost:8080`, never `127.0.0.1:8080`. Only `localhost:8080` is on the R2 CORS allowlist ([R2 Read Access](./DATA_DICTIONARY.md#r2-read-access)), so from `127.0.0.1` every R2 read a test does not mock fails.
 - A test of a module in `shared/src/` belongs in `shared/tests/`, not in the suite of an app that imports the module, so that it runs whenever the module changes.
 
 ---
