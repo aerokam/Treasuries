@@ -218,7 +218,7 @@ function daraInputHTML(fy, daraByYear, flaggedYears, gapSet, future30ySet) {
     : '';
   const displayVal = val != null && !isNaN(val) ? Math.round(val) : '';
   // The group header row's background is LIGHT (table.simple tr.fy-group-header td: #dce8e8,
-  // #c0d8d8 for bracket years — 6.0 §Group Header Row Visual Style), not the dark teal used by the
+  // #c0d8d8 for bracket years), not the dark teal used by the
   // top form card — so this needs a light-theme input (white bg, dark text), the same style the
   // old standalone per-year DARA panel's row inputs used, not a translucent-dark/white-text combo.
   return ' <span class="fy-dara-wrap" style="font-weight:normal">'
@@ -364,8 +364,7 @@ export function renderTable({ details, mode, summary, daraByYear = null, flagged
 
   // Every year in [firstYear, lastYear] gets its own group header row — including gap years and
   // Future 30Y years, which have no TIPS row of their own but still need a row to host the DARA
-  // input (5.0 §Funded Year Group Header Row §DARA Input; 6.0 §Per-Year DARA (Table-Integrated)
-  // §Year list). Insert an empty-rows placeholder group for any in-range year `details` didn't
+  // input (5.0 §Funded Year Group Header Row §DARA Input; 4.5.1 §DARA Input). Insert an empty-rows placeholder group for any in-range year `details` didn't
   // already produce a group for.
   if (summary?.firstYear != null && summary?.lastYear != null) {
     const byYear = new Map(groups.map(g => [g.fy, g]));

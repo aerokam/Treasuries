@@ -80,7 +80,7 @@
   .field select:disabled { opacity: .55; cursor: not-allowed; }
   .field input[type="file"] { display: none; }
   #field-pre-ladder label:last-child { height: auto; }
-  /* Import/Export menus (6.0 §Import/Export Menus): action selects, not persisted-state
+  /* Import/Export menus (4.5 §Row 1): action selects, not persisted-state
      ones — every option performs its action then the select resets straight back to its placeholder,
      so there's no "currently selected" value to keep visible. Button-themed (not `.field select`-
      themed) and identically styled to each other, sitting side by side at the front of Row 1. */
@@ -602,7 +602,7 @@
          "ladder target" fields, always construction policy) once Import/Export moved to Row 1's front,
          to keep the two rows about the same length. Available cash went the other way, to Row 1: it
          is a target-side dollar figure, not construction policy, and Row 2 had grown too long for
-         the card in Rebalance (6.0 §Row 1 / §Row 2). -->
+         the card in Rebalance (4.5 §Row 1 / §Row 2). -->
     <div class="card-inputs" style="margin-top:8px">
       <div class="field" id="field-bracket-mode">
         <label>Brackets</label>
@@ -1125,7 +1125,7 @@ document.querySelectorAll('.tab-bar .tab-btn').forEach(btn => {
     _clearSelection();
     
     // Toggle field visibility
-    // Import (6.0 §Import/Export Menus) is available in both modes now — Build only ever imports a
+    // Import (4.5 §Row 1) is available in both modes now — Build only ever imports a
     // DARA plan (no holdings to browse for), so the CUSIP/Qty option is Rebalance-only; the menu
     // itself stays visible.
     document.getElementById('import-opt-cusip-qty').hidden = !isRebalance;
@@ -1199,7 +1199,7 @@ document.querySelectorAll('.tab-bar .tab-btn').forEach(btn => {
   });
 });
 
-// ─── Import / Export menus (6.0 §Import/Export Menus) ────────────────────────
+// ─── Import / Export menus (4.5 §Row 1) ────────────────────────
 // Button + popup, not a native <select>: a <select>'s 'change' event doesn't carry a strong enough
 // user gesture in Safari/WebKit to open a second native picker (file-open dialog, file save) — see
 // the .menu-dropdown CSS comment above. Each item is a real button so its 'click' fires synchronously
@@ -1410,7 +1410,7 @@ function _captureExpandedState(tbl) {
 //
 // Every path that rebuilds a ladder table goes through this. Changing a parameter on the top card
 // is the reason to be looking at an expanded year in the first place, so collapsing the table on
-// the way to showing the effect defeats the change being made (6.0 §Expand/Collapse State).
+// the way to showing the effect defeats the change being made (4.5.1 §Expand/collapse behaviour).
 function _restoreOrDefaultGroupsExpanded(tbl, prevState) {
   tbl.querySelectorAll('tr.fy-group-header').forEach(hdr => {
     const fy = hdr.dataset.fy;
@@ -1450,7 +1450,7 @@ function _updateExpandCollapseLabels() {
 // yet — selects just the clicked row as a new anchor; it never toggles either.
 //
 // `_deferToolbarLayout` holds off the selection toolbar's display:none/flex flip — which grows
-// #top-row and shifts every row below it down (6.0 §Selection Toolbar) — until mouseup, for as long
+// #top-row and shifts every row below it down (3.0 §Selecting rungs) — until mouseup, for as long
 // as the button is held down. Without this, a hold firing mid-press pushes the just-selected row out
 // from under a stationary cursor the instant the toolbar appears, so the row that ends up under the
 // cursor is the one above the row that actually got selected — confusing even though the selection
@@ -2865,7 +2865,7 @@ function _initRebalDaraFromPortfolio() {
 // already in place for those controls' `rebalanceRendered`-only display. #table-controls (Expand
 // All / Collapse All) is NOT in that list — the ladder table with its collapsible funded-year
 // groups is visible as soon as this preview renders, so those two buttons are usable immediately
-// too (6.0 §Before-State on Load (Rebalance)).
+// too (4.5 §Before Run).
 function _renderBeforeStatePreview() {
   if (currentMode !== 'rebalance' || !currentHoldingsArray || !tipsMarketData || !refCpiRows || !settlementDate) return;
   const rc = lookupRefCpi(refCpiRows, _defaultRefCpiDateStr);
@@ -2898,8 +2898,7 @@ function _renderBeforeStatePreview() {
 
   _rebalBeforeStateShown = true;
   document.getElementById('output').style.display = 'block';
-  // Expand/Collapse All are usable as soon as the table itself is visible (6.0 §Before-State on
-  // Load (Rebalance)) — only the genuinely After-dependent controls below stay hidden.
+  // Expand/Collapse All are usable as soon as the table itself is visible (4.5 §Before Run) — only the genuinely After-dependent controls below stay hidden.
   document.getElementById('table-controls').style.display = 'flex';
   _updateExpandCollapseLabels();
   _syncExportMenu();
@@ -3545,7 +3544,7 @@ function updateDaraInput(force = false) {
 }
 
 // Formerly rendered the standalone Per-Year DARA panel (`#dara-by-year`); that element is removed
-// (6.0 §Per-Year DARA (Table-Integrated) — the input surface now lives inline in the ladder output
+// (4.5.1 §DARA Input — the input surface now lives inline in the ladder output
 // table's group header rows). This function keeps its name (many call sites) but now only:
 // recomputes the in-range year list, trims the store/manual-year set to it, refreshes the
 // history buttons and Select-maturities field sync, syncs the top `#dara` box, and — in

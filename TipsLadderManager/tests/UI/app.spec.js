@@ -124,7 +124,7 @@ async function daraDisplay(page) {
   return placeholder === 'by year' ? 'by year' : '';
 }
 
-// Import/Export are a button+popup, not a native <select> (6.0 §Import/Export Menus — WebKit doesn't
+// Import/Export are a button+popup, not a native <select> (4.5 §Row 1 — WebKit doesn't
 // carry a strong enough user gesture through a <select>'s 'change' event to open a file picker/save).
 // `menu` is 'import-menu' or 'export-menu'; `choice` is the target item's data-choice value.
 async function chooseMenu(page, menu, choice) {
@@ -1183,7 +1183,7 @@ test('rebalance: Infer DARA over a selected range fills an empty interior year',
 // A click-drag across rows (3.0 §Per-Rung DARA Selection §Selecting rungs) must show the row under
 // the cursor as selected (yellow) WHILE the mouse is still over it, mid-drag, not only after the
 // mouse leaves — a same-specificity `:hover` CSS rule used to win over `.selected` and mask the
-// yellow until the cursor moved off the row (6.0 §Selection Toolbar).
+// yellow until the cursor moved off the row (3.0 §Selecting rungs).
 test('rebalance: click-drag selection highlights the row under the cursor immediately, before mouseup', async ({ page }) => {
   await page.locator('#holdings-file').setInputFiles(HOLDINGS_PATH);
   await expect(page.locator('.fy-dara-input[data-year]').first()).toBeVisible({ timeout: 4_000 });
@@ -1234,7 +1234,7 @@ test('rebalance: quick click toggles expand/collapse only, press-and-hold select
 });
 
 // The selection toolbar's display:none/flex flip grows #top-row and shifts the table below it down
-// (6.0 §Selection Toolbar). Revealing it the instant a hold fires, while the button is still down,
+// (3.0 §Selecting rungs). Revealing it the instant a hold fires, while the button is still down,
 // pushes the just-selected row out from under a stationary cursor — the row above ends up under the
 // cursor instead, reading as if the wrong row got selected even though it didn't. The reveal must
 // stay deferred until mouseup.
@@ -1843,7 +1843,7 @@ test("the received-cash window is chosen from this portfolio's own payment dates
 
 // Changing a control on the top card is the reason to be looking at an expanded year: the point is to
 // see what the change did to that year. Collapsing the table on the way to showing the effect hides
-// the effect, so expansion state survives every re-render (6.0 §Expand/Collapse State).
+// the effect, so expansion state survives every re-render (4.5.1 §Expand/collapse behaviour).
 test('the ladder table keeps its expansion state when a top-card control changes', async ({ page }) => {
   test.setTimeout(20_000);
   await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 4_000 });
