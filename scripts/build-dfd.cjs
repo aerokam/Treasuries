@@ -315,17 +315,20 @@ function level1() {
     { key: 'fh', cat: 'reference', name: ['Fund', 'Holdings'], spec: 'DFD_LEVEL2_FUNDHOLDINGS.html', reads: ['funds'] },
     { key: 'ta', cat: 'reference', name: ['Treasury', 'Auctions'], spec: 'DFD_LEVEL2_TREASURYAUCTIONS.html', reads: ['auctions', 'tent'] },
     { key: 'tx', cat: 'reference', name: ['Taxation of', 'Treasuries'], spec: V('TaxationOfTreasuries/docs/TaxationOfTreasuries_Foundation.md'), reads: [] },
+    // Developed and maintained independently: it reads none of the data stores and none of the external entities.
+    { key: 'at', cat: 'external', name: ['After-Tax TIPS', 'Ladder', 'Calculator'], spec: 'https://mweinb.github.io/after-tax-tips/', reads: [] },
   ];
   barycentre(stores, apps);
-  // The column reproduces the portal index: the same three sections in the same
+  // The column reproduces the portal index: the same four sections in the same
   // order, and the same apps in the same order inside each. Barycentre still
   // runs, because the store order it produces is what keeps the flows readable.
   const CATS = [
     { id: 'workflow',    label: 'Daily Workflow', fill: '#5a6e5a' },
     { id: 'reference',   label: 'Reference',      fill: '#2474a6' },
     { id: 'educational', label: 'Educational',    fill: '#6c4ab8' },
+    { id: 'external',    label: 'External Resources', fill: '#c8920a' },
   ];
-  const PORTAL_ORDER = ['ym', 'yc', 'lm', 'ta', 'tr', 'ce', 'tx', 'fh', 'pr', 'sa'];
+  const PORTAL_ORDER = ['ym', 'yc', 'lm', 'ta', 'tr', 'ce', 'tx', 'fh', 'pr', 'sa', 'at'];
   for (const a of apps) {
     if (!PORTAL_ORDER.includes(a.key)) { console.error(`app ${a.key} is missing from PORTAL_ORDER`); process.exit(1); }
   }
@@ -345,7 +348,7 @@ function level1() {
   const store = { x: SX, y: mid, w: SW };
   const JX = SX + SW + 90;                       // where the trunk fans out
   const OBS = [{ x: acq.cx, y: acq.cy, r: acq.r }, ...apps.map((a, j) => ({ x: AX, y: ay(j), r: AR }))];
-  const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 1: one acquisition process, the R2 data stores as one shape, ten app processes and the user.">`, marker()];
+  const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 1: one acquisition process, the R2 data stores as one shape, eleven app processes and the user.">`, marker()];
 
   for (const c of CATS) {
     const idx = apps.map((a, j) => a.cat === c.id ? j : -1).filter(j => j >= 0);
@@ -426,7 +429,8 @@ function level1() {
       '  Three of those files are read by no app: YieldCurves.csv, BreakevenInflation.csv and BidAskSpreads.csv. They are written for the user to pull into a spreadsheet, so their flow goes to the user rather than to a process.',
       '  External entities are not redrawn at this level. Their flows are drawn against each entity on the <a href="DFD_LEVEL0.html">context diagram</a> and enter here as one flow.',
       '  Taxation of Treasuries and Seasonal Adjustments read no store, so no flow reaches them from it: the first reads nothing, and the second reads two snapshot files kept in the app.',
-      '  The app column reproduces the portal index: the same three sections in the same order, and the same apps in the same order inside each.',
+      '  After-Tax TIPS Ladder Calculator is developed and maintained independently. It reads no store and no external entity, so only its flows with the user are drawn, and its bubble opens the app.',
+      '  The app column reproduces the portal index: the same four sections in the same order, and the same apps in the same order inside each.',
       '  Every app has the same pair of flows with the user, labelled once at the top. The user is drawn once, as a tall shape, so no flow to it crosses another.'].join(NL)
   });
 }
