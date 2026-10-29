@@ -343,7 +343,13 @@ When the ladder has Future 30Y years, the interest of the Simulated Outstanding 
 **Purpose**: The frame that makes a modal draggable by its title and resizable from its edges and corners.
 **Exports**: `makeDraggableResizable(modalEl, dragHandleEl, { minWidth, minHeight })`.
 
-**Called by**: [4.5.2 Show drill popups](../TipsLadderManager/knowledge/4.5.2_Show_Drill_Popups.md) (the TIPS Ref and Mkt popup), [4.5.3 Show trade ticket](../TipsLadderManager/knowledge/4.5.3_Show_Trade_Ticket.md) and [4.5.4 Show cash flow calendar](../TipsLadderManager/knowledge/4.5.4_Show_Cash_Flow_Calendar.md).
+**Called by**: [4.5.2 Show drill popups](../TipsLadderManager/knowledge/4.5.2_Show_Drill_Popups.md) (the TIPS Ref and Mkt popup), [4.5.3 Show trade ticket](../TipsLadderManager/knowledge/4.5.3_Show_Trade_Ticket.md), [4.5.4 Show cash flow calendar](../TipsLadderManager/knowledge/4.5.4_Show_Cash_Flow_Calendar.md), the maturity picker ([2.0 §Picking Maturities for a Funded Year](../TipsLadderManager/knowledge/2.0_TIPS_Ladders.md#picking-maturities)) and the priority-order picker ([4.4 §Priority-order picker](../TipsLadderManager/knowledge/4.4_Rebalance_Ladder.md#priority-order-picker)).
+
+**Standard.** Every modal with substantial content (more than a couple of short lines) uses this frame: a fixed-position panel with `display:flex; flex-direction:column`, a title bar with `cursor:move`, and 8 `.resize-handle` divs (n, s, e, w, nw, ne, sw, se). It applies to TipsRef, the maturity picker, the priority-order picker, the Trade Ticket and the Cash Flow Calendar. `makeDraggableResizable(modalEl, titleEl, { minWidth, minHeight })` is called once per modal at startup. A small modal with fixed content (help, account selection) is exempt, because nothing in it benefits from resizing, and a plain centered overlay is simpler.
+
+**Resizing.** Dragging an edge moves that edge and holds the opposite one, including once the size reaches `minWidth` or `minHeight`: the new `left` and `top` come from the size actually applied and not from the pointer delta, so a west or north drag stops and does not slide the modal across the screen. The first resize also drops the content-sizing clamps, because a modal that sizes to its content (`width:max-content` with a `max-width`, as the shared popup does) would otherwise ignore an outward drag.
+
+**A resize may end outside the modal.** The click that follows a drag targets the nearest common ancestor of the press and the release, which is the document body once the pointer leaves the modal. An outside-click close must therefore test where the press started and not where it ended, or a resize closes the modal being resized ([popup.js (M7)](#m7)).
 
 ---
 
