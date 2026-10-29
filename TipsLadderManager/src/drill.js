@@ -1,4 +1,4 @@
-// drill.js -- Drill-down popup HTML builder (6.0_UI_Schema.md)
+// drill.js -- Drill-down popup HTML builder (4.5.2 Show drill popups)
 // Exports: buildDrillHTML(d, colKey, summary)
 
 import { UPPER_BRACKET_YEAR } from './ladder-core.js';

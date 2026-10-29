@@ -1,4 +1,4 @@
-// render.js -- Table rendering driven by COLS schema (6.0_UI_Schema.md)
+// render.js -- Table rendering driven by COLS schema (4.5.1 Render ladder table)
 // Exports: COLS, renderTable
 
 function esc(s) {
@@ -21,7 +21,7 @@ function fmtCls(v, fmt) {
   return (fmt === 'sgn' && typeof v === 'number' && v !== 0) ? (v > 0 ? 'pos' : 'neg') : '';
 }
 
-// COLS schema -- single source for all table rendering (6.0_UI_Schema.md)
+// COLS schema -- single source for all table rendering (4.5.1 §COLS Schema)
 export const COLS = [
   // Shared (both modes)
   { label: 'CUSIP',       key: 'cusip',       fmt: 'str',
