@@ -498,3 +498,56 @@ The value implied for a year with no point in the series (a structural gap year,
 - [4.4.2 Preview before-state](../TipsLadderManager/knowledge/4.4_Rebalance_Ladder.md#preview-before-state), `before-state-lib.js#detectBracketFlags`: `findSpikes` decides which bracket years and cover years are flagged as excess, and below `MIN_SHAPE_POINTS` held years a year is flagged when its raw ARA exceeds the `evenSpread` of the held years.
 - [4.4.1 Derive per-year DARA from holdings or DARA plan](../TipsLadderManager/knowledge/4.4_Rebalance_Ladder.md#derive-per-year-dara-from-holdings-or-dara-plan), `rebalance-lib.js#hasGapCoverageIntent` and `#derivePerYearDara`: `findSpikes` flags the bracket-candidate years and the signal at 2040, and `inferShapeValue` fills the gap-year DARA, in the recovery for a derived Per-Year DARA ([3.0 §Funding the rebalance](../TipsLadderManager/knowledge/3.0_TIPS_Ladder_Rebalancing.md#funding-the-rebalance)). Its low-data fallback flags a bracket-candidate year when its ARA exceeds 1.5 times the `evenSpread`.
 - [4.4.1](../TipsLadderManager/knowledge/4.4_Rebalance_Ladder.md#derive-per-year-dara-from-holdings-or-dara-plan), the file-load derivation in `index.html` ([3.0 §Per-Year DARA from Portfolio](../TipsLadderManager/knowledge/3.0_TIPS_Ladder_Rebalancing.md#per-year-dara-from-portfolio)) calls `inferShapeValue` and `evenSpread` for the gap-year and Future 30Y year fill, with `detectBracketFlags` for the candidate years.
+
+---
+
+## <a id="m11"></a>chart-keys.js (M11)
+**File**: `shared/src/chart-keys.js`
+**Purpose**: The one implementation of the keyboard and modifier-key navigation of a Chart.js chart, of the step that the Y-axis bounds round to, and of the Lock Right window. The plain mouse wheel, the pinch and the drag are those of the Chart.js zoom plugin, which each app configures.
+**Exports**:
+- `handleChartKeydown(e, chart, options)` — the arrow keys pan the chart by `panStep` (default 10%) of its visible span, and `+` (or `=`) and `-` (or `_`) zoom both axes by `zoomStep` (default 10%) about the middle of the visible span. With `lockRight` and `xMaxAnchor` set, a zoom holds the right edge at `xMaxAnchor`. It calls `onAction({ chart })` after a key it handled.
+- `setupAxisWheelZoom(canvas, onXZoom, onYZoom)` — Ctrl with the wheel zooms the X-axis only and Shift with the wheel zooms the Y-axis only, by a factor of 1.1 for a turn forward and 0.9 for a turn back. A wheel turn with neither key is left to the zoom plugin.
+- `snapYBounds(min, max)` — rounds `min` down and `max` up to a step set by the range:
+
+  | Range | Step |
+  |---|---|
+  | under 0.05 | 0.005 |
+  | 0.05 to under 0.1 | 0.01 |
+  | 0.1 to under 0.3 | 0.05 |
+  | 0.3 to under 1 | 0.10 |
+  | 1 to under 4 | 0.25 |
+  | 4 to under 8 | 0.50 |
+  | 8 or more | 1.00 |
+
+- `snapYAfterZoom(chart, factor)` — after a wheel zoom, rounds the bounds in when `factor` is above 1 (the range shrinks) and out otherwise, and sets the tick step. When rounding in leaves no range, it uses the bounds of `snapYBounds`.
+- `lockedRightMin(xMin, xMax, xMaxAnchor, axis, scale)` and `applyLockRight(chart, xMaxAnchor, axis)` — set the right edge of the window to `xMaxAnchor` and the left edge so that the window keeps its width. `axis` (`{ toPos, fromPos }`) is for an axis whose drawn width is not its time span, such as the trading-hours axis, and the width is then kept as drawn.
+
+**Called by**: [Render time series (2.5)](../YieldsMonitor/knowledge/2.5_Render_Time_Series.md#pan-and-zoom) (YieldsMonitor, every export, and `snapYBounds` for the yield curve and breakeven charts), [Build axis scales (3.7.2)](../YieldCurves/knowledge/3.7_Render_Charts_And_Tables.md#build-scales) (YieldCurves, all but `lockedRightMin` and `applyLockRight`) and [Render CPI chart (7.3)](../CpiExplorer/knowledge/7.3_Render_CPI_Chart.md) (CpiExplorer, `handleChartKeydown` and `snapYBounds`).
+
+---
+
+## <a id="m12"></a>chart-time-axis.js (M12)
+**File**: `shared/src/chart-time-axis.js`
+**Purpose**: The one implementation of the time-axis ticks of a Chart.js chart: calendar-aligned ticks for a span of months or years, and the time unit that follows the visible span.
+**Exports**:
+- `calendarTimeAxis({ color, font, gridColor })` — returns the tick, label and gridline options of a time axis, with Chart.js autoskip off:
+  - A visible span under 2 months: a tick every 7 days when the span is over 20 days, every 3 days when it is over 7 days and every day otherwise, counted from the 1st of the month of the axis minimum.
+  - A longer span: the tick interval is the largest of 1, 2, 3, 6, 12, 24, 60 and 120 months that gives at least 6 ticks across the span, and 1 month when none does:
+
+    | Visible span | Interval |
+    |---|---|
+    | 2 to under 12 months | 1 month |
+    | 12 to under 18 months | 2 months |
+    | 18 to under 36 months | 3 months |
+    | 3 to under 6 years | 6 months |
+    | 6 to under 12 years | 1 year |
+    | 12 to under 30 years | 2 years |
+    | 30 to under 60 years | 5 years |
+    | 60 years or more | 10 years |
+
+  - A tick falls on the 1st of a month, anchored to January, so the same months fall at the same positions every year at every zoom level. An interval of a year or more falls on January 1st of each year that is a multiple of the interval in years.
+  - A tick before the axis minimum is not drawn. When the axis starts after January 1st, that year has no tick and the first tick is the next aligned year (2028 and not 2026 for a two-year interval on an axis that starts in October 2026).
+  - A label follows the average spacing of the ticks: the year alone at 300 days or more, `MMM YYYY` from 25 to 299 days and `MMM D` under 25 days. A single tick is labeled `MMM YYYY`.
+- `getXTimeUnit(spanMs)` and `applyXTimeUnit(chart, toPos)` — set the Chart.js time unit from the visible span: minute under 6 hours, hour under 3 days, day under 90 days, month up to 548 days and year beyond. `toPos` maps a time to its drawn position for a trading-hours axis, so the span is the drawn width. [Render time series (2.5)](../YieldsMonitor/knowledge/2.5_Render_Time_Series.md#x-axis-tick-density-and-labels) states the labels of each unit.
+
+**Called by**: [Build axis scales (3.7.2)](../YieldCurves/knowledge/3.7_Render_Charts_And_Tables.md#build-scales) (YieldCurves, `calendarTimeAxis`), [Render CPI chart (7.3)](../CpiExplorer/knowledge/7.3_Render_CPI_Chart.md) (CpiExplorer, `calendarTimeAxis`) and [Render time series (2.5)](../YieldsMonitor/knowledge/2.5_Render_Time_Series.md#x-axis-tick-density-and-labels) (YieldsMonitor, `applyXTimeUnit`).

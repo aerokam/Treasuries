@@ -895,7 +895,7 @@ function level3YieldCurvesRender() {
     spec: V(S), specLabel: '3.7 Render charts and tables',
     title: 'Yield Curves 3.7 — Level 3', h1: 'Level 3 &mdash; Yield Curves 3.7 Render charts and tables', maxWidth: W,
     up: 'DFD_LEVEL2_YIELDCURVES.html', upLabel: 'Level 2 — Yield Curves', svg: P.join(NL),
-    notes: ['  Every process drills to its own section of <a href="viewer.html#/md/' + S + '">3.7 Render charts and tables</a>, the process spec. <a href="viewer.html#/md/' + K + 'Visual_Standards.md">Visual Standards</a> specifies what the drawn output must look like.',
+    notes: ['  Every process drills to its own section of <a href="viewer.html#/md/' + S + '">3.7 Render charts and tables</a>, the process spec.',
       '  <b>Nothing here calculates a yield.</b> Every figure drawn is produced upstream and passed in; a view showing a figure no other process produced is a defect in this stage.',
       '  The view selections from 3.7.1 reach every view, and the axis scales from 3.7.2 reach every chart; each fan is labelled once.',
       '  3.7.2 decides what is visible before anything is drawn. Its axis clipping moves the axis and never removes a security, so a table figure can fall outside what the chart shows.'].join(NL)
