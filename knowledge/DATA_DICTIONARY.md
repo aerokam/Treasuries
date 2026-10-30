@@ -791,7 +791,7 @@ Some values are true only until Treasury issues more TIPS. Left inline as approx
 |---|---|---|---|
 | Gap years | The years after the longest-dated issued 10-year TIPS maturity year and before the upper bracket year (2040) — [Gap Years](#gap-years) | derived from market data each run | A 10-year TIPS maturing in a gap year is issued |
 | Multi-maturity boundary | Years below it may hold more than one maturity month; at/above, 30-year February issues only | 2040 | 10-year issuance extends past the current boundary |
-| Maturity-month pattern | Quarterly at the short end, January/July for 10-year, February for 30-year | quarterly ≤~2030, Jan/Jul ≤~2036, Feb 2040+ | Issuance calendar changes |
+| Maturity-month pattern | Quarterly at the short end, January/July for 10-year, February for 30-year | quarterly ≤~2031, Jan/Jul ≤~2036, Feb 2040+ | Issuance calendar changes |
 | Longest issued maturity year | Maturity year of the longest-dated issued TIPS | 2056 | A new 30-year TIPS is issued |
 | Maximum Future 30Y Rungs | The largest number of Future 30Y years past the longest issued maturity year for which, on the issue date of every [Simulated Outstanding Future 30Y TIPS](#simulated-outstanding-future-30y-tips), the average duration of the Synthetic TIPS not yet converted lies between the modified durations of the lower and upper cover (2.0 §Limit on the ladder’s last year) | derived from market data each run | Yields change, a new 30-year TIPS is issued, or the upper cover’s duration falls with age |
 | Ladder’s last year, at most | Longest issued maturity year + Maximum Future 30Y Rungs | derived from market data each run | The Maximum Future 30Y Rungs changes, or a new 30-year TIPS is issued |
