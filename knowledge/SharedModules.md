@@ -1,13 +1,6 @@
 # Shared Modules (M)
 
-A module here is a real, independently reusable implementation — a whole file, not a single
-formula small enough to restate inline — called by two or more sibling processes. It is drawn on
-every consuming process's diagram as a circle in a distinct color, never a rectangle —
-a rectangle is already the entity shape, so a module stays circular, process-like, and lets its
-color alone say "not a pipeline step of this diagram." Each drawing points at the one entry below,
-so drilling down through any caller reaches the same spec (`DFD_Worklist.md` §2.0). A module used by
-only one process today is not registered here — it becomes an entry the moment a second caller needs
-it, never ahead of that.
+A module here is a real, independently reusable implementation — a whole file, not a single formula small enough to restate inline — used by two or more processes. A process uses a module when the module implements it or when its code calls the module's exports. A module is drawn on the diagram of every process that uses it, as a circle in a distinct color, never a rectangle — a rectangle is already the entity shape, so a module stays circular, process-like, and lets its color alone say "not a pipeline step of this diagram." A process that reaches a module only through another module (4.3.2 reaches gap-math.js through ladder-core.js) is listed under the module and is not drawn with it. Each drawing points at the one entry below, so drilling down through any caller reaches the same spec (`DFD_Worklist.md` §2.0). A module used by only one process is not registered here — it becomes an entry the moment a second process uses it, never ahead of that.
 
 Each entry names the module's purpose and the exports its callers actually use, and lists every
 process that calls it. It does not restate what a caller does with the export — that belongs to the
@@ -21,7 +14,7 @@ caller's spec.
 **Exports**:
 - `parseCsv(text, hasHeader = true)` — with a header row (default), returns one object per row keyed by header name; without one, returns one array of cell values per row.
 
-**Called by**: [4.1.2 Fetch and parse FedInvest prices](../TipsLadderManager/knowledge/4.1_Load_Market_Data.md#fetch-and-parse-fedinvest-prices) and [4.1.3 Fetch auxiliary TIPS data](../TipsLadderManager/knowledge/4.1_Load_Market_Data.md#fetch-auxiliary-tips-data) (TipsLadderManager), [3.1.1 Parse FedInvest prices](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#parse-fedinvest-prices) and [3.1.2 Parse market quotes](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#parse-market-quotes) (YieldCurves), and every other process in the portal that reads a CSV — not yet swept for a complete list.
+**Called by**: [1.1.1 Determine settlement date](./1.1_Download_FedInvest_Prices.md#determine-settlement-date) (`parseCsv(text, false)` for Bond holidays (S16)), [1.1.2 Select prices and add TIPS reference data](./1.1_Download_FedInvest_Prices.md#select-prices-and-add-tips-reference-data), [1.2 Download market quotes](./1.2_Download_Market_Quotes.md), [1.3 Calculate yield curve data sets](./1.3_Calculate_Yield_Curve_Data_Sets.md), [1.4 Fetch auction results](./1.4_Fetch_Auction_Results.md), [1.6 Fetch TIPS reference data](./1.6_Fetch_TIPS_Reference_Data.md), [1.11 Calculate SA and SAO yields](./1.11_Calculate_SA_And_SAO_Yields.md), [1.14 Enrich fund holdings](./1.14_Enrich_Fund_Holdings.md), [3.1.1 Parse FedInvest prices](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#parse-fedinvest-prices), [3.1.3 Parse Ref CPI and SA factors](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#parse-ref-cpi-and-sa-factors), [3.1.4 Parse bond holidays](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#parse-bond-holidays), [2.3 Calculate day change](../YieldsMonitor/knowledge/2.3_Calculate_Day_Change.md), [2.4 Adjust for seasonality](../YieldsMonitor/knowledge/2.4_Adjust_For_Seasonality.md), [2.5 Render time series](../YieldsMonitor/knowledge/2.5_Render_Time_Series.md), [4.1.2 Fetch and parse FedInvest prices](../TipsLadderManager/knowledge/4.1_Load_Market_Data.md#fetch-and-parse-fedinvest-prices) (through market-data.js (M13), which implements it), [4.1.3 Fetch auxiliary TIPS data](../TipsLadderManager/knowledge/4.1_Load_Market_Data.md#fetch-auxiliary-tips-data) (through market-data.js (M13), which implements it), [7.1 Load CPI data](../CpiExplorer/knowledge/7.1_Load_CPI_Data.md), [9.1 Load fund holdings](../FundHoldings/knowledge/9.1_Load_Fund_Holdings.md), [10.2 Load market data](../Primer/knowledge/10.2_Load_Market_Data.md), [11.1 Load snapshot](../SeasonalAdjustments/knowledge/11.1_Load_Snapshot.md).
 
 ---
 
@@ -36,7 +29,7 @@ caller's spec.
 - `actualPaymentDate(d, holidaySet)` — the date a payment scheduled for `d` is actually made: `d` itself if already a trading day, otherwise the next one. Not the same as `nextBusinessDay`, which always advances.
 - `lastBusinessDayOfMonth(year, monthIndex, holidaySet)` — the last bond trading day of a month (`monthIndex` is 0-based).
 
-**Called by**: [4.1.1 Fetch and parse market quotes](../TipsLadderManager/knowledge/4.1_Load_Market_Data.md#fetch-and-parse-market-quotes) and [4.1.3 Fetch auxiliary TIPS data](../TipsLadderManager/knowledge/4.1_Load_Market_Data.md#fetch-auxiliary-tips-data) (TipsLadderManager), and the Rebalance ladder process (`actualPaymentDate` for the Cash Flow Calendar and settlement-year LMI — see [2.0 TIPS Ladders §Gap Year Coverage Model](../TipsLadderManager/knowledge/2.0_TIPS_Ladders.md#gap-year-coverage-model)), [3.1.6 Determine settlement date](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#determine-settlement-date) (YieldCurves), and other processes across the portal — not yet swept for a complete list.
+**Called by**: [1.1.1 Determine settlement date](./1.1_Download_FedInvest_Prices.md#determine-settlement-date) (`parseHolidaySet`), [1.1.3 Calculate yields](./1.1_Download_FedInvest_Prices.md#calculate-yields) (`localDate`), [1.2 Download market quotes](./1.2_Download_Market_Quotes.md), [1.3 Calculate yield curve data sets](./1.3_Calculate_Yield_Curve_Data_Sets.md), [1.11 Calculate SA and SAO yields](./1.11_Calculate_SA_And_SAO_Yields.md), [1.14 Enrich fund holdings](./1.14_Enrich_Fund_Holdings.md) (`toIsoDate`), [2.2 Read live quotes](../YieldsMonitor/knowledge/2.2_Read_Live_Quotes.md) (`localDate`), [2.4 Adjust for seasonality](../YieldsMonitor/knowledge/2.4_Adjust_For_Seasonality.md), [3.1.4 Parse bond holidays](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#parse-bond-holidays) (`parseHolidaySet`), [3.1.6 Determine settlement date](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#determine-settlement-date), [3.7.3 Draw Treasuries view](../YieldCurves/knowledge/3.7_Render_Charts_And_Tables.md#draw-treasuries) (`localDate`), [3.7.4 Draw TIPS view](../YieldCurves/knowledge/3.7_Render_Charts_And_Tables.md#draw-tips) (`localDate`), [4.1.1 Fetch and parse market quotes](../TipsLadderManager/knowledge/4.1_Load_Market_Data.md#fetch-and-parse-market-quotes) (through market-data.js (M13), which implements it), [4.1.2 Fetch and parse FedInvest prices](../TipsLadderManager/knowledge/4.1_Load_Market_Data.md#fetch-and-parse-fedinvest-prices) (through market-data.js (M13), which implements it), [4.1.3 Fetch auxiliary TIPS data](../TipsLadderManager/knowledge/4.1_Load_Market_Data.md#fetch-auxiliary-tips-data) (`parseHolidaySet`, through market-data.js (M13), which implements it), [4.5.4 Show cash flow calendar](../TipsLadderManager/knowledge/4.5.4_Show_Cash_Flow_Calendar.md) (`actualPaymentDate`), [6.1 Load TIPS data](../TipsReference/knowledge/6.1_Load_TIPS_Data.md), [6.2 Calculate index ratios and coupons](../TipsReference/knowledge/6.2_Calculate_Index_Ratios_And_Coupons.md) (`actualPaymentDate`), [11.1 Load snapshot](../SeasonalAdjustments/knowledge/11.1_Load_Snapshot.md) (`localDate`). [4.3.2 Build the ladder](../TipsLadderManager/knowledge/4.3_Build_Ladder.md#build-the-ladder), [4.4.1 Derive per-year DARA from holdings or DARA plan](../TipsLadderManager/knowledge/4.4_Rebalance_Ladder.md#derive-per-year-dara-from-holdings-or-dara-plan), [4.4.3 Rebalance the ladder](../TipsLadderManager/knowledge/4.4_Rebalance_Ladder.md#rebalance-the-ladder) call `actualPaymentDate` and `lastBusinessDayOfMonth` only through ladder-core.js (M5), the source of the settlement-year LMI of the [2.0 TIPS Ladders §Gap Year Coverage Model](../TipsLadderManager/knowledge/2.0_TIPS_Ladders.md#gap-year-coverage-model).
 
 ---
 
@@ -51,7 +44,7 @@ caller's spec.
 - `termYears(settle, maturity)` — the one term measure (`DFD_Worklist.md` §3.9).
 - `cashflowSchedule`, `daysBetween`, `daysInYearFrom`, `calcMktWtdAvg` — supporting calculations for the above.
 
-**Called by**: [4.1.1 Fetch and parse market quotes](../TipsLadderManager/knowledge/4.1_Load_Market_Data.md#fetch-and-parse-market-quotes) (TipsLadderManager, `yieldFromPrice`), [4.3.2 Build the ladder](../TipsLadderManager/knowledge/4.3_Build_Ladder.md#build-the-ladder) and [4.4.3 Rebalance the ladder](../TipsLadderManager/knowledge/4.4_Rebalance_Ladder.md#rebalance-the-ladder) (TipsLadderManager — `accruedInterest`, `bondCalcs`, `couponSchedule`), [3.1.7 Calculate TIPS yields](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#calculate-tips-yields) and [3.1.8 Calculate Treasury yields](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#calculate-treasury-yields) (YieldCurves), and other processes across the portal — not yet swept for a complete list.
+**Called by**: [1.1.3 Calculate yields](./1.1_Download_FedInvest_Prices.md#calculate-yields) (`yieldFromPrice`), [1.3 Calculate yield curve data sets](./1.3_Calculate_Yield_Curve_Data_Sets.md) (`termYears`), [1.14 Enrich fund holdings](./1.14_Enrich_Fund_Holdings.md) (`calculateDuration`, `termYears`, `calcMktWtdAvg`), [2.4 Adjust for seasonality](../YieldsMonitor/knowledge/2.4_Adjust_For_Seasonality.md) (`priceFromYield`, `yieldFromPrice`), [3.1.7 Calculate TIPS yields](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#calculate-tips-yields) (`yieldFromPrice`, through tips-yields.js (M17), which implements it), [3.1.8 Calculate Treasury yields](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#calculate-treasury-yields) (`yieldFromPrice`, through treasury-yields.js (M18), which implements it), [3.4 Fit spot yield curves](../YieldCurves/knowledge/3.4_Fit_Spot_Yield_Curves.md) (`cashflowSchedule`, `termYears`, through spot-curve.js (M16), which implements it), [3.7.3 Draw Treasuries view](../YieldCurves/knowledge/3.7_Render_Charts_And_Tables.md#draw-treasuries) (`termYears`), [3.7.4 Draw TIPS view](../YieldCurves/knowledge/3.7_Render_Charts_And_Tables.md#draw-tips) (`termYears`), [4.1.1 Fetch and parse market quotes](../TipsLadderManager/knowledge/4.1_Load_Market_Data.md#fetch-and-parse-market-quotes) (`yieldFromPrice`, through market-data.js (M13), which implements it), [4.3.2 Build the ladder](../TipsLadderManager/knowledge/4.3_Build_Ladder.md#build-the-ladder) (`bondCalcs`, `calculateMDuration`, `calcMktWtdAvg`, `couponSchedule`, `priceFromYield`, `calculateDurationDetail`), [4.4.2 Preview before-state](../TipsLadderManager/knowledge/4.4_Rebalance_Ladder.md#preview-before-state) (`bondCalcs`), [4.4.3 Rebalance the ladder](../TipsLadderManager/knowledge/4.4_Rebalance_Ladder.md#rebalance-the-ladder) (`calculateMDuration`, `calcMktWtdAvg`, and the calls of 4.3.2 through ladder-core.js (M5) and gap-math.js (M9)), [4.5.3 Show trade ticket](../TipsLadderManager/knowledge/4.5.3_Show_Trade_Ticket.md) (`accruedInterest`, `accruedInterestAdjusted`), [4.5.4 Show cash flow calendar](../TipsLadderManager/knowledge/4.5.4_Show_Cash_Flow_Calendar.md) (`bondCalcs`, `couponSchedule`), [4.6 Explore past markets](../TipsLadderManager/knowledge/4.6_Explore_Past_Markets.md) (`termYears`), [6.1 Load TIPS data](../TipsReference/knowledge/6.1_Load_TIPS_Data.md) (`termYears`, `calculateDuration`, `calculateMDuration`), [6.2 Calculate index ratios and coupons](../TipsReference/knowledge/6.2_Calculate_Index_Ratios_And_Coupons.md) (`accruedInterestAdjusted`, `_nextCouponOnOrAfter`), [10.3 Run calculators](../Primer/knowledge/10.3_Run_Calculators.md) (`priceFromYield`), [11.2 Render pages](../SeasonalAdjustments/knowledge/11.2_Render_Pages.md) (`priceFromYield`, `yieldFromPrice`).
 
 **Contracts**:
 
@@ -199,7 +192,7 @@ They use the weights of `weightedAvgDuration`. `yield_i` is `d.yield` (the real 
 - `parseTreasuryQuotes(text, { settleIso, onUnknownCusip })` — one row per non-TIPS CUSIP (Bills, Notes, Bonds and STRIPS alike), both yields calculated from the quoted ask and bid price.
 - `parseDownloadDate(text)` / `downloadDateIso(stamp)` — the Download Date on the first line, and its date part as ISO.
 
-**Called by**: [4.1.1 Fetch and parse market quotes](../TipsLadderManager/knowledge/4.1_Load_Market_Data.md#fetch-and-parse-market-quotes) (TipsLadderManager, `parseTipsQuotes`) and [3.1.2 Parse market quotes](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#parse-market-quotes) (YieldCurves, both row parsers, for the app and for the acquisition job that writes [Yield curves (S13)](./DATA_DICTIONARY.md#s13)).
+**Called by**: [1.2 Download market quotes](./1.2_Download_Market_Quotes.md) (`parseTipsQuotes`, `parseDownloadDate`, `downloadDateIso`), [1.3 Calculate yield curve data sets](./1.3_Calculate_Yield_Curve_Data_Sets.md) (`parseTipsQuotes`, `parseTreasuryQuotes`, `parseDownloadDate`, `downloadDateIso`), [1.11 Calculate SA and SAO yields](./1.11_Calculate_SA_And_SAO_Yields.md) (`parseTipsQuotes`, `parseDownloadDate`, `downloadDateIso`), [1.14 Enrich fund holdings](./1.14_Enrich_Fund_Holdings.md) (`parseTreasuryQuotes`, `parseTipsQuotes`), [3.1.2 Parse market quotes](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#parse-market-quotes) (`parseTipsQuotes`, `parseTreasuryQuotes`, `parseDownloadDate`, `downloadDateIso`, for the app), [4.1.1 Fetch and parse market quotes](../TipsLadderManager/knowledge/4.1_Load_Market_Data.md#fetch-and-parse-market-quotes) (`parseTipsQuotes`, `parseDownloadDate`, `downloadDateIso`, through market-data.js (M13), which implements it).
 
 ---
 
@@ -208,7 +201,7 @@ They use the weights of `weightedAvgDuration`. `yield_i` is `d.yield` (the real 
 **Purpose**: The single authoritative implementation of "size the target ladder from a DARA." The rules it applies are in [2.0 TIPS Ladders](../TipsLadderManager/knowledge/2.0_TIPS_Ladders.md) (§Algorithm and the duration-matching, Pre-Ladder Interest and Future 30Y sections); the contracts of its functions are below.
 **Exports**: `selectLadderBonds`, `sizeLadder`, `sizeFuture30yCover`, `fundedYearAmount`, `future30yRebalances`, `gapRebalances`, `maxLastYear` and the rest of its exports.
 
-**Called by**: [Build the ladder (4.3.2)](../TipsLadderManager/knowledge/4.3_Build_Ladder.md#build-the-ladder) and [Rebalance the ladder (4.4.3)](../TipsLadderManager/knowledge/4.4_Rebalance_Ladder.md#rebalance-the-ladder).
+**Called by**: [4.3.1 Resolve per-year DARA](../TipsLadderManager/knowledge/4.3_Build_Ladder.md#resolve-per-year-dara) (`defaultFirstYear`, `maxLastYear`, `tipsMaturingAfterExclusion`), [4.3.2 Build the ladder](../TipsLadderManager/knowledge/4.3_Build_Ladder.md#build-the-ladder), [4.4.1 Derive per-year DARA from holdings or DARA plan](../TipsLadderManager/knowledge/4.4_Rebalance_Ladder.md#derive-per-year-dara-from-holdings-or-dara-plan) (`getGapYears`, `upperBracketBond`, `selectFuture30yCovers`, `maxLastYear`), [4.4.2 Preview before-state](../TipsLadderManager/knowledge/4.4_Rebalance_Ladder.md#preview-before-state) (`selectFuture30yCovers`, `UPPER_BRACKET_YEAR`), [4.4.3 Rebalance the ladder](../TipsLadderManager/knowledge/4.4_Rebalance_Ladder.md#rebalance-the-ladder), [4.5.2 Show drill popups](../TipsLadderManager/knowledge/4.5.2_Show_Drill_Popups.md) (`UPPER_BRACKET_YEAR`), [4.5.4 Show cash flow calendar](../TipsLadderManager/knowledge/4.5.4_Show_Cash_Flow_Calendar.md) (`simulatedPayments`).
 
 **Contracts**:
 
@@ -325,7 +318,7 @@ When the ladder has Future 30Y years, the interest of the Simulated Outstanding 
 **Purpose**: The builders of the content of every popup that shows how a figure was calculated: the drill popups of the ladder table, of the trade ticket and of the cash flow calendar.
 **Exports**: `buildDrillHTML`, `buildDurationPopupRows`, `buildTradeTicketCostDrill`, `buildTradeTicketAccruedDrill`, `buildTradeTicketTotalDrill`, `buildCashFlowDateDrill`, `buildCashFlowEventDrill` and the rest of its exports; [4.5.2 §Popup Routing](../TipsLadderManager/knowledge/4.5.2_Show_Drill_Popups.md#popup-routing) states which routes to which.
 
-**Called by**: [4.5.2 Show drill popups](../TipsLadderManager/knowledge/4.5.2_Show_Drill_Popups.md), [4.5.3 Show trade ticket](../TipsLadderManager/knowledge/4.5.3_Show_Trade_Ticket.md) and [4.5.4 Show cash flow calendar](../TipsLadderManager/knowledge/4.5.4_Show_Cash_Flow_Calendar.md).
+**Called by**: [4.5.1 Render ladder table](../TipsLadderManager/knowledge/4.5.1_Render_Ladder_Table.md) (the duration, weighted duration, weighted yield and weighted SA yield rows of the popups), [4.5.2 Show drill popups](../TipsLadderManager/knowledge/4.5.2_Show_Drill_Popups.md), [4.5.3 Show trade ticket](../TipsLadderManager/knowledge/4.5.3_Show_Trade_Ticket.md), [4.5.4 Show cash flow calendar](../TipsLadderManager/knowledge/4.5.4_Show_Cash_Flow_Calendar.md).
 
 ---
 
@@ -358,7 +351,7 @@ When the ladder has Future 30Y years, the interest of the Simulated Outstanding 
 **Purpose**: Gap year analysis and bracket sizing: the yield, coupon, duration and quantity of the Synthetic TIPS of each gap year and Future 30Y year, and the weights and Excess TIPS quantities of the bracket pair and the cover pair. The formulas are defined in [2.0 §Gap Years](../TipsLadderManager/knowledge/2.0_TIPS_Ladders.md#gap-years-section) and [2.0 §Duration Matching (Brackets)](../TipsLadderManager/knowledge/2.0_TIPS_Ladders.md#duration-matching-brackets).
 **Exports**: `interpolateYield`, `syntheticCoupon`, `gapParamsCore`, `future30yParamsCore`, `bracketWeights`, `bracketWeightsN`, `bracketExcessQtys`.
 
-**Called by**: [Build the ladder (4.3.2)](../TipsLadderManager/knowledge/4.3_Build_Ladder.md#build-the-ladder), through `ladder-core.js` (M5), and [Rebalance the ladder (4.4.3)](../TipsLadderManager/knowledge/4.4_Rebalance_Ladder.md#rebalance-the-ladder), through `ladder-core.js` (M5) and directly (`calculateGapParameters`).
+**Called by**: [4.3.2 Build the ladder](../TipsLadderManager/knowledge/4.3_Build_Ladder.md#build-the-ladder) (through ladder-core.js (M5)), [4.4.1 Derive per-year DARA from holdings or DARA plan](../TipsLadderManager/knowledge/4.4_Rebalance_Ladder.md#derive-per-year-dara-from-holdings-or-dara-plan) (`future30yParamsCore`, `bracketWeights`), [4.4.3 Rebalance the ladder](../TipsLadderManager/knowledge/4.4_Rebalance_Ladder.md#rebalance-the-ladder) (through ladder-core.js (M5) and directly), [4.5.4 Show cash flow calendar](../TipsLadderManager/knowledge/4.5.4_Show_Cash_Flow_Calendar.md) (`SYNTHETIC_INDEX_RATIO`).
 
 **Contracts**:
 
@@ -522,7 +515,7 @@ The value implied for a year with no point in the series (a structural gap year,
 - `snapYAfterZoom(chart, factor)` — after a wheel zoom, rounds the bounds in when `factor` is above 1 (the range shrinks) and out otherwise, and sets the tick step. When rounding in leaves no range, it uses the bounds of `snapYBounds`.
 - `lockedRightMin(xMin, xMax, xMaxAnchor, axis, scale)` and `applyLockRight(chart, xMaxAnchor, axis)` — set the right edge of the window to `xMaxAnchor` and the left edge so that the window keeps its width. `axis` (`{ toPos, fromPos }`) is for an axis whose drawn width is not its time span, such as the trading-hours axis, and the width is then kept as drawn.
 
-**Called by**: [Render time series (2.5)](../YieldsMonitor/knowledge/2.5_Render_Time_Series.md#pan-and-zoom) (YieldsMonitor, every export, and `snapYBounds` for the yield curve and breakeven charts), [Build axis scales (3.7.2)](../YieldCurves/knowledge/3.7_Render_Charts_And_Tables.md#build-scales) (YieldCurves, all but `lockedRightMin` and `applyLockRight`) and [Render CPI chart (7.3)](../CpiExplorer/knowledge/7.3_Render_CPI_Chart.md) (CpiExplorer, `handleChartKeydown` and `snapYBounds`).
+**Called by**: [2.5 Render time series](../YieldsMonitor/knowledge/2.5_Render_Time_Series.md) (every export; `snapYBounds` for the per-symbol time series charts), [3.7.2 Build axis scales](../YieldCurves/knowledge/3.7_Render_Charts_And_Tables.md#build-scales) (all but `lockedRightMin` and `applyLockRight`; the calls sit in the chart-drawing functions of 3.7.3 through 3.7.6), [7.3 Render CPI chart](../CpiExplorer/knowledge/7.3_Render_CPI_Chart.md) (`handleChartKeydown`, `setupAxisWheelZoom`, `snapYBounds`, `snapYAfterZoom`).
 
 ---
 
@@ -550,4 +543,128 @@ The value implied for a year with no point in the series (a structural gap year,
   - A label follows the average spacing of the ticks: the year alone at 300 days or more, `MMM YYYY` from 25 to 299 days and `MMM D` under 25 days. A single tick is labeled `MMM YYYY`.
 - `getXTimeUnit(spanMs)` and `applyXTimeUnit(chart, toPos)` — set the Chart.js time unit from the visible span: minute under 6 hours, hour under 3 days, day under 90 days, month up to 548 days and year beyond. `toPos` maps a time to its drawn position for a trading-hours axis, so the span is the drawn width. [Render time series (2.5)](../YieldsMonitor/knowledge/2.5_Render_Time_Series.md#x-axis-tick-density-and-labels) states the labels of each unit.
 
-**Called by**: [Build axis scales (3.7.2)](../YieldCurves/knowledge/3.7_Render_Charts_And_Tables.md#build-scales) (YieldCurves, `calendarTimeAxis`), [Render CPI chart (7.3)](../CpiExplorer/knowledge/7.3_Render_CPI_Chart.md) (CpiExplorer, `calendarTimeAxis`) and [Render time series (2.5)](../YieldsMonitor/knowledge/2.5_Render_Time_Series.md#x-axis-tick-density-and-labels) (YieldsMonitor, `applyXTimeUnit`).
+**Called by**: [2.5 Render time series](../YieldsMonitor/knowledge/2.5_Render_Time_Series.md) (`applyXTimeUnit`), [3.7.2 Build axis scales](../YieldCurves/knowledge/3.7_Render_Charts_And_Tables.md#build-scales) (`calendarTimeAxis`), [3.7.3 Draw Treasuries view](../YieldCurves/knowledge/3.7_Render_Charts_And_Tables.md#draw-treasuries) (`calendarTimeAxis`), [3.7.6 Draw spread view](../YieldCurves/knowledge/3.7_Render_Charts_And_Tables.md#draw-spreads) (`calendarTimeAxis`), [7.3 Render CPI chart](../CpiExplorer/knowledge/7.3_Render_CPI_Chart.md) (`calendarTimeAxis`).
+
+---
+
+## <a id="m13"></a>market-data.js (M13)
+**File**: `shared/src/market-data.js`
+**Purpose**: The one fetch and parse of the TIPS market data and its auxiliary stores. It selects the yield source privately (`YIELD_SOURCE`) and implements [4.1.1 Fetch and parse market quotes](../TipsLadderManager/knowledge/4.1_Load_Market_Data.md#fetch-and-parse-market-quotes), [4.1.2 Fetch and parse FedInvest prices](../TipsLadderManager/knowledge/4.1_Load_Market_Data.md#fetch-and-parse-fedinvest-prices) and [4.1.3 Fetch auxiliary TIPS data](../TipsLadderManager/knowledge/4.1_Load_Market_Data.md#fetch-auxiliary-tips-data) (the source selection is specified in [4.1 §Source selection](../TipsLadderManager/knowledge/4.1_Load_Market_Data.md#source-selection)).
+**Exports**:
+- `loadMarketData()` — the one entry point for a page.
+- `fetchTipsData()`, `fetchMarketQuotesData()` — the FedInvest and Market quotes paths that `loadMarketData()` selects between.
+- `parseFedInvestTipsRows(text)`, `parseTipsRefRows(text)` — row parsers.
+- `nextBondTradingDay(isoDateStr, holidaySet)`, `R2_ROOT`.
+- `lookupRefCpi` and `parseCsv` — re-exports of ref-cpi.js (M14) and csv.js (M1).
+
+**Called by**: [4.6 Explore past markets](../TipsLadderManager/knowledge/4.6_Explore_Past_Markets.md) (`parseFedInvestTipsRows`), [6.1 Load TIPS data](../TipsReference/knowledge/6.1_Load_TIPS_Data.md) (`loadMarketData`).
+
+---
+
+## <a id="m14"></a>ref-cpi.js (M14)
+**File**: `shared/src/ref-cpi.js`
+**Purpose**: The one implementation of Reference CPI logic: the lookup of the retrieved daily [Ref CPI](./DATA_DICTIONARY.md#ref-cpi) (authoritative), its calculation from monthly CPI (fallback), the [Index Ratio](./DATA_DICTIONARY.md#index-ratio) and the SA Factor of a date and of a maturity.
+**Exports**:
+- `lookupRefCpi(rows, dateStr)` — the retrieved Ref CPI of a date.
+- `refCpiFromMonthly(dateStr, monthly)`, `monthlyCpiMap(rows, valueKey)`, `roundHalfUp(x, dp)` — the calculated Ref CPI.
+- `indexRatio(settlementRefCpi, datedDateRefCpi, rounding)` with `TREASURY_ROUNDING` and `NO_ROUNDING`.
+- `saFactorForDate(rows, dateStr)`, `maturitySaFactor(rows, maturityDate, asOfDate)`, `seasonalDriftSigma(month, h)`, `credibilityFactor(month, h)`.
+
+**Called by**: [1.10 Interpolate daily Ref CPI NSA and SA](./1.10_Interpolate_Daily_Ref_CPI_NSA_And_SA.md) (`refCpiFromMonthly`, `monthlyCpiMap`), [3.2 Adjust for seasonality](../YieldCurves/knowledge/3.2_Adjust_For_Seasonality.md) (through sa-yields.js (M15), which implements it), [3.7.7 Answer drill request](../YieldCurves/knowledge/3.7_Render_Charts_And_Tables.md#answer-a-drill) (`saFactorForDate`, `maturitySaFactor`), [4.3.1 Resolve per-year DARA](../TipsLadderManager/knowledge/4.3_Build_Ladder.md#resolve-per-year-dara) (`lookupRefCpi`), [4.3.2 Build the ladder](../TipsLadderManager/knowledge/4.3_Build_Ladder.md#build-the-ladder) (`indexRatio`, through ladder-core.js (M5)), [4.4.1 Derive per-year DARA from holdings or DARA plan](../TipsLadderManager/knowledge/4.4_Rebalance_Ladder.md#derive-per-year-dara-from-holdings-or-dara-plan) (`lookupRefCpi`), [4.4.3 Rebalance the ladder](../TipsLadderManager/knowledge/4.4_Rebalance_Ladder.md#rebalance-the-ladder) (`indexRatio`, `TREASURY_ROUNDING`, `NO_ROUNDING`), [4.5.1 Render ladder table](../TipsLadderManager/knowledge/4.5.1_Render_Ladder_Table.md) (`lookupRefCpi`), [4.5.2 Show drill popups](../TipsLadderManager/knowledge/4.5.2_Show_Drill_Popups.md) (`lookupRefCpi`, `indexRatio`, `NO_ROUNDING`), [4.5.3 Show trade ticket](../TipsLadderManager/knowledge/4.5.3_Show_Trade_Ticket.md) (`lookupRefCpi`, `indexRatio`), [4.5.4 Show cash flow calendar](../TipsLadderManager/knowledge/4.5.4_Show_Cash_Flow_Calendar.md) (`lookupRefCpi`, `indexRatio`), [6.1 Load TIPS data](../TipsReference/knowledge/6.1_Load_TIPS_Data.md) (`lookupRefCpi`), [6.2 Calculate index ratios and coupons](../TipsReference/knowledge/6.2_Calculate_Index_Ratios_And_Coupons.md) (`indexRatio`, `TREASURY_ROUNDING`, `NO_ROUNDING`), [10.2 Load market data](../Primer/knowledge/10.2_Load_Market_Data.md) (`lookupRefCpi`), [10.3 Run calculators](../Primer/knowledge/10.3_Run_Calculators.md) (`indexRatio`, `lookupRefCpi`).
+
+---
+
+## <a id="m15"></a>sa-yields.js (M15)
+**File**: `shared/src/sa-yields.js`
+**Purpose**: The SA Price Factor and the SA Yield of [3.2 Adjust for seasonality](../YieldCurves/knowledge/3.2_Adjust_For_Seasonality.md) for the TIPS yields of [3.1.7 Calculate TIPS yields](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#calculate-tips-yields). It implements [3.2 Adjust for seasonality](../YieldCurves/knowledge/3.2_Adjust_For_Seasonality.md).
+**Exports**:
+- `saYieldsFromTipsYields(tipsYields, refCpiRows)`.
+
+**Called by**: [1.3 Calculate yield curve data sets](./1.3_Calculate_Yield_Curve_Data_Sets.md), [1.11 Calculate SA and SAO yields](./1.11_Calculate_SA_And_SAO_Yields.md), [2.4 Adjust for seasonality](../YieldsMonitor/knowledge/2.4_Adjust_For_Seasonality.md).
+
+---
+
+## <a id="m16"></a>spot-curve.js (M16)
+**File**: `shared/src/spot-curve.js`
+**Purpose**: The Nelson-Siegel-Svensson fit of the SAO smooth curve and of the price-space zero-coupon (spot) curve. It implements [3.3 Adjust for other effects](../YieldCurves/knowledge/3.3_Adjust_For_Other_Effects.md) and [3.4 Fit spot yield curves](../YieldCurves/knowledge/3.4_Fit_Spot_Yield_Curves.md).
+**Exports**:
+- `calculateSAO(bonds)` — the SAO smooth-curve fit.
+- `spotCurveFit(bonds, { priceOf, yieldOf, minT })` with `TREASURIES_SPOT_FIT`, `TIPS_SPOT_FIT` and `TIPS_SA_SPOT_FIT`.
+- `spotCurveGrid(bonds, opts)`, `spotCurveTermGrid(bonds, opts)`, `gridTerms(tMin, tMax, step)`, `unionGridTerms(fits, step)`, `zToSA`, `nssBasis` — the fitted curves on a grid of terms.
+- `fitNSS(taus, ys)`, `fitSpotNSS(specs)`, `ols4(X, y)` and the constants `SAO_NOISE_YRS`, `SAO_BLEND_START_YRS`, `SAO_BLEND_END_YRS` — the fitting routines.
+
+**Called by**: [1.3 Calculate yield curve data sets](./1.3_Calculate_Yield_Curve_Data_Sets.md), [1.11 Calculate SA and SAO yields](./1.11_Calculate_SA_And_SAO_Yields.md), [3.7.3 Draw Treasuries view](../YieldCurves/knowledge/3.7_Render_Charts_And_Tables.md#draw-treasuries) (`spotCurveGrid`), [3.7.4 Draw TIPS view](../YieldCurves/knowledge/3.7_Render_Charts_And_Tables.md#draw-tips) (`spotCurveGrid`, `spotCurveTermGrid`, `nssBasis`, `zToSA`).
+
+---
+
+## <a id="m17"></a>tips-yields.js (M17)
+**File**: `shared/src/tips-yields.js`
+**Purpose**: The Ask Yield and the Bid Yield of the TIPS rows of S1 or the market quotes of S7, combined with one settlement date per source into the security objects every process after [3.1.7 Calculate TIPS yields](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#calculate-tips-yields) works from. It implements [3.1.7 Calculate TIPS yields](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#calculate-tips-yields).
+**Exports**:
+- `tipsYieldsFromPrices(tipsRows, quotesByCusip, isBroker, marketSettleIso)`.
+
+**Called by**: [1.3 Calculate yield curve data sets](./1.3_Calculate_Yield_Curve_Data_Sets.md), [1.11 Calculate SA and SAO yields](./1.11_Calculate_SA_And_SAO_Yields.md).
+
+---
+
+## <a id="m18"></a>treasury-yields.js (M18)
+**File**: `shared/src/treasury-yields.js`
+**Purpose**: The yield of each nominal Treasury of S1 from its price at the settlement date the file states. It implements [3.1.8 Calculate Treasury yields](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#calculate-treasury-yields).
+**Exports**:
+- `treasuryYieldsFromPrices(rows)`.
+
+**Called by**: [1.3 Calculate yield curve data sets](./1.3_Calculate_Yield_Curve_Data_Sets.md).
+
+---
+
+## <a id="m19"></a>breakeven.js (M19)
+**File**: `shared/src/breakeven.js`
+**Purpose**: The two breakeven methods of [3.5 Calculate breakeven inflation](../YieldCurves/knowledge/3.5_Calculate_Breakeven_Inflation.md): the nominal Treasury each per-security breakeven is stated against, and the breakeven across terms between two fitted spot curves. It implements [3.5 Calculate breakeven inflation](../YieldCurves/knowledge/3.5_Calculate_Breakeven_Inflation.md).
+**Exports**:
+- `findClosestNominal(nominals, maturityDate)`.
+- `spotBreakevenAcrossTerms(treasuriesFit, tipsFit)`.
+
+**Called by**: [1.3 Calculate yield curve data sets](./1.3_Calculate_Yield_Curve_Data_Sets.md) (`findClosestNominal`, `spotBreakevenAcrossTerms`).
+
+---
+
+## <a id="m20"></a>spreads.js (M20)
+**File**: `shared/src/spreads.js`
+**Purpose**: The bid and ask spreads of [3.6 Calculate bid and ask spreads](../YieldCurves/knowledge/3.6_Calculate_Bid_And_Ask_Spreads.md) for one security quoted on both sides. It implements [3.6 Calculate bid and ask spreads](../YieldCurves/knowledge/3.6_Calculate_Bid_And_Ask_Spreads.md).
+**Exports**:
+- `yieldSpreadBps(askYield, bidYield)`, `priceSpreadPct(askPrice, bidPrice)`.
+- `addTipsSpreads(tips)`, `addTreasurySpreads(treasuries)`.
+
+**Called by**: [1.3 Calculate yield curve data sets](./1.3_Calculate_Yield_Curve_Data_Sets.md).
+
+---
+
+## <a id="m21"></a>treasury-cusip.js (M21)
+**File**: `shared/src/treasury-cusip.js`
+**Purpose**: The classification of a U.S. Treasury security by CUSIP root, in place of the free-text description of a broker. The reference and its method are in [Treasury CUSIP Reference](./Treasury_CUSIP_Reference.md).
+**Exports**:
+- `classifyByCusipRoot(cusip)`.
+- `isStrip(cusip)`.
+
+**Called by**: [1.3 Calculate yield curve data sets](./1.3_Calculate_Yield_Curve_Data_Sets.md), [3.4 Fit spot yield curves](../YieldCurves/knowledge/3.4_Fit_Spot_Yield_Curves.md) (`isStrip`), [3.7.3 Draw Treasuries view](../YieldCurves/knowledge/3.7_Render_Charts_And_Tables.md#draw-treasuries) (`isStrip`).
+
+---
+
+## <a id="m22"></a>date-picker.js (M22)
+**File**: `shared/src/date-picker.js`
+**Purpose**: The one date input of every app: the styled native date input, with its value exchanged as an ISO date string.
+**Exports**:
+- `initDatePicker(el, opts)`.
+- `createDatePicker(opts)`.
+
+**Called by**: [6.2 Calculate index ratios and coupons](../TipsReference/knowledge/6.2_Calculate_Index_Ratios_And_Coupons.md) (the Ref CPI date), [7.3 Render CPI chart](../CpiExplorer/knowledge/7.3_Render_CPI_Chart.md), [3.7.1 Select view](../YieldCurves/knowledge/3.7_Render_Charts_And_Tables.md#select-view) (the start and end maturity inputs), [6.3 Render TIPS table](../TipsReference/knowledge/6.3_Render_TIPS_Table.md) (through date-range-filter.js (M23)), [5.2 Render Historical Auctions](../TreasuryAuctions/knowledge/5.2_Render_Historical_Auctions.md) (through date-range-filter.js (M23)).
+
+---
+
+## <a id="m23"></a>date-range-filter.js (M23)
+**File**: `shared/src/date-range-filter.js`
+**Purpose**: The date range filter of the date columns of a table.
+**Exports**:
+- `createDateRangeFilter(config)`.
+
+**Called by**: [5.2 Render Historical Auctions](../TreasuryAuctions/knowledge/5.2_Render_Historical_Auctions.md), [6.3 Render TIPS table](../TipsReference/knowledge/6.3_Render_TIPS_Table.md).
