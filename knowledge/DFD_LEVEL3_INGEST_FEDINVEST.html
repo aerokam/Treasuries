@@ -159,7 +159,7 @@
 <h1>Level 3 &mdash; 1.1 Download FedInvest prices and calculate yields</h1>
 
 <div class="diagram">
-<svg viewBox="0 0 1100 660" role="img" aria-label="Level 3: 1.1 Download FedInvest prices and calculate yields, three processes from the FedInvest price list to FedInvest prices (S1).">
+<svg viewBox="0 0 1100 660" role="img" aria-label="Level 3: 1.1 Download FedInvest prices and calculate yields, three processes from the FedInvest price list to FedInvest prices (S1), plus the shared modules its processes call.">
   <defs><marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#55558c"/></marker></defs>
   <path class="flow" d="M 8.0 190.0 Q 162.5 165.3 317.0 190.0" marker-end="url(#a1)"/>
   <text class="flow-label" x="12" y="178"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#fedinvest-daily-price-list"><tspan class="lk">FedInvest daily price list</tspan></a></text>
@@ -168,8 +168,8 @@
   <path class="flow" d="M 380.0 75.0 Q 384.2 101.0 380.0 127.0" marker-end="url(#a1)"/>
   <path class="flow" d="M 380.0 585.0 Q 375.0 554.0 380.0 523.0" marker-end="url(#a1)"/>
   <path class="flow" d="M 763.0 325.0 Q 809.0 317.6 855.0 325.0" marker-end="url(#a1)"/>
-  <path class="flow" d="M 435.3 213.3 Q 547.1 240.7 644.7 301.7" marker-end="url(#a1)"/>
-  <text class="flow-label" x="613" y="268" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#settlement-date"><tspan class="lk">settlement date</tspan></a></text>
+  <path class="flow" d="M 435.3 213.3 Q 554.1 224.0 644.7 301.7" marker-end="url(#a1)"/>
+  <text class="flow-label" x="615" y="263" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#settlement-date"><tspan class="lk">settlement date</tspan></a></text>
   <path class="flow" d="M 431.4 427.5 Q 529.0 366.5 640.8 339.1" marker-end="url(#a1)"/>
   <text class="flow-label" x="597" y="337" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#tips-prices"><tspan class="lk">TIPS prices</tspan></a></text>
   <path class="flow" d="M 439.2 445.9 Q 536.8 385.0 648.6 357.5" marker-end="url(#a1)"/>
@@ -192,6 +192,11 @@
     <line x1="860" y1="345" x2="1075" y2="345"/>
     <text class="s-name" x="967.5" y="330">FedInvest prices (S1)</text>
   </a>
+  <path class="flow" d="M 331.1 285.1 Q 338.5 262.5 352.5 243.3" marker-end="url(#a1)"/>
+  <path class="flow" d="M 477.0 267.3 Q 448.8 251.4 426.9 227.4" marker-end="url(#a1)"/>
+  <path class="flow" d="M 331.3 366.8 Q 345.0 385.1 352.2 406.8" marker-end="url(#a1)"/>
+  <path class="flow" d="M 558.5 303.0 Q 600.6 302.8 640.7 315.8" marker-end="url(#a1)"/>
+  <path class="flow" d="M 661.0 423.2 Q 666.0 400.7 677.9 380.8" marker-end="url(#a1)"/>
   <a class="process" href="viewer.html#/md/knowledge/1.1_Download_FedInvest_Prices.md#determine-settlement-date">
     <circle cx="380" cy="190" r="60"/>
     <text class="p-id" x="380" y="170">1.1.1</text>
@@ -211,6 +216,21 @@
     <text class="p-name" x="700" y="326">Calculate</text>
     <text class="p-name" x="700" y="342">yields</text>
   </a>
+  <a class="module" href="viewer.html#/md/knowledge/SharedModules.md#m1">
+    <circle cx="310" cy="326" r="46"/>
+    <text class="p-id" x="310" y="312">M1</text>
+    <text class="m-name" x="310" y="329">csv.js</text>
+  </a>
+  <a class="module" href="viewer.html#/md/knowledge/SharedModules.md#m2">
+    <circle cx="513" cy="296" r="46"/>
+    <text class="p-id" x="513" y="282">M2</text>
+    <text class="m-name" x="513" y="299">settlement.js</text>
+  </a>
+  <a class="module" href="viewer.html#/md/knowledge/SharedModules.md#m3">
+    <circle cx="644" cy="466" r="46"/>
+    <text class="p-id" x="644" y="452">M3</text>
+    <text class="m-name" x="644" y="469">bond-math.js</text>
+  </a>
 </svg>
 </div>
 
@@ -218,6 +238,7 @@
   Every process here drills to its own section of <a href="viewer.html#/md/knowledge/1.1_Download_FedInvest_Prices.md">1.1 Download FedInvest prices and calculate yields</a>.
   The flow entering from the edge is the FedInvest daily price list, drawn against its source on the <a href="DFD_LEVEL0.html">context diagram</a>. 1.1.1 reads the date it states, and 1.1.2 reads its rows.
   On a Bond Holiday, or when the price list does not state prices for the run date, 1.1.1 produces no settlement date and FedInvest prices (S1) is not written.
+  The amber circles are shared modules (<a href="viewer.html#/md/knowledge/SharedModules.md">SharedModules.md</a>), not process steps of this diagram.
 </p>
 
 </body>

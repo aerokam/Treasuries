@@ -158,7 +158,7 @@
 <h1>Level 2 &mdash; Portal Primer</h1>
 
 <div class="diagram">
-<svg viewBox="0 0 1360 800" role="img" aria-label="Level 2 for Portal Primer: four processes reading three data stores and the deck content kept in the app. No process writes a data store.">
+<svg viewBox="0 0 1360 800" role="img" aria-label="Level 2 for Portal Primer: four processes reading three data stores and the deck content kept in the app. No process writes a data store. Amber circles are the shared modules its processes call.">
   <defs><marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#55558c"/></marker></defs>
   <path class="flow" d="M 260.0 190.0 Q 331.0 178.6 402.0 190.0" marker-end="url(#a1)"/>
   <path class="flow" d="M 260.0 380.0 Q 343.6 417.1 411.4 478.4" marker-end="url(#a1)"/>
@@ -187,6 +187,10 @@
   <path class="flow" d="M 500.0 562.0 Q 853.5 576.2 1185.0 700.0" marker-end="url(#a1)"/>
   <text class="flow-label" x="820" y="690" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#charts-and-tables"><tspan class="lk">charts and tables</tspan></a></text>
   <g class="entity"><rect x="1190" y="100" width="145" height="620" rx="3"/><text class="e-name" x="1262.5" y="400">User</text></g>
+  <path class="flow" d="M 518.2 424.1 Q 508.4 445.1 492.5 462.0" marker-end="url(#a1)"/>
+  <path class="flow" d="M 744.9 366.7 Q 637.7 444.0 511.8 483.9" marker-end="url(#a1)"/>
+  <path class="flow" d="M 965.7 427.3 Q 958.9 449.2 945.6 468.0" marker-end="url(#a1)"/>
+  <path class="flow" d="M 814.1 382.4 Q 856.7 422.6 884.6 474.0" marker-end="url(#a1)"/>
   <a class="store" href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#deck-content">
     <rect x="40" y="170" width="215" height="40" fill="transparent" stroke="none"/>
     <line x1="40" y1="170" x2="255" y2="170"/>
@@ -235,6 +239,21 @@
     <text class="p-name" x="920" y="231">Render</text>
     <text class="p-name" x="920" y="247">deck pages</text>
   </a>
+  <a class="module" href="viewer.html#/md/knowledge/SharedModules.md#m1">
+    <circle cx="544" cy="386" r="46"/>
+    <text class="p-id" x="544" y="372">M1</text>
+    <text class="m-name" x="544" y="389">csv.js</text>
+  </a>
+  <a class="module" href="viewer.html#/md/knowledge/SharedModules.md#m14">
+    <circle cx="786" cy="346" r="46"/>
+    <text class="p-id" x="786" y="332">M14</text>
+    <text class="m-name" x="786" y="349">ref-cpi.js</text>
+  </a>
+  <a class="module" href="viewer.html#/md/knowledge/SharedModules.md#m3">
+    <circle cx="986" cy="386" r="46"/>
+    <text class="p-id" x="986" y="372">M3</text>
+    <text class="m-name" x="986" y="389">bond-math.js</text>
+  </a>
 </svg>
 </div>
 
@@ -242,6 +261,7 @@
   <b>No process here writes a data store.</b> Every flow ends at the user and is gone when the page closes.
   <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#deck-content">Deck content</a> is a file kept in the app, drawn as a store of this diagram only; no job writes it.
   10.2 also states its source line, as <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#charts-and-tables">charts and tables</a>, to the user.
+  The amber circles are shared modules (<a href="viewer.html#/md/knowledge/SharedModules.md">SharedModules.md</a>), not process steps of this diagram.
 </p>
 
 </body>

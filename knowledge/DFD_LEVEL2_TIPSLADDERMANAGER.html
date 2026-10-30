@@ -158,7 +158,7 @@
 <h1>Level 2 &mdash; TipsLadderManager</h1>
 
 <div class="diagram">
-<svg viewBox="0 0 1450 1000" role="img" aria-label="Level 2 for TipsLadderManager: six processes reading five data stores and the Explore price files kept in the app, an imported file and typed parameters from the user. No process writes a data store.">
+<svg viewBox="0 -12 1450 1012" role="img" aria-label="Level 2 for TipsLadderManager: six processes reading five data stores and the Explore price files kept in the app, an imported file and typed parameters from the user. No process writes a data store. Amber circles are the shared modules its processes call.">
   <defs><marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#55558c"/></marker></defs>
   <path class="flow" d="M 260.0 290.0 Q 351.7 389.0 407.8 511.7" marker-end="url(#a1)"/>
   <path class="flow" d="M 260.0 430.0 Q 334.2 467.4 393.0 526.0" marker-end="url(#a1)"/>
@@ -223,6 +223,8 @@
   <path class="flow" d="M 1068.0 576.0 Q 1151.5 562.6 1235.0 576.0" marker-end="url(#a1)"/>
   <text class="flow-label" x="1154" y="570" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#ladder-export"><tspan class="lk">ladder export</tspan></a></text>
   <g class="entity"><rect x="1240" y="40" width="145" height="920" rx="3"/><text class="e-name" x="1312.5" y="500">User</text></g>
+  <path class="flow" d="M 561.9 150.8 Q 601.3 128.7 645.6 120.0" marker-end="url(#a1)"/>
+  <path class="flow" d="M 535.7 61.4 Q 591.6 65.5 643.5 86.7" marker-end="url(#a1)"/>
   <a class="store" href="viewer.html#/md/TipsLadderManager/knowledge/4.6_Explore_Past_Markets.md">
     <rect x="40" y="130" width="215" height="40" fill="transparent" stroke="none"/>
     <line x1="40" y1="130" x2="255" y2="130"/>
@@ -295,6 +297,16 @@
     <text class="p-name" x="700" y="101">Explore</text>
     <text class="p-name" x="700" y="117">past markets</text>
   </a>
+  <a class="module" href="viewer.html#/md/knowledge/SharedModules.md#m3">
+    <circle cx="515" cy="168" r="50"/>
+    <text class="p-id" x="515" y="154">M3</text>
+    <text class="m-name" x="515" y="171">bond-math.js</text>
+  </a>
+  <a class="module" href="viewer.html#/md/knowledge/SharedModules.md#m13">
+    <circle cx="487" cy="50" r="50"/>
+    <text class="p-id" x="487" y="36">M13</text>
+    <text class="m-name" x="487" y="53">market-data.js</text>
+  </a>
 </svg>
 </div>
 
@@ -303,6 +315,7 @@
   4.1 reads Market quotes (S7), the live default; FedInvest prices (S1) is the same module's dormant fallback and is not drawn.
   The Explore price files are kept in the app and drawn on this diagram only: no job writes them. Explore builds with the interface and the output of Build, so 4.6 feeds 4.3.
   Build and Rebalance are separate processes with separate interfaces; the code they share is in the <a href="viewer.html#/md/knowledge/SharedModules.md">shared modules</a>.
+  The amber circles are shared modules (<a href="viewer.html#/md/knowledge/SharedModules.md">SharedModules.md</a>), not process steps of this diagram.
 </p>
 
 </body>

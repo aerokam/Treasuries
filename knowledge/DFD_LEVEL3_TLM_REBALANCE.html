@@ -158,7 +158,7 @@
 <h1>Level 3 &mdash; TipsLadderManager 4.4 Rebalance ladder</h1>
 
 <div class="diagram">
-<svg viewBox="0 0 1180 820" role="img" aria-label="Level 3: TipsLadderManager 4.4, deriving per-year DARA and a before-state preview from holdings, then rebalancing against the shared sizing engine.">
+<svg viewBox="0 0 1180 820" role="img" aria-label="Level 3: TipsLadderManager 4.4, deriving per-year DARA and a before-state preview from holdings, then rebalancing against the shared sizing engine, plus the shared modules each process calls.">
   <defs><marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#55558c"/></marker></defs>
   <path class="flow" d="M 265.0 60.0 Q 311.2 81.1 348.4 115.6" marker-end="url(#a1)"/>
   <text class="flow-label" x="269" y="44"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#tips-market-data"><tspan class="lk">TIPS market data</tspan></a>  ←  4.1</text>
@@ -173,12 +173,18 @@
   <g class="entity"><rect x="60" y="60" width="145" height="530" rx="3"/><text class="e-name" x="132.5" y="330">User</text></g>
   <path class="flow" d="M 400.0 212.0 Q 418.1 325.0 400.0 438.0" marker-end="url(#a1)"/>
   <text class="flow-label" x="416" y="394" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#per-year-dara"><tspan class="lk">per-year DARA</tspan></a></text>
+  <path class="flow" d="M 935.6 427.0 Q 735.1 225.9 455.1 178.5" marker-end="url(#a1)"/>
+  <path class="flow" d="M 944.6 694.6 Q 694.2 444.2 443.8 193.8" marker-end="url(#a1)"/>
   <path class="flow" d="M 930.5 223.2 Q 690.8 228.3 461.4 158.5" marker-end="url(#a1)"/>
+  <path class="flow" d="M 499.4 335.9 Q 453.8 275.9 429.2 204.7" marker-end="url(#a1)"/>
+  <path class="flow" d="M 942.2 557.3 Q 819.6 481.2 726.9 370.6" marker-end="url(#a1)"/>
+  <path class="flow" d="M 933.6 431.4 Q 829.3 407.9 737.6 353.0" marker-end="url(#a1)"/>
   <path class="flow" d="M 932.6 245.8 Q 840.9 293.6 738.8 310.4" marker-end="url(#a1)"/>
-  <path class="flow" d="M 930.2 454.3 Q 699.2 512.0 461.8 494.7" marker-end="url(#a1)"/>
+  <path class="flow" d="M 930.2 454.3 Q 692.7 437.0 461.8 494.7" marker-end="url(#a1)"/>
   <path class="flow" d="M 930.6 582.3 Q 690.1 583.5 461.3 509.5" marker-end="url(#a1)"/>
   <path class="flow" d="M 933.5 711.6 Q 680.5 655.3 457.6 522.9" marker-end="url(#a1)"/>
   <path class="flow" d="M 934.7 251.1 Q 731.1 439.0 456.2 473.8" marker-end="url(#a1)"/>
+  <path class="flow" d="M 487.2 414.9 Q 469.1 439.2 444.4 456.7" marker-end="url(#a1)"/>
   <path class="flow" d="M 462.0 500.0 Q 815.0 556.5 1168.0 500.0" marker-end="url(#a1)"/>
   <text class="flow-label" x="1164" y="492" text-anchor="end"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#rebalance-result"><tspan class="lk">rebalance result</tspan></a>  →  4.5</text>
   <path class="flow" d="M 742.0 330.0 Q 955.0 295.9 1168.0 330.0" marker-end="url(#a1)"/>
@@ -209,11 +215,6 @@
     <text class="m-name" x="980" y="446">ladder-</text>
     <text class="m-name" x="980" y="460">core.js</text>
   </a>
-  <a class="module" href="viewer.html#/md/knowledge/SharedModules.md#m3">
-    <circle cx="980" cy="590" r="50"/>
-    <text class="p-id" x="980" y="576">M3</text>
-    <text class="m-name" x="980" y="593">bond-math.js</text>
-  </a>
   <a class="module" href="viewer.html#/md/knowledge/SharedModules.md#m9">
     <circle cx="980" cy="730" r="50"/>
     <text class="p-id" x="980" y="716">M9</text>
@@ -223,6 +224,16 @@
     <circle cx="980" cy="230" r="50"/>
     <text class="p-id" x="980" y="216">M10</text>
     <text class="m-name" x="980" y="233">shape-math.js</text>
+  </a>
+  <a class="module" href="viewer.html#/md/knowledge/SharedModules.md#m14">
+    <circle cx="523" cy="380" r="50"/>
+    <text class="p-id" x="523" y="366">M14</text>
+    <text class="m-name" x="523" y="383">ref-cpi.js</text>
+  </a>
+  <a class="module" href="viewer.html#/md/knowledge/SharedModules.md#m3">
+    <circle cx="980" cy="590" r="50"/>
+    <text class="p-id" x="980" y="576">M3</text>
+    <text class="m-name" x="980" y="593">bond-math.js</text>
   </a>
 </svg>
 </div>

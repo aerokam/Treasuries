@@ -98,7 +98,7 @@ const labelAt = (x, y, text, anchor) =>
 function flow(x1, y1, x2, y2, opts = {}) {
   const obstacles = opts.obstacles || [], placed = opts.placed;
   let c = null;
-  for (const b of BOWS) { const k = curveWith(x1, y1, x2, y2, b); if (clears(k, obstacles)) { c = k; break; } }
+  for (const b of (opts.bows || BOWS)) { const k = curveWith(x1, y1, x2, y2, b); if (clears(k, obstacles)) { c = k; break; } }
   if (!c) c = curveWith(x1, y1, x2, y2, BOWS[0]);
   const out = [`  <path class="flow" d="M ${x1.toFixed(1)} ${y1.toFixed(1)} Q ${c.cx.toFixed(1)} ${c.cy.toFixed(1)} ${x2.toFixed(1)} ${y2.toFixed(1)}" marker-end="url(#a1)"/>`];
   if (opts.text) {
@@ -224,6 +224,108 @@ function moduleShape(cx, cy, r, href, id, lines) {
     ...lines.map((ln, k) => `    <text class="m-name" x="${cx}" y="${top + 17 + k * 14}">${esc(ln)}</text>`),
     `  </a>`].join(NL);
 }
+// ── shared modules on a diagram ─────────────────────────────────────────────
+// A shared module is drawn on every diagram where a process of that diagram calls it
+// (DFD_Worklist.md §2.0): one circle per module, however many processes call it, and one arrow
+// from the circle to each caller. The arrow points from the module toward the process, the
+// same direction a store's data takes toward the job reading it, since a module is a resource
+// a process draws on rather than a data-transformation step of its own. A module is drawn on
+// the diagram where its caller appears at the lowest level: a process with a Level 3 page is
+// listed on that page and not on its Level 2 page. A call that goes only through another module
+// is listed in SharedModules.md and is not drawn. Each page's SHARED entry holds where its
+// circles sit (at), the module ids each process calls (calls, in the page's process order) and
+// the circle radius (r); the viewBox grows to take in any circle placed beyond the page's edge.
+const MODULE_NAMES = {
+  m1: ['csv.js'], m2: ['settlement.js'], m3: ['bond-math.js'], m4: ['market-', 'quotes.js'], m5: ['ladder-', 'core.js'],
+  m6: ['drill.js'], m7: ['popup.js'], m8: ['modal.js'], m9: ['gap-math.js'], m10: ['shape-math.js'],
+  m11: ['chart-keys.js'], m12: ['chart-time-', 'axis.js'], m13: ['market-data.js'], m14: ['ref-cpi.js'],
+  m15: ['sa-yields.js'], m16: ['spot-curve.js'], m17: ['tips-yields.js'], m18: ['treasury-', 'yields.js'],
+  m19: ['breakeven.js'], m20: ['spreads.js'], m21: ['treasury-', 'cusip.js'], m22: ['date-', 'picker.js'],
+  m23: ['date-range-', 'filter.js'],
+};
+// DFD_LEVEL2_INGESTION has no entry: its seven callers take 27 arrows from 12 modules, which the
+// entity, job and store columns of that page cannot carry without arrows crossing boxes and labels.
+const SHARED = {
+  'ingest-fedinvest': { r: 46,
+    at: { m1: [310, 326], m2: [513, 296], m3: [644, 466] },
+    calls: { '1.1.1': ['m1', 'm2'], '1.1.2': ['m1'], '1.1.3': ['m2', 'm3'] } },
+  'yc': { r: 46,
+    at: { m14: [546, 66], m15: [669, 46], m16: [746, 306], m3: [406, 366], m21: [166, 116], m19: [1026, 746], m20: [986, 941] },
+    calls: { '3.2': ['m14', 'm15'], '3.3': ['m16'], '3.4': ['m3', 'm16', 'm21'], '3.5': ['m19'], '3.6': ['m20'] } },
+  'yc-load': { r: 46,
+    at: { m1: [271, 701], m4: [666, 486], m2: [496, 712], m3: [1046, 746], m17: [994, 206], m18: [899, 686] },
+    calls: { '3.1.1': ['m1'], '3.1.2': ['m4'], '3.1.3': ['m1'], '3.1.4': ['m1', 'm2'], '3.1.6': ['m2'], '3.1.7': ['m3', 'm17'], '3.1.8': ['m3', 'm18'] } },
+  'yc-render': { r: 46,
+    at: { m22: [153, 246], m11: [153, 606], m12: [786, 586], m2: [806, 406], m3: [706, 6], m16: [496, 66], m21: [801, 66], m14: [286, 766] },
+    calls: { '3.7.1': ['m22'], '3.7.2': ['m11', 'm12'], '3.7.3': ['m2', 'm3', 'm12', 'm16', 'm21'], '3.7.4': ['m2', 'm3', 'm16'], '3.7.6': ['m12'], '3.7.7': ['m14'] },
+    bows: { 'm12>3.7.2': [0.16], 'm2>3.7.3': [-0.08] } },
+  'ym': { r: 46,
+    at: { m2: [526, 886], m1: [1147, 60], m3: [724, 866], m15: [884, 886], m11: [766, 66], m12: [964, 286] },
+    calls: { '2.2': ['m2'], '2.3': ['m1'], '2.4': ['m1', 'm2', 'm3', 'm15'], '2.5': ['m1', 'm11', 'm12'] },
+    bows: { 'm1>2.4': [0.5] } },
+  'tlm': { r: 50,
+    at: { m3: [515, 168], m13: [487, 50] },
+    calls: { '4.6': ['m3', 'm13'] } },
+  'tlm-load': { r: 50,
+    at: { m2: [1150, 420], m3: [1150, 100], m4: [1150, 260], m13: [560, 350], m1: [1150, 580] },
+    calls: { '4.1.1': ['m2', 'm3', 'm4', 'm13'], '4.1.3': ['m1', 'm2', 'm13'] },
+    bows: { 'm2>4.1.1': [-0.5], 'm2>4.1.3': [-0.08], 'm3>4.1.1': [-0.08] } },
+  'tlm-build': { r: 50,
+    at: { m5: [920, 220], m14: [540, 70], m3: [920, 360] },
+    calls: { '4.3.1': ['m5', 'm14'], '4.3.2': ['m5', 'm3'] } },
+  'tlm-rebalance': { r: 50,
+    at: { m5: [980, 450], m9: [980, 730], m10: [980, 230], m14: [523, 380], m3: [980, 590] },
+    calls: { '4.4.1': ['m5', 'm9', 'm10', 'm14'], '4.4.2': ['m3', 'm5', 'm10'], '4.4.3': ['m5', 'm3', 'm9', 'm10', 'm14'] },
+    bows: { 'm5>4.4.3': [-0.08], 'm9>4.4.1': [0] } },
+  'tlm-render': { r: 46,
+    at: { m6: [595, 310], m14: [1200, 515], m5: [890, 510], m7: [630, 515], m8: [760, 280], m3: [905, 1010], m2: [1328, 1008], m9: [620, 995] },
+    calls: { '4.5.1': ['m6', 'm14'], '4.5.2': ['m5', 'm6', 'm7', 'm8', 'm14'], '4.5.3': ['m3', 'm6', 'm7', 'm8', 'm14'], '4.5.4': ['m2', 'm3', 'm5', 'm6', 'm7', 'm8', 'm9', 'm14'] } },
+  'tipsref': { r: 50,
+    at: { m2: [570, 150], m3: [510, 50], m13: [419, 550], m14: [770, 470], m22: [677, 50], m23: [1068, 290] },
+    calls: { '6.1': ['m2', 'm3', 'm13', 'm14'], '6.2': ['m2', 'm3', 'm14', 'm22'], '6.3': ['m23'] } },
+  'primer': { r: 46,
+    at: { m1: [544, 386], m14: [786, 346], m3: [986, 386] },
+    calls: { '10.2': ['m1', 'm14'], '10.3': ['m3', 'm14'] } },
+  'cpi': { r: 46,
+    at: { m1: [446, 166], m11: [1091, 228], m12: [1062, 454], m22: [966, 106] },
+    calls: { '7.1': ['m1'], '7.3': ['m11', 'm12', 'm22'] } },
+  'fund': { r: 46,
+    at: { m1: [386, 466] },
+    calls: { '9.1': ['m1'] } },
+  'auctions': { r: 46,
+    at: { m23: [806, 266] },
+    calls: { '5.2': ['m23'] } },
+  'sa': { r: 46,
+    at: { m1: [466, 206], m2: [388, 486], m3: [926, 206] },
+    calls: { '11.1': ['m1', 'm2'], '11.2': ['m3'] } },
+};
+const SHARED_NOTE = '  The amber circles are shared modules (<a href="' + V('knowledge/SharedModules.md') + '">SharedModules.md</a>), not process steps of this diagram.';
+function sharedModules(page) {
+  const spec = SHARED[page] || { at: {}, calls: {} }, r = spec.r || 46;
+  const mods = Object.entries(spec.at).map(([id, [x, y]]) => ({ id, x, y, r }));
+  const byId = Object.fromEntries(mods.map(m => [m.id, m]));
+  return {
+    obstacles: mods.map(m => ({ x: m.x, y: m.y, r: m.r })),
+    // The page's viewBox: [minX, minY, width, height], taking in every circle.
+    viewBox(W, H) {
+      const x0 = Math.min(0, ...mods.map(m => Math.floor(m.x - m.r - 12))), y0 = Math.min(0, ...mods.map(m => Math.floor(m.y - m.r - 12)));
+      const x1 = Math.max(W, ...mods.map(m => Math.ceil(m.x + m.r + 12))), y1 = Math.max(H, ...mods.map(m => Math.ceil(m.y + m.r + 12)));
+      return [x0, y0, x1 - x0, y1 - y0];
+    },
+    flows(P, px, py, PR, OBS) {
+      Object.entries(spec.calls).forEach(([pid, ids]) => ids.forEach(id => {
+        const m = byId[id];
+        if (!m || px[pid] === undefined) { console.error(`shared module ${id} or process ${pid} is not drawn on ${page}`); process.exit(1); }
+        const [x1, y1] = fromCircle(m.x, m.y, m.r, px[pid], py[pid]);
+        const [x2, y2] = toCircle(x1, y1, px[pid], py[pid], PR);
+        const others = OBS.filter(o => !(o.x === m.x && o.y === m.y) && !(o.x === px[pid] && o.y === py[pid]));
+        P.push(flow(x1, y1, x2, y2, { obstacles: others, bows: (spec.bows || {})[id + '>' + pid] }));
+      }));
+    },
+    shapes(P) { mods.forEach(m => P.push(moduleShape(m.x, m.y, m.r, V('knowledge/SharedModules.md#' + m.id), m.id.toUpperCase(), MODULE_NAMES[m.id]))); },
+  };
+}
+
 // Draws every flow in a model whose processes name their outputs as { target: [labels] }.
 function internalFlows(procs, px, py, PR, OBS, LBL) {
   const out = [];
@@ -462,9 +564,11 @@ function level2YieldCurves() {
   const px = { '3.1': 410, '3.2': 630, '3.3': 850, '3.4': 630, '3.5': 850, '3.6': 850, '3.7': 1010 };
   const py = { '3.1': 520, '3.2': 190, '3.3': 190, '3.4': 430, '3.5': 640, '3.6': 880, '3.7': 520 };
   const H = 1000, W = 1360;
-  const OBS = procs.map(q => ({ x: px[q.id], y: py[q.id], r: PR }));
+  const SM = sharedModules('yc');
+  const OBS = [...procs.map(q => ({ x: px[q.id], y: py[q.id], r: PR })), ...SM.obstacles];
   const LBL = [];
-  const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 2 for Yield Curves: seven processes reading four data stores. No process writes a data store.">`, marker()];
+  const [vx, vy, vw, vh] = SM.viewBox(W, H);
+  const P = [`<svg viewBox="${vx} ${vy} ${vw} ${vh}" role="img" aria-label="Level 2 for Yield Curves: seven processes reading four data stores. No process writes a data store. Amber circles are the shared modules its processes call.">`, marker()];
   const sIdx = Object.fromEntries(stores.map((s, i) => [s.id, i]));
   procs.forEach(p => p.reads.forEach(id => {
     const y = sy(sIdx[id]), [x2, y2] = toCircle(SX + SW + 5, y, px[p.id], py[p.id], PR);
@@ -476,19 +580,22 @@ function level2YieldCurves() {
   P.push(labelAt((px['3.7'] + PR + UX) / 2, py['3.7'] - 26, 'charts and tables', 'middle'));
   P.push(labelAt((px['3.7'] + PR + UX) / 2, py['3.7'] + 42, 'view selections', 'middle'));
   P.push(`  <g class="entity"><rect x="${UX}" y="${py['3.7'] - 130}" width="${UW}" height="260" rx="3"/><text class="e-name" x="${UX + UW / 2}" y="${py['3.7'] + 5}">User</text></g>`);
+  SM.flows(P, px, py, PR, OBS);
   stores.forEach((s, i) => P.push(storeShape(SX, sy(i), SW, s.href, s.name)));
   procs.forEach(p => P.push(procShape(px[p.id], py[p.id], PR, p.href, p.id, p.name)));
+  SM.shapes(P);
   P.push('</svg>');
 
   return page({
-    title: 'Yield Curves — Level 2', h1: 'Level 2 &mdash; Yield Curves', maxWidth: W,
+    title: 'Yield Curves — Level 2', h1: 'Level 2 &mdash; Yield Curves', maxWidth: vw,
     up: 'DFD_LEVEL1.html', upLabel: 'Level 1',
     svg: P.join(NL),
     notes: ['  <b>No process here writes a data store.</b> Every flow ends at 3.7 and is gone when the page closes.',
       '  The spot yield curves, breakeven inflation and bid and ask spreads are available from R2 all the same: Level 1 process 1 executes the same calculations as a scheduled job and writes <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s13">Yield curves (S13)</a>, Breakeven inflation (S14) and Bid and ask spreads (S15). Each calculation is defined once, in shared/src/, and imported by both.',
       '  3.1 is the only process that reads a store; the others take their input from each other. It explodes at <a href="DFD_LEVEL3_YC_LOAD.html">Level 3</a>.',
       '  Each flow is named by the one structure it holds, defined in <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#6.0-data-flows">Data Dictionary &sect;6.0</a>. Two structures passing between the same two processes are drawn as two flows.',
-      '  The page also reads the GSW curve parameters, for a reference curve drawn only on an analysis view opened with ?gsw. No view of the app uses them otherwise, so they are not drawn here.'].join(NL)
+      '  The page also reads the GSW curve parameters, for a reference curve drawn only on an analysis view opened with ?gsw. No view of the app uses them otherwise, so they are not drawn here.',
+      SHARED_NOTE].join(NL)
   });
 }
 
@@ -514,9 +621,11 @@ function level3YieldCurvesLoad() {
   const sy = i => 150 + i * 150;
   const px = { '3.1.1': 400, '3.1.2': 400, '3.1.3': 400, '3.1.4': 400, '3.1.6': 640, '3.1.7': 880, '3.1.8': 880 };
   const py = { '3.1.1': 150, '3.1.2': 300, '3.1.3': 450, '3.1.4': 600, '3.1.6': 680, '3.1.7': 300, '3.1.8': 540 };
-  const OBS = procs.map(q => ({ x: px[q.id], y: py[q.id], r: PR }));
+  const SM = sharedModules('yc-load');
+  const OBS = [...procs.map(q => ({ x: px[q.id], y: py[q.id], r: PR })), ...SM.obstacles];
   const LBL = [];
-  const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 3: Yield Curves 3.1, one process per source parsed and three that calculate from what the parses produce.">`, marker()];
+  const [vx, vy, vw, vh] = SM.viewBox(W, H);
+  const P = [`<svg viewBox="${vx} ${vy} ${vw} ${vh}" role="img" aria-label="Level 3: Yield Curves 3.1, one process per source parsed and three that calculate from what the parses produce, plus the shared modules its processes call.">`, marker()];
   const sIdx = Object.fromEntries(stores.map((s, i) => [s.id, i]));
   procs.forEach(p => p.reads.forEach(id => {
     const y = sy(sIdx[id]), [x2, y2] = toCircle(SX + SW + 5, y, px[p.id], py[p.id], PR);
@@ -531,18 +640,21 @@ function level3YieldCurvesLoad() {
     P.push(flow(x1, y1, W - 12, y, { obstacles: others }));
     P.push(labelAt(W - 16, y - 8, lab, 'end'));
   });
+  SM.flows(P, px, py, PR, OBS);
   stores.forEach((s, i) => P.push(storeShape(SX, sy(i), SW, s.href, s.name)));
   procs.forEach(p => P.push(procShape(px[p.id], py[p.id], PR, p.href, p.id, p.name)));
+  SM.shapes(P);
   P.push('</svg>');
 
   return page({
     spec: V(F31), specLabel: '3.1 Parse sources and calculate yields',
-    title: 'Yield Curves 3.1 — Level 3', h1: 'Level 3 &mdash; Yield Curves 3.1 Parse sources and calculate yields', maxWidth: W,
+    title: 'Yield Curves 3.1 — Level 3', h1: 'Level 3 &mdash; Yield Curves 3.1 Parse sources and calculate yields', maxWidth: vw,
     up: 'DFD_LEVEL2_YIELDCURVES.html', upLabel: 'Level 2 — Yield Curves', svg: P.join(NL),
     notes: ['  One process per source parsed, then 3.1.6, 3.1.7 and 3.1.8, which calculate from what the parses produce. The four flows leaving on the right are the outputs of 3.1 at Level 2.',
       '  Every process here drills to its own section of <a href="viewer.html#/md/' + F31 + '">3.1 Parse sources and calculate yields</a>.',
       '  3.1.3 produces nothing another process here uses: its output leaves 3.1 directly, for 3.2.',
-      '  3.1.5 Parse GSW parameters is specified but not drawn. Its output is drawn only on an analysis view opened with ?gsw, and no view of the app uses it otherwise.'].join(NL)
+      '  3.1.5 Parse GSW parameters is specified but not drawn. Its output is drawn only on an analysis view opened with ?gsw, and no view of the app uses it otherwise.',
+      SHARED_NOTE].join(NL)
   });
 }
 
@@ -576,9 +688,11 @@ function level2YieldsMonitor() {
   const px = { '2.1': 410, '2.2': 410, '2.3': 630, '2.4': 630, '2.5': 850, '2.6': 850, '2.7': 850 };
   const py = { '2.1': 320, '2.2': 590, '2.3': 190, '2.4': 750, '2.5': 190, '2.6': 470, '2.7': 750 };
   const H = 950, W = 1360;
-  const OBS = procs.map(q => ({ x: px[q.id], y: py[q.id], r: PR }));
+  const SM = sharedModules('ym');
+  const OBS = [...procs.map(q => ({ x: px[q.id], y: py[q.id], r: PR })), ...SM.obstacles];
   const LBL = [];
-  const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 2 for Yields Monitor: seven processes reading five data stores and one external entity directly. No process writes a data store.">`, marker()];
+  const [vx, vy, vw, vh] = SM.viewBox(W, H);
+  const P = [`<svg viewBox="${vx} ${vy} ${vw} ${vh}" role="img" aria-label="Level 2 for Yields Monitor: seven processes reading five data stores and one external entity directly. No process writes a data store. Amber circles are the shared modules its processes call.">`, marker()];
   const sIdx = Object.fromEntries(stores.map((s, i) => [s.id, i]));
   procs.forEach(p => p.reads.forEach(id => {
     const y = sy(sIdx[id]), [x2, y2] = toCircle(SX + SW + 5, y, px[p.id], py[p.id], PR);
@@ -603,19 +717,22 @@ function level2YieldsMonitor() {
   P.push(flow(UX - 5, py['2.1'], px['2.1'] + PR + 3, py['2.1'] + 20, { obstacles: OBS.filter(o => !(o.x === px['2.1'] && o.y === py['2.1'])) }));
   P.push(labelAt((px['2.1'] + PR + UX) / 2, py['2.1'] + 40, 'view selections', 'middle'));
   P.push(`  <g class="entity"><rect x="${UX}" y="100" width="${UW}" height="${H - 180}" rx="3"/><text class="e-name" x="${UX + UW / 2}" y="${H / 2}">User</text></g>`);
+  SM.flows(P, px, py, PR, OBS);
   stores.forEach((s, i) => P.push(s.entity ? entityShape(SX, sy(i), SW, EH, s.href, s.name) : storeShape(SX, sy(i), SW, s.href, s.name)));
   procs.forEach(p => P.push(procShape(px[p.id], py[p.id], PR, p.href, p.id, p.name)));
+  SM.shapes(P);
   P.push('</svg>');
 
   return page({
-    title: 'Yields Monitor — Level 2', h1: 'Level 2 &mdash; Yields Monitor', maxWidth: W,
+    title: 'Yields Monitor — Level 2', h1: 'Level 2 &mdash; Yields Monitor', maxWidth: vw,
     up: 'DFD_LEVEL1.html', upLabel: 'Level 1',
     svg: P.join(NL),
     notes: ['  <b>No process here writes a data store.</b> Every flow ends at 2.5, 2.6 or 2.7 and is gone when the page closes.',
       '  <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#e5">CNBC (E5)</a> is drawn as a box, in the store column, since this is the one place a Level 2 diagram in this portal shows an app reading an entity directly, live — no acquisition job stands between it and the app (see <a href="viewer.html#/md/knowledge/DFD_Worklist.md">DFD_Worklist.md</a> §4.0). Its two flows are independently named: <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#market-yields">market yields</a>, its chart-bar feed, to 2.1; <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#live-quotes">live quotes</a>, its quote service, to 2.2.',
       '  2.1 explodes at <a href="DFD_LEVEL3_YM_ASSEMBLE.html">Level 3</a>.',
       '  2.3 and 2.4 each read <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s16">Bond holidays (S16)</a> directly, to exclude a weekend or holiday bar from their own calculation, rather than through 2.1. 2.5 and 2.6 read it to leave a Bond Holiday out of the points drawn.',
-      '  Each flow is named by the one structure it holds, defined in <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#6.0-data-flows">Data Dictionary &sect;6.4</a>.'].join(NL)
+      '  Each flow is named by the one structure it holds, defined in <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#6.0-data-flows">Data Dictionary &sect;6.4</a>.',
+      SHARED_NOTE].join(NL)
   });
 }
 
@@ -858,9 +975,11 @@ function level3YieldCurvesRender() {
   const PR = 56, UX = 870, UW = 145, W = 1030, H = 980;
   const px = { '3.7.1': 300, '3.7.2': 300, '3.7.3': 640, '3.7.4': 640, '3.7.5': 640, '3.7.6': 640, '3.7.7': 380 };
   const py = { '3.7.1': 240, '3.7.2': 600, '3.7.3': 150, '3.7.4': 350, '3.7.5': 530, '3.7.6': 700, '3.7.7': 880 };
-  const OBS = procs.map(q => ({ x: px[q.id], y: py[q.id], r: PR }));
+  const SM = sharedModules('yc-render');
+  const OBS = [...procs.map(q => ({ x: px[q.id], y: py[q.id], r: PR })), ...SM.obstacles];
   const LBL = [];
-  const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 3: Yield Curves 3.7, one process per view drawn.">`, marker()];
+  const [vx, vy, vw, vh] = SM.viewBox(W, H);
+  const P = [`<svg viewBox="${vx} ${vy} ${vw} ${vh}" role="img" aria-label="Level 3: Yield Curves 3.7, one process per view drawn, plus the shared modules its processes call.">`, marker()];
 
   // The flows arriving from the rest of the app enter from the page edge, each at the
   // view that draws it, so no flow is drawn without showing which view consumes it.
@@ -888,17 +1007,20 @@ function level3YieldCurvesRender() {
   P.push(labelAt((px['3.7.7'] + PR + UX) / 2, py['3.7.7'] - 14, 'drill popup', 'middle'));
   P.push(`  <g class="entity"><rect x="${UX}" y="90" width="${UW}" height="${H - 180}" rx="3"/><text class="e-name" x="${UX + UW / 2}" y="${H / 2}">User</text></g>`);
   P.push(internalFlows(procs, px, py, PR, OBS, LBL));
+  SM.flows(P, px, py, PR, OBS);
   procs.forEach(pr => P.push(procShape(px[pr.id], py[pr.id], PR, V(S + '#' + pr.a), pr.id, pr.name)));
+  SM.shapes(P);
   P.push('</svg>');
 
   return page({
     spec: V(S), specLabel: '3.7 Render charts and tables',
-    title: 'Yield Curves 3.7 — Level 3', h1: 'Level 3 &mdash; Yield Curves 3.7 Render charts and tables', maxWidth: W,
+    title: 'Yield Curves 3.7 — Level 3', h1: 'Level 3 &mdash; Yield Curves 3.7 Render charts and tables', maxWidth: vw,
     up: 'DFD_LEVEL2_YIELDCURVES.html', upLabel: 'Level 2 — Yield Curves', svg: P.join(NL),
     notes: ['  Every process drills to its own section of <a href="viewer.html#/md/' + S + '">3.7 Render charts and tables</a>, the process spec.',
       '  <b>Nothing here calculates a yield.</b> Every figure drawn is produced upstream and passed in; a view showing a figure no other process produced is a defect in this stage.',
       '  The view selections from 3.7.1 reach every view, and the axis scales from 3.7.2 reach every chart; each fan is labelled once.',
-      '  3.7.2 decides what is visible before anything is drawn. Its axis clipping moves the axis and never removes a security, so a table figure can fall outside what the chart shows.'].join(NL)
+      '  3.7.2 decides what is visible before anything is drawn. Its axis clipping moves the axis and never removes a security, so a table figure can fall outside what the chart shows.',
+      SHARED_NOTE].join(NL)
   });
 }
 
@@ -913,9 +1035,11 @@ function level3IngestFedInvest() {
   const PR = 60, SW = 215, W = 1100, H = 660;
   const px = { '1.1.1': 380, '1.1.2': 380, '1.1.3': 700 };
   const py = { '1.1.1': 190, '1.1.2': 460, '1.1.3': 325 };
-  const OBS = procs.map(q => ({ x: px[q.id], y: py[q.id], r: PR }));
+  const SM = sharedModules('ingest-fedinvest');
+  const OBS = [...procs.map(q => ({ x: px[q.id], y: py[q.id], r: PR })), ...SM.obstacles];
   const LBL = [];
-  const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 3: 1.1 Download FedInvest prices and calculate yields, three processes from the FedInvest price list to FedInvest prices (S1).">`, marker()];
+  const [vx, vy, vw, vh] = SM.viewBox(W, H);
+  const P = [`<svg viewBox="${vx} ${vy} ${vw} ${vh}" role="img" aria-label="Level 3: 1.1 Download FedInvest prices and calculate yields, three processes from the FedInvest price list to FedInvest prices (S1), plus the shared modules its processes call.">`, marker()];
   // The price list enters from the page edge at each process that reads it.
   ['1.1.1', '1.1.2'].forEach(id => {
     P.push(flow(8, py[id], px[id] - PR - 3, py[id], { obstacles: OBS.filter(o => o.y !== py[id]) }));
@@ -930,16 +1054,19 @@ function level3IngestFedInvest() {
   P.push(storeShape(hol.x, hol.y, SW, DS('s16'), 'Bond holidays'));
   P.push(storeShape(ref.x, ref.y, SW, DS('s2'), 'TIPS reference data'));
   P.push(storeShape(s1.x, s1.y, SW, DS('s1'), 'FedInvest prices'));
+  SM.flows(P, px, py, PR, OBS);
   procs.forEach(p => P.push(procShape(px[p.id], py[p.id], PR, p.href, p.id, p.name)));
+  SM.shapes(P);
   P.push('</svg>');
 
   return page({
     spec: S(), specLabel: '1.1 Download FedInvest prices and calculate yields',
-    title: '1.1 Download FedInvest prices and calculate yields — Level 3', h1: 'Level 3 &mdash; 1.1 Download FedInvest prices and calculate yields', maxWidth: W,
+    title: '1.1 Download FedInvest prices and calculate yields — Level 3', h1: 'Level 3 &mdash; 1.1 Download FedInvest prices and calculate yields', maxWidth: vw,
     up: 'DFD_LEVEL2_INGESTION.html', upLabel: 'Level 2 — 1 Acquire and derive reference data', svg: P.join(NL),
     notes: ['  Every process here drills to its own section of <a href="' + S() + '">1.1 Download FedInvest prices and calculate yields</a>.',
       '  The flow entering from the edge is the FedInvest daily price list, drawn against its source on the <a href="DFD_LEVEL0.html">context diagram</a>. 1.1.1 reads the date it states, and 1.1.2 reads its rows.',
-      '  On a Bond Holiday, or when the price list does not state prices for the run date, 1.1.1 produces no settlement date and FedInvest prices (S1) is not written.'].join(NL)
+      '  On a Bond Holiday, or when the price list does not state prices for the run date, 1.1.1 produces no settlement date and FedInvest prices (S1) is not written.',
+      SHARED_NOTE].join(NL)
   });
 }
 
@@ -971,9 +1098,11 @@ function level2TipsLadderManager() {
   const px = { '4.1': 440, '4.2': 700, '4.3': 950, '4.4': 950, '4.5': 1010, '4.6': 700 };
   const py = { '4.1': 560, '4.2': 400, '4.3': 250, '4.4': 780, '4.5': 540, '4.6': 100 };
   const H = 1000, W = 1450;
-  const OBS = procs.map(q => ({ x: px[q.id], y: py[q.id], r: PR }));
+  const SM = sharedModules('tlm');
+  const OBS = [...procs.map(q => ({ x: px[q.id], y: py[q.id], r: PR })), ...SM.obstacles];
   const LBL = [];
-  const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 2 for TipsLadderManager: six processes reading five data stores and the Explore price files kept in the app, an imported file and typed parameters from the user. No process writes a data store.">`, marker()];
+  const [vx, vy, vw, vh] = SM.viewBox(W, H);
+  const P = [`<svg viewBox="${vx} ${vy} ${vw} ${vh}" role="img" aria-label="Level 2 for TipsLadderManager: six processes reading five data stores and the Explore price files kept in the app, an imported file and typed parameters from the user. No process writes a data store. Amber circles are the shared modules its processes call.">`, marker()];
   const sIdx = Object.fromEntries(stores.map((s, i) => [s.id, i]));
   procs.forEach(p => p.reads.forEach(id => {
     const y = sy(sIdx[id]), [x2, y2] = toCircle(SX + SW + 5, y, px[p.id], py[p.id], PR);
@@ -1007,46 +1136,43 @@ function level2TipsLadderManager() {
   flowToUser('4.5', 'cash flow calendar', 12);
   flowToUser('4.5', 'ladder export', 36);
   P.push(`  <g class="entity"><rect x="${UX}" y="40" width="${UW}" height="${H - 80}" rx="3"/><text class="e-name" x="${UX + UW / 2}" y="${H / 2}">User</text></g>`);
+  SM.flows(P, px, py, PR, OBS);
   stores.forEach((s, i) => P.push(storeShape(SX, sy(i), SW, s.href, s.name, s.plain)));
   procs.forEach(p => P.push(procShape(px[p.id], py[p.id], PR, p.href, p.id, p.name)));
+  SM.shapes(P);
   P.push('</svg>');
 
   return page({
-    title: 'TipsLadderManager — Level 2', h1: 'Level 2 &mdash; TipsLadderManager', maxWidth: W,
+    title: 'TipsLadderManager — Level 2', h1: 'Level 2 &mdash; TipsLadderManager', maxWidth: vw,
     up: 'DFD_LEVEL1.html', upLabel: 'Level 1',
     svg: P.join(NL),
     notes: ['  <b>No process here writes a data store.</b> Every flow ends at the user and is gone when the page closes, except the files the Export menu writes.',
       '  4.1 reads Market quotes (S7), the live default; FedInvest prices (S1) is the same module\'s dormant fallback and is not drawn.',
       '  The Explore price files are kept in the app and drawn on this diagram only: no job writes them. Explore builds with the interface and the output of Build, so 4.6 feeds 4.3.',
-      '  Build and Rebalance are separate processes with separate interfaces; the code they share is in the <a href="viewer.html#/md/knowledge/SharedModules.md">shared modules</a>.'].join(NL)
+      '  Build and Rebalance are separate processes with separate interfaces; the code they share is in the <a href="viewer.html#/md/knowledge/SharedModules.md">shared modules</a>.',
+      SHARED_NOTE].join(NL)
   });
 }
 
 // ── Level 3: TipsLadderManager 4.5 ──────────────────────────────────────────
 function level3TipsLadderManagerRender() {
   const S = f => V('TipsLadderManager/knowledge/' + f);
-  const M = a => V('knowledge/SharedModules.md' + (a ? '#' + a : ''));
-  const modules = [
-    { id: 'm6', name: ['drill.js'], href: M('m6') },
-    { id: 'm7', name: ['popup.js'], href: M('m7') },
-    { id: 'm8', name: ['modal.js'], href: M('m8') },
-  ];
   const procs = [
-    { id: '4.5.1', name: ['Render', 'ladder table'], href: S('4.5.1_Render_Ladder_Table.md'), calls: [], out: { '4.5.2': ['ladder table'] } },
-    { id: '4.5.2', name: ['Show drill', 'popups'], href: S('4.5.2_Show_Drill_Popups.md'), calls: ['m6', 'm7', 'm8'], out: {} },
-    { id: '4.5.3', name: ['Show trade', 'ticket'], href: S('4.5.3_Show_Trade_Ticket.md'), calls: ['m6', 'm7', 'm8'], out: {} },
-    { id: '4.5.4', name: ['Show cash flow', 'calendar'], href: S('4.5.4_Show_Cash_Flow_Calendar.md'), calls: ['m6', 'm7', 'm8'], out: {} },
-    { id: '4.5.5', name: ['Export', 'ladder table'], href: S('4.5.5_Export_Ladder_Table.md'), calls: [], out: {} },
-    { id: '4.5.6', name: ['Export holdings', 'and DARA plan'], href: S('4.5.6_Export_Holdings_And_DARA_Plan.md'), calls: [], out: {} },
+    { id: '4.5.1', name: ['Render', 'ladder table'], href: S('4.5.1_Render_Ladder_Table.md'), out: { '4.5.2': ['ladder table'] } },
+    { id: '4.5.2', name: ['Show drill', 'popups'], href: S('4.5.2_Show_Drill_Popups.md'), out: {} },
+    { id: '4.5.3', name: ['Show trade', 'ticket'], href: S('4.5.3_Show_Trade_Ticket.md'), out: {} },
+    { id: '4.5.4', name: ['Show cash flow', 'calendar'], href: S('4.5.4_Show_Cash_Flow_Calendar.md'), out: {} },
+    { id: '4.5.5', name: ['Export', 'ladder table'], href: S('4.5.5_Export_Ladder_Table.md'), out: {} },
+    { id: '4.5.6', name: ['Export holdings', 'and DARA plan'], href: S('4.5.6_Export_Holdings_And_DARA_Plan.md'), out: {} },
   ];
-  const PR = 56, MR = 46, W = 1500, H = 1060;
+  const PR = 56, W = 1500, H = 1060;
+  const SM = sharedModules('tlm-render');
   const px = { '4.5.1': 420, '4.5.2': 1220, '4.5.3': 420, '4.5.4': 420, '4.5.5': 420, '4.5.6': 420 };
   const py = { '4.5.1': 150, '4.5.2': 150, '4.5.3': 400, '4.5.4': 650, '4.5.5': 800, '4.5.6': 940 };
-  const mx = { m6: 900, m7: 900, m8: 900 };
-  const my = { m6: 290, m7: 520, m8: 740 };
-  const OBS = [...Object.keys(px).map(id => ({ x: px[id], y: py[id], r: PR })), ...modules.map(m => ({ x: mx[m.id], y: my[m.id], r: MR }))];
+  const OBS = [...Object.keys(px).map(id => ({ x: px[id], y: py[id], r: PR })), ...SM.obstacles];
   const LBL = [];
-  const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 3: TipsLadderManager 4.5, drawing the result of the mode on screen as a ladder table, popups, a trade ticket and a cash flow calendar, and writing it out.">`, marker()];
+  const [vx, vy, vw, vh] = SM.viewBox(W, H);
+  const P = [`<svg viewBox="${vx} ${vy} ${vw} ${vh}" role="img" aria-label="Level 3: TipsLadderManager 4.5, drawing the result of the mode on screen as a ladder table, popups, a trade ticket and a cash flow calendar, and writing it out, plus the shared modules its processes call.">`, marker()];
   const inFlow = (id, y, label) => {
     const [x2, y2] = toCircle(60, y, px[id], py[id], PR);
     P.push(flow(60, y, x2, y2, { obstacles: OBS.filter(o => !(o.x === px[id] && o.y === py[id])) }));
@@ -1071,12 +1197,7 @@ function level3TipsLadderManagerRender() {
   inFlow('4.5.6', 960, 'per-year DARA  ←  4.2');
   inFlow('4.5.6', 995, 'construction parameters  ←  4.2');
   P.push(internalFlows(procs, px, py, PR, OBS, LBL));
-  procs.forEach(p => (p.calls || []).forEach(id => {
-    const [x1, y1] = fromCircle(mx[id], my[id], MR, px[p.id], py[p.id]);
-    const [x2, y2] = toCircle(x1, y1, px[p.id], py[p.id], PR);
-    const others = OBS.filter(o => !(o.x === mx[id] && o.y === my[id]) && !(o.x === px[p.id] && o.y === py[p.id]));
-    P.push(flow(x1, y1, x2, y2, { obstacles: others }));
-  }));
+  SM.flows(P, px, py, PR, OBS);
   const outFlow = (id, y, label) => {
     const [ox, oy] = fromCircle(px[id], py[id], PR, W - 12, y);
     P.push(flow(ox, oy, W - 12, y, { obstacles: OBS.filter(o => !(o.x === px[id] && o.y === py[id])) }));
@@ -1089,13 +1210,13 @@ function level3TipsLadderManagerRender() {
   outFlow('4.5.3', 400, 'trade ticket  →  User');
   outFlow('4.5.4', 650, 'cash flow calendar  →  User');
   procs.forEach(p => P.push(procShape(px[p.id], py[p.id], PR, p.href, p.id, p.name)));
-  modules.forEach(m => P.push(moduleShape(mx[m.id], my[m.id], MR, m.href, m.id.toUpperCase(), m.name)));
+  SM.shapes(P);
   P.push('</svg>');
 
   return page({
-    title: 'TipsLadderManager 4.5 — Level 3', h1: 'Level 3 &mdash; TipsLadderManager 4.5 Render and export', maxWidth: W,
+    title: 'TipsLadderManager 4.5 — Level 3', h1: 'Level 3 &mdash; TipsLadderManager 4.5 Render and export', maxWidth: vw,
     up: 'DFD_LEVEL2_TIPSLADDERMANAGER.html', upLabel: 'Level 2 — TipsLadderManager', svg: P.join(NL),
-    notes: ['  4.5.2, 4.5.3 and 4.5.4 each show a popup or a modal, so each calls the three shared modules; the amber circles are <a href="' + M() + '">shared modules</a>, not process steps.',
+    notes: ['  4.5.2, 4.5.3 and 4.5.4 each show a popup or a modal, so each calls the shared modules drill.js, popup.js and modal.js.', SHARED_NOTE,
       '  The popups, the trade ticket and the cash flow calendar end at the user, as do the Ladder Table and the exports.'].join(NL)
   });
 }
@@ -1109,46 +1230,30 @@ function level3TipsLadderManagerLoadMarketData() {
     { id: 'sasao', name: 'SA and SAO yields', href: DS('s10') },
     { id: 'hol', name: 'Bond holidays', href: DS('s16') },
   ];
-  const M = a => V('knowledge/SharedModules.md' + (a ? '#' + a : ''));
-  const modules = [
-    { id: 'm2', name: ['settlement.js'], href: M('m2') },
-    { id: 'm3', name: ['bond-math.js'], href: M('m3') },
-    { id: 'm4', name: ['market-', 'quotes.js'], href: M('m4') },
-    { id: 'm1', name: ['csv.js'], href: M('m1') },
-  ];
   const S = a => V('TipsLadderManager/knowledge/4.1_Load_Market_Data.md' + (a ? '#' + a : ''));
   const procs = [
-    { id: '4.1.1', name: ['Fetch and parse', 'market quotes'], href: S('fetch-and-parse-market-quotes'), reads: ['quotes'], calls: ['m2', 'm3', 'm4'],
+    { id: '4.1.1', name: ['Fetch and parse', 'market quotes'], href: S('fetch-and-parse-market-quotes'), reads: ['quotes'],
       out: { '4.1.4': ['TIPS yields'] } },
-    { id: '4.1.3', name: ['Fetch auxiliary', 'TIPS data'], href: S('fetch-auxiliary-tips-data'), reads: ['tipsref', 'refcpi', 'sasao', 'hol'], calls: ['m1', 'm2'],
+    { id: '4.1.3', name: ['Fetch auxiliary', 'TIPS data'], href: S('fetch-auxiliary-tips-data'), reads: ['tipsref', 'refcpi', 'sasao', 'hol'],
       out: { '4.1.1': ['TIPS reference data', 'bond holidays'], '4.1.4': ['SA yields'] } },
     { id: '4.1.4', name: ['Build TIPS', 'market data'], href: S('build-tips-market-data'), reads: [], calls: [], out: {} },
   ];
-  const SX = 40, SW = 210, PR = 62, MR = 50, W = 1420, H = 760;
+  const SX = 40, SW = 210, PR = 62, W = 1420, H = 760;
+  const SM = sharedModules('tlm-load');
   const sy = i => 100 + i * 150;
   const px = { '4.1.3': 460, '4.1.1': 460, '4.1.4': 980 };
   const py = { '4.1.3': 500, '4.1.1': 200, '4.1.4': 350 };
-  const mx = { m2: 1150, m3: 1150, m4: 1150, m1: 1150 };
-  const my = { m3: 100, m4: 260, m2: 420, m1: 580 };
-  const OBS = [...procs.map(q => ({ x: px[q.id], y: py[q.id], r: PR })), ...modules.map(m => ({ x: mx[m.id], y: my[m.id], r: MR }))];
+  const OBS = [...procs.map(q => ({ x: px[q.id], y: py[q.id], r: PR })), ...SM.obstacles];
   const LBL = [];
-  const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 3: TipsLadderManager 4.1, fetching market quotes and the auxiliary TIPS data they need, then building TIPS market data, plus the shared modules each calls into.">`, marker()];
+  const [vx, vy, vw, vh] = SM.viewBox(W, H);
+  const P = [`<svg viewBox="${vx} ${vy} ${vw} ${vh}" role="img" aria-label="Level 3: TipsLadderManager 4.1, fetching market quotes and the auxiliary TIPS data they need, then building TIPS market data, plus the shared modules each calls into.">`, marker()];
   const sIdx = Object.fromEntries(stores.map((s, i) => [s.id, i]));
   procs.forEach(p => p.reads.forEach(id => {
     const y = sy(sIdx[id]), [x2, y2] = toCircle(SX + SW + 5, y, px[p.id], py[p.id], PR);
     P.push(flow(SX + SW + 5, y, x2, y2, { obstacles: OBS }));
   }));
   P.push(internalFlows(procs, px, py, PR, OBS, LBL));
-  // A module is called, not read: the arrow still points from the module toward the
-  // process, the same direction a store's data takes toward the job reading it, since a
-  // module is a resource a process draws on rather than a data-transformation step of its
-  // own (DFD_Worklist.md §2.0).
-  procs.forEach(p => (p.calls || []).forEach(id => {
-    const [x1, y1] = fromCircle(mx[id], my[id], MR, px[p.id], py[p.id]);
-    const [x2, y2] = toCircle(x1, y1, px[p.id], py[p.id], PR);
-    const others = OBS.filter(o => !(o.x === mx[id] && o.y === my[id]) && !(o.x === px[p.id] && o.y === py[p.id]));
-    P.push(flow(x1, y1, x2, y2, { obstacles: others }));
-  }));
+  SM.flows(P, px, py, PR, OBS);
   // 4.1's own output at Level 2: TIPS market data, leaving 4.1.4 for the rest of the app.
   const [ox, oy] = fromCircle(px['4.1.4'], py['4.1.4'], PR, W - 12, py['4.1.4']);
   P.push(flow(ox, oy, W - 12, py['4.1.4'], { obstacles: OBS.filter(o => !(o.x === px['4.1.4'] && o.y === py['4.1.4'])) }));
@@ -1163,14 +1268,14 @@ function level3TipsLadderManagerLoadMarketData() {
   P.push(labelAt(W - 16, py['4.1.3'] + 52, 'bond holidays  →  rest of app', 'end'));
   stores.forEach((s, i) => P.push(storeShape(SX, sy(i), SW, s.href, s.name)));
   procs.forEach(p => P.push(procShape(px[p.id], py[p.id], PR, p.href, p.id, p.name)));
-  modules.forEach(m => P.push(moduleShape(mx[m.id], my[m.id], MR, m.href, m.id.toUpperCase(), m.name)));
+  SM.shapes(P);
   P.push('</svg>');
 
   return page({
-    title: 'TipsLadderManager 4.1 — Level 3', h1: 'Level 3 &mdash; TipsLadderManager 4.1 Load market data', maxWidth: W,
+    title: 'TipsLadderManager 4.1 — Level 3', h1: 'Level 3 &mdash; TipsLadderManager 4.1 Load market data', maxWidth: vw,
     up: 'DFD_LEVEL2_TIPSLADDERMANAGER.html', upLabel: 'Level 2 — TipsLadderManager', svg: P.join(NL),
     notes: ['  4.1.2 Fetch and parse FedInvest prices is specified but not drawn: a real, dormant code path, never selected in production, so it is not part of this diagram\'s active flow — see the spec\'s own note.',
-      '  The amber circles are shared modules (<a href="' + M() + '">SharedModules.md</a>), not process steps of this diagram.',
+      SHARED_NOTE,
       '  See <a href="viewer.html#/md/knowledge/DFD_Worklist.md">DFD_Worklist.md</a> item 27 for what this pass found and logged.'].join(NL)
   });
 }
@@ -1234,22 +1339,18 @@ function level3TipsLadderManagerImport() {
 function level3TipsLadderManagerBuild() {
   const S = a => V('TipsLadderManager/knowledge/4.3_Build_Ladder.md' + (a ? '#' + a : ''));
   const M = a => V('knowledge/SharedModules.md' + (a ? '#' + a : ''));
-  const modules = [
-    { id: 'm5', name: ['ladder-', 'core.js'], href: M('m5') },
-    { id: 'm3', name: ['bond-math.js'], href: M('m3') },
-  ];
   const procs = [
-    { id: '4.3.1', name: ['Resolve per-', 'year DARA'], href: S('resolve-per-year-dara'), calls: [], out: { '4.3.2': ['per-year DARA'] } },
-    { id: '4.3.2', name: ['Build the', 'ladder'], href: S('build-the-ladder'), calls: ['m5', 'm3'], out: {} },
+    { id: '4.3.1', name: ['Resolve per-', 'year DARA'], href: S('resolve-per-year-dara'), out: { '4.3.2': ['per-year DARA'] } },
+    { id: '4.3.2', name: ['Build the', 'ladder'], href: S('build-the-ladder'), out: {} },
   ];
-  const PR = 62, MR = 50, UX = 60, UW = 145, W = 1180, H = 480;
+  const PR = 62, UX = 60, UW = 145, W = 1180, H = 480;
+  const SM = sharedModules('tlm-build');
   const px = { '4.3.1': 420, '4.3.2': 420 };
   const py = { '4.3.1': 190, '4.3.2': 360 };
-  const mx = { m5: 920, m3: 920 };
-  const my = { m5: 220, m3: 360 };
-  const OBS = [...Object.keys(px).map(id => ({ x: px[id], y: py[id], r: PR })), ...modules.map(m => ({ x: mx[m.id], y: my[m.id], r: MR }))];
+  const OBS = [...Object.keys(px).map(id => ({ x: px[id], y: py[id], r: PR })), ...SM.obstacles];
   const LBL = [];
-  const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 3: TipsLadderManager 4.3, resolving the ladder's per-year DARA then building it against the shared sizing engine.">`, marker()];
+  const [vx, vy, vw, vh] = SM.viewBox(W, H);
+  const P = [`<svg viewBox="${vx} ${vy} ${vw} ${vh}" role="img" aria-label="Level 3: TipsLadderManager 4.3, resolving the ladder's per-year DARA then building it against the shared sizing engine, plus the shared modules each process calls.">`, marker()];
 
   const [tx, ty] = toCircle(UX + UW + 60, 80, px['4.3.1'], py['4.3.1'], PR);
   P.push(flow(UX + UW + 60, 80, tx, ty, { obstacles: OBS.filter(o => !(o.x === px['4.3.1'] && o.y === py['4.3.1'])) }));
@@ -1264,53 +1365,41 @@ function level3TipsLadderManagerBuild() {
   P.push(`  <g class="entity"><rect x="${UX}" y="${py['4.3.1'] - 90}" width="${UW}" height="180" rx="3"/><text class="e-name" x="${UX + UW / 2}" y="${py['4.3.1'] + 95}">User</text></g>`);
 
   P.push(internalFlows(procs, px, py, PR, OBS, LBL));
-  procs.forEach(p => (p.calls || []).forEach(id => {
-    const [x1, y1] = fromCircle(mx[id], my[id], MR, px[p.id], py[p.id]);
-    const [x2, y2] = toCircle(x1, y1, px[p.id], py[p.id], PR);
-    const others = OBS.filter(o => !(o.x === mx[id] && o.y === my[id]) && !(o.x === px[p.id] && o.y === py[p.id]));
-    P.push(flow(x1, y1, x2, y2, { obstacles: others }));
-  }));
+  SM.flows(P, px, py, PR, OBS);
 
   const [ox, oy] = fromCircle(px['4.3.2'], py['4.3.2'], PR, W - 12, py['4.3.2']);
   P.push(flow(ox, oy, W - 12, py['4.3.2'], { obstacles: OBS.filter(o => !(o.x === px['4.3.2'] && o.y === py['4.3.2'])) }));
   P.push(labelAt(W - 16, py['4.3.2'] - 8, 'build result  →  4.5', 'end'));
 
   procs.forEach(p => P.push(procShape(px[p.id], py[p.id], PR, p.href, p.id, p.name)));
-  modules.forEach(m => P.push(moduleShape(mx[m.id], my[m.id], MR, m.href, m.id.toUpperCase(), m.name)));
+  SM.shapes(P);
   P.push('</svg>');
 
   return page({
-    title: 'TipsLadderManager 4.3 — Level 3', h1: 'Level 3 &mdash; TipsLadderManager 4.3 Build ladder', maxWidth: W,
+    title: 'TipsLadderManager 4.3 — Level 3', h1: 'Level 3 &mdash; TipsLadderManager 4.3 Build ladder', maxWidth: vw,
     up: 'DFD_LEVEL2_TIPSLADDERMANAGER.html', upLabel: 'Level 2 — TipsLadderManager', svg: P.join(NL),
     notes: ['  M5 (ladder-core.js) is specified in <a href="' + M('m5') + '">SharedModules.md</a>, and the rules it applies in 2.0 TIPS Ladders.',
       '  Built in tandem with 4.4 Rebalance ladder, since both call the same shared sizing engine (ladder-core.js, M5) rather than each carrying its own copy.',
-      '  The amber circles are shared modules (<a href="' + M() + '">SharedModules.md</a>), not process steps of this diagram.'].join(NL)
+      SHARED_NOTE].join(NL)
   });
 }
 
 // ── Level 3: TipsLadderManager 4.4 ──────────────────────────────────────────
 function level3TipsLadderManagerRebalance() {
   const S = a => V('TipsLadderManager/knowledge/4.4_Rebalance_Ladder.md' + (a ? '#' + a : ''));
-  const M = a => V('knowledge/SharedModules.md' + (a ? '#' + a : ''));
-  const modules = [
-    { id: 'm5', name: ['ladder-', 'core.js'], href: M('m5') },
-    { id: 'm3', name: ['bond-math.js'], href: M('m3') },
-    { id: 'm9', name: ['gap-math.js'], href: M('m9') },
-    { id: 'm10', name: ['shape-math.js'], href: M('m10') },
-  ];
   const procs = [
-    { id: '4.4.1', name: ['Derive per-year', 'DARA from', 'holdings or', 'DARA plan'], href: S('derive-per-year-dara-from-holdings-or-dara-plan'), calls: ['m10'], out: { '4.4.3': ['per-year DARA'] } },
-    { id: '4.4.2', name: ['Preview before-', 'state'], href: S('preview-before-state'), calls: ['m10'], out: {} },
-    { id: '4.4.3', name: ['Rebalance the', 'ladder'], href: S('rebalance-the-ladder'), calls: ['m5', 'm3', 'm9', 'm10'], out: {} },
+    { id: '4.4.1', name: ['Derive per-year', 'DARA from', 'holdings or', 'DARA plan'], href: S('derive-per-year-dara-from-holdings-or-dara-plan'), out: { '4.4.3': ['per-year DARA'] } },
+    { id: '4.4.2', name: ['Preview before-', 'state'], href: S('preview-before-state'), out: {} },
+    { id: '4.4.3', name: ['Rebalance the', 'ladder'], href: S('rebalance-the-ladder'), out: {} },
   ];
-  const PR = 62, MR = 50, UX = 60, UW = 145, W = 1180, H = 820;
+  const PR = 62, UX = 60, UW = 145, W = 1180, H = 820;
+  const SM = sharedModules('tlm-rebalance');
   const px = { '4.4.1': 400, '4.4.2': 680, '4.4.3': 400 };
   const py = { '4.4.1': 150, '4.4.2': 330, '4.4.3': 500 };
-  const mx = { m5: 980, m3: 980, m9: 980, m10: 980 };
-  const my = { m10: 230, m5: 450, m3: 590, m9: 730 };
-  const OBS = [...Object.keys(px).map(id => ({ x: px[id], y: py[id], r: PR })), ...modules.map(m => ({ x: mx[m.id], y: my[m.id], r: MR }))];
+  const OBS = [...Object.keys(px).map(id => ({ x: px[id], y: py[id], r: PR })), ...SM.obstacles];
   const LBL = [];
-  const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 3: TipsLadderManager 4.4, deriving per-year DARA and a before-state preview from holdings, then rebalancing against the shared sizing engine.">`, marker()];
+  const [vx, vy, vw, vh] = SM.viewBox(W, H);
+  const P = [`<svg viewBox="${vx} ${vy} ${vw} ${vh}" role="img" aria-label="Level 3: TipsLadderManager 4.4, deriving per-year DARA and a before-state preview from holdings, then rebalancing against the shared sizing engine, plus the shared modules each process calls.">`, marker()];
 
   const [tx, ty] = toCircle(UX + UW + 60, 60, px['4.4.1'], py['4.4.1'], PR);
   P.push(flow(UX + UW + 60, 60, tx, ty, { obstacles: OBS.filter(o => !(o.x === px['4.4.1'] && o.y === py['4.4.1'])) }));
@@ -1332,12 +1421,7 @@ function level3TipsLadderManagerRebalance() {
   P.push(`  <g class="entity"><rect x="${UX}" y="${py['4.4.1'] - 90}" width="${UW}" height="${py['4.4.3'] - py['4.4.1'] + 180}" rx="3"/><text class="e-name" x="${UX + UW / 2}" y="${(py['4.4.1'] + py['4.4.3']) / 2 + 5}">User</text></g>`);
 
   P.push(internalFlows(procs, px, py, PR, OBS, LBL));
-  procs.forEach(p => (p.calls || []).forEach(id => {
-    const [x1, y1] = fromCircle(mx[id], my[id], MR, px[p.id], py[p.id]);
-    const [x2, y2] = toCircle(x1, y1, px[p.id], py[p.id], PR);
-    const others = OBS.filter(o => !(o.x === mx[id] && o.y === my[id]) && !(o.x === px[p.id] && o.y === py[p.id]));
-    P.push(flow(x1, y1, x2, y2, { obstacles: others }));
-  }));
+  SM.flows(P, px, py, PR, OBS);
 
   const [ox, oy] = fromCircle(px['4.4.3'], py['4.4.3'], PR, W - 12, py['4.4.3']);
   P.push(flow(ox, oy, W - 12, py['4.4.3'], { obstacles: OBS.filter(o => !(o.x === px['4.4.3'] && o.y === py['4.4.3'])) }));
@@ -1347,15 +1431,15 @@ function level3TipsLadderManagerRebalance() {
   P.push(labelAt(W - 16, py['4.4.2'] - 8, 'before-state preview  →  4.5', 'end'));
 
   procs.forEach(p => P.push(procShape(px[p.id], py[p.id], PR, p.href, p.id, p.name)));
-  modules.forEach(m => P.push(moduleShape(mx[m.id], my[m.id], MR, m.href, m.id.toUpperCase(), m.name)));
+  SM.shapes(P);
   P.push('</svg>');
 
   return page({
-    title: 'TipsLadderManager 4.4 — Level 3', h1: 'Level 3 &mdash; TipsLadderManager 4.4 Rebalance ladder', maxWidth: W,
+    title: 'TipsLadderManager 4.4 — Level 3', h1: 'Level 3 &mdash; TipsLadderManager 4.4 Rebalance ladder', maxWidth: vw,
     up: 'DFD_LEVEL2_TIPSLADDERMANAGER.html', upLabel: 'Level 2 — TipsLadderManager', svg: P.join(NL),
     notes: ['  4.4.1 and 4.4.2 both run at file-load time, independently of each other and of Run; 4.4.3 runs only on Rebalance Ladder.',
       '  Built in tandem with 4.3 Build ladder, since both call the same shared sizing engine (ladder-core.js, M5) rather than each carrying its own copy.',
-      '  The amber circles are shared modules (<a href="' + M() + '">SharedModules.md</a>), not process steps of this diagram.'].join(NL)
+      SHARED_NOTE].join(NL)
   });
 }
 
@@ -1380,9 +1464,11 @@ function level2TreasuryAuctions() {
   const px = { '5.1': 520, '5.2': 920, '5.3': 920, '5.4': 920 };
   const py = { '5.1': 315, '5.2': 170, '5.3': 400, '5.4': 630 };
   const H = 800, W = 1360;
-  const OBS = procs.map(q => ({ x: px[q.id], y: py[q.id], r: PR }));
+  const SM = sharedModules('auctions');
+  const OBS = [...procs.map(q => ({ x: px[q.id], y: py[q.id], r: PR })), ...SM.obstacles];
   const LBL = [];
-  const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 2 for Treasury Auctions: four processes reading two data stores and one external entity directly. No process writes a data store.">`, marker()];
+  const [vx, vy, vw, vh] = SM.viewBox(W, H);
+  const P = [`<svg viewBox="${vx} ${vy} ${vw} ${vh}" role="img" aria-label="Level 2 for Treasury Auctions: four processes reading two data stores and one external entity directly. No process writes a data store. Amber circles are the shared modules its processes call.">`, marker()];
   const sIdx = Object.fromEntries(stores.map((s, i) => [s.id, i]));
   procs.forEach(p => p.reads.forEach(id => {
     const y = sy(sIdx[id]), [x2, y2] = toCircle(SX + SW + 5, y, px[p.id], py[p.id], PR);
@@ -1404,18 +1490,21 @@ function level2TreasuryAuctions() {
     P.push(labelAt((px[id] + PR + UX) / 2, py[id] + 52, 'view selections', 'middle'));
   });
   P.push(`  <g class="entity"><rect x="${UX}" y="100" width="${UW}" height="${H - 180}" rx="3"/><text class="e-name" x="${UX + UW / 2}" y="${H / 2}">User</text></g>`);
+  SM.flows(P, px, py, PR, OBS);
   stores.forEach((s, i) => P.push(s.entity ? entityShape(SX, sy(i), SW, EH, s.href, s.name) : storeShape(SX, sy(i), SW, s.href, s.name)));
   procs.forEach(p => P.push(procShape(px[p.id], py[p.id], PR, p.href, p.id, p.name)));
+  SM.shapes(P);
   P.push('</svg>');
 
   return page({
-    title: 'Treasury Auctions — Level 2', h1: 'Level 2 &mdash; Treasury Auctions', maxWidth: W,
+    title: 'Treasury Auctions — Level 2', h1: 'Level 2 &mdash; Treasury Auctions', maxWidth: vw,
     up: 'DFD_LEVEL1.html', upLabel: 'Level 1',
     svg: P.join(NL),
     notes: ['  <b>No process here writes a data store.</b> Every flow ends at 5.2, 5.3 or 5.4 and is gone when the page closes.',
       '  <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#e3">FiscalData (E3)</a> is drawn as a box, in the store column: the app reads its <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#upcoming-auctions">upcoming auctions</a> live, with no acquisition job between (see <a href="viewer.html#/md/knowledge/DFD_Worklist.md">DFD_Worklist.md</a> &sect;4.0).',
       '  5.3 reads the auction results and the tentative auction schedule from 5.1 to flag an upcoming auction as a TIPS auction.',
-      '  5.4 applies the typed filters and the sort that <a href="viewer.html#/md/TreasuryAuctions/knowledge/5.2_Render_Historical_Auctions.md">5.2 Render Historical Auctions</a> specifies.'].join(NL)
+      '  5.4 applies the typed filters and the sort that <a href="viewer.html#/md/TreasuryAuctions/knowledge/5.2_Render_Historical_Auctions.md">5.2 Render Historical Auctions</a> specifies.',
+      SHARED_NOTE].join(NL)
   });
 }
 
@@ -1432,9 +1521,11 @@ function level2FundHoldings() {
   const px = { '9.1': 520, '9.2': 920 };
   const py = { '9.1': 400, '9.2': 400 };
   const H = 800, W = 1360;
-  const OBS = procs.map(q => ({ x: px[q.id], y: py[q.id], r: PR }));
+  const SM = sharedModules('fund');
+  const OBS = [...procs.map(q => ({ x: px[q.id], y: py[q.id], r: PR })), ...SM.obstacles];
   const LBL = [];
-  const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 2 for Fund Holdings: two processes reading one data store. No process writes a data store.">`, marker()];
+  const [vx, vy, vw, vh] = SM.viewBox(W, H);
+  const P = [`<svg viewBox="${vx} ${vy} ${vw} ${vh}" role="img" aria-label="Level 2 for Fund Holdings: two processes reading one data store. No process writes a data store. Amber circles are the shared modules its processes call.">`, marker()];
   procs.forEach(p => p.reads.forEach(() => {
     const [x2, y2] = toCircle(SX + SW + 5, sy(), px[p.id], py[p.id], PR);
     P.push(flow(SX + SW + 5, sy(), x2, y2, { obstacles: OBS }));
@@ -1450,17 +1541,20 @@ function level2FundHoldings() {
   P.push(flow(UX - 5, 640, px['9.1'] + 30, py['9.1'] + PR - 6, { obstacles: others('9.1') }));
   P.push(labelAt(820, 600, 'view selections', 'middle'));
   P.push(`  <g class="entity"><rect x="${UX}" y="100" width="${UW}" height="${H - 180}" rx="3"/><text class="e-name" x="${UX + UW / 2}" y="${H / 2}">User</text></g>`);
+  SM.flows(P, px, py, PR, OBS);
   stores.forEach(s => P.push(storeShape(SX, sy(), SW, s.href, s.name)));
   procs.forEach(p => P.push(procShape(px[p.id], py[p.id], PR, p.href, p.id, p.name)));
+  SM.shapes(P);
   P.push('</svg>');
 
   return page({
-    title: 'Fund Holdings — Level 2', h1: 'Level 2 &mdash; Fund Holdings', maxWidth: W,
+    title: 'Fund Holdings — Level 2', h1: 'Level 2 &mdash; Fund Holdings', maxWidth: vw,
     up: 'DFD_LEVEL1.html', upLabel: 'Level 1',
     svg: P.join(NL),
     notes: ['  <b>No process here writes a data store.</b> Every flow ends at the user and is gone when the page closes.',
       '  <a href="viewer.html#/md/knowledge/1.14_Enrich_Fund_Holdings.md">1.14</a> writes <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s11">Fund holdings (S11)</a>; no process of this app reads an external source.',
-      '  9.1 states the fund above the table, so it also sends <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#charts-and-tables">charts and tables</a> to the user.'].join(NL)
+      '  9.1 states the fund above the table, so it also sends <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#charts-and-tables">charts and tables</a> to the user.',
+      SHARED_NOTE].join(NL)
   });
 }
 
@@ -1482,9 +1576,11 @@ function level2CpiExplorer() {
   const px = { '7.1': 440, '7.2': 720, '7.3': 970 };
   const py = { '7.1': 315, '7.2': 520, '7.3': 315 };
   const H = 700, W = 1360;
-  const OBS = procs.map(q => ({ x: px[q.id], y: py[q.id], r: PR }));
+  const SM = sharedModules('cpi');
+  const OBS = [...procs.map(q => ({ x: px[q.id], y: py[q.id], r: PR })), ...SM.obstacles];
   const LBL = [];
-  const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 2 for CPI Explorer: three processes reading two data stores. No process writes a data store.">`, marker()];
+  const [vx, vy, vw, vh] = SM.viewBox(W, H);
+  const P = [`<svg viewBox="${vx} ${vy} ${vw} ${vh}" role="img" aria-label="Level 2 for CPI Explorer: three processes reading two data stores. No process writes a data store. Amber circles are the shared modules its processes call.">`, marker()];
   const sIdx = Object.fromEntries(stores.map((s, i) => [s.id, i]));
   procs.forEach(p => p.reads.forEach(id => {
     const y = sy(sIdx[id]), [x2, y2] = toCircle(SX + SW + 5, y, px[p.id], py[p.id], PR);
@@ -1501,17 +1597,20 @@ function level2CpiExplorer() {
   P.push(flow(px['7.1'] + 20, py['7.1'] - PR + 4, UX - 5, 170, { obstacles: others('7.1') }));
   P.push(labelAt(800, 205, 'charts and tables', 'middle'));
   P.push(`  <g class="entity"><rect x="${UX}" y="100" width="${UW}" height="${H - 180}" rx="3"/><text class="e-name" x="${UX + UW / 2}" y="${H / 2}">User</text></g>`);
+  SM.flows(P, px, py, PR, OBS);
   stores.forEach((s, i) => P.push(storeShape(SX, sy(i), SW, s.href, s.name)));
   procs.forEach(p => P.push(procShape(px[p.id], py[p.id], PR, p.href, p.id, p.name)));
+  SM.shapes(P);
   P.push('</svg>');
 
   return page({
-    title: 'CPI Explorer — Level 2', h1: 'Level 2 &mdash; CPI Explorer', maxWidth: W,
+    title: 'CPI Explorer — Level 2', h1: 'Level 2 &mdash; CPI Explorer', maxWidth: vw,
     up: 'DFD_LEVEL1.html', upLabel: 'Level 1',
     svg: P.join(NL),
     notes: ['  <b>No process here writes a data store.</b> Every flow ends at the user and is gone when the page closes.',
       '  7.1 sends its rows to 7.3 as well as to 7.2: 7.3 bounds the date range by the extent of all three series. 7.1 also states the data status, as <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#charts-and-tables">charts and tables</a>, to the user.',
-      '  <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#cpi-series">CPI series</a> is defined in the Data Dictionary &sect;6.6.'].join(NL)
+      '  <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#cpi-series">CPI series</a> is defined in the Data Dictionary &sect;6.6.',
+      SHARED_NOTE].join(NL)
   });
 }
 
@@ -1537,9 +1636,11 @@ function level2TipsReference() {
   const px = { '6.1': 450, '6.2': 740, '6.3': 960, '6.4': 960 };
   const py = { '6.1': 400, '6.2': 190, '6.3': 400, '6.4': 650 };
   const H = 800, W = 1360;
-  const OBS = procs.map(q => ({ x: px[q.id], y: py[q.id], r: PR }));
+  const SM = sharedModules('tipsref');
+  const OBS = [...procs.map(q => ({ x: px[q.id], y: py[q.id], r: PR })), ...SM.obstacles];
   const LBL = [];
-  const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 2 for TIPS Reference: four processes reading four data stores. No process writes a data store.">`, marker()];
+  const [vx, vy, vw, vh] = SM.viewBox(W, H);
+  const P = [`<svg viewBox="${vx} ${vy} ${vw} ${vh}" role="img" aria-label="Level 2 for TIPS Reference: four processes reading four data stores. No process writes a data store. Amber circles are the shared modules its processes call.">`, marker()];
   const sIdx = Object.fromEntries(stores.map((s, i) => [s.id, i]));
   procs.forEach(p => p.reads.forEach(id => {
     const y = sy(sIdx[id]), [x2, y2] = toCircle(SX + SW + 5, y, px[p.id], py[p.id], PR);
@@ -1558,18 +1659,21 @@ function level2TipsReference() {
   P.push(flow(px['6.4'] + PR + 3, py['6.4'], UX - 5, py['6.4'], { obstacles: others('6.4') }));
   P.push(labelAt((px['6.4'] + PR + UX) / 2, py['6.4'] - 14, 'TIPS reference rows', 'middle'));
   P.push(`  <g class="entity"><rect x="${UX}" y="100" width="${UW}" height="${H - 180}" rx="3"/><text class="e-name" x="${UX + UW / 2}" y="${H / 2}">User</text></g>`);
+  SM.flows(P, px, py, PR, OBS);
   stores.forEach((s, i) => P.push(storeShape(SX, sy(i), SW, s.href, s.name)));
   procs.forEach(p => P.push(procShape(px[p.id], py[p.id], PR, p.href, p.id, p.name)));
+  SM.shapes(P);
   P.push('</svg>');
 
   return page({
-    title: 'TIPS Reference — Level 2', h1: 'Level 2 &mdash; TIPS Reference', maxWidth: W,
+    title: 'TIPS Reference — Level 2', h1: 'Level 2 &mdash; TIPS Reference', maxWidth: vw,
     up: 'DFD_LEVEL1.html', upLabel: 'Level 1',
     svg: P.join(NL),
     notes: ['  <b>No process here writes a data store.</b> Every flow ends at the user and is gone when the page closes.',
       '  6.1 calls the function that <a href="DFD_LEVEL2_TIPSLADDERMANAGER.html">Ladder Manager</a> also calls to read market data. That function also fetches <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s10">SA and SAO yields (S10)</a>, which this app does not use, so no flow from S10 is drawn.',
       '  6.4 writes the rows of the table to a csv file the user saves.',
-      '  <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#tips-reference-rows">TIPS reference rows</a> is defined in the Data Dictionary &sect;6.7.'].join(NL)
+      '  <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#tips-reference-rows">TIPS reference rows</a> is defined in the Data Dictionary &sect;6.7.',
+      SHARED_NOTE].join(NL)
   });
 }
 
@@ -1594,9 +1698,11 @@ function level2Primer() {
   const px = { '10.1': 460, '10.2': 460, '10.3': 920, '10.4': 920 };
   const py = { '10.1': 190, '10.2': 510, '10.3': 520, '10.4': 230 };
   const H = 800, W = 1360;
-  const OBS = procs.map(q => ({ x: px[q.id], y: py[q.id], r: PR }));
+  const SM = sharedModules('primer');
+  const OBS = [...procs.map(q => ({ x: px[q.id], y: py[q.id], r: PR })), ...SM.obstacles];
   const LBL = [];
-  const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 2 for Portal Primer: four processes reading three data stores and the deck content kept in the app. No process writes a data store.">`, marker()];
+  const [vx, vy, vw, vh] = SM.viewBox(W, H);
+  const P = [`<svg viewBox="${vx} ${vy} ${vw} ${vh}" role="img" aria-label="Level 2 for Portal Primer: four processes reading three data stores and the deck content kept in the app. No process writes a data store. Amber circles are the shared modules its processes call.">`, marker()];
   const sIdx = Object.fromEntries(stores.map((s, i) => [s.id, i]));
   procs.forEach(p => p.reads.forEach(id => {
     const y = sy(sIdx[id]), [x2, y2] = toCircle(SX + SW + 5, y, px[p.id], py[p.id], PR);
@@ -1613,17 +1719,20 @@ function level2Primer() {
   P.push(flow(px['10.2'] + 40, py['10.2'] + PR - 6, UX - 5, 700, { obstacles: others('10.2') }));
   P.push(labelAt(820, 690, 'charts and tables', 'middle'));
   P.push(`  <g class="entity"><rect x="${UX}" y="100" width="${UW}" height="${H - 180}" rx="3"/><text class="e-name" x="${UX + UW / 2}" y="${H / 2}">User</text></g>`);
+  SM.flows(P, px, py, PR, OBS);
   stores.forEach((s, i) => P.push(storeShape(SX, sy(i), SW, s.href, s.name)));
   procs.forEach(p => P.push(procShape(px[p.id], py[p.id], PR, p.href, p.id, p.name)));
+  SM.shapes(P);
   P.push('</svg>');
 
   return page({
-    title: 'Portal Primer — Level 2', h1: 'Level 2 &mdash; Portal Primer', maxWidth: W,
+    title: 'Portal Primer — Level 2', h1: 'Level 2 &mdash; Portal Primer', maxWidth: vw,
     up: 'DFD_LEVEL1.html', upLabel: 'Level 1',
     svg: P.join(NL),
     notes: ['  <b>No process here writes a data store.</b> Every flow ends at the user and is gone when the page closes.',
       '  <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#deck-content">Deck content</a> is a file kept in the app, drawn as a store of this diagram only; no job writes it.',
-      '  10.2 also states its source line, as <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#charts-and-tables">charts and tables</a>, to the user.'].join(NL)
+      '  10.2 also states its source line, as <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#charts-and-tables">charts and tables</a>, to the user.',
+      SHARED_NOTE].join(NL)
   });
 }
 
@@ -1644,9 +1753,11 @@ function level2SeasonalAdjustments() {
   const px = { '11.1': 460, '11.2': 920 };
   const py = { '11.1': 355, '11.2': 355 };
   const H = 700, W = 1360;
-  const OBS = procs.map(q => ({ x: px[q.id], y: py[q.id], r: PR }));
+  const SM = sharedModules('sa');
+  const OBS = [...procs.map(q => ({ x: px[q.id], y: py[q.id], r: PR })), ...SM.obstacles];
   const LBL = [];
-  const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 2 for Seasonal Adjustments: two processes reading two snapshot files kept in the app. No process writes a data store.">`, marker()];
+  const [vx, vy, vw, vh] = SM.viewBox(W, H);
+  const P = [`<svg viewBox="${vx} ${vy} ${vw} ${vh}" role="img" aria-label="Level 2 for Seasonal Adjustments: two processes reading two snapshot files kept in the app. No process writes a data store. Amber circles are the shared modules its processes call.">`, marker()];
   const sIdx = Object.fromEntries(stores.map((s, i) => [s.id, i]));
   procs.forEach(p => p.reads.forEach(id => {
     const y = sy(sIdx[id]), [x2, y2] = toCircle(SX + SW + 5, y, px[p.id], py[p.id], PR);
@@ -1661,17 +1772,20 @@ function level2SeasonalAdjustments() {
   P.push(flow(px['11.1'] + 30, py['11.1'] + PR - 6, UX - 5, 560, { obstacles: others('11.1') }));
   P.push(labelAt(800, 540, 'charts and tables', 'middle'));
   P.push(`  <g class="entity"><rect x="${UX}" y="100" width="${UW}" height="${H - 180}" rx="3"/><text class="e-name" x="${UX + UW / 2}" y="${H / 2}">User</text></g>`);
+  SM.flows(P, px, py, PR, OBS);
   stores.forEach((s, i) => P.push(storeShape(SX, sy(i), SW, s.href, s.name, true)));
   procs.forEach(p => P.push(procShape(px[p.id], py[p.id], PR, p.href, p.id, p.name)));
+  SM.shapes(P);
   P.push('</svg>');
 
   return page({
-    title: 'Seasonal Adjustments — Level 2', h1: 'Level 2 &mdash; Seasonal Adjustments', maxWidth: W,
+    title: 'Seasonal Adjustments — Level 2', h1: 'Level 2 &mdash; Seasonal Adjustments', maxWidth: vw,
     up: 'DFD_LEVEL1.html', upLabel: 'Level 1',
     svg: P.join(NL),
     notes: ['  <b>No process here writes a data store.</b> Every flow ends at the user and is gone when the page closes.',
       '  The two snapshot files are copies of <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s10">SA and SAO yields (S10)</a> and <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s4">Ref CPI NSA and SA (S4)</a>, kept in the app and drawn on this diagram only. No job writes them, and the app reads no R2 store.',
-      '  11.1 also states the footer, as <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#charts-and-tables">charts and tables</a>, to the user.'].join(NL)
+      '  11.1 also states the footer, as <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#charts-and-tables">charts and tables</a>, to the user.',
+      SHARED_NOTE].join(NL)
   });
 }
 

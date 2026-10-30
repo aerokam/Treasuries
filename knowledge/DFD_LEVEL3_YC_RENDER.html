@@ -159,7 +159,7 @@
 <h1>Level 3 &mdash; Yield Curves 3.7 Render charts and tables</h1>
 
 <div class="diagram">
-<svg viewBox="0 0 1030 980" role="img" aria-label="Level 3: Yield Curves 3.7, one process per view drawn.">
+<svg viewBox="0 -52 1030 1032" role="img" aria-label="Level 3: Yield Curves 3.7, one process per view drawn, plus the shared modules its processes call.">
   <defs><marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#55558c"/></marker></defs>
   <path class="flow" d="M 20.0 126.0 Q 303.8 91.8 584.0 147.8" marker-end="url(#a1)"/>
   <text class="flow-label" x="24" y="120"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#treasury-yields"><tspan class="lk">Treasury yields</tspan></a>  ←  3.1</text>
@@ -200,6 +200,19 @@
   <path class="flow" d="M 353.7 615.8 Q 475.5 631.4 586.3 684.2" marker-end="url(#a1)"/>
   <path class="flow" d="M 615.3 400.3 Q 544.4 631.9 404.7 829.7" marker-end="url(#a1)"/>
   <text class="flow-label" x="463" y="759" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#drill-request"><tspan class="lk">drill request</tspan></a></text>
+  <path class="flow" d="M 199.0 244.1 Q 221.4 239.6 244.0 242.3" marker-end="url(#a1)"/>
+  <path class="flow" d="M 199.0 604.1 Q 221.4 599.6 244.0 602.3" marker-end="url(#a1)"/>
+  <path class="flow" d="M 740.0 587.3 Q 549.8 654.3 356.0 598.4" marker-end="url(#a1)"/>
+  <path class="flow" d="M 781.0 367.4 Q 739.4 273.4 670.5 197.0" marker-end="url(#a1)"/>
+  <path class="flow" d="M 686.8 47.8 Q 679.2 75.3 663.3 99.1" marker-end="url(#a1)"/>
+  <path class="flow" d="M 771.4 542.4 Q 741.7 363.7 657.8 203.1" marker-end="url(#a1)"/>
+  <path class="flow" d="M 535.7 89.2 Q 566.3 101.0 591.6 121.8" marker-end="url(#a1)"/>
+  <path class="flow" d="M 760.2 87.3 Q 727.9 111.3 689.6 124.1" marker-end="url(#a1)"/>
+  <path class="flow" d="M 762.4 391.3 Q 725.9 385.1 693.1 367.9" marker-end="url(#a1)"/>
+  <path class="flow" d="M 697.3 51.2 Q 737.3 185.3 650.6 295.0" marker-end="url(#a1)"/>
+  <path class="flow" d="M 516.8 107.0 Q 581.2 195.7 614.7 300.1" marker-end="url(#a1)"/>
+  <path class="flow" d="M 749.7 614.3 Q 721.0 645.2 684.1 665.5" marker-end="url(#a1)"/>
+  <path class="flow" d="M 315.3 801.5 Q 332.6 816.8 344.4 836.8" marker-end="url(#a1)"/>
   <a class="process" href="viewer.html#/md/YieldCurves/knowledge/3.7_Render_Charts_And_Tables.md#select-view">
     <circle cx="300" cy="240" r="56"/>
     <text class="p-id" x="300" y="220">3.7.1</text>
@@ -242,6 +255,49 @@
     <text class="p-name" x="380" y="881">Answer</text>
     <text class="p-name" x="380" y="897">drill request</text>
   </a>
+  <a class="module" href="viewer.html#/md/knowledge/SharedModules.md#m22">
+    <circle cx="153" cy="246" r="46"/>
+    <text class="p-id" x="153" y="225">M22</text>
+    <text class="m-name" x="153" y="242">date-</text>
+    <text class="m-name" x="153" y="256">picker.js</text>
+  </a>
+  <a class="module" href="viewer.html#/md/knowledge/SharedModules.md#m11">
+    <circle cx="153" cy="606" r="46"/>
+    <text class="p-id" x="153" y="592">M11</text>
+    <text class="m-name" x="153" y="609">chart-keys.js</text>
+  </a>
+  <a class="module" href="viewer.html#/md/knowledge/SharedModules.md#m12">
+    <circle cx="786" cy="586" r="46"/>
+    <text class="p-id" x="786" y="565">M12</text>
+    <text class="m-name" x="786" y="582">chart-time-</text>
+    <text class="m-name" x="786" y="596">axis.js</text>
+  </a>
+  <a class="module" href="viewer.html#/md/knowledge/SharedModules.md#m2">
+    <circle cx="806" cy="406" r="46"/>
+    <text class="p-id" x="806" y="392">M2</text>
+    <text class="m-name" x="806" y="409">settlement.js</text>
+  </a>
+  <a class="module" href="viewer.html#/md/knowledge/SharedModules.md#m3">
+    <circle cx="706" cy="6" r="46"/>
+    <text class="p-id" x="706" y="-8">M3</text>
+    <text class="m-name" x="706" y="9">bond-math.js</text>
+  </a>
+  <a class="module" href="viewer.html#/md/knowledge/SharedModules.md#m16">
+    <circle cx="496" cy="66" r="46"/>
+    <text class="p-id" x="496" y="52">M16</text>
+    <text class="m-name" x="496" y="69">spot-curve.js</text>
+  </a>
+  <a class="module" href="viewer.html#/md/knowledge/SharedModules.md#m21">
+    <circle cx="801" cy="66" r="46"/>
+    <text class="p-id" x="801" y="45">M21</text>
+    <text class="m-name" x="801" y="62">treasury-</text>
+    <text class="m-name" x="801" y="76">cusip.js</text>
+  </a>
+  <a class="module" href="viewer.html#/md/knowledge/SharedModules.md#m14">
+    <circle cx="286" cy="766" r="46"/>
+    <text class="p-id" x="286" y="752">M14</text>
+    <text class="m-name" x="286" y="769">ref-cpi.js</text>
+  </a>
 </svg>
 </div>
 
@@ -250,6 +306,7 @@
   <b>Nothing here calculates a yield.</b> Every figure drawn is produced upstream and passed in; a view showing a figure no other process produced is a defect in this stage.
   The view selections from 3.7.1 reach every view, and the axis scales from 3.7.2 reach every chart; each fan is labelled once.
   3.7.2 decides what is visible before anything is drawn. Its axis clipping moves the axis and never removes a security, so a table figure can fall outside what the chart shows.
+  The amber circles are shared modules (<a href="viewer.html#/md/knowledge/SharedModules.md">SharedModules.md</a>), not process steps of this diagram.
 </p>
 
 </body>

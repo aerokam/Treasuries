@@ -158,7 +158,7 @@
 <h1>Level 2 &mdash; TIPS Reference</h1>
 
 <div class="diagram">
-<svg viewBox="0 0 1360 800" role="img" aria-label="Level 2 for TIPS Reference: four processes reading four data stores. No process writes a data store.">
+<svg viewBox="0 -12 1360 812" role="img" aria-label="Level 2 for TIPS Reference: four processes reading four data stores. No process writes a data store. Amber circles are the shared modules its processes call.">
   <defs><marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#55558c"/></marker></defs>
   <path class="flow" d="M 260.0 160.0 Q 352.6 244.9 414.0 354.5" marker-end="url(#a1)"/>
   <path class="flow" d="M 260.0 290.0 Q 336.4 319.3 399.8 370.9" marker-end="url(#a1)"/>
@@ -191,6 +191,15 @@
   <path class="flow" d="M 1021.0 650.0 Q 1103.0 636.9 1185.0 650.0" marker-end="url(#a1)"/>
   <text class="flow-label" x="1104" y="636" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#tips-reference-rows"><tspan class="lk">TIPS reference rows</tspan></a></text>
   <g class="entity"><rect x="1190" y="100" width="145" height="620" rx="3"/><text class="e-name" x="1262.5" y="400">User</text></g>
+  <path class="flow" d="M 548.4 195.1 Q 523.9 277.3 475.1 347.7" marker-end="url(#a1)"/>
+  <path class="flow" d="M 501.6 99.3 Q 500.2 224.4 459.8 342.8" marker-end="url(#a1)"/>
+  <path class="flow" d="M 429.1 501.0 Q 430.2 478.2 438.3 456.8" marker-end="url(#a1)"/>
+  <path class="flow" d="M 721.2 459.3 Q 610.2 453.0 506.7 412.4" marker-end="url(#a1)"/>
+  <path class="flow" d="M 618.7 161.5 Q 652.3 163.9 683.5 176.7" marker-end="url(#a1)"/>
+  <path class="flow" d="M 552.7 76.0 Q 635.0 95.9 690.5 159.8" marker-end="url(#a1)"/>
+  <path class="flow" d="M 764.7 420.3 Q 741.6 335.5 746.2 247.7" marker-end="url(#a1)"/>
+  <path class="flow" d="M 697.5 95.6 Q 710.2 114.9 716.2 137.1" marker-end="url(#a1)"/>
+  <path class="flow" d="M 1033.0 325.7 Q 1019.4 344.7 1000.6 358.6" marker-end="url(#a1)"/>
   <a class="store" href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s2">
     <rect x="40" y="140" width="215" height="40" fill="transparent" stroke="none"/>
     <line x1="40" y1="140" x2="255" y2="140"/>
@@ -240,6 +249,38 @@
     <text class="p-name" x="960" y="651">Export</text>
     <text class="p-name" x="960" y="667">TIPS table</text>
   </a>
+  <a class="module" href="viewer.html#/md/knowledge/SharedModules.md#m2">
+    <circle cx="570" cy="150" r="50"/>
+    <text class="p-id" x="570" y="136">M2</text>
+    <text class="m-name" x="570" y="153">settlement.js</text>
+  </a>
+  <a class="module" href="viewer.html#/md/knowledge/SharedModules.md#m3">
+    <circle cx="510" cy="50" r="50"/>
+    <text class="p-id" x="510" y="36">M3</text>
+    <text class="m-name" x="510" y="53">bond-math.js</text>
+  </a>
+  <a class="module" href="viewer.html#/md/knowledge/SharedModules.md#m13">
+    <circle cx="419" cy="550" r="50"/>
+    <text class="p-id" x="419" y="536">M13</text>
+    <text class="m-name" x="419" y="553">market-data.js</text>
+  </a>
+  <a class="module" href="viewer.html#/md/knowledge/SharedModules.md#m14">
+    <circle cx="770" cy="470" r="50"/>
+    <text class="p-id" x="770" y="456">M14</text>
+    <text class="m-name" x="770" y="473">ref-cpi.js</text>
+  </a>
+  <a class="module" href="viewer.html#/md/knowledge/SharedModules.md#m22">
+    <circle cx="677" cy="50" r="50"/>
+    <text class="p-id" x="677" y="29">M22</text>
+    <text class="m-name" x="677" y="46">date-</text>
+    <text class="m-name" x="677" y="60">picker.js</text>
+  </a>
+  <a class="module" href="viewer.html#/md/knowledge/SharedModules.md#m23">
+    <circle cx="1068" cy="290" r="50"/>
+    <text class="p-id" x="1068" y="269">M23</text>
+    <text class="m-name" x="1068" y="286">date-range-</text>
+    <text class="m-name" x="1068" y="300">filter.js</text>
+  </a>
 </svg>
 </div>
 
@@ -248,6 +289,7 @@
   6.1 calls the function that <a href="DFD_LEVEL2_TIPSLADDERMANAGER.html">Ladder Manager</a> also calls to read market data. That function also fetches <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s10">SA and SAO yields (S10)</a>, which this app does not use, so no flow from S10 is drawn.
   6.4 writes the rows of the table to a csv file the user saves.
   <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#tips-reference-rows">TIPS reference rows</a> is defined in the Data Dictionary &sect;6.7.
+  The amber circles are shared modules (<a href="viewer.html#/md/knowledge/SharedModules.md">SharedModules.md</a>), not process steps of this diagram.
 </p>
 
 </body>

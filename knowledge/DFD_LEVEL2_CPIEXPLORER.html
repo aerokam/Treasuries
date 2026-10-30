@@ -158,7 +158,7 @@
 <h1>Level 2 &mdash; CPI Explorer</h1>
 
 <div class="diagram">
-<svg viewBox="0 0 1360 700" role="img" aria-label="Level 2 for CPI Explorer: three processes reading two data stores. No process writes a data store.">
+<svg viewBox="0 0 1360 700" role="img" aria-label="Level 2 for CPI Explorer: three processes reading two data stores. No process writes a data store. Amber circles are the shared modules its processes call.">
   <defs><marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#55558c"/></marker></defs>
   <path class="flow" d="M 260.0 250.0 Q 326.3 262.6 385.4 295.3" marker-end="url(#a1)"/>
   <path class="flow" d="M 260.0 380.0 Q 319.1 347.3 385.4 334.7" marker-end="url(#a1)"/>
@@ -181,6 +181,10 @@
   <path class="flow" d="M 460.0 261.0 Q 815.2 157.5 1185.0 170.0" marker-end="url(#a1)"/>
   <text class="flow-label" x="800" y="205" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#charts-and-tables"><tspan class="lk">charts and tables</tspan></a></text>
   <g class="entity"><rect x="1190" y="100" width="145" height="520" rx="3"/><text class="e-name" x="1262.5" y="350">User</text></g>
+  <path class="flow" d="M 444.1 212.0 Q 446.8 234.7 442.3 257.0" marker-end="url(#a1)"/>
+  <path class="flow" d="M 1053.7 254.9 Q 1037.5 270.9 1017.1 281.1" marker-end="url(#a1)"/>
+  <path class="flow" d="M 1036.6 415.6 Q 1015.1 392.3 1002.0 363.4" marker-end="url(#a1)"/>
+  <path class="flow" d="M 966.9 152.0 Q 976.3 204.3 968.9 257.0" marker-end="url(#a1)"/>
   <a class="store" href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s8">
     <rect x="40" y="230" width="215" height="40" fill="transparent" stroke="none"/>
     <line x1="40" y1="230" x2="255" y2="230"/>
@@ -211,6 +215,28 @@
     <text class="p-name" x="970" y="316">Render CPI</text>
     <text class="p-name" x="970" y="332">chart</text>
   </a>
+  <a class="module" href="viewer.html#/md/knowledge/SharedModules.md#m1">
+    <circle cx="446" cy="166" r="46"/>
+    <text class="p-id" x="446" y="152">M1</text>
+    <text class="m-name" x="446" y="169">csv.js</text>
+  </a>
+  <a class="module" href="viewer.html#/md/knowledge/SharedModules.md#m11">
+    <circle cx="1091" cy="228" r="46"/>
+    <text class="p-id" x="1091" y="214">M11</text>
+    <text class="m-name" x="1091" y="231">chart-keys.js</text>
+  </a>
+  <a class="module" href="viewer.html#/md/knowledge/SharedModules.md#m12">
+    <circle cx="1062" cy="454" r="46"/>
+    <text class="p-id" x="1062" y="433">M12</text>
+    <text class="m-name" x="1062" y="450">chart-time-</text>
+    <text class="m-name" x="1062" y="464">axis.js</text>
+  </a>
+  <a class="module" href="viewer.html#/md/knowledge/SharedModules.md#m22">
+    <circle cx="966" cy="106" r="46"/>
+    <text class="p-id" x="966" y="85">M22</text>
+    <text class="m-name" x="966" y="102">date-</text>
+    <text class="m-name" x="966" y="116">picker.js</text>
+  </a>
 </svg>
 </div>
 
@@ -218,6 +244,7 @@
   <b>No process here writes a data store.</b> Every flow ends at the user and is gone when the page closes.
   7.1 sends its rows to 7.3 as well as to 7.2: 7.3 bounds the date range by the extent of all three series. 7.1 also states the data status, as <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#charts-and-tables">charts and tables</a>, to the user.
   <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#cpi-series">CPI series</a> is defined in the Data Dictionary &sect;6.6.
+  The amber circles are shared modules (<a href="viewer.html#/md/knowledge/SharedModules.md">SharedModules.md</a>), not process steps of this diagram.
 </p>
 
 </body>

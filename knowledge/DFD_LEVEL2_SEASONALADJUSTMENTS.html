@@ -158,7 +158,7 @@
 <h1>Level 2 &mdash; Seasonal Adjustments</h1>
 
 <div class="diagram">
-<svg viewBox="0 0 1360 700" role="img" aria-label="Level 2 for Seasonal Adjustments: two processes reading two snapshot files kept in the app. No process writes a data store.">
+<svg viewBox="0 0 1360 700" role="img" aria-label="Level 2 for Seasonal Adjustments: two processes reading two snapshot files kept in the app. No process writes a data store. Amber circles are the shared modules its processes call.">
   <defs><marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#55558c"/></marker></defs>
   <path class="flow" d="M 260.0 290.0 Q 336.2 301.9 404.8 337.1" marker-end="url(#a1)"/>
   <path class="flow" d="M 260.0 420.0 Q 328.7 384.9 404.8 372.9" marker-end="url(#a1)"/>
@@ -173,6 +173,9 @@
   <path class="flow" d="M 490.0 407.0 Q 849.7 427.9 1185.0 560.0" marker-end="url(#a1)"/>
   <text class="flow-label" x="800" y="540" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#charts-and-tables"><tspan class="lk">charts and tables</tspan></a></text>
   <g class="entity"><rect x="1190" y="100" width="145" height="520" rx="3"/><text class="e-name" x="1262.5" y="350">User</text></g>
+  <path class="flow" d="M 464.1 252.0 Q 466.8 274.7 462.3 297.0" marker-end="url(#a1)"/>
+  <path class="flow" d="M 410.2 445.7 Q 417.9 424.0 432.1 405.8" marker-end="url(#a1)"/>
+  <path class="flow" d="M 924.1 252.0 Q 926.8 274.7 922.3 297.0" marker-end="url(#a1)"/>
   <a class="store" href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s10">
     <rect x="40" y="270" width="215" height="40" fill="transparent" stroke="none"/>
     <line x1="40" y1="270" x2="255" y2="270"/>
@@ -197,6 +200,21 @@
     <text class="p-name" x="920" y="356">Render</text>
     <text class="p-name" x="920" y="372">pages</text>
   </a>
+  <a class="module" href="viewer.html#/md/knowledge/SharedModules.md#m1">
+    <circle cx="466" cy="206" r="46"/>
+    <text class="p-id" x="466" y="192">M1</text>
+    <text class="m-name" x="466" y="209">csv.js</text>
+  </a>
+  <a class="module" href="viewer.html#/md/knowledge/SharedModules.md#m2">
+    <circle cx="388" cy="486" r="46"/>
+    <text class="p-id" x="388" y="472">M2</text>
+    <text class="m-name" x="388" y="489">settlement.js</text>
+  </a>
+  <a class="module" href="viewer.html#/md/knowledge/SharedModules.md#m3">
+    <circle cx="926" cy="206" r="46"/>
+    <text class="p-id" x="926" y="192">M3</text>
+    <text class="m-name" x="926" y="209">bond-math.js</text>
+  </a>
 </svg>
 </div>
 
@@ -204,6 +222,7 @@
   <b>No process here writes a data store.</b> Every flow ends at the user and is gone when the page closes.
   The two snapshot files are copies of <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s10">SA and SAO yields (S10)</a> and <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s4">Ref CPI NSA and SA (S4)</a>, kept in the app and drawn on this diagram only. No job writes them, and the app reads no R2 store.
   11.1 also states the footer, as <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#charts-and-tables">charts and tables</a>, to the user.
+  The amber circles are shared modules (<a href="viewer.html#/md/knowledge/SharedModules.md">SharedModules.md</a>), not process steps of this diagram.
 </p>
 
 </body>
