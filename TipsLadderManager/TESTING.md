@@ -163,7 +163,7 @@ from the real account at one scale factor (0.5), commits them, and pushes that c
 ([knowledge/Testing.md §4.0](../knowledge/Testing.md)). `.githooks/pre-push` runs the
 unit and UI suites and blocks that push (or any push) on a failure — this file's rulings exist
 to keep that gate meaningful rather than a thing contributors route around. The ingestion scripts
-themselves (what fetches and writes R2) are specified at 3.1 Data Pipeline §2.0, not here.
+themselves (what fetches and writes R2) are specified in the ingestion process specs `knowledge/1.1`–`1.15`, not here.
 
 **Committing `tests/run.js`:** its blob is stored with CRLF line endings, and `git commit -- <path>`
 under `core.autocrlf=true` can silently convert it to LF — a whole-file diff that looks like a
