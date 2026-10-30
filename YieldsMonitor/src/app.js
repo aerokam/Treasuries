@@ -1388,21 +1388,32 @@ function etMinutesOfDay(ts) { const p = ET_FULL_FMT.formatToParts(new Date(+ts))
 // open, and the end reading is the last point there is.
 let curveEndClosed = true;
 function curveWindow(pickLast) { return compactOn() && (!pickLast || curveEndClosed) ? (pickLast ? CURVE_END_WINDOW : CURVE_START_WINDOW) : null; }
-function windowLabel(dateStr, pickLast) {
-  const [from, to] = pickLast ? CURVE_END_WINDOW : CURVE_START_WINDOW, hm = m => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+// The opening window of a curve ends at 08:30 ET, or later when a maturity of the curve has no point by
+// then: it ends at the time by which every maturity of the curve that quotes on the date has its first
+// point of the session (08:00 through 17:05 ET).
+function curveStartWindow(syms, dateStr) {
+  if (!compactOn() || !dateStr) return null;
+  let to = CURVE_START_WINDOW[1];
+  syms.forEach(s => {
+    const first = (rangeData[s] || []).map(p => ({ d: getEtDateStr(p.x), m: etMinutesOfDay(p.x) })).find(p => p.d === dateStr && p.m >= CURVE_START_WINDOW[0] && p.m <= CURVE_END_WINDOW[1]);
+    if (first && first.m > to) to = first.m;
+  });
+  return [CURVE_START_WINDOW[0], to];
+}
+function windowLabel(dateStr, pickLast, startWin) {
+  const [from, to] = pickLast ? CURVE_END_WINDOW : (startWin || CURVE_START_WINDOW), hm = m => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
   return `${dateStr}, ${hm(from)}–${hm(to)} ET`;
 }
 
-function valueFromSeriesOnDate(data, dateStr, pickLast) {
+function valueFromSeriesOnDate(data, dateStr, pickLast, win = curveWindow(pickLast)) {
   if (!data || !data.length || !dateStr) return null;
-  const win = curveWindow(pickLast);
   const pts = data.filter(p => getEtDateStr(p.x) === dateStr && (!win || (etMinutesOfDay(p.x) >= win[0] && etMinutesOfDay(p.x) <= win[1])));
   if (!pts.length) return null;
   return (pickLast ? pts[pts.length - 1] : pts[0]).y;
 }
 
-function valueOnDate(sym, dateStr, pickLast) {
-  return valueFromSeriesOnDate(rangeData[sym], dateStr, pickLast);
+function valueOnDate(sym, dateStr, pickLast, win) {
+  return valueFromSeriesOnDate(rangeData[sym], dateStr, pickLast, win);
 }
 
 function updateYieldCurves() {
@@ -1426,7 +1437,7 @@ function updateYieldCurves() {
   const endDateStr = refEnd ? getEtDateStr(refEnd.x) : null;
   const sT = refStart ? adjustFirstPointToClosingTime(refStart.x) : null, eT = refEnd ? refEnd.x : null;
   curveEndClosed = !refEnd || etMinutesOfDay(refEnd.x) >= CURVE_END_WINDOW[0];
-  const sL = sT ? (compactOn() ? windowLabel(startDateStr, false) : ET_HM_FMT.format(sT) + ' ET') : '—', eL = eT ? (compactOn() && curveEndClosed ? windowLabel(endDateStr, true) : ET_HM_FMT.format(eT) + ' ET') : '—';
+  const startLabel = win => sT ? (compactOn() ? windowLabel(startDateStr, false, win) : ET_HM_FMT.format(sT) + ' ET') : '—', eL = eT ? (compactOn() && curveEndClosed ? windowLabel(endDateStr, true) : ET_HM_FMT.format(eT) + ' ET') : '—';
 
   // SA overlay data, per SA-eligible symbol, for the active range — reused by both the TIPS
   // curve (direct SA yield) and the BEI curve (Nominal - SA yield). Same "overlay, don't
@@ -1451,10 +1462,11 @@ function updateYieldCurves() {
   // showQuotedYieldCurve only when saEligible — the Nominal curve has no SA counterpart, so the
   // TIPS-scoped Quoted toggle never hides it.
   const buildYield = (id, key, syms, saEligible) => {
+    const sWin = curveStartWindow(syms, startDateStr), sL = startLabel(sWin);
     const rawGap = saEligible && !showQuotedYieldCurve;
-    const sD = rawGap ? syms.map(() => null) : syms.map(s => valueOnDate(s, startDateStr, false));
+    const sD = rawGap ? syms.map(() => null) : syms.map(s => valueOnDate(s, startDateStr, false, sWin));
     const eD = rawGap ? syms.map(() => null) : syms.map(s => valueOnDate(s, endDateStr, true));
-    const saSD = saEligible ? syms.map(s => showSaYieldCurve ? valueFromSeriesOnDate(saSeriesBySym[s], startDateStr, false) : null) : null;
+    const saSD = saEligible ? syms.map(s => showSaYieldCurve ? valueFromSeriesOnDate(saSeriesBySym[s], startDateStr, false, sWin) : null) : null;
     const saED = saEligible ? syms.map(s => showSaYieldCurve ? valueFromSeriesOnDate(saSeriesBySym[s], endDateStr, true) : null) : null;
     if (yieldCurveCharts[key]) {
       const c = yieldCurveCharts[key];
@@ -1477,15 +1489,16 @@ function updateYieldCurves() {
   };
 
   const buildBei = (id, key, pairs) => {
-    const sD = !showQuotedYieldCurve ? pairs.map(() => null) : pairs.map(p => { const n = valueOnDate(p.n, startDateStr, false), t = valueOnDate(p.t, startDateStr, false); return (n == null || t == null) ? null : n - t; });
+    const sWin = curveStartWindow(pairs.flatMap(p => [p.n, p.t]), startDateStr), sL = startLabel(sWin);
+    const sD = !showQuotedYieldCurve ? pairs.map(() => null) : pairs.map(p => { const n = valueOnDate(p.n, startDateStr, false, sWin), t = valueOnDate(p.t, startDateStr, false, sWin); return (n == null || t == null) ? null : n - t; });
     const eD = !showQuotedYieldCurve ? pairs.map(() => null) : pairs.map(p => { const n = valueOnDate(p.n, endDateStr, true), t = valueOnDate(p.t, endDateStr, true); return (n == null || t == null) ? null : n - t; });
-    const saBei = (p, dateStr, pickLast) => {
+    const saBei = (p, dateStr, pickLast, win) => {
       if (!showSaYieldCurve || !SA_SYMBOLS.has(p.t)) return null;
-      const n = valueOnDate(p.n, dateStr, pickLast), t = valueFromSeriesOnDate(saSeriesBySym[p.t], dateStr, pickLast);
+      const n = valueOnDate(p.n, dateStr, pickLast, win), t = valueFromSeriesOnDate(saSeriesBySym[p.t], dateStr, pickLast, win);
       return (n == null || t == null) ? null : n - t;
     };
-    const saSD = pairs.map(p => saBei(p, startDateStr, false));
-    const saED = pairs.map(p => saBei(p, endDateStr, true));
+    const saSD = pairs.map(p => saBei(p, startDateStr, false, sWin));
+    const saED = pairs.map(p => saBei(p, endDateStr, true, curveWindow(true)));
     if (yieldCurveCharts[key]) {
       const c = yieldCurveCharts[key];
       c.data.datasets[0].data = sD; c.data.datasets[0].label = sL;
