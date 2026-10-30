@@ -4,7 +4,7 @@
 
 This file is interaction/workflow guidance only — commands, tool gotchas, git hooks. It is **not** a substitute for the specs and must never restate spec content (see the top-level `CLAUDE.md`'s Specs-First Mandate and Single Source of Truth directive). Before touching code in a project that has a `knowledge/` folder, read the governing spec(s) first:
 
-- **TipsLadderManager**: `TipsLadderManager/knowledge/1.0`–`6.0`, plus `DATA_DICTIONARY.md`, `TECHNICAL_REFERENCE.md`, `PROJECT_VISION.md` in the same folder.
+- **TipsLadderManager**: `TipsLadderManager/knowledge/`, the specs `1.0`–`3.0` and the process specs `4.1`–`4.6`, plus the repo-root `knowledge/DATA_DICTIONARY.md`.
 - **Shared/global** (R2 data stores, ingestion pipelines, domain terminology used by every app): repo-root `knowledge/DATA_DICTIONARY.md`, the ingestion process specs `knowledge/1.1`–`1.15`, `Bond_Basics.md`, `TIPS_Basics.md`.
 - **YieldCurves**: `YieldCurves/knowledge/` (SA/SAO adjustment logic, visual standards) plus the shared specs above for data pipeline facts — YieldCurves has no separate project-level data-pipeline spec of its own.
 
@@ -222,7 +222,7 @@ Column schema and rendering are specified in `knowledge/4.5.1_Render_Ladder_Tabl
 
 ### Data Infrastructure
 
-Yield-source pipeline (default vs. cross-check source) is specified in `knowledge/3.1_Data_Pipeline.md` §4.0. Full R2 file manifest: repo-root `knowledge/DATA_DICTIONARY.md` §2.0.
+Yield-source selection (default vs. cross-check source) is specified in `knowledge/4.1_Load_Market_Data.md` §Source selection. Full R2 file manifest: repo-root `knowledge/DATA_DICTIONARY.md` §2.0.
 
 - **Scheduled updates**: Windows Task Scheduler (local)
 
