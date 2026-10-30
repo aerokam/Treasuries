@@ -125,4 +125,4 @@ The FedInvest daily price list publishes three prices per security: **Buy**, **S
 ## See Also
 
 - [FedInvest Pricing Logic](FedInvest_Pricing_Logic.md) — How TipsLadderManager and YieldCurves interpret and use FedInvest prices
-- [3.1 Data Pipeline](../../TipsLadderManager/knowledge/3.1_Data_Pipeline.md) — Ingestion processes and yield source selection
+- [Load market data §Source selection](../../TipsLadderManager/knowledge/4.1_Load_Market_Data.md#source-selection) — Yield source selection
