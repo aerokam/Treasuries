@@ -49,6 +49,7 @@ The other apps have no suite. A suite is added for an app when that app is next 
 | A markdown file under any `knowledge/` directory | `test:UI:KnowledgeMap`, the viewer suite, and no app suite |
 | `knowledge/DATA_DICTIONARY.md` | The same, and `test:Unit:TipsLadderManager`, which reads `LOWER_COVER_YIELD` from it |
 | A markdown file elsewhere | None |
+| A code file whose change is only comments | None |
 | Any other file in an app's directory | That app's suites |
 | `shared/src/<file>` | `test:Unit:Shared`, plus the suites of every app whose code imports that file, directly or through another file in `shared/src/` |
 | A file in `shared/tests/` | `test:Unit:Shared` |
@@ -56,6 +57,8 @@ The other apps have no suite. A suite is added for an app when that app is next 
 | Anything else | None |
 
 - The importing apps are read from the import statements at push time.
+- A code file is a `.js`, `.mjs`, `.cjs` or `.html` file. For `.js`, `.mjs` and `.cjs`, the comment-only test removes the comments from the file as pushed and as it is on the remote and compares the two texts with whitespace collapsed; a file added or deleted by the push, or one the scan cannot read to the end, is not comment-only. For `.html`, every added and removed line must be wholly a comment. A file changed in two pushed commit ranges is comment-only only if both ranges change it in comments alone.
+- `package.json`, `playwright.config.js`, `scripts/pre-push-tests.js`, `.githooks/pre-push` and the sample files are never treated as comment-only: a change to them selects suites as the table states.
 - A push with no prior remote state to compare against, such as the first push of a new branch, runs every suite.
 - A failing suite blocks the push. A suite that fails by a browser crash or a timeout runs once more first; an assertion failure does not.
 - `git push --no-verify` is the only way past a failure.

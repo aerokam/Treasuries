@@ -17,7 +17,9 @@
 //     (KnowledgeMap), and the Data Dictionary also runs TipsLadderManager's unit suite, which reads
 //     LOWER_COVER_YIELD from it;
 //   - a change to the test wiring itself (package.json, playwright.config.js, this script, the
-//     hook) runs every suite.
+//     hook) runs every suite;
+//   - a code file (.js, .mjs, .cjs, .html) changed only in comments runs nothing: the old and new
+//     text are compared with comments removed (.html: every changed line is wholly a comment).
 // So a Primer-only push runs nothing, and a YieldsMonitor-only push never pays for
 // TipsLadderManager's suites.
 
@@ -91,6 +93,190 @@ const CODE_FILE = /\.(m?js|cjs|html)$/;
 function changedFiles(range) {
   const out = execFileSync('git', ['diff', '--name-only', ...range], { cwd: ROOT }).toString();
   return out.split('\n').map(l => l.trim()).filter(Boolean);
+}
+
+// A code file whose change between two commits is only comments selects no suite. Failing safe (the
+// suites run) is always acceptable; wrongly skipping is not, so every doubt answers "not comment-only".
+const REGEX_AFTER_PUNCT = new Set([...'(,=:[!&|?{};+-*%<>~^']);
+const REGEX_AFTER_WORD = new Set(['return', 'typeof', 'instanceof', 'in', 'of', 'new', 'delete', 'void', 'throw', 'case', 'do', 'else', 'yield', 'await']);
+
+// The text of a .js/.mjs/.cjs file with its comments removed and code whitespace collapsed (a run
+// with a newline becomes one newline, any other run one space; string, template and regex text is
+// kept verbatim), or null when the scan cannot be sure: an unterminated string, comment, template
+// or regex, a string or regex running past the end of its line.
+function stripJsComments(src) {
+  const s = src.replace(/\r\n?/g, '\n');
+  const n = s.length;
+  const isWord = (c) => /[A-Za-z0-9_$\u0080-\uffff]/.test(c);
+  let out = '';
+  let i = 0;
+  let lastWasWs = false;
+  let prev = { kind: 'start' };
+  const exprDepth = []; // open brace count inside each template ${ } being scanned as code
+  const emitWs = (w) => {
+    if (lastWasWs) {
+      if (w === '\n' && out.endsWith(' ')) out = out.slice(0, -1) + '\n';
+      return;
+    }
+    out += w;
+    lastWasWs = true;
+  };
+  const emit = (t) => { out += t; lastWasWs = false; };
+  // From inside a template body: copies text up to the closing backtick (prev becomes a value) or
+  // up to a ${ (code resumes). False at end of file.
+  const templateBody = () => {
+    while (i < n) {
+      const c = s[i];
+      if (c === '\\') { emit(s.slice(i, i + 2)); i += 2; continue; }
+      if (c === '`') { emit(c); i++; prev = { kind: 'value' }; return true; }
+      if (c === '$' && s[i + 1] === '{') { emit('${'); i += 2; exprDepth.push(0); prev = { kind: 'punct', ch: '{' }; return true; }
+      emit(c); i++;
+    }
+    return false;
+  };
+  if (s.startsWith('#!')) { const e = s.indexOf('\n'); const j = e < 0 ? n : e; emit(s.slice(0, j)); i = j; }
+  while (i < n) {
+    const c = s[i];
+    if (/\s/.test(c)) {
+      let nl = false;
+      while (i < n && /\s/.test(s[i])) { if (s[i] === '\n') nl = true; i++; }
+      emitWs(nl ? '\n' : ' ');
+      continue;
+    }
+    if (c === '/' && s[i + 1] === '/') {
+      while (i < n && s[i] !== '\n') i++;
+      emitWs(' ');
+      continue;
+    }
+    if (c === '/' && s[i + 1] === '*') {
+      const e = s.indexOf('*/', i + 2);
+      if (e < 0) return null;
+      emitWs(s.slice(i, e).includes('\n') ? '\n' : ' ');
+      i = e + 2;
+      continue;
+    }
+    if (c === '"' || c === "'") {
+      let j = i + 1;
+      for (;;) {
+        if (j >= n || s[j] === '\n') return null;
+        if (s[j] === '\\') { j += 2; continue; }
+        if (s[j] === c) break;
+        j++;
+      }
+      emit(s.slice(i, j + 1));
+      i = j + 1;
+      prev = { kind: 'value' };
+      continue;
+    }
+    if (c === '`') {
+      emit(c); i++;
+      if (!templateBody()) return null;
+      continue;
+    }
+    if (c === '/') {
+      const regexAllowed = prev.kind === 'start' || (prev.kind === 'punct' && REGEX_AFTER_PUNCT.has(prev.ch)) || (prev.kind === 'word' && REGEX_AFTER_WORD.has(prev.word));
+      if (!regexAllowed) { emit(c); i++; prev = { kind: 'punct', ch: c }; continue; }
+      let j = i + 1;
+      let inClass = false;
+      for (;;) {
+        if (j >= n || s[j] === '\n') return null;
+        if (s[j] === '\\') { j += 2; continue; }
+        if (s[j] === '[') inClass = true;
+        else if (s[j] === ']') inClass = false;
+        else if (s[j] === '/' && !inClass) break;
+        j++;
+      }
+      emit(s.slice(i, j + 1));
+      i = j + 1;
+      prev = { kind: 'value' };
+      continue;
+    }
+    if (isWord(c)) {
+      let j = i;
+      while (j < n && isWord(s[j])) j++;
+      emit(s.slice(i, j));
+      prev = { kind: 'word', word: s.slice(i, j) };
+      i = j;
+      continue;
+    }
+    if (c === '{' && exprDepth.length) exprDepth[exprDepth.length - 1]++;
+    if (c === '}' && exprDepth.length) {
+      if (exprDepth[exprDepth.length - 1] === 0) {
+        exprDepth.pop();
+        emit(c); i++;
+        if (!templateBody()) return null;
+        continue;
+      }
+      exprDepth[exprDepth.length - 1]--;
+    }
+    emit(c); i++;
+    prev = { kind: 'punct', ch: c };
+  }
+  return exprDepth.length ? null : out.trim();
+}
+
+// The nearest preceding lines starting with * are the body of a block comment only if they lead back
+// to a line opening one (/* with no */ after it) without passing a line that closes one.
+function inBlockComment(lines, idx) {
+  for (let k = idx - 1; k >= 0; k--) {
+    const t = lines[k].trim();
+    if (t.startsWith('/*')) return !t.includes('*/');
+    if (!/^\*(\s|$)/.test(t)) return false;
+  }
+  return false;
+}
+
+// Whether a trimmed line is wholly a comment, judged on the line alone except for the * body lines
+// of a block comment, which look back through the lines of that same version of the file.
+function isCommentLine(trimmed, lines, idx) {
+  if (trimmed.startsWith('//')) return true;
+  if (trimmed.startsWith('/*') && trimmed.endsWith('*/') && trimmed.indexOf('*/') === trimmed.length - 2) return true;
+  if (trimmed.startsWith('<!--') && trimmed.endsWith('-->') && trimmed.indexOf('-->') === trimmed.length - 3) return true;
+  return /^\*(\s|$)/.test(trimmed) && inBlockComment(lines, idx);
+}
+
+// A line-based test for .html, where apostrophes in prose would break a string scan: every added
+// and removed line of the diff is wholly a comment.
+function htmlCommentOnly(file, base, head, oldText, newText) {
+  const diff = gitText(['diff', '-U0', '--no-color', '--no-ext-diff', base, head, '--', file]);
+  const oldLines = oldText.replace(/\r\n?/g, '\n').split('\n');
+  const newLines = newText.replace(/\r\n?/g, '\n').split('\n');
+  let oldNo = 0;
+  let newNo = 0;
+  let started = false;
+  for (const raw of diff.replace(/\r\n?/g, '\n').split('\n')) {
+    const hunk = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(raw);
+    if (hunk) { started = true; oldNo = Number(hunk[1]); newNo = Number(hunk[2]); continue; }
+    if (!started || raw.startsWith('\\')) continue;
+    if (raw.startsWith('-')) {
+      if (!isCommentLine(raw.slice(1).trim(), oldLines, oldNo - 1)) return false;
+      oldNo++;
+    } else if (raw.startsWith('+')) {
+      if (!isCommentLine(raw.slice(1).trim(), newLines, newNo - 1)) return false;
+      newNo++;
+    }
+  }
+  return true;
+}
+
+function gitText(args) {
+  return execFileSync('git', args, { cwd: ROOT, encoding: 'utf8', maxBuffer: 256 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] });
+}
+
+// True when `file` differs between base and head only in comments. A file missing at either end
+// (added or deleted), a test wiring or sample file, or any error answers false.
+function commentOnlyChange(file, base, head) {
+  if (!CODE_FILE.test(file) || TEST_WIRING.has(file) || SAMPLE_FILES.has(file)) return false;
+  try {
+    const oldText = gitText(['show', `${base}:${file}`]);
+    const newText = gitText(['show', `${head}:${file}`]);
+    if (/\.html$/.test(file)) return htmlCommentOnly(file, base, head, oldText, newText);
+    const a = stripJsComments(oldText);
+    const b = stripJsComments(newText);
+    return a !== null && b !== null && a === b;
+  } catch {
+    return false;
+  }
 }
 
 function trackedFiles(dir) {
@@ -168,8 +354,12 @@ const lines = stdinText.split('\n').map(l => l.trim()).filter(Boolean);
 let runAll = false;
 const files = new Set();
 if (process.argv.includes('--files')) {
-  // File list on stdin instead of git's ref lines (see --list below).
-  for (const f of lines) files.add(f);
+  // File list on stdin instead of git's ref lines (see --list below). With --base <ref> and
+  // --head <ref> as well, a code file changed only in comments between them is left out.
+  const argAfter = (flag) => { const k = process.argv.indexOf(flag); return k >= 0 ? process.argv[k + 1] : undefined; };
+  const base = argAfter('--base');
+  const head = argAfter('--head');
+  for (const f of lines) if (!(base && head && commentOnlyChange(f, base, head))) files.add(f);
 } else if (lines.length === 0) {
   // No refs on stdin (unusual) -- be conservative and check everything with tests.
   runAll = true;
@@ -185,7 +375,7 @@ if (process.argv.includes('--files')) {
       continue;
     }
     try {
-      for (const f of changedFiles([remoteSha, localSha])) files.add(f);
+      for (const f of changedFiles([remoteSha, localSha])) if (!commentOnlyChange(f, remoteSha, localSha)) files.add(f);
     } catch {
       // Couldn't diff (e.g. remoteSha unknown locally) -- be conservative.
       runAll = true;
@@ -200,7 +390,7 @@ if (toRun.length === 0) {
 }
 console.log(`pre-push: running ${toRun.map(s => s.script).join(', ')}`);
 // --list prints the selection and stops, to check it by hand:
-//   git diff --name-only <from> <to> | node scripts/pre-push-tests.js --files --list
+//   git diff --name-only <from> <to> | node scripts/pre-push-tests.js --files --list [--base <from> --head <to>]
 if (process.argv.includes('--list')) process.exit(0);
 
 let failed = false;
