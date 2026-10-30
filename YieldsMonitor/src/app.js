@@ -422,7 +422,7 @@ function syncChartContainers() {
 }
 
 // Draws a series' points as markers only while adjacent visible points are far enough apart to be
-// told apart (see knowledge/Visual_Standards.md). Runs on every update, so a zoom or pan re-decides.
+// told apart (see knowledge/2.5_Render_Time_Series.md §Data point markers). Runs on every update, so a zoom or pan re-decides.
 const POINT_MARKER_RADIUS = 2.5;
 const MARKER_CLIP_PX = 8;
 // A series may draw this far past the plot area's right edge, so the latest point's marker is not half-clipped.

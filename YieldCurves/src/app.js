@@ -36,7 +36,7 @@ const SHOW_GSW = new URLSearchParams(location.search).has('gsw');
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 // Chart gridline color — horizontal (Y) and vertical (X) alike, on every chart
-// (Yield Curves, Breakeven, Bid-Ask Spread). See knowledge/Visual_Standards.md §2.
+// (Yield Curves, Breakeven, Bid-Ask Spread). See knowledge/3.7_Render_Charts_And_Tables.md §3.7.2.
 const GRID_COLOR = 'rgba(0,0,0,0.08)';
 
 // GSW (Gürkaynak-Sack-Wright, FEDS 2008-05) fitted TIPS zero-coupon curve — a snapshot for
@@ -2342,7 +2342,7 @@ document.getElementById('nominalsTable').querySelector('thead').addEventListener
 // range: it changes to match the current set of selections, growing or shrinking as needed,
 // the same way checking Bonds already reached out to the long end before Spot existed as a
 // checkbox. A manually typed range still works between checkbox changes, but the next one
-// recomputes over it (Visual_Standards.md §3a).
+// recomputes over it (3.7_Render_Charts_And_Tables.md §3.7.3).
 function recomputeRangeFromChecked() {
   const startEl = document.getElementById('startMaturity');
   const endEl = document.getElementById('endMaturity');

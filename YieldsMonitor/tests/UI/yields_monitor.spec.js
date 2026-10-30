@@ -283,7 +283,7 @@ test.describe('Yields Monitor Regression Tests', () => {
     expect(newSpan).toBeGreaterThan(initialSpan);
   });
 
-  // YieldsMonitor/knowledge/Visual_Standards.md §Y-axis auto-rescale: a chart the user has manually
+  // YieldsMonitor/knowledge/2.5_Render_Time_Series.md §Y-axis auto-rescale: a chart the user has manually
   // zoomed on Y is left alone by the visible-range rescale, so a vertical pan afterward moves the
   // Y-axis window instead of snapping it back. (A plain wheel zoom, both axes at once, is followed by
   // the rescale, so it does not count as a manual Y zoom; Shift+wheel, Y only, does.)
