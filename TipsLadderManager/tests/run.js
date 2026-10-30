@@ -6,7 +6,7 @@ import { readFileSync, readdirSync, existsSync } from 'fs';
 import path from 'path';
 import { buildTipsMarketData, localDate, runRebalance, runFundedRebalance, inferDARAFromCash, inferScaledDARAFromPortfolio, computePortfolioARAByYear, getGapYearBracketCandidates, getGapYears, derivePerYearDara, parseFundedYearDaraBlock, parseParamsBlock, inferFirstYearFromHoldings, inferLastYearFromHoldings } from '../src/rebalance-lib.js';
 import { computeBeforeState, detectBracketFlags, heldYearMedianExcluding } from '../src/before-state-lib.js';
-import { EXCLUDE_MATURING_WITHIN_MONTHS, defaultFirstYear, tipsMaturingAfterExclusion, remainingCouponPaymentsThisYear, rmdCappedRemainingCoupons, latestRemainingCouponDate, future30yLimit, maxLastYear, selectLadderBonds, selectFuture30yCovers, LOWER_COVER_YIELD, gapRebalances } from '../src/ladder-core.js';
+import { EXCLUDE_MATURING_WITHIN_MONTHS, defaultFirstYear, tipsMaturingAfterExclusion, remainingCouponPaymentsThisYear, rmdCappedRemainingCoupons, latestRemainingCouponDate, future30yLimit, maxLastYear, selectLadderBonds, selectFuture30yCovers, LOWER_COVER_YIELD, gapRebalances, simulatedPayments } from '../src/ladder-core.js';
 import { bracketWeights, bracketWeightsN, syntheticCoupon } from '../src/gap-math.js';
 import { findSpikes, smoothCurve } from '../src/shape-math.js';
 import { buildDurationPopupRows, buildBracketWeightDrill, buildFuture30yDurationPopupRows, buildFuture30yLMIDrill, buildSyntheticPIDrill, buildDrillHTML, buildIndexRatioDrill, buildCashFlowEventDrill, buildTradeTicketCostDrill } from '../src/drill.js';
@@ -3988,6 +3988,37 @@ console.log('\nFuture 30Y Dur popup — cost-weighted average, computed match, c
       if (inside) assert(label + ' ' + c.year + ': the blend of the three durations is the average duration of the Synthetic TIPS not yet issued', blend, c.avgDuration, 1e-6);
       assert(label + ' ' + c.year + ': the retained maturity is held no higher than it was', c.retainedQtyAfter[0] <= Math.min(c.retainedQtyBefore[0], retainedQty), true);
     });
+  }
+
+  // simulatedPayments, the walk that the LMI credit and the Simulated Cash Flow Calendar share (4.5.4 §Simulated tab).
+  {
+    const reb = bS.gapRebalances, convs = reb.conversions;
+    const pays = simulatedPayments({ rebalances: reb, from: new Date(settlementDate.getFullYear(), 0, 1) });
+    const ofType = (type) => pays.filter(p => p.type === type);
+    assert('simulatedPayments: one Net Cash per conversion, dated on its issue date', ofType('netCash').map(p => +p.date).join(), convs.map(c => +c.issueDate).join());
+    assert('simulatedPayments: the Net Cashes total the Net Cash of the conversions, with the Excess TIPS the conversions were calculated from', Math.abs(ofType('netCash').reduce((s, p) => s + p.amount, 0) - convs.reduce((s, c) => s + c.netCash, 0)) < 0.01, true);
+    assert('simulatedPayments: each Net Cash is the Excess TIPS sold less the cost of the Simulated Outstanding Future 10Y TIPS', ofType('netCash').every(p => Math.abs(p.amount - (p.excessSold - p.simulatedCost)) < 1e-9), true);
+    for (const c of convs) {
+      const sim = pays.filter(p => p.year === c.year && (p.type === 'simulatedCoupon' || p.type === 'simulatedPrincipal'));
+      const coupons = sim.filter(p => p.type === 'simulatedCoupon').map(p => +p.date).sort((a, b) => a - b);
+      const gapMaturity = new Date(c.year, 0, 15);
+      assert('simulatedPayments ' + c.year + ': the first coupon of the Simulated Outstanding Future 10Y TIPS is July 15 of its issue year', coupons[0], +new Date(c.issueYear, 6, 15));
+      assert('simulatedPayments ' + c.year + ': July 15 of the issue year, two a year after that, and the maturity date (January 15)', coupons.length, 2 * (c.year - c.issueYear));
+      assert('simulatedPayments ' + c.year + ': the last coupon is on the maturity date', coupons[coupons.length - 1], +gapMaturity);
+      const principal = sim.filter(p => p.type === 'simulatedPrincipal');
+      assert('simulatedPayments ' + c.year + ': the principal is paid once, on the maturity date, on the Pass 1 quantity', principal.length === 1 && +principal[0].date === +gapMaturity && principal[0].qty === c.simulatedQty, true);
+    }
+    const lastIssue = convs[convs.length - 1].issueDate;
+    const excess = ofType('excessCoupon');
+    assert('simulatedPayments: the Excess TIPS pays no coupon after the last issue date', excess.every(p => p.date <= lastIssue), true);
+    assert('simulatedPayments: the Excess TIPS pays no coupon on or after its maturity', excess.every(p => p.date < p.bond.maturity), true);
+    // Before the first issue date the Excess TIPS pays on the Pass 1 quantity, from then on on the quantity that conversion leaves.
+    const c0 = convs[0];
+    const lowerOfFirstYear = excess.filter(p => p.bond === reb.lowerBond && p.date.getFullYear() === c0.issueYear);
+    assert('simulatedPayments: the lower bracket pays on the quantity held on each coupon date in the year of the first conversion', lowerOfFirstYear.every(p => p.qty === (p.date < c0.issueDate ? reb.lowerQty0 : c0.lowerQtyAfter)), true);
+    // The LMI credit reads these payments.
+    const netCashOfYear = (y) => ofType('netCash').filter(p => p.date.getFullYear() === y).reduce((s, p) => s + p.amount, 0);
+    assert('simulatedPayments: the Net Cash credited to each funded year is that of the payments in it', [...bS.gapNetCashByYear].every(([y, v]) => Math.abs(netCashOfYear(y) - v) < 1e-6), true);
   }
 }
 

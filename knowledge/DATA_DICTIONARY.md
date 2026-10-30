@@ -666,7 +666,7 @@ excessCost_b = gap total cost × bracketWeight_b
 
 <a id="net-cash"></a>
 ### Net Cash
-`Net_Cash` = *The cash credit or debit left after a rebalance: the per-row cost deltas summed across the run. Negative when the rebalance buys more than it sells. Rebalance’s counterpart to [Total Cost](#total-cost).*
+`Net_Cash` = *The cash credit or debit left after a rebalance: the per-row cost deltas summed across the run. Negative when the rebalance buys more than it sells. Rebalance’s counterpart to [Total Cost](#total-cost). On the issue date of a [Simulated](#simulated) conversion it is the proceeds of the Excess TIPS sold less the cost of the Simulated Outstanding TIPS bought (2.0 §Gap Year Simulated Outstanding TIPS).*
 
 <a id="total-cost"></a>
 ### Total Cost
@@ -714,7 +714,15 @@ coverExcessCost_c = Future 30Y total cost × coverWeight_c
 
 <a id="cash-flow-calendar"></a>
 ### Cash Flow Calendar
-`Cash_Flow_Calendar` = *When a portfolio’s current holdings pay, and how much, by date. Independent of funded years, DARA, brackets, gaps and covers: a fact about the held CUSIPs and quantities rather than a ladder-construction result (4.5.4 §Cash Flow Calendar). The Synthetic tab is the exception: it replaces the [Excess TIPS](#excess-tips) with the [Synthetic TIPS](#synthetic-tips) of the [Gap Years](#gap-years) and Future 30Y years, which are never purchased (4.5.4 §Synthetic tab).*
+`Cash_Flow_Calendar` = *When a portfolio’s current holdings pay, and how much, by date. Independent of funded years, DARA, brackets, gaps and covers: a fact about the held CUSIPs and quantities rather than a ladder-construction result (4.5.4 §Cash Flow Calendar). The [Simulated](#simulated) tab is the exception: it adds the [Simulated Outstanding Future 10Y TIPS](#simulated-outstanding-future-10y-tips), the [Simulated Outstanding Future 30Y TIPS](#simulated-outstanding-future-30y-tips) and the [Net Cash](#net-cash) of each issue date, none of which is purchased (4.5.4 §Simulated tab). The other tabs are [Static](#static).*
+
+<a id="static"></a>
+### Static
+`Static` = *The assumption that no [Excess TIPS](#excess-tips) is sold before it matures. A Static [Cash Flow Calendar](#cash-flow-calendar) shows each holding paying its coupons until maturity and its principal at maturity. Counterpart of [Simulated](#simulated).*
+
+<a id="simulated"></a>
+### Simulated
+`Simulated` = *The assumption that the [Excess TIPS](#excess-tips) is sold down on the issue date of each [Synthetic TIPS](#synthetic-tips), which becomes a [Simulated Outstanding Future 10Y TIPS](#simulated-outstanding-future-10y-tips) or a [Simulated Outstanding Future 30Y TIPS](#simulated-outstanding-future-30y-tips), as in [Pass 2](#pass-2) (2.0 §Gap Year Simulated Outstanding TIPS, §Future 30Y Simulated Outstanding TIPS). A Simulated [Cash Flow Calendar](#cash-flow-calendar) pays the Excess TIPS coupons on the quantity held on each coupon date, adds the coupons and principal of the Simulated Outstanding TIPS from their issue dates, and adds the [Net Cash](#net-cash) of each issue date. Counterpart of [Static](#static).*
 
 ---
 

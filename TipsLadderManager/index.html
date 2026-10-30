@@ -480,10 +480,10 @@
     <div id="cash-flow-title" style="font-size:14px;font-weight:700;margin-bottom:4px;color:#1e293b;padding-right:24px;border-bottom:2px solid #1e293b;padding-bottom:6px;cursor:move;user-select:none;flex-shrink:0;">Cash Flow Calendar</div>
     <div style="font-size:11px;color:#94a3b8;margin-bottom:14px;flex-shrink:0;" id="cash-flow-subtitle"></div>
     <div id="cash-flow-toggle" style="display:none;gap:6px;margin-bottom:10px;flex-shrink:0;">
-      <button id="cash-flow-ladder-btn" class="tab-btn" style="display:none;">Ladder</button>
-      <button id="cash-flow-before-btn" class="tab-btn active">Before</button>
-      <button id="cash-flow-after-btn" class="tab-btn">After</button>
-      <button id="cash-flow-synthetic-btn" class="tab-btn" title="The Cash Flow Calendar of the ladder with its Excess TIPS replaced by the Synthetic TIPS of the Gap Years and Future 30Y years. Each Synthetic TIPS is modeled as issued on the settlement date at Index Ratio 1.00000. It is a theoretical Cash Flow Calendar, because the Synthetic TIPS are never purchased.">Synthetic</button>
+      <button id="cash-flow-static-btn" class="tab-btn" style="display:none;">Static</button>
+      <button id="cash-flow-before-btn" class="tab-btn active">Before Static</button>
+      <button id="cash-flow-after-btn" class="tab-btn">After Static</button>
+      <button id="cash-flow-simulated-btn" class="tab-btn" title="The Cash Flow Calendar of the ladder with its Excess TIPS sold down as the Synthetic TIPS of the Gap Years and Future 30Y years are issued, as in Pass 2. The Excess TIPS pay on the quantity held on each coupon date. The Simulated Outstanding TIPS pay from their issue dates at Index Ratio 1.00000, and the Net Cash of each issue date is included. It is a theoretical Cash Flow Calendar, because the Simulated Outstanding TIPS are never purchased.">Simulated</button>
     </div>
     <div id="cash-flow-content"></div>
     <div style="margin-top:16px;text-align:right;flex-shrink:0;">
@@ -728,10 +728,10 @@ import { buildTipsMarketData, localDate, runFundedRebalance, inferScaledDARAFrom
 import { computeBeforeState, detectBracketFlags, UPPER_BRACKET_YEAR, future30yCoverYears } from './src/before-state-lib.js';
 import { evenSpread, inferShapeValue } from './src/shape-math.js';
 import { runBuild } from './src/build-lib.js';
-import { maxLastYear, tipsMaturingAfterExclusion, defaultFirstYear } from './src/ladder-core.js';
+import { maxLastYear, tipsMaturingAfterExclusion, defaultFirstYear, simulatedPayments } from './src/ladder-core.js';
 import { SYNTHETIC_INDEX_RATIO } from './src/gap-math.js';
 import { renderTable, COLS } from './src/render.js';
-import { buildDrillHTML, buildDurationPopupRows, buildWeightedDurationPopupRows, buildWeightedYieldPopupRows, buildWeightedSaYieldPopupRows, buildFuture30yDurationPopupRows, buildIndexRatioDrill, buildRefCpiDrill, buildPIPerBondDrill, buildPreLadderPoolDrill, buildTradeTicketCostDrill, buildTradeTicketAccruedDrill, buildTradeTicketTotalDrill, buildCashFlowDateDrill, buildCashFlowEventDrill, buildGapYearDurationDrill, buildFuture30yYearDurationDrill, buildBracketWeightDrill, buildSyntheticPIDrill, buildSyntheticLMIDrill, buildFuture30yLMIDrill } from './src/drill.js';
+import { buildDrillHTML, buildDurationPopupRows, buildWeightedDurationPopupRows, buildWeightedYieldPopupRows, buildWeightedSaYieldPopupRows, buildFuture30yDurationPopupRows, buildIndexRatioDrill, buildRefCpiDrill, buildPIPerBondDrill, buildPreLadderPoolDrill, buildTradeTicketCostDrill, buildTradeTicketAccruedDrill, buildTradeTicketTotalDrill, buildCashFlowDateDrill, buildCashFlowEventDrill, cashFlowEventLabel, simulatedTipsName, fm2, buildGapYearDurationDrill, buildFuture30yYearDurationDrill, buildBracketWeightDrill, buildSyntheticPIDrill, buildSyntheticLMIDrill, buildFuture30yLMIDrill } from './src/drill.js';
 import { showPopup, hidePopup } from './src/popup.js';
 import { makeDraggableResizable } from './src/modal.js';
 import { rankForYear } from './src/allocation-policy.js';
@@ -2077,7 +2077,7 @@ document.getElementById('trade-ticket-copy').addEventListener('click', () => {
 // the current portfolio, not a DARA-sizing quantity.
 // Penny-precise (unlike the rest of the app's whole-dollar fmtCell/fm) — the Cash Flow Calendar
 // exists specifically to compare against real brokerage transactions, which post to the cent.
-function _cfFm(n) { return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function _cfFm(n) { return fm2(n); }
 const _fmtLongDate = fmtDateLong; // src/date-util.js — single source, shared with the Cash Flow Calendar's own date formatting
 function _isoDate(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
 
@@ -2100,7 +2100,7 @@ function _couponEventCalc(bond, d, activeRc, activeDateIso) {
   const actualRc = lookupRefCpi(refCpiRows, dIso);
   const isActual = actualRc != null;
   const eventRc = isActual ? actualRc : activeRc;
-  // A Synthetic TIPS has no Dated date Ref CPI: its Index Ratio is the fixed SYNTHETIC_INDEX_RATIO (4.5.4 §Synthetic tab).
+  // A Synthetic TIPS has no Dated date Ref CPI: its Index Ratio is the fixed SYNTHETIC_INDEX_RATIO (4.5.4 §Simulated tab).
   const { principalPerBond, indexRatio, paymentIndexRatio } = bond.synthetic
     ? { principalPerBond: 1000 * SYNTHETIC_INDEX_RATIO, indexRatio: SYNTHETIC_INDEX_RATIO, paymentIndexRatio: SYNTHETIC_INDEX_RATIO }
     : bondCalcs(bond, eventRc);
@@ -2283,7 +2283,10 @@ function _shortDay(iso) {
 // holdingsArr: the portfolio to walk. Before = currentHoldingsArray (what's actually held today,
 // the only source of real cash flow); After = _afterRebalHoldings() (the rebalance's target
 // portfolio, for previewing what the calendar looks like once the trades settle).
-function buildCashFlowData(holdingsArr) {
+// simulated: the conversions of the Simulated tab ([{ rebalances }], 4.5.4 §Simulated tab), whose payments
+// come from simulatedPayments (ladder-core.js), the walk that also credits the LMI of the funded years.
+// A CUSIP that appears as funded TIPS and as Excess TIPS on a date is one event, at the sum of the quantities.
+function buildCashFlowData(holdingsArr, simulated = []) {
   if (!holdingsArr || !tipsMarketData || !refCpiRows) return [];
   const activeDateIso = _defaultRefCpiDateStr;
   const activeRc = lookupRefCpi(refCpiRows, activeDateIso);
@@ -2295,26 +2298,48 @@ function buildCashFlowData(holdingsArr) {
   // anything already paid.
   const walkFrom = new Date(today); walkFrom.setDate(walkFrom.getDate() - 10);
   const events = [];
+  const byKey = new Map();
+  const pushPaymentEvents = (b, cusip, qty, d, withPrincipal) => {
+    const ev = _couponEventCalc(b, d, activeRc, activeDateIso);
+    const { principalPerBond, couponPerBond } = ev;
+    const calc = {
+      refCPI: ev.eventRc, datedDateRefCpi: b.datedDateRefCpi, indexRatio: ev.indexRatio, paymentIndexRatio: ev.paymentIndexRatio,
+      synthetic: !!b.synthetic,
+      principalPerBond, coupon: b.coupon ?? 0,
+      isActual: ev.isActual, refCpiDateDisplay: ev.refCpiDateDisplay,
+    };
+    const add = (type, perBond) => {
+      const key = d.getTime() + '|' + cusip + '|' + type;
+      const seen = byKey.get(key);
+      if (seen) { seen.qty += qty; seen.amount += perBond * qty; return; }
+      const e = { date: d, cusip, type, amount: perBond * qty, qty, ...calc };
+      byKey.set(key, e); events.push(e);
+    };
+    add('coupon', couponPerBond);
+    if (withPrincipal) add('principal', principalPerBond);
+  };
   for (const h of holdingsArr) {
-    const b = h.synthetic ?? tipsMarketData.get(h.cusip);
+    const b = tipsMarketData.get(h.cusip);
     if (!b?.maturity || !h.qty) continue;
     for (const d of couponSchedule(walkFrom, b.maturity)) {
       if (_actualPaymentDate(d) <= today) continue;
-      const ev = _couponEventCalc(b, d, activeRc, activeDateIso);
-      const { principalPerBond, couponPerBond } = ev;
-      const calc = {
-        qty: h.qty, refCPI: ev.eventRc, datedDateRefCpi: b.datedDateRefCpi, indexRatio: ev.indexRatio, paymentIndexRatio: ev.paymentIndexRatio,
-        synthetic: !!b.synthetic,
-        principalPerBond, coupon: b.coupon ?? 0,
-        isActual: ev.isActual, refCpiDateDisplay: ev.refCpiDateDisplay,
-      };
-      events.push({ date: d, cusip: h.cusip, type: 'coupon', amount: couponPerBond * h.qty, ...calc });
-      if (d.getTime() === b.maturity.getTime()) {
-        events.push({ date: d, cusip: h.cusip, type: 'principal', amount: principalPerBond * h.qty, ...calc });
-      }
+      pushPaymentEvents(b, h.cusip, h.qty, d, d.getTime() === b.maturity.getTime());
     }
   }
-  events.sort((a, b) => a.date - b.date || a.cusip.localeCompare(b.cusip) || (a.type === 'principal' ? 1 : -1));
+  for (const rebalances of simulated) {
+    for (const p of simulatedPayments({ rebalances, from: walkFrom })) {
+      if (_actualPaymentDate(p.date) <= today) continue;
+      if (p.type === 'excessCoupon') { pushPaymentEvents(p.bond, p.bond.cusip, p.qty, p.date, false); continue; }
+      const name = simulatedTipsName(p);
+      if (p.type === 'netCash') {
+        events.push({ date: p.date, cusip: name, type: 'netCash', amount: p.amount, excessSold: p.excessSold, simulatedCost: p.simulatedCost });
+        continue;
+      }
+      pushPaymentEvents({ coupon: p.coupon, maturity: p.maturity, synthetic: true }, name, p.qty, p.date, p.type === 'simulatedPrincipal');
+    }
+  }
+  const rank = { coupon: 0, principal: 1, netCash: 2 };
+  events.sort((a, b) => a.date - b.date || a.cusip.localeCompare(b.cusip) || rank[a.type] - rank[b.type]);
   return events;
 }
 
@@ -2327,7 +2352,7 @@ function _groupCashFlowByYear(events) {
     if (!byYear.has(y)) byYear.set(y, new Map());
     const byDate = byYear.get(y);
     const key = e.date.getTime();
-    if (!byDate.has(key)) byDate.set(key, { date: e.date, coupon: 0, principal: 0, events: [] });
+    if (!byDate.has(key)) byDate.set(key, { date: e.date, coupon: 0, principal: 0, netCash: 0, events: [] });
     const bucket = byDate.get(key);
     bucket[e.type] += e.amount;
     bucket.events.push(e);
@@ -2362,10 +2387,10 @@ function _afterBuildHoldings() {
   return [...byCusip].map(([cusip, qty]) => ({ cusip, qty }));
 }
 
-// The Synthetic tab's portfolio (4.5.4 §Synthetic tab): the actual TIPS at their funded quantity, so the
-// Excess TIPS and Cover Excess drop out, plus one Synthetic TIPS per gap year (Jan 15) and per Future 30Y
-// year (Feb 15) at the Pass 1 quantity and coupon. Rebalance reads the After state, Build the built ladder.
-function _syntheticLadderHoldings() {
+// The Simulated tab's funded TIPS (4.5.4 §Simulated tab): the actual TIPS at their funded quantity, which the
+// Excess TIPS and Cover Excess are not part of; they come from the conversions (_simulatedConversions).
+// Rebalance reads the After state, Build the built ladder.
+function _simulatedFundedHoldings() {
   const build = currentMode === 'build';
   const byCusip = new Map();
   for (const d of (build ? buildDetails : rebalDetails) ?? []) {
@@ -2373,43 +2398,41 @@ function _syntheticLadderHoldings() {
     if (!d.cusip || !(qty > 0)) continue;
     byCusip.set(d.cusip, (byCusip.get(d.cusip) ?? 0) + qty);
   }
-  const holdings = [...byCusip].map(([cusip, qty]) => ({ cusip, qty }));
-  const summary = build ? buildSummary : rebalSummary;
-  const addSynthetic = (breakdown, month) => {
-    for (const g of breakdown ?? []) {
-      if (!(g.qty > 0)) continue;
-      holdings.push({ cusip: `Synthetic TIPS ${g.year}`, qty: g.qty,
-        synthetic: { maturity: new Date(g.year, month, 15), coupon: g.synCpn, synthetic: true } });
-    }
-  };
-  addSynthetic(summary?.gapParams?.breakdown, 0);
-  addSynthetic(summary?.future30yParams?.breakdown, 1);
-  return holdings;
+  return [...byCusip].map(([cusip, qty]) => ({ cusip, qty }));
+}
+
+// The conversions of the gap years and of the Future 30Y years, those with at least one issue date to come.
+function _simulatedConversions() {
+  const summary = currentMode === 'build' ? buildSummary : rebalSummary;
+  return [summary?.gapRebalances, summary?.future30yRebalances].filter(r => r?.conversions?.length);
 }
 
 let _cfEvents = [];
 let _cfDrillBuckets = [];
 let _cfMode = 'before';
 
-function _cashFlowRowsHTML(byYear) {
+function _cashFlowRowsHTML(byYear, withNetCash = false) {
   const today = localDate(_defaultRefCpiDateStr);
   const curYear = today ? today.getFullYear() : null;
   _cfDrillBuckets = [];
-  let html = '<table><thead><tr><th></th><th>Coupon</th><th>Principal</th><th>Total</th></tr></thead><tbody>';
+  const netCashHdr = withNetCash ? '<th>Net Cash</th>' : '';
+  const netCashCell = n => withNetCash ? `<td>${_cfFm(n)}</td>` : '';
+  let html = `<table><thead><tr><th></th><th>Coupon</th><th>Principal</th>${netCashHdr}<th>Total</th></tr></thead><tbody>`;
   const years = [...byYear.keys()].sort((a, b) => a - b);
   for (const y of years) {
     const dates = [...byYear.get(y).values()].sort((a, b) => a.date - b.date);
     const yCoupon = dates.reduce((s, d) => s + d.coupon, 0);
     const yPrincipal = dates.reduce((s, d) => s + d.principal, 0);
+    const yNetCash = dates.reduce((s, d) => s + d.netCash, 0);
     const expanded = y === curYear;
     html += `<tr class="cf-year-header" data-cf-year="${y}" data-expanded="${expanded}">`
       + `<td>${expanded ? '▼' : '▶'} ${y}</td>`
-      + `<td>${_cfFm(yCoupon)}</td><td>${_cfFm(yPrincipal)}</td><td>${_cfFm(yCoupon + yPrincipal)}</td></tr>`;
+      + `<td>${_cfFm(yCoupon)}</td><td>${_cfFm(yPrincipal)}</td>${netCashCell(yNetCash)}<td>${_cfFm(yCoupon + yPrincipal + yNetCash)}</td></tr>`;
     for (const bucket of dates) {
       const idx = _cfDrillBuckets.push(bucket) - 1;
       html += `<tr class="cf-date-row" data-cf-year="${y}" ${expanded ? '' : 'hidden'}>`
         + `<td class="cf-date-cell" data-cf-idx="${idx}">${_fmtLongDate(bucket.date)}</td>`
-        + `<td>${_cfFm(bucket.coupon)}</td><td>${_cfFm(bucket.principal)}</td><td>${_cfFm(bucket.coupon + bucket.principal)}</td></tr>`;
+        + `<td>${_cfFm(bucket.coupon)}</td><td>${_cfFm(bucket.principal)}</td>${netCashCell(bucket.netCash)}<td>${_cfFm(bucket.coupon + bucket.principal + bucket.netCash)}</td></tr>`;
     }
   }
   html += '</tbody></table>';
@@ -2424,43 +2447,45 @@ function _updateCashFlowBtnVisibility() {
 }
 
 // Renders the calendar for the given state and updates the toggle buttons to match.
+// mode: 'static' (Build), 'before' (Before Static), 'after' (After Static), 'simulated' (Simulated, After Simulated in Rebalance).
 function _renderCashFlowMode(mode) {
   _cfMode = mode;
-  document.getElementById('cash-flow-ladder-btn').classList.toggle('active', mode === 'ladder');
-  document.getElementById('cash-flow-before-btn').classList.toggle('active', mode === 'before');
-  document.getElementById('cash-flow-after-btn').classList.toggle('active', mode === 'after');
-  document.getElementById('cash-flow-synthetic-btn').classList.toggle('active', mode === 'synthetic');
-  const holdings = mode === 'synthetic' ? _syntheticLadderHoldings()
+  for (const m of ['static', 'before', 'after', 'simulated']) {
+    document.getElementById('cash-flow-' + m + '-btn').classList.toggle('active', mode === m);
+  }
+  const simulated = mode === 'simulated';
+  const holdings = simulated ? _simulatedFundedHoldings()
     : currentMode === 'build' ? _afterBuildHoldings()
     : (mode === 'after' ? _afterRebalHoldings() : currentHoldingsArray);
-  _cfEvents = buildCashFlowData(holdings);
+  _cfEvents = buildCashFlowData(holdings, simulated ? _simulatedConversions() : []);
   const byYear = _groupCashFlowByYear(_cfEvents);
   document.getElementById('cash-flow-subtitle').textContent = _cfEvents.length
     ? `${_cfEvents[0].date.getFullYear()}–${_cfEvents[_cfEvents.length - 1].date.getFullYear()}`
     : 'No holdings loaded.';
-  document.getElementById('cash-flow-content').innerHTML = _cashFlowRowsHTML(byYear);
+  document.getElementById('cash-flow-content').innerHTML = _cashFlowRowsHTML(byYear, simulated);
 }
 
 document.getElementById('cash-flow-btn').addEventListener('click', () => {
-  // After is only meaningful once a rebalance plan exists to preview — an unrendered rebalance has no
-  // target portfolio yet. Build has no Before/After: its first tab is the built ladder (4.5.4 §Synthetic tab).
-  // Synthetic shows only where the ladder has a Synthetic TIPS, else it would repeat After / Ladder.
+  // After Static is only meaningful once a rebalance plan exists to preview — an unrendered rebalance has no
+  // target portfolio yet. Build has no Before: its first tab is Static (4.5.4 §Tabs). Simulated shows only
+  // where the ladder has a conversion, else it would repeat After Static / Static.
   const build = currentMode === 'build';
   const planned = build ? !!buildDetails?.length : rebalanceRendered && rebalDetails?.length > 0;
-  const hasSynthetic = planned && _syntheticLadderHoldings().some(h => h.synthetic);
-  document.getElementById('cash-flow-ladder-btn').style.display = build ? '' : 'none';
+  const hasSimulated = planned && _simulatedConversions().length > 0;
+  document.getElementById('cash-flow-static-btn').style.display = build ? '' : 'none';
   document.getElementById('cash-flow-before-btn').style.display = build ? 'none' : '';
   document.getElementById('cash-flow-after-btn').style.display = build ? 'none' : '';
-  document.getElementById('cash-flow-synthetic-btn').style.display = hasSynthetic ? '' : 'none';
-  const showToggle = build ? hasSynthetic : planned;
+  const simulatedBtn = document.getElementById('cash-flow-simulated-btn');
+  simulatedBtn.style.display = hasSimulated ? '' : 'none';
+  simulatedBtn.textContent = build ? 'Simulated' : 'After Simulated';
+  const showToggle = build ? hasSimulated : planned;
   document.getElementById('cash-flow-toggle').style.display = showToggle ? 'flex' : 'none';
-  _renderCashFlowMode(build ? 'ladder' : 'before');
+  _renderCashFlowMode(build ? 'static' : 'before');
   document.getElementById('cash-flow-overlay').style.display = 'block';
 });
-document.getElementById('cash-flow-ladder-btn').addEventListener('click', () => _renderCashFlowMode('ladder'));
-document.getElementById('cash-flow-before-btn').addEventListener('click', () => _renderCashFlowMode('before'));
-document.getElementById('cash-flow-after-btn').addEventListener('click', () => _renderCashFlowMode('after'));
-document.getElementById('cash-flow-synthetic-btn').addEventListener('click', () => _renderCashFlowMode('synthetic'));
+for (const m of ['static', 'before', 'after', 'simulated']) {
+  document.getElementById('cash-flow-' + m + '-btn').addEventListener('click', () => _renderCashFlowMode(m));
+}
 
 document.getElementById('cash-flow-close').addEventListener('click', () => {
   document.getElementById('cash-flow-overlay').style.display = 'none';
@@ -2492,7 +2517,7 @@ document.getElementById('cash-flow-content').addEventListener('click', e => {
 });
 document.getElementById('cash-flow-export').addEventListener('click', () => {
   const rows = ['Date,CUSIP,Type,Amount'];
-  for (const e of _cfEvents) rows.push(`${_isoDate(e.date)},${e.cusip},${e.type},${e.amount.toFixed(2)}`);
+  for (const e of _cfEvents) rows.push(`${_isoDate(e.date)},${e.cusip},${e.type === 'netCash' ? 'net cash' : e.type},${e.amount.toFixed(2)}`);
   const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
   const url = window.URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -2509,7 +2534,7 @@ document.addEventListener('click', e => {
   if (!el || !_cfOpenBucket) return;
   const ev = _cfOpenBucket.events[parseInt(el.dataset.cfEventIdx, 10)];
   if (!ev) return;
-  showPopup(el, ev.cusip + (ev.type === 'principal' ? ' — Principal' : ' — Coupon'), buildCashFlowEventDrill(ev), _fmtLongDate(_cfOpenBucket.date));
+  showPopup(el, cashFlowEventLabel(ev), buildCashFlowEventDrill(ev), _fmtLongDate(_cfOpenBucket.date));
 });
 
 // ─── Render rebalance output ──────────────────────────────────────────────────

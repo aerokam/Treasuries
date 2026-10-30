@@ -4,7 +4,10 @@
 import { UPPER_BRACKET_YEAR } from './ladder-core.js';
 
 function fm(n)  { return '$' + Math.round(n).toLocaleString('en-US'); }
-function fm2(n) { return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+export function fm2(n) {
+  const s = Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return (n < 0 && s !== '0.00' ? '-$' : '$') + s;
+}
 function fd(n, dp) { return Number(n).toFixed(dp); }
 
 function row(label, formula, value, isTotal, drillKey, rowId) {
@@ -720,11 +723,15 @@ export function buildTradeTicketTotalDrill(r, label) {
 }
 
 // ─── Cash Flow Calendar: per-date breakdown (4.5.4 §Cash Flow Calendar) ─────────
-// bucket: { date, coupon, principal, events: [{ cusip, type, amount, qty, refCPI, datedDateRefCpi, indexRatio, principalPerBond, coupon, isActual, refCpiDateDisplay }] }
+// bucket: { date, coupon, principal, netCash, events: [{ cusip, type, amount, qty, refCPI, datedDateRefCpi, indexRatio, principalPerBond, coupon, isActual, refCpiDateDisplay }] }
 // Ref CPI is a single national series, not per-bond, so every event sharing this date shares the
 // same refCPI/isActual/refCpiDateDisplay — shown once at the top rather than repeated per line.
+const CASH_FLOW_TYPE_LABEL = { coupon: 'Coupon', principal: 'Principal', netCash: 'Net Cash' };
+export function cashFlowEventLabel(e) { return e.cusip + ' — ' + CASH_FLOW_TYPE_LABEL[e.type]; }
+export function simulatedTipsName(p) { return 'Simulated Outstanding Future ' + (p.kind === 'gap' ? '10Y' : '30Y') + ' TIPS ' + p.year; }
+
 export function buildCashFlowDateDrill(bucket) {
-  const first = bucket.events[0];
+  const first = bucket.events.find(e => !e.synthetic && e.type !== 'netCash');
   const rows = [];
   if (first) {
     rows.push({ label: first.isActual ? 'Cpn Ref CPI date' : 'Ref CPI date', value: first.refCpiDateDisplay });
@@ -734,12 +741,12 @@ export function buildCashFlowDateDrill(bucket) {
   bucket.events.forEach((e, i) => {
     rows.push({
       label: '<span class="cf-event-drill" data-cf-event-idx="' + i + '" style="cursor:pointer;text-decoration:underline dotted #94a3b8;">'
-        + e.cusip + (e.type === 'principal' ? ' — Principal' : ' — Coupon') + '</span>',
+        + cashFlowEventLabel(e) + '</span>',
       value: fm2(e.amount),
     });
   });
   rows.push({ sep: true });
-  rows.push({ label: 'Total', value: fm2(bucket.coupon + bucket.principal), total: true });
+  rows.push({ label: 'Total', value: fm2(bucket.coupon + bucket.principal + bucket.netCash), total: true });
   return rows;
 }
 
@@ -747,7 +754,16 @@ export function buildCashFlowDateDrill(bucket) {
 // calculated. The date's Ref CPI is already shown once above (buildCashFlowDateDrill) — this starts
 // from Dated date Ref CPI so nothing is repeated.
 export function buildCashFlowEventDrill(e) {
-  // A Synthetic TIPS (Synthetic tab, 4.5.4) has the fixed Index Ratio of the DD entry, so no Ref CPI rows.
+  // The Net Cash of an issue date (Simulated tab, 4.5.4): the Excess TIPS sold less the cost of the Simulated Outstanding TIPS bought.
+  if (e.type === 'netCash') {
+    return [
+      { label: 'Excess TIPS sold', note: 'proceeds on the issue date', value: fm2(e.excessSold) },
+      { label: 'Cost of the ' + e.cusip, note: 'on the issue date', value: fm2(-e.simulatedCost) },
+      { sep: true },
+      { label: 'Net Cash', note: 'Excess TIPS sold less cost', value: fm2(e.amount), total: true },
+    ];
+  }
+  // A Simulated Outstanding TIPS (Simulated tab, 4.5.4) has the fixed Index Ratio of the DD entry, so no Ref CPI rows.
   const rows = e.synthetic ? [
     { label: 'Index ratio', note: 'Synthetic TIPS', value: fd(e.paymentIndexRatio, 5) },
     { label: 'Inflation-Adjusted Principal per TIPS', note: '1,000 \xd7 index ratio', value: fm2(e.principalPerBond) },

@@ -213,7 +213,8 @@ function simulatedRebalances({ kind, breakdown: rows, lowerBond, upperBond, reta
   const { monthIndex } = SIMULATED_TIPS[kind];
   const breakdown = [...(rows ?? [])].sort((a, b) => a.year - b.year);
   const retainedQty0 = retained.map(r => r.qty0 ?? 0);
-  if (!breakdown.length || !lowerBond || !upperBond) return { conversions: [], lowerQty0, upperQty0, retainedQty0 };
+  const legsOf = { kind, lowerBond, upperBond, retained };
+  if (!breakdown.length || !lowerBond || !upperBond) return { conversions: [], lowerQty0, upperQty0, retainedQty0, ...legsOf };
   const irOfBond = (bond) => calcIndexRatio(refCPI, bond.datedDateRefCpi ?? refCPI, NO_ROUNDING);   // prices a traded TIPS (cost)
   const irL = irOfBond(lowerBond), irU = irOfBond(upperBond);
   const cpbOn = (bond, ir, date) => (priceFromYield(bond.yield ?? 0, bond.coupon ?? 0, date, bond.maturity) ?? 0) / 100 * ir * 1000;
@@ -274,7 +275,7 @@ function simulatedRebalances({ kind, breakdown: rows, lowerBond, upperBond, reta
     });
     lowerQty = lowerQtyAfter; upperQty = upperQtyAfter; retainedQty = retainedQtyAfter;
   }
-  return { conversions, lowerQty0, upperQty0, retainedQty0 };
+  return { conversions, lowerQty0, upperQty0, retainedQty0, ...legsOf };
 }
 
 export function future30yRebalances({ future30yParams, lowerCoverBond, upperCoverBond, refCPI, bondHolidays = new Set(), lowerQty0 = 0, upperQty0 = 0 }) {
@@ -288,35 +289,96 @@ export function gapRebalances({ gapParams, lowerBracketBond, upperBracketBond, r
   return simulatedRebalances({ kind: 'gap', breakdown: gapParams?.breakdown, lowerBond: lowerBracketBond, upperBond: upperBracketBond, retained, refCPI, bondHolidays, lowerQty0, upperQty0 });
 }
 
+// ─── Payments of the Simulated conversions ──────────────────────────────────────
+// Spec: 2.0 §Future 30Y Simulated Outstanding TIPS and §Gap Year Simulated Outstanding TIPS, each
+// §Interest credited to a funded year; 4.5.4 §Simulated tab.
+// Every payment on or after `from`, one entry per date, shared by the LMI credit of the funded years
+// (simulatedInterestByYear) and the Simulated Cash Flow Calendar, so the two agree on which TIPS pays on
+// which date and on the quantity. Four types, each with its `date`:
+//   simulatedCoupon / simulatedPrincipal — a Simulated Outstanding TIPS (`qty`, `coupon`, `year` of its
+//               maturity, `maturity`, `issueDate`). It matures on the 15th of the issue month, so its coupon
+//               dates are that day and six months later; a coupon dated before the issue date is not paid, and
+//               the maturity date pays the last coupon and the principal;
+//   excessCoupon — a coupon of an Excess TIPS (`bond`, `qty`): each coupon date's quantity is the one held on
+//               that date (before that year's conversion for a coupon dated earlier in the year than the issue
+//               date, after it for a later coupon); `lowerQty0`/`upperQty0` before the first conversion. A
+//               coupon on or after the maturity is not paid, since the Excess TIPS is sold before it matures;
+//   netCash    — the Net Cash of an issue date (`amount`, with the `excessSold` and `simulatedCost` it is made of).
+// The Net Cash of the first issue date depends on the Excess TIPS held before it, so it is worked out here
+// from `lowerQty0`/`upperQty0` (the Before state passes the held quantities) rather than read from the
+// conversion, whose own figure assumes the quantities Pass 1 sized.
+// The bonds default to those the rebalances were calculated with. Amounts are the caller's: the LMI prices
+// the Excess TIPS at the settlement Ref CPI, the calendar at the Ref CPI of each payment date.
+export function simulatedPayments({
+  rebalances, kind = rebalances?.kind, lowerBond = rebalances?.lowerBond, upperBond = rebalances?.upperBond,
+  retained = rebalances?.retained ?? [],
+  lowerQty0 = rebalances?.lowerQty0 ?? 0, upperQty0 = rebalances?.upperQty0 ?? 0, from,
+}) {
+  const conversions = rebalances?.conversions ?? [];
+  if (!conversions.length) return [];
+  const { monthIndex } = SIMULATED_TIPS[kind];
+  const payments = [];
+  for (const c of conversions) {
+    const maturity = new Date(c.year, monthIndex, 15);
+    const simulated = { qty: c.simulatedQty, coupon: c.simulatedCoupon, year: c.year, maturity, issueDate: c.issueDate, kind };
+    for (let y = c.issueYear; y <= c.year; y++) {
+      for (const date of [new Date(y, monthIndex, 15), new Date(y, monthIndex + 6, 15)]) {
+        if (date <= c.issueDate || date > maturity || date < from) continue;
+        payments.push({ type: 'simulatedCoupon', date, ...simulated });
+        if (+date === +maturity) payments.push({ type: 'simulatedPrincipal', date, ...simulated });
+      }
+    }
+  }
+  // The Excess TIPS legs: the lower bracket, the upper bracket and any retained maturity, each with the
+  // quantity held before the first conversion and the quantity after each conversion.
+  const legs = [
+    { bond: lowerBond, qty0: lowerQty0, after: c => c.lowerQtyAfter },
+    { bond: upperBond, qty0: upperQty0, after: c => c.upperQtyAfter },
+    ...retained.map((r, i) => ({ bond: r.bond, qty0: rebalances.retainedQty0?.[i] ?? r.qty0 ?? 0, after: c => c.retainedQtyAfter?.[i] ?? 0 })),
+  ];
+  for (const { bond, qty0, after } of legs) {
+    if (!bond?.maturity) continue;
+    for (const date of couponSchedule(from, bond.maturity)) {
+      if (date >= bond.maturity) continue;
+      let qty = qty0;
+      for (const c of conversions) if (c.issueDate < date) qty = after(c);
+      if (qty > 0) payments.push({ type: 'excessCoupon', date, bond, qty, kind });
+    }
+  }
+  const held = legs.map(l => l.qty0);
+  for (const c of conversions) {
+    const costs = [c.lowerCostPerBond, c.upperCostPerBond, ...(c.retainedCostPerBond ?? [])];
+    let excessSold = 0;
+    legs.forEach((l, i) => { excessSold += (held[i] - l.after(c)) * costs[i]; held[i] = l.after(c); });
+    if (c.issueDate >= from) {
+      payments.push({ type: 'netCash', date: c.issueDate, amount: excessSold - c.simulatedCost, excessSold, simulatedCost: c.simulatedCost, year: c.year, kind });
+    }
+  }
+  return payments;
+}
+
 // ─── Interest credited to the funded years before the first simulated year ──────
 // Spec: 2.0 §Future 30Y Simulated Outstanding TIPS and §Gap Year Simulated Outstanding TIPS, each
 // §Interest credited to a funded year.
-// For each year from settlement to the year before the first Future 30Y year (gap year), three amounts:
+// For each year from settlement to the year before the first Future 30Y year (gap year), three amounts
+// from the payments of simulatedPayments:
 //   simulated — the coupons of every Simulated Outstanding TIPS issued by that year: one coupon (the
 //               one after the issue date) in its issue year, two in each later year (half the annual
 //               coupon each: quantity × 1,000 × synthetic coupon ÷ 2);
-//   excess    — the coupons of the Excess TIPS (Cover Excess): each coupon date's quantity is the one
-//               held on that date (before that year's conversion for a coupon dated earlier in the year
-//               than the issue date, after it for a later coupon); `lowerQty0`/`upperQty0` before the
-//               first conversion;
-//   netCash   — the Net Cash of each issue date in that year: the Excess TIPS sold less the cost of
-//               the Simulated Outstanding TIPS bought, both on the issue date. Cash delivered in a year
-//               counts toward that year.
+//   excess    — the coupons of the Excess TIPS (Cover Excess);
+//   netCash   — the Net Cash of each issue date in that year. Cash delivered in a year counts toward
+//               that year.
 // A coupon counts toward the year it is paid in. In the settlement year only a coupon not yet paid
 // as of tradeDate counts, filtered by the Coupon Counting choice the same way rmdCappedRemainingCoupons
 // filters an actual holding (2.0 §Settlement-year LMI is remaining coupons only). The Net Cash is not
 // a coupon, and every issue date falls after settlement, so it is not filtered. None of the three is
 // carried in the running LMI: the amounts differ from year to year.
-// The Net Cash of the first issue date depends on the Excess TIPS held before it, so it is worked
-// out here from `lowerQty0`/`upperQty0` (the Before state passes the held quantities) rather than read
-// from the conversion, whose own figure assumes the quantities Pass 1 sized.
 // Returns { simulated: Map<year, $>, excess: Map<year, $>, netCash: Map<year, $> }.
 function simulatedInterestByYear({
   kind, rebalances, lowerBond, upperBond, retained = [], refCPI, settlementDate, firstYear,
   lowerQty0 = rebalances?.lowerQty0 ?? 0, upperQty0 = rebalances?.upperQty0 ?? 0,
   bondHolidays = new Set(), rmdCouponMode = 'all', tradeDate = settlementDate, rmdLastDate = null,
 }) {
-  const { monthIndex } = SIMULATED_TIPS[kind];
   const simulated = new Map(), excess = new Map(), netCash = new Map();
   const conversions = rebalances?.conversions ?? [];
   if (!conversions.length || firstYear == null) return { simulated, excess, netCash };
@@ -330,46 +392,16 @@ function simulatedInterestByYear({
     return true;
   };
   const add = (map, year, v) => { if (v) map.set(year, (map.get(year) ?? 0) + v); };
-  // The Excess TIPS legs: the lower bracket, the upper bracket and any retained maturity, each with the
-  // quantity held before the first conversion and the quantity after each conversion.
-  const legs = [
-    { bond: lowerBond, qty0: lowerQty0, after: c => c.lowerQtyAfter },
-    { bond: upperBond, qty0: upperQty0, after: c => c.upperQtyAfter },
-    ...retained.map((r, i) => ({ bond: r.bond, qty0: rebalances.retainedQty0?.[i] ?? r.qty0 ?? 0, after: c => c.retainedQtyAfter?.[i] ?? 0 })),
-  ];
-
-  for (let year = settlementYear; year < firstYear; year++) {
-    // Simulated Outstanding TIPS: every TIPS matures on the 15th of the issue month, so its coupon
-    // dates are that day and six months later; a coupon dated before the issue date is not paid.
-    for (const c of conversions) {
-      if (c.issueYear > year) continue;
-      const half = c.simulatedQty * 1000 * c.simulatedCoupon / 2;
-      for (const date of [new Date(year, monthIndex, 15), new Date(year, monthIndex + 6, 15)]) {
-        if (date > c.issueDate && counts(date)) add(simulated, year, half);
-      }
+  const payments = simulatedPayments({ rebalances, kind, lowerBond, upperBond, retained, lowerQty0, upperQty0, from: new Date(settlementYear, 0, 1) });
+  for (const pay of payments) {
+    const year = pay.date.getFullYear();
+    if (year < settlementYear || year >= firstYear) continue;
+    if (pay.type === 'netCash') add(netCash, year, pay.amount);
+    else if (pay.type === 'simulatedCoupon' && counts(pay.date)) add(simulated, year, pay.qty * 1000 * pay.coupon / 2);
+    else if (pay.type === 'excessCoupon' && counts(pay.date)) {
+      const ir = calcIndexRatio(refCPI, pay.bond.datedDateRefCpi ?? refCPI, TREASURY_ROUNDING);
+      add(excess, year, pay.qty * 1000 * ir * (pay.bond.coupon ?? 0) / 2);
     }
-    // Excess TIPS, on each bracket TIPS' own coupon dates in this year.
-    for (const { bond, qty0, after } of legs) {
-      if (!bond?.maturity) continue;
-      const ir = calcIndexRatio(refCPI, bond.datedDateRefCpi ?? refCPI, TREASURY_ROUNDING);
-      const halfPerBond = 1000 * ir * (bond.coupon ?? 0) / 2;
-      const from = new Date(year, 0, 1);
-      for (const date of couponSchedule(from, bond.maturity)) {
-        if (date.getFullYear() !== year) continue;
-        if (date >= bond.maturity) continue;   // the Excess TIPS is sold before it matures
-        let qty = qty0;
-        for (const c of conversions) if (c.issueDate < date) qty = after(c);
-        if (qty > 0 && counts(date)) add(excess, year, qty * halfPerBond);
-      }
-    }
-  }
-  // Net Cash, credited to the funded year of the year of its issue date.
-  const held = legs.map(l => l.qty0);
-  for (const c of conversions) {
-    const costs = [c.lowerCostPerBond, c.upperCostPerBond, ...(c.retainedCostPerBond ?? [])];
-    let net = -c.simulatedCost;
-    legs.forEach((l, i) => { net += (held[i] - l.after(c)) * costs[i]; held[i] = l.after(c); });
-    if (c.issueYear >= settlementYear && c.issueYear < firstYear) add(netCash, c.issueYear, net);
   }
   return { simulated, excess, netCash };
 }

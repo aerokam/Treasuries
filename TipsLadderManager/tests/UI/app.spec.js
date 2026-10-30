@@ -2548,6 +2548,9 @@ test('Cash Flow Calendar: Before/After toggle appears after rebalance, switches 
   await expect(toggle).toBeVisible();
   const beforeBtn = page.locator('#cash-flow-before-btn');
   const afterBtn = page.locator('#cash-flow-after-btn');
+  await expect(beforeBtn).toHaveText('Before Static');
+  await expect(afterBtn).toHaveText('After Static');
+  await expect(page.locator('#cash-flow-simulated-btn')).toHaveText('After Simulated');
   await expect(beforeBtn).toHaveClass(/active/);
   await expect(afterBtn).not.toHaveClass(/active/);
 
@@ -2586,7 +2589,7 @@ test('build: Cash Flow Calendar shows the built ladder, not leftover Rebalance h
   await expect(page.locator('#cash-flow-overlay')).toBeVisible();
   await expect(page.locator('#cash-flow-before-btn')).toBeHidden(); // Build has no Before/After
   await expect(page.locator('#cash-flow-after-btn')).toBeHidden();
-  await expect(page.locator('#cash-flow-ladder-btn')).toHaveClass(/active/);
+  await expect(page.locator('#cash-flow-static-btn')).toHaveClass(/active/);
 
   // A full funded year's total cash flow should land near the $40,000 DARA the ladder was built
   // for — not near whatever SampleHoldings.csv happens to throw off.
@@ -2601,63 +2604,100 @@ test('build: Cash Flow Calendar shows the built ladder, not leftover Rebalance h
   expect(Math.max(...totals)).toBeGreaterThan(30_000);
 });
 
-// Synthetic tab (4.5.4 §Synthetic tab): the Excess TIPS drop out and the Synthetic TIPS of the gap years
-// come in at Index Ratio 1.00000, so a Synthetic TIPS pays principal in whole multiples of 1,000.
-async function syntheticCsvLines(page) {
-  await page.locator('#cash-flow-synthetic-btn').click();
-  await expect(page.locator('#cash-flow-synthetic-btn')).toHaveClass(/active/);
+// Simulated tab (4.5.4 §Simulated tab): the Excess TIPS pay until each issue date, the Simulated Outstanding TIPS
+// pay from their issue dates at Index Ratio 1.00000, and the Net Cash of each issue date is a payment of its own type.
+async function simulatedCsvLines(page) {
+  await page.locator('#cash-flow-simulated-btn').click();
+  await expect(page.locator('#cash-flow-simulated-btn')).toHaveClass(/active/);
   const downloadPromise = page.waitForEvent('download');
   await page.locator('#cash-flow-export').click();
   const download = await downloadPromise;
-  const csvPath = test.info().outputPath('cash-flow-synthetic.csv');
+  const csvPath = test.info().outputPath('cash-flow-simulated.csv');
   await download.saveAs(csvPath);
   return readFileSync(csvPath, 'utf8').trim().split('\n').slice(1).map(l => l.split(','));
 }
 
-test('Cash Flow Calendar: Synthetic tab replaces the Excess TIPS with Synthetic TIPS (Build)', async ({ page }) => {
+// The timeline of the user's example: nothing of a Simulated Outstanding TIPS is paid before the first issue date, and its
+// first coupon is the July 15 after it. The Net Cash is dated on the issue date.
+function expectSimulatedTimeline(rows) {
+  const netCash = rows.filter(r => r[2] === 'net cash');
+  expect(netCash.length).toBeGreaterThan(0);
+  for (const r of netCash) expect(r[0]).toMatch(/^\d{4}-0[12]-\d{2}$/);
+  const firstIssue = netCash.map(r => r[0]).sort()[0];
+  const simulated = rows.filter(r => r[1].startsWith('Simulated Outstanding') && r[2] !== 'net cash');
+  expect(simulated.length).toBeGreaterThan(0);
+  const earliest = simulated.map(r => r[0]).sort()[0];
+  expect(earliest > firstIssue).toBe(true);
+  expect(earliest.slice(0, 4)).toBe(firstIssue.slice(0, 4));
+  expect(earliest.slice(5)).toMatch(/^0[78]-15$/);
+  for (const r of simulated.filter(r => r[2] === 'principal')) expect(Number(r[3]) % 1000).toBe(0);
+}
+
+test('Cash Flow Calendar: Simulated tab sells the Excess TIPS down as the Simulated Outstanding TIPS are issued (Build)', async ({ page }) => {
   test.setTimeout(20_000);
   await page.locator('.tab-btn[data-mode="build"]').click();
   await page.locator('#run-btn').click();
   await expect(page.locator('#build-output')).toHaveCSS('display', 'block', { timeout: 4_000 });
   await page.locator('#cash-flow-btn').click();
   await expect(page.locator('#cash-flow-toggle')).toBeVisible();
-  await expect(page.locator('#cash-flow-synthetic-btn')).toHaveAttribute('title', /Synthetic TIPS/);
+  await expect(page.locator('#cash-flow-static-btn')).toHaveText('Static');
+  await expect(page.locator('#cash-flow-simulated-btn')).toHaveText('Simulated');
+  await expect(page.locator('#cash-flow-simulated-btn')).toHaveAttribute('title', /Simulated Outstanding TIPS/);
+  await expect(page.locator('#cash-flow-content th', { hasText: 'Net Cash' })).toHaveCount(0);
 
-  const ladderTotals = await page.locator('#cash-flow-content tr.cf-year-header td:last-child').allTextContents();
-  const rows = await syntheticCsvLines(page);
-  const synPrincipal = rows.filter(r => r[1].startsWith('Synthetic TIPS') && r[2] === 'principal');
-  expect(synPrincipal.length).toBeGreaterThan(0);
-  for (const r of synPrincipal) expect(Number(r[3]) % 1000).toBe(0);
+  const staticTotals = await page.locator('#cash-flow-content tr.cf-year-header td:last-child').allTextContents();
+  expectSimulatedTimeline(await simulatedCsvLines(page));
+  await expect(page.locator('#cash-flow-content th', { hasText: 'Net Cash' })).toHaveCount(1);
+  // The large amounts of the bracket years drop out: no year pays much more than the DARA.
+  const maxTotal = async () => Math.max(...(await page.locator('#cash-flow-content tr.cf-year-header td:last-child').allTextContents()).map(s => Number(s.replace(/[^0-9.-]/g, ''))));
+  const simulatedMax = await maxTotal();
+  await page.locator('#cash-flow-static-btn').click();
+  expect(simulatedMax).toBeLessThan(await maxTotal() / 1.5);
+  await page.locator('#cash-flow-simulated-btn').click();
 
-  await page.locator('#cash-flow-ladder-btn').click();
-  expect(await page.locator('#cash-flow-content tr.cf-year-header td:last-child').allTextContents()).toEqual(ladderTotals);
+  await page.locator('#cash-flow-static-btn').click();
+  expect(await page.locator('#cash-flow-content tr.cf-year-header td:last-child').allTextContents()).toEqual(staticTotals);
 });
 
-test('Cash Flow Calendar: Synthetic tab after a rebalance, event popup omits the Ref CPI rows', async ({ page }) => {
-  test.setTimeout(20_000);
+// Opens the Level-4 popup of the event of a CSV row, from the calendar's year and date rows.
+async function openCashFlowEvent(page, r, label) {
+  const [y, m, d] = r[0].split('-').map(Number);
+  const yearRow = page.locator(`#cash-flow-content tr.cf-year-header[data-cf-year="${y}"]`);
+  if ((await yearRow.getAttribute('data-expanded')) === 'false') await yearRow.click();
+  const longDate = new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  await page.locator(`#cash-flow-content tr.cf-date-row[data-cf-year="${y}"] td.cf-date-cell`, { hasText: longDate }).click();
+  await page.locator('#shared-popup .cf-event-drill', { hasText: label }).first().click();
+}
+
+async function openSimulatedRebalance(page) {
   await page.locator('#holdings-file').setInputFiles(HOLDINGS_PATH);
   await page.locator('#run-btn').click();
   await expect(page.locator('#simple-table tbody tr').first()).toBeVisible({ timeout: 4_000 });
   await page.locator('#cash-flow-btn').click();
-  await expect(page.locator('#cash-flow-synthetic-btn')).toBeVisible();
+  await expect(page.locator('#cash-flow-simulated-btn')).toBeVisible();
+  const rows = await simulatedCsvLines(page);
+  expectSimulatedTimeline(rows);
+  return rows;
+}
 
-  const rows = await syntheticCsvLines(page);
-  const synPrincipal = rows.filter(r => r[1].startsWith('Synthetic TIPS') && r[2] === 'principal');
-  expect(synPrincipal.length).toBeGreaterThan(0);
-  for (const r of synPrincipal) expect(Number(r[3]) % 1000).toBe(0);
-
-  // Open the Level-4 popup of a Synthetic TIPS event.
-  const year = synPrincipal[0][0].slice(0, 4);
-  const yearRow = page.locator(`#cash-flow-content tr.cf-year-header[data-cf-year="${year}"]`);
-  if ((await yearRow.getAttribute('data-expanded')) === 'false') await yearRow.click();
-  const dateCells = page.locator(`#cash-flow-content tr.cf-date-row[data-cf-year="${year}"] td.cf-date-cell:visible`);
-  const synEvent = page.locator('#shared-popup .cf-event-drill', { hasText: 'Synthetic TIPS' });
-  for (let i = 0; i < await dateCells.count() && !(await synEvent.count()); i++) await dateCells.nth(i).click();
-  await synEvent.first().click();
+test('Cash Flow Calendar: After Simulated after a rebalance, the event popup of a Simulated Outstanding TIPS omits the Ref CPI rows', async ({ page }) => {
+  test.setTimeout(20_000);
+  const rows = await openSimulatedRebalance(page);
+  const principal = rows.find(r => r[1].startsWith('Simulated Outstanding') && r[2] === 'principal');
+  await openCashFlowEvent(page, principal, principal[1] + ' — Principal');
   await expect(page.locator('#shared-popup-l3')).toContainText('Index ratio');
   const popupText = await page.locator('#shared-popup-l3').textContent();
   expect(popupText).toContain('1.00000');
   expect(popupText).not.toContain('Dated date Ref CPI');
+});
+
+test('Cash Flow Calendar: After Simulated after a rebalance, the event popup of a Net Cash shows the Excess TIPS sold', async ({ page }) => {
+  test.setTimeout(20_000);
+  const rows = await openSimulatedRebalance(page);
+  const netCash = rows.find(r => r[2] === 'net cash');
+  await openCashFlowEvent(page, netCash, ' — Net Cash');
+  await expect(page.locator('#shared-popup-l3')).toContainText('Excess TIPS sold');
+  await expect(page.locator('#shared-popup-l3')).toContainText('Net Cash');
 });
 
 // ── Modal frame: resizing a popup ────────────────────────────────────────────
