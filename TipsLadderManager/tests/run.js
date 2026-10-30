@@ -3364,6 +3364,27 @@ console.log('\nBefore-state preview — standalone before-state-lib.js');
   // display half of the same bug (2.0 §Retained Bracket Excess).
   assert('idempotent reload: Jan 2036 is recognized as a bracket target (isBracketTarget)', jan36Row?.isBracketTarget, true);
   assert('idempotent reload: Jan 2036 excessQtyBefore reflects its imported split, not 0', (jan36Row?.excessQtyBefore ?? 0) > 0, true);
+
+  // Two TIPS of one maturity year tie on the excess of the year, so the later-maturing is the Active Lower
+  // Bracket (DD §Active Lower Bracket) even when the earlier-maturing is the larger holding. Reading the larger
+  // holding as the bracket made the Jul 2036 Excess TIPS look funded, so each pass sold it and the next bought it back.
+  const holdingsBigJan = [
+    { cusip: 'TEST35JUL', qty: 34, excessQty: 0 },
+    { cusip: 'TEST36JAN', qty: 46, excessQty: 17 },
+    { cusip: 'TEST36JUL', qty: 42, excessQty: 42 },
+    { cusip: 'TEST40FEB', qty: 25, excessQty: 13 },
+  ];
+  let settled = runRebalance({ dara: 20000, bracketMode: '3bracket', holdings: holdingsBigJan, tipsMarketData: map, refCPI, settlementDate });
+  const jul36Big = settled.details.find(d => d.cusip === 'TEST36JUL');
+  assert('larger earlier-maturing holding: Jul 2036 is the bracket target', jul36Big?.isBracketTarget, true);
+  assert('larger earlier-maturing holding: Jul 2036 excessQtyBefore is its imported split, not 0', jul36Big?.excessQtyBefore, 42);
+  const hasTradesBigJan = ds => ds.some(d => (d.fundedYearQtyDelta || 0) !== 0 || (d.excessQtyDelta || 0) !== 0);
+  let tripsBigJan = 0;
+  while (hasTradesBigJan(settled.details) && tripsBigJan < 3) {
+    settled = runRebalance({ dara: 20000, bracketMode: '3bracket', holdings: toHoldings(settled.details), tipsMarketData: map, refCPI, settlementDate });
+    tripsBigJan++;
+  }
+  assert('larger earlier-maturing holding: export -> reimport -> rerun settles to no trades within 3 round trips', hasTradesBigJan(settled.details), false);
   // Select maturities in a bracket year: a TIPS outside the picks has a funded contribution of 0 and keeps its
   // Excess TIPS; the picked TIPS carry the funded need of the year (2.0 §Picking Maturities for a Funded Year,
   // 3.0 §Target CUSIP resolution).

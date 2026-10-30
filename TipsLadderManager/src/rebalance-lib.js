@@ -80,7 +80,10 @@ function identifyBrackets(gapYears, holdings, yearInfo, tipsMarketData, araByYea
       // A few dollars over the DARA is not a spike: the excess has to reach its share of what a ladder built with this year as the lower bracket held there.
       const expected = expectedExcessARAOf ? expectedExcessARAOf(cusip, upperCUSIP) : null;
       if (expected != null && excess < RETAINED_BRACKET_MIN_SHARE * expected) continue;
-      if (excess > maxExcess || (excess === maxExcess && totalQty > (cusipTotals.get(lowerCUSIP) || -1))) {
+      // The excess is a figure of the year, so two TIPS of one maturity year tie. The later-maturing is the
+      // Active Lower Bracket (DD §Active Lower Bracket); the larger holding decides only between equal maturities.
+      const laterMaturity = lowerMaturity == null ? 0 : bond.maturity - lowerMaturity;
+      if (excess > maxExcess || (excess === maxExcess && (laterMaturity > 0 || (laterMaturity === 0 && totalQty > (cusipTotals.get(lowerCUSIP) || -1))))) {
         maxExcess = excess; lowerCUSIP = cusip; lowerYear = y; lowerMaturity = bond.maturity;
       }
     }
