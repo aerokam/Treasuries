@@ -1415,7 +1415,7 @@ function level2TreasuryAuctions() {
     notes: ['  <b>No process here writes a data store.</b> Every flow ends at 5.2, 5.3 or 5.4 and is gone when the page closes.',
       '  <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#e3">FiscalData (E3)</a> is drawn as a box, in the store column: the app reads its <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#upcoming-auctions">upcoming auctions</a> live, with no acquisition job between (see <a href="viewer.html#/md/knowledge/DFD_Worklist.md">DFD_Worklist.md</a> &sect;4.0).',
       '  5.3 reads the auction results and the tentative auction schedule from 5.1 to flag an upcoming auction as a TIPS auction.',
-      '  5.2 and 5.4 apply the typed filters and the sort of <a href="viewer.html#/md/TreasuryAuctions/knowledge/Filtering_And_Columns.md">Filtering and Columns</a>.'].join(NL)
+      '  5.4 applies the typed filters and the sort that <a href="viewer.html#/md/TreasuryAuctions/knowledge/5.2_Render_Historical_Auctions.md">5.2 Render Historical Auctions</a> specifies.'].join(NL)
   });
 }
 

@@ -82,7 +82,7 @@
 *External sources providing data to the system. Click these in the Context Diagram to see their data structures.*
 
 - <a id="e1"></a>**FedInvest (E1)** = `Prices_For + { CUSIP + SECURITY_TYPE + RATE + MATURITY_DATE + CALL_DATE + BUY + SELL + END_OF_DAY }`
-  *TreasuryDirect’s daily price list for marketable Treasury securities, one row per security. The page states the date its prices are for on a `Prices For:` line, and its price table has the eight columns above, named as the page names them. Prices are published for the current business day and, on a separate page, for a past date. The three prices, and how Treasury derives them, are described in [FedInvest Pricing Logic](../YieldCurves/knowledge/FedInvest_Pricing_Logic.md).*
+  *TreasuryDirect’s daily price list for marketable Treasury securities, one row per security. The page states the date its prices are for on a `Prices For:` line, and its price table has the eight columns above, named as the page names them. Prices are published for the current business day and, on a separate page, for a past date. The three prices, and how Treasury derives them, are described in [FedInvest Treasury Pricing Methodology](../YieldCurves/knowledge/FedInvest_Treasury_Pricing_Methodology.md).*
 - <a id="e2"></a>**TreasuryDirect SecIndex (E2)** = `CUSIP + Index_Date + Ref_CPI`
   *Authority for daily interpolated RefCPI. Provides values for every day of the month.*
 - <a id="e3"></a>**FiscalData (E3)** = `CUSIP + Auction_Date + Security_Type + High_Yield + Bid_to_Cover + ...`
