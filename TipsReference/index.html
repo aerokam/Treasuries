@@ -175,10 +175,10 @@ import { initDatePicker } from '../shared/src/date-picker.js';
 import { createDateRangeFilter } from '../shared/src/date-range-filter.js';
 // Single entry point for market data (source decision, fetch, parse) — shared with
 // TipsLadderManager so a YIELD_SOURCE flip applies to every consumer at once
-// (projects/CLAUDE.md §2a; TipsLadderManager/knowledge/3.1_Data_Pipeline.md §4.0).
+// (projects/CLAUDE.md §2a; TipsLadderManager/knowledge/4.1_Load_Market_Data.md §Source selection).
 import { loadMarketData } from '../shared/src/market-data.js';
 // Bond-calendar primitives (weekend/SIFMA-holiday skip) — same module TipsLadderManager,
-// YieldsMonitor, SeasonalAdjustments, and YieldCurves import (3.1_Data_Pipeline.md §4.0).
+// YieldsMonitor, SeasonalAdjustments, and YieldCurves import (4.1_Load_Market_Data.md §Source selection).
 import { localDate, toIsoDate, actualPaymentDate } from '../shared/src/settlement.js';
 
 var allRows = [];
@@ -534,7 +534,7 @@ async function loadData() {
     refCpiRows = d.refCpiRows;
     // Trade = the data's as-of/"today" date (the Download Date; for the dormant
     // FedInvest cross-check path, settleDateStr doubles as this — see loadMarketData()).
-    // Settlement = T+1, source-dependent (3.1_Data_Pipeline.md §4.0).
+    // Settlement = T+1, source-dependent (4.1_Load_Market_Data.md §Source selection).
     priceDateStr = d.tradeDateStr;
     settlementDateStr = d.settleDateStr;
 

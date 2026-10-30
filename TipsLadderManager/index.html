@@ -925,7 +925,7 @@ let _bondHolidays = null;
 // Market quotes ask prices/yields are the only source surfaced to users. FedInvest
 // stays available as a dormant cross-check path (matches tipsladder.com) via
 // Which source the app prices from is decided once, inside data.js's loadMarketData()
-// (3.1_Data_Pipeline.md §4.0). No UI control exposes the choice, and nothing here makes it.
+// (4.1_Load_Market_Data.md §Source selection). No UI control exposes the choice, and nothing here makes it.
 async function loadData() {
   console.log('loadData() started');
   try {

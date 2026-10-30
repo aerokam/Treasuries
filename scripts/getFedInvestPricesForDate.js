@@ -5,7 +5,7 @@
 // what makes a realistic year-over-year test possible — build a ladder in the world as it stood a
 // year ago, export it, then load that export against today's data (TipsLadderManager
 // KNOWN_ISSUES §Reproducing the year-over-year scenario). It is also the source's remaining live
-// purpose: the app itself prices off market quotes (3.1_Data_Pipeline.md §4.0).
+// purpose: the app itself prices off market quotes (4.1_Load_Market_Data.md §Source selection).
 //
 // Distinct from getYieldsFedInvest.js, which handles the daily endpoint and has no historical
 // equivalent. This one drives the date-selection flow instead, and writes a local file rather than

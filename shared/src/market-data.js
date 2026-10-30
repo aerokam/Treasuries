@@ -1,5 +1,5 @@
 // market-data.js -- CSV fetch and parse for TIPS market data (SharedModules.md,
-// TipsLadderManager/knowledge/3.1_Data_Pipeline.md).
+// TipsLadderManager/knowledge/4.1_Load_Market_Data.md §Source selection).
 // Moved here from TipsLadderManager/src/data.js so TipsReference can share it too, per the
 // project-wide no-redundancy directive (projects/CLAUDE.md §2a) -- a source flip in YIELD_SOURCE
 // now applies to every consumer at once, instead of being able to strand one app on the dormant
@@ -134,10 +134,10 @@ export function parseFedInvestTipsRows(text) {
 }
 
 // Fetches MarketQuotes.csv from R2 (ask price; yield is computed from that price via the shared
-// yieldFromPrice(), see 3.1_Data_Pipeline.md). datedDateRefCpi comes from TipsRef.csv (Market
+// yieldFromPrice(), see 4.1.1 Fetch and parse market quotes). datedDateRefCpi comes from TipsRef.csv (Market
 // quotes does not carry it). Settlement is T+1 from the Download Date (real broker trade
 // settlement), unlike FedInvest's T=0 (1.1_Download_FedInvest_Prices.md
-// #determine-settlement-date) -- see 3.1_Data_Pipeline.md "Settlement Date Conventions".
+// #determine-settlement-date) -- see 4.1_Load_Market_Data.md §Source selection.
 // Returns the same shape as fetchTipsData(): { yieldsRows, refCpiRows, tipsRefRows, bondHolidays }
 // Throws on HTTP errors.
 //
@@ -156,7 +156,7 @@ const YIELD_SOURCE = 'market';
 // source-dependent, so no caller has to know -- or can get wrong -- which source is active.
 // Callers build TIPS market data themselves via buildTipsMarketData (TipsLadderManager's
 // rebalance-lib.js): this module is a leaf and does not import an orchestrator
-// (TipsLadderManager knowledge/3.1_Data_Pipeline.md).
+// (TipsLadderManager knowledge/4.1_Load_Market_Data.md §Source selection).
 export async function loadMarketData() {
   const d = YIELD_SOURCE === 'fedinvest' ? await fetchTipsData() : await fetchMarketQuotesData();
   const { yieldsRows, refCpiRows, tipsRefRows, saSaoRows, bondHolidays, asOfDate } = d;
