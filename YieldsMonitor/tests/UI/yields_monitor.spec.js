@@ -93,9 +93,9 @@ test.describe('Yields Monitor Regression Tests', () => {
     await page.locator('.tab-btn[data-tab="yieldcurves"]').click();
     const [start, end] = await labels();
     // the opening window ends at 08:30, or later when a maturity of the curve has no point by then
-    const startEnd = start.match(/, 08:00–([0-9]{2}:[0-9]{2}) ET$/);
-    expect(startEnd).not.toBeNull();
-    expect(startEnd[1] >= '08:30' && startEnd[1] <= '17:05').toBe(true);
+    const win = start.match(/, ([0-9]{2}:[0-9]{2})–([0-9]{2}:[0-9]{2}) ET$/);
+    expect(win).not.toBeNull();
+    expect(win[1] >= '08:00' && win[1] <= win[2] && win[2] >= '08:30' && win[2] <= '17:05').toBe(true);
     // a day still open has no close: its end label is the time of the last point
     expect(end).toMatch(/, (17:00–17:05|[0-9]{2}:[0-9]{2}) ET$/);
 

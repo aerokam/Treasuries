@@ -1388,17 +1388,14 @@ function etMinutesOfDay(ts) { const p = ET_FULL_FMT.formatToParts(new Date(+ts))
 // open, and the end reading is the last point there is.
 let curveEndClosed = true;
 function curveWindow(pickLast) { return compactOn() && (!pickLast || curveEndClosed) ? (pickLast ? CURVE_END_WINDOW : CURVE_START_WINDOW) : null; }
-// The opening window of a curve ends at 08:30 ET, or later when a maturity of the curve has no point by
-// then: it ends at the time by which every maturity of the curve that quotes on the date has its first
-// point of the session (08:00 through 17:05 ET).
+// The opening window of a curve runs from the earliest first point of the session (08:00 through 17:05 ET)
+// of any maturity of the curve to 08:30 ET, or to the latest such first point when that is later, so that
+// every maturity of the curve that quotes on the date has a point in the window.
 function curveStartWindow(syms, dateStr) {
   if (!compactOn() || !dateStr) return null;
-  let to = CURVE_START_WINDOW[1];
-  syms.forEach(s => {
-    const first = (rangeData[s] || []).map(p => ({ d: getEtDateStr(p.x), m: etMinutesOfDay(p.x) })).find(p => p.d === dateStr && p.m >= CURVE_START_WINDOW[0] && p.m <= CURVE_END_WINDOW[1]);
-    if (first && first.m > to) to = first.m;
-  });
-  return [CURVE_START_WINDOW[0], to];
+  const firsts = syms.map(s => (rangeData[s] || []).map(p => ({ d: getEtDateStr(p.x), m: etMinutesOfDay(p.x) })).find(p => p.d === dateStr && p.m >= CURVE_START_WINDOW[0] && p.m <= CURVE_END_WINDOW[1])).filter(Boolean).map(p => p.m);
+  if (!firsts.length) return CURVE_START_WINDOW;
+  return [Math.min(...firsts), Math.max(CURVE_START_WINDOW[1], ...firsts)];
 }
 function windowLabel(dateStr, pickLast, startWin) {
   const [from, to] = pickLast ? CURVE_END_WINDOW : (startWin || CURVE_START_WINDOW), hm = m => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
