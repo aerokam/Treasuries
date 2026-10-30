@@ -1,6 +1,6 @@
 # Largest Changes in the 30-Year TIPS Yield
 
-Measured changes in the [Yield](../../knowledge/DATA_DICTIONARY.md#yield) of the 30-Year TIPS, symbol `US30YTIPS` in [Yields Monitor](../README.md), between consecutive closes, between Friday closes, and over 5 trading days.
+Measured changes in the [Yield](../../knowledge/DATA_DICTIONARY.md#yield) of the 30-Year TIPS, symbol `US30YTIPS` in [Yields Monitor](/knowledge/DFD_LEVEL2_YIELDSMONITOR), between consecutive closes, between Friday closes, and over 5 trading days.
 **Basis of every figure:** [Yield history (S6)](../../knowledge/DATA_DICTIONARY.md#s6) as read from R2 on 2026-10-24, symbol `US30YTIPS`, whose last point is dated 2026-10-22 (3.062%), and the close of 2026-10-23 (3.087%) read from CNBC's daily feeds on 2026-10-25. Changes are in basis points (bp, 1 bp = 0.01 percentage point), the Yield at the end date less the Yield at the start date.
 
 ## 1. Data

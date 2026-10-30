@@ -483,7 +483,7 @@ function level2YieldCurves() {
   return page({
     title: 'Yield Curves — Level 2', h1: 'Level 2 &mdash; Yield Curves', maxWidth: W,
     up: 'DFD_LEVEL1.html', upLabel: 'Level 1',
-    spec: V('YieldCurves/README.md'), specLabel: 'Yield Curves specs', svg: P.join(NL),
+    svg: P.join(NL),
     notes: ['  <b>No process here writes a data store.</b> Every flow ends at 3.7 and is gone when the page closes.',
       '  The spot yield curves, breakeven inflation and bid and ask spreads are available from R2 all the same: Level 1 process 1 executes the same calculations as a scheduled job and writes <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s13">Yield curves (S13)</a>, Breakeven inflation (S14) and Bid and ask spreads (S15). Each calculation is defined once, in shared/src/, and imported by both.',
       '  3.1 is the only process that reads a store; the others take their input from each other. It explodes at <a href="DFD_LEVEL3_YC_LOAD.html">Level 3</a>.',
@@ -610,7 +610,7 @@ function level2YieldsMonitor() {
   return page({
     title: 'Yields Monitor — Level 2', h1: 'Level 2 &mdash; Yields Monitor', maxWidth: W,
     up: 'DFD_LEVEL1.html', upLabel: 'Level 1',
-    spec: V('YieldsMonitor/README.md'), specLabel: 'Yields Monitor specs', svg: P.join(NL),
+    svg: P.join(NL),
     notes: ['  <b>No process here writes a data store.</b> Every flow ends at 2.5, 2.6 or 2.7 and is gone when the page closes.',
       '  <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#e5">CNBC (E5)</a> is drawn as a box, in the store column, since this is the one place a Level 2 diagram in this portal shows an app reading an entity directly, live — no acquisition job stands between it and the app (see <a href="viewer.html#/md/knowledge/DFD_Worklist.md">DFD_Worklist.md</a> §4.0). Its two flows are independently named: <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#market-yields">market yields</a>, its chart-bar feed, to 2.1; <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#live-quotes">live quotes</a>, its quote service, to 2.2.',
       '  2.1 explodes at <a href="DFD_LEVEL3_YM_ASSEMBLE.html">Level 3</a>.',
