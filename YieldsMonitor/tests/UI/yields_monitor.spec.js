@@ -96,8 +96,8 @@ test.describe('Yields Monitor Regression Tests', () => {
     const win = start.match(/, ([0-9]{2}:[0-9]{2})–([0-9]{2}:[0-9]{2}) ET$/);
     expect(win).not.toBeNull();
     expect(win[1] >= '08:00' && win[1] <= win[2] && win[2] >= '08:30' && win[2] <= '17:05').toBe(true);
-    // a day still open has no close: its end label is the time of the last point
-    expect(end).toMatch(/, (17:00–17:05|[0-9]{2}:[0-9]{2}) ET$/);
+    // a day still open: the end window runs from the earliest to the latest last point of the curve's maturities
+    expect(end).toMatch(/, ([0-9]{2}:[0-9]{2}–)?[0-9]{2}:[0-9]{2} ET$/);
 
     await page.locator('.tab-btn[data-tab="timeseries"]').click();
     await page.locator('#hideNonTrading').uncheck();
