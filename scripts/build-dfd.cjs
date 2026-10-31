@@ -157,15 +157,7 @@ function drawLine(P, ln) {
     P.push(`  <path class="flow" d="M ${ln.rootX.toFixed(1)} ${ln.rootY.toFixed(1)} H ${ln.laneX.toFixed(1)}"/>`);
     P.push(`  <path class="flow" d="M ${ln.laneX.toFixed(1)} ${Math.min(...ys).toFixed(1)} V ${Math.max(...ys).toFixed(1)}"/>`);
     ln.branches.forEach(b => {
-      // A branch whose row would otherwise cross a store's own box (see safeY, above)
-      // jogs, in its own lane, from the safe crossing height down to its true row —
-      // still one continuous line, just with one more bend, never a second flow merging in.
-      if (b.laneX !== undefined) {
-        P.push(`  <path class="flow" d="M ${ln.laneX.toFixed(1)} ${b.y.toFixed(1)} H ${b.laneX.toFixed(1)}"/>`);
-        P.push(`  <path class="flow" d="M ${b.laneX.toFixed(1)} ${b.y.toFixed(1)} V ${b.trueY.toFixed(1)} H ${b.x.toFixed(1)}" marker-end="url(#a1)"/>`);
-      } else {
-        P.push(`  <path class="flow" d="M ${ln.laneX.toFixed(1)} ${b.y.toFixed(1)} H ${b.x.toFixed(1)}" marker-end="url(#a1)"/>`);
-      }
+      P.push(`  <path class="flow" d="M ${ln.laneX.toFixed(1)} ${b.y.toFixed(1)} H ${b.x.toFixed(1)}" marker-end="url(#a1)"/>`);
     });
   } else {
     P.push(`  <path class="flow" d="M ${ln.x1.toFixed(1)} ${ln.y1.toFixed(1)} H ${ln.laneX.toFixed(1)} V ${ln.y2.toFixed(1)} H ${ln.x2.toFixed(1)}" marker-end="url(#a1)"/>`);
@@ -193,11 +185,13 @@ function entityShape(x, y, w, h, href, lines) {
     ...shown.map((ln, k) => `    <text class="e-name" x="${x + w / 2}" y="${top + h / 2 + (k - (shown.length - 1) / 2) * 16 + 5}">${esc(ln)}</text>`),
     `  </a>`].join(NL);
 }
-function storeShape(x, y, w, href, name, plain) {
+// closed draws the two ends as well, for a tall store that stands for several.
+function storeShape(x, y, w, href, name, plain, h = 40, closed = false) {
   return [`  <a class="store" href="${href}">`,
-    `    <rect x="${x}" y="${y - 20}" width="${w}" height="40" fill="transparent" stroke="none"/>`,
-    `    <line x1="${x}" y1="${y - 20}" x2="${x + w}" y2="${y - 20}"/>`,
-    `    <line x1="${x}" y1="${y + 20}" x2="${x + w}" y2="${y + 20}"/>`,
+    `    <rect x="${x}" y="${y - h / 2}" width="${w}" height="${h}" fill="transparent" stroke="none"/>`,
+    `    <line x1="${x}" y1="${y - h / 2}" x2="${x + w}" y2="${y - h / 2}"/>`,
+    `    <line x1="${x}" y1="${y + h / 2}" x2="${x + w}" y2="${y + h / 2}"/>`,
+    ...(closed ? [`    <line x1="${x}" y1="${y - h / 2}" x2="${x}" y2="${y + h / 2}"/>`, `    <line x1="${x + w}" y1="${y - h / 2}" x2="${x + w}" y2="${y + h / 2}"/>`] : []),
     `    <text class="s-name" x="${x + w / 2}" y="${y + 5}">${esc(name + (plain ? '' : idSuffix(href)))}</text>`, `  </a>`].join(NL);
 }
 // caption, when given, is written beneath the circle: the portal name of an app.
@@ -243,8 +237,7 @@ const MODULE_NAMES = {
   m19: ['breakeven.js'], m20: ['spreads.js'], m21: ['treasury-', 'cusip.js'], m22: ['date-', 'picker.js'],
   m23: ['date-range-', 'filter.js'],
 };
-// DFD_LEVEL2_INGESTION has no entry: its seven callers take 27 arrows from 12 modules, which the
-// entity, job and store columns of that page cannot carry without arrows crossing boxes and labels.
+// The ingestion jobs 1.2 to 1.15 are registered below from INGEST_JOBS, with the job's own module list.
 const SHARED = {
   'ingest-fedinvest': { r: 46,
     at: { m1: [310, 326], m2: [513, 296], m3: [644, 466] },
@@ -324,6 +317,167 @@ function sharedModules(page) {
     },
     shapes(P) { mods.forEach(m => P.push(moduleShape(m.x, m.y, m.r, V('knowledge/SharedModules.md#' + m.id), m.id.toUpperCase(), MODULE_NAMES[m.id]))); },
   };
+}
+
+// ── process 1: the ingestion jobs ───────────────────────────────────────────
+// The one definition of the jobs, of the external entities they read and of the data stores they
+// read and write. Level 2 of process 1 and the Level 3 page of every job are drawn from it, so a
+// store, an entity or a job is named, linked and wired in one place. Reads and writes are what the
+// job's process spec states; modules are the shared modules whose Called by line in
+// knowledge/SharedModules.md names the job (1.1 names its three processes there, so its Level 3
+// page keeps its own SHARED entry). stops, where the spec states it, says when the run writes nothing.
+const INGEST_STORES = {
+  fedinv: ['FedInvest prices', DS('s1')], tipsref: ['TIPS reference data', DS('s2')],
+  refcpi: ['Ref CPI', DS('s3')], nsasa: ['Ref CPI NSA and SA', DS('s4')],
+  auctions: ['Auction results', DS('s5')], yhist: ['Yield history', DS('s6')],
+  quotes: ['Market quotes', DS('s7')], cpihist: ['CPI history', DS('s8')],
+  tent: ['Tentative auction schedule', DS('s9')], sasao: ['SA and SAO yields', DS('s10')],
+  funds: ['Fund holdings', DS('s11')], gsw: ['GSW curve parameters', DS('s12')],
+  yc: ['Yield curves', DS('s13')], bei: ['Breakeven inflation', DS('s14')],
+  spread: ['Bid and ask spreads', DS('s15')], hol: ['Bond holidays', DS('s16')],
+  blscpi: ['Monthly CPI', DS('s17')], ia: ['Intraday archive', DS('s18')],
+};
+const INGEST_ENTITIES = {
+  e1: { name: ['FedInvest'], href: DD + 'e1' },
+  e2: { name: ['TreasuryDirect', 'SecIndex'], href: DD + 'e2' },
+  e15: { name: ['TreasuryDirect'], href: DD + 'e15' },
+  e3: { name: ['FiscalData'], href: DD + 'e3' },
+  e4: { name: ['BLS'], href: DD + 'e4' },
+  e5: { name: ['CNBC'], href: DD + 'e5' },
+  e6: { name: ['Market quotes', 'source'], href: DD + 'e6' },
+  fund: { name: ['Fund providers', '(E7-E12)'], href: DD + 'fund-holdings', sources: 6 },
+  e13: { name: ['Federal Reserve', 'FEDS 2008-05'], href: DD + 'e13' },
+  e14: { name: ['Treasury Tentative', 'Auction Schedule'], href: DD + 'e14' },
+};
+const INGEST_JOBS = [
+  { id: '1.1', slug: 'FEDINVEST', file: '1.1_Download_FedInvest_Prices.md', title: 'Download FedInvest prices and calculate yields',
+    name: ['Download', 'FedInvest prices', 'and calculate', 'yields'], data: 'FedInvest daily price list',
+    entities: ['e1'], reads: ['tipsref', 'hol'], writes: ['fedinv'] },
+  { id: '1.2', slug: 'MARKETQUOTES', file: '1.2_Download_Market_Quotes.md', title: 'Download market quotes',
+    name: ['Download', 'market quotes'], data: 'market quotes',
+    entities: ['e6'], reads: ['hol'], writes: ['quotes'], modules: ['m1', 'm2', 'm4'],
+    stops: 'The run is skipped on a weekend or a Bond Holiday, and {quotes} is left unchanged when the capture holds fewer than 10 TIPS rows.' },
+  { id: '1.3', slug: 'YIELDCURVEDATA', file: '1.3_Calculate_Yield_Curve_Data_Sets.md', title: 'Calculate yield curve data sets',
+    name: ['Calculate', 'yield curve', 'data sets'], data: null,
+    entities: [], reads: ['fedinv', 'quotes', 'nsasa', 'hol'], writes: ['yc', 'bei', 'spread'],
+    modules: ['m1', 'm2', 'm3', 'm4', 'm15', 'm16', 'm17', 'm18', 'm19', 'm20', 'm21'] },
+  { id: '1.4', slug: 'AUCTIONRESULTS', file: '1.4_Fetch_Auction_Results.md', title: 'Fetch auction results',
+    name: ['Fetch auction', 'results'], data: 'auction results',
+    entities: ['e3', 'e15'], reads: ['auctions'], writes: ['auctions'], modules: ['m1'],
+    stops: 'The run ends with an error and writes nothing when {auctions} is missing or lacks a column of the table it reads.' },
+  { id: '1.5', slug: 'AUCTIONSCHEDULE', file: '1.5_Fetch_Tentative_Auction_Schedule.md', title: 'Fetch tentative auction schedule',
+    name: ['Fetch tentative', 'auction', 'schedule'], data: 'tentative auction schedule',
+    entities: ['e14'], reads: [], writes: ['tent'] },
+  { id: '1.6', slug: 'TIPSREFERENCE', file: '1.6_Fetch_TIPS_Reference_Data.md', title: 'Fetch TIPS reference data',
+    name: ['Fetch TIPS', 'reference data'], data: 'TIPS reference data',
+    entities: ['e3'], reads: ['tipsref'], writes: ['tipsref'], modules: ['m1'] },
+  { id: '1.7', slug: 'YIELDHISTORY', file: '1.7_Update_Yield_History.md', title: 'Update yield history',
+    name: ['Update yield', 'history'], data: 'market yields',
+    entities: ['e5'], reads: ['yhist'], writes: ['yhist'] },
+  { id: '1.8', slug: 'INTRADAYARCHIVE', file: '1.8_Archive_Intraday_Yields.md', title: 'Archive intraday yields',
+    name: ['Archive', 'intraday yields'], data: 'market yields',
+    entities: ['e5'], reads: [], writes: ['ia'] },
+  { id: '1.9', slug: 'MONTHLYCPI', file: '1.9_Fetch_Monthly_CPI.md', title: 'Fetch monthly CPI',
+    name: ['Fetch monthly', 'CPI'], data: 'monthly CPI-U',
+    entities: ['e4'], reads: [], writes: ['blscpi'] },
+  { id: '1.10', slug: 'REFCPINSASA', file: '1.10_Interpolate_Daily_Ref_CPI_NSA_And_SA.md', title: 'Interpolate daily Ref CPI NSA and SA',
+    name: ['Interpolate', 'daily Ref CPI', 'NSA and SA'], data: null,
+    entities: [], reads: ['blscpi'], writes: ['nsasa'], modules: ['m14'] },
+  { id: '1.11', slug: 'SASAOYIELDS', file: '1.11_Calculate_SA_And_SAO_Yields.md', title: 'Calculate SA and SAO yields',
+    name: ['Calculate SA', 'and SAO yields'], data: null,
+    entities: [], reads: ['quotes', 'nsasa', 'hol'], writes: ['sasao'], modules: ['m1', 'm2', 'm4', 'm15', 'm16', 'm17'] },
+  { id: '1.12', slug: 'CPIHISTORY', file: '1.12_Fetch_CPI_History.md', title: 'Fetch CPI history',
+    name: ['Fetch CPI', 'history'], data: 'monthly CPI-U',
+    entities: ['e4'], reads: [], writes: ['cpihist'] },
+  { id: '1.13', slug: 'DAILYREFCPI', file: '1.13_Fetch_Daily_Ref_CPI.md', title: 'Fetch daily Ref CPI',
+    name: ['Fetch daily', 'Ref CPI'], data: 'daily Ref CPI',
+    entities: ['e2'], reads: ['tipsref', 'cpihist', 'refcpi'], writes: ['refcpi'],
+    stops: '{refcpi} is not written when the fetched series ends before the last day of the second month after the latest month of {cpihist}, or when the merged series has a gap of more than one calendar day or is shorter than what the store already held.' },
+  { id: '1.14', slug: 'FUNDHOLDINGS', file: '1.14_Enrich_Fund_Holdings.md', title: 'Enrich fund holdings',
+    name: ['Enrich fund', 'holdings'], data: 'fund holdings',
+    entities: ['fund'], reads: ['quotes', 'sasao'], writes: ['funds'], modules: ['m1', 'm2', 'm3', 'm4'] },
+  { id: '1.15', slug: 'GSWCURVE', file: '1.15_Fetch_GSW_Curve_Parameters.md', title: 'Fetch GSW curve parameters',
+    name: ['Fetch GSW', 'curve parameters'], data: 'GSW curve parameters',
+    entities: ['e13'], reads: [], writes: ['gsw'] },
+];
+const ingestPageName = job => 'DFD_LEVEL3_INGEST_' + job.slug + '.html';
+const ingestSharedKey = job => 'ingest-' + job.slug.toLowerCase();
+const ingestJob = id => INGEST_JOBS.find(j => j.id === id);
+const ingestStore = (k, x, y, w) => storeShape(x, y, w, INGEST_STORES[k][1], INGEST_STORES[k][0]);
+const termLink = t => `<a href="${DD}${TERMS[t]}">${esc(t)}</a>`;
+const storeRef = k => `<a href="${INGEST_STORES[k][1]}">${esc(INGEST_STORES[k][0] + idSuffix(INGEST_STORES[k][1]))}</a>`;
+const entityText = e => [...e.name.slice(0, -1), e.name[e.name.length - 1] + idSuffix(e.href)].join(' ');
+const andList = a => a.length < 3 ? a.join(' and ') : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1];
+
+// The Level 3 page of a job that has no sub-processes: the one process, the external entities that
+// feed it down the left, the data stores it only reads beneath them, the data stores it writes down
+// the right (a store it also reads takes an arrow each way), and the shared modules it calls in a row
+// above and a row below, each on a straight arrow to the process. The module rows keep clear of both
+// store columns, so no arrow crosses a box or another arrow; assertIngestClear stops the build if one does.
+const ING = { PR: 60, SW: 235, EW: 190, EH: 52, ROW: 96, LGAP: 210, RGAP: 150, PAD: 30, MR: 46, PITCH: 114, PAIR: 8 };
+function ingestLayout(job) {
+  const { PR, SW, EW, EH, ROW, LGAP, RGAP, PAD, MR, PITCH } = ING;
+  const left = [...job.entities.map(key => ({ kind: 'entity', key })),
+    ...job.reads.filter(k => !job.writes.includes(k)).map(key => ({ kind: 'store', key }))];
+  const right = job.writes.map(key => ({ key, also: job.reads.includes(key) }));
+  const mods = job.modules || [];
+  const nTop = Math.ceil(mods.length / 2), nBot = mods.length - nTop;
+  const dxMax = Math.max(0, (Math.max(nTop, nBot) - 1) / 2 * PITCH);
+  const D = mods.length ? Math.max(175, Math.ceil(dxMax * 0.8 / 5) * 5) : 0;
+  const leftHalf = ((left.length - 1) * ROW + EH) / 2, rightHalf = ((right.length - 1) * ROW + 40) / 2;
+  const up = Math.max(PR, leftHalf, rightHalf, nTop ? D + MR : 0), down = Math.max(PR, leftHalf, rightHalf, nBot ? D + MR : 0);
+  const cy = PAD + up, LR = PAD + SW;
+  const cx = Math.max(LR + LGAP + PR, PAD + dxMax + MR);
+  const RX = cx + PR + RGAP;
+  left.forEach((it, i) => { it.y = cy + (i - (left.length - 1) / 2) * ROW; });
+  right.forEach((it, i) => { it.y = cy + (i - (right.length - 1) / 2) * ROW; });
+  const at = {};
+  mods.slice(0, nTop).forEach((id, k) => { at[id] = [cx + (k - (nTop - 1) / 2) * PITCH, cy - D]; });
+  mods.slice(nTop).forEach((id, k) => { at[id] = [cx + (k - (nBot - 1) / 2) * PITCH, cy + D]; });
+  return { cx, cy, LR, RX, left, right, at, W: RX + SW + PAD, H: cy + down + PAD };
+}
+for (const job of INGEST_JOBS) {
+  if (!job.modules) continue;
+  SHARED[ingestSharedKey(job)] = { r: ING.MR, at: ingestLayout(job).at, calls: { [job.id]: job.modules },
+    bows: Object.fromEntries(job.modules.map(m => [m + '>' + job.id, [0]])) };
+}
+
+// Fails the build when an arrow of an ingestion Level 3 page passes through a box or a circle it is
+// not attached to, crosses another arrow, or runs under a flow label.
+function assertIngestClear(job, segs, shapes, labels) {
+  const fail = msg => { console.error(`${job.id} Level 3: ${msg}`); process.exit(1); };
+  const hitsCircle = (s, c, pad) => {
+    const dx = s.x2 - s.x1, dy = s.y2 - s.y1, L2 = dx * dx + dy * dy || 1;
+    const t = Math.max(0, Math.min(1, ((c.x - s.x1) * dx + (c.y - s.y1) * dy) / L2));
+    return Math.hypot(s.x1 + t * dx - c.x, s.y1 + t * dy - c.y) < c.r + pad;
+  };
+  const hitsRect = (s, r, pad) => {
+    for (let i = 0; i <= 40; i++) {
+      const x = s.x1 + (s.x2 - s.x1) * i / 40, y = s.y1 + (s.y2 - s.y1) * i / 40;
+      if (x > r.x - pad && x < r.x + r.w + pad && y > r.y - pad && y < r.y + r.h + pad) return true;
+    }
+    return false;
+  };
+  const cross = (a, b) => {
+    const d = (a.x2 - a.x1) * (b.y2 - b.y1) - (a.y2 - a.y1) * (b.x2 - b.x1);
+    if (Math.abs(d) < 1e-9) return false;
+    const t = ((b.x1 - a.x1) * (b.y2 - b.y1) - (b.y1 - a.y1) * (b.x2 - b.x1)) / d;
+    const u = ((b.x1 - a.x1) * (a.y2 - a.y1) - (b.y1 - a.y1) * (a.x2 - a.x1)) / d;
+    return t > 0.001 && t < 0.999 && u > 0.001 && u < 0.999;
+  };
+  segs.forEach(s => {
+    shapes.forEach(sh => {
+      if (sh.id === s.a || sh.id === s.b) return;
+      if (sh.r ? hitsCircle(s, sh, 6) : hitsRect(s, sh, 6)) fail(`${s.id} passes through ${sh.id}`);
+    });
+    labels.forEach(l => { if (hitsRect(s, l, 2)) fail(`${s.id} runs under the label ${l.id}`); });
+  });
+  segs.forEach((a, i) => segs.slice(i + 1).forEach(b => { if (cross(a, b)) fail(`${a.id} crosses ${b.id}`); }));
+  labels.forEach(l => shapes.forEach(sh => {
+    const hit = sh.r ? (Math.hypot(Math.max(l.x, Math.min(sh.x, l.x + l.w)) - sh.x, Math.max(l.y, Math.min(sh.y, l.y + l.h)) - sh.y) < sh.r)
+      : (l.x < sh.x + sh.w && l.x + l.w > sh.x && l.y < sh.y + sh.h && l.y + l.h > sh.y);
+    if (hit) fail(`the label ${l.id} overlaps ${sh.id}`);
+  }));
 }
 
 // Draws every flow in a model whose processes name their outputs as { target: [labels] }.
@@ -785,67 +939,18 @@ function level3YieldsMonitorAssemble() {
 
 // ── Level 2: process 1, the ingestion jobs ──────────────────────────────────
 function level2Ingestion() {
-  // Each job is a process; each writes the store named beside it. Unlike Level 1, an
-  // external entity IS drawn here — the fan-out this diagram would need to show every
-  // entity is bounded (one box per source, some feeding two jobs), not the every-app
-  // fan-out that rules entities out at Level 1. See DFD_Worklist.md §4.0.
-  const entities = [
-    { name: ['FedInvest'], href: DD + 'e1', jobs: ['1.1'] },
-    { name: ['TreasuryDirect', 'SecIndex'], href: DD + 'e2', jobs: ['1.13'] },
-    { name: ['TreasuryDirect'], href: DD + 'e15', jobs: ['1.4'] },
-    { name: ['FiscalData'], href: DD + 'e3', jobs: ['1.4', '1.6'] },
-    { name: ['BLS'], href: DD + 'e4', jobs: ['1.9', '1.12'] },
-    { name: ['CNBC'], href: DD + 'e5', jobs: ['1.7', '1.8'] },
-    { name: ['Market quotes', 'source'], href: DD + 'e6', jobs: ['1.2'] },
-    { name: ['Fund providers', '(E7-E12)'], href: DD + 'fund-holdings', jobs: ['1.14'] },
-    { name: ['Federal Reserve', 'FEDS 2008-05'], href: DD + 'e13', jobs: ['1.15'] },
-    { name: ['Treasury Tentative', 'Auction Schedule'], href: DD + 'e14', jobs: ['1.5'] },
-  ];
-  const jobs = [
-    { id: '1.1',  name: ['Download', 'FedInvest prices', 'and calculate', 'yields'], data: 'FedInvest daily price list', reads: ['tipsref', 'hol'], writes: ['fedinv'], href: 'DFD_LEVEL3_INGEST_FEDINVEST.html' },
-    { id: '1.2',  name: ['Download', 'market quotes'],              data: 'market quotes', reads: ['hol'],     writes: ['quotes'], href: V('knowledge/1.2_Download_Market_Quotes.md') },
-    { id: '1.3',  name: ['Calculate', 'yield curve', 'data sets'],  data: null, reads: ['fedinv', 'quotes', 'nsasa', 'hol'], writes: ['yc', 'bei', 'spread'], href: V('knowledge/1.3_Calculate_Yield_Curve_Data_Sets.md') },
-    { id: '1.4',  name: ['Fetch auction', 'results'],               data: 'auction results',            writes: ['auctions'], href: V('knowledge/1.4_Fetch_Auction_Results.md') },
-    { id: '1.5',  name: ['Fetch tentative', 'auction', 'schedule'], data: 'tentative auction schedule', writes: ['tent'], href: V('knowledge/1.5_Fetch_Tentative_Auction_Schedule.md') },
-    { id: '1.6',  name: ['Fetch TIPS', 'reference data'],           data: 'TIPS reference data',        writes: ['tipsref'], href: V('knowledge/1.6_Fetch_TIPS_Reference_Data.md') },
-    { id: '1.7',  name: ['Update yield', 'history'],                data: 'market yields',              writes: ['yhist'], href: V('knowledge/1.7_Update_Yield_History.md') },
-    { id: '1.8',  name: ['Archive', 'intraday yields'],             data: 'market yields',              writes: ['ia'], href: V('knowledge/1.8_Archive_Intraday_Yields.md') },
-    { id: '1.9',  name: ['Fetch monthly', 'CPI'],                   data: 'monthly CPI-U',              writes: ['blscpi'], href: V('knowledge/1.9_Fetch_Monthly_CPI.md') },
-    { id: '1.10', name: ['Interpolate', 'daily Ref CPI', 'NSA and SA'], data: null, reads: ['blscpi'], writes: ['nsasa'], href: V('knowledge/1.10_Interpolate_Daily_Ref_CPI_NSA_And_SA.md') },
-    { id: '1.11', name: ['Calculate SA', 'and SAO yields'],         data: null, reads: ['quotes', 'nsasa', 'hol'], writes: ['sasao'], href: V('knowledge/1.11_Calculate_SA_And_SAO_Yields.md') },
-    { id: '1.12', name: ['Fetch CPI', 'history'],                   data: 'monthly CPI-U',              writes: ['cpihist'], href: V('knowledge/1.12_Fetch_CPI_History.md') },
-    { id: '1.13', name: ['Fetch daily', 'Ref CPI'],                 data: 'daily Ref CPI',              writes: ['refcpi'], href: V('knowledge/1.13_Fetch_Daily_Ref_CPI.md') },
-    { id: '1.14', name: ['Enrich fund', 'holdings'],                data: 'fund holdings', reads: ['quotes', 'sasao'], writes: ['funds'], href: V('knowledge/1.14_Enrich_Fund_Holdings.md') },
-    { id: '1.15', name: ['Fetch GSW', 'curve parameters'],          data: 'GSW curve parameters',       writes: ['gsw'], href: V('knowledge/1.15_Fetch_GSW_Curve_Parameters.md') },
-  ];
-  const stores = {
-    fedinv: ['FedInvest prices', DS('s1')], tipsref: ['TIPS reference data', DS('s2')],
-    refcpi: ['Ref CPI', DS('s3')], nsasa: ['Ref CPI NSA and SA', DS('s4')],
-    auctions: ['Auction results', DS('s5')], yhist: ['Yield history', DS('s6')],
-    quotes: ['Market quotes', DS('s7')], cpihist: ['CPI history', DS('s8')],
-    tent: ['Tentative auction schedule', DS('s9')], sasao: ['SA and SAO yields', DS('s10')],
-    funds: ['Fund holdings', DS('s11')], gsw: ['GSW curve parameters', DS('s12')],
-    yc: ['Yield curves', DS('s13')], bei: ['Breakeven inflation', DS('s14')],
-    spread: ['Bid and ask spreads', DS('s15')], hol: ['Bond holidays', DS('s16')],
-    blscpi: ['Monthly CPI', DS('s17')], ia: ['Intraday archive', DS('s18')],
-  };
-  const JX = 470, JR = 54, SX = 760, SW = 235;
+  // Each job is a process. The data stores are one shape on the right, standing for all of them: a
+  // job has an arrow to it when it writes a store and an arrow from it when it reads one, and its
+  // Level 3 page draws the stores themselves. Unlike Level 1, an external entity IS drawn here — the
+  // fan-out this diagram would need to show every entity is bounded (one box per source, some feeding
+  // two jobs), not the every-app fan-out that rules entities out at Level 1. See DFD_Worklist.md §4.0.
+  const jobs = INGEST_JOBS;
+  const entities = Object.entries(INGEST_ENTITIES).map(([key, e]) => ({ ...e, jobs: jobs.filter(j => j.entities.includes(key)).map(j => j.id) }));
+  const JX = 470, JR = 54, BX = JX + JR + 150, BW = 170, PAIR = 8;
   const EX = 20, EW = 190, EH = 52;
   const jy = i => 90 + i * 116;
   const jobIdx = Object.fromEntries(jobs.map((j, i) => [j.id, i]));
-  // Stores are ordered by the mean row index of every job that reads or writes them, the
-  // same barycentre principle level1() uses — a store touched only by one job sits level
-  // with it; one touched by several sits near their middle, which is what keeps the H-V-H
-  // lanes below short rather than spanning the whole column.
-  const touches = {};
-  jobs.forEach((j, i) => [...(j.reads || []), ...(j.writes || [])].forEach(k => (touches[k] ||= []).push(i)));
-  const order = Object.keys(stores).sort((a, b) => {
-    const mean = arr => arr.reduce((s, v) => s + v, 0) / arr.length;
-    return mean(touches[a]) - mean(touches[b]);
-  });
-  const sy = i => 80 + i * 97;
-  const RGAP0 = SX + SW + 8, RGAP1 = RGAP0 + 150;
-  const H = Math.max(jy(jobs.length - 1), sy(order.length - 1)) + 110, W = RGAP1 + 30;
+  const H = jy(jobs.length - 1) + 110, W = BX + BW + 30;
   entities.forEach(e => { e.y = e.jobs.reduce((s, jid) => s + jy(jobIdx[jid]), 0) / e.jobs.length; });
   // An entity feeding two jobs sits at their midpoint, which can land exactly on a
   // single-job entity sitting between them (FiscalData's two jobs bracket Treasury
@@ -856,16 +961,13 @@ function level2Ingestion() {
   for (let i = 1; i < entities.length; i++) {
     if (entities[i].y - entities[i - 1].y < MIN_ENTITY_GAP) entities[i].y = entities[i - 1].y + MIN_ENTITY_GAP;
   }
-  const sIdx = Object.fromEntries(order.map((k, i) => [k, i]));
 
-  const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 2 for process 1: the ingestion jobs, the external entity each one reads, and the data store each one writes.">`, marker()];
-  // Every flow here is drawn horizontal-out, vertical, horizontal-in — never a curve — so
-  // a line crossing the store or entity column stays a straight run through the gap
-  // between columns rather than a bow that can sweep behind a box. A source read or fed
-  // to more than one consumer (a store read by several jobs, or one named flow reaching
-  // several jobs from the same entity) is one trunk line with a branch at each real
-  // consumer, never several independent lines that happen to share a lane — see
-  // routeLines/drawLine.
+  const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 2 for process 1: the ingestion jobs, the external entity each one reads, and one shape that stands for the data stores each one reads and writes.">`, marker()];
+  // An entity flow is drawn horizontal-out, vertical, horizontal-in — never a curve — so a line
+  // crossing the gap between the entity column and the job column stays a straight run rather than
+  // a bow that can sweep behind a box. One named flow reaching several jobs from the same entity is
+  // one trunk line with a branch at each real consumer, never several independent lines that
+  // happen to share a lane — see routeLines/drawLine.
   const EGAP0 = EX + EW + 4, EGAP1 = JX - JR - 4;
   const entLines = [];
   entities.forEach(e => {
@@ -888,71 +990,31 @@ function level2Ingestion() {
   routeLines(entLines, EGAP0 + 8, EGAP1 - 8);
   entLines.forEach(ln => { drawLine(P, ln); P.push(labelAt(...ln.labelAt, ln.label)); });
 
-  // A job with several of its own store-side connections (some reads, some writes) never
-  // has them all touch its circle at the identical point — each gets its own small offset
-  // around the job's true row, same principle as a multi-flow entity above.
-  const SGAP0 = JX + JR + 4, SGAP1 = SX - 4;
-  const jobTouchY = jobs.map((j, i) => {
-    const keys = [...(j.reads || []).map(k => 'r:' + k), ...(j.writes || []).map(k => 'w:' + k)];
-    const n = keys.length, y = jy(i), out = {};
-    keys.forEach((key, k) => { out[key] = n > 1 ? y + (k - (n - 1) / 2) * 14 : y; });
-    return out;
-  });
-
-  // A write (job produces, store receives) stays in the corridor between the two columns,
-  // entering the store's left side, same as every store-adjacent flow elsewhere.
-  const writeLines = [];
+  // The data stores: a job that writes one has a plain horizontal arrow to the shape and a job that
+  // reads one has a plain horizontal arrow from it, set a few px apart when it does both.
+  const JE = JX + JR + 3, BE = BX - 5;
   jobs.forEach((j, i) => {
-    (j.writes || []).forEach(k => {
-      const y = jobTouchY[i]['w:' + k], y2 = sy(sIdx[k]);
-      writeLines.push({ kind: 'simple', x1: SGAP0, y1: y, x2: SGAP1, y2, span: Math.abs(y - y2) });
-    });
+    const y = jy(i), both = j.writes.length > 0 && j.reads.length > 0;
+    if (j.writes.length) P.push(flow(JE, both ? y - PAIR : y, BE, both ? y - PAIR : y, { bows: [0] }));
+    if (j.reads.length) P.push(flow(BE, both ? y + PAIR : y, JE, both ? y + PAIR : y, { bows: [0] }));
   });
-  routeLines(writeLines, SGAP0 + 8, SGAP1 - 8);
-  writeLines.forEach(ln => drawLine(P, ln));
-
-  // A read (store produces, job receives) exits the store's right side instead, into a
-  // lane that never touches the job/store corridor at all, then travels up or down and the
-  // whole way left at the reading job's own row — the developer's own routing. That
-  // leftward run has to cross the entire store column, though, and a store can sit close
-  // enough to a job's own row that the run would pass straight through its box; safeY()
-  // nudges the crossing height just clear of any store it would otherwise cross, and the
-  // one job whose row that lands on gets one extra short jog — vertical, then a last short
-  // horizontal — back down to its true row, in its own small lane so two jogs never merge.
-  const storeYs = order.map((_, i) => sy(i));
-  const safeY = y => { for (const s of storeYs) if (Math.abs(y - s) < 24) return y < s ? s - 24 : s + 24; return y; };
-  const JOG0 = SGAP0 + 4, JOG1 = SGAP0 + 70;
-  const readsByStore = {};
-  jobs.forEach((j, i) => (j.reads || []).forEach(k => (readsByStore[k] ||= []).push(i)));
-  const readLines = [], jogs = [];
-  Object.entries(readsByStore).forEach(([k, jobIdxs]) => {
-    const rootY = sy(sIdx[k]);
-    const branches = jobIdxs.map(i => {
-      const y = jobTouchY[i]['r:' + k], cross = safeY(y);
-      const b = { y: cross, x: SGAP0, trueY: y };
-      if (cross !== y) { b.span = Math.abs(y - cross); jogs.push(b); }
-      return b;
-    });
-    const ys = [rootY, ...branches.map(b => b.y)];
-    readLines.push({ kind: 'trunk', rootX: RGAP0, rootY, branches, span: Math.max(...ys) - Math.min(...ys) });
-  });
-  routeLines(readLines, RGAP0 + 8, RGAP1 - 8);
-  routeLines(jogs, JOG0, JOG1);
-  readLines.forEach(ln => drawLine(P, ln));
+  const top = jy(0) - JR, bottom = jy(jobs.length - 1) + JR;
+  P.push(storeShape(BX, (top + bottom) / 2, BW, DS(), 'Data Stores', true, bottom - top, true));
   entities.forEach(e => P.push(entityShape(EX, e.y, EW, EH, e.href, e.name)));
-  order.forEach((k, i) => P.push(storeShape(SX, sy(i), SW, stores[k][1], stores[k][0])));
-  jobs.forEach((j, i) => P.push(procShape(JX, jy(i), JR, j.href, j.id, j.name)));
+  jobs.forEach((j, i) => P.push(procShape(JX, jy(i), JR, ingestPageName(j), j.id, j.name)));
   P.push('</svg>');
 
+  const storeOnly = jobs.filter(j => !j.entities.length && j.reads.length).map(j => j.id);
+  const entityAndStore = jobs.filter(j => j.entities.length && j.reads.length).map(j => j.id);
   return page({
     title: 'Ingestion jobs — Level 2', h1: 'Level 2 &mdash; 1 Acquire and derive reference data', maxWidth: W,
     up: 'DFD_LEVEL1.html', upLabel: 'Level 1', svg: P.join(NL),
-    notes: ['  One process per scheduled job: the external entity it reads (if any), and the store it writes.',
-      '  1.3, 1.10 and 1.11 read no external source: they calculate from what the retrieving jobs have stored. 1.1, 1.2 and 1.14 read both an external source and one or more stores.',
+    notes: ['  One process per scheduled job, with the external entity it reads (if any). The <a href="' + DS() + '">Data Stores</a> shape stands for every data store: a job that writes one has an arrow to it, a job that reads one has an arrow from it, and a job that does both has both.',
+      '  ' + andList(storeOnly) + ' read no external source: they calculate from what the retrieving jobs have stored. ' + andList(entityAndStore) + ' read both an external source and one or more stores.',
       '  An entity feeding two jobs (FiscalData, BLS, CNBC) is drawn once, with a separately labelled flow to each — the same source, not two sources. FiscalData\'s two flows here match its two flows in the Data Dictionary; BLS\'s and CNBC\'s two jobs each read the same flow independently.',
       '  1.4 reads two entities, FiscalData and TreasuryDirect, for the one flow <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#auction-results">auction results</a>.',
       '  E7 through E12 are drawn as one box: the six fund-holdings providers, each with its own entry in the <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md">Data Dictionary</a>, are otherwise identical in shape from this diagram\'s point of view — one job reads all six.',
-      '  1.1 explodes at <a href="DFD_LEVEL3_INGEST_FEDINVEST.html">Level 3</a>; every other job drills straight to its own process spec, which names the script that implements it and the script that registers its schedule.'].join(NL)
+      '  Each job explodes at Level 3, which draws the data stores that job reads and writes and the shared modules it calls. 1.1 decomposes into three processes; every other job is one process there, and its bubble opens the job\'s process spec, which names the script that implements it and the script that registers its schedule.'].join(NL)
   });
 }
 
@@ -1026,7 +1088,8 @@ function level3YieldCurvesRender() {
 
 // ── Level 3: 1.1 Download FedInvest prices and calculate yields ────────────
 function level3IngestFedInvest() {
-  const S = a => V('knowledge/1.1_Download_FedInvest_Prices.md' + (a ? '#' + a : ''));
+  const J = ingestJob('1.1');
+  const S = a => V('knowledge/' + J.file + (a ? '#' + a : ''));
   const procs = [
     { id: '1.1.1', name: ['Determine', 'settlement date'], href: S('determine-settlement-date'), out: { '1.1.3': ['settlement date'] } },
     { id: '1.1.2', name: ['Select prices', 'and add TIPS', 'reference data'], href: S('select-prices-and-add-tips-reference-data'), out: { '1.1.3': ['TIPS prices', 'Treasury prices'] } },
@@ -1035,15 +1098,15 @@ function level3IngestFedInvest() {
   const PR = 60, SW = 215, W = 1100, H = 660;
   const px = { '1.1.1': 380, '1.1.2': 380, '1.1.3': 700 };
   const py = { '1.1.1': 190, '1.1.2': 460, '1.1.3': 325 };
-  const SM = sharedModules('ingest-fedinvest');
+  const SM = sharedModules(ingestSharedKey(J));
   const OBS = [...procs.map(q => ({ x: px[q.id], y: py[q.id], r: PR })), ...SM.obstacles];
   const LBL = [];
   const [vx, vy, vw, vh] = SM.viewBox(W, H);
-  const P = [`<svg viewBox="${vx} ${vy} ${vw} ${vh}" role="img" aria-label="Level 3: 1.1 Download FedInvest prices and calculate yields, three processes from the FedInvest price list to FedInvest prices (S1), plus the shared modules its processes call.">`, marker()];
+  const P = [`<svg viewBox="${vx} ${vy} ${vw} ${vh}" role="img" aria-label="Level 3: ${J.id} ${J.title}, three processes from the FedInvest price list to FedInvest prices (S1), plus the shared modules its processes call.">`, marker()];
   // The price list enters from the page edge at each process that reads it.
   ['1.1.1', '1.1.2'].forEach(id => {
     P.push(flow(8, py[id], px[id] - PR - 3, py[id], { obstacles: OBS.filter(o => o.y !== py[id]) }));
-    P.push(labelAt(12, py[id] - 12, 'FedInvest daily price list'));
+    P.push(labelAt(12, py[id] - 12, J.data));
   });
   // Bond holidays above 1.1.1 and TIPS reference data (S2) below 1.1.2 are read; FedInvest prices (S1), right of 1.1.3, is written.
   const hol = { x: px['1.1.1'] - SW / 2, y: 50 }, ref = { x: px['1.1.2'] - SW / 2, y: 610 }, s1 = { x: 860, y: py['1.1.3'] };
@@ -1051,22 +1114,107 @@ function level3IngestFedInvest() {
   P.push(flow(px['1.1.2'], ref.y - 25, px['1.1.2'], py['1.1.2'] + PR + 3));
   P.push(flow(px['1.1.3'] + PR + 3, s1.y, s1.x - 5, s1.y));
   P.push(internalFlows(procs, px, py, PR, OBS, LBL));
-  P.push(storeShape(hol.x, hol.y, SW, DS('s16'), 'Bond holidays'));
-  P.push(storeShape(ref.x, ref.y, SW, DS('s2'), 'TIPS reference data'));
-  P.push(storeShape(s1.x, s1.y, SW, DS('s1'), 'FedInvest prices'));
+  P.push(ingestStore('hol', hol.x, hol.y, SW));
+  P.push(ingestStore('tipsref', ref.x, ref.y, SW));
+  P.push(ingestStore('fedinv', s1.x, s1.y, SW));
   SM.flows(P, px, py, PR, OBS);
   procs.forEach(p => P.push(procShape(px[p.id], py[p.id], PR, p.href, p.id, p.name)));
   SM.shapes(P);
   P.push('</svg>');
 
   return page({
-    spec: S(), specLabel: '1.1 Download FedInvest prices and calculate yields',
-    title: '1.1 Download FedInvest prices and calculate yields — Level 3', h1: 'Level 3 &mdash; 1.1 Download FedInvest prices and calculate yields', maxWidth: vw,
+    spec: S(), specLabel: J.id + ' ' + J.title,
+    title: J.id + ' ' + J.title + ' — Level 3', h1: 'Level 3 &mdash; ' + J.id + ' ' + J.title, maxWidth: vw,
     up: 'DFD_LEVEL2_INGESTION.html', upLabel: 'Level 2 — 1 Acquire and derive reference data', svg: P.join(NL),
-    notes: ['  Every process here drills to its own section of <a href="' + S() + '">1.1 Download FedInvest prices and calculate yields</a>.',
+    notes: ['  Every process here drills to its own section of <a href="' + S() + '">' + J.id + ' ' + J.title + '</a>.',
       '  The flow entering from the edge is the FedInvest daily price list, drawn against its source on the <a href="DFD_LEVEL0.html">context diagram</a>. 1.1.1 reads the date it states, and 1.1.2 reads its rows.',
       '  On a Bond Holiday, or when the price list does not state prices for the run date, 1.1.1 produces no settlement date and FedInvest prices (S1) is not written.',
       SHARED_NOTE].join(NL)
+  });
+}
+
+// ── Level 3: one ingestion job that has no sub-processes (1.2 to 1.15) ───────
+function level3Ingest(job) {
+  const { PR, SW, EW, EH, PAIR, MR } = ING;
+  const L = ingestLayout(job), { cx, cy, LR, RX } = L;
+  const SM = sharedModules(ingestSharedKey(job));
+  const px = { [job.id]: cx }, py = { [job.id]: cy };
+  const OBS = [{ x: cx, y: cy, r: PR }, ...SM.obstacles];
+  const [vx, vy, vw, vh] = SM.viewBox(L.W, L.H);
+  const parts = [];
+  if (job.entities.length) parts.push(job.entities.length > 1 ? 'the external entities it reads' : 'the external entity it reads');
+  const storeNoun = new Set([...job.reads, ...job.writes]).size > 1 ? 'the data stores' : 'the data store';
+  parts.push(job.reads.length ? storeNoun + ' it reads and writes' : storeNoun + ' it writes');
+  if (job.modules) parts.push('the shared modules it calls');
+  const P = [`<svg viewBox="${vx} ${vy} ${vw} ${vh}" role="img" aria-label="Level 3: ${job.id} ${esc(job.title)}, one process with ${andList(parts)}.">`, marker()];
+  const segs = [], shapes = [{ id: 'the process', x: cx, y: cy, r: PR }], labels = [];
+  const arrow = (id, x1, y1, x2, y2, a, b) => { P.push(flow(x1, y1, x2, y2, { bows: [0] })); segs.push({ id, x1, y1, x2, y2, a, b }); };
+  const out = [];   // the shapes, drawn over the arrows
+
+  // Down the left: the external entities, then the data stores the job only reads.
+  L.left.forEach(it => {
+    const x1 = LR + 5, y1 = it.y, [x2, y2] = toCircle(x1, y1, cx, cy, PR);
+    if (it.kind === 'entity') {
+      const e = INGEST_ENTITIES[it.key], name = entityText(e);
+      shapes.push({ id: name, x: LR - EW, y: it.y - EH / 2, w: EW, h: EH });
+      arrow('the flow from ' + name, x1, y1, x2, y2, name, 'the process');
+      // The label sits above the start of a flow that descends to the process and below the start of one that rises to it.
+      const ly = y1 > cy ? y1 + 18 : y1 - 8;
+      P.push(labelAt(x1 + 6, ly, job.data));
+      labels.push({ id: job.data, x: x1 + 6, y: ly - 12, w: job.data.length * 6.4, h: 15 });
+      out.push(entityShape(LR - EW, it.y, EW, EH, e.href, e.name));
+    } else {
+      const [name, href] = INGEST_STORES[it.key], id = name + idSuffix(href);
+      shapes.push({ id, x: LR - SW, y: it.y - 20, w: SW, h: 40 });
+      arrow('the flow from ' + id, x1, y1, x2, y2, id, 'the process');
+      out.push(ingestStore(it.key, LR - SW, it.y, SW));
+    }
+  });
+
+  // Down the right: the data stores the job writes. A store it also reads takes a second arrow, the
+  // two set PAIR px either side of the line from the process to the store so both stay visible.
+  L.right.forEach(it => {
+    const [name, href] = INGEST_STORES[it.key], id = name + idSuffix(href), tx = RX - 5, ty = it.y;
+    shapes.push({ id, x: RX, y: it.y - 20, w: SW, h: 40 });
+    out.push(ingestStore(it.key, RX, it.y, SW));
+    if (!it.also) {
+      const [x1, y1] = fromCircle(cx, cy, PR, tx, ty);
+      arrow('the flow to ' + id, x1, y1, tx, ty, 'the process', id);
+      return;
+    }
+    const L0 = Math.hypot(tx - cx, ty - cy), ux = (tx - cx) / L0, uy = (ty - cy) / L0, nx = -uy, ny = ux;
+    const edge = s => [cx + nx * s + ux * Math.sqrt(PR * PR - s * s), cy + ny * s + uy * Math.sqrt(PR * PR - s * s)];
+    const [wx, wy] = edge(-PAIR), [rx, ry] = edge(PAIR);
+    arrow('the flow to ' + id, wx, wy, tx - nx * PAIR, ty - ny * PAIR, 'the process', id);
+    arrow('the flow from ' + id, tx + nx * PAIR, ty + ny * PAIR, rx, ry, id, 'the process');
+  });
+
+  // The shared modules, on straight arrows from the module toward the process that calls it.
+  (job.modules || []).forEach(m => {
+    const [mx, my] = L.at[m], [x1, y1] = fromCircle(mx, my, MR, cx, cy), [x2, y2] = toCircle(x1, y1, cx, cy, PR);
+    shapes.push({ id: m.toUpperCase(), x: mx, y: my, r: MR });
+    segs.push({ id: 'the flow from ' + m.toUpperCase(), x1, y1, x2, y2, a: m.toUpperCase(), b: 'the process' });
+  });
+  assertIngestClear(job, segs, shapes, labels);
+
+  SM.flows(P, px, py, PR, OBS);
+  out.forEach(s => P.push(s));
+  P.push(procShape(cx, cy, PR, V('knowledge/' + job.file), job.id, job.name));
+  SM.shapes(P);
+  P.push('</svg>');
+
+  const both = job.writes.filter(k => job.reads.includes(k));
+  const sources = job.entities.reduce((s, k) => s + (INGEST_ENTITIES[k].sources || 1), 0);
+  const notes = ['  The process drills to <a href="' + V('knowledge/' + job.file) + '">' + job.id + ' ' + esc(job.title) + '</a>, the process spec.'];
+  if (job.entities.length) notes.push('  The flow entering from the left is ' + termLink(job.data) + ', drawn against ' + ({ 1: 'its source', 2: 'its two sources', 6: 'its six sources' }[sources]) + ' on the <a href="DFD_LEVEL0.html">context diagram</a>.');
+  both.forEach(k => notes.push('  ' + storeRef(k) + ' has an arrow each way: the run merges what it fetches into what the store already holds.'));
+  if (job.stops) notes.push('  ' + job.stops.replace(/\{(\w+)\}/g, (_, k) => storeRef(k)));
+  if (job.modules) notes.push(SHARED_NOTE);
+  return page({
+    spec: V('knowledge/' + job.file), specLabel: job.id + ' ' + job.title,
+    title: job.id + ' ' + job.title + ' — Level 3', h1: 'Level 3 &mdash; ' + job.id + ' ' + esc(job.title), maxWidth: vw,
+    up: 'DFD_LEVEL2_INGESTION.html', upLabel: 'Level 2 — 1 Acquire and derive reference data', svg: P.join(NL),
+    notes: notes.join(NL)
   });
 }
 
@@ -1792,7 +1940,8 @@ function level2SeasonalAdjustments() {
 const outputs = [
   ['knowledge/DFD_LEVEL1.html', level1()],
   ['knowledge/DFD_LEVEL2_INGESTION.html', level2Ingestion()],
-  ['knowledge/DFD_LEVEL3_INGEST_FEDINVEST.html', level3IngestFedInvest()],
+  ['knowledge/' + ingestPageName(ingestJob('1.1')), level3IngestFedInvest()],
+  ...INGEST_JOBS.filter(j => j.id !== '1.1').map(j => ['knowledge/' + ingestPageName(j), level3Ingest(j)]),
   ['knowledge/DFD_LEVEL2_YIELDCURVES.html', level2YieldCurves()],
   ['knowledge/DFD_LEVEL3_YC_LOAD.html', level3YieldCurvesLoad()],
   ['knowledge/DFD_LEVEL3_YC_RENDER.html', level3YieldCurvesRender()],
