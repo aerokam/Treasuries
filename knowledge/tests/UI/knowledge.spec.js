@@ -26,6 +26,50 @@ test.describe('Knowledge Map and Viewer', () => {
     await expect(page.locator('h1')).toContainText('3.3 Adjust for other effects');
   });
 
+  test('drills from an ingestion job to its Level 3 page, its process spec, and back up', async ({ page }) => {
+    await page.goto('/knowledge/DFD_LEVEL2_INGESTION.html');
+
+    // 1.3 Calculate yield curve data sets: the bubble opens the job's Level 3 page, not the spec.
+    await page.locator('a.process[href="DFD_LEVEL3_INGEST_YIELDCURVEDATA.html"]').click();
+    await expect(page).toHaveURL(/DFD_LEVEL3_INGEST_YIELDCURVEDATA(\.html)?$/, { timeout: 10000 });
+    await expect(page.locator('h1')).toContainText('1.3 Calculate yield curve data sets');
+
+    // The one process there opens the process spec, and the spec's up link returns to this Level 3 page.
+    await page.locator('a.process[href*="1.3_Calculate_Yield_Curve_Data_Sets.md"]').click();
+    await expect(page).toHaveURL(/1\.3_Calculate_Yield_Curve_Data_Sets\.md/, { timeout: 10000 });
+    await expect(page.locator('h1')).toContainText('1.3 Calculate yield curve data sets');
+    const upLink = page.locator('#up-link');
+    await expect(upLink).toContainText('Up to Level 3 DFD', { timeout: 15000 });
+    await upLink.click();
+    await expect(page).toHaveURL(/DFD_LEVEL3_INGEST_YIELDCURVEDATA(\.html)?$/, { timeout: 10000 });
+
+    // The Level 3 header returns to Level 2.
+    await page.locator('.nav-header a', { hasText: 'Level 2' }).click();
+    await expect(page).toHaveURL(/DFD_LEVEL2_INGESTION(\.html)?$/, { timeout: 10000 });
+    await expect(page.locator('h1')).toContainText('1 Acquire and derive reference data');
+  });
+
+  test('every ingestion job has a Level 3 page that opens its spec and is the page its spec points up to', async ({ page, request }) => {
+    await page.goto('/knowledge/DFD_LEVEL2_INGESTION.html');
+    const hrefs = await page.locator('a.process').evaluateAll(els => els.map(a => a.getAttribute('href')));
+    expect(hrefs).toHaveLength(15);
+
+    for (const href of hrefs) {
+      expect(href, 'a job bubble opens its Level 3 page').toMatch(/^DFD_LEVEL3_INGEST_[A-Z]+\.html$/);
+      const diagram = await request.get('/knowledge/' + href);
+      expect(diagram.ok(), href).toBe(true);
+      const html = await diagram.text();
+      expect(html, href + ' returns to Level 2').toContain('href="DFD_LEVEL2_INGESTION.html"');
+      const spec = /<a class="process" href="viewer\.html#\/md\/knowledge\/(1\.\d+_[A-Za-z_]+\.md)/.exec(html);
+      expect(spec, href + ' has a process that opens a process spec').not.toBeNull();
+
+      const md = await request.get('/knowledge/' + spec[1]);
+      expect(md.ok(), spec[1]).toBe(true);
+      const specifies = (await md.text()).split('\n').find(l => l.startsWith('**Specifies:**'));
+      expect(specifies, spec[1] + ' points up to ' + href).toContain('(/knowledge/' + href.replace('.html', '') + ')');
+    }
+  });
+
   test('reaches the parent spec from a diagram header', async ({ page }) => {
     await page.goto('/knowledge/DFD_LEVEL3_YC_LOAD.html');
     await expect(page.locator('h1')).toContainText('3.1');
