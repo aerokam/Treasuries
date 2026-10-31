@@ -59,7 +59,7 @@ async function marketQuotesWithTodayDownloadDate() {
   const now = new Date();
   const mo = String(now.getMonth() + 1).padStart(2, '0');
   const dy = String(now.getDate()).padStart(2, '0');
-  return raw.replace(/^[^\n]*/, `${now.getFullYear()}-${mo}-${dy} 12:00 EDT`);
+  return raw.replace(/^[^\n]*/, `${now.getFullYear()}-${mo}-${dy} 12:00`);
 }
 
 // Holdings CSV for rebalance tests (Format 3: cusip,qty) — single canonical copy in data/

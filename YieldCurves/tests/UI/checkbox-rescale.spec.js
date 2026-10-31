@@ -34,7 +34,7 @@ const HOLIDAYS_CSV = '"Wednesday, January 1, 2025",New Year\'s Day\n';
 // Market quotes (S7): the Download Date line first, then the header. The quote settles T+1 from the
 // Download Date (2026-03-26), and both quoted sides are priced to that date.
 const MARKET_QUOTES_CSV = [
-  '2026-03-25 08:27 EDT',
+  '2026-03-25 08:27',
   'type,cusip,maturity,coupon,askPrice,bidPrice,adjAskPrice,adjBidPrice',
   'Treasury,912797TB3,2026-06-26,0,99.06,99.04,,',
   'Treasury,91282CBT7,2028-03-25,0.0425,100,99.9,,',

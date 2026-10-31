@@ -2,12 +2,11 @@
 // knowledge/DATA_DICTIONARY.md#s7. Only the columns S7 states are kept; every other column, and
 // the quantity quoted beside each price, is dropped here and the raw file is never uploaded.
 //
-// The raw download's column names and its download-date line are in quoteSource.local.js, which
-// is not in the repository.
+// The raw download's column names are in quoteSource.local.js, which is not in the repository.
 //
 // Spec: knowledge/1.2_Download_Market_Quotes.md
 import { parseCsv } from '../../shared/src/csv.js';
-import { EXPORT_COLUMNS as C, downloadStamp } from './quoteSource.local.js';
+import { EXPORT_COLUMNS as C } from './quoteSource.local.js';
 
 const PRODUCTS = { tips: 'TIPS', treasury: 'Treasury' };
 
@@ -28,10 +27,20 @@ function isoMaturity(s) {
 
 const num = (v, digits) => (Number.isFinite(v) ? String(+v.toFixed(digits)) : '');
 
-// Returns { text, stamp, tipsCount, treasuryCount }, or throws when the download has no date line.
-export function marketQuotesFromExport(raw) {
-  const stamp = downloadStamp(raw);
-  if (!stamp) throw new Error('download has no date line, or its date line states no time zone');
+// The instant `now` as "YYYY-MM-DD HH:MM" on the Eastern clock. The zone is named here, so the
+// result does not depend on the time zone of the machine the run is on.
+export function easternStamp(now = new Date()) {
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/New_York', hourCycle: 'h23',
+    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
+  }).formatToParts(now).map(x => [x.type, x.value]));
+  return `${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute}`;
+}
+
+// Returns { text, stamp, tipsCount, treasuryCount }. The stamp is the time of this run, on the
+// Eastern clock; the download's own date line is not read.
+export function marketQuotesFromExport(raw, now = new Date()) {
+  const stamp = easternStamp(now);
 
   const out = [];
   const seen = new Set();

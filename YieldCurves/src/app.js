@@ -69,9 +69,9 @@ let rawNominalsData = null;
 let rawRefCpiData = null;
 let holidaySet = new Set();
 let brokerPrices = null;
-let brokerDownloadDate = null;    // Download Date of Market quotes (S7), 'YYYY-MM-DD HH:MM ZONE'
+let brokerDownloadDate = null;    // Download Date of Market quotes (S7), 'YYYY-MM-DD HH:MM'
 let marketNominalsData = null;  // processed bond objects from Market quotes (S7)
-let marketNominalsDate = null;  // Download Date of Market quotes (S7), 'YYYY-MM-DD HH:MM ZONE'
+let marketNominalsDate = null;  // Download Date of Market quotes (S7), 'YYYY-MM-DD HH:MM'
 let gswTipsCurve = null;          // { date, beta0..beta3, tau1, tau2 } — GSW fitted TIPS curve, R2 (weekly)
 let nominalsShowStrips = false;
 // Starts false/hidden -- the checkbox and this flag only turn on together, at load, when an
@@ -107,7 +107,7 @@ window._currentBonds = [];
 let tipsTableFed = null, tipsTableBroker = null;
 
 // --- Helpers ---
-// Parse the Download Date "YYYY-MM-DD HH:MM ZONE" → Date (date part only)
+// Parse the Download Date "YYYY-MM-DD HH:MM" → Date (date part only)
 function parseDownloadDateStr(s) {
   return localDate(downloadDateIso(s));
 }
@@ -155,14 +155,14 @@ function ttmLabel(ms) {
   return `${Math.round(days / 365.25)}y`;
 }
 
-// The Download Date "YYYY-MM-DD HH:MM ZONE" shown as M/D h:mm AM/PM ZONE, in the zone it states.
+// The Download Date "YYYY-MM-DD HH:MM" is on the Eastern clock; show it without the year, as
+// M/D h:mm AM/PM.
 function fmtBrokerTime(s) {
   if (!s) return s;
-  const [datePart, timePart, zone] = s.split(' ');
+  const [datePart, timePart] = s.split(' ');
   const [, mo, dy] = datePart.split('-').map(Number);
   const [hh, mm] = timePart.split(':').map(Number);
-  const h12 = hh % 12 || 12;
-  return `${mo}/${dy} ${h12}:${String(mm).padStart(2, '0')} ${hh >= 12 ? 'PM' : 'AM'} ${zone}`;
+  return `${mo}/${dy} ${hh % 12 || 12}:${String(mm).padStart(2, '0')} ${hh >= 12 ? 'PM' : 'AM'}`;
 }
 // Parse a native date input's ISO value (YYYY-MM-DD) → Date (or null if empty/invalid)
 function parseIsoInput(iso) {
@@ -695,7 +695,7 @@ function processAndRenderNominals() {
     const treaFedSettle = rawNominalsData?.[0]?.settlementDate;
     document.getElementById('treaFedMeta').textContent = showFed && treaFedSettle ? isoToMDY(treaFedSettle) : '';
     if (showMq && marketNominalsDate) {
-      document.getElementById('treaMktMeta').textContent = `${fmtBrokerTime(marketNominalsDate)} · settle ${isoToMDY(mktSettle)} (T+1)`;
+      document.getElementById('treaMktMeta').textContent = `${fmtBrokerTime(marketNominalsDate)} ET · settle ${isoToMDY(mktSettle)} (T+1)`;
     } else {
       document.getElementById('treaMktMeta').textContent = '';
     }
@@ -1111,7 +1111,7 @@ function processAndRenderTips() {
 
     document.getElementById('tipsFedMeta').textContent = showFed && fedSettleStr ? isoToMDY(fedSettleStr) : '';
     if (showBroker && brokerDownloadDate) {
-      document.getElementById('tipsMktMeta').textContent = `${fmtBrokerTime(brokerDownloadDate)} · settle ${isoToMDY(marketSettleIso())} (T+1)`;
+      document.getElementById('tipsMktMeta').textContent = `${fmtBrokerTime(brokerDownloadDate)} ET · settle ${isoToMDY(marketSettleIso())} (T+1)`;
     } else {
       document.getElementById('tipsMktMeta').textContent = '';
     }
@@ -1562,7 +1562,7 @@ function processAndRenderBei() {
     renderBeiChart(filtered, spotBeiGrid);
 
     if (brokerDownloadDate) {
-      document.getElementById('tipsMktMeta').textContent = `${fmtBrokerTime(brokerDownloadDate)} · settle ${isoToMDY(marketSettleIso())} (T+1)`;
+      document.getElementById('tipsMktMeta').textContent = `${fmtBrokerTime(brokerDownloadDate)} ET · settle ${isoToMDY(marketSettleIso())} (T+1)`;
     } else {
       document.getElementById('tipsMktMeta').textContent = '';
     }
