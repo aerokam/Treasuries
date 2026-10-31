@@ -10,7 +10,7 @@ const near = (a, b, tol = 1e-9) => Math.abs(a - b) < tol;
 
 const HEADER = 'type,cusip,maturity,coupon,askPrice,bidPrice,adjAskPrice,adjBidPrice';
 const FILE = [
-  '2026-03-25 08:27',
+  '2026-03-25 08:27 EDT',
   HEADER,
   'Treasury,912797TB3,2026-06-26,0,99.06,99.04,,',
   'Treasury,91282CBT7,2028-03-25,0.0425,100,99.9,,',
@@ -23,12 +23,12 @@ const FILE = [
 ].join('\n');
 
 // ── Download Date ──
-ok(parseDownloadDate(FILE) === '2026-03-25 08:27', 'the Download Date is the first line');
+ok(parseDownloadDate(FILE) === '2026-03-25 08:27 EDT', 'the Download Date is the first line');
 ok(downloadDateIso(parseDownloadDate(FILE)) === '2026-03-25', 'the date part of the Download Date');
 ok(parseDownloadDate('type,cusip\nTIPS,1') === null, 'a first line that is not a stamp gives no Download Date');
 ok(parseDownloadDate('') === null, 'an empty file gives no Download Date');
 ok(downloadDateIso(null) === null, 'no stamp gives no date');
-ok(parseDownloadDate('﻿2026-03-25 08:27\n' + HEADER) === '2026-03-25 08:27', 'a leading byte order mark is ignored');
+ok(parseDownloadDate('﻿2026-03-25 08:27 EDT\n' + HEADER) === '2026-03-25 08:27 EDT', 'a leading byte order mark is ignored');
 
 // ── TIPS Quotes ──
 {

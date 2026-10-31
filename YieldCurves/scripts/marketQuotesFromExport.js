@@ -31,7 +31,7 @@ const num = (v, digits) => (Number.isFinite(v) ? String(+v.toFixed(digits)) : ''
 // Returns { text, stamp, tipsCount, treasuryCount }, or throws when the download has no date line.
 export function marketQuotesFromExport(raw) {
   const stamp = downloadStamp(raw);
-  if (!stamp) throw new Error('download has no date line');
+  if (!stamp) throw new Error('download has no date line, or its date line states no time zone');
 
   const out = [];
   const seen = new Set();

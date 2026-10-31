@@ -12,8 +12,8 @@ import { yieldFromPrice } from './bond-math.js';
 import { localDate } from './settlement.js';
 import { classifyByCusipRoot } from './treasury-cusip.js';
 
-// The file's first line is the Download Date alone, 'YYYY-MM-DD HH:MM' on a 24-hour clock; the
-// header is the second line and each line after it is one quote.
+// The file's first line is the Download Date alone, 'YYYY-MM-DD HH:MM ZONE' on a 24-hour clock in
+// the stated zone (e.g. EDT); the header is the second line and each line after it is one quote.
 function splitStore(text) {
   const lines = (text || '').replace(/^\uFEFF/, '').split(/\r?\n/);
   const first = lines.findIndex(l => l.trim());
@@ -21,15 +21,15 @@ function splitStore(text) {
   return { stamp: lines[first].trim(), body: lines.slice(first + 1).join('\n') };
 }
 
-// The Download Date line -> 'YYYY-MM-DD HH:MM', or null when the first line is not a stamp.
+// The Download Date line -> 'YYYY-MM-DD HH:MM ZONE', or null when the first line is not a stamp.
 export function parseDownloadDate(text) {
   const { stamp } = splitStore(text);
-  return /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(stamp || '') ? stamp : null;
+  return /^\d{4}-\d{2}-\d{2} \d{2}:\d{2} [A-Z]{3}$/.test(stamp || '') ? stamp : null;
 }
 
-// 'YYYY-MM-DD HH:MM' (the Download Date) -> 'YYYY-MM-DD' (date part only), or null.
+// 'YYYY-MM-DD HH:MM ZONE' (the Download Date) -> 'YYYY-MM-DD' (date part only), or null.
 export function downloadDateIso(stamp) {
-  const m = /^(\d{4}-\d{2}-\d{2})(?: \d{2}:\d{2})?$/.exec(stamp || '');
+  const m = /^(\d{4}-\d{2}-\d{2})(?: \d{2}:\d{2} [A-Z]{3})?$/.exec(stamp || '');
   return m ? m[1] : null;
 }
 

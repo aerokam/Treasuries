@@ -169,7 +169,7 @@
 - <a id="s6"></a>**Yield history (S6)**, `history.json` = `{ @Symbol + { Timestamp + Yield } }`
   *R2 key `Treasuries/yields-history/history.json` ([View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/yields-history/history.json)). One JSON object keyed by symbol, each value an array of `{ x, y }` points: `x` is the timestamp as `YYYYMMDDHHMMSS`, `y` the [Yield](#yield) as a number in percent. Each point is a closing value at daily resolution, at weekly resolution before the daily points begin and at quarterly resolution before the weekly points begin; [1.7 Update yield history](./1.7_Update_Yield_History.md) specifies the dating.*
 - <a id="s7"></a>**Market quotes (S7)**, `MarketQuotes.csv` = `Download_Date + { type + @cusip + maturity + coupon + askPrice + ( bidPrice ) + ( adjAskPrice ) + ( adjBidPrice ) }`
-  *R2 key `Treasuries/MarketQuotes.csv` ([View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/MarketQuotes.csv)). The first line holds the [Download Date](#download-date) alone, `YYYY-MM-DD HH:MM` on a 24-hour clock, the second line is the header, and each line after it is one security: the Treasury and TIPS rows of [Market quotes source (E6)](#e6) in one file, told apart by `type`. A price that is not quoted is a blank cell.*
+  *R2 key `Treasuries/MarketQuotes.csv` ([View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/MarketQuotes.csv)). The first line holds the [Download Date](#download-date) alone, `YYYY-MM-DD HH:MM ZONE` on a 24-hour clock in the stated time zone, the second line is the header, and each line after it is one security: the Treasury and TIPS rows of [Market quotes source (E6)](#e6) in one file, told apart by `type`. A price that is not quoted is a blank cell.*
 
   | Column | Defined term |
   |---|---|
@@ -334,7 +334,7 @@
 
 <a id="download-date"></a>
 ### Download Date
-`Download_Date` = *The date and time [Market quotes source (E6)](#e6) was downloaded, on the clock of the machine that downloaded it, stated on the first line of [Market quotes (S7)](#s7) as `YYYY-MM-DD HH:MM`. It is the trade date from which the [Settlement Date](#settlement-date) of the quotes in the file is counted.*
+`Download_Date` = *The date and time [Market quotes source (E6)](#e6) was downloaded, in the time zone [Market quotes source (E6)](#e6) states, stated on the first line of [Market quotes (S7)](#s7) as `YYYY-MM-DD HH:MM ZONE`, e.g. `2026-10-30 17:05 EDT`. It is the trade date from which the [Settlement Date](#settlement-date) of the quotes in the file is counted.*
 
 <a id="bond-holiday"></a>
 ### Bond Holiday

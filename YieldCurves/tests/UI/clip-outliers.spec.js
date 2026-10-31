@@ -47,7 +47,7 @@ function makeFedOutlierCsv() {
 // Market quotes states the coupon as a decimal and prices at par, so each yield equals its coupon.
 // Type is classified from the CUSIP root (912828/91282C = Note, 912810 = Bond, 912797 = Bill).
 function makeMarketQuotesCsv() {
-  const rows = ['2026-03-25 08:27', 'type,cusip,maturity,coupon,askPrice,bidPrice,adjAskPrice,adjBidPrice'];
+  const rows = ['2026-03-25 08:27 EDT', 'type,cusip,maturity,coupon,askPrice,bidPrice,adjAskPrice,adjBidPrice'];
   for (let i = 0; i < 30; i++) {
     const coupon = (0.0400 + i * 0.0002).toFixed(5);
     const cusip  = `912828${String(i).padStart(3, '0')}`;
@@ -430,7 +430,7 @@ function makeBillsOutlierCsv() {
   return rows.join('\n');
 }
 
-const MARKET_QUOTES_EMPTY_CSV = '2026-03-25 08:27\ntype,cusip,maturity,coupon,askPrice,bidPrice,adjAskPrice,adjBidPrice';
+const MARKET_QUOTES_EMPTY_CSV = '2026-03-25 08:27 EDT\ntype,cusip,maturity,coupon,askPrice,bidPrice,adjAskPrice,adjBidPrice';
 
 const BILLS_OUTLIER_CSV = makeBillsOutlierCsv();
 

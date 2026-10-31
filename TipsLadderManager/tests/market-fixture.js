@@ -12,7 +12,7 @@ export function marketQuotesWithTodayDownloadDate(raw) {
   const now = new Date();
   const mo = String(now.getMonth() + 1).padStart(2, '0');
   const dy = String(now.getDate()).padStart(2, '0');
-  return raw.replace(/^[^\n]*/, `${now.getFullYear()}-${mo}-${dy} 12:00`);
+  return raw.replace(/^[^\n]*/, `${now.getFullYear()}-${mo}-${dy} 12:00 EDT`);
 }
 
 // FedInvest's fixture carries its own settlement date on line 1; keep it in step with today too,
