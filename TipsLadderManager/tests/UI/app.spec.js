@@ -2548,9 +2548,17 @@ test('Cash Flow Calendar: Before/After toggle appears after rebalance, switches 
   await expect(toggle).toBeVisible();
   const beforeBtn = page.locator('#cash-flow-before-btn');
   const afterBtn = page.locator('#cash-flow-after-btn');
-  await expect(beforeBtn).toHaveText('Before Static');
-  await expect(afterBtn).toHaveText('After Static');
-  await expect(page.locator('#cash-flow-simulated-btn')).toHaveText('After Simulated');
+  await expect(beforeBtn).toHaveText('Static Before');
+  await expect(afterBtn).toHaveText('Static After');
+  await expect(page.locator('#cash-flow-simulated-btn')).toHaveText('Simulated After');
+  // Every tab has a hover that explains it, in terms a user knows: Static is explained and the passes of the ladder are not named.
+  for (const id of ['before', 'after', 'simulated']) {
+    const title = await page.locator('#cash-flow-' + id + '-btn').getAttribute('title');
+    expect(title.length).toBeGreaterThan(40);
+    expect(title).not.toMatch(/Pass [12]/);
+  }
+  await expect(beforeBtn).toHaveAttribute('title', /Static means no Excess TIPS is sold before it matures/);
+  await expect(afterBtn).toHaveAttribute('title', /Static means no Excess TIPS is sold before it matures/);
   await expect(beforeBtn).toHaveClass(/active/);
   await expect(afterBtn).not.toHaveClass(/active/);
 
@@ -2643,6 +2651,8 @@ test('Cash Flow Calendar: Simulated tab sells the Excess TIPS down as the Simula
   await expect(page.locator('#cash-flow-static-btn')).toHaveText('Static');
   await expect(page.locator('#cash-flow-simulated-btn')).toHaveText('Simulated');
   await expect(page.locator('#cash-flow-simulated-btn')).toHaveAttribute('title', /Simulated Outstanding TIPS/);
+  await expect(page.locator('#cash-flow-simulated-btn')).not.toHaveAttribute('title', /Pass [12]/);
+  await expect(page.locator('#cash-flow-static-btn')).toHaveAttribute('title', /Static means no Excess TIPS is sold before it matures/);
   await expect(page.locator('#cash-flow-content th', { hasText: 'Net Cash' })).toHaveCount(0);
 
   const staticTotals = await page.locator('#cash-flow-content tr.cf-year-header td:last-child').allTextContents();
@@ -2680,7 +2690,7 @@ async function openSimulatedRebalance(page) {
   return rows;
 }
 
-test('Cash Flow Calendar: After Simulated after a rebalance, the event popup of a Simulated Outstanding TIPS omits the Ref CPI rows', async ({ page }) => {
+test('Cash Flow Calendar: Simulated After after a rebalance, the event popup of a Simulated Outstanding TIPS omits the Ref CPI rows', async ({ page }) => {
   test.setTimeout(20_000);
   const rows = await openSimulatedRebalance(page);
   const principal = rows.find(r => r[1].startsWith('Simulated Outstanding') && r[2] === 'principal');
@@ -2691,7 +2701,7 @@ test('Cash Flow Calendar: After Simulated after a rebalance, the event popup of 
   expect(popupText).not.toContain('Dated date Ref CPI');
 });
 
-test('Cash Flow Calendar: After Simulated after a rebalance, the event popup of a Net Cash shows the Excess TIPS sold', async ({ page }) => {
+test('Cash Flow Calendar: Simulated After after a rebalance, the event popup of a Net Cash shows the Excess TIPS sold', async ({ page }) => {
   test.setTimeout(20_000);
   const rows = await openSimulatedRebalance(page);
   const netCash = rows.find(r => r[2] === 'net cash');

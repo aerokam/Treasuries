@@ -607,6 +607,10 @@ Displayed as **Amount**, and as **Real Amount** where a fuller header fits. The 
 ### Simulated Outstanding Future 10Y TIPS
 `Simulated_Outstanding_Future_10Y_TIPS` = *A [Synthetic TIPS](#synthetic-tips) of a [Gap Year](#gap-years) in [Pass 1](#pass-1), treated in [Pass 2](#pass-2) as outstanding in the year it is issued: the last trading day of January, 10 years before its maturity year. A TIPS maturing in January 2039, for example, is issued on the last trading day of January 2029. Its price, yield and coupon are those of the Synthetic TIPS from which it is converted in Pass 2. From its issue year it contributes its coupon to the [LMI](#lmi) of every earlier funded year: one coupon in the issue year, two in each later year. Buying it is modeled as a rebalance that sells enough [Excess TIPS](#excess-tips) to duration-match the Synthetic TIPS not yet converted, measured on its issue date. The [Net Cash](#net-cash) of that rebalance counts toward the funded year of the year it is delivered.*
 
+<a id="simulated-outstanding-tips"></a>
+### Simulated Outstanding TIPS
+`Simulated_Outstanding_TIPS` = *The [Simulated Outstanding Future 10Y TIPS](#simulated-outstanding-future-10y-tips) and the [Simulated Outstanding Future 30Y TIPS](#simulated-outstanding-future-30y-tips) together.*
+
 <a id="bracket-year"></a>
 ### Bracket Year
 `Bracket_Year` = *A maturity year holding TIPS dedicated to duration matching. The bracket years surround the [Gap Years](#gap-years) — lower bracket year, then the gap years, then the upper bracket year — which is where the name comes from.*
