@@ -120,6 +120,17 @@ function renderMath(el) {
 // depending on the file) gets the same link next to each one too: a diagram bubble drills
 // down to that heading directly, landing mid-document, so the nav-bar link alone would
 // need a scroll back to the top.
+// A repo-root-absolute path ("/knowledge/DFD_LEVEL2_INGESTION", written that way so it also
+// works as a bare filesystem path) is only right when the site is served at the domain root.
+// On a project site (/Treasuries/) it must be relative to this page, which lives at
+// <root>/knowledge/viewer.html. An extensionless last segment is a generated .html page.
+function repoPathToPageHref(href) {
+    if (!href.startsWith('/') || href.startsWith('//')) return href;
+    const [, path, suffix] = href.match(/^([^?#]*)(.*)$/);
+    const lastSegment = path.split('/').pop();
+    return '../' + path.slice(1) + (lastSegment.includes('.') ? '' : '.html') + suffix;
+}
+
 function updateUpLink(contentEl) {
     const upLink = document.getElementById('up-link');
     const strongs = contentEl.querySelectorAll('p > strong');
@@ -138,9 +149,10 @@ function updateUpLink(contentEl) {
     const levelMatch = href.match(/DFD_LEVEL(\d)/);
     const label = levelMatch ? `↑ Up to Level ${levelMatch[1]} DFD` : '↑ Up to DFD';
     upLink.textContent = label;
-    upLink.setAttribute('href', href);
+    const pageHref = repoPathToPageHref(href);
+    upLink.setAttribute('href', pageHref);
     upLink.style.display = '';
-    addProcessUpLinks(contentEl, href, label);
+    addProcessUpLinks(contentEl, pageHref, label);
 }
 
 function addProcessUpLinks(contentEl, href, label) {
@@ -185,7 +197,7 @@ async function loadMarkdown() {
 
     // Guard: never render .html files — redirect to the actual page
     if (filePath.endsWith('.html')) {
-        window.location.replace('/' + filePath.replace(/^\/md\//, ''));
+        window.location.replace(repoPathToPageHref('/' + filePath.replace(/^\/md\//, '')));
         return;
     }
 
@@ -286,7 +298,11 @@ document.addEventListener('click', async (e) => {
     // 2.5 Absolute path to a non-markdown resource (a generated DFD diagram's .html,
     // linked without its extension so it also works as a bare filesystem path) — a real
     // page navigation, not a /md/ viewer route. Only a .md target belongs in the viewer.
-    if (hrefAttr.startsWith('/') && !hrefAttr.split(/[?#]/)[0].toLowerCase().endsWith('.md')) return;
+    if (hrefAttr.startsWith('/') && !hrefAttr.split(/[?#]/)[0].toLowerCase().endsWith('.md')) {
+        e.preventDefault(); e.stopPropagation();
+        window.location.href = repoPathToPageHref(hrefAttr);
+        return;
+    }
 
     // 3. Same-page anchor (not a cross-file /md/ path)
     if (hrefAttr.startsWith('#') && !hrefAttr.startsWith('#/md/')) {

@@ -42,6 +42,24 @@ test.describe('Knowledge Map and Viewer', () => {
     await expect(body).toContainText('Implemented by:');
   });
 
+  test('a process spec up link is relative to the viewer, so it works on a project site', async ({ page }) => {
+    await page.goto('/knowledge/viewer.html#/md/knowledge/1.1_Download_FedInvest_Prices.md');
+    const upLink = page.locator('#up-link');
+    await expect(upLink).toBeVisible({ timeout: 15000 });
+    await expect(upLink).toContainText('Up to Level 3 DFD');
+
+    // A root-absolute href would leave /Treasuries/ on a project site.
+    const raw = await upLink.getAttribute('href');
+    expect(raw.startsWith('/')).toBe(false);
+    const resolved = await upLink.evaluate(a => new URL(a.getAttribute('href'), location.href).pathname);
+    expect(resolved).toMatch(/\/knowledge\/DFD_LEVEL3_INGEST_FEDINVEST\.html$/);
+
+    await upLink.click();
+    // The local server may redirect the .html away; the page that loads is the diagram either way.
+    await expect(page).toHaveURL(/\/knowledge\/DFD_LEVEL3_INGEST_FEDINVEST(\.html)?$/, { timeout: 10000 });
+    await expect(page.locator('h1')).toContainText('1.1', { timeout: 10000 });
+  });
+
   test('toggles a CSV preview in the Data Dictionary', async ({ page }) => {
     await page.goto('/knowledge/viewer.html#/md/knowledge/DATA_DICTIONARY.md');
 
