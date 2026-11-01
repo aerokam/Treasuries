@@ -43,3 +43,27 @@ export function parseCsv(text, hasHeader = true) {
   }
   return result;
 }
+
+// Serializes a header row and data rows (arrays of cell values) to CSV text.
+// A cell containing a comma, a double quote or a line break is quoted, and a double quote inside it is doubled.
+// Rows are joined with CRLF, per RFC 4180.
+export function formatCsv(headerRow, rows) {
+  const cell = v => {
+    const s = v == null ? '' : String(v);
+    return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  return [headerRow, ...rows].map(r => r.map(cell).join(',')).join('\r\n') + '\r\n';
+}
+
+// Saves `csvText` as `filename` through the browser's download. A leading byte-order mark makes Excel read the file as UTF-8.
+export function downloadCsv(filename, csvText) {
+  const blob = new Blob(['﻿', csvText], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}

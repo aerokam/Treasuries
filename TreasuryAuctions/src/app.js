@@ -1,6 +1,7 @@
 // Treasury Auctions - app.js
 
 import { createDateRangeFilter } from '../../shared/src/date-range-filter.js';
+import { formatCsv, downloadCsv } from '../../shared/src/csv.js';
 
 const R2_CSV_URL = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/Auctions.csv';
 
@@ -228,6 +229,8 @@ let tentSortCol = null;
 let tentSortAsc = true;
 let tentFilters = {};
 let upcomingCount = 0;           // data rows in the Upcoming table (the message row is not counted)
+let upcomingHeaders = [];        // columns of the Upcoming table, as drawn
+let upcomingRows = [];           // rows of the Upcoming table, as drawn
 
 let orderedColumns = { all: [], bills: [], notesbonds: [], tips: [] };
 const DEFAULT_COL_WIDTHS = { issue_date: 82, maturity_date: 82 }; // wide enough to show a fully-typed mm/dd/yyyy filter
@@ -359,7 +362,7 @@ function getActiveRows() {
   const capped = activeView !== 'tips' && !anyRangeActive;
   const displayRows = capped ? rows.slice(0, ROW_LIMIT) : rows;
 
-  return { displayRows, totalRows, capped };
+  return { displayRows, totalRows, capped, rows };
 }
 
 // ── Sticky Header Helpers ───────────────────────────────────────────────────
@@ -521,6 +524,8 @@ function showUpcomingCount() {
 function renderUpcoming(csvText) {
   const tbody = document.getElementById('upcoming-tbody');
   const thead = document.getElementById('upcoming-thead');
+  upcomingHeaders = [];
+  upcomingRows = [];
   if (!csvText) {
     thead.innerHTML = '';
     tbody.innerHTML = '<tr><td style="padding:8px 10px;color:#64748b;font-style:italic;">No upcoming auction data available.</td></tr>';
@@ -558,6 +563,8 @@ function renderUpcoming(csvText) {
     r.inflation_protected = (isActuallyTips || isTentativeTips || isKnownTipsCusip) ? 'Yes' : 'No';
   });
 
+  upcomingHeaders = extendedHeaders;
+  upcomingRows = rows;
   thead.innerHTML = extendedHeaders.map(f => `<th>${fieldLabel(f)}</th>`).join('');
   let band = 0, lastDate = null;
   tbody.innerHTML = rows.map(r => {
@@ -654,10 +661,8 @@ function renderTentative() {
   renderTentBody();
 }
 
-function renderTentBody() {
-  const tbody = document.getElementById('tentative-tbody');
-
-  // Exclude FRNs, then apply column filters
+// Rows of the Tentative Schedule table: FRNs excluded, typed filters applied, sorted.
+function getTentRows() {
   let rows = tentativeAuctions.filter(a => a.floating_rate !== 'Yes');
   rows = rows.filter(r => rowMatchesFilters(r, tentFilters));
 
@@ -671,6 +676,12 @@ function renderTentBody() {
       return tentSortAsc ? cmp : -cmp;
     });
   }
+  return rows;
+}
+
+function renderTentBody() {
+  const tbody = document.getElementById('tentative-tbody');
+  const rows = getTentRows();
 
   // Band by auction_date change
   let band = 0, lastDate = null;
@@ -688,6 +699,31 @@ function renderTentBody() {
     rowHtml += '</tr>';
     return rowHtml;
   }).join('');
+}
+
+// ── Export CSV ────────────────────────────────────────────────────────────────
+// Writes the table of the active tab: its visible columns in their order, labelled and
+// formatted as the table shows them, and every row that passes the filters in the table's sort.
+function exportActiveTab() {
+  let name, fields, rows;
+  if (document.getElementById('tab-historical').classList.contains('active')) {
+    name = `historical-${activeView}`;
+    fields = (orderedColumns[activeView] || []).filter(f => viewCols[activeView].has(f));
+    rows = getActiveRows().rows;
+  } else if (document.getElementById('tab-upcoming').classList.contains('active')) {
+    name = 'upcoming';
+    fields = upcomingHeaders;
+    rows = upcomingRows;
+  } else {
+    name = 'tentative';
+    fields = TENT_FIELDS.map(f => f.key);
+    rows = getTentRows();
+  }
+  if (!fields.length) return;
+  const labels = name === 'tentative' ? TENT_FIELDS.map(f => f.label) : fields.map(fieldLabel);
+  const table = rows.map(r => fields.map(f => fmtVal(r[f], detectFmt(f))));
+  const today = new Date().toISOString().substring(0, 10);
+  downloadCsv(`auctions-${name}-${today}.csv`, formatCsv(labels, table));
 }
 
 // ── Load data ─────────────────────────────────────────────────────────────────
@@ -895,6 +931,9 @@ function init() {
 
   // Refresh
   document.getElementById('refreshBtn').addEventListener('click', loadData);
+
+  // Export CSV
+  document.getElementById('exportBtn').addEventListener('click', exportActiveTab);
 
   loadData();
 }
