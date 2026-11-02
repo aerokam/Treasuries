@@ -223,15 +223,15 @@
   | `beta0`–`beta3` | Svensson level, slope and two curvature coefficients, in percent |
   | `tau1`, `tau2` | Svensson decay parameters, in years |
 
-- <a id="s13"></a>**Yield curves (S13)**, `YieldCurves.csv` = `{ Source + Trade_Date + Settlement_Date } + { Term_y + ( Maturity + CUSIP + Type ) + Source + ( Coupon + Price ) + ( Ask + SA + SAO ) + ( Spot + Spot_SA ) }`
+- <a id="s13"></a>**Yield curves (S13)**, `YieldCurves.csv` = `{ Source + Trade_Date + Settlement_Date } + { ( Maturity ) + Term_y + CUSIP + Type + Source + ( Coupon + Price ) + ( Ask + SA + SAO ) + ( Spot + Spot_SA ) }`
   *R2 key `Treasuries/YieldCurves.csv` ([View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/YieldCurves.csv)). The first two lines each hold one `Source`, `FedInvest` then `Market`, with the [Trade Date](#trade-date) and the [Settlement Date](#settlement-date) of its prices, comma-separated. The Trade Date of `Market` is its [Download Date](#download-date), `YYYY-MM-DD HH:MM` on a 24-hour Eastern clock; the other two dates are `YYYY-MM-DD`. The third line is the header, then two kinds of row, general-purpose and spreadsheet-ready: the security rows in order of `Maturity`, `Coupon`, `CUSIP` and `Source`, so that the rows of one security are together, then the grid rows in order of `Type`, `Source` and `Term (y)`, so that each curve is together.*
   - *A **security row** is one priced security: every Bill, Note, Bond, STRIPS and TIPS, and on a `Market` row an Unclassified security, a [Market quotes (S7)](#s7) CUSIP root the [Treasury CUSIP Reference](./Treasury_CUSIP_Reference.md) does not recognise. A FedInvest-source row never has Type `Unclassified`: [1.1.2](./1.1_Download_FedInvest_Prices.md#select-prices-and-add-tips-reference-data) states its type directly.*
   - *A **grid row** is a fitted [Spot Yield Curve](#spot-yield-curves) evaluated at one term, with `CUSIP` = `Spot` and `Maturity` blank. There are three grid rows per term per `Source`, Type `Treasury`, `TIPS` and `BEI`. The terms are half-year steps from 0.5 across the union of the valid ranges of the three fits of that `Source`. A cell is blank where its fit is outside its valid range at that term or fails its sanity check (`shared/src/spot-curve.js#spotCurveFit`), and the rest of the row is kept.*
 
   | Column | Defined term |
   |---|---|
-  | `Term (y)` | [Term](#term): from the source's [Settlement Date](#settlement-date) to maturity on a security row, and the fitted curve's horizon from the same settlement date on a grid row |
   | `Maturity` | [Maturity Date](#maturity-date), `YYYY-MM-DD`; blank on a grid row |
+  | `Term (y)` | [Term](#term): from the source's [Settlement Date](#settlement-date) to maturity on a security row, and the fitted curve's horizon from the same settlement date on a grid row |
   | `CUSIP` | [CUSIP](#cusip) on a security row; `Spot` on a grid row |
   | `Type` | security row: `Bill`, `Note`, `Bond`, `STRIPS`, `TIPS` or `Unclassified`; grid row: `Treasury` (fitted nominal spot), `TIPS` (fitted TIPS spot) or `BEI` ([Breakeven Inflation](#breakeven-inflation) across terms) |
   | `Source` | `FedInvest` ([FedInvest prices (S1)](#s1)) or `Market` ([Market quotes (S7)](#s7)) |
