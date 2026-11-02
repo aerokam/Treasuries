@@ -47,7 +47,7 @@
 
 **S** &nbsp; [SA and SAO yields (S10)](#s10) &middot; [SA Factor](#sa-factor) &middot; [SA Price Factor](#sa-price-factor) &middot; [SA Yield](#sa-yield) &middot; [SA Yield Series](#sa-yield-series) &middot; [SA Yields](#sa-yields) &middot; [SACP](#sacp) &middot; [same year excess interest](#same-maturity-excess-interest) *(see Same-Maturity Excess Interest)* &middot; [Same-Maturity Excess Interest](#same-maturity-excess-interest) &middot; [SAO Blend Weight](#sao-blend-weight) &middot; [SAO Yield](#sao-yield) &middot; [SAO Yields](#sao-yields) &middot; [Schwab Asset Management holdings export (E10)](#e10) &middot; [Schwab Export](#schwab-export) &middot; [Seasonal Amplitude](#seasonal-amplitude) &middot; [Seasonal Factor Drift](#seasonal-factor-drift) &middot; [Settlement Date](#settlement-date) &middot; [simulated future 30y tips](#simulated-outstanding-future-30y-tips) *(see Simulated Outstanding Future 30Y TIPS)* &middot; [Simulated Outstanding Future 10Y TIPS](#simulated-outstanding-future-10y-tips) &middot; [Simulated Outstanding Future 30Y TIPS](#simulated-outstanding-future-30y-tips) &middot; [Source Data](#source-data) &middot; [Spot Yield](#spot-yield) &middot; [Spot Yield Curves](#spot-yield-curves) &middot; [Synthetic TIPS](#synthetic-tips)
 
-**T** &nbsp; [Tentative Auction Schedule](#tentative-auction-schedule) &middot; [Tentative auction schedule (S9)](#s9) &middot; [Term](#term) &middot; [TIPS](#tips) &middot; [TIPS Ladder](#tips-ladder) &middot; [TIPS Market Data](#tips-market-data) &middot; [TIPS Prices](#tips-prices) &middot; [TIPS Quotes](#tips-quotes) &middot; [TIPS Reference Data](#tips-reference-data) &middot; [TIPS reference data (S2)](#s2) &middot; [TIPS Reference Rows](#tips-reference-rows) &middot; [TIPS Yields](#tips-yields) &middot; [tipsladder.com Format](#tipsladdercom-format) &middot; [Total Cost](#total-cost) &middot; [Trade Ticket](#trade-ticket) &middot; [Treasury Bill](#treasury-bill) &middot; [Treasury Bond](#treasury-bond) &middot; [Treasury Note](#treasury-note) &middot; [Treasury Prices](#treasury-prices) &middot; [Treasury Quotes](#treasury-quotes) &middot; [Treasury Tentative Auction Schedule (E14)](#e14) &middot; [Treasury Yields](#treasury-yields) &middot; [TreasuryDirect (E15)](#e15) &middot; [TreasuryDirect SecIndex (E2)](#e2)
+**T** &nbsp; [Tentative Auction Schedule](#tentative-auction-schedule) &middot; [Tentative auction schedule (S9)](#s9) &middot; [Term](#term) &middot; [TIPS](#tips) &middot; [TIPS Ladder](#tips-ladder) &middot; [TIPS Market Data](#tips-market-data) &middot; [TIPS Prices](#tips-prices) &middot; [TIPS Quotes](#tips-quotes) &middot; [TIPS Reference Data](#tips-reference-data) &middot; [TIPS reference data (S2)](#s2) &middot; [TIPS Reference Rows](#tips-reference-rows) &middot; [TIPS Yields](#tips-yields) &middot; [tipsladder.com Format](#tipsladdercom-format) &middot; [Total Cost](#total-cost) &middot; [Trade Date](#trade-date) &middot; [Trade Ticket](#trade-ticket) &middot; [Treasury Bill](#treasury-bill) &middot; [Treasury Bond](#treasury-bond) &middot; [Treasury Note](#treasury-note) &middot; [Treasury Prices](#treasury-prices) &middot; [Treasury Quotes](#treasury-quotes) &middot; [Treasury Tentative Auction Schedule (E14)](#e14) &middot; [Treasury Yields](#treasury-yields) &middot; [TreasuryDirect (E15)](#e15) &middot; [TreasuryDirect SecIndex (E2)](#e2)
 
 **U** &nbsp; [Upcoming Auctions](#upcoming-auctions)
 
@@ -223,8 +223,8 @@
   | `beta0`–`beta3` | Svensson level, slope and two curvature coefficients, in percent |
   | `tau1`, `tau2` | Svensson decay parameters, in years |
 
-- <a id="s13"></a>**Yield curves (S13)**, `YieldCurves.csv` = `{ Term_y + ( Maturity + CUSIP + Type ) + Source + ( Ask + SA + SAO ) + ( Spot + Spot_SA ) }`
-  *R2 key `Treasuries/YieldCurves.csv` ([View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/YieldCurves.csv)). Header row first, then two kinds of row, general-purpose and spreadsheet-ready.*
+- <a id="s13"></a>**Yield curves (S13)**, `YieldCurves.csv` = `{ Source + Trade_Date + Settlement_Date } + { Term_y + ( Maturity + CUSIP + Type ) + Source + ( Coupon + Price ) + ( Ask + SA + SAO ) + ( Spot + Spot_SA ) }`
+  *R2 key `Treasuries/YieldCurves.csv` ([View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/YieldCurves.csv)). The first two lines each hold one `Source`, `FedInvest` then `Market`, with the [Trade Date](#trade-date) and the [Settlement Date](#settlement-date) of its prices, comma-separated. The Trade Date of `Market` is its [Download Date](#download-date), `YYYY-MM-DD HH:MM` on a 24-hour Eastern clock; the other two dates are `YYYY-MM-DD`. The third line is the header, then two kinds of row, general-purpose and spreadsheet-ready: the security rows in order of `Maturity`, `Coupon`, `CUSIP` and `Source`, so that the rows of one security are together, then the grid rows in order of `Type`, `Source` and `Term (y)`, so that each curve is together.*
   - *A **security row** is one priced security: every Bill, Note, Bond, STRIPS and TIPS, and on a `Market` row an Unclassified security, a [Market quotes (S7)](#s7) CUSIP root the [Treasury CUSIP Reference](./Treasury_CUSIP_Reference.md) does not recognise. A FedInvest-source row never has Type `Unclassified`: [1.1.2](./1.1_Download_FedInvest_Prices.md#select-prices-and-add-tips-reference-data) states its type directly.*
   - *A **grid row** is a fitted [Spot Yield Curve](#spot-yield-curves) evaluated at one term, with `CUSIP` = `Spot` and `Maturity` blank. There are three grid rows per term per `Source`, Type `Treasury`, `TIPS` and `BEI`. The terms are half-year steps from 0.5 across the union of the valid ranges of the three fits of that `Source`. A cell is blank where its fit is outside its valid range at that term or fails its sanity check (`shared/src/spot-curve.js#spotCurveFit`), and the rest of the row is kept.*
 
@@ -235,31 +235,34 @@
   | `CUSIP` | [CUSIP](#cusip) on a security row; `Spot` on a grid row |
   | `Type` | security row: `Bill`, `Note`, `Bond`, `STRIPS`, `TIPS` or `Unclassified`; grid row: `Treasury` (fitted nominal spot), `TIPS` (fitted TIPS spot) or `BEI` ([Breakeven Inflation](#breakeven-inflation) across terms) |
   | `Source` | `FedInvest` ([FedInvest prices (S1)](#s1)) or `Market` ([Market quotes (S7)](#s7)) |
+  | `Coupon` | [Coupon Rate](#coupon-rate), as a decimal; security rows only |
+  | `Price` | the [Price](#price) the row's `Ask` is calculated from, unadjusted; security rows only |
   | `Ask` | [Yield](#yield) calculated from the row's price at its source's settlement date, as a decimal. The price of a FedInvest-source row is the one [1.1.2](./1.1_Download_FedInvest_Prices.md#select-prices-and-add-tips-reference-data) selects from the Buy, Sell and End of Day prices of [FedInvest (E1)](#e1), not an ask |
   | `SA` | [SA Yield](#sa-yield), as a decimal; TIPS security rows only |
   | `SAO` | [SAO Yield](#sao-yield), as a decimal; TIPS security rows only |
   | `Spot` | [Spot Yield](#spot-yield) on a grid row, as a decimal on the semi-annual bond-equivalent basis of `Ask`: fitted to the nominal Treasuries for Type `Treasury`, to the TIPS quoted prices for Type `TIPS`, and for Type `BEI` the nominal spot less the TIPS quoted spot |
   | `Spot SA` | Spot Yield fitted to the TIPS seasonally adjusted prices for Type `TIPS`; for Type `BEI` the nominal spot less the TIPS SA spot ([3.5 §Across terms](../YieldCurves/knowledge/3.5_Calculate_Breakeven_Inflation.md#across-terms)); blank for Type `Treasury` |
 
-- <a id="s14"></a>**Breakeven inflation (S14)**, `BreakevenInflation.csv` = `{ @cusip + maturity + coupon + ask_yield + sa_yield + sao_yield + nominal_cusip + nominal_maturity + nominal_yield + ask_bei + sa_bei + sao_bei }`
-  *R2 key `Treasuries/BreakevenInflation.csv` ([View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/BreakevenInflation.csv)). Header row first, then one row per TIPS in [Market quotes (S7)](#s7): the [Breakeven Inflation](#breakeven-inflation) of its Ask, SA and SAO Yield against the yield of the nominal Treasury nearest to it in maturity, the per security construction.*
+- <a id="s14"></a>**Breakeven inflation (S14)**, `BreakevenInflation.csv` = `Trade_Date + Settlement_Date + { @tips_cusip + tips_maturity + tips_coupon + tips_ask_yield + tips_sa_yield + tips_sao_yield + nominal_cusip + nominal_maturity + nominal_coupon + nominal_yield + ask_bei + sa_bei + sao_bei }`
+  *R2 key `Treasuries/BreakevenInflation.csv` ([View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/BreakevenInflation.csv)). The first line holds the [Trade Date](#trade-date) and the [Settlement Date](#settlement-date) of [Market quotes (S7)](#s7), comma-separated, in the form of the `Market` line of [Yield curves (S13)](#s13). The second line is the header, then one row per TIPS in [Market quotes (S7)](#s7): the [Breakeven Inflation](#breakeven-inflation) of its Ask, SA and SAO Yield against the yield of the nominal Treasury nearest to it in maturity, the per security construction.*
 
   | Column | Defined term |
   |---|---|
-  | `cusip`, `maturity`, `coupon`, `ask_yield`, `sa_yield`, `sao_yield` | as in [SA and SAO yields (S10)](#s10) |
+  | `tips_cusip`, `tips_maturity`, `tips_coupon`, `tips_ask_yield`, `tips_sa_yield`, `tips_sao_yield` | the `cusip`, `maturity`, `coupon`, `ask_yield`, `sa_yield` and `sao_yield` of [SA and SAO yields (S10)](#s10), for the TIPS |
   | `nominal_cusip` | [CUSIP](#cusip) of the nominal Treasury nearest in maturity to the TIPS |
   | `nominal_maturity` | [Maturity Date](#maturity-date) of that nominal Treasury |
+  | `nominal_coupon` | [Coupon Rate](#coupon-rate) of that nominal Treasury, as a decimal |
   | `nominal_yield` | [Yield](#yield) of that nominal Treasury, [ask](#ask) side, as a decimal |
-  | `ask_bei` | `nominal_yield − ask_yield` |
-  | `sa_bei` | `nominal_yield − sa_yield` |
-  | `sao_bei` | `nominal_yield − sao_yield` |
+  | `ask_bei` | `nominal_yield − tips_ask_yield` |
+  | `sa_bei` | `nominal_yield − tips_sa_yield` |
+  | `sao_bei` | `nominal_yield − tips_sao_yield` |
 
-- <a id="s15"></a>**Bid and ask spreads (S15)**, `BidAskSpreads.csv` = `{ @security_type + @cusip + maturity + coupon + ask_yield + bid_yield + yield_spread_bps + ask_price + bid_price + price_spread_pct }`
-  *R2 key `Treasuries/BidAskSpreads.csv` ([View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/BidAskSpreads.csv)). Header row first, then one row per TIPS and nominal Treasury in [Market quotes (S7)](#s7), the [Bid and Ask Spreads](#bid-and-ask-spreads) of each.*
+- <a id="s15"></a>**Bid and ask spreads (S15)**, `BidAskSpreads.csv` = `Trade_Date + Settlement_Date + { @security_type + @cusip + maturity + coupon + ask_yield + bid_yield + yield_spread_bps + ask_price + bid_price + ( adj_ask_price + adj_bid_price ) + price_spread_pct }`
+  *R2 key `Treasuries/BidAskSpreads.csv` ([View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/BidAskSpreads.csv)). The first line holds the [Trade Date](#trade-date) and the [Settlement Date](#settlement-date) of [Market quotes (S7)](#s7), comma-separated, in the form of the `Market` line of [Yield curves (S13)](#s13). The second line is the header, then one row per security in [Market quotes (S7)](#s7), the [Bid and Ask Spreads](#bid-and-ask-spreads) of each, in order of `maturity`, `coupon` and `cusip`.*
 
   | Column | Defined term |
   |---|---|
-  | `security_type` | `TIPS` or `Treasury` |
+  | `security_type` | `Bill`, `Note`, `Bond`, `STRIPS`, `TIPS` or `Unclassified`, as `Type` in [Yield curves (S13)](#s13) |
   | `cusip` | [CUSIP](#cusip) |
   | `maturity` | [Maturity Date](#maturity-date), `YYYY-MM-DD` |
   | `coupon` | [Coupon Rate](#coupon-rate), as a decimal |
@@ -268,6 +271,7 @@
   | `yield_spread_bps` | the yield spread of [Bid and Ask Spreads](#bid-and-ask-spreads), in basis points |
   | `ask_price` | [Price](#price), ask side, unadjusted |
   | `bid_price` | [Price](#price), bid side, unadjusted |
+  | `adj_ask_price`, `adj_bid_price` | [Adjusted Ask Price / Adjusted Bid Price](#adjusted-price), TIPS only; the prices the price spread of a TIPS is calculated from |
   | `price_spread_pct` | the price spread of [Bid and Ask Spreads](#bid-and-ask-spreads), in percent |
 
 - <a id="s16"></a>**Bond holidays (S16)**, `BondHolidaysSifma.csv` = `{ Date + Holiday_Name }`
@@ -335,6 +339,10 @@
 <a id="download-date"></a>
 ### Download Date
 `Download_Date` = *The date and time of the run of [Download market quotes (1.2)](./1.2_Download_Market_Quotes.md) that wrote [Market quotes (S7)](#s7), on the Eastern clock, stated on the first line of [Market quotes (S7)](#s7) as `YYYY-MM-DD HH:MM`. It is the trade date from which the [Settlement Date](#settlement-date) of the quotes in the file is counted.*
+
+<a id="trade-date"></a>
+### Trade Date
+`Trade_Date` = *The date on which a bond trade is made, from which its [Settlement Date](#settlement-date) is counted. For [Market quotes (S7)](#s7) it is the [Download Date](#download-date), which also states the time of the run; for [FedInvest prices (S1)](#s1), the date FedInvest states its prices are for, which is also their Settlement Date (T+0).*
 
 <a id="bond-holiday"></a>
 ### Bond Holiday
@@ -853,7 +861,7 @@ Some values are true only until Treasury issues more TIPS. Left inline as approx
 - <a id="app-inputs"></a>**App Inputs** = *What a user enters or selects in an app. [View Selections](#view-selections) are the Yield Curves case.*
 - <a id="app-outputs"></a>**App Outputs** = *What an app shows a user. [Charts and Tables](#charts-and-tables) are the Yield Curves case.*
 - <a id="downloaded-data-sets"></a>**Downloaded Data Sets** = `Yield curves (S13) + Breakeven inflation (S14) + Bid and ask spreads (S15)`
-  *The three stores written for a user to download into a spreadsheet. No app reads them.*
+  *The three stores written by [Calculate yield curve data sets (1.3)](./1.3_Calculate_Yield_Curve_Data_Sets.md), which a user can also download into a spreadsheet.*
 
 ### 6.3 Yield Curves
 
