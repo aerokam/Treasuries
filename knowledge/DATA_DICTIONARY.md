@@ -35,7 +35,7 @@
 
 **M** &nbsp; [Market Quotes](#market-quotes) &middot; [Market quotes (S7)](#s7) &middot; [Market quotes source (E6)](#e6) &middot; [Market Yields](#market-yields) &middot; [Maturity Date](#maturity-date) &middot; [Maturity SA Factor](#maturity-sa-factor) &middot; [Maturity Year](#maturity-year) &middot; [Monthly CPI (S17)](#s17) &middot; [Monthly CPI-U](#monthly-cpi-u)
 
-**N** &nbsp; [Net Cash](#net-cash)
+**N** &nbsp; [Naive Maturity SA Factor](#naive-maturity-sa-factor) &middot; [Net Cash](#net-cash)
 
 **O** &nbsp; [Outstanding TIPS](#outstanding-tips)
 
@@ -45,7 +45,7 @@
 
 **R** &nbsp; [R2 Read Access](#r2-read-access) &middot; [Rebalance Result](#rebalance-result) &middot; [Ref CPI](#ref-cpi) &middot; [Ref CPI (S3)](#s3) &middot; [Ref CPI NSA and SA (S4)](#s4) &middot; [Reference Data](#reference-data) &middot; [Reference Date](#reference-date) &middot; [Retained Bracket Excess](#retained-bracket-excess) &middot; [Retained Lower Bracket](#retained-lower-bracket) &middot; [Rolling CPI Change](#rolling-cpi-change) &middot; [Rung](#rung)
 
-**S** &nbsp; [SA and SAO yields (S10)](#s10) &middot; [SA Factor](#sa-factor) &middot; [SA Price Factor](#sa-price-factor) &middot; [SA Yield](#sa-yield) &middot; [SA Yield Series](#sa-yield-series) &middot; [SA Yields](#sa-yields) &middot; [SACP](#sacp) &middot; [same year excess interest](#same-maturity-excess-interest) *(see Same-Maturity Excess Interest)* &middot; [Same-Maturity Excess Interest](#same-maturity-excess-interest) &middot; [SAO Blend Weight](#sao-blend-weight) &middot; [SAO Yield](#sao-yield) &middot; [SAO Yields](#sao-yields) &middot; [Schwab Asset Management holdings export (E10)](#e10) &middot; [Schwab Export](#schwab-export) &middot; [Seasonal Amplitude](#seasonal-amplitude) &middot; [Seasonal Factor Drift](#seasonal-factor-drift) &middot; [Settlement Date](#settlement-date) &middot; [simulated future 30y tips](#simulated-outstanding-future-30y-tips) *(see Simulated Outstanding Future 30Y TIPS)* &middot; [Simulated Outstanding Future 10Y TIPS](#simulated-outstanding-future-10y-tips) &middot; [Simulated Outstanding Future 30Y TIPS](#simulated-outstanding-future-30y-tips) &middot; [Source Data](#source-data) &middot; [Spot Yield](#spot-yield) &middot; [Spot Yield Curves](#spot-yield-curves) &middot; [Synthetic TIPS](#synthetic-tips)
+**S** &nbsp; [SA and SAO yields (S10)](#s10) &middot; [SA Factor](#sa-factor) &middot; [SA Price](#sa-price) &middot; [SA Price Factor](#sa-price-factor) &middot; [SA Yield](#sa-yield) &middot; [SA Yield Series](#sa-yield-series) &middot; [SA Yields](#sa-yields) &middot; [SACP](#sacp) &middot; [same year excess interest](#same-maturity-excess-interest) *(see Same-Maturity Excess Interest)* &middot; [Same-Maturity Excess Interest](#same-maturity-excess-interest) &middot; [SAO Blend Weight](#sao-blend-weight) &middot; [SAO Yield](#sao-yield) &middot; [SAO Yields](#sao-yields) &middot; [Schwab Asset Management holdings export (E10)](#e10) &middot; [Schwab Export](#schwab-export) &middot; [Seasonal Amplitude](#seasonal-amplitude) &middot; [Seasonal Factor Drift](#seasonal-factor-drift) &middot; [Settlement Date](#settlement-date) &middot; [simulated future 30y tips](#simulated-outstanding-future-30y-tips) *(see Simulated Outstanding Future 30Y TIPS)* &middot; [Simulated Outstanding Future 10Y TIPS](#simulated-outstanding-future-10y-tips) &middot; [Simulated Outstanding Future 30Y TIPS](#simulated-outstanding-future-30y-tips) &middot; [Source Data](#source-data) &middot; [Spot Yield](#spot-yield) &middot; [Spot Yield Curves](#spot-yield-curves) &middot; [Synthetic TIPS](#synthetic-tips)
 
 **T** &nbsp; [Tentative Auction Schedule](#tentative-auction-schedule) &middot; [Tentative auction schedule (S9)](#s9) &middot; [Term](#term) &middot; [TIPS](#tips) &middot; [TIPS Ladder](#tips-ladder) &middot; [TIPS Market Data](#tips-market-data) &middot; [TIPS Prices](#tips-prices) &middot; [TIPS Quotes](#tips-quotes) &middot; [TIPS Reference Data](#tips-reference-data) &middot; [TIPS reference data (S2)](#s2) &middot; [TIPS Reference Rows](#tips-reference-rows) &middot; [TIPS Yields](#tips-yields) &middot; [tipsladder.com Format](#tipsladdercom-format) &middot; [Total Cost](#total-cost) &middot; [Trade Date](#trade-date) &middot; [Trade Ticket](#trade-ticket) &middot; [Treasury Bill](#treasury-bill) &middot; [Treasury Bond](#treasury-bond) &middot; [Treasury Note](#treasury-note) &middot; [Treasury Prices](#treasury-prices) &middot; [Treasury Quotes](#treasury-quotes) &middot; [Treasury Tentative Auction Schedule (E14)](#e14) &middot; [Treasury Yields](#treasury-yields) &middot; [TreasuryDirect (E15)](#e15) &middot; [TreasuryDirect SecIndex (E2)](#e2)
 
@@ -223,7 +223,7 @@
   | `beta0`–`beta3` | Svensson level, slope and two curvature coefficients, in percent |
   | `tau1`, `tau2` | Svensson decay parameters, in years |
 
-- <a id="s13"></a>**Yield curves (S13)**, `YieldCurves.csv` = `{ Source + Trade_Date + Settlement_Date } + { ( Maturity ) + Term_y + CUSIP + Type + Source + ( Coupon + Price ) + ( Ask + SA + SAO ) + ( Spot + Spot_SA ) }`
+- <a id="s13"></a>**Yield curves (S13)**, `YieldCurves.csv` = `{ Source + Trade_Date + Settlement_Date } + { ( Maturity ) + Term_y + CUSIP + Type + Source + ( Coupon + Price ) + ( Ask + SA + SAO ) + ( Settlement_Date_SA_Factor + Naive_Maturity_SA_Factor + Maturity_SA_Factor + SA_Price_Factor + SA_Price ) + ( Spot + Spot_SA ) }`
   *R2 key `Treasuries/YieldCurves.csv` ([View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/YieldCurves.csv)). The first two lines each hold one `Source`, `FedInvest` then `Market`, with the [Trade Date](#trade-date) and the [Settlement Date](#settlement-date) of its prices, comma-separated. The Trade Date of `Market` is its [Download Date](#download-date), `YYYY-MM-DD HH:MM` on a 24-hour Eastern clock; the other two dates are `YYYY-MM-DD`. The third line is the header, then two kinds of row, general-purpose and spreadsheet-ready: the security rows in order of `Maturity`, `Coupon`, `CUSIP` and `Source`, so that the rows of one security are together, then the grid rows in order of `Type`, `Source` and `Term (y)`, so that each curve is together.*
   - *A **security row** is one priced security: every Bill, Note, Bond, STRIPS and TIPS, and on a `Market` row an Unclassified security, a [Market quotes (S7)](#s7) CUSIP root the [Treasury CUSIP Reference](./Treasury_CUSIP_Reference.md) does not recognise. A FedInvest-source row never has Type `Unclassified`: [1.1.2](./1.1_Download_FedInvest_Prices.md#select-prices-and-add-tips-reference-data) states its type directly.*
   - *A **grid row** is a fitted [Spot Yield Curve](#spot-yield-curves) evaluated at one term, with `CUSIP` = `Spot` and `Maturity` blank. There are three grid rows per term per `Source`, Type `Treasury`, `TIPS` and `BEI`. The terms are half-year steps from 0.5 across the union of the valid ranges of the three fits of that `Source`. A cell is blank where its fit is outside its valid range at that term or fails its sanity check (`shared/src/spot-curve.js#spotCurveFit`), and the rest of the row is kept.*
@@ -240,6 +240,11 @@
   | `Ask` | [Yield](#yield) calculated from the row's price at its source's settlement date, as a decimal. The price of a FedInvest-source row is the one [1.1.2](./1.1_Download_FedInvest_Prices.md#select-prices-and-add-tips-reference-data) selects from the Buy, Sell and End of Day prices of [FedInvest (E1)](#e1), not an ask |
   | `SA` | [SA Yield](#sa-yield), as a decimal; TIPS security rows only |
   | `SAO` | [SAO Yield](#sao-yield), as a decimal; TIPS security rows only |
+  | `Settlement Date SA Factor` | the [SA Factor](#sa-factor) for the source’s [Settlement Date](#settlement-date); TIPS security rows only |
+  | `Naive Maturity SA Factor` | [Naive Maturity SA Factor](#naive-maturity-sa-factor); TIPS security rows only |
+  | `Maturity SA Factor` | [Maturity SA Factor](#maturity-sa-factor), the one the `SA Price Factor` uses; TIPS security rows only |
+  | `SA Price Factor` | [SA Price Factor](#sa-price-factor); TIPS security rows only |
+  | `SA Price` | [SA Price](#sa-price), the price `SA` is the yield of; TIPS security rows only |
   | `Spot` | [Spot Yield](#spot-yield) on a grid row, as a decimal on the semi-annual bond-equivalent basis of `Ask`: fitted to the nominal Treasuries for Type `Treasury`, to the TIPS quoted prices for Type `TIPS`, and for Type `BEI` the nominal spot less the TIPS quoted spot |
   | `Spot SA` | Spot Yield fitted to the TIPS seasonally adjusted prices for Type `TIPS`; for Type `BEI` the nominal spot less the TIPS SA spot ([3.5 §Across terms](../YieldCurves/knowledge/3.5_Calculate_Breakeven_Inflation.md#across-terms)); blank for Type `Treasury` |
 
@@ -746,7 +751,7 @@ coverExcessCost_c = Future 30Y total cost × coverWeight_c
 
 <a id="sa-yield"></a>
 ### SA Yield
-`SA_Yield` = *Real yield derived from a Seasonally Adjusted Clean Price. Removes the predictable seasonal component of CPI from the raw YTM.*
+`SA_Yield` = *Seasonally adjusted real yield: the real yield derived from the [SA Price](#sa-price). Removes the predictable seasonal component of CPI from the raw YTM.*
 
 <a id="sao-yield"></a>
 ### SAO Yield
@@ -754,17 +759,25 @@ coverExcessCost_c = Future 30Y total cost × coverWeight_c
 
 <a id="sacp"></a>
 ### SACP
-`SACP` = *Seasonally Adjusted Clean Price (Canty 2009, Eq. 14 approximation): `SACP ≈ CP × SA_Price_Factor`. Removes the predictable seasonal component from the quoted clean price.*
+`SACP` = *Seasonally Adjusted Clean Price, Canty’s name (2009, Eq. 14 approximation) for the [SA Price](#sa-price): `SACP ≈ CP × SA_Price_Factor`, where `CP` is his notation for the [Price](#price). Used in the summary of his paper ([Canty](../YieldCurves/knowledge/Canty.md)) and nowhere else.*
+
+<a id="sa-price"></a>
+### SA Price
+`SA_Price` = `Price × SA_Price_Factor` *(Seasonally Adjusted Price: the [Price](#price) with the predictable seasonal component removed; a TIPS only. The price the [SA Yield](#sa-yield) is the yield of. Canty’s [SACP](#sacp).)*
 
 <a id="sa-price-factor"></a>
 ### SA Price Factor
-`SA_Price_Factor` = `SA_Factor(settlement date) / Maturity_SA_Factor` *(the multiplier applied to the quoted clean price to produce [`SACP`](#sacp), Canty 2009 Eq. 14.)*
+`SA_Price_Factor` = `SA_Factor(settlement date) / Maturity_SA_Factor` *(the multiplier applied to the [Price](#price) to produce the [SA Price](#sa-price), Canty 2009 Eq. 14.)*
 
 **The two factors are not obtained the same way.** The settlement date factor involves no approximation: Treasury publishes the daily [Ref CPI](#ref-cpi) NSA for that date, the daily Ref CPI SA is calculated for the same date by the same interpolation ([SA Factor](#sa-factor)), and the factor is their ratio. The maturity date factor is an approximation for nearly every outstanding TIPS, and approaches 1.0 as the horizon lengthens — see [Maturity SA Factor](#maturity-sa-factor). The two are therefore never exactly equal, even where settlement and maturity fall on the same calendar month and day, so a whole number of years to maturity no longer implies no adjustment.
 
 <a id="maturity-sa-factor"></a>
 ### Maturity SA Factor
-`Maturity_SA_Factor` = *The [SA Factor](#sa-factor) for the maturity date, the denominator of the [SA Price Factor](#sa-price-factor). A maturity date inside the published [Ref CPI](#ref-cpi) series takes that date’s exact value. A maturity date beyond it has no published factor: the same calendar month and day is taken from the most recent completed cycle, and its departure from 1.0 is scaled by the [Credibility Factor](#credibility-factor) — `1 + (S_maturity − 1) × w(h)`. The second case covers nearly every outstanding TIPS, since most mature beyond the published series. `shared/src/ref-cpi.js#maturitySaFactor`; specified in [3.2 Adjust for seasonality](../YieldCurves/knowledge/3.2_Adjust_For_Seasonality.md#horizon-dependent-maturity-factor).*
+`Maturity_SA_Factor` = *The [SA Factor](#sa-factor) for the maturity date as used, the denominator of the [SA Price Factor](#sa-price-factor). A maturity date inside the published [Ref CPI](#ref-cpi) series takes that date’s exact value. A maturity date beyond it has no published factor: the [Naive Maturity SA Factor](#naive-maturity-sa-factor) is corrected for the uncertainty of a projection at longer maturities by scaling its departure from 1.0 by the [Credibility Factor](#credibility-factor) — `1 + (S_maturity − 1) × w(h)`. The second case covers nearly every outstanding TIPS, since most mature beyond the published series. `shared/src/ref-cpi.js#maturitySaFactor`; specified in [3.2 Adjust for seasonality](../YieldCurves/knowledge/3.2_Adjust_For_Seasonality.md#horizon-dependent-maturity-factor).*
+
+<a id="naive-maturity-sa-factor"></a>
+### Naive Maturity SA Factor
+`Naive_Maturity_SA_Factor` = *The [SA Factor](#sa-factor) of the same calendar month and day as the maturity date, taken from the most recent completed cycle with no correction for the horizon. Naive because it depends on the month and day of the maturity date alone. The [Maturity SA Factor](#maturity-sa-factor) is this value corrected for the uncertainty of a projection at longer maturities, and equals it where the correction leaves it unchanged, as when the maturity date is inside the published [Ref CPI](#ref-cpi) series and both are that date’s exact value.*
 
 *Measured: the factor for February 15, the maturity date of every 30-year TIPS, has a 30-year drift standard deviation of about 0.29% of price, against a current departure from 1.0 of −0.45%. The drift over the horizon the projection is used at is comparable to the whole adjustment being made, which is what the weight scales for ([Seasonal Factor Drift §4.1](../YieldCurves/knowledge/Seasonal_Factor_Drift.md#feb-15-dependency)).*
 
@@ -884,7 +897,7 @@ Some values are true only until Treasury issues more TIPS. Left inline as approx
 - <a id="spot-yield-curves"></a>**Spot Yield Curves** = `{ [ Treasury | TIPS | TIPS_SA ] + { Term + Spot_Yield } }`
   *For each source shown, one [Spot Yield](#spot-yield) curve per series: fitted to the nominal Treasuries, to the TIPS quoted prices and to the TIPS seasonally adjusted prices.*
 - <a id="bid-and-ask-spreads"></a>**Bid and Ask Spreads** = `{ @CUSIP + Security_Type + Yield_Spread + Price_Spread }`
-  *For each security quoted on both sides: the yield spread, the [bid](#ask) yield less the ask yield, in basis points; and the price spread, the ask price less the bid price, as a percentage of the ask price, from [Adjusted Prices](#adjusted-price) for a TIPS and clean prices for a nominal Treasury. [Bid and ask spreads (S15)](#s15) holds it.*
+  *For each security quoted on both sides: the yield spread, the [bid](#ask) yield less the ask yield, in basis points; and the price spread, the ask price less the bid price, as a percentage of the ask price, from [Adjusted Prices](#adjusted-price) for a TIPS and [Prices](#price) for a nominal Treasury. [Bid and ask spreads (S15)](#s15) holds it.*
 - <a id="view-selections"></a>**View Selections** = *The choices a user makes on an app's own page, driving what it fetches and draws. Composition differs by app:*
 
   - *Yield Curves: `Tab + ( Spread_Mode ) + { Source } + { Series } + Maturity_Range + Horizontal_Axis_Mode + IQR_Clip_Setting` — the Treasuries, TIPS or breakeven tab; spread mode; the sources and series shown; the range of maturities; calendar or term on the horizontal axis; and whether the [IQR Clip](#iqr-clip) applies.*
