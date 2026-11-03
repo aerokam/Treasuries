@@ -221,7 +221,7 @@ var COLS = [
   { key: 'modDuration', label: 'Mod Duration',        align: 'right', sortType: 'num',
     fmt: function(v) { return v != null ? v.toFixed(2) : '—'; } },
   { key: 'accruedInterest', label: 'Adj Accrued/$1K', align: 'right', sortType: 'num', wrapHeader: true,
-    title: 'Accrued Interest (Adjusted) per 1,000 of par at the Settlement Date',
+    title: 'Accrued Interest (Adjusted) per 1,000 of par at the Ref CPI Date',
     fmt: function(v) { return v != null ? v.toFixed(5) : '—'; } },
   { key: 'nextCoupon',  cpnGroup: true, label: 'Cpn Date',             align: 'left',  sortType: 'str', isDate: true,
     title: 'Coupon payment date on or after the selected Ref CPI Date',
@@ -291,6 +291,11 @@ function recomputeWithRefCpi(dateStr) {
     // Adj Price is a broker's adjusted price, which does not round the Index Ratio (DD Index Ratio).
     var adjIR = indexRatio(rowCpi, r.datedDateRefCpi, NO_ROUNDING);
     r.adjPrice = (adjIR != null && r.price != null) ? r.price * adjIR : null;
+
+    // Accrued Interest (Adjusted) at the Ref CPI Date, with the Index Ratio of that date (DD Accrued Interest (Adjusted)); none once matured.
+    r.accruedInterest = (matDate && r.coupon != null)
+      ? accruedInterestAdjusted(r.coupon, refDate, localDate(r.maturity), cpi, r.datedDateRefCpi)
+      : null;
 
     // Cpn Date / Cpn Date IR / Adj Cpn/$1K: if today is the effective (weekend/holiday-rolled)
     // payment date of this bond's next-or-final coupon, show that realized payment
@@ -551,10 +556,6 @@ async function loadData() {
       var term = (matDate && matDate > settlDate) ? termYears(settlDate, matDate) : null;
       var macDur = (matDate && ref.coupon != null && yields && yields.yield != null && !isNaN(yields.yield))
         ? calculateDuration(settlDate, matDate, ref.coupon, yields.yield) : null;
-      // Accrued Interest (Adjusted) at the Settlement Date, as DD Accrued Interest (Adjusted) states it; none once matured.
-      var accrued = (matDate && ref.coupon != null)
-        ? accruedInterestAdjusted(ref.coupon, localDate(settlementDateStr), localDate(ref.maturity), lookupRefCpi(refCpiRows, settlementDateStr), ref.datedDateRefCpi)
-        : null;
       var modDur = (macDur != null) ? calculateMDuration(settlDate, matDate, ref.coupon, yields.yield) : null;
       return {
         cusip:       ref.cusip,
@@ -569,7 +570,7 @@ async function loadData() {
         term:        term,
         macDuration: macDur,
         modDuration: modDur,
-        accruedInterest: accrued,
+        accruedInterest: null,
         nextCoupon:  null,
         cpnDateIR:   null,
         cpnPayment:  null,
