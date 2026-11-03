@@ -293,7 +293,7 @@ function recomputeWithRefCpi(dateStr) {
     r.adjPrice = (adjIR != null && r.price != null) ? r.price * adjIR : null;
 
     // Accrued Interest (Adjusted) at the Ref CPI Date, with the Index Ratio of that date (DD Accrued Interest (Adjusted)); none once matured.
-    r.accruedInterest = (matDate && r.coupon != null)
+    r.accruedInterest = (matDate && r.coupon != null && r.datedDate && dateStr >= r.datedDate)
       ? accruedInterestAdjusted(r.coupon, refDate, localDate(r.maturity), cpi, r.datedDateRefCpi)
       : null;
 
