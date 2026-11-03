@@ -775,11 +775,11 @@ coverExcessCost_c = Future 30Y total cost × coverWeight_c
 ### Maturity SA Factor
 `Maturity_SA_Factor` = *The [SA Factor](#sa-factor) for the maturity date as used, the denominator of the [SA Price Factor](#sa-price-factor). A maturity date inside the published [Ref CPI](#ref-cpi) series takes that date’s exact value. A maturity date beyond it has no published factor: the [Naive Maturity SA Factor](#naive-maturity-sa-factor) is corrected for the uncertainty of a projection at longer maturities by scaling its departure from 1.0 by the [Credibility Factor](#credibility-factor) — `1 + (S_maturity − 1) × w(h)`. The second case covers nearly every outstanding TIPS, since most mature beyond the published series. `shared/src/ref-cpi.js#maturitySaFactor`; specified in [3.2 Adjust for seasonality](../YieldCurves/knowledge/3.2_Adjust_For_Seasonality.md#horizon-dependent-maturity-factor).*
 
+*Measured: the factor for February 15, the maturity date of every 30-year TIPS, has a 30-year drift standard deviation of about 0.29% of price, against a current departure from 1.0 of −0.45%. The drift over the horizon the projection is used at is comparable to the whole adjustment being made, which is what the weight scales for ([Seasonal Factor Drift §4.1](../YieldCurves/knowledge/Seasonal_Factor_Drift.md#feb-15-dependency)).*
+
 <a id="naive-maturity-sa-factor"></a>
 ### Naive Maturity SA Factor
 `Naive_Maturity_SA_Factor` = *The [SA Factor](#sa-factor) of the same calendar month and day as the maturity date, taken from the most recent completed cycle with no correction for the horizon. Naive because it depends on the month and day of the maturity date alone. The [Maturity SA Factor](#maturity-sa-factor) is this value corrected for the uncertainty of a projection at longer maturities, and equals it where the correction leaves it unchanged, as when the maturity date is inside the published [Ref CPI](#ref-cpi) series and both are that date’s exact value.*
-
-*Measured: the factor for February 15, the maturity date of every 30-year TIPS, has a 30-year drift standard deviation of about 0.29% of price, against a current departure from 1.0 of −0.45%. The drift over the horizon the projection is used at is comparable to the whole adjustment being made, which is what the weight scales for ([Seasonal Factor Drift §4.1](../YieldCurves/knowledge/Seasonal_Factor_Drift.md#feb-15-dependency)).*
 
 <a id="seasonal-amplitude"></a>
 ### Seasonal Amplitude
