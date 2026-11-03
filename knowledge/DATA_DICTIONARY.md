@@ -326,11 +326,11 @@
 <a id="adjusted-ask-price"></a>
 <a id="adjusted-bid-price"></a>
 ### Adjusted Price
-`Adjusted_Price` = `Price × Index_Ratio` *(a TIPS only. The Adjusted Ask Price is the ask [Price](#price) so adjusted and the Adjusted Bid Price the bid Price, as [Market quotes (S7)](#s7) states them in its `adjAskPrice` and `adjBidPrice` columns.)*
+`Adjusted_Price` = `Price × Index_Ratio` *A TIPS only. The Adjusted Ask Price is the ask [Price](#price) so adjusted and the Adjusted Bid Price the bid Price, as [Market quotes (S7)](#s7) states them in its `adjAskPrice` and `adjBidPrice` columns.*
 
 <a id="accrued-interest-nominal"></a>
 ### Accrued Interest (Nominal)
-`Accrued_Interest_Nominal` = `(Coupon_Rate / 2 × 1,000) × (A / E)` *(interest owed to the seller since the last coupon date, per $1,000 par — Actual/Actual day count: A = days since last coupon date, E = days in the current coupon period. A = 0 on a coupon date, because the coupon paid that day is the seller’s. NOT a flat half-coupon. For TIPS, index-ratio adjusted: see [Accrued Interest (Adjusted)](#accrued-interest-adjusted).)*
+`Accrued_Interest_Nominal` = `(Coupon_Rate / 2 × 1,000) × (A / E)` *Interest owed to the seller since the last coupon date, per $1,000 par — Actual/Actual day count: A = days since last coupon date, E = days in the current coupon period. A = 0 on a coupon date, because the coupon paid that day is the seller’s. NOT a flat half-coupon. For TIPS, index-ratio adjusted: see [Accrued Interest (Adjusted)](#accrued-interest-adjusted).*
 
 <a id="settlement-date"></a>
 ### Settlement Date
@@ -448,23 +448,23 @@ For nominal Treasuries, 31 CFR §356.2 applies: *"Dated date means the date from
 
 <a id="cpi-change-p2p"></a>
 ### CPI Change (Point-to-Point)
-`CPI_Change_P2P` = `(CPI[end] / CPI[start] − 1) × 100` *(Total percent change in CPI between two user-specified dates)*
+`CPI_Change_P2P` = `(CPI[end] / CPI[start] − 1) × 100` *Total percent change in CPI between two user-specified dates*
 
 <a id="cpi-change-yoy"></a>
 ### CPI Change (Year-over-Year)
-`CPI_Change_YoY` = `(CPI[t] / CPI[t − 12 months] − 1) × 100` *(Annual inflation rate: percent change vs. same month prior year)*
+`CPI_Change_YoY` = `(CPI[t] / CPI[t − 12 months] − 1) × 100` *Annual inflation rate: percent change vs. same month prior year*
 
 <a id="cpi-change-mom"></a>
 ### CPI Change (Month-over-Month)
-`CPI_Change_MoM` = `(CPI[t] / CPI[t − 1 month] − 1) × 100` *(Monthly inflation rate: percent change vs. prior month)*
+`CPI_Change_MoM` = `(CPI[t] / CPI[t − 1 month] − 1) × 100` *Monthly inflation rate: percent change vs. prior month*
 
 <a id="rolling-cpi-change"></a>
 ### Rolling CPI Change
-`Rolling_CPI_Change` = `(CPI[t] / CPI[t − N months] − 1) × 100` for each t *(Continuous series of trailing N-month total percent change. N is user-specified.)*
+`Rolling_CPI_Change` = `(CPI[t] / CPI[t − N months] − 1) × 100` for each t *Continuous series of trailing N-month total percent change. N is user-specified.*
 
 <a id="cpi-cagr"></a>
 ### CPI CAGR
-`CPI_CAGR` = `((CPI[end] / CPI[start])^(12 / N_months) − 1) × 100` *(Compound Annual Growth Rate over N months. Annualizes the point-to-point change.)*
+`CPI_CAGR` = `((CPI[end] / CPI[start])^(12 / N_months) − 1) × 100` *Compound Annual Growth Rate over N months. Annualizes the point-to-point change.*
 
 ---
 
@@ -499,15 +499,15 @@ For nominal Treasuries, 31 CFR §356.2 applies: *"Dated date means the date from
 
 <a id="inflation-adjusted-principal"></a>
 ### Inflation-Adjusted Principal
-`Inflation_Adjusted_Principal` = `Par × Index_Ratio` *(the Index Ratio truncated to six decimal places, then rounded to five, as [31 CFR 356 Appendix B](./31_CFR_356_Definitions_And_Formulas.md) states for the principal and interest payments Treasury calculates). A TIPS is redeemed at maturity at its Inflation-Adjusted Principal or at its [Par](#par), whichever is greater ([31 CFR 356 §356.5](./31_CFR_356_Definitions_And_Formulas.md)).*
+`Inflation_Adjusted_Principal` = `Par × Index_Ratio` *The Index Ratio truncated to six decimal places, then rounded to five, as [31 CFR 356 Appendix B](./31_CFR_356_Definitions_And_Formulas.md) states for the principal and interest payments Treasury calculates). A TIPS is redeemed at maturity at its Inflation-Adjusted Principal or at its [Par](#par), whichever is greater ([31 CFR 356 §356.5](./31_CFR_356_Definitions_And_Formulas.md).*
 
 <a id="annual-interest-real"></a>
 ### Annual Interest (Real)
-`Annual_Interest_Real` = `Par × Coupon_Rate` *(coupon applied to the fixed par — constant in real terms)*
+`Annual_Interest_Real` = `Par × Coupon_Rate` *Coupon applied to the fixed par — constant in real terms*
 
 <a id="annual-interest-nominal"></a>
 ### Annual Interest (Nominal)
-`Annual_Interest_Nominal` = `Inflation_Adjusted_Principal × Coupon_Rate` *(coupon applied to inflation-adjusted principal)*
+`Annual_Interest_Nominal` = `Inflation_Adjusted_Principal × Coupon_Rate` *Coupon applied to inflation-adjusted principal*
 
 <a id="pi"></a>
 ### P+I
@@ -519,11 +519,11 @@ For nominal Treasuries, 31 CFR §356.2 applies: *"Dated date means the date from
 
 <a id="cost-per-tips"></a>
 ### Cost per TIPS
-`Cost_per_TIPS` = `(Price / 100) × Index_Ratio × 1000` *(nominal cost to purchase one $1,000 par unit)*
+`Cost_per_TIPS` = `(Price / 100) × Index_Ratio × 1000` *Nominal cost to purchase one $1,000 par unit*
 
 <a id="accrued-interest-adjusted"></a>
 ### Accrued Interest (Adjusted)
-`Accrued_Interest_Adjusted` = `Accrued_Interest_Nominal × Index_Ratio` *(index-ratio-adjusted accrued interest per TIPS, real dollars, with the Index Ratio truncated to six decimal places and then rounded to five and the result rounded to five decimal places for $1,000 par, as [31 CFR 356 Appendix B](./31_CFR_356_Definitions_And_Formulas.md) §I.D.4 states for accrued interest — extends [Accrued Interest (Nominal)](#accrued-interest-nominal) the same way [Inflation-Adjusted Principal](#inflation-adjusted-principal) extends [Par Value (Nominal)](#par-value-nominal). See TIPS_Basics.md §Accrued Interest.)*
+`Accrued_Interest_Adjusted` = `Accrued_Interest_Nominal × Index_Ratio` *Index-ratio-adjusted accrued interest per TIPS, real dollars, with the Index Ratio truncated to six decimal places and then rounded to five and the result rounded to five decimal places for $1,000 par, as [31 CFR 356 Appendix B](./31_CFR_356_Definitions_And_Formulas.md) §I.D.4 states for accrued interest — extends [Accrued Interest (Nominal)](#accrued-interest-nominal) the same way [Inflation-Adjusted Principal](#inflation-adjusted-principal) extends [Par Value (Nominal)](#par-value-nominal). See TIPS_Basics.md §Accrued Interest.*
 
 ---
 
@@ -574,13 +574,13 @@ For nominal Treasuries, 31 CFR §356.2 applies: *"Dated date means the date from
 <a id="ara"></a>
 <a id="amount"></a>
 ### ARA
-`ARA` = `Funded_PI + LMI + Same_Maturity_Excess_Interest` *(Annual Real Amount: total real cash flow produced for a Funded Year)*
+`ARA` = `Funded_PI + LMI + Same_Maturity_Excess_Interest` *Annual Real Amount: total real cash flow produced for a Funded Year*
 
 Displayed as **Amount**, and as **Real Amount** where a fuller header fits. The header drops *Annual* because it applies to each funded year while the totals row beneath is not annual, and drops *Real* because every principal and interest value in a TIPS ladder is inflation-adjusted, so real is implied throughout. The Cost and Quantity headers drop *Annual* for the same reason.
 
 <a id="lmi"></a>
 ### LMI
-`LMI` = `Σ Annual_Interest_Real for TIPS maturing in years > Current_Year` *(Later Maturity Interest: interest contributions to the current funded year from bonds maturing in future years)*
+`LMI` = `Σ Annual_Interest_Real for TIPS maturing in years > Current_Year` *Later Maturity Interest: interest contributions to the current funded year from bonds maturing in future years*
 
 <a id="same-maturity-excess-interest"></a>
 <a id="same-year-excess-interest"></a>
@@ -755,7 +755,7 @@ coverExcessCost_c = Future 30Y total cost × coverWeight_c
 
 <a id="sao-yield"></a>
 ### SAO Yield
-`SAO_Yield` = *[SA Yield](#sa-yield) with a further adjustment for **other** effects: the non-seasonal factors that move a TIPS away from a smooth curve. The `O` is *other*. Seasonality is identified and removed by name; the remaining deviations are not individually identified, and are removed together by fitting the SA yields to a smooth curve and reading each TIPS from that fit. Institutional participants act on relative-value factors this project cannot enumerate, so the step removes them as a class rather than by a named list. Distinct from the outlier index `O_t` of [FACP](#facp), which Canty determines analytically per known event ([3.3](../YieldCurves/knowledge/3.3_Adjust_For_Other_Effects.md)).*
+`SAO_Yield` = Seasonally Adjusted and Other Adjusted Yield. *The [SA Yield](#sa-yield) with a further adjustment for **other** effects: the non-seasonal factors that move a TIPS away from a smooth curve. The `O` is *other*. Seasonality is identified and removed by name; the remaining deviations are not individually identified, and are removed together by fitting the SA yields to a smooth curve and reading each TIPS from that fit. Institutional participants act on relative-value factors this project cannot enumerate, so the step removes them as a class rather than by a named list. Distinct from the outlier index `O_t` of [FACP](#facp), which Canty determines analytically per known event ([3.3](../YieldCurves/knowledge/3.3_Adjust_For_Other_Effects.md)).*
 
 <a id="sacp"></a>
 ### SACP
@@ -791,7 +791,7 @@ coverExcessCost_c = Future 30Y total cost × coverWeight_c
 
 <a id="credibility-factor"></a>
 ### Credibility Factor
-`Credibility_Factor` = `A² / (A² + σ_drift(h)²)` *(`w(h)`, the fraction of a projected [SA Factor](#sa-factor)’s departure from 1.0 that survives at a horizon of `h` years. The signal-to-noise ratio of [Seasonal Amplitude](#seasonal-amplitude) against [Seasonal Factor Drift](#seasonal-factor-drift); both are measured rather than fitted, so the weight has no free parameter. The name is the established one: this is the credibility factor of actuarial credibility theory, Bühlmann’s `Z` at a single observation, and the expression is the posterior mean weight for a prior centred on 1.0. 1.0 at zero horizon, about 0.91 at 1 year, about 0.45 for February 15 at 30 years. Applied at every horizon with no floor, and applied only to a projected factor: the settlement date factor is measured and is never scaled. `shared/src/ref-cpi.js#credibilityFactor`.)*
+`Credibility_Factor` = `A² / (A² + σ_drift(h)²)` *`w(h)`, the fraction of a projected [SA Factor](#sa-factor)’s departure from 1.0 that survives at a horizon of `h` years. The signal-to-noise ratio of [Seasonal Amplitude](#seasonal-amplitude) against [Seasonal Factor Drift](#seasonal-factor-drift); both are measured rather than fitted, so the weight has no free parameter. The name is the established one: this is the credibility factor of actuarial credibility theory, Bühlmann’s `Z` at a single observation, and the expression is the posterior mean weight for a prior centred on 1.0. 1.0 at zero horizon, about 0.91 at 1 year, about 0.45 for February 15 at 30 years. Applied at every horizon with no floor, and applied only to a projected factor: the settlement date factor is measured and is never scaled. `shared/src/ref-cpi.js#credibilityFactor`.*
 
 <a id="facp"></a>
 ### FACP
@@ -799,7 +799,7 @@ coverExcessCost_c = Future 30Y total cost × coverWeight_c
 
 <a id="sao-blend-weight"></a>
 ### SAO Blend Weight
-`SAO_Blend_Weight` = *`w`, the weight given to the fitted smooth curve when forming the [SAO Yield](#sao-yield): `SAO = w × curve(maturity) + (1 − w) × SA`. `w` is 1 out to `SAO_BLEND_START_YRS` (5 years), declines linearly to 0 at `SAO_BLEND_END_YRS` (6 years), and is 0 beyond, where the SAO Yield is the SA Yield unchanged. Securities inside `SAO_NOISE_YRS` (0.5 years) are excluded from the fit, their SA yield being dominated by price noise. `shared/src/spot-curve.js` ([3.3](../YieldCurves/knowledge/3.3_Adjust_For_Other_Effects.md)).*
+`SAO_Blend_Weight` = Seasonally Adjusted and Other Adjusted Blend Weight. *`w`, the weight given to the fitted smooth curve when forming the [SAO Yield](#sao-yield): `SAO = w × curve(maturity) + (1 − w) × SA`. `w` is 1 out to `SAO_BLEND_START_YRS` (5 years), declines linearly to 0 at `SAO_BLEND_END_YRS` (6 years), and is 0 beyond, where the SAO Yield is the SA Yield unchanged. Securities inside `SAO_NOISE_YRS` (0.5 years) are excluded from the fit, their SA yield being dominated by price noise. `shared/src/spot-curve.js` ([3.3](../YieldCurves/knowledge/3.3_Adjust_For_Other_Effects.md)).*
 
 <a id="iqr-clip"></a>
 ### IQR Clip
@@ -833,10 +833,10 @@ Some values are true only until Treasury issues more TIPS. Left inline as approx
 | Active lower bracket | [Active Lower Bracket](#active-lower-bracket) — latest outstanding maturity before the first gap year | derived from market data each run | The next pre-gap maturity is issued |
 | Default First Year | The earliest [Maturity Year](#maturity-year) with at least one TIPS maturing more than `EXCLUDE_MATURING_WITHIN_MONTHS` months after the [Settlement Date](#settlement-date) | derived from market data each run | A TIPS comes within `EXCLUDE_MATURING_WITHIN_MONTHS` months of its maturity |
 
-`LOWEST_LOWER_BRACKET_YEAR` = 2032 *(a design choice, not derived from market data: the floor of the holdings search range for [retained bracket excess](#retained-bracket-excess): only maturity years in `[LOWEST_LOWER_BRACKET_YEAR, minGapYear)` are considered. Matches `rebalance-lib.js`.)*
-`RETAINED_BRACKET_MIN_SHARE` = 30% *(a design choice, not derived from market data: the share of its [Expected Excess](#expected-excess) that a held year must reach to be a [Retained Lower Bracket](#retained-lower-bracket). A smaller excess is the difference between an ARA and a DARA rounded to whole dollars, or a few TIPS over the plan, and is not a spike. Matches `rebalance-lib.js`.)*
-`EXCLUDE_MATURING_WITHIN_MONTHS` = 3 *(a design choice, not derived from market data: a [TIPS](#tips) maturing no more than this many months after the [Settlement Date](#settlement-date) is not offered in Build: it is not among the First Year choices and is not chosen for a funded year under any Maturity preference, including Select maturities. A year with other TIPS maturing later uses those. The Default First Year (§5.1) is the earliest maturity year with a TIPS maturing later than that. A TIPS that short gives little protection against unexpected inflation, and [Market Quotes](#market-quotes) omit a Treasury maturing within about a week. Rebalance applies no exclusion: a TIPS in a holdings file is shown and kept as held. A value of 0 turns the exclusion off. Matches `ladder-core.js`.)*
-`LOWER_COVER_YIELD` = 4% *(the yield at which the Synthetic TIPS of the first Future 30Y year is measured when the Lower cover (§5.1) is chosen. A fixed yield above the market yield keeps the choice from changing with each day's yield; the durations of the covers barely move with yield, while the duration of that Synthetic TIPS moves with it. [Research](../TipsLadderManager/research/Future_30Y_Cover_Excess_Analysis.md).)*
+`LOWEST_LOWER_BRACKET_YEAR` = 2032 *A design choice, not derived from market data: the floor of the holdings search range for [retained bracket excess](#retained-bracket-excess): only maturity years in `[LOWEST_LOWER_BRACKET_YEAR, minGapYear)` are considered. Matches `rebalance-lib.js`.*
+`RETAINED_BRACKET_MIN_SHARE` = 30% *A design choice, not derived from market data: the share of its [Expected Excess](#expected-excess) that a held year must reach to be a [Retained Lower Bracket](#retained-lower-bracket). A smaller excess is the difference between an ARA and a DARA rounded to whole dollars, or a few TIPS over the plan, and is not a spike. Matches `rebalance-lib.js`.*
+`EXCLUDE_MATURING_WITHIN_MONTHS` = 3 *A design choice, not derived from market data: a [TIPS](#tips) maturing no more than this many months after the [Settlement Date](#settlement-date) is not offered in Build: it is not among the First Year choices and is not chosen for a funded year under any Maturity preference, including Select maturities. A year with other TIPS maturing later uses those. The Default First Year (§5.1) is the earliest maturity year with a TIPS maturing later than that. A TIPS that short gives little protection against unexpected inflation, and [Market Quotes](#market-quotes) omit a Treasury maturing within about a week. Rebalance applies no exclusion: a TIPS in a holdings file is shown and kept as held. A value of 0 turns the exclusion off. Matches `ladder-core.js`.*
+`LOWER_COVER_YIELD` = 4% *The yield at which the Synthetic TIPS of the first Future 30Y year is measured when the Lower cover (§5.1) is chosen. A fixed yield above the market yield keeps the choice from changing with each day's yield; the durations of the covers barely move with yield, while the duration of that Synthetic TIPS moves with it. [Research](../TipsLadderManager/research/Future_30Y_Cover_Excess_Analysis.md).*
 `REFCPI_CUSIP` = *the CUSIP whose series the daily Ref CPI is pulled from at TreasuryDirect ([TreasuryDirect SecIndex (E2)](#e2)).*
   **Selection rule (the rule, not the value):** Ref CPI is *market-wide* — identical across all TIPS on a given date — so the CUSIP determines only which dates its series covers. The recurring fetch selects, on every run, the [Outstanding TIPS](#outstanding-tips) with the latest [Maturity Date](#maturity-date) in [TIPS reference data (S2)](#s2), the CUSIP that stays outstanding longest, so no rotation is needed when a TIPS matures. The one-shot full-history rebuild merges `9128272M3` (matured 2007-01-15) and `912810FD5` (matures 2028-04-15), whose series together cover 1997-01-15 to present with no gap ([Fetch daily Ref CPI (1.13)](./1.13_Fetch_Daily_Ref_CPI.md)).
 `SIFMA_HOLIDAYS` = *The calendar of [Bond Holidays](#bond-holiday).*
