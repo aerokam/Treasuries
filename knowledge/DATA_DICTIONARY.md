@@ -747,11 +747,11 @@ coverExcessCost_c = Future 30Y total cost × coverWeight_c
 
 <a id="sa-factor"></a>
 ### SA Factor
-`SA_Factor` = `Ref_CPI_NSA(date) / Ref_CPI_SA(date)` *(daily ratio that isolates the seasonal component of the Ref CPI. `Ref_CPI_NSA` is the Treasury-published Ref CPI. `Ref_CPI_SA` applies the same 31 CFR App. B daily interpolation to BLS's monthly seasonally adjusted CPI-U — a constructed series, since no official seasonally adjusted Ref CPI exists. Analogous to the monthly seasonal factors BLS publishes (`NSA index / SA index`, shown ×100 to 3 dp), but daily and unscaled. Stored to five decimal places in [`RefCpiNsaSa.csv`](#s4); lookup via `shared/src/ref-cpi.js#saFactorForDate`.)*
+`SA_Factor` = Seasonal Adjustment Factor = `Ref_CPI_NSA(date) / Ref_CPI_SA(date)` *Daily ratio that isolates the seasonal component of the Ref CPI. `Ref_CPI_NSA` is the Treasury-published Ref CPI. `Ref_CPI_SA` applies the same 31 CFR App. B daily interpolation to BLS's monthly seasonally adjusted CPI-U — a constructed series, since no official seasonally adjusted Ref CPI exists. Analogous to the monthly seasonal factors BLS publishes (`NSA index / SA index`, shown ×100 to 3 dp), but daily and unscaled. Stored to five decimal places in [`RefCpiNsaSa.csv`](#s4); lookup via `shared/src/ref-cpi.js#saFactorForDate`.*
 
 <a id="sa-yield"></a>
 ### SA Yield
-`SA_Yield` = *Seasonally adjusted real yield: the real yield derived from the [SA Price](#sa-price). Removes the predictable seasonal component of CPI from the raw YTM.*
+`SA_Yield` = Seasonally Adjusted Yield. *The real yield derived from the [SA Price](#sa-price). Removes the predictable seasonal component of CPI from the raw YTM.*
 
 <a id="sao-yield"></a>
 ### SAO Yield
@@ -763,23 +763,23 @@ coverExcessCost_c = Future 30Y total cost × coverWeight_c
 
 <a id="sa-price"></a>
 ### SA Price
-`SA_Price` = `Price × SA_Price_Factor` *(Seasonally Adjusted Price: the [Price](#price) with the predictable seasonal component removed; a TIPS only. The price the [SA Yield](#sa-yield) is the yield of. Canty’s [SACP](#sacp).)*
+`SA_Price` = Seasonally Adjusted Price = `Price × SA_Price_Factor` *The [Price](#price) with the predictable seasonal component removed; a TIPS only. The price the [SA Yield](#sa-yield) is the yield of. Canty’s [SACP](#sacp).*
 
 <a id="sa-price-factor"></a>
 ### SA Price Factor
-`SA_Price_Factor` = `SA_Factor(settlement date) / Maturity_SA_Factor` *(the multiplier applied to the [Price](#price) to produce the [SA Price](#sa-price), Canty 2009 Eq. 14.)*
+`SA_Price_Factor` = Seasonal Adjustment Price Factor = `SA_Factor(settlement date) / Maturity_SA_Factor` *The multiplier applied to the [Price](#price) to produce the [SA Price](#sa-price), Canty 2009 Eq. 14.*
 
 **The two factors are not obtained the same way.** The settlement date factor involves no approximation: Treasury publishes the daily [Ref CPI](#ref-cpi) NSA for that date, the daily Ref CPI SA is calculated for the same date by the same interpolation ([SA Factor](#sa-factor)), and the factor is their ratio. The maturity date factor is an approximation for nearly every outstanding TIPS, and approaches 1.0 as the horizon lengthens — see [Maturity SA Factor](#maturity-sa-factor). The two are therefore never exactly equal, even where settlement and maturity fall on the same calendar month and day, so a whole number of years to maturity no longer implies no adjustment.
 
 <a id="maturity-sa-factor"></a>
 ### Maturity SA Factor
-`Maturity_SA_Factor` = *The [SA Factor](#sa-factor) for the maturity date as used, the denominator of the [SA Price Factor](#sa-price-factor). A maturity date inside the published [Ref CPI](#ref-cpi) series takes that date’s exact value. A maturity date beyond it has no published factor: the [Naive Maturity SA Factor](#naive-maturity-sa-factor) is corrected for the uncertainty of a projection at longer maturities by scaling its departure from 1.0 by the [Credibility Factor](#credibility-factor) — `1 + (S_maturity − 1) × w(h)`. The second case covers nearly every outstanding TIPS, since most mature beyond the published series. `shared/src/ref-cpi.js#maturitySaFactor`; specified in [3.2 Adjust for seasonality](../YieldCurves/knowledge/3.2_Adjust_For_Seasonality.md#horizon-dependent-maturity-factor).*
+`Maturity_SA_Factor` = Maturity Seasonal Adjustment Factor. *The [SA Factor](#sa-factor) for the maturity date as used, the denominator of the [SA Price Factor](#sa-price-factor). A maturity date inside the published [Ref CPI](#ref-cpi) series takes that date’s exact value. A maturity date beyond it has no published factor: the [Naive Maturity SA Factor](#naive-maturity-sa-factor) is corrected for the uncertainty of a projection at longer maturities by scaling its departure from 1.0 by the [Credibility Factor](#credibility-factor) — `1 + (Naive_Maturity_SA_Factor − 1) × w(h)`. The second case covers nearly every outstanding TIPS, since most mature beyond the published series. `shared/src/ref-cpi.js#maturitySaFactor`; specified in [3.2 Adjust for seasonality](../YieldCurves/knowledge/3.2_Adjust_For_Seasonality.md#horizon-dependent-maturity-factor).*
 
 *Measured: the factor for February 15, the maturity date of every 30-year TIPS, has a 30-year drift standard deviation of about 0.29% of price, against a current departure from 1.0 of −0.45%. The drift over the horizon the projection is used at is comparable to the whole adjustment being made, which is what the weight scales for ([Seasonal Factor Drift §4.1](../YieldCurves/knowledge/Seasonal_Factor_Drift.md#feb-15-dependency)).*
 
 <a id="naive-maturity-sa-factor"></a>
 ### Naive Maturity SA Factor
-`Naive_Maturity_SA_Factor` = *The [SA Factor](#sa-factor) of the same calendar month and day as the maturity date, taken from the most recent completed cycle with no correction for the horizon. Naive because it depends on the month and day of the maturity date alone. The [Maturity SA Factor](#maturity-sa-factor) is this value corrected for the uncertainty of a projection at longer maturities, and equals it where the correction leaves it unchanged, as when the maturity date is inside the published [Ref CPI](#ref-cpi) series and both are that date’s exact value.*
+`Naive_Maturity_SA_Factor` = Naive Maturity Seasonal Adjustment Factor. *The [SA Factor](#sa-factor) of the same calendar month and day as the maturity date, taken from the most recent completed cycle with no correction for the horizon. Naive because it depends on the month and day of the maturity date alone. The [Maturity SA Factor](#maturity-sa-factor) is this value corrected for the uncertainty of a projection at longer maturities, and equals it where the correction leaves it unchanged, as when the maturity date is inside the published [Ref CPI](#ref-cpi) series and both are that date’s exact value.*
 
 <a id="seasonal-amplitude"></a>
 ### Seasonal Amplitude
