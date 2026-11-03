@@ -96,7 +96,7 @@ function roundTrips(settle, mature, coupon, yld, tol = 1e-9) {
 // accruedInterest: day-count proration (2.1 TIPS Basics, Trade Ticket). Moved here from
 // TipsLadderManager/tests/run.js, since it tests this module and not ladder logic.
 {
-  const coupon = 0.02; // 2% annual: 1.0 per $100 semiannual
+  const coupon = 0.02; // 2% annual: 10.0 per $1,000 semiannual
   const maturity = new Date(2036, 0, 15); // coupon dates Jan15/Jul15
   const E_expected = daysBetween(new Date(2025, 6, 15), new Date(2026, 0, 15)); // 184 days
 
@@ -104,14 +104,14 @@ function roundTrips(settle, mature, coupon, yld, tol = 1e-9) {
   const early = accruedInterest(coupon, new Date(2025, 6, 16), maturity);
   ok(early.E === E_expected, `accruedInterest: E matches period length (${early.E} vs ${E_expected})`);
   ok(early.A === 1, `accruedInterest: A=1 the day after a coupon (got ${early.A})`);
-  ok(Math.abs(early.accrued - 1 / E_expected) < 1e-9, `accruedInterest: accrued = semiCoupon x 1/E (got ${early.accrued})`);
+  ok(Math.abs(early.accrued - 10 / E_expected) < 1e-9, `accruedInterest: accrued = semiCoupon x 1/E (got ${early.accrued})`);
 
   // One day before the next coupon: A=E-1, accrued is nearly the full semiannual coupon,
   // not the flat cpn/2 x par of a non-prorated calculation.
   const late = accruedInterest(coupon, new Date(2026, 0, 14), maturity);
   ok(late.A === E_expected - 1, `accruedInterest: A=E-1 the day before the next coupon (got ${late.A})`);
-  ok(Math.abs(late.accrued - (E_expected - 1) / E_expected) < 1e-9, `accruedInterest: accrued = semiCoupon x (E-1)/E (got ${late.accrued})`);
-  ok(late.accrued < 1.0, `accruedInterest: accrued strictly below the full semiannual coupon (got ${late.accrued})`);
+  ok(Math.abs(late.accrued - 10 * (E_expected - 1) / E_expected) < 1e-9, `accruedInterest: accrued = semiCoupon x (E-1)/E (got ${late.accrued})`);
+  ok(late.accrued < 10.0, `accruedInterest: accrued strictly below the full semiannual coupon (got ${late.accrued})`);
 
   // On a coupon date the coupon paid that day is the seller's: A = 0, accrued 0, the buyer's first coupon is the
   // next one, and a final-period settlement on the last coupon date still reaches maturity.

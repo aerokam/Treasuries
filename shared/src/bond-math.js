@@ -184,9 +184,10 @@ export function termYears(settle, maturity) {
 // ─── Accrued interest (actual/actual day count) ───────────────────────────────
 // Spec: 1.0 Bond Basics §Accrued Interest, SharedModules M3 §accruedInterest
 // Prorates the current coupon period by days elapsed since the last coupon date.
-// Returns accrued interest per $100 par (nominal — no index ratio applied), plus
+// Returns accrued interest per $1,000 par (no index ratio applied), plus
 // the day-count components (A = days since last coupon, E = days in period).
 // On a coupon date the last coupon date is that date: A = 0 and the coupon paid that day is the seller's.
+// A Price is per $100 par, so a caller that adds `accrued` to one divides it by 10.
 // settle: Date object. mature: Date object.
 export function accruedInterest(coupon, settle, mature) {
   const nextCoupon = _nextCouponAfter(settle, mature);
@@ -194,20 +195,20 @@ export function accruedInterest(coupon, settle, mature) {
   const lastCoupon = addSemiannualPeriods(nextCoupon, -1, mature.getDate());
   const E = daysBetween(lastCoupon, nextCoupon);
   const A = daysBetween(lastCoupon, settle);
-  const semiCoupon = (coupon / 2) * 100;
+  const semiCoupon = (coupon / 2) * 1000;
   return { accrued: semiCoupon * (A / E), A, E, lastCoupon, nextCoupon };
 }
 
 // ─── Accrued Interest (Adjusted) per $1,000 par ───────────────────────────────
-// DATA_DICTIONARY.md#accrued-interest-adjusted. The accrued interest of accruedInterest() per $100 par,
-// times the Index Ratio at settlement (truncated to six decimal places, then rounded to five), on $1,000 par,
+// DATA_DICTIONARY.md#accrued-interest-adjusted. The accrued interest of accruedInterest() per $1,000 par,
+// times the Index Ratio at settlement (truncated to six decimal places, then rounded to five),
 // rounded to five decimal places (31 CFR §356 App. B §I.D.4: accrued interest is rounded to five decimal
 // places for a $1,000 par amount). Returns null at or after maturity, or when either Ref CPI is missing.
 export function accruedInterestAdjusted(coupon, settle, mature, settlementRefCpi, datedDateRefCpi) {
   if (settle >= mature) return null;
   const ir = calcIndexRatio(settlementRefCpi, datedDateRefCpi, TREASURY_ROUNDING);
   if (ir == null) return null;
-  return roundHalfUp(accruedInterest(coupon, settle, mature).accrued / 100 * ir * 1000, 5);
+  return roundHalfUp(accruedInterest(coupon, settle, mature).accrued * ir, 5);
 }
 
 // ─── Yield from price (actual/actual, matches Excel YIELD(...,2,1)) ───────────
@@ -246,7 +247,7 @@ export function yieldFromPrice(cleanPrice, coupon, settle, mature) {
   if (!nextCoupon) return null;
   const { accrued, E } = accruedInterest(coupon, settle, mature);
   const DSC = daysBetween(settle, nextCoupon);
-  const dirtyPrice = cleanPrice + accrued;
+  const dirtyPrice = cleanPrice + accrued / 10;   // Price is per $100 par, accrued per $1,000
   const w = DSC / E;
 
   // Frequency is always 2 (semiannual), matching Excel YIELD(...,2,1) — there is no
@@ -325,7 +326,7 @@ export function priceFromYield(yld, coupon, settle, mature) {
     pv += cf / Math.pow(1 + r, w + k);
   }
 
-  return pv - accrued; // Return clean price
+  return pv - accrued / 10; // Return clean price; accrued is per $1,000 par, the price per $100
 }
 
 // ─── Market-value weighted average ────────────────────────────────────────────

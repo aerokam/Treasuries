@@ -330,7 +330,7 @@
 
 <a id="accrued-interest-nominal"></a>
 ### Accrued Interest (Nominal)
-`Accrued_Interest_Nominal` = `(Coupon_Rate / 2 × 100) × (A / E)` *(interest owed to the seller since the last coupon date, per $100 par — Actual/Actual day count: A = days since last coupon date, E = days in the current coupon period. A = 0 on a coupon date, because the coupon paid that day is the seller’s. NOT a flat half-coupon. For TIPS, index-ratio adjusted: see [Accrued Interest (Adjusted)](#accrued-interest-adjusted).)*
+`Accrued_Interest_Nominal` = `(Coupon_Rate / 2 × 1,000) × (A / E)` *(interest owed to the seller since the last coupon date, per $1,000 par — Actual/Actual day count: A = days since last coupon date, E = days in the current coupon period. A = 0 on a coupon date, because the coupon paid that day is the seller’s. NOT a flat half-coupon. For TIPS, index-ratio adjusted: see [Accrued Interest (Adjusted)](#accrued-interest-adjusted).)*
 
 <a id="settlement-date"></a>
 ### Settlement Date
@@ -523,7 +523,7 @@ For nominal Treasuries, 31 CFR §356.2 applies: *"Dated date means the date from
 
 <a id="accrued-interest-adjusted"></a>
 ### Accrued Interest (Adjusted)
-`Accrued_Interest_Adjusted` = `Accrued_Interest_Nominal / 100 × Index_Ratio × 1000` *(index-ratio-adjusted accrued interest per TIPS, real dollars, with the Index Ratio truncated to six decimal places and then rounded to five and the result rounded to five decimal places for $1,000 par, as [31 CFR 356 Appendix B](./31_CFR_356_Definitions_And_Formulas.md) §I.D.4 states for accrued interest — extends [Accrued Interest (Nominal)](#accrued-interest-nominal) the same way [Inflation-Adjusted Principal](#inflation-adjusted-principal) extends [Par Value (Nominal)](#par-value-nominal). See TIPS_Basics.md §Accrued Interest.)*
+`Accrued_Interest_Adjusted` = `Accrued_Interest_Nominal × Index_Ratio` *(index-ratio-adjusted accrued interest per TIPS, real dollars, with the Index Ratio truncated to six decimal places and then rounded to five and the result rounded to five decimal places for $1,000 par, as [31 CFR 356 Appendix B](./31_CFR_356_Definitions_And_Formulas.md) §I.D.4 states for accrued interest — extends [Accrued Interest (Nominal)](#accrued-interest-nominal) the same way [Inflation-Adjusted Principal](#inflation-adjusted-principal) extends [Par Value (Nominal)](#par-value-nominal). See TIPS_Basics.md §Accrued Interest.)*
 
 ---
 
