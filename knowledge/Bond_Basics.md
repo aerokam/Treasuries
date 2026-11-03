@@ -24,9 +24,9 @@
   ```
   A = days elapsed since the last coupon date
   E = days in the current coupon period
-  accruedInterest = (couponRate/2 × 100) × (A / E)   // per $100 par
+  accruedInterest = (couponRate/2 × 1,000) × (A / E)   // per $1,000 par
   ```
-  A bond bought on a coupon date owes no accrued interest (A = 0), because the coupon paid that day is the seller's. A bond bought the day after a coupon date owes almost none, and one bought the day before the next coupon date owes nearly the full semiannual coupon. The dirty price, which is what the buyer pays, is the clean price plus the accrued interest.
+  A bond bought on a coupon date owes no accrued interest (A = 0), because the coupon paid that day is the seller's. A bond bought the day after a coupon date owes almost none, and one bought the day before the next coupon date owes nearly the full semiannual coupon. The dirty price, which is what the buyer pays, is the clean price plus the accrued interest. A Price is per $100 par and the accrued interest per $1,000 par, so the accrued interest is divided by 10 to add it to a Price.
   *(See [TIPS Basics](./TIPS_Basics.md) for the inflation-adjusted extension.)*
 - **[Settlement Date](./DATA_DICTIONARY.md#settlement-date):** The trade date plus 1 bond trading day (T+1) for a secondary market trade.
 - **[Maturity Date](./DATA_DICTIONARY.md#maturity-date):** The date on which principal is repaid to the holder.

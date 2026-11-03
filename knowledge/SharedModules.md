@@ -151,12 +151,12 @@ It uses `_nextCouponOnOrAfter`, the finder beneath `_nextCouponAfter` (which `ca
 nextCoupon, lastCoupon  // the semiannual schedule of calculateDuration; nextCoupon is the first coupon date strictly after settle, so on a coupon date lastCoupon = settle and A = 0
 E   = days(lastCoupon, nextCoupon)   // days in the current coupon period
 A   = days(lastCoupon, settle)       // days elapsed since the last coupon
-accrued = (coupon/2 × 100) × (A / E) // per $100 par, nominal, with no Index Ratio applied
+accrued = (coupon/2 × 1,000) × (A / E) // per $1,000 par, nominal, with no Index Ratio applied
 ```
 
 **Returns:** `{ accrued, A, E, lastCoupon, nextCoupon }`.
 
-**Spec reference:** [Bond Basics §Accrued Interest](./Bond_Basics.md): Actual/Actual day count, the Treasury and broker settlement convention, and not a flat half-coupon. The function returns the general nominal formula. A TIPS caller applies the Index Ratio ([TIPS Basics §Accrued Interest](./TIPS_Basics.md)). It is the one accrued-interest implementation: `yieldFromPrice` and `priceFromYield` call it and share the coupon finder `_nextCouponAfter` with `calculateDuration`, and the Accrued Interest column of the Trade Ticket ([4.5.3 §Trade Ticket](../TipsLadderManager/knowledge/4.5.3_Show_Trade_Ticket.md#trade-ticket)) calls it directly. The dollars per bond of a TIPS are `accrued/100 × indexRatio × 1000`.
+**Spec reference:** [Bond Basics §Accrued Interest](./Bond_Basics.md): Actual/Actual day count, the Treasury and broker settlement convention, and not a flat half-coupon. The function returns the general nominal formula. A TIPS caller applies the Index Ratio ([TIPS Basics §Accrued Interest](./TIPS_Basics.md)). It is the one accrued-interest implementation: `yieldFromPrice` and `priceFromYield` call it, divide it by 10 to state it per $100 par as a Price is, and share the coupon finder `_nextCouponAfter` with `calculateDuration`, and the Accrued Interest column of the Trade Ticket ([4.5.3 §Trade Ticket](../TipsLadderManager/knowledge/4.5.3_Show_Trade_Ticket.md#trade-ticket)) calls it directly. The dollars per bond of a TIPS are `accrued × indexRatio`.
 
 <a id="weighted-modified-duration"></a>
 ### Weighted Modified Duration
