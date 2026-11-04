@@ -319,8 +319,6 @@ function _showSaoDrill(cusip) {
 
   const now = new Date();
   const yearsToMat = (bond.maturityDate - now) / 31557600000;
-  const dev = bond._saoDevBps || 0;
-  const richCheap = dev > 0 ? 'cheap (yield above curve)' : 'rich (yield below curve)';
 
   let logicHtml = '';
 
@@ -355,13 +353,11 @@ function _showSaoDrill(cusip) {
           Since the residual this corrects amortizes with maturity, the snap weight declines between ${SAO_BLEND_START_YRS}y and ${SAO_BLEND_END_YRS}y (see <em>2.2 §6</em>).
         </div>
         <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>Raw SA Yield</span><span>${(bond.saYield * 100).toFixed(3)}%</span></div>
-        <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>Deviation from curve</span><span>${dev >= 0 ? '+' : ''}${dev.toFixed(1)} bp — ${richCheap}</span></div>
         ${blendNote}
         <div style="border-top:1px dashed #cbd5e1;margin:8px 0;padding-top:8px;display:flex;justify-content:space-between;color:#1a56db;font-weight:700;">
           <span>SAO Yield${bond._saoMode === 'blend' ? ' (blended)' : ' (smooth curve)'}</span><span>${(bond.saoYield * 100).toFixed(3)}%</span>
         </div>
       </div>
-      <p style="font-size:11px;color:#94a3b8;margin:0;">* The deviation is a rich/cheap relative-value signal — informative, but smoothed out of the SAO fair-value curve.</p>
     `;
   }
 
