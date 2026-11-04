@@ -75,6 +75,7 @@ const SUITES = [
   { script: 'test:Unit:YieldsMonitor', dir: 'YieldsMonitor' },
   { script: 'test:UI:YieldsMonitor', dir: 'YieldsMonitor' },
   { script: 'test:UI:KnowledgeMap', dir: 'knowledge' },
+  { script: 'test:UI:TaxationOfTreasuries', dir: 'TaxationOfTreasuries' },
   { script: 'test:Unit:Shared', dir: 'shared' },
   { script: 'test:Unit:CpiExplorer', dir: 'CpiExplorer' },
 ];

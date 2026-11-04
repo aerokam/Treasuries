@@ -16,6 +16,7 @@ export default defineConfig({
     { name: 'TreasuryAuctions', testDir: './TreasuryAuctions/tests/UI' },
     { name: 'YieldsMonitor', testDir: './YieldsMonitor/tests/UI' },
     { name: 'KnowledgeMap', testDir: './knowledge/tests/UI' },
+    { name: 'TaxationOfTreasuries', testDir: './TaxationOfTreasuries/tests/UI' },
   ],
   webServer: {
     command: 'npx serve . -p 8080',
