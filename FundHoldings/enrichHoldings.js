@@ -3,6 +3,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { calculateDuration, termYears, calcMktWtdAvg } from "../shared/src/bond-math.js";
 import { parseCsv } from "../shared/src/csv.js";
+import { marketTipsRowsFromYieldCurves } from "../shared/src/yield-curve-stores.js";
 import { parseTreasuryQuotes } from "../shared/src/market-quotes.js";
 import { toIsoDate } from "../shared/src/settlement.js";
 import { upload } from "../shared/upload.js";
@@ -10,14 +11,8 @@ import { upload } from "../shared/upload.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.join(__dirname, "data");
 
-const YIELDS_SA_SAO_URL = "https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/TIPS/YieldsSaSao.csv";
+const YIELD_CURVES_URL = "https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/YieldCurves.csv";
 const MARKET_QUOTES_URL = "https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/MarketQuotes.csv";
-
-async function fetchCsv(url) {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Failed to fetch ${url}: HTTP ${res.status}`);
-  return parseCsv(await res.text());
-}
 
 function parseDate(isoDate) {
   const [y, m, d] = isoDate.split("-").map(Number);
@@ -31,12 +26,13 @@ async function fetchText(url) {
 }
 
 async function loadYieldSources(settle) {
-  const [tipsRows, quotesText] = await Promise.all([
-    fetchCsv(YIELDS_SA_SAO_URL),
+  const [yieldCurvesText, quotesText] = await Promise.all([
+    fetchText(YIELD_CURVES_URL),
     fetchText(MARKET_QUOTES_URL)
   ]);
 
-  const tipsByCusip = new Map(tipsRows.map(r => [r.cusip, r]));
+  // The Market TIPS security rows of Yield curves (S13), by CUSIP.
+  const tipsByCusip = new Map(marketTipsRowsFromYieldCurves(yieldCurvesText).map(r => [r.cusip, r]));
   // MARKET_QUOTES_URL is a combined file (Treasury + TIPS rows); nominals are the non-TIPS rows,
   // each with its ask yield calculated from its ask price at the settlement date.
   const nominalByCusip = new Map(
@@ -45,7 +41,7 @@ async function loadYieldSources(settle) {
   return { tipsByCusip, nominalByCusip };
 }
 
-// CUSIP presence in the TIPS SA/SAO file is the source of truth for "is this a
+// CUSIP presence among the Market TIPS rows of Yield curves (S13) is the source of truth for "is this a
 // TIPS holding" — more reliable than the holding name text or a per-fund flag,
 // and correctly handles a fund that mixes TIPS and nominal holdings.
 function enrichRow(row, settle, { tipsByCusip, nominalByCusip }) {
@@ -95,7 +91,7 @@ function enrichRow(row, settle, { tipsByCusip, nominalByCusip }) {
   }
 
   // Coupon (display, percent-scale, matching the raw fetchers' convention)
-  // always comes from the matched S10/S7 row, overwriting whatever the
+  // always comes from the matched S13/S7 row, overwriting whatever the
   // fund's own raw export reported: some providers round it in their export
   // (e.g. BlackRock/ICPI reports "0.13" for TIPS's actual 0.125% coupon).
   // `coupon` above is a true fraction in both branches, so *100 recovers the

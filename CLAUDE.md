@@ -249,7 +249,7 @@ npx serve .               # Serve locally (run from root of Treasuries repo)
 
 ### Data Infrastructure (R2)
 
-R2 file manifest is specified in the repo-root `knowledge/DATA_DICTIONARY.md` §2.0, and each job that writes a store in its process spec `knowledge/1.1`–`1.15` (covers `Treasuries/YieldsFromFedInvestPrices.csv`, `Treasuries/MarketQuotes.csv`, `TIPS/RefCpiNsaSa.csv`, `TIPS/YieldsSaSao.csv`, `misc/BondHolidaysSifma.csv`). Do not restate here.
+R2 file manifest is specified in the repo-root `knowledge/DATA_DICTIONARY.md` §2.0, and each job that writes a store in its process spec `knowledge/1.1`–`1.15` (covers `Treasuries/YieldsFromFedInvestPrices.csv`, `Treasuries/MarketQuotes.csv`, `TIPS/RefCpiNsaSa.csv`, `misc/BondHolidaysSifma.csv`). Do not restate here.
 
 ### Market Quotes Download Flow
 

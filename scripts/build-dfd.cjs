@@ -331,7 +331,7 @@ const INGEST_STORES = {
   refcpi: ['Ref CPI', DS('s3')], nsasa: ['Ref CPI NSA and SA', DS('s4')],
   auctions: ['Auction results', DS('s5')], yhist: ['Yield history', DS('s6')],
   quotes: ['Market quotes', DS('s7')], cpihist: ['CPI history', DS('s8')],
-  tent: ['Tentative auction schedule', DS('s9')], sasao: ['SA and SAO yields', DS('s10')],
+  tent: ['Tentative auction schedule', DS('s9')],
   funds: ['Fund holdings', DS('s11')], gsw: ['GSW curve parameters', DS('s12')],
   yc: ['Yield curves', DS('s13')], bei: ['Breakeven inflation', DS('s14')],
   spread: ['Bid and ask spreads', DS('s15')], hol: ['Bond holidays', DS('s16')],
@@ -383,9 +383,6 @@ const INGEST_JOBS = [
   { id: '1.10', slug: 'REFCPINSASA', file: '1.10_Interpolate_Daily_Ref_CPI_NSA_And_SA.md', title: 'Interpolate daily Ref CPI NSA and SA',
     name: ['Interpolate', 'daily Ref CPI', 'NSA and SA'], data: null,
     entities: [], reads: ['blscpi'], writes: ['nsasa'], modules: ['m14'] },
-  { id: '1.11', slug: 'SASAOYIELDS', file: '1.11_Calculate_SA_And_SAO_Yields.md', title: 'Calculate SA and SAO yields',
-    name: ['Calculate SA', 'and SAO yields'], data: null,
-    entities: [], reads: ['quotes', 'nsasa', 'hol'], writes: ['sasao'], modules: ['m1', 'm2', 'm4', 'm15', 'm16', 'm17'] },
   { id: '1.12', slug: 'CPIHISTORY', file: '1.12_Fetch_CPI_History.md', title: 'Fetch CPI history',
     name: ['Fetch CPI', 'history'], data: 'monthly CPI-U',
     entities: ['e4'], reads: [], writes: ['cpihist'] },
@@ -395,7 +392,7 @@ const INGEST_JOBS = [
     stops: '{refcpi} is not written when the fetched series ends before the last day of the second month after the latest month of {cpihist}, or when the merged series has a gap of more than one calendar day or is shorter than what the store already held.' },
   { id: '1.14', slug: 'FUNDHOLDINGS', file: '1.14_Enrich_Fund_Holdings.md', title: 'Enrich fund holdings',
     name: ['Enrich fund', 'holdings'], data: 'fund holdings',
-    entities: ['fund'], reads: ['quotes', 'sasao'], writes: ['funds'], modules: ['m1', 'm2', 'm3', 'm4'] },
+    entities: ['fund'], reads: ['quotes', 'yc'], writes: ['funds'], modules: ['m1', 'm2', 'm3', 'm4'] },
   { id: '1.15', slug: 'GSWCURVE', file: '1.15_Fetch_GSW_Curve_Parameters.md', title: 'Fetch GSW curve parameters',
     name: ['Fetch GSW', 'curve parameters'], data: 'GSW curve parameters',
     entities: ['e13'], reads: [], writes: ['gsw'] },
@@ -549,7 +546,6 @@ function level1() {
     { id: 'quotes', name: 'Market quotes', href: DS('s7') },
     { id: 'cpihist', name: 'CPI history', href: DS('s8') },
     { id: 'tent', name: 'Tentative auction schedule', href: DS('s9') },
-    { id: 'sasao', name: 'SA and SAO yields', href: DS('s10') },
     { id: 'funds', name: 'Fund holdings', href: DS('s11') },
     { id: 'gsw', name: 'GSW curve parameters', href: DS('s12') },
     { id: 'hol', name: 'Bond holidays', href: DS('s16') },
@@ -561,7 +557,7 @@ function level1() {
   ];
   // Each app is named as the portal names it.
   const apps = [
-    { key: 'lm', cat: 'workflow', name: ['Ladder', 'Manager'], spec: 'DFD_LEVEL2_TIPSLADDERMANAGER.html', reads: ['quotes', 'tipsref', 'refcpi', 'sasao', 'hol'] },
+    { key: 'lm', cat: 'workflow', name: ['Ladder', 'Manager'], spec: 'DFD_LEVEL2_TIPSLADDERMANAGER.html', reads: ['quotes', 'tipsref', 'refcpi', 'spot', 'hol'] },
     { key: 'tr', cat: 'reference', name: ['TIPS', 'Reference'], spec: 'DFD_LEVEL2_TIPSREFERENCE.html', reads: ['quotes', 'tipsref', 'refcpi', 'hol'] },
     { key: 'pr', cat: 'educational', name: ['Portal', 'Primer'], spec: 'DFD_LEVEL2_PRIMER.html', reads: ['fedinv', 'tipsref', 'refcpi'] },
     { key: 'ce', cat: 'reference', name: ['CPI', 'Explorer'], spec: 'DFD_LEVEL2_CPIEXPLORER.html', reads: ['refcpi', 'cpihist'] },
@@ -1227,11 +1223,11 @@ function level2TipsLadderManager() {
     { id: 'quotes', name: 'Market quotes', href: DS('s7') },
     { id: 'tipsref', name: 'TIPS reference data', href: DS('s2') },
     { id: 'refcpi', name: 'Ref CPI', href: DS('s3') },
-    { id: 'sasao', name: 'SA and SAO yields', href: DS('s10') },
+    { id: 'yc', name: 'Yield curves', href: DS('s13') },
     { id: 'hol', name: 'Bond holidays', href: DS('s16') },
   ];
   const procs = [
-    { id: '4.1', name: ['Load market', 'data'], href: 'DFD_LEVEL3_TLM_LOAD.html', reads: ['quotes', 'tipsref', 'refcpi', 'sasao', 'hol'],
+    { id: '4.1', name: ['Load market', 'data'], href: 'DFD_LEVEL3_TLM_LOAD.html', reads: ['quotes', 'tipsref', 'refcpi', 'yc', 'hol'],
       out: { '4.3': ['TIPS market data'], '4.4': ['TIPS market data'], '4.5': ['TIPS market data', 'daily Ref CPI', 'bond holidays'], '4.6': ['TIPS market data'] } },
     { id: '4.2', name: ['Import holdings', 'and DARA plan'], href: 'DFD_LEVEL3_TLM_IMPORT.html', reads: [],
       out: { '4.3': ['DARA plan'], '4.4': ['holdings', 'DARA plan'], '4.5': ['holdings'] } },
@@ -1375,14 +1371,14 @@ function level3TipsLadderManagerLoadMarketData() {
     { id: 'quotes', name: 'Market quotes', href: DS('s7') },
     { id: 'tipsref', name: 'TIPS reference data', href: DS('s2') },
     { id: 'refcpi', name: 'Ref CPI', href: DS('s3') },
-    { id: 'sasao', name: 'SA and SAO yields', href: DS('s10') },
+    { id: 'yc', name: 'Yield curves', href: DS('s13') },
     { id: 'hol', name: 'Bond holidays', href: DS('s16') },
   ];
   const S = a => V('TipsLadderManager/knowledge/4.1_Load_Market_Data.md' + (a ? '#' + a : ''));
   const procs = [
     { id: '4.1.1', name: ['Fetch and parse', 'market quotes'], href: S('fetch-and-parse-market-quotes'), reads: ['quotes'],
       out: { '4.1.4': ['TIPS yields'] } },
-    { id: '4.1.3', name: ['Fetch auxiliary', 'TIPS data'], href: S('fetch-auxiliary-tips-data'), reads: ['tipsref', 'refcpi', 'sasao', 'hol'],
+    { id: '4.1.3', name: ['Fetch auxiliary', 'TIPS data'], href: S('fetch-auxiliary-tips-data'), reads: ['tipsref', 'refcpi', 'yc', 'hol'],
       out: { '4.1.1': ['TIPS reference data', 'bond holidays'], '4.1.4': ['SA yields'] } },
     { id: '4.1.4', name: ['Build TIPS', 'market data'], href: S('build-tips-market-data'), reads: [], calls: [], out: {} },
   ];
@@ -1818,7 +1814,7 @@ function level2TipsReference() {
     up: 'DFD_LEVEL1.html', upLabel: 'Level 1',
     svg: P.join(NL),
     notes: ['  <b>No process here writes a data store.</b> Every flow ends at the user and is gone when the page closes.',
-      '  6.1 calls the function that <a href="DFD_LEVEL2_TIPSLADDERMANAGER.html">Ladder Manager</a> also calls to read market data. That function also fetches <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s10">SA and SAO yields (S10)</a>, which this app does not use, so no flow from S10 is drawn.',
+      '  6.1 calls the function that <a href="DFD_LEVEL2_TIPSLADDERMANAGER.html">Ladder Manager</a> also calls to read market data. That function also fetches <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s13">Yield curves (S13)</a>, which this app does not use, so no flow from S13 is drawn.',
       '  6.4 writes the rows of the table to a csv file the user saves.',
       '  <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#tips-reference-rows">TIPS reference rows</a> is defined in the Data Dictionary &sect;6.7.',
       SHARED_NOTE].join(NL)
@@ -1889,11 +1885,11 @@ const KSA = 'SeasonalAdjustments/knowledge/';
 function level2SeasonalAdjustments() {
   // The two snapshot files are kept in the app and are drawn here only: no job writes them.
   const stores = [
-    { id: 'ysao', name: 'SA and SAO yields snapshot', href: DS('s10') },
+    { id: 'ycsnap', name: 'Yield curves snapshot', href: DS('s13') },
     { id: 'rcpi', name: 'Ref CPI NSA and SA snapshot', href: DS('s4') },
   ];
   const procs = [
-    { id: '11.1', name: ['Load', 'snapshot'], href: V(KSA + '11.1_Load_Snapshot.md'), reads: ['ysao', 'rcpi'], out: { '11.2': ['SAO yields', 'SA factors'] } },
+    { id: '11.1', name: ['Load', 'snapshot'], href: V(KSA + '11.1_Load_Snapshot.md'), reads: ['ycsnap', 'rcpi'], out: { '11.2': ['SAO yields', 'SA factors'] } },
     { id: '11.2', name: ['Render', 'pages'], href: V(KSA + '11.2_Render_Pages.md'), reads: [], out: {} },
   ];
   const SX = 40, SW = 215, PR = 58, UX = 1190, UW = 145;
@@ -1931,7 +1927,7 @@ function level2SeasonalAdjustments() {
     up: 'DFD_LEVEL1.html', upLabel: 'Level 1',
     svg: P.join(NL),
     notes: ['  <b>No process here writes a data store.</b> Every flow ends at the user and is gone when the page closes.',
-      '  The two snapshot files are copies of <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s10">SA and SAO yields (S10)</a> and <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s4">Ref CPI NSA and SA (S4)</a>, kept in the app and drawn on this diagram only. No job writes them, and the app reads no R2 store.',
+      '  The two snapshot files are copies of the Market TIPS security rows of <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s13">Yield curves (S13)</a> and <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s4">Ref CPI NSA and SA (S4)</a>, kept in the app and drawn on this diagram only. No job writes them, and the app reads no R2 store.',
       '  11.1 also states the footer, as <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#charts-and-tables">charts and tables</a>, to the user.',
       SHARED_NOTE].join(NL)
   });

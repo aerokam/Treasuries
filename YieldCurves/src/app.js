@@ -1049,7 +1049,7 @@ function renderNominalsChart(fedBonds, mqBonds, fedSpotBonds, mqSpotBonds) {
 }
 
 // The TIPS of one source (FedInvest or Market) is built in three steps, each one implementation
-// shared with the acquisition jobs that write S10, S13, S14 and S15:
+// shared with the acquisition job that writes S13, S14 and S15:
 //   shared/src/tips-yields.js#tipsYieldsFromPrices   Ask Yield and Bid Yield (3.1.7)
 //   shared/src/sa-yields.js#saYieldsFromTipsYields   SA Price Factor and SA Yield (3.2)
 //   shared/src/spreads.js#addTipsSpreads             yield and price spreads (3.6)

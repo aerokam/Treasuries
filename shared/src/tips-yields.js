@@ -8,8 +8,7 @@
 // spreads by 3.6 (shared/src/spreads.js), each from the output of this one.
 //
 // One implementation, imported by the YieldCurves page (YieldCurves/src/app.js) and by the
-// acquisition jobs that write S10, S13, S14 and S15 (YieldCurves/scripts/updateSaSaoYields.js,
-// YieldCurves/scripts/updateYieldCurveDataSets.js), per the no-redundancy directive
+// acquisition job that writes S13, S14 and S15 (YieldCurves/scripts/updateYieldCurveDataSets.js), per the no-redundancy directive
 // (projects/CLAUDE.md §2a). The page and the job kept separate copies until 2026-09-13 and had
 // diverged on the settlement date the market quotes are stated at.
 import { yieldFromPrice } from './bond-math.js';

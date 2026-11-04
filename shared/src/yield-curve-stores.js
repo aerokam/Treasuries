@@ -188,6 +188,35 @@ export function buildYieldCurvesCsv({ dates, securityRows, spotRows }) {
   return lines.join('\n') + '\n';
 }
 
+// ─── S13 reader ──────────────────────────────────────────────────────────────
+// The Market TIPS security rows of S13 text (Source Market, Type TIPS, CUSIP not Spot), in file
+// order, for every consumer that needs the Ask, SA and SAO Yield of the TIPS in Market quotes
+// (S7): the one reader of those rows, so no app keeps a store of its own for them.
+//
+// The columns are found by header name (csv.js#parseCsvWithPreamble), never by position, so the
+// lines before the header and the order of the columns do not matter. Every value is the cell text
+// as written (a blank cell is ''), so a consumer parses it as it parsed the cells of the retired
+// SA and SAO yields (S10).
+//
+// Returns [{ cusip, maturity, coupon, ask_yield, sa_yield, sao_yield,
+//            settleSaFactor, naiveMaturitySaFactor, maturitySaFactor, saPriceFactor, saPrice }]
+// Throws when the text has no header line.
+export function marketTipsRowsFromYieldCurves(text) {
+  const parsed = parseCsvWithPreamble(text, 'CUSIP');
+  if (!parsed) throw new Error('Yield curves (S13) has no header line.');
+  const header = key => S13_COLUMNS.find(c => c[1] === key)[0];
+  const cell = (row, key) => row[header(key)] ?? '';
+  return parsed.rows
+    .filter(r => r['Source'] === MARKET && r['Type'] === 'TIPS' && r['CUSIP'] && r['CUSIP'] !== 'Spot')
+    .map(r => ({
+      cusip: cell(r, 'cusip'), maturity: cell(r, 'maturity'), coupon: cell(r, 'coupon'),
+      ask_yield: cell(r, 'ask'), sa_yield: cell(r, 'sa'), sao_yield: cell(r, 'sao'),
+      settleSaFactor: cell(r, 'settleSaFactor'), naiveMaturitySaFactor: cell(r, 'naiveMaturitySaFactor'),
+      maturitySaFactor: cell(r, 'maturitySaFactor'), saPriceFactor: cell(r, 'saPriceFactor'),
+      saPrice: cell(r, 'saPrice'),
+    }));
+}
+
 // ─── S14 ─────────────────────────────────────────────────────────────────────
 // One row per Market TIPS, against the nominal Treasury nearest it in maturity (3.5 Per security),
 // in the order of the TIPS given. `nominals` are the Bills, Notes and Bonds only: a STRIPS and an

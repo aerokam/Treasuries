@@ -14,8 +14,8 @@ async function main() {
     console.log("\nStep 2: Calculating daily Reference CPI...");
     execSync(`node "${path.join(__dirname, 'calcRefCpi.js')}"`, { stdio: 'inherit' });
     
-    console.log("\nStep 3: Refreshing SA/SAO Yields...");
-    execSync(`node "${path.join(__dirname, 'updateSaSaoYields.js')}"`, { stdio: 'inherit' });
+    console.log("\nStep 3: Refreshing the yield curve data sets (S13, S14, S15) from the new Ref CPI NSA and SA (S4)...");
+    execSync(`node "${path.join(__dirname, 'updateYieldCurveDataSets.js')}"`, { stdio: 'inherit' });
     
     console.log("\nUpdate complete.");
   } catch (error) {

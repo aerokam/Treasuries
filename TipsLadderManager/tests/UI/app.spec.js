@@ -1,7 +1,7 @@
 // E2E regression tests — guards against GUI breakage (inop buttons, broken table render, drill popups)
 // Run: npx playwright test
 // Mocks EVERY R2 fetch (YieldsFromFedInvestPrices.csv, MarketQuotes.csv,
-// RefCPI.csv, TipsRef.csv, YieldsSaSao.csv, BondHolidaysSifma.csv) via page.route() in beforeEach below, fulfilled with the file's current R2 content (r2Text, fetched once per run; nothing market-related is committed);
+// RefCPI.csv, TipsRef.csv, YieldCurves.csv, BondHolidaysSifma.csv) via page.route() in beforeEach below, fulfilled with the file's current R2 content (r2Text, fetched once per run; nothing market-related is committed);
 // the test browser has no live network egress in a sandboxed session, so an unmocked R2 URL fails with
 // "Failed to fetch" (this is by design, not flakiness; well-known, see TESTING.md §Mock every R2 fetch).
 // Any new required R2 fetch added to shared/src/market-data.js MUST get a matching route() mock here, or
@@ -143,8 +143,8 @@ test.beforeEach(async ({ page }) => {
     r.fulfill({ body: await r2Text('TIPS/RefCPI.csv'), contentType: 'text/csv' }));
   await page.route('**/TIPS/TipsRef.csv', async r =>
     r.fulfill({ body: await r2Text('TIPS/TipsRef.csv'), contentType: 'text/csv' }));
-  await page.route('**/TIPS/YieldsSaSao.csv', async r =>
-    r.fulfill({ body: await r2Text('TIPS/YieldsSaSao.csv'), contentType: 'text/csv' }));
+  await page.route('**/Treasuries/YieldCurves.csv', async r =>
+    r.fulfill({ body: await r2Text('Treasuries/YieldCurves.csv'), contentType: 'text/csv' }));
   await page.route('**/misc/BondHolidaysSifma.csv', async r =>
     r.fulfill({ body: await r2Text('misc/BondHolidaysSifma.csv'), contentType: 'text/csv' }));
   // Allow sample pre-populate to succeed (fetches data/SampleHoldings.csv via serve)

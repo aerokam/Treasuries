@@ -18,6 +18,7 @@ import { parseTipsQuotes, parseDownloadDate, downloadDateIso } from './market-qu
 import { yieldFromPrice } from './bond-math.js';
 import { localDate, toIsoDate, nextBusinessDay, parseHolidaySet } from './settlement.js';
 import { parseCsv as parseCsvRows } from './csv.js';
+import { marketTipsRowsFromYieldCurves } from './yield-curve-stores.js';
 
 export const R2_ROOT = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev';
 const BASE_URL = R2_ROOT + '/Treasuries';
@@ -39,7 +40,7 @@ export { parseCsvRows as parseCsv };
 
 // Parses TIPS reference data (S2, TIPS/TipsRef.csv), FiscalData's immutable per-CUSIP
 // metadata -- knowledge/DATA_DICTIONARY.md#s2. One implementation, used by fetchAuxTipsData()
-// below and by any other caller that needs S2 without the RefCPI/YieldsSaSao fetches that
+// below and by any other caller that needs S2 without the RefCPI/YieldCurves fetches that
 // function bundles with it (projects/CLAUDE.md §2a).
 // Returns: [{ cusip, maturity, datedDate, coupon, datedDateRefCpi, term }]
 export function parseTipsRefRows(text) {
@@ -55,19 +56,19 @@ export function parseTipsRefRows(text) {
   }));
 }
 
-// Fetches RefCPI.csv, TipsRef.csv, YieldsSaSao.csv, and BondHolidaysSifma.csv from R2 --
+// Fetches RefCPI.csv, TipsRef.csv, YieldCurves.csv (Yield curves, S13), and BondHolidaysSifma.csv from R2 --
 // shared by both fetchTipsData() (FedInvest) and fetchMarketQuotesData() (Market quotes) so the
 // parsing isn't duplicated between the two sources (projects/CLAUDE.md §2a).
-// Throws on HTTP errors for RefCPI/TipsRef/YieldsSaSao; holidays are optional (3s timeout).
+// Throws on HTTP errors for RefCPI/TipsRef/YieldCurves; holidays are optional (3s timeout).
 async function fetchAuxTipsData() {
   const [refCpiRes, tipsRefRes, saSaoRes] = await Promise.all([
     fetch(TIPS_URL + '/RefCPI.csv', { cache: 'no-cache' }),
     fetch(TIPS_URL + '/TipsRef.csv', { cache: 'no-cache' }),
-    fetch(TIPS_URL + '/YieldsSaSao.csv', { cache: 'no-cache' }),
+    fetch(BASE_URL + '/YieldCurves.csv', { cache: 'no-cache' }),
   ]);
   if (!refCpiRes.ok) throw new Error('RefCPI.csv: HTTP ' + refCpiRes.status);
   if (!tipsRefRes.ok) throw new Error('TipsRef.csv: HTTP ' + tipsRefRes.status);
-  if (!saSaoRes.ok) throw new Error('YieldsSaSao.csv: HTTP ' + saSaoRes.status);
+  if (!saSaoRes.ok) throw new Error('YieldCurves.csv: HTTP ' + saSaoRes.status);
 
   let bondHolidays = new Set();
   try {
@@ -85,10 +86,11 @@ async function fetchAuxTipsData() {
 
   const tipsRefRows = parseTipsRefRows(await tipsRefRes.text());
 
-  // YieldsSaSao.csv: cusip,maturity,coupon,ask_yield,sa_yield,sao_yield -- produced by
-  // YieldCurves/scripts/updateSaSaoYields.js. Only sa_yield is consumed (2.0 §Within-Year
-  // Allocation Policy); ask_yield/sao_yield are parsed but unused here.
-  const saSaoRows = parseCsvRows(await saSaoRes.text()).map(r => ({
+  // YieldCurves.csv (Yield curves, S13), written by YieldCurves/scripts/updateYieldCurveDataSets.js:
+  // its Market TIPS security rows, read by shared/src/yield-curve-stores.js#marketTipsRowsFromYieldCurves.
+  // Only sa_yield is consumed (2.0 §Within-Year Allocation Policy); the ask and SAO Yield are
+  // read but unused here.
+  const saSaoRows = marketTipsRowsFromYieldCurves(await saSaoRes.text()).map(r => ({
     cusip:    r.cusip,
     saYield:  parseFloat(r.sa_yield),
   }));

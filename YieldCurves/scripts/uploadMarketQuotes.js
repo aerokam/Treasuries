@@ -6,7 +6,6 @@
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import { fileURLToPath } from 'url';
 import { uploadToR2 } from './r2.js';
 import { marketQuotesFromExport } from './marketQuotesFromExport.js';
 import { parseTipsQuotes } from '../../shared/src/market-quotes.js';
@@ -50,11 +49,5 @@ if (tipsRowCount < MIN_TIPS_ROWS) {
 console.log(`Uploading Market quotes (downloaded ${derived.stamp}, ${tipsRowCount} TIPS rows, ${derived.treasuryCount} Treasury rows) -> ${R2_KEY}`);
 await uploadToR2(R2_KEY, derived.text);
 
-const { execSync } = await import('child_process');
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-console.log('Triggering SA/SAO Yield refresh...');
-try {
-  execSync(`node "${path.join(__dirname, 'updateSaSaoYields.js')}"`, { stdio: 'inherit' });
-} catch (err) {
-  console.error('Failed to refresh SA/SAO Yields:', err.message);
-}
+// Nothing is refreshed from here: run-market-quotes.cmd calls run-yield-curves.cmd after this
+// script exits 0, and that runs updateYieldCurveDataSets.js (1.3).

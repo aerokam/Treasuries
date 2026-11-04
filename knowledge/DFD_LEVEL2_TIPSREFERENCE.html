@@ -286,7 +286,7 @@
 
 <p class="notes">
   <b>No process here writes a data store.</b> Every flow ends at the user and is gone when the page closes.
-  6.1 calls the function that <a href="DFD_LEVEL2_TIPSLADDERMANAGER.html">Ladder Manager</a> also calls to read market data. That function also fetches <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s10">SA and SAO yields (S10)</a>, which this app does not use, so no flow from S10 is drawn.
+  6.1 calls the function that <a href="DFD_LEVEL2_TIPSLADDERMANAGER.html">Ladder Manager</a> also calls to read market data. That function also fetches <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s13">Yield curves (S13)</a>, which this app does not use, so no flow from S13 is drawn.
   6.4 writes the rows of the table to a csv file the user saves.
   <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#tips-reference-rows">TIPS reference rows</a> is defined in the Data Dictionary &sect;6.7.
   The amber circles are shared modules (<a href="viewer.html#/md/knowledge/SharedModules.md">SharedModules.md</a>), not process steps of this diagram.

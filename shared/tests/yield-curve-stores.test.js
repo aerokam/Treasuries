@@ -11,6 +11,7 @@ import {
   S13_HEADER, S14_HEADER, S15_HEADER, priceDecimals,
   buildYieldCurvesCsv, buildBreakevenCsv, buildSpreadsCsv, breakevenRows, spreadRows,
   compareSecurityRows, compareSpotRows, fedInvestNominalType, spotRowsFromFits, buildYieldCurveStores,
+  marketTipsRowsFromYieldCurves,
 } from '../src/yield-curve-stores.js';
 import { parseCsvWithPreamble } from '../src/csv.js';
 import { parseDownloadDate, parseTipsQuotes, parseTreasuryQuotes } from '../src/market-quotes.js';
@@ -101,6 +102,30 @@ const s13 = buildYieldCurvesCsv({ dates, securityRows, spotRows });
   eq([spotTips.Spot, spotTips['Spot SA'], spotTips.SA, spotTips['SA Price']], ['0.0200000', '0.0210000', '', ''], 'S13: a spot row has Spot and Spot SA only');
   const bei = p.rows.find(r => r.CUSIP === 'Spot' && r.Type === 'BEI');
   eq([bei.Spot, bei['Spot SA']], ['0.0200000', ''], 'S13: a null spot cell is blank');
+}
+{
+  // marketTipsRowsFromYieldCurves: the Market TIPS security rows, by header name.
+  const rows = marketTipsRowsFromYieldCurves(s13);
+  eq(rows.map(r => r.cusip), ['C'], 'S13 reader: only the Market TIPS security row (not FedInvest, a nominal or a spot row)');
+  eq([rows[0].maturity, rows[0].coupon, rows[0].ask_yield, rows[0].sa_yield, rows[0].sao_yield],
+    ['2028-01-15', '0.0125000', '0.0400000', '0.0100000', '0.0110000'], 'S13 reader: the cells as written, under the keys of the retired S10');
+  eq([rows[0].settleSaFactor, rows[0].naiveMaturitySaFactor, rows[0].maturitySaFactor, rows[0].saPriceFactor, rows[0].saPrice],
+    ['1.00248', '0.99878', '0.99889', '1.00359', '100.571'], 'S13 reader: the five working values');
+
+  // Column order does not matter after CUSIP (the first cell of the header line): the same rows with the other columns reversed.
+  const lines = s13.trim().split('\n');
+  const reorder = l => { const c = l.split(','); return [c[0], ...c.slice(1).reverse()].join(','); };
+  const reversed = lines.map((l, i) => i < 4 ? l : reorder(l)).join('\n') + '\n';
+  eq(marketTipsRowsFromYieldCurves(reversed), rows, 'S13 reader: columns found by header name, not position');
+
+  // A TIPS with no SA Yield has blank sa_yield and sao_yield cells, as in S10.
+  const noSa = buildYieldCurvesCsv({ dates, securityRows: [sec('T', 'Market', '2030-07-15', 3.7, 'TIPS', 0.01, 100, { sa: NaN, sao: NaN })], spotRows: [] });
+  const t = marketTipsRowsFromYieldCurves(noSa)[0];
+  eq([t.cusip, t.ask_yield, t.sa_yield, t.sao_yield], ['T', '0.0400000', '', ''], 'S13 reader: a blank SA and SAO cell is an empty string');
+
+  let threw = false;
+  try { marketTipsRowsFromYieldCurves('a,b\n1,2\n'); } catch { threw = true; }
+  ok(threw, 'S13 reader: text with no header line throws');
 }
 {
   // NaN working values (a TIPS with no SA Yield) are blank, not "NaN".
@@ -247,6 +272,11 @@ const nomSec = (cusip, cusipType, maturity, coupon, yld, price, bidPrice, bidYie
     const a = s15p.rows[i - 1], b = s15p.rows[i];
     ok(a.maturity < b.maturity || (a.maturity === b.maturity && (+a.coupon < +b.coupon || (+a.coupon === +b.coupon && a.cusip <= b.cusip))), `whole S15: ordered at row ${i}`);
   }
+
+  // The S13 reader returns one row per Market TIPS of the built text, with the SA Yield of S14's row for the same CUSIP.
+  const marketTips = marketTipsRowsFromYieldCurves(out.yieldCurvesCsv);
+  ok(marketTips.length === 7 && marketTips.every(r => s14p.rows.some(b => b.tips_cusip === r.cusip && b.tips_sa_yield === r.sa_yield && b.tips_ask_yield === r.ask_yield)),
+    'whole S13 reader: one row per Market TIPS, agreeing with S14 on the Ask and SA Yield');
 
   // The Market quotes the file was built from, read back the way the writer reads them.
   const quotes = marketLines.join('\n');

@@ -2,8 +2,7 @@
 // YieldCurves/knowledge/3.2_Adjust_For_Seasonality.md (3.2), for the TIPS Yields of 3.1.7.
 //
 // One implementation, imported by the YieldCurves page (YieldCurves/src/app.js) and by the
-// acquisition jobs that write S10 and S13 (YieldCurves/scripts/updateSaSaoYields.js,
-// YieldCurves/scripts/updateYieldCurveDataSets.js), per the no-redundancy directive
+// acquisition job that writes S13 (YieldCurves/scripts/updateYieldCurveDataSets.js), per the no-redundancy directive
 // (projects/CLAUDE.md §2a). The SA Factor lookups are shared/src/ref-cpi.js.
 import { yieldFromPrice } from './bond-math.js';
 import { saFactorForDate, maturitySaFactors } from './ref-cpi.js';

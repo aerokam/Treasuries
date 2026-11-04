@@ -212,7 +212,7 @@ Register-NodeTask "IntradayArchive" `
 
 # SaFactors  -  Daily 6:35am PT
 Register-NodeTask "SaFactors" `
-    "Fetch CPI NSA/SA from BLS, calculate daily SA factors, upload RefCpiNsaSa.csv, refresh SA/SAO yields" `
+    "Fetch CPI NSA/SA from BLS, calculate daily SA factors, upload RefCpiNsaSa.csv, then refresh the yield curve data sets (Yield curves, Breakeven inflation, Bid and ask spreads)" `
     @(New-ScheduledTaskTrigger -Daily -At "6:35am") `
     "YieldCurves/scripts/updateRefCpi.js"
 
@@ -298,6 +298,8 @@ Register-DataTask "VendorUpdateCheck" `
 # success only, via YieldCurves/scripts/run-yield-curves.cmd. Both are its actual inputs
 # (MarketQuotes.csv and YieldsFromFedInvestPrices.csv), so it re-fits whenever
 # either one actually changed rather than on its own fixed clock.
+# It also runs as the last step of updateRefCpi.js (the SaFactors task, above), because a new
+# Ref CPI NSA and SA (S4) changes the SA Yield of every TIPS in it.
 
 # ---------------------------------------------------------------------------
 # CPI release date tasks  -  date-specific triggers fetched live from R2
