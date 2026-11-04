@@ -598,59 +598,6 @@ The value implied for a year with no point in the series (a structural gap year,
 
 ---
 
-## <a id="m17"></a>tips-yields.js (M17)
-**File**: `shared/src/tips-yields.js`
-**Purpose**: The Ask Yield and the Bid Yield of the TIPS rows of S1 or the market quotes of S7, combined with one settlement date per source into the security objects every process after [1.3.1.6 Calculate TIPS yields](1.3.1_Parse_Sources_And_Calculate_Yields.md#calculate-tips-yields) works from. It implements [1.3.1.6 Calculate TIPS yields](1.3.1_Parse_Sources_And_Calculate_Yields.md#calculate-tips-yields).
-**Exports**:
-- `tipsYieldsFromPrices(tipsRows, quotesByCusip, isBroker, marketSettleIso)`.
-
-**Called by**: [1.3 Calculate yield curve data sets](./1.3_Calculate_Yield_Curve_Data_Sets.md).
-
----
-
-## <a id="m18"></a>treasury-yields.js (M18)
-**File**: `shared/src/treasury-yields.js`
-**Purpose**: The yield of each nominal Treasury of S1 from its price at the settlement date the file states. It implements [1.3.1.7 Calculate Treasury yields](1.3.1_Parse_Sources_And_Calculate_Yields.md#calculate-treasury-yields).
-**Exports**:
-- `treasuryYieldsFromPrices(rows)`.
-
-**Called by**: [1.3 Calculate yield curve data sets](./1.3_Calculate_Yield_Curve_Data_Sets.md).
-
----
-
-## <a id="m19"></a>breakeven.js (M19)
-**File**: `shared/src/breakeven.js`
-**Purpose**: The two breakeven methods of [1.3.5 Calculate breakeven inflation](1.3.5_Calculate_Breakeven_Inflation.md): the nominal Treasury each per-security breakeven is stated against, and the breakeven across terms between two fitted spot curves. It implements [1.3.5 Calculate breakeven inflation](1.3.5_Calculate_Breakeven_Inflation.md).
-**Exports**:
-- `findClosestNominal(nominals, maturityDate)`.
-- `spotBreakevenAcrossTerms(treasuriesFit, tipsFit)`.
-
-**Called by**: [1.3 Calculate yield curve data sets](./1.3_Calculate_Yield_Curve_Data_Sets.md) (`findClosestNominal`, `spotBreakevenAcrossTerms`).
-
----
-
-## <a id="m20"></a>spreads.js (M20)
-**File**: `shared/src/spreads.js`
-**Purpose**: The bid and ask spreads of [1.3.6 Calculate bid and ask spreads](1.3.6_Calculate_Bid_And_Ask_Spreads.md) for one security quoted on both sides. It implements [1.3.6 Calculate bid and ask spreads](1.3.6_Calculate_Bid_And_Ask_Spreads.md).
-**Exports**:
-- `yieldSpreadBps(askYield, bidYield)`, `priceSpreadPct(askPrice, bidPrice)`.
-- `addTipsSpreads(tips)`, `addTreasurySpreads(treasuries)`.
-
-**Called by**: [1.3 Calculate yield curve data sets](./1.3_Calculate_Yield_Curve_Data_Sets.md).
-
----
-
-## <a id="m21"></a>treasury-cusip.js (M21)
-**File**: `shared/src/treasury-cusip.js`
-**Purpose**: The classification of a U.S. Treasury security by CUSIP root, in place of the free-text description of a broker. The reference and its method are in [Treasury CUSIP Reference](./Treasury_CUSIP_Reference.md).
-**Exports**:
-- `classifyByCusipRoot(cusip)`.
-- `isStrip(cusip)`.
-
-**Called by**: [1.3 Calculate yield curve data sets](./1.3_Calculate_Yield_Curve_Data_Sets.md), [1.3.4 Fit spot yield curves](1.3.4_Fit_Spot_Yield_Curves.md) (`isStrip`).
-
----
-
 ## <a id="m22"></a>date-picker.js (M22)
 **File**: `shared/src/date-picker.js`
 **Purpose**: The one date input of every app: the styled native date input, with its value exchanged as an ISO date string.
