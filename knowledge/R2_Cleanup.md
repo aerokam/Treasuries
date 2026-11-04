@@ -66,7 +66,7 @@ true now. Three consumers read `TIPS/YieldsSaSao.csv`: TipsLadderManager takes `
 through `shared/src/market-data.js` for its within-year allocation policy, FundHoldings
 enriches TIPS fund holdings from it, and SeasonalAdjustments reads a committed snapshot of
 it rather than the object itself. It is both a public resource and an input to the suite.
-**Retired 2026-11-03:** the rows of that file were the Market TIPS security rows of [Yield curves (S13)](./DATA_DICTIONARY.md#s13), calculated twice by two jobs. `updateSaSaoYields.js` is deleted, every reader moved to `Treasuries/YieldCurves.csv`, and `TIPS/YieldsSaSao.csv` is no longer written. The object stays on R2, frozen at its last write, until the developer says to delete it.
+**Retired 2026-11-03:** the rows of that file were the Market TIPS security rows of [Yield curves (S13)](./DATA_DICTIONARY.md#s13), calculated twice by two jobs. `updateSaSaoYields.js` is deleted, every reader moved to `Treasuries/YieldCurves.csv`, and `TIPS/YieldsSaSao.csv` is no longer written. The object was deleted from R2 on 2026-11-04; a spreadsheet that used its URL reads Yield curves instead, filtered to Source `Market` and Type `TIPS`.
 
 Separately, that run was logging `Exited with code 1` even on success: the script wrote
 its progress via `console.error`, and the quote download wrapper's `2>&1` pipe makes PowerShell 5.1
