@@ -21,7 +21,7 @@
 
 **D** &nbsp; [DAA](#daa) &middot; [Daily Ref CPI](#daily-ref-cpi) &middot; [DARA](#dara) &middot; [DARA Plan](#dara-plan) &middot; [DARA Plan File](#dara-plan-file) &middot; [Dated Date](#dated-date) &middot; [Day Change](#day-change) &middot; [Deck Content](#deck-content) &middot; [Deck Pages](#deck-pages) &middot; [Disposition Date](#disposition-date) &middot; [Download Date](#download-date) &middot; [Downloaded Data Sets](#downloaded-data-sets) &middot; [Drill Popup](#drill-popup) &middot; [Drill Request](#drill-request) &middot; [Duration](#duration) &middot; [Duration Matching](#duration-matching)
 
-**E** &nbsp; [Excess TIPS](#excess-tips) &middot; [Expected Excess](#expected-excess)
+**E** &nbsp; [End Date](#end-date) &middot; [Excess TIPS](#excess-tips) &middot; [Expected Excess](#expected-excess)
 
 **F** &nbsp; [Face Value](#face-value) &middot; [FACP](#facp) &middot; [Federal Reserve FEDS 2008-05 (E13)](#e13) &middot; [FedInvest (E1)](#e1) &middot; [FedInvest Daily Price List](#fedinvest-daily-price-list) &middot; [FedInvest prices (S1)](#s1) &middot; [Fidelity Export](#fidelity-export) &middot; [FiscalData (E3)](#e3) &middot; [fminvest.com (E8)](#e8) &middot; [Forward Rate](#forward-rate) &middot; [Fund Holdings](#fund-holdings) &middot; [Fund holdings (S11)](#s11) &middot; [Funded Year](#funded-year) &middot; [Funded Year TIPS](#funded-year-tips)
 
@@ -45,13 +45,13 @@
 
 **R** &nbsp; [R2 Read Access](#r2-read-access) &middot; [Rebalance Result](#rebalance-result) &middot; [Ref CPI](#ref-cpi) &middot; [Ref CPI (S3)](#s3) &middot; [Ref CPI NSA and SA (S4)](#s4) &middot; [Reference Data](#reference-data) &middot; [Reference Date](#reference-date) &middot; [Retained Bracket Excess](#retained-bracket-excess) &middot; [Retained Lower Bracket](#retained-lower-bracket) &middot; [Rolling CPI Change](#rolling-cpi-change) &middot; [Rung](#rung)
 
-**S** &nbsp; [SA Factor](#sa-factor) &middot; [SA Price](#sa-price) &middot; [SA Price Factor](#sa-price-factor) &middot; [SA Yield](#sa-yield) &middot; [SA Yield Series](#sa-yield-series) &middot; [SA Yields](#sa-yields) &middot; [SACP](#sacp) &middot; [same year excess interest](#same-maturity-excess-interest) *(see Same-Maturity Excess Interest)* &middot; [Same-Maturity Excess Interest](#same-maturity-excess-interest) &middot; [SAO Blend Weight](#sao-blend-weight) &middot; [SAO Yield](#sao-yield) &middot; [SAO Yields](#sao-yields) &middot; [Schwab Asset Management holdings export (E10)](#e10) &middot; [Schwab Export](#schwab-export) &middot; [Seasonal Amplitude](#seasonal-amplitude) &middot; [Seasonal Factor Drift](#seasonal-factor-drift) &middot; [Settlement Date](#settlement-date) &middot; [Simulated](#simulated) &middot; [simulated future 30y tips](#simulated-outstanding-future-30y-tips) *(see Simulated Outstanding Future 30Y TIPS)* &middot; [Simulated Outstanding Future 10Y TIPS](#simulated-outstanding-future-10y-tips) &middot; [Simulated Outstanding Future 30Y TIPS](#simulated-outstanding-future-30y-tips) &middot; [Simulated Outstanding TIPS](#simulated-outstanding-tips) &middot; [Source Data](#source-data) &middot; [Spot Yield](#spot-yield) &middot; [Spot Yield Curves](#spot-yield-curves) &middot; [Static](#static) &middot; [Synthetic TIPS](#synthetic-tips)
+**S** &nbsp; [SA Factor](#sa-factor) &middot; [SA Price](#sa-price) &middot; [SA Price Factor](#sa-price-factor) &middot; [SA Yield](#sa-yield) &middot; [SA Yield Series](#sa-yield-series) &middot; [SA Yields](#sa-yields) &middot; [SACP](#sacp) &middot; [same year excess interest](#same-maturity-excess-interest) *(see Same-Maturity Excess Interest)* &middot; [Same-Maturity Excess Interest](#same-maturity-excess-interest) &middot; [SAO Blend Weight](#sao-blend-weight) &middot; [SAO Yield](#sao-yield) &middot; [SAO Yields](#sao-yields) &middot; [Schwab Asset Management holdings export (E10)](#e10) &middot; [Schwab Export](#schwab-export) &middot; [Seasonal Amplitude](#seasonal-amplitude) &middot; [Seasonal Factor Drift](#seasonal-factor-drift) &middot; [Settlement Date](#settlement-date) &middot; [Simulated](#simulated) &middot; [simulated future 30y tips](#simulated-outstanding-future-30y-tips) *(see Simulated Outstanding Future 30Y TIPS)* &middot; [Simulated Outstanding Future 10Y TIPS](#simulated-outstanding-future-10y-tips) &middot; [Simulated Outstanding Future 30Y TIPS](#simulated-outstanding-future-30y-tips) &middot; [Simulated Outstanding TIPS](#simulated-outstanding-tips) &middot; [Source Data](#source-data) &middot; [Spot Yield](#spot-yield) &middot; [Spot Yield Curves](#spot-yield-curves) &middot; [Start Date](#start-date) &middot; [Static](#static) &middot; [Synthetic TIPS](#synthetic-tips)
 
 **T** &nbsp; [Tentative Auction Schedule](#tentative-auction-schedule) &middot; [Tentative auction schedule (S9)](#s9) &middot; [Term](#term) &middot; [TIPS](#tips) &middot; [TIPS Ladder](#tips-ladder) &middot; [TIPS Market Data](#tips-market-data) &middot; [TIPS Prices](#tips-prices) &middot; [TIPS Quotes](#tips-quotes) &middot; [TIPS Reference Data](#tips-reference-data) &middot; [TIPS reference data (S2)](#s2) &middot; [TIPS Reference Rows](#tips-reference-rows) &middot; [TIPS Yields](#tips-yields) &middot; [tipsladder.com Format](#tipsladdercom-format) &middot; [Total Cost](#total-cost) &middot; [Trade Date](#trade-date) &middot; [Trade Ticket](#trade-ticket) &middot; [Treasury Bill](#treasury-bill) &middot; [Treasury Bond](#treasury-bond) &middot; [Treasury Note](#treasury-note) &middot; [Treasury Prices](#treasury-prices) &middot; [Treasury Quotes](#treasury-quotes) &middot; [Treasury Tentative Auction Schedule (E14)](#e14) &middot; [Treasury Yields](#treasury-yields) &middot; [TreasuryDirect (E15)](#e15) &middot; [TreasuryDirect SecIndex (E2)](#e2)
 
 **U** &nbsp; [Upcoming Auctions](#upcoming-auctions)
 
-**V** &nbsp; [Valuation Date](#valuation-date) &middot; [Vanguard Advisors (E7)](#e7) &middot; [Vanguard Export](#vanguard-export) &middot; [View Selections](#view-selections)
+**V** &nbsp; [Vanguard Advisors (E7)](#e7) &middot; [Vanguard Export](#vanguard-export) &middot; [View Selections](#view-selections)
 
 **W** &nbsp; [Within-Year Allocation Policy](#within-year-allocation-policy)
 
@@ -346,10 +346,13 @@
 ### Disposition Date
 `Disposition_Date` = *The date a holder stops holding a security: its [Maturity Date](#maturity-date) when it is held to maturity, or the [Settlement Date](#settlement-date) of its sale. It is never the [Trade Date](#trade-date) of the sale.*
 
-<a id="valuation-date"></a>
-### Valuation Date
-`Valuation_Date` = *The date for which a value is calculated. The [OID](#oid) of a TIPS is calculated for a Valuation Date that is January 1 of the year after the tax year when the TIPS is held at the end of the tax year, as [IRS Publication 1212](https://www.irs.gov/publications/p1212) states, and the [Disposition Date](#disposition-date) when the TIPS is sold or matures during the tax year.*
+<a id="start-date"></a>
+### Start Date
+`Start_Date` = *The first day of the period for which an [OID](#oid) is calculated: the [Acquisition Date](#acquisition-date) for a TIPS acquired in the tax year, and January 1 of the tax year for a TIPS acquired in an earlier year, which [IRS Publication 1212](https://www.irs.gov/publications/p1212) states as the first day on which the holder held the debt instrument during the tax year.*
 
+<a id="end-date"></a>
+### End Date
+`End_Date` = *The last day of the period for which an [OID](#oid) is calculated: January 1 of the year after the tax year for a TIPS held at the end of the tax year, as [IRS Publication 1212](https://www.irs.gov/publications/p1212) states, and the [Disposition Date](#disposition-date) for a TIPS sold or matured during the tax year.*
 
 <a id="bond-holiday"></a>
 ### Bond Holiday
@@ -505,7 +508,7 @@ For nominal Treasuries, 31 CFR §356.2 applies: *"Dated date means the date from
 
 <a id="oid"></a>
 ### OID
-`OID` = `Par × (Index_Ratio_at_Valuation_Date − Index_Ratio_at_Acquisition_Date)` *Original issue discount of a [TIPS](#tips): its inflation adjustment over the period from an [Acquisition Date](#acquisition-date) to a [Valuation Date](#valuation-date), which Form 1099-OID Box 8 reports for a tax year. The [Index Ratio](#index-ratio) of each date is not rounded, as a broker does not round it, unless the calculation states that it is rounded as Treasury rounds it. A negative OID is a deflation adjustment. The reporting rule is in [TIPS OID Tax Reference, Box 8](../TaxationOfTreasuries/docs/TIPS_OID_Tax_Reference.md#box-8-oid-annual-inflation-accrual).*
+`OID` = `Par × (Index_Ratio_at_End_Date − Index_Ratio_at_Start_Date)` *Original issue discount of a [TIPS](#tips): its inflation adjustment over the period from a [Start Date](#start-date) to an [End Date](#end-date), which Form 1099-OID Box 8 reports for a tax year. The [Index Ratio](#index-ratio) of each date is not rounded, as a broker does not round it, unless the calculation states that it is rounded as Treasury rounds it. A negative OID is a deflation adjustment. The reporting rule is in [TIPS OID Tax Reference, Box 8](../TaxationOfTreasuries/docs/TIPS_OID_Tax_Reference.md#box-8-oid-annual-inflation-accrual).*
 
 
 <a id="annual-interest-real"></a>

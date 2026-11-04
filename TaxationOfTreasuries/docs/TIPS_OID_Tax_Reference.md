@@ -173,7 +173,7 @@ A negative result is a deflation adjustment, not negative OID: it offsets the st
 
 For the first year held, "first day held" = the settlement date of the purchase, not its trade date. For subsequent years, it is 1/1 of that year.
 
-The OID Calculator in this app's left pane calculates this amount for a CUSIP, a quantity, a first day held and an end day, with the index ratio rounded or not rounded.
+The OID Calculator in this app's left pane calculates this amount for a CUSIP, a quantity, a Start Date (the first day held) and an End Date (the end day), with the index ratio rounded or not rounded.
 
 ### Vanguard — Monthly Breakdown
 

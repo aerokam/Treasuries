@@ -34,10 +34,15 @@ const STYLE = `
 
 const HELP = `
   <ul>
-    <li>OID is the inflation adjustment of a TIPS from its Acquisition Date to a Valuation Date: Par × (Index Ratio of the Valuation Date − Index Ratio of the Acquisition Date).</li>
+    <li>OID is the inflation adjustment of a TIPS from a Start Date to an End Date: Par × (Index Ratio of the End Date − Index Ratio of the Start Date).</li>
     <li>Quantity is the number of $1,000 par units. A Quantity of 1 is $1,000 par.</li>
-    <li>Acquisition Date is the Settlement Date of the purchase, not the Trade Date. For a tax year after the year of purchase, enter January 1 of that tax year.</li>
-    <li>Valuation Date is the date the OID is calculated for:
+    <li>Start Date is the first day the TIPS is held in the tax year:
+      <ul>
+        <li>A TIPS bought in the tax year: the Settlement Date of the purchase, not the Trade Date.</li>
+        <li>A TIPS bought in an earlier year: January 1 of the tax year.</li>
+      </ul>
+    </li>
+    <li>End Date is the last day of the period:
       <ul>
         <li>A TIPS held at the end of the tax year: January 1 of the next year.</li>
         <li>A TIPS sold during the tax year: the Settlement Date of the sale.</li>
@@ -45,7 +50,7 @@ const HELP = `
       </ul>
     </li>
     <li>Index Ratio, not rounded, is the Ref CPI of the date divided by the Dated Date Ref CPI. Rounded as Treasury rounds it, the ratio is truncated to six decimal places and then rounded to five. Compare the OID of each with Box 8 of the Form 1099-OID.</li>
-    <li>When Ref CPI is not yet published for the Valuation Date, the OID is calculated as of the last date with a published Ref CPI, and the result states that date.</li>
+    <li>When Ref CPI is not yet published for the End Date, the OID is calculated as of the last date with a published Ref CPI, and the result states that date.</li>
   </ul>`;
 
 let loaded = null; // { tipsRows, refCpiRows }, fetched once per page load
@@ -70,13 +75,13 @@ function messageFor(result, tips, refCpiRows) {
   switch (result.reason) {
     case 'cusip-not-found': return 'No TIPS has this CUSIP.';
     case 'quantity': return 'Quantity is a whole number of 1 or more.';
-    case 'dates-missing': return 'Enter an Acquisition Date and a Valuation Date.';
-    case 'acquisition-after-valuation': return 'The Acquisition Date is after the Valuation Date.';
-    case 'acquisition-before-dated-date': return `The Acquisition Date is before the Dated Date, ${tips.datedDate}.`;
-    case 'acquisition-after-maturity': return `The Acquisition Date is after the Maturity Date, ${tips.maturity}.`;
-    case 'valuation-after-maturity': return `The Valuation Date is after the Maturity Date, ${tips.maturity}. For a TIPS held to maturity, enter the Maturity Date.`;
-    case 'no-ref-cpi-acquisition': return 'There is no Ref CPI for the Acquisition Date.' + published;
-    case 'no-ref-cpi-valuation': return 'There is no Ref CPI for the Valuation Date.' + published;
+    case 'dates-missing': return 'Enter a Start Date and an End Date.';
+    case 'start-after-end': return 'The Start Date is after the End Date.';
+    case 'start-before-dated-date': return `The Start Date is before the Dated Date, ${tips.datedDate}.`;
+    case 'start-after-maturity': return `The Start Date is after the Maturity Date, ${tips.maturity}.`;
+    case 'end-after-maturity': return `The End Date is after the Maturity Date, ${tips.maturity}. For a TIPS held to maturity, enter the Maturity Date.`;
+    case 'no-ref-cpi-start': return 'There is no Ref CPI for the Start Date.' + published;
+    case 'no-ref-cpi-end': return 'There is no Ref CPI for the End Date.' + published;
     default: return 'No result.';
   }
 }
@@ -86,21 +91,21 @@ function resultHtml(r, tips) {
   const ir = x => x.toFixed(rounded ? 5 : 8);
   const row = (label, date, refCpi, ratio) =>
     `<tr><td>${label}</td><td>${date}</td><td class="num">${refCpi.toFixed(5)}</td><td class="num">${ratio}</td></tr>`;
-  const valuationDate = r.valuationDateLimited
-    ? `${r.valuationDateUsed} <em>(entered ${r.valuationDate})</em>` : r.valuationDate;
+  const endDate = r.endDateLimited
+    ? `${r.endDateUsed} <em>(entered ${r.endDate})</em>` : r.endDate;
   let html = `<p>${couponText(tips.coupon)} TIPS due ${tips.maturity}</p>
     <table>
       <thead><tr><th></th><th>Date</th><th>Ref CPI</th><th>Index Ratio</th></tr></thead>
       <tbody>
         ${row('Dated Date', tips.datedDate, r.datedDateRefCpi, '1')}
-        ${row('Acquisition Date', r.acquisitionDate, r.acquisitionRefCpi, ir(r.acquisitionIndexRatio))}
-        ${row('Valuation Date', valuationDate, r.valuationRefCpi, ir(r.valuationIndexRatio))}
+        ${row('Start Date', r.startDate, r.startRefCpi, ir(r.startIndexRatio))}
+        ${row('End Date', endDate, r.endRefCpi, ir(r.endIndexRatio))}
       </tbody>
     </table>
     <div class="oid-amount">OID ${money(r.oid)}</div>
-    <div class="oid-formula">Par ${money(r.par).replace('.00', '')} × (${ir(r.valuationIndexRatio)} − ${ir(r.acquisitionIndexRatio)})</div>`;
-  if (r.valuationDateLimited) {
-    html += `<div class="oid-note">Ref CPI is published through ${r.lastRefCpiDate}. The OID is calculated as of that date, not as of the Valuation Date entered.</div>`;
+    <div class="oid-formula">Par ${money(r.par).replace('.00', '')} × (${ir(r.endIndexRatio)} − ${ir(r.startIndexRatio)})</div>`;
+  if (r.endDateLimited) {
+    html += `<div class="oid-note">Ref CPI is published through ${r.lastRefCpiDate}. The OID is calculated as of that date, not as of the End Date entered.</div>`;
   }
   if (r.oid < 0) html += '<div class="oid-note">A negative OID is a deflation adjustment.</div>';
   return html;
@@ -116,8 +121,8 @@ export async function render(container) {
         <label>CUSIP<input type="text" id="oid-cusip" list="oid-cusips" maxlength="9" autocomplete="off" spellcheck="false"></label>
         <datalist id="oid-cusips"></datalist>
         <label>Quantity<input type="number" id="oid-quantity" min="1" step="1" value="1"></label>
-        <label>Acquisition Date<input type="date" id="oid-acquisition"></label>
-        <label>Valuation Date<input type="date" id="oid-valuation"></label>
+        <label>Start Date<input type="date" id="oid-start"></label>
+        <label>End Date<input type="date" id="oid-end"></label>
         <fieldset>
           <legend>Index Ratio</legend>
           <label><input type="radio" name="oid-rounding" value="${NO_ROUNDING}" checked> Not rounded</label>
@@ -131,7 +136,7 @@ export async function render(container) {
   const status = $('oid-status');
   const resultEl = $('oid-result');
   const hint = text => { resultEl.innerHTML = `<p class="oid-hint">${text}</p>`; };
-  hint('Enter a CUSIP, an Acquisition Date and a Valuation Date.');
+  hint('Enter a CUSIP, a Start Date and an End Date.');
 
   let data;
   try {
@@ -148,17 +153,17 @@ export async function render(container) {
 
   const update = () => {
     const cusip = $('oid-cusip').value.trim().toUpperCase();
-    const acquisitionDate = $('oid-acquisition').value;
-    const valuationDate = $('oid-valuation').value;
-    if (!cusip || !acquisitionDate || !valuationDate) {
-      hint('Enter a CUSIP, an Acquisition Date and a Valuation Date.');
+    const startDate = $('oid-start').value;
+    const endDate = $('oid-end').value;
+    if (!cusip || !startDate || !endDate) {
+      hint('Enter a CUSIP, a Start Date and an End Date.');
       return;
     }
     const tips = tipsRows.find(t => t.cusip === cusip);
     const result = calculateTipsOid({
       tips,
       quantity: Number($('oid-quantity').value),
-      acquisitionDate, valuationDate, refCpiRows,
+      startDate, endDate, refCpiRows,
       rounding: container.querySelector('input[name="oid-rounding"]:checked').value,
     });
     resultEl.innerHTML = result.ok
