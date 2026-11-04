@@ -105,10 +105,11 @@ test('January 1 takes the CPI-U of October of the year before', () => {
   assert.equal(r.endCpiMonth, '2025-10');
 });
 
-test('a date after the last Ref CPI date that is not the first of a month, or whose CPI-U is absent, is calculated at the last date', () => {
+test('an End Date after the latest known Ref CPI is calculated at the latest known Ref CPI, or at the last Ref CPI date without CPI history', () => {
   const mid = calculateTipsOid({ ...base, tips: later, startDate: '2024-06-14', endDate: '2025-03-15', monthlyCpi: { '2024-12': 320.123 } });
   assert.equal(mid.endDateLimited, true);
-  assert.equal(mid.endDateUsed, '2025-02-01');
+  assert.equal(mid.endDateUsed, '2025-03-01');
+  assert.equal(mid.lastKnownRefCpiDate, '2025-03-01');
   const absent = calculateTipsOid({ ...base, tips: later, startDate: '2024-06-14', endDate: '2025-03-01', monthlyCpi: {} });
   assert.equal(absent.endDateLimited, true);
   const none = calculateTipsOid({ ...base, tips: later, startDate: '2024-06-14', endDate: '2025-03-01' });
@@ -121,7 +122,7 @@ test('a published Ref CPI is used in place of the CPI-U for the same date', () =
   assert.equal(r.endCpiMonth, null);
 });
 
-test('the day after the last Ref CPI date is the latest known Ref CPI date when it is the first of a month with its CPI-U', () => {
+test('the latest known Ref CPI date is the first of the month three months after the latest month of CPI history', () => {
   const rowsToJan31 = [...rows.slice(0, 3), { date: '2025-01-31', refCpi: 318.1 }];
   const known = calculateTipsOid({ ...base, tips: later, refCpiRows: rowsToJan31, startDate: '2024-06-14', endDate: '2025-02-15', monthlyCpi: { '2024-11': 319.5 } });
   assert.equal(known.endDateLimited, true);
@@ -131,4 +132,12 @@ test('the day after the last Ref CPI date is the latest known Ref CPI date when 
   const unknown = calculateTipsOid({ ...base, tips: later, refCpiRows: rowsToJan31, startDate: '2024-06-14', endDate: '2025-02-15' });
   assert.equal(unknown.endDateUsed, '2025-01-31');
   assert.equal(unknown.lastKnownRefCpiDate, '2025-01-31');
+});
+
+test('a date between the last Ref CPI date and the latest known Ref CPI date is calculated at the last Ref CPI date', () => {
+  const rowsToJan31 = [...rows.slice(0, 3), { date: '2025-01-31', refCpi: 318.1 }];
+  const r = calculateTipsOid({ ...base, tips: later, refCpiRows: rowsToJan31, startDate: '2024-06-14', endDate: '2025-02-15', monthlyCpi: { '2024-12': 320.123 } });
+  assert.equal(r.endDateLimited, true);
+  assert.equal(r.endDateUsed, '2025-01-31');
+  assert.equal(r.lastKnownRefCpiDate, '2025-03-01');
 });

@@ -45,9 +45,9 @@ test('OID of $20,000 par from the dated date to 2024-06-14, not rounded and roun
 test('an End Date after the last Ref CPI date is calculated at the last date, with a note', async ({ page }) => {
   await open(page);
   await enter(page, { cusip: '91282CAQ4', start: '2024-06-14', end: '2025-10-15' });
-  await expect(page.locator('#oid-result')).toContainText('2025-02-01 (entered 2025-10-15)');
-  await expect(page.locator('#oid-result .oid-note')).toContainText('The latest known Ref CPI is that of 2025-02-01. The OID is calculated as of that date, not as of the End Date entered.');
-  await expect(page.locator('#oid-result .oid-amount')).toHaveText('OID $21.74');
+  await expect(page.locator('#oid-result')).toContainText('2025-03-01 (entered 2025-10-15)');
+  await expect(page.locator('#oid-result .oid-note', { hasText: 'The latest known' })).toContainText('The latest known Ref CPI is that of 2025-03-01. The OID is calculated as of that date, not as of the End Date entered.');
+  await expect(page.locator('#oid-result .oid-amount')).toHaveText('OID $28.00');
 });
 
 test('an End Date after the Maturity Date shows its message', async ({ page }) => {

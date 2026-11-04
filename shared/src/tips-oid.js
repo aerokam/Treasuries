@@ -37,19 +37,26 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 // A date after the last date of the series that is the first of a month has the Ref CPI of 31 CFR 356
 // App. B for that day: the CPI-U NSA of the month three months earlier, read from monthlyCpi with no
 // interpolation. startCpiMonth and endCpiMonth are that month as 'YYYY-MM', and null for a published Ref CPI.
-// The latest known Ref CPI is that of the last date of the series, or of the day after it when that day is
-// the first of a month whose CPI-U is in monthlyCpi. An End Date after the latest known Ref CPI is
-// calculated at its date: endDateUsed is that date and endDateLimited is true.
+// The latest known Ref CPI is that of the first of the month three months after the latest month of
+// monthlyCpi, or that of the last date of the series when that is later. An End Date after a date with a
+// Ref CPI that has none of its own is calculated at the latest known Ref CPI when it is after it, and at
+// the last date of the series otherwise: endDateUsed is that date and endDateLimited is true.
 function monthThreeBefore(date) {
   let y = Number(date.slice(0, 4)), m = Number(date.slice(5, 7)) - 3;
   if (m < 1) { m += 12; y -= 1; }
   return y + '-' + String(m).padStart(2, '0');
 }
 
-function nextDay(date) {
-  const d = new Date(date + 'T00:00:00Z');
-  d.setUTCDate(d.getUTCDate() + 1);
-  return d.toISOString().slice(0, 10);
+// The first of the month three months after the latest month of monthlyCpi, or null when it has none.
+function firstOfMonthAfterLatestCpi(monthlyCpi) {
+  let latest = null;
+  for (const key of Object.keys(monthlyCpi || {})) {
+    const [y, m] = key.split('-').map(Number);
+    if (latest == null || y * 12 + m > latest) latest = y * 12 + m;
+  }
+  if (latest == null) return null;
+  const months = latest + 3 - 1; // zero-based month count of the first of that month
+  return String(Math.floor(months / 12)) + '-' + String(months % 12 + 1).padStart(2, '0') + '-01';
 }
 
 function refCpiOf(date, refCpiRows, lastDate, monthlyCpi) {
@@ -74,17 +81,17 @@ export function calculateTipsOid({ tips, quantity, startDate, endDate, refCpiRow
   if (endDate > tips.maturity) return { ok: false, reason: 'end-after-maturity' };
 
   const lastDate = refCpiRows && refCpiRows.length ? refCpiRows[refCpiRows.length - 1].date : null;
-  const next = lastDate != null ? nextDay(lastDate) : null;
-  const lastKnown = next != null && refCpiOf(next, refCpiRows, lastDate, monthlyCpi) ? next : lastDate;
+  const known = firstOfMonthAfterLatestCpi(monthlyCpi);
+  const lastKnown = known != null && (lastDate == null || known > lastDate) ? known : lastDate;
   const start = refCpiOf(startDate, refCpiRows, lastDate, monthlyCpi);
   if (start == null) return { ok: false, reason: 'no-ref-cpi-start' };
   let end = refCpiOf(endDate, refCpiRows, lastDate, monthlyCpi);
   let endDateLimited = false;
   let endDateUsed = endDate;
-  if (end == null && lastKnown != null && endDate > lastKnown) {
+  if (end == null && lastDate != null && endDate > lastDate) {
     endDateLimited = true;
-    endDateUsed = lastKnown;
-    end = refCpiOf(lastKnown, refCpiRows, lastDate, monthlyCpi);
+    endDateUsed = endDate > lastKnown ? lastKnown : lastDate;
+    end = refCpiOf(endDateUsed, refCpiRows, lastDate, monthlyCpi);
   }
   if (end == null) return { ok: false, reason: 'no-ref-cpi-end' };
   const startRefCpi = start.refCpi, endRefCpi = end.refCpi;

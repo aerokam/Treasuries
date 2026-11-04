@@ -117,7 +117,7 @@ function resultHtml(r, tips) {
   if (r.endDateLimited) {
     html += `<div class="oid-note">The latest known Ref CPI is that of ${r.lastKnownRefCpiDate}. The OID is calculated as of that date, not as of the End Date entered.</div>`;
   }
-  for (const [date, month] of [[r.startDate, r.startCpiMonth], [r.endDate, r.endCpiMonth]]) {
+  for (const [date, month] of [[r.startDate, r.startCpiMonth], [r.endDateUsed, r.endCpiMonth]]) {
     if (month) {
       html += `<div class="oid-note">Treasury has not published the Ref CPI of ${date}. It is the CPI-U of ${monthName(month)}, as 31 CFR 356 Appendix B states for the first day of a month.</div>`;
     }
