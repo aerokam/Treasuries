@@ -56,6 +56,28 @@ export function parseTipsRefRows(text) {
   }));
 }
 
+// Ref CPI (S3) and TIPS reference data (S2) alone, for an app that needs no quotes or yields.
+// Each returns the rows the matching parse below produces; throws on an HTTP error.
+export async function fetchRefCpiRows() {
+  const res = await fetch(TIPS_URL + '/RefCPI.csv', { cache: 'no-cache' });
+  if (!res.ok) throw new Error('RefCPI.csv: HTTP ' + res.status);
+  return parseRefCpiRows(await res.text());
+}
+
+export async function fetchTipsRefRows() {
+  const res = await fetch(TIPS_URL + '/TipsRef.csv', { cache: 'no-cache' });
+  if (!res.ok) throw new Error('TipsRef.csv: HTTP ' + res.status);
+  return parseTipsRefRows(await res.text());
+}
+
+// Parses Ref CPI (S3, TIPS/RefCPI.csv): [{ date: 'YYYY-MM-DD', refCpi: Number }], oldest first.
+export function parseRefCpiRows(text) {
+  return parseCsvRows(text).map(r => ({
+    date:   r.date,
+    refCpi: parseFloat(r.refCpi),
+  }));
+}
+
 // Fetches RefCPI.csv, TipsRef.csv, YieldCurves.csv (Yield curves, S13), and BondHolidaysSifma.csv from R2 --
 // shared by both fetchTipsData() (FedInvest) and fetchMarketQuotesData() (Market quotes) so the
 // parsing isn't duplicated between the two sources (projects/CLAUDE.md §2a).
@@ -79,10 +101,7 @@ async function fetchAuxTipsData() {
     if (holidayRes.ok) bondHolidays = parseHolidaySet(parseCsvRows(await holidayRes.text(), false));
   } catch (_) { /* unavailable -- T+1 falls back to weekend-skip only */ }
 
-  const refCpiRows = parseCsvRows(await refCpiRes.text()).map(r => ({
-    date:   r.date,
-    refCpi: parseFloat(r.refCpi),
-  }));
+  const refCpiRows = parseRefCpiRows(await refCpiRes.text());
 
   const tipsRefRows = parseTipsRefRows(await tipsRefRes.text());
 
