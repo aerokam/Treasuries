@@ -4,6 +4,8 @@
 // Per the project-wide no-redundancy directive (projects/CLAUDE.md §2a), this is the
 // one implementation; apps import it instead of keeping their own copy.
 
+import { downloadDateIso } from './market-quotes.js';
+
 // Parses a 'YYYY-MM-DD' string into a local-time Date (midnight local).
 export function localDate(s) {
   if (!s) return null;
@@ -26,6 +28,17 @@ export function nextBusinessDay(date, holidaySet) {
     d.setDate(d.getDate() + 1);
   } while (d.getDay() === 0 || d.getDay() === 6 || holidaySet.has(toIsoDate(d)));
   return d;
+}
+
+// spec: 1.3.1_Parse_Sources_And_Calculate_Yields.md#determine-settlement-date (1.3.1.5)
+// The Settlement Date of Market quotes (S7): the Download Date ('YYYY-MM-DD HH:MM', or
+// 'YYYY-MM-DD') advanced one bond trading day (T+1), past any Bond Holiday. Returns
+// 'YYYY-MM-DD', or null when the Download Date cannot be read.
+// market-quotes.js imports localDate from this module; both uses are at call time, so the
+// two-way import is safe.
+export function marketSettleIso(downloadDateStr, holidaySet = new Set()) {
+  const iso = downloadDateIso(downloadDateStr);
+  return iso ? toIsoDate(nextBusinessDay(localDate(iso), holidaySet)) : null;
 }
 
 // Deterministic month-name table for parseHolidaySet — avoids `new Date("April 3, 2026")`,

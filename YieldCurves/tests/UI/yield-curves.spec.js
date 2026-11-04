@@ -1,7 +1,10 @@
 import { test, expect } from '@playwright/test';
+import { routeStores, buildStores } from './store-routes.js';
+import { parseYieldCurvesCsv } from '../../../shared/src/yield-curve-stores.js';
 
 // ─── Shared fixture data ───────────────────────────────────────────────────────
-// Same CUSIPs across FedInvest + Market quotes so parseMarketNominals accepts them.
+// The four stores the writer of Yield curves (S13), Breakeven inflation (S14) and Bid and ask
+// spreads (S15) reads; store-routes.js builds the three the app reads from them.
 
 const SETTLE = '2026-03-25';
 
@@ -46,12 +49,8 @@ const MARKET_QUOTES_CSV = [
 
 // ─── Setup helpers ────────────────────────────────────────────────────────────
 
-async function setupRoutes(page) {
-  await page.route('**/Treasuries/YieldsFromFedInvestPrices.csv', r => r.fulfill({ status: 200, contentType: 'text/csv', body: FED_YIELDS_CSV }));
-  await page.route('**/TIPS/RefCpiNsaSa.csv',                      r => r.fulfill({ status: 200, contentType: 'text/csv', body: REF_CPI_CSV }));
-  await page.route('**/misc/BondHolidaysSifma.csv',                       r => r.fulfill({ status: 200, contentType: 'text/csv', body: HOLIDAYS_CSV }));
-  await page.route('**/TIPS/GswTipsCurve.json', r => r.fulfill({ status: 404, body: '' }));  // GSW overlay: force snapshot fallback in tests
-  await page.route('**/Treasuries/MarketQuotes.csv',            r => r.fulfill({ status: 200, contentType: 'text/csv', body: MARKET_QUOTES_CSV }));
+async function setupRoutes(page, quotesText = MARKET_QUOTES_CSV) {
+  await routeStores(page, { yieldsText: FED_YIELDS_CSV, refCpiText: REF_CPI_CSV, holidayText: HOLIDAYS_CSV, quotesText });
 }
 
 // Load on TIPS tab, wait for initial render + market data
@@ -74,15 +73,11 @@ async function loadTreasuries(page) {
 
 // Same as MARKET_QUOTES_CSV, but the Bill's CUSIP root is one shared/src/treasury-cusip.js
 // does not recognise -- proves the Unclassified checkbox actually appears/hides based on
-// real data, not just that the code compiles (shared/src/market-quotes.js#parseTreasuryQuotes).
+// real data, not just that the code compiles: the writer stores that CUSIP with Type Unclassified.
 const MARKET_QUOTES_UNCLASSIFIED_CSV = MARKET_QUOTES_CSV.replace(/912797TB3/g, '999999TB3');
 
 test('Unclassified checkbox: hidden with no unrecognized CUSIP, appears when one occurs', async ({ page }) => {
-  await page.route('**/Treasuries/YieldsFromFedInvestPrices.csv', r => r.fulfill({ status: 200, contentType: 'text/csv', body: FED_YIELDS_CSV }));
-  await page.route('**/TIPS/RefCpiNsaSa.csv',                      r => r.fulfill({ status: 200, contentType: 'text/csv', body: REF_CPI_CSV }));
-  await page.route('**/misc/BondHolidaysSifma.csv',                       r => r.fulfill({ status: 200, contentType: 'text/csv', body: HOLIDAYS_CSV }));
-  await page.route('**/TIPS/GswTipsCurve.json', r => r.fulfill({ status: 404, body: '' }));
-  await page.route('**/Treasuries/MarketQuotes.csv',            r => r.fulfill({ status: 200, contentType: 'text/csv', body: MARKET_QUOTES_UNCLASSIFIED_CSV }));
+  await setupRoutes(page, MARKET_QUOTES_UNCLASSIFIED_CSV);
   await page.goto('./');
   await expect(page.locator('#saTable tbody tr')).toHaveCount(3, { timeout: 10000 });
   await page.click('[data-tab="treasuries"]');
@@ -230,6 +225,32 @@ test('unchecking Bills+Notes in Treasuries spread shows only Bonds', async ({ pa
   await expect(page.locator('#spreadChartWrap')).toBeVisible();
 });
 
+// ─── Drill popups: stored values, Data Dictionary labels (3.2.7 Answer drill request) ─────
+
+test('SA and SAO drill popups show the values stored on the row of Yield curves (S13)', async ({ page }) => {
+  await loadTips(page);
+  const stored = parseYieldCurvesCsv(buildStores({ yieldsText: FED_YIELDS_CSV, refCpiText: REF_CPI_CSV, holidayText: HOLIDAYS_CSV, quotesText: MARKET_QUOTES_CSV }).yieldCurvesCsv)
+    .securities.find(r => r.source === 'Market' && r.cusip === '91282CCA7');
+  const modal = page.locator('#drill-modal');
+
+  await page.locator('#tableBody td.drillable[data-drill="sa"][data-cusip="91282CCA7"]').click();
+  for (const label of ['Settlement Date SA Factor', 'Naive Maturity SA Factor', 'Maturity SA Factor', 'SA Price Factor', 'SA Price', 'SA Yield']) {
+    await expect(modal).toContainText(label);
+  }
+  await expect(modal).toContainText(stored.saPriceFactor.toFixed(5));
+  await expect(modal).toContainText(stored.settleSaFactor.toFixed(5));
+  await expect(modal).not.toContainText('S-Factor');
+  await expect(modal).not.toContainText('Adjustment Ratio');
+  await expect(modal).not.toContainText('Adjusted Price');
+  await page.click('#drill-close');
+
+  await page.locator('#tableBody td.drillable[data-drill="sao"][data-cusip="91282CCA7"]').click();
+  await expect(modal).toContainText('Near-Maturity');   // Term under 0.5y
+  await expect(modal).toContainText(`${(stored.sao * 100).toFixed(3)}%`);
+  await expect(modal).toContainText(`${(stored.sa * 100).toFixed(3)}%`);
+  await expect(modal).not.toContainText('Curve weight');
+});
+
 // ─── BEI tab: Spot BEI series wiring ─────────────────────────────────────────
 
 test('BEI tab loads with the Spot BEI toggle and no crash', async ({ page }) => {
@@ -264,18 +285,6 @@ test('Treasuries Spot label opens a help popup', async ({ page }) => {
   await expect(page.locator('#drill-modal')).toContainText('Zero-Coupon Yield Curve');
 });
 
-// ─── Market-quote nominal yields are calculated from price, not read from the quote ──
-// The fixture quotes this Bill at an ask yield of 3.810% on an ask price of 99.060. That
-// price, settling 2026-03-26 (T+1 from the file's download date) against a 2026-06-26
-// maturity, is 92 days of a 365-day year, so the Treasury investment rate it implies is
-// (100 / 99.060 - 1) x 365 / 92 = 3.765%. Reading the quoted yield would show 3.810%.
-test('market-quote nominal yield comes from the quoted price, not the quoted yield', async ({ page }) => {
-  await loadTreasuries(page);
-  const billRow = page.locator('#nominalsTable tbody tr', { hasText: '912797TB3' });
-  await expect(billRow).toContainText('3.765%');
-  await expect(billRow).not.toContainText('3.810%');
-});
-
 test('Treasuries: unchecking Bills/Notes/Bonds with Spot on leaves only Spot curve rows', async ({ page }) => {
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
@@ -285,7 +294,7 @@ test('Treasuries: unchecking Bills/Notes/Bonds with Spot on leaves only Spot cur
   await page.locator('#filterNotes').uncheck();
   await page.locator('#filterBonds').uncheck();
   // Security rows are gone, but Spot curve rows remain — the curve fits the full non-STRIP
-  // set regardless of which security types are checked (per 3.7.3 Draw Treasuries view).
+  // set regardless of which security types are checked (per 3.2.3 Draw Treasuries view).
   const rows = page.locator('#nominalsTable tbody tr');
   await expect(rows.first()).toContainText('Spot (');
   await expect(page.locator('#nominalsTable tbody tr', { hasText: '912797TB3' })).toHaveCount(0);

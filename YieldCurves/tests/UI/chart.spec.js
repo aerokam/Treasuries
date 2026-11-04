@@ -1,40 +1,28 @@
 import { test, expect } from '@playwright/test';
+import { routeStores } from './store-routes.js';
+
+// FedInvest prices (S1), Ref CPI (S4) and Bond holidays (S16), from which store-routes.js builds
+// the stores the app reads.
+const FED_YIELDS_CSV = [
+  '2026-03-19',
+  'type,cusip,maturity,coupon,datedDateCpi,price,yield',
+  'TIPS,91282CCA7,2026-04-15,0.00125,262.25027,100.0625,-0.00715670',
+  'TIPS,912828S50,2026-07-15,0.00125,239.70132,101.4375,-0.04207774',
+  'TIPS,91282CDC2,2026-10-15,0.00125,273.25771,100.96875,-0.01548122',
+].join(String.fromCharCode(10));
+const REF_CPI_CSV = [
+  'Ref CPI Date,Ref CPI NSA,Ref CPI SA,SA Factor',
+  '2026-04-15,325.96740,326.99493,0.99686',
+  '2026-07-15,321.09758,320.44561,1.00203',
+  '2026-10-15,323.46710,322.67571,1.00245',
+  '2026-03-19,324.74961,326.35442,0.99508',
+].join(String.fromCharCode(10));
+const HOLIDAYS_CSV = '"Wednesday, January 1, 2025",New Year’s Day';
 
 test.describe('Yield Curves Chart and UI', () => {
   test.beforeEach(async ({ page }) => {
-    // Intercept CSV fetches to use mock data
-    await page.route('**/Treasuries/YieldsFromFedInvestPrices.csv', async route => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'text/csv',
-        body: '2026-03-19\n' +
-              'type,cusip,maturity,coupon,datedDateCpi,price,yield\n' +
-              'TIPS,91282CCA7,2026-04-15,0.00125,262.25027,100.0625,-0.00715670\n' +
-              'TIPS,912828S50,2026-07-15,0.00125,239.70132,101.4375,-0.04207774\n' +
-              'TIPS,91282CDC2,2026-10-15,0.00125,273.25771,100.96875,-0.01548122\n'
-      });
-    });
-
-    await page.route('**/TIPS/RefCpiNsaSa.csv', async route => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'text/csv',
-        body: 'Ref CPI Date,Ref CPI NSA,Ref CPI SA,SA Factor\n' +
-              '2026-04-15,325.96740,326.99493,0.99686\n' +
-              '2026-07-15,321.09758,320.44561,1.00203\n' +
-              '2026-10-15,323.46710,322.67571,1.00245\n' +
-              '2026-03-19,324.74961,326.35442,0.99508\n'
-      });
-    });
-
-    await page.route('**/misc/BondHolidaysSifma.csv', async route => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'text/csv',
-        body: '"Wednesday, January 1, 2025",New Year’s Day\n'
-      });
-    });
-    await page.route('**/TIPS/GswTipsCurve.json', r => r.fulfill({ status: 404, body: '' }));  // GSW overlay: force snapshot fallback in tests
+    // The stores the app reads, built from these fixtures, with no Market quotes.
+    await routeStores(page, { yieldsText: FED_YIELDS_CSV, refCpiText: REF_CPI_CSV, holidayText: HOLIDAYS_CSV });
 
     await page.goto('./');
     // FedInvest defaults off and no Market data is mocked here, so it must be

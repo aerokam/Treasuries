@@ -21,7 +21,7 @@ export function findClosestNominal(nominals, maturityDate) {
 }
 
 // The breakeven across terms: the Spot Yield of the Treasuries curve less the Spot Yield of a
-// TIPS curve, each on a semi-annual bond-equivalent basis, at every Term of the grid of 3.4
+// TIPS curve, each on a semi-annual bond-equivalent basis, at every Term of the grid of 1.3.4
 // (every half-year, and the longest Term of each curve) where both curves exist. There is no
 // minimum or maximum Term of its own. A Term where either value fails its fit's sanity check is
 // omitted.

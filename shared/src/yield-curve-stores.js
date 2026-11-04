@@ -19,9 +19,10 @@ import { treasuryYieldsFromPrices } from './treasury-yields.js';
 import { addTipsSpreads, addTreasurySpreads } from './spreads.js';
 import { findClosestNominal, spotBreakevenAcrossTerms } from './breakeven.js';
 import { parseCsv, parseCsvWithPreamble } from './csv.js';
-import { localDate, toIsoDate, nextBusinessDay, parseHolidaySet } from './settlement.js';
+import { localDate, marketSettleIso, parseHolidaySet } from './settlement.js';
 import { classifyByCusipRoot, isStrip } from './treasury-cusip.js';
-import { parseDownloadDate, downloadDateIso, parseTipsQuotes, parseTreasuryQuotes } from './market-quotes.js';
+import { parseDownloadDate, parseTipsQuotes, parseTreasuryQuotes } from './market-quotes.js';
+import { parseFedInvestPrices } from './fedinvest-prices.js';
 import {
   spotCurveFit, calculateSAO, zToSA, unionGridTerms,
   TREASURIES_SPOT_FIT, TIPS_SPOT_FIT, TIPS_SA_SPOT_FIT,
@@ -30,7 +31,7 @@ import {
 export const FEDINVEST = 'FedInvest';
 export const MARKET = 'Market';
 
-// Half-year grid of the spot rows -- the grid of 3.4 and of the chart.
+// Half-year grid of the spot rows -- the grid of 1.3.4 and of the chart.
 export const GRID_STEP_YRS = 0.5;
 
 // ─── Layout of the three files ───────────────────────────────────────────────
@@ -45,11 +46,23 @@ export const S13_COLUMNS = [
 ];
 export const S13_HEADER = S13_COLUMNS.map(c => c[0]).join(',');
 
-export const S14_HEADER = 'TIPS CUSIP,TIPS Maturity,TIPS Coupon,TIPS Ask,TIPS SA,TIPS SAO,'
-  + 'Nominal CUSIP,Nominal Maturity,Nominal Coupon,Nominal Ask,Ask BEI,SA BEI,SAO BEI';
+// S14 columns, in file order: [header, key of the row object parseBreakevenCsv returns].
+export const S14_COLUMNS = [
+  ['TIPS CUSIP', 'tipsCusip'], ['TIPS Maturity', 'tipsMaturity'], ['TIPS Coupon', 'tipsCoupon'],
+  ['TIPS Ask', 'tipsAsk'], ['TIPS SA', 'tipsSa'], ['TIPS SAO', 'tipsSao'],
+  ['Nominal CUSIP', 'nominalCusip'], ['Nominal Maturity', 'nominalMaturity'], ['Nominal Coupon', 'nominalCoupon'],
+  ['Nominal Ask', 'nominalAsk'], ['Ask BEI', 'askBei'], ['SA BEI', 'saBei'], ['SAO BEI', 'saoBei'],
+];
+export const S14_HEADER = S14_COLUMNS.map(c => c[0]).join(',');
 
-export const S15_HEADER = 'CUSIP,Maturity,Type,Coupon,Ask Yield,Bid Yield,Yield Spread (bps),'
-  + 'Ask Price,Bid Price,Adjusted Ask Price,Adjusted Bid Price,Price Spread %';
+// S15 columns, in file order: [header, key of the row object parseSpreadsCsv returns].
+export const S15_COLUMNS = [
+  ['CUSIP', 'cusip'], ['Maturity', 'maturity'], ['Type', 'type'], ['Coupon', 'coupon'],
+  ['Ask Yield', 'askYield'], ['Bid Yield', 'bidYield'], ['Yield Spread (bps)', 'yieldSpreadBps'],
+  ['Ask Price', 'askPrice'], ['Bid Price', 'bidPrice'], ['Adjusted Ask Price', 'adjustedAskPrice'],
+  ['Adjusted Bid Price', 'adjustedBidPrice'], ['Price Spread %', 'priceSpreadPct'],
+];
+export const S15_HEADER = S15_COLUMNS.map(c => c[0]).join(',');
 
 // ─── Cell formats ────────────────────────────────────────────────────────────
 const blank = v => v === '' || v == null || (typeof v === 'number' && !Number.isFinite(v));
@@ -128,7 +141,7 @@ function evalFitAt(fit, t) {
 // The spot rows of one source: three rows per term (Type Treasury, TIPS and BEI) across the union
 // of the valid ranges of the three fits. A cell is blank where its fit is outside its valid range
 // at that term or fails its sanity check, and the rest of the row is kept. The BEI cells are
-// breakeven.js#spotBreakevenAcrossTerms (3.5 Across terms).
+// breakeven.js#spotBreakevenAcrossTerms (1.3.5 Across terms).
 //
 // fits   { nominal, tips, tips_sa }, each a spot-curve.js#spotCurveFit result or null
 export function spotRowsFromFits(fits, source, stepYrs = GRID_STEP_YRS) {
@@ -222,8 +235,112 @@ export function marketTipsRowsFromYieldCurves(text) {
     }));
 }
 
+// ─── Readers of S13, S14 and S15 ─────────────────────────────────────────────
+// spec: YieldCurves/knowledge/3.1_Read_Yield_Curve_Data_Sets.md
+// The inverse of buildYieldCurvesCsv, buildBreakevenCsv and buildSpreadsCsv. Every column is found
+// by its header name, never by its position, the date lines included: the label of a date line is
+// in the first column, its Source in the `Source` column (S13 only) and its date in the `Maturity`
+// column (`TIPS Maturity` in S14). A number cell is a JS number, NaN where it is blank; CUSIP,
+// Source, Maturity and Type stay strings, and every date stays the string written.
+
+// The String columns of the three stores; every other column is read as a number.
+const STRING_KEYS = new Set([
+  'cusip', 'source', 'maturity', 'type',
+  'tipsCusip', 'tipsMaturity', 'nominalCusip', 'nominalMaturity',
+]);
+const num = s => (s == null || s === '') ? NaN : Number(s);
+
+// The header and rows of one store, every column of `columns` checked present by name.
+// Returns { at, preamble, rows }: `at(name)` is the index of a header name in the file.
+function readStore(text, columns, storeName) {
+  const parsed = parseCsvWithPreamble(text, columns[0][0]);
+  if (!parsed) throw new Error(`${storeName} has no header line.`);
+  const missing = columns.map(c => c[0]).filter(h => !parsed.header.includes(h));
+  if (missing.length) throw new Error(`${storeName} has no column ${missing.join(', ')}.`);
+  return { at: name => parsed.header.indexOf(name), preamble: parsed.preamble, rows: parsed.rows };
+}
+
+// One row object of a store: each [header, key] of `columns`, a string or a number by STRING_KEYS.
+// `rename` maps a key of `columns` to the key returned.
+function readRow(r, columns, rename = {}) {
+  const out = {};
+  for (const [h, key] of columns) out[rename[key] ?? key] = STRING_KEYS.has(key) ? (r[h] ?? '') : num(r[h]);
+  return out;
+}
+
+// The date of the date line with `label` (and `source`, where the store has a Source column).
+function readDateLine(store, label, source, dateColumn, storeName) {
+  const iLabel = 0, iDate = store.at(dateColumn), iSource = source == null ? -1 : store.at('Source');
+  const line = store.preamble.find(c => c[iLabel] === label && (iSource < 0 || c[iSource] === source));
+  const date = line ? line[iDate] : '';
+  if (!date) throw new Error(`${storeName} has no ${label} line${source == null ? '' : ` of ${source}`}.`);
+  return date;
+}
+
+const S13_SPOT_KEYS = ['type', 'term', 'source', 'spot', 'spotSa'];
+const S13_SECURITY_KEYS = S13_COLUMNS.map(c => c[1]).filter(k => k !== 'spot' && k !== 'spotSa');
+
+// Parses Yield curves (S13) text.
+// Returns { dates: { fedInvest: { trade, settle }, market: { trade, settle } },
+//   securities: [{ cusip, source, maturity, termYears, type, coupon, price, ask, sa, sao,
+//     settleSaFactor, naiveMaturitySaFactor, maturitySaFactor, saPriceFactor, saPrice }],
+//   spot: [{ type, termYears, source, spot, spotSa }] }, each in file order.
+// A row with CUSIP `Spot` is a spot row, every other row a security row.
+// Throws when the text has no header line, a column, or one of the four date lines.
+export function parseYieldCurvesCsv(text) {
+  const name = 'Yield curves (S13)';
+  const store = readStore(text, S13_COLUMNS, name);
+  const date = (label, source) => readDateLine(store, label, source, 'Maturity', name);
+  const dates = {
+    fedInvest: { trade: date('Trade Date', FEDINVEST), settle: date('Settlement Date', FEDINVEST) },
+    market: { trade: date('Trade Date', MARKET), settle: date('Settlement Date', MARKET) },
+  };
+  const pick = keys => S13_COLUMNS.filter(c => keys.includes(c[1]));
+  const rename = { term: 'termYears' };
+  const securities = [], spot = [];
+  for (const r of store.rows) {
+    if (r['CUSIP'] === 'Spot') spot.push(readRow(r, pick(S13_SPOT_KEYS), rename));
+    else if (r['CUSIP']) securities.push(readRow(r, pick(S13_SECURITY_KEYS), rename));
+  }
+  return { dates, securities, spot };
+}
+
+// Market dates of S14 and S15: two date lines with no Source cell.
+function readMarketDates(store, dateColumn, storeName) {
+  return {
+    trade: readDateLine(store, 'Trade Date', null, dateColumn, storeName),
+    settle: readDateLine(store, 'Settlement Date', null, dateColumn, storeName),
+  };
+}
+
+// Parses Breakeven inflation (S14) text.
+// Returns { dates: { trade, settle }, rows: [{ tipsCusip, tipsMaturity, tipsCoupon, tipsAsk, tipsSa,
+//   tipsSao, nominalCusip, nominalMaturity, nominalCoupon, nominalAsk, askBei, saBei, saoBei }] }.
+// Throws when the text has no header line, a column, or one of the two date lines.
+export function parseBreakevenCsv(text) {
+  const name = 'Breakeven inflation (S14)';
+  const store = readStore(text, S14_COLUMNS, name);
+  return {
+    dates: readMarketDates(store, 'TIPS Maturity', name),
+    rows: store.rows.filter(r => r['TIPS CUSIP']).map(r => readRow(r, S14_COLUMNS)),
+  };
+}
+
+// Parses Bid and ask spreads (S15) text.
+// Returns { dates: { trade, settle }, rows: [{ cusip, maturity, type, coupon, askYield, bidYield,
+//   yieldSpreadBps, askPrice, bidPrice, adjustedAskPrice, adjustedBidPrice, priceSpreadPct }] }.
+// Throws when the text has no header line, a column, or one of the two date lines.
+export function parseSpreadsCsv(text) {
+  const name = 'Bid and ask spreads (S15)';
+  const store = readStore(text, S15_COLUMNS, name);
+  return {
+    dates: readMarketDates(store, 'Maturity', name),
+    rows: store.rows.filter(r => r['CUSIP']).map(r => readRow(r, S15_COLUMNS)),
+  };
+}
+
 // ─── S14 ─────────────────────────────────────────────────────────────────────
-// One row per Market TIPS, against the nominal Treasury nearest it in maturity (3.5 Per security),
+// One row per Market TIPS, against the nominal Treasury nearest it in maturity (1.3.5 Per security),
 // in the order of the TIPS given. `nominals` are the Bills, Notes and Bonds only: a STRIPS and an
 // Unclassified security are not a reference for a coupon TIPS.
 export function breakevenRows(tips, nominals) {
@@ -306,23 +423,16 @@ export function buildSpreadsCsv({ dates, rows }) {
 //
 // Returns { yieldCurvesCsv, breakevenCsv, spreadsCsv } plus the dates and the row counts.
 export function buildYieldCurveStores({ yieldsText, refCpiText, holidayText, quotesText, log = () => {}, warn = () => {} }) {
-  // S1: the Settlement Date on the lines before the header, which is the first line whose first cell is `type`.
-  const s1 = parseCsvWithPreamble(yieldsText, 'type');
-  if (!s1) throw new Error('FedInvest prices (S1) has no header line.');
-  const fedSettleStr = (s1.preamble[0] || [])[0] || '';
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(fedSettleStr)) throw new Error('FedInvest prices (S1) has no Settlement Date line.');
-  const allYieldsRows = s1.rows.map(r => ({ ...r, settlementDate: fedSettleStr }));
-  const rawTipsData = allYieldsRows.filter(r => r.type === 'TIPS');
-  const rawNominalsData = allYieldsRows.filter(r => r.type !== 'TIPS');
+  // S1 (1.3.1.1).
+  const { tips: rawTipsData, nominals: rawNominalsData, settlementDate: fedSettleStr } = parseFedInvestPrices(yieldsText);
   const refCpiData = parseCsv(refCpiText);
   const holidaySet = parseHolidaySet(parseCsv(holidayText, false));
   log(`FedInvest settlement ${fedSettleStr}: ${rawTipsData.length} TIPS, ${rawNominalsData.length} nominal rows.`);
 
-  // S7: the Download Date is the Market Trade Date; the Settlement Date is one bond trading day later.
+  // S7: the Download Date is the Market Trade Date; the Settlement Date is one bond trading day later (1.3.1.5).
   const downloadDateStr = parseDownloadDate(quotesText);
   if (!downloadDateStr) throw new Error('Market quotes has no Download Date line.');
-  const downloadIso = downloadDateIso(downloadDateStr);
-  const brokerSettleStr = toIsoDate(nextBusinessDay(localDate(downloadIso), holidaySet));
+  const brokerSettleStr = marketSettleIso(downloadDateStr, holidaySet);
   log(`Market settlement (T+1): ${brokerSettleStr}`);
   const dates = {
     fedInvest: { trade: fedSettleStr, settle: fedSettleStr },   // T+0: FedInvest states its prices for its Settlement Date
@@ -339,23 +449,23 @@ export function buildYieldCurveStores({ yieldsText, refCpiText, holidayText, quo
     settleIso: brokerSettleStr,
     onUnknownCusip: cusip => warn(`  Unrecognized CUSIP root, tagged Unclassified: ${cusip}`),
   });
-  // The curve-fit inputs and S14 leave STRIPS and Unclassified out (3.4, 3.5).
+  // The curve-fit inputs and S14 leave STRIPS and Unclassified out (1.3.4, 1.3.5).
   const mktNominalBonds = mktNominalBondsAll.filter(b => !isStrip(b.cusip) && b.cusipType !== 'Unclassified');
   log(`Market: ${priceMap.size} TIPS quotes, ${mktNominalBondsAll.length} nominal quotes `
     + `(${mktNominalBondsAll.filter(b => isStrip(b.cusip)).length} STRIPS, `
     + `${mktNominalBondsAll.filter(b => b.cusipType === 'Unclassified').length} Unclassified).`);
 
-  // TIPS Yields (3.1.7), SA Yield (3.2), SAO Yield (3.3).
+  // TIPS Yields (1.3.1.6), SA Yield (1.3.2), SAO Yield (1.3.3).
   const fedTips = saYieldsFromTipsYields(tipsYieldsFromPrices(rawTipsData, priceMap, false, brokerSettleStr), refCpiData);
   const mktTips = saYieldsFromTipsYields(tipsYieldsFromPrices(rawTipsData, priceMap, true, brokerSettleStr), refCpiData);
   if (fedTips.length) { const s = calculateSAO(fedTips); fedTips.forEach((b, i) => b.saoYield = s[i]); }
   if (mktTips.length) { const s = calculateSAO(mktTips); mktTips.forEach((b, i) => b.saoYield = s[i]); }
 
-  // Treasury Yields (3.1.8).
+  // Treasury Yields (1.3.1.7).
   const fedNominalBondsAll = treasuryYieldsFromPrices(rawNominalsData);
   const fedNominalBonds = fedNominalBondsAll.filter(b => !isStrip(b.cusip));
 
-  // Spot curves (3.4).
+  // Spot curves (1.3.4).
   const fits = {
     [FEDINVEST]: {
       nominal: spotCurveFit(fedNominalBonds, TREASURIES_SPOT_FIT),

@@ -11,7 +11,7 @@ import {
   S13_HEADER, S14_HEADER, S15_HEADER, priceDecimals,
   buildYieldCurvesCsv, buildBreakevenCsv, buildSpreadsCsv, breakevenRows, spreadRows,
   compareSecurityRows, compareSpotRows, fedInvestNominalType, spotRowsFromFits, buildYieldCurveStores,
-  marketTipsRowsFromYieldCurves,
+  marketTipsRowsFromYieldCurves, parseYieldCurvesCsv, parseBreakevenCsv, parseSpreadsCsv,
 } from '../src/yield-curve-stores.js';
 import { parseCsvWithPreamble } from '../src/csv.js';
 import { parseDownloadDate, parseTipsQuotes, parseTreasuryQuotes } from '../src/market-quotes.js';
@@ -278,9 +278,82 @@ const nomSec = (cusip, cusipType, maturity, coupon, yld, price, bidPrice, bidYie
   ok(marketTips.length === 7 && marketTips.every(r => s14p.rows.some(b => b['TIPS CUSIP'] === r.cusip && b['TIPS SA'] === r.sa_yield && b['TIPS Ask'] === r.ask_yield)),
     'whole S13 reader: one row per Market TIPS, agreeing with S14 on the Ask and SA Yield');
 
+  // The readers of 3.1, on the built texts: the same dates, rows and counts as the writer's.
+  const y = parseYieldCurvesCsv(out.yieldCurvesCsv);
+  eq(y.dates, out.dates, 'whole parseYieldCurvesCsv: the dates of both sources');
+  ok(y.securities.length === out.counts.securityRows && y.spot.length === out.counts.spotRows, 'whole parseYieldCurvesCsv: every security and spot row');
+  ok(y.securities.every((r, i) => r.cusip === secs[i].CUSIP && r.source === secs[i].Source), 'whole parseYieldCurvesCsv: security rows in file order');
+  const b = parseBreakevenCsv(out.breakevenCsv);
+  eq(b.dates, out.dates.market, 'whole parseBreakevenCsv: the Market dates');
+  ok(b.rows.length === out.counts.breakeven && b.rows.every(r => Math.abs(r.askBei - (r.nominalAsk - r.tipsAsk)) < 2e-7), 'whole parseBreakevenCsv: Ask BEI is Nominal Ask less TIPS Ask');
+  const s = parseSpreadsCsv(out.spreadsCsv);
+  eq(s.dates, out.dates.market, 'whole parseSpreadsCsv: the Market dates');
+  ok(s.rows.length === out.counts.spreads && s.rows.every((r, i) => r.cusip === s15p.rows[i].CUSIP), 'whole parseSpreadsCsv: every row in file order');
+
   // The Market quotes the file was built from, read back the way the writer reads them.
   const quotes = marketLines.join('\n');
   ok(parseDownloadDate(quotes) === '2026-11-03 17:05' && parseTipsQuotes(quotes).length === 7 && parseTreasuryQuotes(quotes, { settleIso: '2026-11-04' }).length === 9 + 3, 'the writer reads S7 by header name');
+}
+
+// ── Readers (3.1): the inverse of the builders, by header name ──
+const throws = f => { try { f(); return false; } catch { return true; } };
+// The same text with every column after the first in reverse order, the date lines included
+// (each padded to the width of the header first, so that its date stays under its column name).
+const reverseColumns = text => {
+  const lines = text.trim().split('\n').map(l => l.split(','));
+  const width = Math.max(...lines.map(c => c.length));
+  return lines.map(c => { const p = [...c, ...Array(width - c.length).fill('')]; return [p[0], ...p.slice(1).reverse()].join(','); }).join('\n') + '\n';
+};
+{
+  const y = parseYieldCurvesCsv(s13);
+  eq(y.dates, dates, 'parseYieldCurvesCsv: the four dates, the Market Trade Date with its time');
+  eq(y.securities.map(r => `${r.cusip}/${r.source}`), ['C/FedInvest', 'C/Market', 'A/FedInvest', 'A/Market', 'A0/Market', 'B/Market'], 'parseYieldCurvesCsv: security rows in file order');
+  const t = y.securities[1];
+  eq(t, {
+    cusip: 'C', source: 'Market', maturity: '2028-01-15', termYears: 1.2, type: 'TIPS', coupon: 0.0125, price: 100.211,
+    ask: 0.04, sa: 0.01, sao: 0.011, settleSaFactor: 1.00248, naiveMaturitySaFactor: 0.99878, maturitySaFactor: 0.99889,
+    saPriceFactor: 1.00359, saPrice: 100.571,
+  }, 'parseYieldCurvesCsv: a TIPS security row, numbers as numbers');
+  const n = y.securities.find(r => r.cusip === 'B');
+  ok(n.type === 'Note' && n.ask === 0.04 && [n.sa, n.sao, n.settleSaFactor, n.naiveMaturitySaFactor, n.maturitySaFactor, n.saPriceFactor, n.saPrice].every(Number.isNaN),
+    'parseYieldCurvesCsv: a blank cell is NaN');
+  ok(!('spot' in n) && !('spotSa' in n), 'parseYieldCurvesCsv: a security row has no spot keys');
+  eq(y.spot.map(r => `${r.type}/${r.termYears}/${r.source}`), ['BEI/1/Market', 'TIPS/1/FedInvest', 'TIPS/1/Market', 'Treasury/0.5/Market', 'Treasury/1/FedInvest'], 'parseYieldCurvesCsv: spot rows in file order');
+  const bei = y.spot[0];
+  ok(Object.keys(bei).sort().join() === 'source,spot,spotSa,termYears,type' && bei.spot === 0.02 && Number.isNaN(bei.spotSa), 'parseYieldCurvesCsv: a spot row, its blank Spot SA NaN');
+  ok(Number.isNaN(y.spot.find(r => r.type === 'Treasury').spotSa), 'parseYieldCurvesCsv: Spot SA is NaN on a Treasury spot row');
+
+  eq(JSON.stringify(parseYieldCurvesCsv(reverseColumns(s13))), JSON.stringify(y), 'parseYieldCurvesCsv: columns found by header name, not position');
+  ok(throws(() => parseYieldCurvesCsv('a,b\n1,2\n')), 'parseYieldCurvesCsv: no header line throws');
+  ok(throws(() => parseYieldCurvesCsv(s13.split('\n').filter(l => l !== 'Trade Date,Market,2026-11-03 17:05').join('\n'))), 'parseYieldCurvesCsv: a missing date line throws');
+  ok(throws(() => parseYieldCurvesCsv(s13.replace('Spot SA', 'Spot S'))), 'parseYieldCurvesCsv: a missing column throws');
+}
+{
+  const nominals = [nomSec('N1', 'Note', '2029-01-15', 0.04, 0.041, 100, 99.9, 0.0415)];
+  const tips = [tipsSec('T1', '2029-07-15', 0.01, 0.015, 0.014, NaN, 100, 99.8, 0.016)];
+  const csv = buildBreakevenCsv({ dates, rows: breakevenRows(tips, nominals) });
+  const b = parseBreakevenCsv(csv);
+  eq(b.dates, dates.market, 'parseBreakevenCsv: the two Market dates');
+  const r = b.rows[0];
+  ok(b.rows.length === 1 && r.tipsCusip === 'T1' && r.tipsMaturity === '2029-07-15' && r.tipsCoupon === 0.01 && r.tipsAsk === 0.015 && r.tipsSa === 0.014
+    && r.nominalCusip === 'N1' && r.nominalMaturity === '2029-01-15' && r.nominalCoupon === 0.04 && r.nominalAsk === 0.041
+    && r.askBei === 0.026 && r.saBei === 0.027, 'parseBreakevenCsv: a row, numbers as numbers');
+  ok(Number.isNaN(r.tipsSao) && Number.isNaN(r.saoBei), 'parseBreakevenCsv: a blank cell is NaN');
+  eq(JSON.stringify(parseBreakevenCsv(reverseColumns(csv))), JSON.stringify(b), 'parseBreakevenCsv: columns found by header name, not position');
+  ok(throws(() => parseBreakevenCsv(csv.split('\n').slice(1).join('\n'))), 'parseBreakevenCsv: a missing date line throws');
+}
+{
+  const nominals = [nomSec('X', 'Note', '2030-02-15', 0.03, 0.04, 100, 99.9, 0.0405)];
+  const tips = [tipsSec('T', '2030-02-15', 0.0125, 0.015, 0.014, 0.0145, 100, 99.8, 0.016)];
+  const csv = buildSpreadsCsv({ dates, rows: spreadRows(tips, nominals) });
+  const s = parseSpreadsCsv(csv);
+  eq(s.dates, dates.market, 'parseSpreadsCsv: the two Market dates');
+  const byType = Object.fromEntries(s.rows.map(r => [r.type, r]));
+  eq(Object.keys(byType.TIPS), ['cusip', 'maturity', 'type', 'coupon', 'askYield', 'bidYield', 'yieldSpreadBps', 'askPrice', 'bidPrice', 'adjustedAskPrice', 'adjustedBidPrice', 'priceSpreadPct'], 'parseSpreadsCsv: the keys of a row');
+  ok(byType.TIPS.adjustedAskPrice === 130 && byType.TIPS.adjustedBidPrice === 129.74 && byType.TIPS.priceSpreadPct === 0.2, 'parseSpreadsCsv: a TIPS row, numbers as numbers');
+  ok(byType.Note.yieldSpreadBps === 5 && byType.Note.priceSpreadPct === 0.1 && Number.isNaN(byType.Note.adjustedAskPrice) && Number.isNaN(byType.Note.adjustedBidPrice), 'parseSpreadsCsv: a blank adjusted price is NaN');
+  eq(JSON.stringify(parseSpreadsCsv(reverseColumns(csv))), JSON.stringify(s), 'parseSpreadsCsv: columns found by header name, not position');
+  ok(throws(() => parseSpreadsCsv('Trade Date,2026-11-03 17:05\n' + S15_HEADER + '\n')), 'parseSpreadsCsv: a missing Settlement Date line throws');
 }
 
 console.log(`${pass} passed, ${fail} failed`);

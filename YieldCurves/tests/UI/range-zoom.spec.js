@@ -3,6 +3,7 @@
 // start or end maturity is changed.
 
 import { test, expect } from '@playwright/test';
+import { routeStores } from './store-routes.js';
 
 const SETTLE = '2026-03-25';
 
@@ -26,7 +27,7 @@ const NOMINALS_CSV = [
   'MARKET BASED NOTE,91282CKH3,2031-03-25,0.04350,,100.000,0.04350',
   'MARKET BASED BOND,912810PS1,2036-03-25,0.04750,,100.000,0.04750',
   'MARKET BASED BOND,912810XX1,2056-03-25,0.04850,,100.000,0.04850',
-  // A few TIPS rows so rawYieldsData is non-empty (avoids early return in processAndRenderTips)
+  // A few TIPS rows, so the FedInvest source has TIPS as well
   'TIPS,TPS2026A,2026-04-15,0.00125,262.25027,100.0625,0.000',
   'TIPS,TPS2030A,2030-04-15,0.00250,262.25027,99.0625,0.000',
 ].join('\n');
@@ -46,19 +47,11 @@ const HOLIDAYS_CSV = '"Wednesday, January 1, 2025",New Year\'s Day\n';
 // ── Route helpers ─────────────────────────────────────────────────────────────
 
 async function setupTipsRoutes(page) {
-  await page.route('**/Treasuries/YieldsFromFedInvestPrices.csv', r => r.fulfill({ body: TIPS_MULTIYR_CSV, contentType: 'text/csv' }));
-  await page.route('**/TIPS/RefCpiNsaSa.csv', r => r.fulfill({ body: REF_CPI_CSV, contentType: 'text/csv' }));
-  await page.route('**/misc/BondHolidaysSifma.csv', r => r.fulfill({ body: HOLIDAYS_CSV, contentType: 'text/csv' }));
-  await page.route('**/TIPS/GswTipsCurve.json', r => r.fulfill({ status: 404, body: '' }));  // GSW overlay: force snapshot fallback in tests
-  await page.route('**/Treasuries/MarketQuotes.csv', r => r.fulfill({ status: 404, body: '' }));
+  await routeStores(page, { yieldsText: TIPS_MULTIYR_CSV, refCpiText: REF_CPI_CSV, holidayText: HOLIDAYS_CSV });   // no Market quotes
 }
 
 async function setupNominalsRoutes(page) {
-  await page.route('**/Treasuries/YieldsFromFedInvestPrices.csv', r => r.fulfill({ body: NOMINALS_CSV, contentType: 'text/csv' }));
-  await page.route('**/TIPS/RefCpiNsaSa.csv', r => r.fulfill({ body: REF_CPI_CSV, contentType: 'text/csv' }));
-  await page.route('**/misc/BondHolidaysSifma.csv', r => r.fulfill({ body: HOLIDAYS_CSV, contentType: 'text/csv' }));
-  await page.route('**/TIPS/GswTipsCurve.json', r => r.fulfill({ status: 404, body: '' }));  // GSW overlay: force snapshot fallback in tests
-  await page.route('**/Treasuries/MarketQuotes.csv', r => r.fulfill({ status: 404, body: '' }));
+  await routeStores(page, { yieldsText: NOMINALS_CSV, refCpiText: REF_CPI_CSV, holidayText: HOLIDAYS_CSV });   // no Market quotes
 }
 
 // ── Chart helpers ─────────────────────────────────────────────────────────────

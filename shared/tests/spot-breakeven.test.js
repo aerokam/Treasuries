@@ -2,7 +2,7 @@
 // breakeven across terms of knowledge/1.3.5_Calculate_Breakeven_Inflation.md#across-terms.
 // Run: node shared/tests/spot-breakeven.test.js
 //
-// The rule it pins: the breakeven exists at every Term of the 3.4 grid where the Treasuries
+// The rule it pins: the breakeven exists at every Term of the 1.3.4 grid where the Treasuries
 // curve and the TIPS curve both exist, with no minimum Term of its own. The Breakeven tab once
 // started its grid at 2 years and fitted its own nominal curve to the Notes and Bonds from a
 // minimum Term of 1 year; a test that a point exists below 2 years fails against that behaviour.

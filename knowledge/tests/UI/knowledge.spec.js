@@ -20,10 +20,10 @@ test.describe('Knowledge Map and Viewer', () => {
   test('reaches a process spec from a level-2 bubble', async ({ page }) => {
     await page.goto('/knowledge/DFD_LEVEL2_YIELDCURVES.html');
 
-    // 3.3 Adjust for other effects. Its bubble opens the spec named for it, whose title is the process name.
-    await page.locator('a.process[href*="1.3.3_Adjust_For_Other_Effects.md"]').first().click();
-    await expect(page).toHaveURL(/3\.3_Adjust_For_Other_Effects\.md/, { timeout: 10000 });
-    await expect(page.locator('h1')).toContainText('3.3 Adjust for other effects');
+    // 3.1 Read yield curve data sets. Its bubble opens the spec named for it, whose title is the process name.
+    await page.locator('a.process[href*="3.1_Read_Yield_Curve_Data_Sets.md"]').first().click();
+    await expect(page).toHaveURL(/3\.1_Read_Yield_Curve_Data_Sets\.md/, { timeout: 10000 });
+    await expect(page.locator('h1')).toContainText('3.1 Read yield curve data sets');
   });
 
   test('drills from an ingestion job to its Level 3 page, its process spec, and back up', async ({ page }) => {
@@ -34,8 +34,8 @@ test.describe('Knowledge Map and Viewer', () => {
     await expect(page).toHaveURL(/DFD_LEVEL3_INGEST_YIELDCURVEDATA(\.html)?$/, { timeout: 10000 });
     await expect(page.locator('h1')).toContainText('1.3 Calculate yield curve data sets');
 
-    // The one process there opens the process spec, and the spec's up link returns to this Level 3 page.
-    await page.locator('a.process[href*="1.3_Calculate_Yield_Curve_Data_Sets.md"]').click();
+    // The header of the page opens the process spec, and the spec's up link returns to this Level 3 page.
+    await page.locator('a.spec-link').click();
     await expect(page).toHaveURL(/1\.3_Calculate_Yield_Curve_Data_Sets\.md/, { timeout: 10000 });
     await expect(page.locator('h1')).toContainText('1.3 Calculate yield curve data sets');
     const upLink = page.locator('#up-link');
@@ -60,7 +60,7 @@ test.describe('Knowledge Map and Viewer', () => {
       expect(diagram.ok(), href).toBe(true);
       const html = await diagram.text();
       expect(html, href + ' returns to Level 2').toContain('href="DFD_LEVEL2_INGESTION.html"');
-      const spec = /<a class="process" href="viewer\.html#\/md\/knowledge\/(1\.\d+_[A-Za-z_]+\.md)/.exec(html);
+      const spec = /<a (?:class="process" href|href)="viewer\.html#\/md\/knowledge\/(1\.\d+_[A-Za-z_]+\.md)/.exec(html);
       expect(spec, href + ' has a process that opens a process spec').not.toBeNull();
 
       const md = await request.get('/knowledge/' + spec[1]);
@@ -71,17 +71,17 @@ test.describe('Knowledge Map and Viewer', () => {
   });
 
   test('reaches the parent spec from a diagram header', async ({ page }) => {
-    await page.goto('/knowledge/DFD_LEVEL3_YC_LOAD.html');
-    await expect(page.locator('h1')).toContainText('3.1');
+    await page.goto('/knowledge/DFD_LEVEL4_INGEST_YIELDCURVEDATA_PARSE.html');
+    await expect(page.locator('h1')).toContainText('1.3.1');
 
     await page.locator('a.spec-link').click();
-    await expect(page).toHaveURL(/3\.1_Parse_Sources_And_Calculate_Yields\.md/, { timeout: 10000 });
+    await expect(page).toHaveURL(/1\.3\.1_Parse_Sources_And_Calculate_Yields\.md/, { timeout: 10000 });
   });
 
   test('a leaf process spec names the code that implements it', async ({ page }) => {
-    await page.goto('/knowledge/viewer.html#/md/YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md');
+    await page.goto('/knowledge/viewer.html#/md/knowledge/1.3.1_Parse_Sources_And_Calculate_Yields.md');
     const body = page.locator('#content');
-    await expect(body).toContainText('parseRefCpiAndSaFactors', { timeout: 15000 });
+    await expect(body).toContainText('parseFedInvestPrices', { timeout: 15000 });
     await expect(body).toContainText('Specifies:');
     await expect(body).toContainText('Implemented by:');
   });
@@ -142,7 +142,7 @@ test.describe('Knowledge Map and Viewer', () => {
   });
 
   test('renders LaTeX math via KaTeX, not raw source', async ({ page }) => {
-    await page.goto('/knowledge/viewer.html#/md/YieldCurves/knowledge/3.2_Adjust_For_Seasonality.md');
+    await page.goto('/knowledge/viewer.html#/md/knowledge/1.3.2_Adjust_For_Seasonality.md');
 
     const katex = page.locator('.katex').first();
     await expect(katex).toBeVisible({ timeout: 15000 });

@@ -1,11 +1,11 @@
 // tips-yields.js -- calculates the TIPS yields of
-// knowledge/1.3.1_Parse_Sources_And_Calculate_Yields.md#calculate-tips-yields (3.1.7): the FedInvest TIPS
+// knowledge/1.3.1_Parse_Sources_And_Calculate_Yields.md#calculate-tips-yields (1.3.1.6): the FedInvest TIPS
 // rows of S1 or the market quotes of S7, and one settlement date per source, combined into the
-// security objects every process downstream of 3.1 works from.
+// security objects every process downstream of 1.3.1 works from.
 //
 // This function produces the Ask Yield and the Bid Yield and nothing else. The SA Price Factor and
-// the SA Yield are produced by 3.2 (shared/src/sa-yields.js#saYieldsFromTipsYields) and the
-// spreads by 3.6 (shared/src/spreads.js), each from the output of this one.
+// the SA Yield are produced by 1.3.2 (shared/src/sa-yields.js#saYieldsFromTipsYields) and the
+// spreads by 1.3.6 (shared/src/spreads.js), each from the output of this one.
 //
 // One implementation, imported by the YieldCurves page (YieldCurves/src/app.js) and by the
 // acquisition job that writes S13, S14 and S15 (YieldCurves/scripts/updateYieldCurveDataSets.js), per the no-redundancy directive
@@ -20,7 +20,7 @@ import { localDate } from './settlement.js';
 //                 or null when the quoted source is not shown
 // isBroker        true to price each security from its market quote, false to price it from S1
 // marketSettleIso the settlement date the market quotes are stated at, 'YYYY-MM-DD', from
-//                 3.1.6 -- the quote file's own date advanced by one bond trading day. Ignored
+//                 1.3.1.5 -- the quote file's date advanced by one bond trading day. Ignored
 //                 when isBroker is false, where each row's own settlementDate is used.
 //
 // A security is dropped when it has no price on the side being priced, no settlement date, or an

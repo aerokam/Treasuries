@@ -1,31 +1,24 @@
 // Yield Curves — Frontend Logic
-import { yieldFromPrice, cashflowSchedule, termYears } from '../../shared/src/bond-math.js';
-import { saFactorForDate, maturitySaFactor } from '../../shared/src/ref-cpi.js';
-import { tipsYieldsFromPrices } from '../../shared/src/tips-yields.js';
-import { saYieldsFromTipsYields } from '../../shared/src/sa-yields.js';
-import { treasuryYieldsFromPrices } from '../../shared/src/treasury-yields.js';
-import { addTipsSpreads, addTreasurySpreads } from '../../shared/src/spreads.js';
-import { findClosestNominal, spotBreakevenAcrossTerms } from '../../shared/src/breakeven.js';
+// The app reads the stores of knowledge/1.3_Calculate_Yield_Curve_Data_Sets.md and calculates
+// nothing (YieldCurves/knowledge/3.1_Read_Yield_Curve_Data_Sets.md): every value a view draws
+// is a value stored in Yield curves (S13), Breakeven inflation (S14) or Bid and ask spreads (S15).
+import { termYears } from '../../shared/src/bond-math.js';
 import {
   SAO_NOISE_YRS, SAO_BLEND_START_YRS, SAO_BLEND_END_YRS,
-  TREASURIES_SPOT_FIT, TIPS_SPOT_FIT, TIPS_SA_SPOT_FIT,
-  nssBasis, zToSA, spotCurveFit, spotCurveGrid, spotCurveTermGrid, calculateSAO,
+  nssBasis, zToSA,
 } from '../../shared/src/spot-curve.js';
-import { parseCsv } from '../../shared/src/csv.js';
-import { localDate, toIsoDate, nextBusinessDay, parseHolidaySet } from '../../shared/src/settlement.js';
+import { localDate } from '../../shared/src/settlement.js';
+import { parseYieldCurvesCsv, parseBreakevenCsv, parseSpreadsCsv } from '../../shared/src/yield-curve-stores.js';
 import { handleChartKeydown, setupAxisWheelZoom, snapYBounds, snapYAfterZoom } from '../../shared/src/chart-keys.js';
 import { initDatePicker } from '../../shared/src/date-picker.js';
 import { calendarTimeAxis } from '../../shared/src/chart-time-axis.js';
-import { isStrip } from '../../shared/src/treasury-cusip.js';
-import { parseDownloadDate, downloadDateIso, parseTipsQuotes, parseTreasuryQuotes } from '../../shared/src/market-quotes.js';
 
 console.log("YieldCurves app.js loading...");
 
 const R2_BASE_URL = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev';
-const YIELDS_CSV_URL = `${R2_BASE_URL}/Treasuries/YieldsFromFedInvestPrices.csv`;
-const REF_CPI_CSV_URL = `${R2_BASE_URL}/TIPS/RefCpiNsaSa.csv`;
-const HOLIDAYS_CSV_URL = `${R2_BASE_URL}/misc/BondHolidaysSifma.csv`;
-const MARKET_QUOTES_URL = `${R2_BASE_URL}/Treasuries/MarketQuotes.csv`;
+const YIELD_CURVES_URL = `${R2_BASE_URL}/Treasuries/YieldCurves.csv`;                // Yield curves (S13)
+const BREAKEVEN_URL = `${R2_BASE_URL}/Treasuries/BreakevenInflation.csv`;           // Breakeven inflation (S14)
+const SPREADS_URL = `${R2_BASE_URL}/Treasuries/BidAskSpreads.csv`;                  // Bid and ask spreads (S15)
 const GSW_TIPS_CURVE_URL = `${R2_BASE_URL}/TIPS/GswTipsCurve.json`;   // { date, beta0..beta3, tau1, tau2 } — updateGswTipsCurve.js
 
 // The GSW reference line is an analysis aid, not an end-user feature — the published curve
@@ -36,7 +29,7 @@ const SHOW_GSW = new URLSearchParams(location.search).has('gsw');
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 // Chart gridline color — horizontal (Y) and vertical (X) alike, on every chart
-// (Yield Curves, Breakeven, Bid-Ask Spread). See knowledge/3.7_Render_Charts_And_Tables.md §3.7.2.
+// (Yield Curves, Breakeven, Bid-Ask Spread). See YieldCurves/knowledge/3.2_Render_Charts_And_Tables.md#build-scales (3.2.2).
 const GRID_COLOR = 'rgba(0,0,0,0.08)';
 
 // GSW (Gürkaynak-Sack-Wright, FEDS 2008-05) fitted TIPS zero-coupon curve — a snapshot for
@@ -64,20 +57,21 @@ function iqrClipBounds(source, minFence = 0.5) {
 }
 
 // --- State ---
-let rawYieldsData = null;
-let rawNominalsData = null;
-let rawRefCpiData = null;
-let holidaySet = new Set();
-let brokerPrices = null;
-let brokerDownloadDate = null;    // Download Date of Market quotes (S7), 'YYYY-MM-DD HH:MM'
-let marketNominalsData = null;  // processed bond objects from Market quotes (S7)
-let marketNominalsDate = null;  // Download Date of Market quotes (S7), 'YYYY-MM-DD HH:MM'
+// Security rows of Yield curves (S13), mapped by toTipsBond / toNominalBond onto the fields the
+// render functions draw. A source with no rows is null.
+let fedTipsData = null;
+let marketTipsData = null;
+let fedNominalsData = null;
+let marketNominalsData = null;
+let spotRows = [];                // spot rows of S13: { type, termYears, source, spot, spotSa }
+let storeDates = null;            // { fedInvest: { trade, settle }, market: { trade, settle } } of S13
+let beiStore = null;              // Breakeven inflation (S14): { dates, rows }
+let spreadsStore = null;          // Bid and ask spreads (S15): { dates, rows }
 let gswTipsCurve = null;          // { date, beta0..beta3, tau1, tau2 } — GSW fitted TIPS curve, R2 (weekly)
 let nominalsShowStrips = false;
-// Starts false/hidden -- the checkbox and this flag only turn on together, at load, when an
-// unrecognized CUSIP root actually occurs (see the marketNominalsData assignment in init()).
-// It exists so that can't go unnoticed; a permanent checkbox nobody ever needs would be worse,
-// not better, at that job (easy to become blind to). See shared/src/market-quotes.js#parseTreasuryQuotes.
+// Starts false/hidden -- the checkbox and this flag only turn on together, at load, when a
+// Market row of Type Unclassified occurs in S13 (see init()). It exists so that can't go
+// unnoticed; a permanent checkbox nobody ever needs would be worse, not better, at that job.
 let nominalsShowUnclassified = false;
 let nominalsClipOutliers = true;
 let beiClipOutliers = true;
@@ -88,11 +82,8 @@ let spreadModeActive = false;
 const savedZoom = { tips: null, treasuries: null, bei: null };
 const savedDateRange = { tips: null, treasuries: null, bei: null };
 
-// classifyByCusipRoot() returns 'Bill'/'Note'/'Bond'/'STRIPS'/'Unclassified'; map to the
-// app's internal type strings (which mirror FedInvest's own Type column). 'Unclassified' has
-// no FedInvest counterpart (FedInvest states its own type directly, see fedinvest-prices.js) --
-// the string below is this app's own, for a CUSIP root shared/src/treasury-cusip.js does not
-// recognise.
+// The Type of a nominal security row of S13 ('Bill'/'Note'/'Bond'/'STRIPS'/'Unclassified'),
+// mapped to the type strings the type filters and series of this app match on.
 const CUSIP_TYPE_TO_MARKET_BASED = { Bill: 'MARKET BASED BILL', Note: 'MARKET BASED NOTE', Bond: 'MARKET BASED BOND', STRIPS: 'MARKET BASED STRIPS', Unclassified: 'MARKET BASED UNCLASSIFIED' };
 
 let activeTab = 'tips';
@@ -105,21 +96,6 @@ window._currentBonds = [];
 // existing chart in place rather than rebuilding it) can re-render the table without a
 // full processAndRenderTips() pass — see the showTipsAsk/Sa/Sao/Spot/SpotSa handlers below.
 let tipsTableFed = null, tipsTableBroker = null;
-
-// --- Helpers ---
-// Parse the Download Date "YYYY-MM-DD HH:MM" → Date (date part only)
-function parseDownloadDateStr(s) {
-  return localDate(downloadDateIso(s));
-}
-
-// Settlement date for Market quotes — TIPS and nominals alike: the trade date
-// in the file (its Download Date) plus one bond trading day (T+1). DATA_DICTIONARY.md#settlement-date.
-// `downloadDate` lets a caller that holds the file's own footer date (the parser, which runs
-// before the module-level dates are assigned) settle from it; omitted, the assigned dates are used.
-function marketSettleIso(downloadDate) {
-  const d = downloadDate ?? (brokerDownloadDate || marketNominalsDate);
-  return d ? toIsoDate(nextBusinessDay(parseDownloadDateStr(d), holidaySet)) : null;
-}
 
 // ── Date range input helpers ──────────────────────────────────────────────────
 // Convert YYYY-MM-DD → MM/DD/YYYY for display in text inputs
@@ -280,83 +256,89 @@ function _showColHelp(colKey) {
   _showDrillPopup(entry.title, entry.html);
 }
 
+// spec: YieldCurves/knowledge/3.2_Render_Charts_And_Tables.md#answer-a-drill (3.2.7)
+// Every value shown is a value stored on the security row of Yield curves (S13); the popups
+// calculate nothing.
+const fmtPct3 = v => Number.isFinite(v) ? `${(v * 100).toFixed(3)}%` : '—';
+const fmtNum = (v, d) => Number.isFinite(v) ? v.toFixed(d) : '—';
+const drillRow = (label, value, style = 'margin-bottom:4px;') =>
+  `<div style="display:flex;justify-content:space-between;${style}"><span>${label}</span> <strong>${value}</strong></div>`;
+
 function _showSaDrill(cusip) {
   const bond = window._currentBonds.find(b => b.cusip === cusip);
   if (!bond) return;
 
-  const mmddSettle = bond.settlementDate.slice(5, 10);
-  const mmddMature = bond.maturity.slice(5, 10);
-  const saS = saFactorForDate(rawRefCpiData, bond.settlementDate);
-  const saMraw = saFactorForDate(rawRefCpiData, bond.maturity);
-  const saM = maturitySaFactor(rawRefCpiData, bond.maturity, bond.settlementDate);
-  const scaled = Math.abs(saM - saMraw) > 5e-5;
-  const ratio = saS / saM;
+  const scaled = Number.isFinite(bond.maturitySaFactor) && Number.isFinite(bond.naiveMaturitySaFactor)
+    && bond.maturitySaFactor !== bond.naiveMaturitySaFactor;
 
   const html = `
     <div style="background:#f8fafc;padding:12px;border-radius:6px;border:1px solid #e2e8f0;margin-bottom:16px;">
-      <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>Market Price</span> <strong>${bond.price.toFixed(3)}</strong></div>
-      <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>S-Factor (Settle ${mmddSettle})</span> <strong>${saS.toFixed(4)}</strong></div>
-      <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>S-Factor (Maturity ${mmddMature})${scaled ? ` <span style="color:#94a3b8;">from ${saMraw.toFixed(4)}, scaled toward 1.0 for the horizon</span>` : ''}</span> <strong>${saM.toFixed(4)}</strong></div>
+      ${drillRow('Price', fmtNum(bond.price, 3))}
+      ${drillRow('Settlement Date SA Factor', fmtNum(bond.settleSaFactor, 5))}
+      ${drillRow('Naive Maturity SA Factor', fmtNum(bond.naiveMaturitySaFactor, 5))}
+      ${drillRow('Maturity SA Factor', fmtNum(bond.maturitySaFactor, 5))}
       <div style="border-top:1px dashed #cbd5e1;margin:8px 0;padding-top:8px;display:flex;justify-content:space-between;">
-        <span>Adjustment Ratio (S_s / S_m)</span> <strong>${ratio.toFixed(4)}</strong>
+        <span>SA Price Factor</span> <strong>${fmtNum(bond.saPriceFactor, 5)}</strong>
       </div>
+      ${drillRow('SA Price', fmtNum(bond.saPrice, 3))}
       <div style="display:flex;justify-content:space-between;color:#1a56db;font-weight:700;">
-        <span>Adjusted Price</span> <span>${(bond.price * ratio).toFixed(3)}</span>
+        <span>SA Yield</span> <span>${fmtPct3(bond.saYield)}</span>
       </div>
     </div>
     <div style="font-size:12px;color:#64748b;">
-      <p>The <strong>SA Yield</strong> is calculated by finding the internal rate of return (IRR) of the TIPS using the <strong>Adjusted Price</strong> instead of the market price.</p>
-      <p>A ratio &lt; 1.0 reduces the price (increasing yield), while a ratio &gt; 1.0 increases the price (decreasing yield).</p>
-      ${scaled ? `<p>The maturity S-Factor is reused from a past year, since no seasonal factor exists for a date this far ahead. BLS re-estimates seasonal factors every year from a moving window of recent data, so the reused value is scaled toward 1.0 by its credibility factor as the horizon grows (see <em>1.1 Seasonal Factor Drift</em>).</p>` : ''}
+      <p>The <strong>SA Yield</strong> is calculated by finding the internal rate of return (IRR) of the TIPS using the <strong>SA Price</strong> instead of the Price.</p>
+      <p>An SA Price Factor &lt; 1.0 reduces the price (increasing yield), while an SA Price Factor &gt; 1.0 increases the price (decreasing yield).</p>
+      ${scaled ? `<p>The Maturity SA Factor is the Naive Maturity SA Factor, reused from a past year, since no SA Factor is published for a date this far ahead. BLS re-estimates seasonal factors every year from a moving window of recent data, so the reused value is scaled toward 1.0 by its Credibility Factor as the horizon grows (see <em>Seasonal Factor Drift</em>).</p>` : ''}
     </div>
   `;
   _showDrillPopup(`SA Drill-down: ${bond.cusip} (${fmtMMM(bond.maturity)})`, html);
 }
 
+// The paragraph is chosen by the Term (y) of the row against the SAO_* constants of
+// shared/src/spot-curve.js (knowledge/1.3.3_Adjust_For_Other_Effects.md#the-calculation). No value of
+// the SAO Blend Weight is shown.
 function _showSaoDrill(cusip) {
   const bond = window._currentBonds.find(b => b.cusip === cusip);
   if (!bond) return;
 
-  const now = new Date();
-  const yearsToMat = (bond.maturityDate - now) / 31557600000;
+  const t = bond.termYears;
+  const termTxt = Number.isFinite(t) ? `${t.toFixed(2)}y` : '—';
+  const saRow = drillRow('SA Yield', fmtPct3(bond.saYield));
+  const saoRow = label => `<div style="border-top:1px dashed #cbd5e1;margin:8px 0 0;padding-top:8px;display:flex;justify-content:space-between;color:#1a56db;font-weight:700;"><span>${label}</span><span>${fmtPct3(bond.saoYield)}</span></div>`;
 
   let logicHtml = '';
 
-  if (bond._saoMode === 'noise') {
+  if (t < SAO_NOISE_YRS) {
     logicHtml = `
       <div style="background:#fef3f2;padding:12px;border-radius:6px;border:1px solid #fecdca;margin-bottom:16px;">
         <p style="margin:0;color:#b42318;font-weight:600;">Near-Maturity (excluded from fit)</p>
-        <p style="margin:8px 0 0;font-size:12px;">Maturity ${yearsToMat.toFixed(2)}y &lt; ${SAO_NOISE_YRS}y: the SA yield is dominated by price noise on a tiny remaining duration, so this point does not drive the curve fit. Its SAO is read off the smooth curve, which is held flat below the shortest fitted maturity rather than extrapolated (see 2.0 &sect;&ldquo;The very short end&rdquo;).</p>
-        <div style="margin-top:8px;display:flex;justify-content:space-between;color:#1a56db;font-weight:700;"><span>SAO (on curve)</span><span>${(bond.saoYield * 100).toFixed(3)}%</span></div>
+        <p style="margin:8px 0;font-size:12px;">Term ${termTxt} &lt; ${SAO_NOISE_YRS}y: the SA yield is dominated by price noise on a tiny remaining duration, so this point does not drive the curve fit. Its SAO Yield is read off the smooth curve, which is held flat below the shortest fitted maturity rather than extrapolated (see <em>Adjust for other effects</em>, &ldquo;The very short end&rdquo;).</p>
+        ${saRow}
+        ${saoRow('SAO Yield (on curve)')}
       </div>
     `;
-  } else if (bond._saoMode === 'raw') {
+  } else if (t >= SAO_BLEND_END_YRS) {
     logicHtml = `
       <div style="background:#f0fdf4;padding:12px;border-radius:6px;border:1px solid #bbf7d0;margin-bottom:16px;">
         <p style="margin:0;color:#166534;font-weight:600;">Beyond the blend range — no smoothing applied</p>
-        <p style="margin:8px 0 0;font-size:12px;">Maturity ${yearsToMat.toFixed(2)}y &ge; ${SAO_BLEND_END_YRS}y: the deseasonalization residual that motivates smoothing amortizes away by the long end (see 2.2 §6), so SAO reports the raw SA yield unchanged.</p>
-        <div style="margin-top:8px;display:flex;justify-content:space-between;color:#1a56db;font-weight:700;"><span>SAO (= SA, unsmoothed)</span><span>${(bond.saoYield * 100).toFixed(3)}%</span></div>
+        <p style="margin:8px 0;font-size:12px;">Term ${termTxt} &ge; ${SAO_BLEND_END_YRS}y: the deseasonalization residual that motivates smoothing amortizes away by the long end (see <em>The SAO Residual</em> §6), so the SAO Yield is the SA Yield unchanged.</p>
+        ${saRow}
+        ${saoRow('SAO Yield (= SA Yield, unsmoothed)')}
       </div>
     `;
   } else {
-    const weight = bond._saoWeight != null ? bond._saoWeight : 1;
-    const blendNote = bond._saoMode === 'blend'
-      ? `<div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>Curve weight (${SAO_BLEND_START_YRS}y&rarr;${SAO_BLEND_END_YRS}y)</span><span>${(weight * 100).toFixed(0)}%</span></div>`
-      : '';
+    const blend = t > SAO_BLEND_START_YRS;
     logicHtml = `
       <div style="background:#f8fafc;padding:12px;border-radius:6px;border:1px solid #e2e8f0;margin-bottom:16px;">
         <div style="font-size:12px;color:#64748b;margin-bottom:12px;">
           The <strong>SAO</strong> is a <strong>smooth fair-value curve</strong> (Nelson-Siegel-Svensson) fitted through the SA real yields.
           Each TIPS is snapped to the curve: for a buy-and-hold holder, any deviation not explained by a value-relevant
           factor (coupon, index ratio — both immaterial here) is treated as not particularly relevant and smoothed away.
-          Inspired by Canty's outlier-factor analysis, but — lacking identifiable outlier factors — operationally a curve fit (see <em>2.0 / 2.2</em>).
-          Since the residual this corrects amortizes with maturity, the snap weight declines between ${SAO_BLEND_START_YRS}y and ${SAO_BLEND_END_YRS}y (see <em>2.2 §6</em>).
+          Inspired by Canty's outlier-factor analysis, but — lacking identifiable outlier factors — operationally a curve fit (see <em>Adjust for other effects</em>).
+          Since the residual this corrects amortizes with maturity, the snap weight declines between ${SAO_BLEND_START_YRS}y and ${SAO_BLEND_END_YRS}y (see <em>The SAO Residual</em> §6).
         </div>
-        <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>Raw SA Yield</span><span>${(bond.saYield * 100).toFixed(3)}%</span></div>
-        ${blendNote}
-        <div style="border-top:1px dashed #cbd5e1;margin:8px 0;padding-top:8px;display:flex;justify-content:space-between;color:#1a56db;font-weight:700;">
-          <span>SAO Yield${bond._saoMode === 'blend' ? ' (blended)' : ' (smooth curve)'}</span><span>${(bond.saoYield * 100).toFixed(3)}%</span>
-        </div>
+        ${saRow}
+        ${saoRow(`SAO Yield${blend ? ' (blended)' : ' (smooth curve)'}`)}
       </div>
     `;
   }
@@ -364,37 +346,18 @@ function _showSaoDrill(cusip) {
   _showDrillPopup(`SAO Drill-down: ${bond.cusip} (Smooth Curve Fit)`, logicHtml);
 }
 
+
 // ─── Main Logic ──────────────────────────────────────────────────────────────
 
 Chart.defaults.font.size = 13;
 Chart.defaults.color = '#334155';
 
-// ── 3.1 Load and parse source data ─────────────────────────────────────────
-// One function per process of knowledge/DFD_LEVEL3_YC_LOAD, specified in
-// knowledge/1.3.1_Parse_Sources_And_Calculate_Yields.md. Each parses and returns; applying
-// the result to app state and to the controls is init()'s job, not theirs.
+// ── 3.1 Read yield curve data sets ─────────────────────────────────────────
+// spec: YieldCurves/knowledge/3.1_Read_Yield_Curve_Data_Sets.md
+// Each reads and returns; applying the result to app state and to the controls is init()'s
+// job, not theirs.
 
-// spec: 1.3.1_Parse_Sources_And_Calculate_Yields.md#parse-fedinvest-prices (3.1.1)
-// Row 1 is the settlement date, row 2 the header, rows 3 on the data.
-function parseFedInvestPrices(text) {
-  const lines = text.split(/\r?\n/).filter(l => l.trim());
-  const settlementDate = lines[0].trim();
-  const rows = parseCsv(lines.slice(1).join(String.fromCharCode(10)))
-    .map(r => ({ ...r, settlementDate }));
-  return { tips: rows.filter(r => r.type === 'TIPS'), nominals: rows.filter(r => r.type !== 'TIPS'), settlementDate };
-}
-
-// spec: 1.3.1_Parse_Sources_And_Calculate_Yields.md#parse-ref-cpi-and-sa-factors (3.1.3)
-function parseRefCpiAndSaFactors(text) {
-  return parseCsv(text);
-}
-
-// spec: 1.3.1_Parse_Sources_And_Calculate_Yields.md#parse-bond-holidays (3.1.4)
-function parseBondHolidays(text) {
-  return parseHolidaySet(parseCsv(text, false));
-}
-
-// spec: 1.3.1_Parse_Sources_And_Calculate_Yields.md#parse-gsw-parameters (3.1.5)
+// spec: YieldCurves/knowledge/3.1_Read_Yield_Curve_Data_Sets.md (GSW curve parameters (S12))
 // A missing or malformed file leaves the app without a published curve rather
 // than without a page, so both cases return null.
 async function parseGswParameters(res) {
@@ -402,97 +365,103 @@ async function parseGswParameters(res) {
   try { return await res.json(); } catch { return null; }
 }
 
-// spec: 1.3.1_Parse_Sources_And_Calculate_Yields.md#parse-market-quotes (3.1.2)
-// Every TIPS Quote (parseTipsQuotes limits these to the rows of type TIPS) is kept, provided it
-// has an ask price.
-function parseMarketQuotes(text) {
-  const { bonds, downloadDate } = parseMarketNominals(text, marketSettleIso(parseDownloadDate(text)));
-  const tipsPrices = new Map();
-  parseTipsQuotes(text).forEach(r => {
-    if (isNaN(r.askPrice)) return;
-    tipsPrices.set(r.cusip, r);
-  });
-  return { nominals: bonds, nominalsDate: downloadDate, tipsPrices, tipsDate: parseDownloadDate(text) };
+// spec: YieldCurves/knowledge/3.1_Read_Yield_Curve_Data_Sets.md
+// Fetches Yield curves (S13), Breakeven inflation (S14), Bid and ask spreads (S15) and the GSW
+// curve parameters (S12), and reads each with its reader in shared/src/yield-curve-stores.js
+// (S12 with parseGswParameters). S13 is required; S14 or S15 that cannot be read is null, and
+// leaves its view empty.
+async function loadYieldCurveDataSets() {
+  const get = url => fetch(url, { cache: 'no-cache' }).catch(e => ({ ok: false, error: e }));
+  const [ycRes, beiRes, spreadsRes, gswRes] = await Promise.all([
+    get(YIELD_CURVES_URL), get(BREAKEVEN_URL), get(SPREADS_URL), get(GSW_TIPS_CURVE_URL),
+  ]);
+  if (!ycRes.ok) throw new Error(`Failed to fetch yield curves: ${ycRes.status || ycRes.error}`);
+  const readOptional = async (res, parse, name) => {
+    if (!res.ok) { console.warn(`${name} not available on R2`); return null; }
+    try { return parse(await res.text()); } catch (e) { console.warn(`${name} could not be read:`, e); return null; }
+  };
+  const [yieldCurves, breakeven, spreads, gsw] = await Promise.all([
+    ycRes.text().then(parseYieldCurvesCsv),
+    readOptional(beiRes, parseBreakevenCsv, 'Breakeven inflation'),
+    readOptional(spreadsRes, parseSpreadsCsv, 'Bid and ask spreads'),
+    parseGswParameters(gswRes),
+  ]);
+  return { yieldCurves, breakeven, spreads, gsw };
 }
+
+// A security row of S13 of Type TIPS → the fields the TIPS views draw.
+function toTipsBond(r) {
+  return {
+    cusip: r.cusip, source: r.source, maturity: r.maturity, maturityDate: localDate(r.maturity),
+    termYears: r.termYears, coupon: r.coupon, price: r.price,
+    askYield: r.ask, saYield: r.sa, saoYield: r.sao,
+    settleSaFactor: r.settleSaFactor, naiveMaturitySaFactor: r.naiveMaturitySaFactor,
+    maturitySaFactor: r.maturitySaFactor, saPriceFactor: r.saPriceFactor, saPrice: r.saPrice,
+  };
+}
+
+// A security row of S13 of any other Type → the fields the Treasuries views draw.
+function toNominalBond(r) {
+  return {
+    cusip: r.cusip, source: r.source, maturity: r.maturity, maturityDate: localDate(r.maturity),
+    termYears: r.termYears, coupon: r.coupon, price: r.price, yield: r.ask,
+    type: CUSIP_TYPE_TO_MARKET_BASED[r.type] || r.type,
+  };
+}
+
+// The stored spot points of one curve: S13 spot rows of `type` and `source`, value `key`
+// ('spot' or 'spotSa', decimal), as { t, y } with y in percent. A blank cell is no point.
+function storedSpotPoints(type, source, key) {
+  return spotRows
+    .filter(r => r.type === type && r.source === source && Number.isFinite(r[key]))
+    .map(r => ({ t: r.termYears, y: parseFloat((r[key] * 100).toFixed(3)) }))
+    .sort((a, b) => a.t - b.t);
+}
+
+const sourceRows = (rows, source, pred) => {
+  const out = rows.filter(r => r.source === source && pred(r)).sort((a, b) => a.maturityDate - b.maturityDate);
+  return out.length ? out : null;
+};
 
 async function init() {
   const statusEl = document.getElementById('status');
   console.log("init() started");
-  
+
   try {
-    console.log("Fetching market data...");
-    const [yieldsRes, refCpiRes, holidayRes, quotesRes, gswRes] = await Promise.all([
-      fetch(YIELDS_CSV_URL, { cache: 'no-cache' }).then(r => { console.log("Yields fetched"); return r; }).catch(e => ({ ok: false, error: e })),
-      fetch(REF_CPI_CSV_URL, { cache: 'no-cache' }).then(r => { console.log("RefCPI fetched"); return r; }).catch(e => ({ ok: false, error: e })),
-      fetch(HOLIDAYS_CSV_URL, { cache: 'no-cache' }).then(r => { console.log("Holidays fetched"); return r; }).catch(e => ({ ok: false, error: e })),
-      fetch(MARKET_QUOTES_URL, { cache: 'no-cache' }).then(r => { console.log("Market quotes fetched"); return r; }).catch(e => ({ ok: false, error: e })),
-      fetch(GSW_TIPS_CURVE_URL, { cache: 'no-cache' }).then(r => { console.log("GSW curve fetched"); return r; }).catch(e => ({ ok: false, error: e })),
-    ]);
+    const { yieldCurves, breakeven, spreads, gsw } = await loadYieldCurveDataSets();
+    gswTipsCurve = gsw;
+    storeDates = yieldCurves.dates;
+    beiStore = breakeven;
+    spreadsStore = spreads;
+    spotRows = yieldCurves.spot;
+    const tips = yieldCurves.securities.filter(r => r.type === 'TIPS').map(toTipsBond);
+    const nominals = yieldCurves.securities.filter(r => r.type !== 'TIPS').map(toNominalBond);
+    fedTipsData = sourceRows(tips, 'FedInvest', () => true);
+    marketTipsData = sourceRows(tips, 'Market', () => true);
+    fedNominalsData = sourceRows(nominals, 'FedInvest', () => true);
+    marketNominalsData = sourceRows(nominals, 'Market', () => true);
+    console.log(`Read ${yieldCurves.securities.length} security rows and ${spotRows.length} spot rows.`);
 
-    gswTipsCurve = await parseGswParameters(gswRes);
-
-    if (!yieldsRes.ok) throw new Error(`Failed to fetch yields: ${yieldsRes.status || yieldsRes.error}`);
-    if (!refCpiRes.ok) throw new Error(`Failed to fetch Ref CPI: ${refCpiRes.status || refCpiRes.error}`);
-    if (!holidayRes.ok) throw new Error(`Failed to fetch bond holidays: ${holidayRes.status || holidayRes.error}`);
-
-    console.log("Fetches complete, parsing text...");
-    const [yieldsText, refCpiText, holidayText] = await Promise.all([
-      yieldsRes.text(),
-      refCpiRes.text(),
-      holidayRes.text(),
-    ]);
-
-    console.log("Parsing CSVs...");
-    const fedInvest = parseFedInvestPrices(yieldsText);
-    rawYieldsData = fedInvest.tips;
-    rawNominalsData = treasuryYieldsFromPrices(fedInvest.nominals);
-    rawRefCpiData = parseRefCpiAndSaFactors(refCpiText);
-    
-    console.log(`Parsed ${rawYieldsData.length} yield rows and ${rawRefCpiData.length} RefCPI rows.`);
-
-    holidaySet = parseBondHolidays(holidayText);
-    console.log(`Holiday set populated with ${holidaySet.size} dates.`);
-
-    if (quotesRes.ok) {
-      const quotesText = await quotesRes.text();
-      const quotes = parseMarketQuotes(quotesText);
-
-      // Nominals (Treasuries)
-      const bonds = quotes.nominals;
-      if (bonds.length > 0) {
-        marketNominalsData = bonds;
-        marketNominalsDate = quotes.nominalsDate;
-        const chkMq = document.getElementById('chkMarket');
-        chkMq.disabled = false;
-        chkMq.checked = true;
-        console.log(`Loaded ${bonds.length} Market Treasuries (${quotes.nominalsDate})`);
-        // The Unclassified checkbox only exists to surface a CUSIP root shared/src/
-        // treasury-cusip.js doesn't recognise -- shown, and checked, only when one actually
-        // occurs (see shared/src/market-quotes.js#parseTreasuryQuotes). Setting the flag
-        // and the checkbox together, only in this branch, keeps them consistent: no world
-        // where the checkbox is hidden but still counts as "on" for the Ask-column/range logic.
-        const hasUnclassified = bonds.some(b => b.type === 'MARKET BASED UNCLASSIFIED');
-        if (hasUnclassified) {
-          nominalsShowUnclassified = true;
-          document.getElementById('filterUnclassified').checked = true;
-          document.getElementById('filterUnclassifiedRow').style.display = 'flex';
-        }
-        updateModeToggle();
+    if (marketNominalsData) {
+      const chkMq = document.getElementById('chkMarket');
+      chkMq.disabled = false;
+      chkMq.checked = true;
+      // The Unclassified checkbox is shown, and checked, only when a Market row of Type
+      // Unclassified occurs. Setting the flag and the checkbox together, only in this branch,
+      // keeps them consistent: no world where the checkbox is hidden but still counts as "on"
+      // for the Ask-column/range logic.
+      if (marketNominalsData.some(b => b.type === 'MARKET BASED UNCLASSIFIED')) {
+        nominalsShowUnclassified = true;
+        document.getElementById('filterUnclassified').checked = true;
+        document.getElementById('filterUnclassifiedRow').style.display = 'flex';
       }
-
-      // TIPS prices
-      const priceMap = quotes.tipsPrices;
-      if (priceMap.size > 0) {
-        brokerPrices = priceMap;
-        brokerDownloadDate = quotes.tipsDate;
-        const chkBroker = document.getElementById('chkTipsBroker');
-        chkBroker.disabled = false;
-        chkBroker.checked = true;
-        console.log(`Loaded ${priceMap.size} Market TIPS prices (${brokerDownloadDate})`);
-        updateModeToggle();
-      }
-    } else {
-      console.warn('Market quotes not available on R2');
+      updateModeToggle();
+    }
+    if (marketTipsData) {
+      const chkBroker = document.getElementById('chkTipsBroker');
+      chkBroker.disabled = false;
+      chkBroker.checked = true;
+      updateModeToggle();
     }
 
     const onRangeChange = () => { savedZoom[activeTab] = null; processAndRender(); };
@@ -533,11 +502,6 @@ async function init() {
     console.error('Initialization failed:', err);
   }
 }
-
-// SAO / spot-curve math (fitNSS, fitSpotNSS, spotCurveFit, spotCurveGrid, calculateSAO,
-// zToSA, and the SAO_* constants) lives in shared/src/spot-curve.js — single source of
-// truth for both this app and any pipeline script computing the same fitted curves.
-// See knowledge/3.3_Adjust_For_Other_Effects.md and 1.3.4_Fit_Spot_Yield_Curves.md.
 
 // years-to-maturity → current x-axis unit (calendar ms in Maturity mode, weeks in Term mode).
 function yearsToX(now) {
@@ -590,25 +554,38 @@ function switchTab(tab) {
   processAndRender();
 }
 
-// Works with text from file upload or R2 fetch. The row parse and both yield calculations
-// live in shared/src/market-quotes.js#parseTreasuryQuotes, which the acquisition script
-// that writes S13/S15 imports too, so neither can move onto a different method (§2a).
-// parseTreasuryQuotes already drops TIPS rows on its own via the type column, so this
-// app adds no FedInvest cross-reference to gate on. What stays here is the S1 type vocabulary
-// the rest of the app filters on.
-function parseMarketNominals(text, settleIso = null) {
-  const bonds = parseTreasuryQuotes(text, {
-    settleIso,
-    onUnknownCusip: cusip => console.warn(`Unrecognized CUSIP root, tagged Unclassified: ${cusip}`),
-  }).map(b => ({ ...b, type: CUSIP_TYPE_TO_MARKET_BASED[b.cusipType] }));
-  return { bonds, downloadDate: parseDownloadDate(text) };
+// Which nominal securities the type checkboxes show.
+const nominalTypeShown = r => nominalsTypeFilters.has(r.type)
+  || (nominalsShowStrips && r.type === 'MARKET BASED STRIPS')
+  || (nominalsShowUnclassified && r.type === 'MARKET BASED UNCLASSIFIED');
+// The Treasuries the spot curve of 1.3.4 is fitted to: every Bill, Note and Bond. A STRIPS and
+// an Unclassified security are excluded. Used for the Maturity Range of a checked Spot.
+const isSpotFitType = b => b.type !== 'MARKET BASED STRIPS' && b.type !== 'MARKET BASED UNCLASSIFIED';
+
+// The Market source line beside a source checkbox: the Download Date and the Settlement Date.
+const marketMetaText = d => `${fmtBrokerTime(d.trade)} ET · settle ${isoToMDY(d.settle)} (T+1)`;
+
+// Bid and ask spreads (S15) rows of nominal Treasuries → the fields the spread views draw.
+function nominalSpreadBonds() {
+  return (spreadsStore?.rows || []).filter(r => r.type !== 'TIPS').map(r => ({
+    cusip: r.cusip, maturity: r.maturity, maturityDate: localDate(r.maturity),
+    type: CUSIP_TYPE_TO_MARKET_BASED[r.type] || r.type, coupon: r.coupon,
+    price: r.askPrice, bidPrice: r.bidPrice, yield: r.askYield, bidYield: r.bidYield,
+    yieldSpreadBps: r.yieldSpreadBps, priceSpreadPct: r.priceSpreadPct,
+  }));
 }
 
-// The Treasuries the spot curve of 3.4 is fitted to: every Bill, Note and Bond. A STRIPS and an
-// Unclassified CUSIP are excluded. Used by the Treasuries tab and by the Spot BEI of the
-// Breakeven tab, so both draw the same curve.
-const treasuriesSpotSet = bonds => bonds.filter(b => !isStrip(b.cusip) && b.type !== 'MARKET BASED STRIPS' && b.type !== 'MARKET BASED UNCLASSIFIED');
+// Bid and ask spreads (S15) rows of TIPS → the fields the spread views draw.
+function tipsSpreadBonds() {
+  return (spreadsStore?.rows || []).filter(r => r.type === 'TIPS').map(r => ({
+    cusip: r.cusip, maturity: r.maturity, maturityDate: localDate(r.maturity), coupon: r.coupon,
+    price: r.askPrice, bidPrice: r.bidPrice, askYield: r.askYield, bidYield: r.bidYield,
+    adjAskPrice: r.adjustedAskPrice, adjBidPrice: r.adjustedBidPrice,
+    yieldSpreadBps: r.yieldSpreadBps, priceSpreadPct: r.priceSpreadPct,
+  }));
+}
 
+// spec: YieldCurves/knowledge/3.2_Render_Charts_And_Tables.md#draw-treasuries (3.2.3)
 function processAndRenderNominals() {
   const statusEl = document.getElementById('status');
   const showFed = document.getElementById('chkFedInvest').checked;
@@ -617,45 +594,16 @@ function processAndRenderNominals() {
   if (!showFed && !showMq) { statusEl.textContent = ''; if (chart) { chart.destroy(); chart = null; } return; }
 
   try {
-    // FedInvest rows settle on the price date itself (T=0); market quotes settle T+1.
-    const mktSettle = marketSettleIso();
-
     let fedProcessed = null;
     if (showFed) {
-      if (!rawNominalsData || rawNominalsData.length === 0) { statusEl.textContent = 'No FedInvest data available.'; return; }
-      fedProcessed = rawNominalsData.filter(r => nominalsTypeFilters.has(r.type) || (nominalsShowStrips && isStrip(r.cusip)) || (nominalsShowUnclassified && r.type === 'MARKET BASED UNCLASSIFIED'))
-        .sort((a, b) => a.maturityDate - b.maturityDate);
+      if (!fedNominalsData) { statusEl.textContent = 'No FedInvest data available.'; return; }
+      fedProcessed = fedNominalsData.filter(nominalTypeShown);
     }
-
-    let mqProcessed = null;
-    if (showMq) {
-      mqProcessed = marketNominalsData.filter(r => nominalsTypeFilters.has(r.type) || (nominalsShowStrips && isStrip(r.cusip)) || (nominalsShowUnclassified && r.type === 'MARKET BASED UNCLASSIFIED'));
-    }
-
-    // Full coupon+bill set for the spot fit — independent of the Bills/Notes/Bonds
-    // checkboxes (those pick which per-bond series are drawn, not what the curve is
-    // fitted to). Bills are already zero-coupon, so they anchor the short end. Unclassified
-    // is excluded the same way STRIPS is: its true cash-flow structure is unknown, so it
-    // cannot be fit as a plain coupon bond.
-    let fedSpotSet = showFed ? treasuriesSpotSet(rawNominalsData) : null;
-    let mqSpotSet = showMq ? treasuriesSpotSet(marketNominalsData) : null;
-
-    // Filter STRIPS unless user opts in (already handled by the initial filter above for performance, but we keep the mqProcessed part consistent)
-    if (!nominalsShowStrips) {
-      if (fedProcessed) fedProcessed = fedProcessed.filter(b => !isStrip(b.cusip));
-      if (mqProcessed) mqProcessed = mqProcessed.filter(b => !isStrip(b.cusip));
-    }
-    // Filter Unclassified unless user opts in (mirrors the STRIPS block above; performance
-    // note above applies here too)
-    if (!nominalsShowUnclassified) {
-      if (fedProcessed) fedProcessed = fedProcessed.filter(b => b.type !== 'MARKET BASED UNCLASSIFIED');
-      if (mqProcessed) mqProcessed = mqProcessed.filter(b => b.type !== 'MARKET BASED UNCLASSIFIED');
-    }
+    const mqProcessed = showMq ? marketNominalsData.filter(nominalTypeShown) : null;
 
     // Initial default: the range spans whatever is checked by default (Bills/Notes/Bonds).
-    // Checking something new later expands the range to fit it (see expandRangeToInclude in
-    // the change handler below) — it never shrinks on its own; only unchecking something, or
-    // typing a narrower range by hand, reduces what's shown.
+    // A checkbox change recomputes it (recomputeRangeFromChecked); typing a range by hand
+    // holds until the next one.
     const allBonds = [...(fedProcessed || []), ...(mqProcessed || [])].sort((a, b) => a.maturityDate - b.maturityDate);
     const startEl = document.getElementById('startMaturity');
     const endEl = document.getElementById('endMaturity');
@@ -670,31 +618,27 @@ function processAndRenderNominals() {
     const fedFiltered = fedProcessed ? fedProcessed.filter(inRange) : null;
     const mqFiltered = mqProcessed ? mqProcessed.filter(inRange) : null;
 
-    // The Spot fit itself always uses the full, un-ranged set (fedSpotSet/mqSpotSet) — the
-    // Maturity Range only crops what gets drawn/listed from the resulting curve, exactly like
-    // it crops the other security types' own points, via startTermY/endTermY below and via
-    // the chart's own axis domain.
-    const refSettle = localDate(fedSpotSet?.[0]?.settlementDate || mqSpotSet?.[0]?.settlementDate);
+    // The stored spot curve of each source shown (S13 spot rows of Type Treasury), fitted to
+    // the full Bill, Note and Bond set whichever types are checked. The Maturity Range only
+    // crops which of its points the table lists, via startTermY/endTermY below, and which part
+    // the chart shows, via the chart's axis domain.
+    const fedSpot = showFed ? storedSpotPoints('Treasury', 'FedInvest', 'spot') : null;
+    const mqSpot = showMq ? storedSpotPoints('Treasury', 'Market', 'spot') : null;
+    const refSettle = localDate(showFed ? storeDates.fedInvest.settle : storeDates.market.settle);
     const startTermY = refSettle ? termYears(refSettle, startDate) : -Infinity;
     const endTermY = refSettle ? termYears(refSettle, endDate) : Infinity;
 
-    if (mqFiltered) addTreasurySpreads(mqFiltered);
-
     if (spreadModeActive && mqFiltered) {
-      renderSpreadCharts(mqFiltered, 'treasuries');
-      renderSpreadTable(mqFiltered, 'treasuries');
+      const spreadBonds = nominalSpreadBonds().filter(nominalTypeShown).filter(inRange);
+      renderSpreadCharts(spreadBonds, 'treasuries');
+      renderSpreadTable(spreadBonds, 'treasuries');
     } else {
-      renderNominalsTable(fedFiltered, mqFiltered, fedSpotSet, mqSpotSet, startTermY, endTermY);
-      renderNominalsChart(fedFiltered, mqFiltered, fedSpotSet, mqSpotSet);
+      renderNominalsTable(fedFiltered, mqFiltered, fedSpot, mqSpot, startTermY, endTermY);
+      renderNominalsChart(fedFiltered, mqFiltered, fedSpot, mqSpot);
     }
 
-    const treaFedSettle = rawNominalsData?.[0]?.settlementDate;
-    document.getElementById('treaFedMeta').textContent = showFed && treaFedSettle ? isoToMDY(treaFedSettle) : '';
-    if (showMq && marketNominalsDate) {
-      document.getElementById('treaMktMeta').textContent = `${fmtBrokerTime(marketNominalsDate)} ET · settle ${isoToMDY(mktSettle)} (T+1)`;
-    } else {
-      document.getElementById('treaMktMeta').textContent = '';
-    }
+    document.getElementById('treaFedMeta').textContent = showFed ? isoToMDY(storeDates.fedInvest.settle) : '';
+    document.getElementById('treaMktMeta').textContent = showMq ? marketMetaText(storeDates.market) : '';
     document.getElementById('treaFedCount').textContent = showFed ? (fedFiltered?.length || 0) : '';
     document.getElementById('treaMktCount').textContent = showMq ? (mqFiltered?.length || 0) : '';
     statusEl.textContent = '';
@@ -706,7 +650,8 @@ function processAndRenderNominals() {
   }
 }
 
-function renderNominalsTable(fedBonds, mqBonds, fedSpotBonds, mqSpotBonds, startTermY, endTermY) {
+// fedSpot / mqSpot: stored spot points { t, y } of the Treasury curve of each source, or null.
+function renderNominalsTable(fedBonds, mqBonds, fedSpot, mqSpot, startTermY, endTermY) {
   const theadRow = document.querySelector('#nominalsTable thead tr');
   const tbody = document.getElementById('nominalsTableBody');
   const bothActive = fedBonds && mqBonds;
@@ -775,26 +720,23 @@ function renderNominalsTable(fedBonds, mqBonds, fedSpotBonds, mqSpotBonds, start
       </tr>`).join('');
   }
 
-  // Spot curve rows — the fitted zero-coupon Treasury curve (same fit the chart draws),
-  // appended after the security rows since a curve point has a Term but no CUSIP to sort by.
-  // The fit itself always uses the full fedSpotBonds/mqSpotBonds (never range-restricted —
-  // Spot is independent of the Maturity Range the same way it is independent of the security
-  // type checkboxes); the Range only crops which resulting terms are listed here, the same
-  // way it crops the other security types' own rows.
+  // Spot curve rows — the stored points of the zero-coupon Treasury curve (the points the chart
+  // draws), appended after the security rows since a curve point has a Term but no CUSIP to
+  // sort by. The Maturity Range only crops which terms are listed here, the same way it crops
+  // the rows of the other security types.
   if (spotColIdx !== -1) {
     const curveByTerm = new Map();   // term.toFixed(4) -> { term, fed, mkt }
-    const addCurve = (bonds, source) => {
-      const grid = bonds && spotCurveTermGrid(bonds, TREASURIES_SPOT_FIT);
-      if (!grid) return;
-      for (const { t, y } of grid) {
+    const addCurve = (points, source) => {
+      if (!points) return;
+      for (const { t, y } of points) {
         if (t < startTermY || t > endTermY) continue;
         const tk = t.toFixed(4);
         if (!curveByTerm.has(tk)) curveByTerm.set(tk, { term: t });
         curveByTerm.get(tk)[source] = y;
       }
     };
-    addCurve(fedSpotBonds, 'fed');
-    addCurve(mqSpotBonds, 'mkt');
+    addCurve(fedSpot, 'fed');
+    addCurve(mqSpot, 'mkt');
     const fmt = v => v != null ? v.toFixed(3) + '%' : '—';
     tbody.innerHTML += [...curveByTerm.values()].sort((a, b) => a.term - b.term).map(({ term, fed, mkt }) => {
       const cells = curveCols.map((c, i) => i === spotColIdx
@@ -805,10 +747,10 @@ function renderNominalsTable(fedBonds, mqBonds, fedSpotBonds, mqSpotBonds, start
   }
 }
 
-function renderNominalsChart(fedBonds, mqBonds, fedSpotBonds, mqSpotBonds) {
+function renderNominalsChart(fedBonds, mqBonds, fedSpot, mqSpot) {
   const ctx = document.getElementById('yieldChart').getContext('2d');
   const allBonds = [...(fedBonds || []), ...(mqBonds || [])];
-  const haveSpotInput = (fedSpotBonds && fedSpotBonds.length) || (mqSpotBonds && mqSpotBonds.length);
+  const haveSpotInput = (fedSpot && fedSpot.length) || (mqSpot && mqSpot.length);
   if (allBonds.length === 0 && !haveSpotInput) { if (chart) { chart.destroy(); chart = null; } return; }
 
   const now = Date.now();
@@ -822,39 +764,37 @@ function renderNominalsChart(fedBonds, mqBonds, fedSpotBonds, mqSpotBonds) {
   if (fedBonds) {
     const sfx = bothShown ? ' (FedInvest)' : '';
     seriesDef.push(
-      { label: `Bills${sfx}`,  data: fedBonds.filter(b => b.type === 'MARKET BASED BILL' && !isStrip(b.cusip)).map(toPoint), color: '#0ea5e9', r: 1, w: 1.5, dash: [4, 4] },
-      { label: `Notes${sfx}`,  data: fedBonds.filter(b => b.type === 'MARKET BASED NOTE' && !isStrip(b.cusip)).map(toPoint), color: '#1a56db', r: 1, w: 2.5, dash: [4, 4] },
-      { label: `Bonds${sfx}`,  data: fedBonds.filter(b => b.type === 'MARKET BASED BOND' && !isStrip(b.cusip)).map(toPoint), color: '#7c3aed', r: 1, w: 2.5, dash: [4, 4] },
-      { label: `STRIPS${sfx}`, data: fedBonds.filter(b => isStrip(b.cusip)).map(toPoint), color: '#64748b', r: 1, w: 2.2, dash: [4, 4] },
+      { label: `Bills${sfx}`,  data: fedBonds.filter(b => b.type === 'MARKET BASED BILL').map(toPoint), color: '#0ea5e9', r: 1, w: 1.5, dash: [4, 4] },
+      { label: `Notes${sfx}`,  data: fedBonds.filter(b => b.type === 'MARKET BASED NOTE').map(toPoint), color: '#1a56db', r: 1, w: 2.5, dash: [4, 4] },
+      { label: `Bonds${sfx}`,  data: fedBonds.filter(b => b.type === 'MARKET BASED BOND').map(toPoint), color: '#7c3aed', r: 1, w: 2.5, dash: [4, 4] },
+      { label: `STRIPS${sfx}`, data: fedBonds.filter(b => b.type === 'MARKET BASED STRIPS').map(toPoint), color: '#64748b', r: 1, w: 2.2, dash: [4, 4] },
       { label: `Unclassified${sfx}`, data: fedBonds.filter(b => b.type === 'MARKET BASED UNCLASSIFIED').map(toPoint), color: '#b45309', r: 1, w: 2.2, dash: [4, 4] }
     );
   }
   if (mqBonds) {
     const sfx = bothShown ? ' (Market)' : '';
     seriesDef.push(
-      { label: `Bills${sfx}`,  data: mqBonds.filter(b => b.type === 'MARKET BASED BILL' && !isStrip(b.cusip)).map(toPoint), color: '#f97316', r: 1, w: 1.5, dash: [] },
-      { label: `Notes${sfx}`,  data: mqBonds.filter(b => b.type === 'MARKET BASED NOTE' && !isStrip(b.cusip)).map(toPoint), color: '#dc2626', r: 1, w: 2.5, dash: [] },
-      { label: `Bonds${sfx}`,  data: mqBonds.filter(b => b.type === 'MARKET BASED BOND' && !isStrip(b.cusip)).map(toPoint), color: '#059669', r: 1, w: 2.5, dash: [] },
-      { label: `STRIPS${sfx}`, data: mqBonds.filter(b => isStrip(b.cusip)).map(toPoint), color: '#78350f', r: 1, w: 2.2, dash: [] },
+      { label: `Bills${sfx}`,  data: mqBonds.filter(b => b.type === 'MARKET BASED BILL').map(toPoint), color: '#f97316', r: 1, w: 1.5, dash: [] },
+      { label: `Notes${sfx}`,  data: mqBonds.filter(b => b.type === 'MARKET BASED NOTE').map(toPoint), color: '#dc2626', r: 1, w: 2.5, dash: [] },
+      { label: `Bonds${sfx}`,  data: mqBonds.filter(b => b.type === 'MARKET BASED BOND').map(toPoint), color: '#059669', r: 1, w: 2.5, dash: [] },
+      { label: `STRIPS${sfx}`, data: mqBonds.filter(b => b.type === 'MARKET BASED STRIPS').map(toPoint), color: '#78350f', r: 1, w: 2.2, dash: [] },
       { label: `Unclassified${sfx}`, data: mqBonds.filter(b => b.type === 'MARKET BASED UNCLASSIFIED').map(toPoint), color: '#eab308', r: 1, w: 2.2, dash: [] }
     );
   }
 
-  // Zero-coupon (spot) curve, per source — fitted in price space to every non-STRIPS,
-  // non-Unclassified nominal (Bills, Notes and Bonds), independent of the Bills/Notes/Bonds
-  // checkboxes. Only
-  // built at all when Spot is checked — an unchecked series must not appear in the dataset
-  // array, or Chart.js's legend shows it struck through instead of simply omitting it.
-  // Its own colour, distinct from the per-bond lines.
+  // Zero-coupon (spot) curve, per source — the stored points of S13 (Type Treasury), fitted to
+  // the Bills, Notes and Bonds whichever of their checkboxes are on. Only built at all when
+  // Spot is checked — an unchecked series must not appear in the dataset array, or Chart.js's
+  // legend shows it struck through instead of simply omitting it. Its colour is distinct from
+  // the per-bond lines.
   const yToX = yearsToX(now);
   if (document.getElementById('showTsySpot').checked) {
-    const bothSpot = fedSpotBonds && fedSpotBonds.length && mqSpotBonds && mqSpotBonds.length;
+    const bothSpot = fedSpot && fedSpot.length && mqSpot && mqSpot.length;
     const nomCurveSrc = [];
-    if (fedSpotBonds && fedSpotBonds.length) nomCurveSrc.push({ bonds: fedSpotBonds, sfx: bothSpot ? ' (FedInvest)' : '', color: '#0f172a' });
-    if (mqSpotBonds && mqSpotBonds.length) nomCurveSrc.push({ bonds: mqSpotBonds, sfx: bothSpot ? ' (Market)' : '',    color: '#b45309' });
-    for (const { bonds, sfx, color } of nomCurveSrc) {
-      const grid = spotCurveGrid(bonds, { ...TREASURIES_SPOT_FIT, yToX });
-      if (grid) seriesDef.push({ label: `Spot${sfx}`, data: grid, color, w: 2.5, dash: [], curve: true, r: 0, markerR: 2 });
+    if (fedSpot && fedSpot.length) nomCurveSrc.push({ points: fedSpot, sfx: bothSpot ? ' (FedInvest)' : '', color: '#0f172a' });
+    if (mqSpot && mqSpot.length) nomCurveSrc.push({ points: mqSpot, sfx: bothSpot ? ' (Market)' : '',    color: '#b45309' });
+    for (const { points, sfx, color } of nomCurveSrc) {
+      seriesDef.push({ label: `Spot${sfx}`, data: points.map(({ t, y }) => ({ x: yToX(t), y })), color, w: 2.5, dash: [], curve: true, r: 0, markerR: 2 });
     }
   }
 
@@ -1048,37 +988,18 @@ function renderNominalsChart(fedBonds, mqBonds, fedSpotBonds, mqSpotBonds) {
 
 }
 
-// The TIPS of one source (FedInvest or Market) is built in three steps, each one implementation
-// shared with the acquisition job that writes S13, S14 and S15:
-//   shared/src/tips-yields.js#tipsYieldsFromPrices   Ask Yield and Bid Yield (3.1.7)
-//   shared/src/sa-yields.js#saYieldsFromTipsYields   SA Price Factor and SA Yield (3.2)
-//   shared/src/spreads.js#addTipsSpreads             yield and price spreads (3.6)
-const tipsFor = (quotesByCusip, isBroker) => addTipsSpreads(saYieldsFromTipsYields(
-  tipsYieldsFromPrices(rawYieldsData, quotesByCusip, isBroker, marketSettleIso()), rawRefCpiData));
-
+// spec: YieldCurves/knowledge/3.2_Render_Charts_And_Tables.md#draw-tips (3.2.4)
 function processAndRenderTips() {
   const statusEl = document.getElementById('status');
   const showFed = document.getElementById('chkTipsFed').checked;
-  const showBroker = document.getElementById('chkTipsBroker').checked && !!brokerPrices;
+  const showBroker = document.getElementById('chkTipsBroker').checked && !!marketTipsData;
 
   if (!showFed && !showBroker) { statusEl.textContent = ''; if (chart) { chart.destroy(); chart = null; } return; }
-  if (!rawYieldsData || rawYieldsData.length === 0 || !rawRefCpiData) return;
+  if (showFed && !fedTipsData && !showBroker) return;
 
   try {
-    const fedSettleStr = rawYieldsData[0]?.settlementDate;
-
-    let fedBonds = showFed ? tipsFor(null, false) : null;
-    let brokerBonds = showBroker ? tipsFor(brokerPrices, true) : null;
-
-    // Apply SAO to each set
-    if (fedBonds) {
-      const smoothed = calculateSAO(fedBonds);
-      fedBonds.forEach((b, i) => { b.saoYield = smoothed[i]; });
-    }
-    if (brokerBonds) {
-      const smoothed = calculateSAO(brokerBonds);
-      brokerBonds.forEach((b, i) => { b.saoYield = smoothed[i]; });
-    }
+    const fedBonds = showFed ? fedTipsData : null;
+    const brokerBonds = showBroker ? marketTipsData : null;
 
     const startEl = document.getElementById('startMaturity');
     const endEl = document.getElementById('endMaturity');
@@ -1096,8 +1017,9 @@ function processAndRenderTips() {
     const brokerFiltered = brokerBonds ? brokerBonds.filter(inRange) : null;
 
     if (spreadModeActive && brokerFiltered) {
-      renderSpreadCharts(brokerFiltered, 'tips');
-      renderSpreadTable(brokerFiltered, 'tips');
+      const spreadBonds = tipsSpreadBonds().filter(inRange);
+      renderSpreadCharts(spreadBonds, 'tips');
+      renderSpreadTable(spreadBonds, 'tips');
     } else {
       tipsTableFed = fedFiltered;
       tipsTableBroker = brokerFiltered;
@@ -1105,12 +1027,8 @@ function processAndRenderTips() {
       renderChart(fedFiltered, brokerFiltered);
     }
 
-    document.getElementById('tipsFedMeta').textContent = showFed && fedSettleStr ? isoToMDY(fedSettleStr) : '';
-    if (showBroker && brokerDownloadDate) {
-      document.getElementById('tipsMktMeta').textContent = `${fmtBrokerTime(brokerDownloadDate)} ET · settle ${isoToMDY(marketSettleIso())} (T+1)`;
-    } else {
-      document.getElementById('tipsMktMeta').textContent = '';
-    }
+    document.getElementById('tipsFedMeta').textContent = showFed ? isoToMDY(storeDates.fedInvest.settle) : '';
+    document.getElementById('tipsMktMeta').textContent = showBroker ? marketMetaText(storeDates.market) : '';
     document.getElementById('tipsFedCount').textContent = showFed ? (fedFiltered?.length || 0) : '';
     document.getElementById('tipsBrokerCount').textContent = showBroker ? (brokerFiltered?.length || 0) : '';
     statusEl.textContent = '';
@@ -1122,11 +1040,11 @@ function processAndRenderTips() {
   }
 }
 
-// Table columns follow the chart's own series checkboxes (Ask/SA/SAO/Spot/Spot SA) rather
-// than a fixed set — see YieldCurves/knowledge/3.2_Render_Charts_And_Tables.md §3.7.4. Spot and Spot SA are
-// fitted curves, not a value tied to any one security, so they get their own rows (Term
-// only, evaluated at the curve's half-year grid plus its own longest-fitted endpoint —
-// spotCurveTermGrid, same fit the chart draws) interleaved by Term with the security rows.
+// Table columns follow the chart's series checkboxes (Ask/SA/SAO/Spot/Spot SA) rather than a
+// fixed set — see YieldCurves/knowledge/3.2_Render_Charts_And_Tables.md#draw-tips (3.2.4). Spot
+// and Spot SA are fitted curves, not a value tied to any one security, so they get separate
+// rows (Term only, at the stored points of S13 — the points the chart draws) interleaved by
+// Term with the security rows.
 const TIPS_TABLE_SERIES = [
   { key: 'ask',    label: 'Ask',      help: 'ask-yield', yieldKey: 'askYield' },
   { key: 'sa',     label: 'SA',       help: 'sa-yield',  yieldKey: 'saYield',  drill: 'sa' },
@@ -1139,9 +1057,9 @@ function renderTable(fedBonds, brokerBonds) {
   const thead = document.querySelector('#saTable thead tr');
   const both = fedBonds && brokerBonds;
   const fmtY = y => (y != null && !isNaN(y)) ? (y * 100).toFixed(3) + '%' : '—';
-  // Term runs from the settlement date the security's own price is stated at, the same
-  // measure the curve rows below carry (DATA_DICTIONARY.md#term).
-  const termOf = b => termYears(localDate(b.settlementDate), b.maturityDate);
+  // Term (y) as stored on the row: from the Settlement Date of the source of its price, the
+  // same measure the curve rows below carry (DATA_DICTIONARY.md#term).
+  const termOf = b => b.termYears;
 
   window._currentBonds = [...(fedBonds || []), ...(brokerBonds || [])].sort((a, b) => a.maturityDate - b.maturityDate);
 
@@ -1170,22 +1088,22 @@ function renderTable(fedBonds, brokerBonds) {
 
   // Curve rows — Spot / Spot SA only, added when checked.
   const curveByTerm = new Map();   // term.toFixed(4) -> { term, spot_fed, spot_mkt, spotSa_fed, spotSa_mkt }
-  const addCurve = (key, bonds, source, opts) => {
-    const grid = bonds && spotCurveTermGrid(bonds, opts);
-    if (!grid) return;
-    for (const { t, y } of grid) {
+  // `shown`: the security rows of that source, null when the source is not shown.
+  const addCurve = (key, shown, source, tag) => {
+    if (!shown) return;
+    for (const { t, y } of storedSpotPoints('TIPS', source, key)) {
       const tk = t.toFixed(4);
       if (!curveByTerm.has(tk)) curveByTerm.set(tk, { term: t });
-      curveByTerm.get(tk)[`${key}_${source}`] = y;
+      curveByTerm.get(tk)[`${key}_${tag}`] = y;
     }
   };
   if (cols.some(c => c.key === 'spot')) {
-    addCurve('spot', fedBonds, 'fed', TIPS_SPOT_FIT);
-    addCurve('spot', brokerBonds, 'mkt', TIPS_SPOT_FIT);
+    addCurve('spot', fedBonds, 'FedInvest', 'fed');
+    addCurve('spot', brokerBonds, 'Market', 'mkt');
   }
   if (cols.some(c => c.key === 'spotSa')) {
-    addCurve('spotSa', fedBonds, 'fed', TIPS_SA_SPOT_FIT);
-    addCurve('spotSa', brokerBonds, 'mkt', TIPS_SA_SPOT_FIT);
+    addCurve('spotSa', fedBonds, 'FedInvest', 'fed');
+    addCurve('spotSa', brokerBonds, 'Market', 'mkt');
   }
   for (const { term, ...vals } of curveByTerm.values()) {
     const cells = cols.map(c => {
@@ -1325,18 +1243,19 @@ function renderChart(fedBonds, brokerBonds) {
     );
   }
 
-  // Zero-coupon (spot) curves, per source: one fitted to the quoted ask yields, one to the
-  // seasonally adjusted yields (spotCurveGrid → fitSpotNSS in price space). Plus the GSW
+  // Zero-coupon (spot) curves, per source: the stored points of S13 (Type TIPS), Spot fitted to
+  // the quoted ask yields and Spot SA to the seasonally adjusted yields. Plus the GSW
   // reference (?gsw only).
   const yToX = yearsToX(now);
+  const toCurve = points => points.map(({ t, y }) => ({ x: yToX(t), y }));
   const curveSrc = [];
-  if (fedBonds)    curveSrc.push({ bonds: fedBonds,    sfx: both ? ' (Fed)' : '',    color: '#1a56db' });
-  if (brokerBonds) curveSrc.push({ bonds: brokerBonds, sfx: both ? ' (Market)' : '', color: '#b45309' });
-  for (const { bonds, sfx, color } of curveSrc) {
-    const ask = spotCurveGrid(bonds, { ...TIPS_SPOT_FIT, yToX });
-    if (ask) seriesDef.push({ label: `Spot${sfx}`, data: ask, color, curve: true, w: 2.25, dash: [], style: 'circle', r: 0, markerR: 2 });
-    const sa = spotCurveGrid(bonds, { ...TIPS_SA_SPOT_FIT, yToX });
-    if (sa) seriesDef.push({ label: `Spot SA${sfx}`, data: sa, color, curve: true, w: 2.25, dash: [2, 3], style: 'circle', r: 0, markerR: 2 });
+  if (fedBonds)    curveSrc.push({ source: 'FedInvest', sfx: both ? ' (Fed)' : '',    color: '#1a56db' });
+  if (brokerBonds) curveSrc.push({ source: 'Market',    sfx: both ? ' (Market)' : '', color: '#b45309' });
+  for (const { source, sfx, color } of curveSrc) {
+    const ask = toCurve(storedSpotPoints('TIPS', source, 'spot'));
+    if (ask.length) seriesDef.push({ label: `Spot${sfx}`, data: ask, color, curve: true, w: 2.25, dash: [], style: 'circle', r: 0, markerR: 2 });
+    const sa = toCurve(storedSpotPoints('TIPS', source, 'spotSa'));
+    if (sa.length) seriesDef.push({ label: `Spot SA${sfx}`, data: sa, color, curve: true, w: 2.25, dash: [2, 3], style: 'circle', r: 0, markerR: 2 });
   }
   // GSW zero reference (analysis aid, ?gsw only): evaluate its published Svensson parameters
   // (weekly R2 pull) on the same half-year grid, converted to the semi-annual basis. Falls
@@ -1495,54 +1414,37 @@ function rescaleToVisible(chart) {
 
 
 // ─── BEI (Breakeven Inflation) ───────────────────────────────────────────────
-// BEI = closest-maturity nominal yield (Market, no STRIPS) − TIPS yield, for each of the
-// TIPS Ask/SA/SAO variants. Market-only: BEI needs both legs quoted the same way (broker
-// ask), so it doesn't mix in FedInvest's bid/ask-midpoint pricing the way the TIPS tab does.
+// spec: YieldCurves/knowledge/3.2_Render_Charts_And_Tables.md#draw-breakeven (3.2.5)
+// Per security: the rows of Breakeven inflation (S14), the closest-maturity nominal Ask less
+// each of the TIPS Ask, SA and SAO. Across terms: the stored spot rows of S13 of Type BEI and
+// Source Market, Spot SA (the nominal curve less the TIPS SA curve). Market-only.
+
+// A row of S14 → the fields the breakeven views draw.
+function toBeiBond(r) {
+  return {
+    cusip: r.tipsCusip, maturity: r.tipsMaturity, maturityDate: localDate(r.tipsMaturity), coupon: r.tipsCoupon,
+    askYield: r.tipsAsk, saYield: r.tipsSa, saoYield: r.tipsSao,
+    nominalCusip: r.nominalCusip, nominalMaturity: r.nominalMaturity, nominalCoupon: r.nominalCoupon,
+    nominalYield: r.nominalAsk, beiAsk: r.askBei, beiSa: r.saBei, beiSao: r.saoBei,
+  };
+}
 
 function processAndRenderBei() {
   const statusEl = document.getElementById('status');
 
-  if (!brokerPrices || !marketNominalsData) {
+  const tips = (beiStore?.rows || []).map(toBeiBond).sort((a, b) => a.maturityDate - b.maturityDate);
+  if (tips.length === 0) {
     statusEl.textContent = 'BEI requires market-quote TIPS and nominal data.';
     statusEl.className = '';
     if (chart) { chart.destroy(); chart = null; }
     document.getElementById('beiTableBody').innerHTML = '';
     return;
   }
-  if (!rawRefCpiData) return;
 
   try {
-    const tips = tipsFor(brokerPrices, true);
-    const smoothed = calculateSAO(tips);
-    tips.forEach((b, i) => { b.saoYield = smoothed[i]; });
-
-    const nominalCandidates = marketNominalsData.filter(b => b.type !== 'MARKET BASED STRIPS' && b.type !== 'MARKET BASED UNCLASSIFIED');
-    if (nominalCandidates.length === 0) {
-      statusEl.textContent = 'No market nominal data available for BEI.';
-      if (chart) { chart.destroy(); chart = null; }
-      document.getElementById('beiTableBody').innerHTML = '';
-      return;
-    }
-
-    tips.forEach(b => {
-      const nom = findClosestNominal(nominalCandidates, b.maturityDate);
-      b.nominalCusip = nom.cusip;
-      b.nominalMaturity = nom.maturity;
-      b.nominalCoupon = nom.coupon;
-      b.nominalYield = nom.yield;
-      b.beiAsk = nom.yield - b.askYield;
-      b.beiSa = nom.yield - b.saYield;
-      b.beiSao = nom.yield - b.saoYield;
-    });
-
-    // Spot BEI (3.5 Across terms): the Treasuries curve the Treasuries tab draws, less the TIPS SA
-    // curve the TIPS tab draws, at every Term where both exist -- a true same-horizon
-    // breakeven at every point, unlike the per-bond closest-maturity match above.
     const yToX = yearsToX(Date.now());
-    const nomFit = spotCurveFit(treasuriesSpotSet(marketNominalsData), TREASURIES_SPOT_FIT);
-    const saFit = spotCurveFit(tips, TIPS_SA_SPOT_FIT);
-    const spotBei = spotBreakevenAcrossTerms(nomFit, saFit);
-    const spotBeiGrid = spotBei && spotBei.map(({ t, bei }) => ({ x: yToX(t), y: parseFloat(bei.toFixed(3)) }));
+    const spotBei = storedSpotPoints('BEI', 'Market', 'spotSa');
+    const spotBeiGrid = spotBei.length ? spotBei.map(({ t, y }) => ({ x: yToX(t), y })) : null;
 
     const startEl = document.getElementById('startMaturity');
     const endEl = document.getElementById('endMaturity');
@@ -1557,11 +1459,7 @@ function processAndRenderBei() {
     renderBeiTable(filtered);
     renderBeiChart(filtered, spotBeiGrid);
 
-    if (brokerDownloadDate) {
-      document.getElementById('tipsMktMeta').textContent = `${fmtBrokerTime(brokerDownloadDate)} ET · settle ${isoToMDY(marketSettleIso())} (T+1)`;
-    } else {
-      document.getElementById('tipsMktMeta').textContent = '';
-    }
+    document.getElementById('tipsMktMeta').textContent = marketMetaText(beiStore.dates);
     document.getElementById('tipsBrokerCount').textContent = filtered.length;
     document.getElementById('tipsFedMeta').textContent = '';
     document.getElementById('tipsFedCount').textContent = '';
@@ -1708,7 +1606,7 @@ function renderBeiTable(bonds) {
 
 function updateModeToggle() {
   const isBei = activeTab === 'bei';
-  const hasMarket = activeTab === 'tips' ? !!brokerPrices : !!marketNominalsData;
+  const hasMarket = activeTab === 'tips' ? !!marketTipsData : !!marketNominalsData;
   const spreadBtn = document.querySelector('#chart-mode-tabs .tab-btn[data-mode="spread"]');
   if (!spreadBtn) return;
   // BEI has no bid/ask-spread concept — always disabled there, regardless of Market data.
@@ -1775,13 +1673,13 @@ function switchChartMode(mode) {
     const brokerLabel = chkBroker.closest('label');
     if (isBei) {
       if (!chkBroker.disabled) chkBroker._savedChecked = chkBroker.checked;
-      chkBroker.checked = !!brokerPrices;
+      chkBroker.checked = !!marketTipsData;
       chkBroker.disabled = true;
       if (brokerLabel) brokerLabel.style.opacity = '0.4';
     } else if (chkBroker._savedChecked !== undefined) {
       chkBroker.checked = chkBroker._savedChecked;
-      chkBroker.disabled = !brokerPrices;
-      if (brokerLabel) brokerLabel.style.opacity = brokerPrices ? '' : '0.4';
+      chkBroker.disabled = !marketTipsData;
+      if (brokerLabel) brokerLabel.style.opacity = marketTipsData ? '' : '0.4';
       chkBroker._savedChecked = undefined;
     }
   }
@@ -2331,17 +2229,17 @@ document.getElementById('nominalsTable').querySelector('thead').addEventListener
 // range: it changes to match the current set of selections, growing or shrinking as needed,
 // the same way checking Bonds already reached out to the long end before Spot existed as a
 // checkbox. A manually typed range still works between checkbox changes, but the next one
-// recomputes over it (3.2_Render_Charts_And_Tables.md §3.7.3).
+// recomputes over it (YieldCurves/knowledge/3.2_Render_Charts_And_Tables.md#draw-treasuries, 3.2.3).
 function recomputeRangeFromChecked() {
   const startEl = document.getElementById('startMaturity');
   const endEl = document.getElementById('endMaturity');
-  const typeMatches = r => nominalsTypeFilters.has(r.type) || (nominalsShowStrips && isStrip(r.cusip)) || (nominalsShowUnclassified && r.type === 'MARKET BASED UNCLASSIFIED');
+  const typeMatches = nominalTypeShown;
   const candidates = [];
-  if (rawNominalsData) candidates.push(...rawNominalsData.filter(typeMatches));
+  if (fedNominalsData) candidates.push(...fedNominalsData.filter(typeMatches));
   if (marketNominalsData) candidates.push(...marketNominalsData.filter(typeMatches));
   if (document.getElementById('showTsySpot').checked) {
-    if (rawNominalsData) candidates.push(...rawNominalsData.filter(r => !isStrip(r.cusip) && r.type !== 'MARKET BASED UNCLASSIFIED'));
-    if (marketNominalsData) candidates.push(...marketNominalsData.filter(r => !isStrip(r.cusip) && r.type !== 'MARKET BASED STRIPS' && r.type !== 'MARKET BASED UNCLASSIFIED'));
+    if (fedNominalsData) candidates.push(...fedNominalsData.filter(isSpotFitType));
+    if (marketNominalsData) candidates.push(...marketNominalsData.filter(isSpotFitType));
   }
   if (candidates.length === 0) { startEl.value = ''; endEl.value = ''; return; }
   const minB = candidates.reduce((a, b) => a.maturityDate <= b.maturityDate ? a : b);

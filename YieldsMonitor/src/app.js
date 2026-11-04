@@ -709,7 +709,7 @@ async function ensureHolidaysLoaded() {
 // (bondMeta, from fetchTipsBondMeta). tradeDateStr is "MM/DD/YYYY" (getEtDateStr format);
 // settlement is T+1 bond trading day from the trade date (see knowledge/DATA_DICTIONARY.md
 // #settlement-date). The SA Price Factor and the SA Yield are calculated by
-// shared/src/sa-yields.js#saYieldsFromTipsYields, the one implementation (3.2); this function
+// shared/src/sa-yields.js#saYieldsFromTipsYields, the one implementation (1.3.2); this function
 // supplies the Settlement Date and the price that the quoted Yield implies. Returns null if any
 // required input isn't available yet.
 function saYieldForQuote(yieldPct, tradeDateStr, bondMeta, holidaySet, saRows) {

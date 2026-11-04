@@ -8,7 +8,7 @@ import { cashflowSchedule, termYears } from './bond-math.js';
 import { localDate } from './settlement.js';
 
 // SAO "O" step — a SMOOTH-CURVE FIT, not Canty's inflation-shock outlier factor.
-// See knowledge/3.3_Adjust_For_Other_Effects.md and SAO_Residual_Analysis.md.
+// See knowledge/1.3.3_Adjust_For_Other_Effects.md and SAO_Residual_Analysis.md.
 //
 // Canty's O_t (Eq 20–21) adjusts for *known, non-seasonal* inflation shocks not yet
 // in the CPI (VAT hike, a gasoline move since the last print) — determined analytically
@@ -170,7 +170,7 @@ export function spotCurveFit(bonds, { priceOf, yieldOf, minT = SAO_NOISE_YRS }) 
   };
 }
 
-// The options each spot curve of 3.4 is fitted with, defined once so every consumer (the app's
+// The options each spot curve of 1.3.4 is fitted with, defined once so every consumer (the app's
 // tabs, the breakeven across terms and the acquisition job that writes S13) fits the same
 // curve. The Treasuries curve is fitted to the price and yield of every Bill, Note and Bond from
 // a minimum Term of 0.25 years; the TIPS curve to the ask prices, and the TIPS SA curve to the
@@ -246,7 +246,7 @@ export function calculateSAO(bonds) {
   const yrs = bonds.map(b => termYears(settle, b.maturityDate));   // DATA_DICTIONARY.md#term
 
   // Fit on reliable points only; near-maturity SA yields are price-noise-dominated. A TIPS
-  // with no SA Yield (3.2) has no SAO Yield, and is left out of the fit.
+  // with no SA Yield (1.3.2) has no SAO Yield, and is left out of the fit.
   const fitIdx = [];
   for (let i = 0; i < n; i++) if (yrs[i] >= SAO_NOISE_YRS && Number.isFinite(bonds[i].saYield)) fitIdx.push(i);
   const curve = fitNSS(fitIdx.map(i => yrs[i]), fitIdx.map(i => bonds[i].saYield));

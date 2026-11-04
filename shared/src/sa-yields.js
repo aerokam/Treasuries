@@ -1,5 +1,5 @@
 // sa-yields.js -- the SA Price Factor and the SA Yield of
-// knowledge/1.3.2_Adjust_For_Seasonality.md (3.2), for the TIPS Yields of 3.1.7.
+// knowledge/1.3.2_Adjust_For_Seasonality.md (1.3.2), for the TIPS Yields of 1.3.1.6.
 //
 // One implementation, imported by the YieldCurves page (YieldCurves/src/app.js) and by the
 // acquisition job that writes S13 (YieldCurves/scripts/updateYieldCurveDataSets.js), per the no-redundancy directive
@@ -37,7 +37,7 @@ export function saYieldsFromTipsYields(tipsYields, refCpiRows) {
     if (saSettle == null || isNaN(saSettle) || saMature == null || isNaN(saMature)) {
       return { ...tips, ...working, saRatio: NaN, saPrice: NaN, saYield: NaN };
     }
-    const saRatio = saSettle / saMature;   // SA clean price = price x saRatio (3.2_Adjust_For_Seasonality)
+    const saRatio = saSettle / saMature;   // SA clean price = price x saRatio (1.3.2_Adjust_For_Seasonality)
     const saPrice = tips.price * saRatio;
     const saYield = yieldFromPrice(saPrice, tips.coupon, localDate(tips.settlementDate), tips.maturityDate);
     return { ...tips, ...working, saRatio, saPrice, saYield: saYield == null || isNaN(saYield) ? NaN : saYield };

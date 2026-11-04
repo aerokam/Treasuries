@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { routeStores } from './store-routes.js';
 
 // ─── Mock data ────────────────────────────────────────────────────────────────
 // FedInvest outlier dataset: 2 extreme notes at 1.5% and 2.0%, 30 normal notes
@@ -85,11 +86,7 @@ const HOLIDAYS_CSV = '"Wednesday, January 1, 2025",New Year\'s Day\n';
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 async function setupRoutes(page) {
-  await page.route('**/Treasuries/YieldsFromFedInvestPrices.csv', r => r.fulfill({ status: 200, contentType: 'text/csv', body: FED_OUTLIER_CSV }));
-  await page.route('**/TIPS/RefCpiNsaSa.csv',                      r => r.fulfill({ status: 200, contentType: 'text/csv', body: REF_CPI_CSV }));
-  await page.route('**/misc/BondHolidaysSifma.csv',                       r => r.fulfill({ status: 200, contentType: 'text/csv', body: HOLIDAYS_CSV }));
-  await page.route('**/TIPS/GswTipsCurve.json', r => r.fulfill({ status: 404, body: '' }));  // GSW overlay: force snapshot fallback in tests
-  await page.route('**/Treasuries/MarketQuotes.csv',            r => r.fulfill({ status: 200, contentType: 'text/csv', body: MARKET_QUOTES_CSV }));
+  await routeStores(page, { yieldsText: FED_OUTLIER_CSV, refCpiText: REF_CPI_CSV, holidayText: HOLIDAYS_CSV, quotesText: MARKET_QUOTES_CSV });
 }
 
 // Y values are stored as percentage (e.g. 4.0 = 4.0%). Extreme notes have Y = 1.5 and 2.0.
@@ -436,11 +433,7 @@ const BILLS_OUTLIER_CSV = makeBillsOutlierCsv();
 
 test.describe('Clip Outliers — Bills outlier regression', () => {
   test.beforeEach(async ({ page }) => {
-    await page.route('**/Treasuries/YieldsFromFedInvestPrices.csv', r => r.fulfill({ status: 200, contentType: 'text/csv', body: BILLS_OUTLIER_CSV }));
-    await page.route('**/TIPS/RefCpiNsaSa.csv',                      r => r.fulfill({ status: 200, contentType: 'text/csv', body: REF_CPI_CSV }));
-    await page.route('**/misc/BondHolidaysSifma.csv',                       r => r.fulfill({ status: 200, contentType: 'text/csv', body: HOLIDAYS_CSV }));
-    await page.route('**/TIPS/GswTipsCurve.json', r => r.fulfill({ status: 404, body: '' }));  // GSW overlay: force snapshot fallback in tests
-    await page.route('**/Treasuries/MarketQuotes.csv',            r => r.fulfill({ status: 200, contentType: 'text/csv', body: MARKET_QUOTES_EMPTY_CSV }));
+    await routeStores(page, { yieldsText: BILLS_OUTLIER_CSV, refCpiText: REF_CPI_CSV, holidayText: HOLIDAYS_CSV, quotesText: MARKET_QUOTES_EMPTY_CSV });
     await page.goto('./');
     // FedInvest defaults off and Market quotes is empty in this fixture, so it's the only source.
     await page.check('#chkTipsFed');

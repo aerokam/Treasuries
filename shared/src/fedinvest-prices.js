@@ -1,6 +1,7 @@
 // fedinvest-prices.js — FedInvest (E1) price-row parsing, TIPS/Treasury selection, yield
-// calculation and S1 (YieldsFromFedInvestPrices.csv) serialization.
-// Spec: knowledge/1.1_Download_FedInvest_Prices.md
+// calculation and S1 (YieldsFromFedInvestPrices.csv) serialization, and the parse of S1 text.
+// Spec: knowledge/1.1_Download_FedInvest_Prices.md; the parse of S1,
+// knowledge/1.3.1_Parse_Sources_And_Calculate_Yields.md#parse-fedinvest-prices.
 //
 // Shared by scripts/getYieldsFedInvest.js (the daily job: all four E1 types, uploads S1 to
 // R2) and scripts/getFedInvestPricesForDate.js (the historical tool: TIPS only, writes a
@@ -12,7 +13,7 @@
 
 import { yieldFromPrice } from './bond-math.js';
 import { localDate } from './settlement.js';
-import { parseCsv } from './csv.js';
+import { parseCsv, parseCsvWithPreamble } from './csv.js';
 
 // E1 SECURITY TYPE values 1.1.2 keeps. FRN and every other type is dropped by omission —
 // a caller filters parseFedInvestPriceRows()'s output against this set (or a subset of it,
@@ -106,4 +107,21 @@ export function serializeS1(settleDateStr, rows, formatYield = (y) => (y ?? ''))
     [r.type, r.cusip, r.maturity, r.coupon, r.datedDateCpi, r.price ?? '', formatYield(r.yield)].join(',')
   );
   return [settleDateStr, header, ...lines].join('\n') + '\n';
+}
+
+// spec: 1.3.1_Parse_Sources_And_Calculate_Yields.md#parse-fedinvest-prices (1.3.1.1)
+// Parses S1 text (the inverse of serializeS1): the Settlement Date on the line before the
+// header, the first line whose first cell is `type` (csv.js#parseCsvWithPreamble), then one row
+// per security, its cells as written and its settlementDate added. The TIPS Prices are the rows
+// of type TIPS and the Treasury Prices every other row.
+//
+// Returns { tips, nominals, settlementDate }. Throws when the text has no header line or no
+// Settlement Date line.
+export function parseFedInvestPrices(text) {
+  const s1 = parseCsvWithPreamble(text, 'type');
+  if (!s1) throw new Error('FedInvest prices (S1) has no header line.');
+  const settlementDate = (s1.preamble[0] || [])[0] || '';
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(settlementDate)) throw new Error('FedInvest prices (S1) has no Settlement Date line.');
+  const rows = s1.rows.map(r => ({ ...r, settlementDate }));
+  return { tips: rows.filter(r => r.type === 'TIPS'), nominals: rows.filter(r => r.type !== 'TIPS'), settlementDate };
 }

@@ -9,7 +9,7 @@
 
 import {
   FEDINVEST_TYPES, parseFedInvestPriceRows, parseTipsRefMap,
-  selectPrice, selectPricedSecurity,
+  selectPrice, selectPricedSecurity, parseFedInvestPrices, serializeS1,
 } from '../src/fedinvest-prices.js';
 
 let pass = 0, fail = 0;
@@ -60,6 +60,22 @@ ok(selectPrice({ buy: 0, sell: 0, eod: 0 }) === null, 'selectPrice is null when 
   ok(sel3.maturity === '2045-02-15', 'non-TIPS maturity converted from MM/DD/YYYY to YYYY-MM-DD');
   ok(sel3.coupon === 2.5, "non-TIPS keeps E1's own RATE");
   ok(sel3.price === 97.25, 'non-TIPS price falls through BUY(0) to SELL');
+}
+
+// ── parseFedInvestPrices: S1 text, the inverse of serializeS1 ──────────────────
+{
+  const text = serializeS1('2026-11-03', [
+    { type: 'TIPS', cusip: '912828AB1', maturity: '2030-01-15', coupon: 0.00125, datedDateCpi: 250.5, price: 101.5, yield: 0.01 },
+    { type: 'MARKET BASED NOTE', cusip: '912828AB3', maturity: '2032-01-15', coupon: 1.25, datedDateCpi: '', price: 98.5, yield: 0.04 },
+  ]);
+  const p = parseFedInvestPrices(text);
+  ok(p.settlementDate === '2026-11-03', 'parseFedInvestPrices: the Settlement Date of the first line');
+  ok(p.tips.length === 1 && p.tips[0].cusip === '912828AB1' && p.tips[0].price === '101.5', 'parseFedInvestPrices: the TIPS rows, cells as written');
+  ok(p.nominals.length === 1 && p.nominals[0].type === 'MARKET BASED NOTE', 'parseFedInvestPrices: every other row is a nominal');
+  ok([...p.tips, ...p.nominals].every(r => r.settlementDate === '2026-11-03'), 'parseFedInvestPrices: every row has the Settlement Date');
+  const throws = s => { try { parseFedInvestPrices(s); return false; } catch { return true; } };
+  ok(throws('cusip,price\nX,100\n'), 'parseFedInvestPrices: no header line throws');
+  ok(throws('type,cusip\nTIPS,X\n'), 'parseFedInvestPrices: no Settlement Date line throws');
 }
 
 console.log(`\n${fail === 0 ? 'PASS' : 'FAIL'} — ${pass} passed, ${fail} failed`);

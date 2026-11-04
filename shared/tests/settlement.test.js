@@ -10,7 +10,7 @@
 // regresses: actualPaymentDate is "on or after" (returns d unchanged if d already IS a trading
 // day), not "strictly after" like nextBusinessDay.
 
-import { localDate, toIsoDate, nextBusinessDay, parseHolidaySet, actualPaymentDate, lastBusinessDayOfMonth } from '../src/settlement.js';
+import { localDate, toIsoDate, nextBusinessDay, parseHolidaySet, actualPaymentDate, lastBusinessDayOfMonth, marketSettleIso } from '../src/settlement.js';
 import { parseCsv } from '../src/csv.js';
 
 const R2 = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev';
@@ -56,6 +56,13 @@ async function main() {
   ok(toIsoDate(lastBusinessDayOfMonth(2027, 1)) === '2027-02-26', 'lastBusinessDayOfMonth(Feb 2027) is Fri Feb 26 (Feb 28 is a Sunday)');
   ok(toIsoDate(lastBusinessDayOfMonth(2028, 1)) === '2028-02-29', 'lastBusinessDayOfMonth(Feb 2028) is Tue Feb 29 (leap year)');
   ok(toIsoDate(lastBusinessDayOfMonth(2027, 1, new Set(['2027-02-26']))) === '2027-02-25', 'lastBusinessDayOfMonth skips a holiday on the last weekday');
+
+  // ── marketSettleIso: the Download Date advanced one bond trading day ──
+  ok(marketSettleIso('2026-11-06 17:05', new Set()) === '2026-11-09', 'marketSettleIso: a Friday Download Date settles the next Monday');
+  ok(marketSettleIso('2026-11-10 17:05', new Set(['2026-11-11'])) === '2026-11-12', 'marketSettleIso: a Bond Holiday is skipped');
+  ok(marketSettleIso('2026-11-10 17:05', holidays) === '2026-11-12', 'marketSettleIso: Veterans Day 2026 in the live S16 is skipped');
+  ok(marketSettleIso('2026-11-10') === '2026-11-11', 'marketSettleIso: a date with no time, and no holiday set');
+  ok(marketSettleIso(null, new Set()) === null && marketSettleIso('11/10/2026', new Set()) === null, 'marketSettleIso: no Download Date gives null');
 
   console.log(`\n${fail === 0 ? 'PASS' : 'FAIL'} — ${pass} passed, ${fail} failed`);
   process.exit(fail === 0 ? 0 : 1);

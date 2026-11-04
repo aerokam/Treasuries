@@ -52,13 +52,14 @@ export function parseCsvLine(line) {
 // line whose first cell is `headerFirstCell`, and every line before it is a preamble line.
 // Columns are found by header name, never by position, as parseCsv does.
 //
-// Returns { preamble: [[cell, ...], ...], rows: [{ header: cell, ... }, ...] }; null when no
-// line has `headerFirstCell` as its first cell. A leading byte order mark is ignored.
+// Returns { header: [name, ...], preamble: [[cell, ...], ...], rows: [{ header: cell, ... }, ...] };
+// null when no line has `headerFirstCell` as its first cell. A leading byte order mark is ignored.
 export function parseCsvWithPreamble(text, headerFirstCell) {
   const lines = (text || '').replace(/^\uFEFF/, '').split(/\r?\n/).filter(l => l.trim());
   const at = lines.findIndex(l => parseCsvLine(l)[0] === headerFirstCell);
   if (at < 0) return null;
   return {
+    header: parseCsvLine(lines[at]),
     preamble: lines.slice(0, at).map(parseCsvLine),
     rows: parseCsv(lines.slice(at).join('\n')),
   };
