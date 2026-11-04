@@ -151,7 +151,7 @@ annual_OID = face × IR(1/1 next year) + principal_payments_received
 > "Add the inflation-adjusted principal amount for the last day on which you held the debt instrument during the tax year and any principal payments you received during the year. (For TIPS, multiply the par value by the index ratio for the sale or retirement date, and add any principal payments received.)"
 
 ```
-annual_OID = face × IR(sale or retirement date) + principal_payments_received
+annual_OID = face × IR(sale settlement date or maturity date) + principal_payments_received
              − face × IR(first day held this year)
 ```
 
@@ -165,13 +165,15 @@ With `IR(d) = refCPI(d) / refCPI_dated_date` and no principal payments received,
 annual_OID = face × (refCPI(end day) − refCPI(first day held)) / refCPI_dated_date
 ```
 
-`end day` is 1/1 of the next year for an instrument held at the end of the tax year, and the sale or retirement date for an instrument sold or retired. Pub 1212 says retirement date; for a TIPS that is the maturity date, the date on which principal is repaid.
+`end day` is 1/1 of the next year for an instrument held at the end of the tax year, and the settlement date of the sale or the maturity date for an instrument sold or retired. Pub 1212 says retirement date; for a TIPS that is the maturity date, the date on which principal is repaid.
 
-`principal_payments_received` is zero for a TIPS. The term comes from Treas. Reg. §1.1275-7(d)(4)(ii), which states the inflation adjustment for every inflation-indexed debt instrument, including one that repays principal in installments. A TIPS repays principal only at maturity. In the year of retirement, the index ratio for the retirement date already measures the principal redeemed, so adding the redemption as a principal payment would count it twice.
+`principal_payments_received` is zero for a TIPS. The term comes from Treas. Reg. §1.1275-7(d)(4)(ii), which states the inflation adjustment for every inflation-indexed debt instrument, including one that repays principal in installments. A TIPS repays principal only at maturity. In the year of maturity, the index ratio for the maturity date already measures the principal redeemed, so adding the redemption as a principal payment would count it twice.
 
 A negative result is a deflation adjustment, not negative OID: it offsets the stated interest for the year and reduces basis by the same amount (Pub 1212 Example 9).
 
-For the first year held, "first day held" = settlement date. For subsequent years, it is 1/1 of that year.
+For the first year held, "first day held" = the settlement date of the purchase, not its trade date. For subsequent years, it is 1/1 of that year.
+
+The OID Calculator in this app's left pane calculates this amount for a CUSIP, a quantity, a first day held and an end day, with the index ratio rounded or not rounded.
 
 ### Vanguard — Monthly Breakdown
 
