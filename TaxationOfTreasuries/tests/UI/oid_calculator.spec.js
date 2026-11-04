@@ -48,6 +48,7 @@ test('an End Date after the last Ref CPI date is calculated at the last date, wi
   await expect(page.locator('#oid-result')).toContainText('2025-03-01 (entered 2025-10-15)');
   await expect(page.locator('#oid-result .oid-note', { hasText: 'The latest known' })).toContainText('The latest known Ref CPI is that of 2025-03-01. The OID is calculated as of that date, not as of the End Date entered.');
   await expect(page.locator('#oid-result .oid-amount')).toHaveText('OID $28.00');
+  await expect(page.locator('#oid-result')).not.toContainText('Treasury has not yet published');
 });
 
 test('an End Date after the Maturity Date shows its message', async ({ page }) => {
@@ -68,7 +69,7 @@ test('an End Date that is the first of a month after the last Ref CPI date uses 
   await open(page);
   await enter(page, { cusip: '91282CAQ4', start: '2024-06-14', end: '2025-03-01' });
   await expect(page.locator('#oid-result .oid-amount')).toHaveText('OID $28.00');
-  await expect(page.locator('#oid-result .oid-note')).toHaveText('Treasury has not published the Ref CPI of 2025-03-01. It is the CPI-U of December 2024, as 31 CFR 356 Appendix B states for the first day of a month.');
+  await expect(page.locator('#oid-result .oid-note')).toHaveText('Treasury has not yet published the Ref CPI of 2025-03-01. It is known from the CPI-U of December 2024, as 31 CFR 356 Appendix B §I.B.3 states for the first day of a month.');
   await expect(page.locator('#oid-result')).not.toContainText('(entered');
 });
 
@@ -79,4 +80,10 @@ test('a failed load shows the load error and no result', async ({ page }) => {
   await page.goto('/TaxationOfTreasuries/');
   await page.getByRole('button', { name: /OID Calculator/ }).click();
   await expect(page.locator('#oid-status')).toContainText('Load error: TipsRef.csv: HTTP 500');
+});
+
+test('a Start Date after the latest known Ref CPI shows the dates for which Ref CPI values are available', async ({ page }) => {
+  await open(page);
+  await enter(page, { cusip: '91282CAQ4', start: '2025-06-01', end: '2025-07-01' });
+  await expect(page.locator('#oid-result .oid-message')).toHaveText('There is no Ref CPI for the Start Date. Ref CPI values are available from 2020-10-15 through 2025-03-01.');
 });

@@ -69,7 +69,7 @@ test('an End Date after the last Ref CPI date is calculated at the last Ref CPI 
 
 test('a Start Date after the last Ref CPI date has no result', () => {
   const r = calculateTipsOid({ ...base, startDate: '2025-06-01', endDate: '2025-10-15' });
-  assert.deepEqual(r, { ok: false, reason: 'no-ref-cpi-start' });
+  assert.deepEqual(r, { ok: false, reason: 'no-ref-cpi-start', lastKnownRefCpiDate: '2025-02-01' });
 });
 
 test('each invalid input has its own reason', () => {

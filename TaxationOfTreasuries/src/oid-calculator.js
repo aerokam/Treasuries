@@ -52,7 +52,7 @@ const HELP = `
     <li>Index Ratio, not rounded, is the Ref CPI of the date divided by the Dated Date Ref CPI. Rounded as Treasury rounds it, the ratio is truncated to six decimal places and then rounded to five. Compare the OID of each with Box 8 of the Form 1099-OID.</li>
     <li>When Treasury has not yet published the Ref CPI of a date:
       <ul>
-        <li>The first of a month: the Ref CPI is the CPI-U of the month three months earlier, as 31 CFR 356 Appendix B states. January 1 takes the CPI-U of October.</li>
+        <li>The first of a month: the Ref CPI is the CPI-U of the month three months earlier, as 31 CFR 356 Appendix B §I.B.3 states. January 1 takes the CPI-U of October.</li>
         <li>Any other date: the OID is calculated as of the latest known Ref CPI, and the result states its date.</li>
       </ul>
     </li>
@@ -80,8 +80,8 @@ const monthName = ym => new Date(Number(ym.slice(0, 4)), Number(ym.slice(5, 7)) 
 const couponText = c => Number((c * 100).toFixed(3)) + '%';
 
 function messageFor(result, tips, refCpiRows) {
-  const first = refCpiRows[0].date, last = refCpiRows[refCpiRows.length - 1].date;
-  const published = ` Ref CPI is published from ${first} through ${last}.`;
+  const first = refCpiRows[0].date, last = result.lastKnownRefCpiDate || refCpiRows[refCpiRows.length - 1].date;
+  const published = ` Ref CPI values are available from ${first} through ${last}.`;
   switch (result.reason) {
     case 'cusip-not-found': return 'No TIPS has this CUSIP.';
     case 'quantity': return 'Quantity is a whole number of 1 or more.';
@@ -117,9 +117,9 @@ function resultHtml(r, tips) {
   if (r.endDateLimited) {
     html += `<div class="oid-note">The latest known Ref CPI is that of ${r.lastKnownRefCpiDate}. The OID is calculated as of that date, not as of the End Date entered.</div>`;
   }
-  for (const [date, month] of [[r.startDate, r.startCpiMonth], [r.endDateUsed, r.endCpiMonth]]) {
+  for (const [date, month] of [[r.startDate, r.startCpiMonth], [r.endDate, r.endDateLimited ? null : r.endCpiMonth]]) {
     if (month) {
-      html += `<div class="oid-note">Treasury has not published the Ref CPI of ${date}. It is the CPI-U of ${monthName(month)}, as 31 CFR 356 Appendix B states for the first day of a month.</div>`;
+      html += `<div class="oid-note">Treasury has not yet published the Ref CPI of ${date}. It is known from the CPI-U of ${monthName(month)}, as 31 CFR 356 Appendix B §I.B.3 states for the first day of a month.</div>`;
     }
   }
   if (r.oid < 0) html += '<div class="oid-note">A negative OID is a deflation adjustment.</div>';

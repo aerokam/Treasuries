@@ -84,7 +84,7 @@ export function calculateTipsOid({ tips, quantity, startDate, endDate, refCpiRow
   const known = firstOfMonthAfterLatestCpi(monthlyCpi);
   const lastKnown = known != null && (lastDate == null || known > lastDate) ? known : lastDate;
   const start = refCpiOf(startDate, refCpiRows, lastDate, monthlyCpi);
-  if (start == null) return { ok: false, reason: 'no-ref-cpi-start' };
+  if (start == null) return { ok: false, reason: 'no-ref-cpi-start', lastKnownRefCpiDate: lastKnown };
   let end = refCpiOf(endDate, refCpiRows, lastDate, monthlyCpi);
   let endDateLimited = false;
   let endDateUsed = endDate;
@@ -93,7 +93,7 @@ export function calculateTipsOid({ tips, quantity, startDate, endDate, refCpiRow
     endDateUsed = endDate > lastKnown ? lastKnown : lastDate;
     end = refCpiOf(endDateUsed, refCpiRows, lastDate, monthlyCpi);
   }
-  if (end == null) return { ok: false, reason: 'no-ref-cpi-end' };
+  if (end == null) return { ok: false, reason: 'no-ref-cpi-end', lastKnownRefCpiDate: lastKnown };
   const startRefCpi = start.refCpi, endRefCpi = end.refCpi;
 
   const par = quantity * PAR_PER_QUANTITY;
