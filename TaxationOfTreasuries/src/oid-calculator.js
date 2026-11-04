@@ -1,6 +1,6 @@
 // oid-calculator.js: the OID Calculator page of Taxation of Treasuries.
-// Specs: knowledge/12.1_Load_Oid_Inputs.md, 12.2_Calculate_Tips_Oid.md (calculation in shared/src/tips-oid.js),
-//        12.3_Render_Oid_Calculator.md (every string below).
+// Specs: knowledge/8.1_Load_Oid_Inputs.md, 8.2_Calculate_Tips_Oid.md (calculation in shared/src/tips-oid.js),
+//        8.3_Render_Oid_Calculator.md (every string below).
 
 import { fetchTipsRefRows, fetchRefCpiRows, fetchMonthlyCpiNsa } from '../../shared/src/market-data.js';
 import { calculateTipsOid, TREASURY_ROUNDING, NO_ROUNDING } from '../../shared/src/tips-oid.js';

@@ -180,6 +180,7 @@
   <path class="flow" d="M 750.0 1006.0 Q 790.9 862.2 874.7 738.4" marker-end="url(#a1)"/>
   <path class="flow" d="M 750.0 1006.0 Q 795.1 933.8 860.6 879.2" marker-end="url(#a1)"/>
   <path class="flow" d="M 750.0 1006.0 Q 794.3 992.1 840.6 992.7" marker-end="url(#a1)"/>
+  <path class="flow" d="M 750.0 1006.0 Q 809.3 1042.2 854.4 1095.1" marker-end="url(#a1)"/>
   <path class="flow" d="M 750.0 1006.0 Q 792.7 1128.3 871.5 1231.2" marker-end="url(#a1)"/>
   <path class="flow" d="M 750.0 1006.0 Q 782.7 1224.0 881.8 1420.8" marker-end="url(#a1)"/>
   <text class="flow-label" x="705" y="994" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#reference-data"><tspan class="lk">reference data</tspan></a></text>
@@ -266,7 +267,7 @@
     <text class="p-name" x="900" y="985">CPI</text>
     <text class="p-name" x="900" y="1001">Explorer</text>
   </a>
-  <a class="process" href="viewer.html#/md/TaxationOfTreasuries/docs/TaxationOfTreasuries_Foundation.md">
+  <a class="process" href="DFD_LEVEL2_TAXATIONOFTREASURIES.html">
     <circle cx="900" cy="1134" r="60"/>
     <text class="p-id" x="900" y="1114">8</text>
     <text class="p-name" x="900" y="1135">Taxation of</text>
@@ -306,7 +307,7 @@
   The stores are drawn as one shape. Level 1 answers which app reads what rather than which file, and the shape opens the full list.
   Three of those files are read by no app: YieldCurves.csv, BreakevenInflation.csv and BidAskSpreads.csv. They are written for the user to pull into a spreadsheet, so their flow goes to the user rather than to a process.
   External entities are not redrawn at this level. Their flows are drawn against each entity on the <a href="DFD_LEVEL0.html">context diagram</a> and enter here as one flow.
-  Taxation of Treasuries and Seasonal Adjustments read no store, so no flow reaches them from it: the first reads nothing, and the second reads two snapshot files kept in the app.
+  Seasonal Adjustments reads no store, so no flow reaches it from it: it reads two snapshot files kept in the app.
   After-Tax TIPS Ladder Calculator is developed and maintained independently. It reads no store and no external entity, so only its flows with the user are drawn, and its bubble opens the app.
   The app column reproduces the portal index: the same four sections in the same order, and the same apps in the same order inside each.
   Every app has the same pair of flows with the user, labelled once at the top. The user is drawn once, as a tall shape, so no flow to it crosses another.

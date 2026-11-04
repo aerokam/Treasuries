@@ -17,6 +17,7 @@ State of the levelled data flow diagrams and the spec rewrite that goes with the
 | 2, Yield Curves | `knowledge/DFD_LEVEL2_YIELDCURVES.html` | yes |
 | 4, 1.3.1 Parse sources and calculate yields | `knowledge/DFD_LEVEL4_INGEST_YIELDCURVEDATA_PARSE.html` | yes |
 | 3, 7.7 rendering | `knowledge/DFD_LEVEL3_YC_RENDER.html` | yes |
+| 2, Taxation of Treasuries | `knowledge/DFD_LEVEL2_TAXATIONOFTREASURIES.html` | yes |
 
 **Two other generators.** `scripts/build-dd-index.cjs` regenerates the A-Z index at the top of the Data Dictionary, covering every anchor so a synonym leads to its term; run it after adding an entry. `scripts/check-spec-code.cjs` reports specs naming code that no longer exists.
 

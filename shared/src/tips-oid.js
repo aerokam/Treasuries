@@ -1,6 +1,6 @@
 // tips-oid.js: the single calculation of the OID of a TIPS (DATA_DICTIONARY.md#oid) over the period
 // from a Start Date to an End Date.
-// Spec: TaxationOfTreasuries/knowledge/12.2_Calculate_Tips_Oid.md
+// Spec: TaxationOfTreasuries/knowledge/8.2_Calculate_Tips_Oid.md
 //
 //   OID = Par x (Index Ratio at the End Date - Index Ratio at the Start Date)
 //
