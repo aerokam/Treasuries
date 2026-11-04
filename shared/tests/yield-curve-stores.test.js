@@ -35,8 +35,8 @@ const eq = (a, b, msg) => ok(JSON.stringify(a) === JSON.stringify(b), `${msg} (g
 
 // ── Layout constants ──
 eq(S13_HEADER, 'CUSIP,Source,Maturity,Term (y),Type,Coupon,Price,Ask,SA,SAO,Settlement Date SA Factor,Naive Maturity SA Factor,Maturity SA Factor,SA Price Factor,SA Price,Spot,Spot SA', 'S13 header');
-eq(S14_HEADER, 'tips_cusip,tips_maturity,tips_coupon,tips_ask_yield,tips_sa_yield,tips_sao_yield,nominal_cusip,nominal_maturity,nominal_coupon,nominal_yield,ask_bei,sa_bei,sao_bei', 'S14 header');
-eq(S15_HEADER, 'security_type,cusip,maturity,coupon,ask_yield,bid_yield,yield_spread_bps,ask_price,bid_price,adj_ask_price,adj_bid_price,price_spread_pct', 'S15 header');
+eq(S14_HEADER, 'TIPS CUSIP,TIPS Maturity,TIPS Coupon,TIPS Ask,TIPS SA,TIPS SAO,Nominal CUSIP,Nominal Maturity,Nominal Coupon,Nominal Ask,Ask BEI,SA BEI,SAO BEI', 'S14 header');
+eq(S15_HEADER, 'CUSIP,Maturity,Type,Coupon,Ask Yield,Bid Yield,Yield Spread (bps),Ask Price,Bid Price,Adjusted Ask Price,Adjusted Bid Price,Price Spread %', 'S15 header');
 
 // ── Cell formats ──
 ok(priceDecimals(99.821) === 3 && priceDecimals(100) === 3 && priceDecimals(99.71875) === 5 && priceDecimals(99.9785) === 4,
@@ -170,13 +170,13 @@ const nomSec = (cusip, cusipType, maturity, coupon, yld, price, bidPrice, bidYie
   ok(rows[0].nominal_coupon === 0.04, 'S14: nominal_coupon');
   const csv = buildBreakevenCsv({ dates, rows });
   const lines = csv.split('\n');
-  eq(lines.slice(0, 3), ['Trade Date,Market,2026-11-03 17:05', 'Settlement Date,Market,2026-11-04', S14_HEADER], 'S14: two Market date lines, then the header');
-  const p = parseCsvWithPreamble(csv, 'tips_cusip');
+  eq(lines.slice(0, 3), ['Trade Date,2026-11-03 17:05', 'Settlement Date,2026-11-04', S14_HEADER], 'S14: two Market date lines, then the header');
+  const p = parseCsvWithPreamble(csv, 'TIPS CUSIP');
   ok(p.preamble.length === 2 && p.rows.length === 2, 'S14: read back by header name');
   const r1 = p.rows[0];
-  eq([r1.tips_cusip, r1.tips_maturity, r1.tips_coupon, r1.tips_ask_yield, r1.tips_sa_yield, r1.tips_sao_yield], ['T1', '2029-07-15', '0.0100000', '0.0150000', '0.0140000', ''], 'S14: a TIPS with no SAO Yield has a blank sao cell');
-  eq([r1.nominal_cusip, r1.nominal_maturity, r1.nominal_coupon, r1.nominal_yield], ['N1', '2029-01-15', '0.0400000', '0.0410000'], 'S14: the nominal columns, with nominal_coupon');
-  eq([r1.ask_bei, r1.sa_bei, r1.sao_bei], ['0.0260000', '0.0270000', ''], 'S14: breakevens are the nominal yield less the TIPS yield');
+  eq([r1['TIPS CUSIP'], r1['TIPS Maturity'], r1['TIPS Coupon'], r1['TIPS Ask'], r1['TIPS SA'], r1['TIPS SAO']], ['T1', '2029-07-15', '0.0100000', '0.0150000', '0.0140000', ''], 'S14: a TIPS with no SAO Yield has a blank sao cell');
+  eq([r1['Nominal CUSIP'], r1['Nominal Maturity'], r1['Nominal Coupon'], r1['Nominal Ask']], ['N1', '2029-01-15', '0.0400000', '0.0410000'], 'S14: the nominal columns, with nominal_coupon');
+  eq([r1['Ask BEI'], r1['SA BEI'], r1['SAO BEI']], ['0.0260000', '0.0270000', ''], 'S14: breakevens are the nominal yield less the TIPS yield');
 }
 {
   const nominals = [
@@ -189,13 +189,13 @@ const nomSec = (cusip, cusipType, maturity, coupon, yld, price, bidPrice, bidYie
   const rows = spreadRows(tips, nominals);
   eq(rows.map(r => `${r.security_type}/${r.cusip}`), ['Bill/W', 'STRIPS/Z', 'TIPS/T', 'Note/X', 'Unclassified/Y'], 'S15: every security including STRIPS and Unclassified, in order of maturity, coupon and CUSIP');
   const csv = buildSpreadsCsv({ dates, rows });
-  eq(csv.split('\n').slice(0, 3), ['Trade Date,Market,2026-11-03 17:05', 'Settlement Date,Market,2026-11-04', S15_HEADER], 'S15: two Market date lines, then the header');
-  const p = parseCsvWithPreamble(csv, 'security_type');
-  const byType = Object.fromEntries(p.rows.map(r => [r.security_type, r]));
-  ok(byType.TIPS.adj_ask_price === '130.0000' && byType.TIPS.adj_bid_price === '129.7400', 'S15: a TIPS has its adjusted prices');
-  ok(['Bill', 'STRIPS', 'Note', 'Unclassified'].every(t => byType[t].adj_ask_price === '' && byType[t].adj_bid_price === ''), 'S15: the adjusted prices are blank on every other security');
-  ok(byType.TIPS.price_spread_pct === '0.2000000', 'S15: a TIPS price spread is calculated from its adjusted prices');
-  ok(byType.Note.price_spread_pct === '0.1000000' && byType.Note.yield_spread_bps === '5.0000000', 'S15: a nominal price spread and yield spread');
+  eq(csv.split('\n').slice(0, 3), ['Trade Date,2026-11-03 17:05', 'Settlement Date,2026-11-04', S15_HEADER], 'S15: two Market date lines, then the header');
+  const p = parseCsvWithPreamble(csv, 'CUSIP');
+  const byType = Object.fromEntries(p.rows.map(r => [r['Type'], r]));
+  ok(byType.TIPS['Adjusted Ask Price'] === '130.0000' && byType.TIPS['Adjusted Bid Price'] === '129.7400', 'S15: a TIPS has its adjusted prices');
+  ok(['Bill', 'STRIPS', 'Note', 'Unclassified'].every(t => byType[t]['Adjusted Ask Price'] === '' && byType[t]['Adjusted Bid Price'] === ''), 'S15: the adjusted prices are blank on every other security');
+  ok(byType.TIPS['Price Spread %'] === '0.2000000', 'S15: a TIPS price spread is calculated from its adjusted prices');
+  ok(byType.Note['Price Spread %'] === '0.1000000' && byType.Note['Yield Spread (bps)'] === '5.0000000', 'S15: a nominal price spread and yield spread');
 }
 
 // ── The whole of 1.3, from the texts of the four stores it reads ──
@@ -258,24 +258,24 @@ const nomSec = (cusip, cusipType, maturity, coupon, yld, price, bidPrice, bidYie
     ok(compareSpotRows({ type: a.Type, term: +a['Term (y)'], source: a.Source }, { type: b.Type, term: +b['Term (y)'], source: b.Source }) <= 0, `whole S13: spot rows ordered at row ${i}`);
   }
 
-  const s14p = parseCsvWithPreamble(out.breakevenCsv, 'tips_cusip');
-  eq(s14p.preamble, [['Trade Date', 'Market', '2026-11-03 17:05'], ['Settlement Date', 'Market', '2026-11-04']], 'whole S14: date lines');
-  ok(s14p.rows.length === 7 && s14p.rows.every(r => notes.includes(r.nominal_cusip) && r.nominal_coupon === '0.0400000'), 'whole S14: one row per Market TIPS, against a Note, with its coupon (never a STRIPS or Unclassified)');
-  ok(s14p.rows.every((r, i) => i === 0 || s14p.rows[i - 1].tips_maturity <= r.tips_maturity), 'whole S14: rows in maturity order');
+  const s14p = parseCsvWithPreamble(out.breakevenCsv, 'TIPS CUSIP');
+  eq(s14p.preamble, [['Trade Date', '2026-11-03 17:05'], ['Settlement Date', '2026-11-04']], 'whole S14: date lines');
+  ok(s14p.rows.length === 7 && s14p.rows.every(r => notes.includes(r['Nominal CUSIP']) && r['Nominal Coupon'] === '0.0400000'), 'whole S14: one row per Market TIPS, against a Note, with its coupon (never a STRIPS or Unclassified)');
+  ok(s14p.rows.every((r, i) => i === 0 || s14p.rows[i - 1]['TIPS Maturity'] <= r['TIPS Maturity']), 'whole S14: rows in maturity order');
 
-  const s15p = parseCsvWithPreamble(out.spreadsCsv, 'security_type');
-  eq(s15p.preamble, [['Trade Date', 'Market', '2026-11-03 17:05'], ['Settlement Date', 'Market', '2026-11-04']], 'whole S15: date lines');
+  const s15p = parseCsvWithPreamble(out.spreadsCsv, 'CUSIP');
+  eq(s15p.preamble, [['Trade Date', '2026-11-03 17:05'], ['Settlement Date', '2026-11-04']], 'whole S15: date lines');
   ok(s15p.rows.length === 9 + 1 + 1 + 1 + 7, 'whole S15: one row per Market security');
-  eq([...new Set(s15p.rows.map(r => r.security_type))].sort(), ['Bill', 'Note', 'STRIPS', 'TIPS', 'Unclassified'], 'whole S15: security types, STRIPS and Unclassified included');
-  ok(s15p.rows.filter(r => r.security_type === 'TIPS').every(r => r.adj_ask_price !== '' && r.adj_bid_price !== '') && s15p.rows.filter(r => r.security_type !== 'TIPS').every(r => r.adj_ask_price === '' && r.adj_bid_price === ''), 'whole S15: adjusted prices are a TIPS\'s only');
+  eq([...new Set(s15p.rows.map(r => r['Type']))].sort(), ['Bill', 'Note', 'STRIPS', 'TIPS', 'Unclassified'], 'whole S15: security types, STRIPS and Unclassified included');
+  ok(s15p.rows.filter(r => r['Type'] === 'TIPS').every(r => r['Adjusted Ask Price'] !== '' && r['Adjusted Bid Price'] !== '') && s15p.rows.filter(r => r['Type'] !== 'TIPS').every(r => r['Adjusted Ask Price'] === '' && r['Adjusted Bid Price'] === ''), 'whole S15: adjusted prices are a TIPS\'s only');
   for (let i = 1; i < s15p.rows.length; i++) {
     const a = s15p.rows[i - 1], b = s15p.rows[i];
-    ok(a.maturity < b.maturity || (a.maturity === b.maturity && (+a.coupon < +b.coupon || (+a.coupon === +b.coupon && a.cusip <= b.cusip))), `whole S15: ordered at row ${i}`);
+    ok(a['Maturity'] < b['Maturity'] || (a['Maturity'] === b['Maturity'] && (+a['Coupon'] < +b['Coupon'] || (+a['Coupon'] === +b['Coupon'] && a['CUSIP'] <= b['CUSIP']))), `whole S15: ordered at row ${i}`);
   }
 
   // The S13 reader returns one row per Market TIPS of the built text, with the SA Yield of S14's row for the same CUSIP.
   const marketTips = marketTipsRowsFromYieldCurves(out.yieldCurvesCsv);
-  ok(marketTips.length === 7 && marketTips.every(r => s14p.rows.some(b => b.tips_cusip === r.cusip && b.tips_sa_yield === r.sa_yield && b.tips_ask_yield === r.ask_yield)),
+  ok(marketTips.length === 7 && marketTips.every(r => s14p.rows.some(b => b['TIPS CUSIP'] === r.cusip && b['TIPS SA'] === r.sa_yield && b['TIPS Ask'] === r.ask_yield)),
     'whole S13 reader: one row per Market TIPS, agreeing with S14 on the Ask and SA Yield');
 
   // The Market quotes the file was built from, read back the way the writer reads them.

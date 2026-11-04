@@ -237,36 +237,36 @@
   | `Spot` | [Spot Yield](#spot-yield) on a spot row, as a decimal on the semi-annual bond-equivalent basis of `Ask`: fitted to the nominal Treasuries for Type `Treasury`, to the TIPS quoted prices for Type `TIPS`, and for Type `BEI` the nominal spot less the TIPS quoted spot |
   | `Spot SA` | Spot Yield fitted to the TIPS seasonally adjusted prices for Type `TIPS`; for Type `BEI` the nominal spot less the TIPS SA spot ([3.5 §Across terms](../YieldCurves/knowledge/3.5_Calculate_Breakeven_Inflation.md#across-terms)); blank for Type `Treasury` |
 
-- <a id="s14"></a>**Breakeven inflation (S14)**, `BreakevenInflation.csv` = `Trade_Date + Settlement_Date + { @tips_cusip + tips_maturity + tips_coupon + tips_ask_yield + tips_sa_yield + tips_sao_yield + nominal_cusip + nominal_maturity + nominal_coupon + nominal_yield + ask_bei + sa_bei + sao_bei }`
-  *R2 key `Treasuries/BreakevenInflation.csv` ([View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/BreakevenInflation.csv)). The first two lines hold the [Trade Date](#trade-date) and the [Settlement Date](#settlement-date) of [Market quotes (S7)](#s7), in the form of the `Market` lines of [Yield curves (S13)](#s13). The third line is the header, then one row per TIPS in [Market quotes (S7)](#s7): the [Breakeven Inflation](#breakeven-inflation) of its Ask, SA and SAO Yield against the yield of the nominal Treasury nearest to it in maturity, the per security construction.*
+- <a id="s14"></a>**Breakeven inflation (S14)**, `BreakevenInflation.csv` = `{ [ Trade_Date | Settlement_Date ] + TIPS_Maturity } + { @TIPS_CUSIP + TIPS_Maturity + TIPS_Coupon + TIPS_Ask + TIPS_SA + TIPS_SAO + Nominal_CUSIP + Nominal_Maturity + Nominal_Coupon + Nominal_Ask + Ask_BEI + SA_BEI + SAO_BEI }`
+  *R2 key `Treasuries/BreakevenInflation.csv` ([View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/BreakevenInflation.csv)). The first two lines state the dates of [Market quotes (S7)](#s7) in the first two columns, so that each date is in the `TIPS Maturity` column and formats as one: `Trade Date` and the [Trade Date](#trade-date), then `Settlement Date` and the [Settlement Date](#settlement-date). The Trade Date is the [Download Date](#download-date), `YYYY-MM-DD HH:MM` on a 24-hour Eastern clock; the Settlement Date is `YYYY-MM-DD`. The third line is the header, then one row per TIPS in [Market quotes (S7)](#s7): the [Breakeven Inflation](#breakeven-inflation) of its Ask, SA and SAO Yield against the yield of the nominal Treasury nearest to it in maturity, the per security construction. The source is always `Market`, so there is no source column.*
 
   | Column | Defined term |
   |---|---|
-  | `tips_cusip`, `tips_maturity`, `tips_coupon`, `tips_ask_yield`, `tips_sa_yield`, `tips_sao_yield` | the `cusip`, `maturity`, `coupon`, `ask_yield`, `sa_yield` and `sao_yield` of the Market TIPS security row of [Yield curves (S13)](#s13), named `CUSIP`, `Maturity`, `Coupon`, `Ask`, `SA` and `SAO` there |
-  | `nominal_cusip` | [CUSIP](#cusip) of the nominal Treasury nearest in maturity to the TIPS |
-  | `nominal_maturity` | [Maturity Date](#maturity-date) of that nominal Treasury |
-  | `nominal_coupon` | [Coupon Rate](#coupon-rate) of that nominal Treasury, as a decimal |
-  | `nominal_yield` | [Yield](#yield) of that nominal Treasury, [ask](#ask) side, as a decimal |
-  | `ask_bei` | `nominal_yield − tips_ask_yield` |
-  | `sa_bei` | `nominal_yield − tips_sa_yield` |
-  | `sao_bei` | `nominal_yield − tips_sao_yield` |
+  | `TIPS CUSIP`, `TIPS Maturity`, `TIPS Coupon`, `TIPS Ask`, `TIPS SA`, `TIPS SAO` | the `CUSIP`, `Maturity`, `Coupon`, `Ask`, `SA` and `SAO` of the Market TIPS security row of [Yield curves (S13)](#s13) |
+  | `Nominal CUSIP` | [CUSIP](#cusip) of the nominal Treasury nearest in maturity to the TIPS |
+  | `Nominal Maturity` | [Maturity Date](#maturity-date) of that nominal Treasury |
+  | `Nominal Coupon` | [Coupon Rate](#coupon-rate) of that nominal Treasury, as a decimal |
+  | `Nominal Ask` | [Yield](#yield) of that nominal Treasury, [ask](#ask) side, as a decimal |
+  | `Ask BEI` | `Nominal Ask − TIPS Ask` |
+  | `SA BEI` | `Nominal Ask − TIPS SA` |
+  | `SAO BEI` | `Nominal Ask − TIPS SAO` |
 
-- <a id="s15"></a>**Bid and ask spreads (S15)**, `BidAskSpreads.csv` = `Trade_Date + Settlement_Date + { @security_type + @cusip + maturity + coupon + ask_yield + bid_yield + yield_spread_bps + ask_price + bid_price + ( adj_ask_price + adj_bid_price ) + price_spread_pct }`
-  *R2 key `Treasuries/BidAskSpreads.csv` ([View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/BidAskSpreads.csv)). The first two lines hold the [Trade Date](#trade-date) and the [Settlement Date](#settlement-date) of [Market quotes (S7)](#s7), in the form of the `Market` lines of [Yield curves (S13)](#s13). The third line is the header, then one row per security in [Market quotes (S7)](#s7), the [Bid and Ask Spreads](#bid-and-ask-spreads) of each, in order of `maturity`, `coupon` and `cusip`.*
+- <a id="s15"></a>**Bid and ask spreads (S15)**, `BidAskSpreads.csv` = `{ [ Trade_Date | Settlement_Date ] + Maturity } + { @CUSIP + Maturity + Type + Coupon + Ask_Yield + Bid_Yield + Yield_Spread_bps + Ask_Price + Bid_Price + ( Adjusted_Ask_Price + Adjusted_Bid_Price ) + Price_Spread_pct }`
+  *R2 key `Treasuries/BidAskSpreads.csv` ([View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/BidAskSpreads.csv)). The first two lines state the dates of [Market quotes (S7)](#s7) in the first two columns, so that each date is in the `Maturity` column and formats as one: `Trade Date` and the [Trade Date](#trade-date), then `Settlement Date` and the [Settlement Date](#settlement-date). The Trade Date is the [Download Date](#download-date), `YYYY-MM-DD HH:MM` on a 24-hour Eastern clock; the Settlement Date is `YYYY-MM-DD`. The third line is the header, then one row per security in [Market quotes (S7)](#s7), the [Bid and Ask Spreads](#bid-and-ask-spreads) of each, in order of `Maturity`, `Coupon` and `CUSIP`. The source is always `Market`, so there is no source column.*
 
   | Column | Defined term |
   |---|---|
-  | `security_type` | `Bill`, `Note`, `Bond`, `STRIPS`, `TIPS` or `Unclassified`, as `Type` in [Yield curves (S13)](#s13) |
-  | `cusip` | [CUSIP](#cusip) |
-  | `maturity` | [Maturity Date](#maturity-date), `YYYY-MM-DD` |
-  | `coupon` | [Coupon Rate](#coupon-rate), as a decimal |
-  | `ask_yield` | [Yield](#yield), [ask](#ask) side, as a decimal |
-  | `bid_yield` | [Yield](#yield), [bid](#bid) side, as a decimal |
-  | `yield_spread_bps` | the yield spread of [Bid and Ask Spreads](#bid-and-ask-spreads), in basis points |
-  | `ask_price` | [Price](#price), ask side, unadjusted |
-  | `bid_price` | [Price](#price), bid side, unadjusted |
-  | `adj_ask_price`, `adj_bid_price` | [Adjusted Ask Price / Adjusted Bid Price](#adjusted-price), TIPS only; the prices the price spread of a TIPS is calculated from |
-  | `price_spread_pct` | the price spread of [Bid and Ask Spreads](#bid-and-ask-spreads), in percent |
+  | `CUSIP` | [CUSIP](#cusip) on a security row; `Trade Date` or `Settlement Date` on a date line |
+  | `Maturity` | [Maturity Date](#maturity-date), `YYYY-MM-DD`; the date itself on a date line |
+  | `Type` | `Bill`, `Note`, `Bond`, `STRIPS`, `TIPS` or `Unclassified`, as `Type` in [Yield curves (S13)](#s13) |
+  | `Coupon` | [Coupon Rate](#coupon-rate), as a decimal |
+  | `Ask Yield` | [Yield](#yield), [ask](#ask) side, as a decimal |
+  | `Bid Yield` | [Yield](#yield), [bid](#bid) side, as a decimal |
+  | `Yield Spread (bps)` | the yield spread of [Bid and Ask Spreads](#bid-and-ask-spreads), in basis points |
+  | `Ask Price` | [Price](#price), ask side, unadjusted |
+  | `Bid Price` | [Price](#price), bid side, unadjusted |
+  | `Adjusted Ask Price`, `Adjusted Bid Price` | [Adjusted Ask Price / Adjusted Bid Price](#adjusted-price), TIPS only; the prices the price spread of a TIPS is calculated from |
+  | `Price Spread %` | the price spread of [Bid and Ask Spreads](#bid-and-ask-spreads), as a percentage |
 
 - <a id="s16"></a>**Bond holidays (S16)**, `BondHolidaysSifma.csv` = `{ Date + Holiday_Name }`
   *R2 key `misc/BondHolidaysSifma.csv` ([View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/misc/BondHolidaysSifma.csv)). SIFMA's US bond-market holiday schedule, filtered to the eleven base US market holidays plus New Year's Day. No header row. `Date` is written as `"Weekday, Month D, YYYY"`. Backs the [Bond Holiday](#bond-holiday) term.*

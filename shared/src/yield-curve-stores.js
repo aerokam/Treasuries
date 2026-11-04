@@ -45,11 +45,11 @@ export const S13_COLUMNS = [
 ];
 export const S13_HEADER = S13_COLUMNS.map(c => c[0]).join(',');
 
-export const S14_HEADER = 'tips_cusip,tips_maturity,tips_coupon,tips_ask_yield,tips_sa_yield,tips_sao_yield,'
-  + 'nominal_cusip,nominal_maturity,nominal_coupon,nominal_yield,ask_bei,sa_bei,sao_bei';
+export const S14_HEADER = 'TIPS CUSIP,TIPS Maturity,TIPS Coupon,TIPS Ask,TIPS SA,TIPS SAO,'
+  + 'Nominal CUSIP,Nominal Maturity,Nominal Coupon,Nominal Ask,Ask BEI,SA BEI,SAO BEI';
 
-export const S15_HEADER = 'security_type,cusip,maturity,coupon,ask_yield,bid_yield,yield_spread_bps,'
-  + 'ask_price,bid_price,adj_ask_price,adj_bid_price,price_spread_pct';
+export const S15_HEADER = 'CUSIP,Maturity,Type,Coupon,Ask Yield,Bid Yield,Yield Spread (bps),'
+  + 'Ask Price,Bid Price,Adjusted Ask Price,Adjusted Bid Price,Price Spread %';
 
 // ─── Cell formats ────────────────────────────────────────────────────────────
 const blank = v => v === '' || v == null || (typeof v === 'number' && !Number.isFinite(v));
@@ -157,9 +157,14 @@ export function spotRowsFromFits(fits, source, stepYrs = GRID_STEP_YRS) {
 // dates  { fedInvest: { trade, settle }, market: { trade, settle } }
 // The Market trade date is the Download Date ('YYYY-MM-DD HH:MM'), every other date 'YYYY-MM-DD'.
 const dateLine = (label, source, date) => {
-  if (!date) throw new Error(`${label} of ${source} is missing`);
-  return `${label},${source},${date}`;
+  if (!date) throw new Error(`${label} of ${source ?? MARKET} is missing`);
+  return source == null ? `${label},${date}` : `${label},${source},${date}`;
 };
+// S14 and S15 are Market only: the date is in the second column, with no Source cell.
+const marketDateLinesNoSource = dates => [
+  dateLine('Trade Date', null, dates.market.trade),
+  dateLine('Settlement Date', null, dates.market.settle),
+];
 const marketDateLines = dates => [
   dateLine('Trade Date', MARKET, dates.market.trade),
   dateLine('Settlement Date', MARKET, dates.market.settle),
@@ -238,7 +243,7 @@ export function breakevenRows(tips, nominals) {
 
 export function buildBreakevenCsv({ dates, rows }) {
   const lines = [
-    ...marketDateLines(dates),
+    ...marketDateLinesNoSource(dates),
     S14_HEADER,
     ...rows.map(r => [
       r.tips_cusip, r.tips_maturity, fmtCoupon(r.tips_coupon),
@@ -280,10 +285,10 @@ export function spreadRows(tips, nominals) {
 
 export function buildSpreadsCsv({ dates, rows }) {
   const lines = [
-    ...marketDateLines(dates),
+    ...marketDateLinesNoSource(dates),
     S15_HEADER,
     ...rows.map(r => [
-      r.security_type, r.cusip, r.maturity, fmtCoupon(r.coupon),
+      r.cusip, r.maturity, r.security_type, fmtCoupon(r.coupon),
       fmtNum(r.ask_yield), fmtNum(r.bid_yield), fmtNum(r.yield_spread_bps),
       fmtNum(r.ask_price), fmtNum(r.bid_price), fmtNum(r.adj_ask_price), fmtNum(r.adj_bid_price),
       fmtNum(r.price_spread_pct),
