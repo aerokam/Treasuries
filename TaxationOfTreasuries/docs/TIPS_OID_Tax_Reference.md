@@ -199,6 +199,8 @@ Row 1 may be slightly negative if settlement is near month-end and ref CPI inter
 | Fidelity | Single total per CUSIP | 1/1 ✓ |
 | TreasuryDirect | Annual only | 12/31 ❌ |
 
+Fidelity calculates the 1099-OID amounts with the index ratio not rounded.
+
 TD 1099-OID is calculated incorrectly per IRS Pub 1212 — always recalculate if using TD figures. (TD uses 12/31 as year-end; IRS Pub 1212 requires the ref CPI for 1/1 of the following year.)
 
 ---
