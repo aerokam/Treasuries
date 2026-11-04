@@ -1,5 +1,5 @@
 // sa-yields.test.js — Coverage for the working values of the SA Yield
-// (YieldCurves/knowledge/3.2_Adjust_For_Seasonality.md): shared/src/ref-cpi.js#naiveMaturitySaFactor,
+// (knowledge/1.3.2_Adjust_For_Seasonality.md): shared/src/ref-cpi.js#naiveMaturitySaFactor,
 // #maturitySaFactors and #maturitySaFactor, and shared/src/sa-yields.js#saYieldsFromTipsYields,
 // which exposes the Settlement Date SA Factor, the Naive Maturity SA Factor, the Maturity SA
 // Factor, the SA Price Factor and the SA Price beside the SA Yield.

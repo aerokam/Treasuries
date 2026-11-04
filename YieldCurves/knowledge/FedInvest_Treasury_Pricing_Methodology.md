@@ -1,6 +1,6 @@
 # FedInvest Treasury Pricing Methodology
 
-**Reference for:** [3.1 Parse sources and calculate yields](./3.1_Parse_Sources_And_Calculate_Yields.md#parse-fedinvest-prices)
+**Reference for:** [3.1 Parse sources and calculate yields](../../knowledge/1.3.1_Parse_Sources_And_Calculate_Yields.md#parse-fedinvest-prices)
 
 **Source:** Treasury Fiscal Service, *Appendix 1: Purchase Prices and Yields on Investments and Sales Prices on Redemptions* (updated 2024-03)  
 **Official URL:** https://tfx.treasury.gov/sites/default/files/2024-03/Appendix-1-2-4300.pdf

@@ -1,5 +1,5 @@
 // tips-yields.js -- calculates the TIPS yields of
-// YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#calculate-tips-yields (3.1.7): the FedInvest TIPS
+// knowledge/1.3.1_Parse_Sources_And_Calculate_Yields.md#calculate-tips-yields (3.1.7): the FedInvest TIPS
 // rows of S1 or the market quotes of S7, and one settlement date per source, combined into the
 // security objects every process downstream of 3.1 works from.
 //

@@ -1,6 +1,6 @@
 // market-quotes.js -- shared parser for Market quotes (S7), knowledge/DATA_DICTIONARY.md#s7
 // (R2 key Treasuries/MarketQuotes.csv). Spec: YieldCurves/knowledge/
-// 3.1_Parse_Sources_And_Calculate_Yields.md#parse-market-quotes (3.1.2).
+// 1.3.1_Parse_Sources_And_Calculate_Yields.md#parse-market-quotes (3.1.2).
 //
 // The two row parsers below are the single canonical home for their respective row types, per
 // the no-redundancy directive (projects/CLAUDE.md §2a): each app and acquisition script imports
@@ -72,7 +72,7 @@ export function parseTipsQuotes(text) {
 // gives. A caller fitting a coupon-bond curve filters them out itself.
 //
 // Both yields are calculated from the quoted price at `settleIso`, which puts them on one
-// convention and makes their difference the spread of 3.6_Calculate_Bid_And_Ask_Spreads.md. A
+// convention and makes their difference the spread of 1.3.6_Calculate_Bid_And_Ask_Spreads.md. A
 // row with an ask price but no bid price keeps its ask yield; it has no bid yield and so no
 // spread.
 //

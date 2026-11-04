@@ -2,7 +2,7 @@
 // zero-coupon (spot) curve fit. Single source of truth for both: the YieldCurves browser
 // app (src/app.js) and any pipeline script that persists the same fitted curves import
 // this module rather than keeping their own copy.
-// See YieldCurves/knowledge/3.3_Adjust_For_Other_Effects.md and 3.4_Fit_Spot_Yield_Curves.md.
+// See knowledge/1.3.3_Adjust_For_Other_Effects.md and 1.3.4_Fit_Spot_Yield_Curves.md.
 
 import { cashflowSchedule, termYears } from './bond-math.js';
 import { localDate } from './settlement.js';
@@ -235,7 +235,7 @@ export function spotCurveGrid(bonds, opts) {
 }
 
 // Snap each bond's SA yield to a smooth NSS fair-value curve, with the snap weight declining
-// to 0 over the blend band in years-to-maturity (see 3.3_Adjust_For_Other_Effects.md). Mutates each bond with _saoFit /
+// to 0 over the blend band in years-to-maturity (see 1.3.3_Adjust_For_Other_Effects.md). Mutates each bond with _saoFit /
 // _saoWeight / _saoDevBps / _saoMode diagnostics; returns the SAO yield array.
 export function calculateSAO(bonds) {
   const n = bonds.length;
@@ -253,7 +253,7 @@ export function calculateSAO(bonds) {
   // Below the shortest fitted maturity the global NSS form is unconstrained and its
   // extrapolation diverges (a near-maturity TIPS can swing hundreds of bps negative).
   // Hold the curve flat at its shortest-anchor value there instead of extrapolating
-  // (see 3.3_Adjust_For_Other_Effects.md §"The very short end").
+  // (see 1.3.3_Adjust_For_Other_Effects.md §"The very short end").
   const tMin = fitIdx.length ? Math.min(...fitIdx.map(i => yrs[i])) : 0;
 
   for (let i = 0; i < n; i++) {

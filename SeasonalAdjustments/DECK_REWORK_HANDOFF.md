@@ -81,7 +81,7 @@ Between current slide 2 and current slide 3:
   "Available from several sources" applies only to the **monthly** SA CPI (BLS
   API, FRED `CPIAUCSL`, the annual revised-seasonal-indexes XLSX).
 - The ingestion spec (`knowledge/1.9_Fetch_Monthly_CPI.md`, `knowledge/1.10_Interpolate_Daily_Ref_CPI_NSA_And_SA.md`,
-  `YieldCurves/knowledge/3.2_Adjust_For_Seasonality.md`) is being refined by the
+  `knowledge/1.3.2_Adjust_For_Seasonality.md`) is being refined by the
   user in a separate session — **do not fix it here.**
 
 ### BLS seasonal factor — verified 2026-09-05
@@ -139,7 +139,7 @@ internal consistency with the wave shown on slides 3–5. FAR (1.25% Apr-2028)
 - `YieldCurves/knowledge/Canty.md` — SA math. Eq. 14: `SACP ≈ CP × S_settle /
   S_maturity`. §1b motivating example (the "extra months"), §2 decomposition
   (`I = T·S`), §3 derivation.
-- `YieldCurves/knowledge/3.2_Adjust_For_Seasonality.md` — canonical SA transform.
+- `knowledge/1.3.2_Adjust_For_Seasonality.md` — canonical SA transform.
 - `knowledge/DATA_DICTIONARY.md` — SA Factor, SA Price Factor, SACP, SA Yield,
   Clean Price, Index Ratio, CPI-U NSA/SA (all reviewed/edited this rework).
 - `SeasonalAdjustments/knowledge/1.0_SeasonalAdjustments_Explorer.md` — **STALE**:

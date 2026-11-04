@@ -50,7 +50,7 @@ A settlement date within 6 months of maturity does not make the final coupon per
 | TIPS | 52 | 0.059 bp | 0.14 bp | 1 |
 | Zero-coupon nominal Treasuries | 293 | 0.055 bp | 3.9 bp | 38 |
 
-Price carries more digits than the file's yield, which is rounded to 3 decimal places (0.1 bp), so the yield calculated from price is the more precise of the two. [Market quotes (S7)](./DATA_DICTIONARY.md#s7) states the yield that [Yield Curves](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md) calculates from price.
+Price carries more digits than the file's yield, which is rounded to 3 decimal places (0.1 bp), so the yield calculated from price is the more precise of the two. [Market quotes (S7)](./DATA_DICTIONARY.md#s7) states the yield that [Yield Curves](1.3.1_Parse_Sources_And_Calculate_Yields.md) calculates from price.
 
 ---
 

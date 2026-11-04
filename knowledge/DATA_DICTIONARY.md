@@ -235,7 +235,7 @@
   | `SA Price Factor` | [SA Price Factor](#sa-price-factor); TIPS security rows only |
   | `SA Price` | [SA Price](#sa-price), the price `SA` is the yield of; TIPS security rows only |
   | `Spot` | [Spot Yield](#spot-yield) on a spot row, as a decimal on the semi-annual bond-equivalent basis of `Ask`: fitted to the nominal Treasuries for Type `Treasury`, to the TIPS quoted prices for Type `TIPS`, and for Type `BEI` the nominal spot less the TIPS quoted spot |
-  | `Spot SA` | Spot Yield fitted to the TIPS seasonally adjusted prices for Type `TIPS`; for Type `BEI` the nominal spot less the TIPS SA spot ([3.5 §Across terms](../YieldCurves/knowledge/3.5_Calculate_Breakeven_Inflation.md#across-terms)); blank for Type `Treasury` |
+  | `Spot SA` | Spot Yield fitted to the TIPS seasonally adjusted prices for Type `TIPS`; for Type `BEI` the nominal spot less the TIPS SA spot ([3.5 §Across terms](1.3.5_Calculate_Breakeven_Inflation.md#across-terms)); blank for Type `Treasury` |
 
 - <a id="s14"></a>**Breakeven inflation (S14)**, `BreakevenInflation.csv` = `{ [ Trade_Date | Settlement_Date ] + TIPS_Maturity } + { @TIPS_CUSIP + TIPS_Maturity + TIPS_Coupon + TIPS_Ask + TIPS_SA + TIPS_SAO + Nominal_CUSIP + Nominal_Maturity + Nominal_Coupon + Nominal_Ask + Ask_BEI + SA_BEI + SAO_BEI }`
   *R2 key `Treasuries/BreakevenInflation.csv` ([View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/BreakevenInflation.csv)). The first two lines state the dates of [Market quotes (S7)](#s7) in the first two columns, so that each date is in the `TIPS Maturity` column and formats as one: `Trade Date` and the [Trade Date](#trade-date), then `Settlement Date` and the [Settlement Date](#settlement-date). The Trade Date is the [Download Date](#download-date), `YYYY-MM-DD HH:MM` on a 24-hour Eastern clock; the Settlement Date is `YYYY-MM-DD`. The third line is the header, then one row per TIPS in [Market quotes (S7)](#s7): the [Breakeven Inflation](#breakeven-inflation) of its Ask, SA and SAO Yield against the yield of the nominal Treasury nearest to it in maturity, the per security construction. The source is always `Market`, so there is no source column.*
@@ -327,7 +327,7 @@
 
 *Each source’s settlement date is determined once, by the process that assigns it:*
 
-- *Market quotes ([S7](#s7)): the [Download Date](#download-date) plus one bond trading day (T+1), in [3.1.6 Determine settlement date](../YieldCurves/knowledge/3.1_Parse_Sources_And_Calculate_Yields.md#determine-settlement-date).*
+- *Market quotes ([S7](#s7)): the [Download Date](#download-date) plus one bond trading day (T+1), in [3.1.6 Determine settlement date](1.3.1_Parse_Sources_And_Calculate_Yields.md#determine-settlement-date).*
 - *FedInvest prices ([S1](#s1)): the date FedInvest states its prices are for (T+0), in [1.1.1 Determine settlement date](./1.1_Download_FedInvest_Prices.md#determine-settlement-date), where the basis for T+0 is recorded.*
 
 <a id="download-date"></a>
@@ -397,7 +397,7 @@ For nominal Treasuries, 31 CFR §356.2 applies: *"Dated date means the date from
 
 *Two constructions are in use and they do not give the same figure, so a breakeven is stated with the construction that produced it:*
 
-- ***per security*** — *a TIPS yield subtracted from the yield of the nominal whose maturity is nearest to it. The pairing has no distance limit, so where nominal maturities are sparse the two yields are for different terms (specified in [Calculate breakeven inflation (3.5)](../YieldCurves/knowledge/3.5_Calculate_Breakeven_Inflation.md#breakeven-inflation), and in [Render breakeven inflation (2.7)](../YieldsMonitor/knowledge/2.7_Render_Breakeven_Inflation.md) for Yields Monitor).*
+- ***per security*** — *a TIPS yield subtracted from the yield of the nominal whose maturity is nearest to it. The pairing has no distance limit, so where nominal maturities are sparse the two yields are for different terms (specified in [Calculate breakeven inflation (3.5)](1.3.5_Calculate_Breakeven_Inflation.md#breakeven-inflation), and in [Render breakeven inflation (2.7)](../YieldsMonitor/knowledge/2.7_Render_Breakeven_Inflation.md) for Yields Monitor).*
 - ***across terms*** — *the fitted real [Spot Yield](#spot-yield) curve subtracted from the fitted nominal one, read at the same term. No pairing is involved.*
 
 <a id="inflation-compensation"></a>
@@ -744,7 +744,7 @@ coverExcessCost_c = Future 30Y total cost × coverWeight_c
 
 <a id="sao-yield"></a>
 ### SAO Yield
-`SAO_Yield` = Seasonally Adjusted and Other Adjusted Yield. *The [SA Yield](#sa-yield) with a further adjustment for **other** effects: the non-seasonal factors that move a TIPS away from a smooth curve. The `O` is *other*. Seasonality is identified and removed by name; the remaining deviations are not individually identified, and are removed together by fitting the SA yields to a smooth curve and reading each TIPS from that fit. Institutional participants act on relative-value factors this project cannot enumerate, so the step removes them as a class rather than by a named list. Distinct from the outlier index `O_t` of [FACP](#facp), which Canty determines analytically per known event ([3.3](../YieldCurves/knowledge/3.3_Adjust_For_Other_Effects.md)).*
+`SAO_Yield` = Seasonally Adjusted and Other Adjusted Yield. *The [SA Yield](#sa-yield) with a further adjustment for **other** effects: the non-seasonal factors that move a TIPS away from a smooth curve. The `O` is *other*. Seasonality is identified and removed by name; the remaining deviations are not individually identified, and are removed together by fitting the SA yields to a smooth curve and reading each TIPS from that fit. Institutional participants act on relative-value factors this project cannot enumerate, so the step removes them as a class rather than by a named list. Distinct from the outlier index `O_t` of [FACP](#facp), which Canty determines analytically per known event ([3.3](1.3.3_Adjust_For_Other_Effects.md)).*
 
 <a id="sacp"></a>
 ### SACP
@@ -762,7 +762,7 @@ coverExcessCost_c = Future 30Y total cost × coverWeight_c
 
 <a id="maturity-sa-factor"></a>
 ### Maturity SA Factor
-`Maturity_SA_Factor` = Maturity Seasonal Adjustment Factor. *The [SA Factor](#sa-factor) for the maturity date as used, the denominator of the [SA Price Factor](#sa-price-factor). A maturity date inside the published [Ref CPI](#ref-cpi) series takes that date’s exact value. A maturity date beyond it has no published factor: the [Naive Maturity SA Factor](#naive-maturity-sa-factor) is corrected for the uncertainty of a projection at longer maturities by scaling its departure from 1.0 by the [Credibility Factor](#credibility-factor) — `1 + (Naive_Maturity_SA_Factor − 1) × w(h)`. The second case covers nearly every outstanding TIPS, since most mature beyond the published series. `shared/src/ref-cpi.js#maturitySaFactor`; specified in [3.2 Adjust for seasonality](../YieldCurves/knowledge/3.2_Adjust_For_Seasonality.md#horizon-dependent-maturity-factor).*
+`Maturity_SA_Factor` = Maturity Seasonal Adjustment Factor. *The [SA Factor](#sa-factor) for the maturity date as used, the denominator of the [SA Price Factor](#sa-price-factor). A maturity date inside the published [Ref CPI](#ref-cpi) series takes that date’s exact value. A maturity date beyond it has no published factor: the [Naive Maturity SA Factor](#naive-maturity-sa-factor) is corrected for the uncertainty of a projection at longer maturities by scaling its departure from 1.0 by the [Credibility Factor](#credibility-factor) — `1 + (Naive_Maturity_SA_Factor − 1) × w(h)`. The second case covers nearly every outstanding TIPS, since most mature beyond the published series. `shared/src/ref-cpi.js#maturitySaFactor`; specified in [3.2 Adjust for seasonality](1.3.2_Adjust_For_Seasonality.md#horizon-dependent-maturity-factor).*
 
 *Measured: the factor for February 15, the maturity date of every 30-year TIPS, has a 30-year drift standard deviation of about 0.29% of price, against a current departure from 1.0 of −0.45%. The drift over the horizon the projection is used at is comparable to the whole adjustment being made, which is what the weight scales for ([Seasonal Factor Drift §4.1](../YieldCurves/knowledge/Seasonal_Factor_Drift.md#feb-15-dependency)).*
 
@@ -788,7 +788,7 @@ coverExcessCost_c = Future 30Y total cost × coverWeight_c
 
 <a id="sao-blend-weight"></a>
 ### SAO Blend Weight
-`SAO_Blend_Weight` = Seasonally Adjusted and Other Adjusted Blend Weight. *`w`, the weight given to the fitted smooth curve when forming the [SAO Yield](#sao-yield): `SAO = w × curve(maturity) + (1 − w) × SA`. `w` is 1 out to `SAO_BLEND_START_YRS` (5 years), declines linearly to 0 at `SAO_BLEND_END_YRS` (6 years), and is 0 beyond, where the SAO Yield is the SA Yield unchanged. Securities inside `SAO_NOISE_YRS` (0.5 years) are excluded from the fit, their SA yield being dominated by price noise. `shared/src/spot-curve.js` ([3.3](../YieldCurves/knowledge/3.3_Adjust_For_Other_Effects.md)).*
+`SAO_Blend_Weight` = Seasonally Adjusted and Other Adjusted Blend Weight. *`w`, the weight given to the fitted smooth curve when forming the [SAO Yield](#sao-yield): `SAO = w × curve(maturity) + (1 − w) × SA`. `w` is 1 out to `SAO_BLEND_START_YRS` (5 years), declines linearly to 0 at `SAO_BLEND_END_YRS` (6 years), and is 0 beyond, where the SAO Yield is the SA Yield unchanged. Securities inside `SAO_NOISE_YRS` (0.5 years) are excluded from the fit, their SA yield being dominated by price noise. `shared/src/spot-curve.js` ([3.3](1.3.3_Adjust_For_Other_Effects.md)).*
 
 <a id="iqr-clip"></a>
 ### IQR Clip

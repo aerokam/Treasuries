@@ -1,5 +1,5 @@
 // spreads.js -- the bid and ask spreads of
-// YieldCurves/knowledge/3.6_Calculate_Bid_And_Ask_Spreads.md (3.6), for one security quoted
+// knowledge/1.3.6_Calculate_Bid_And_Ask_Spreads.md (3.6), for one security quoted
 // on both sides.
 //
 // One implementation, imported by the YieldCurves page (YieldCurves/src/app.js) and the

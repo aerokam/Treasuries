@@ -31,4 +31,4 @@ Follow these steps to verify that the navigation, rendering and drill-down featu
 ## 4. Anchor Handling (Inside YieldCurves)
 - [ ] Open the **YieldCurves** Level 2 diagram from Level 1.
 - [ ] **Process Click**: Click the **3.2 Adjust for seasonality** process.
-    - *Expected*: Navigates to the detailed `3.2_Adjust_For_Seasonality.md` document.
+    - *Expected*: Navigates to the detailed `1.3.2_Adjust_For_Seasonality.md` document.

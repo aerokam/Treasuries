@@ -1,5 +1,5 @@
 // sa-yields.js -- the SA Price Factor and the SA Yield of
-// YieldCurves/knowledge/3.2_Adjust_For_Seasonality.md (3.2), for the TIPS Yields of 3.1.7.
+// knowledge/1.3.2_Adjust_For_Seasonality.md (3.2), for the TIPS Yields of 3.1.7.
 //
 // One implementation, imported by the YieldCurves page (YieldCurves/src/app.js) and by the
 // acquisition job that writes S13 (YieldCurves/scripts/updateYieldCurveDataSets.js), per the no-redundancy directive

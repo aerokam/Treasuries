@@ -21,7 +21,7 @@ test.describe('Knowledge Map and Viewer', () => {
     await page.goto('/knowledge/DFD_LEVEL2_YIELDCURVES.html');
 
     // 3.3 Adjust for other effects. Its bubble opens the spec named for it, whose title is the process name.
-    await page.locator('a.process[href*="3.3_Adjust_For_Other_Effects.md"]').first().click();
+    await page.locator('a.process[href*="1.3.3_Adjust_For_Other_Effects.md"]').first().click();
     await expect(page).toHaveURL(/3\.3_Adjust_For_Other_Effects\.md/, { timeout: 10000 });
     await expect(page.locator('h1')).toContainText('3.3 Adjust for other effects');
   });

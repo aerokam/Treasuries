@@ -20,7 +20,7 @@ const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
 const V = p => 'viewer.html#/md/' + p;
 const DS = a => V('knowledge/DATA_DICTIONARY.md#' + (a || '2.0-data-stores-s'));
 const K = 'YieldCurves/knowledge/';
-const F31 = K + '3.1_Parse_Sources_And_Calculate_Yields.md';
+const F31 = K + '1.3.1_Parse_Sources_And_Calculate_Yields.md';
 
 // ── geometry ────────────────────────────────────────────────────────────────
 // A flow bows off its chord, as DeMarco drew them. The bow is not fixed: the
@@ -699,14 +699,14 @@ function level2YieldCurves() {
     { id: '3.1', name: ['Parse sources', 'and calculate', 'yields'], href: 'DFD_LEVEL3_YC_LOAD.html', reads: ['fedinv', 'quotes', 'nsasa', 'hol'],
       out: { '3.2': ['TIPS yields', 'SA factors'], '3.4': ['Treasury yields'], '3.5': ['Treasury yields'],
              '3.6': ['TIPS yields', 'Treasury yields'], '3.7': ['Treasury yields', 'download date'] } },
-    { id: '3.2', name: ['Adjust for', 'seasonality'], href: V(K + '3.2_Adjust_For_Seasonality.md'), reads: [],
+    { id: '3.2', name: ['Adjust for', 'seasonality'], href: V(K + '1.3.2_Adjust_For_Seasonality.md'), reads: [],
       out: { '3.3': ['SA yields'], '3.4': ['SA yields'] } },
-    { id: '3.3', name: ['Adjust for', 'other effects'], href: V(K + '3.3_Adjust_For_Other_Effects.md'), reads: [],
+    { id: '3.3', name: ['Adjust for', 'other effects'], href: V(K + '1.3.3_Adjust_For_Other_Effects.md'), reads: [],
       out: { '3.5': ['SAO yields'], '3.7': ['SAO yields'] } },
-    { id: '3.4', name: ['Fit spot', 'yield curves'], href: V(K + '3.4_Fit_Spot_Yield_Curves.md'), reads: [],
+    { id: '3.4', name: ['Fit spot', 'yield curves'], href: V(K + '1.3.4_Fit_Spot_Yield_Curves.md'), reads: [],
       out: { '3.5': ['spot yield curves'], '3.7': ['spot yield curves'] } },
-    { id: '3.5', name: ['Calculate', 'breakeven', 'inflation'], href: V(K + '3.5_Calculate_Breakeven_Inflation.md'), reads: [], out: { '3.7': ['breakeven inflation'] } },
-    { id: '3.6', name: ['Calculate', 'bid and ask', 'spreads'], href: V(K + '3.6_Calculate_Bid_And_Ask_Spreads.md'), reads: [], out: { '3.7': ['bid and ask spreads'] } },
+    { id: '3.5', name: ['Calculate', 'breakeven', 'inflation'], href: V(K + '1.3.5_Calculate_Breakeven_Inflation.md'), reads: [], out: { '3.7': ['breakeven inflation'] } },
+    { id: '3.6', name: ['Calculate', 'bid and ask', 'spreads'], href: V(K + '1.3.6_Calculate_Bid_And_Ask_Spreads.md'), reads: [], out: { '3.7': ['bid and ask spreads'] } },
     { id: '3.7', name: ['Render charts', 'and tables'], href: 'DFD_LEVEL3_YC_RENDER.html', reads: [], out: {} },
   ];
   const SX = 40, SW = 215, PR = 58, UX = 1190, UW = 145;
@@ -1017,7 +1017,7 @@ function level2Ingestion() {
 
 // ── Level 3: Yield Curves 3.7 ───────────────────────────────────────────────
 function level3YieldCurvesRender() {
-  const S = K + '3.7_Render_Charts_And_Tables.md';
+  const S = K + '3.2_Render_Charts_And_Tables.md';
   const views = ['3.7.3', '3.7.4', '3.7.5', '3.7.6'];
   const procs = [
     { id: '3.7.1', name: ['Select', 'view'], a: 'select-view',

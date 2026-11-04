@@ -1,5 +1,5 @@
 // breakeven.js -- the two breakeven methods of
-// YieldCurves/knowledge/3.5_Calculate_Breakeven_Inflation.md: the nominal Treasury each
+// knowledge/1.3.5_Calculate_Breakeven_Inflation.md: the nominal Treasury each
 // per-security breakeven is stated against (#breakeven-inflation), and the breakeven across
 // terms between two fitted spot curves (#across-terms).
 //

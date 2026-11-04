@@ -1,5 +1,5 @@
 // spot-breakeven.test.js — Coverage for shared/src/breakeven.js#spotBreakevenAcrossTerms, the
-// breakeven across terms of YieldCurves/knowledge/3.5_Calculate_Breakeven_Inflation.md#across-terms.
+// breakeven across terms of knowledge/1.3.5_Calculate_Breakeven_Inflation.md#across-terms.
 // Run: node shared/tests/spot-breakeven.test.js
 //
 // The rule it pins: the breakeven exists at every Term of the 3.4 grid where the Treasuries
