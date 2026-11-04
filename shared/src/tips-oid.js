@@ -7,7 +7,7 @@
 // The Ref CPI of each date comes from the daily Ref CPI series (Ref CPI, S3), through lookupRefCpi in
 // ref-cpi.js. The Index Ratio is indexRatio() of ref-cpi.js, rounded or not as the caller states.
 
-import { lookupRefCpi, indexRatio, roundHalfUp, TREASURY_ROUNDING, NO_ROUNDING } from './ref-cpi.js';
+import { lookupRefCpi, refCpiFromMonthly, indexRatio, roundHalfUp, TREASURY_ROUNDING, NO_ROUNDING } from './ref-cpi.js';
 
 export { TREASURY_ROUNDING, NO_ROUNDING };
 
@@ -20,6 +20,7 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 //   quantity      number of $1,000 par units, a positive integer
 //   startDate, endDate   'YYYY-MM-DD'
 //   refCpiRows    [{ date: 'YYYY-MM-DD', refCpi: Number }], ascending by date (S3)
+//   monthlyCpi    optional, the monthly CPI-U NSA of CPI history (S8) as monthlyCpiMap() of ref-cpi.js builds it
 //   rounding      TREASURY_ROUNDING or NO_ROUNDING, applied to the Index Ratio of each date
 //
 // Returns { ok: false, reason } or { ok: true, ... }. The reasons:
@@ -33,9 +34,35 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 //   'no-ref-cpi-start'     the series has no Ref CPI for the Start Date
 //   'no-ref-cpi-end'       the series has no Ref CPI for the End Date, which is inside its range
 //
-// An End Date after the last date of the series is calculated at that last date:
-// endDateUsed is that date and endDateLimited is true.
-export function calculateTipsOid({ tips, quantity, startDate, endDate, refCpiRows, rounding }) {
+// A date after the last date of the series that is the first of a month has the Ref CPI of 31 CFR 356
+// App. B for that day: the CPI-U NSA of the month three months earlier, read from monthlyCpi with no
+// interpolation. startCpiMonth and endCpiMonth are that month as 'YYYY-MM', and null for a published Ref CPI.
+// The latest known Ref CPI is that of the last date of the series, or of the day after it when that day is
+// the first of a month whose CPI-U is in monthlyCpi. An End Date after the latest known Ref CPI is
+// calculated at its date: endDateUsed is that date and endDateLimited is true.
+function monthThreeBefore(date) {
+  let y = Number(date.slice(0, 4)), m = Number(date.slice(5, 7)) - 3;
+  if (m < 1) { m += 12; y -= 1; }
+  return y + '-' + String(m).padStart(2, '0');
+}
+
+function nextDay(date) {
+  const d = new Date(date + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
+
+function refCpiOf(date, refCpiRows, lastDate, monthlyCpi) {
+  const published = lookupRefCpi(refCpiRows, date);
+  if (published != null) return { refCpi: published, cpiMonth: null };
+  if (monthlyCpi && lastDate != null && date > lastDate && date.endsWith('-01')) {
+    const v = refCpiFromMonthly(date, monthlyCpi);
+    if (v != null) return { refCpi: v, cpiMonth: monthThreeBefore(date) };
+  }
+  return null;
+}
+
+export function calculateTipsOid({ tips, quantity, startDate, endDate, refCpiRows, monthlyCpi, rounding }) {
   if (!tips) return { ok: false, reason: 'cusip-not-found' };
   if (!Number.isInteger(quantity) || quantity < 1) return { ok: false, reason: 'quantity' };
   if (!ISO_DATE.test(startDate || '') || !ISO_DATE.test(endDate || '')) {
@@ -47,13 +74,20 @@ export function calculateTipsOid({ tips, quantity, startDate, endDate, refCpiRow
   if (endDate > tips.maturity) return { ok: false, reason: 'end-after-maturity' };
 
   const lastDate = refCpiRows && refCpiRows.length ? refCpiRows[refCpiRows.length - 1].date : null;
-  const endDateLimited = lastDate != null && endDate > lastDate;
-  const endDateUsed = endDateLimited ? lastDate : endDate;
-
-  const startRefCpi = lookupRefCpi(refCpiRows, startDate);
-  if (startRefCpi == null) return { ok: false, reason: 'no-ref-cpi-start' };
-  const endRefCpi = lookupRefCpi(refCpiRows, endDateUsed);
-  if (endRefCpi == null) return { ok: false, reason: 'no-ref-cpi-end' };
+  const next = lastDate != null ? nextDay(lastDate) : null;
+  const lastKnown = next != null && refCpiOf(next, refCpiRows, lastDate, monthlyCpi) ? next : lastDate;
+  const start = refCpiOf(startDate, refCpiRows, lastDate, monthlyCpi);
+  if (start == null) return { ok: false, reason: 'no-ref-cpi-start' };
+  let end = refCpiOf(endDate, refCpiRows, lastDate, monthlyCpi);
+  let endDateLimited = false;
+  let endDateUsed = endDate;
+  if (end == null && lastKnown != null && endDate > lastKnown) {
+    endDateLimited = true;
+    endDateUsed = lastKnown;
+    end = refCpiOf(lastKnown, refCpiRows, lastDate, monthlyCpi);
+  }
+  if (end == null) return { ok: false, reason: 'no-ref-cpi-end' };
+  const startRefCpi = start.refCpi, endRefCpi = end.refCpi;
 
   const par = quantity * PAR_PER_QUANTITY;
   const startIndexRatio = indexRatio(startRefCpi, tips.datedDateRefCpi, rounding);
@@ -68,9 +102,9 @@ export function calculateTipsOid({ tips, quantity, startDate, endDate, refCpiRow
     ok: true,
     par,
     datedDateRefCpi: tips.datedDateRefCpi,
-    startDate, startRefCpi, startIndexRatio,
-    endDate, endDateUsed, endDateLimited, endRefCpi, endIndexRatio,
-    lastRefCpiDate: lastDate,
+    startDate, startRefCpi, startCpiMonth: start.cpiMonth, startIndexRatio,
+    endDate, endDateUsed, endDateLimited, endRefCpi, endCpiMonth: end.cpiMonth, endIndexRatio,
+    lastKnownRefCpiDate: lastKnown,
     rounding,
     oid,
   };

@@ -14,6 +14,7 @@
 // Ref CPI lookup is defined once in shared/src/ref-cpi.js (no-redundancy directive,
 // projects/CLAUDE.md §2a). Re-exported here so existing `from './market-data.js'` imports resolve.
 export { lookupRefCpi } from './ref-cpi.js';
+import { monthlyCpiMap } from './ref-cpi.js';
 import { parseTipsQuotes, parseDownloadDate, downloadDateIso } from './market-quotes.js';
 import { yieldFromPrice } from './bond-math.js';
 import { localDate, toIsoDate, nextBusinessDay, parseHolidaySet } from './settlement.js';
@@ -68,6 +69,14 @@ export async function fetchTipsRefRows() {
   const res = await fetch(TIPS_URL + '/TipsRef.csv', { cache: 'no-cache' });
   if (!res.ok) throw new Error('TipsRef.csv: HTTP ' + res.status);
   return parseTipsRefRows(await res.text());
+}
+
+// The monthly CPI-U NSA of CPI history (S8, bls/CPI_history.csv) as { 'YYYY-M': value } (month 1-12, not
+// zero-padded), the map refCpiFromMonthly() of ref-cpi.js reads. Throws on an HTTP error.
+export async function fetchMonthlyCpiNsa() {
+  const res = await fetch(R2_ROOT + '/bls/CPI_history.csv', { cache: 'no-cache' });
+  if (!res.ok) throw new Error('CPI_history.csv: HTTP ' + res.status);
+  return monthlyCpiMap(parseCsvRows(await res.text()).map(r => ({ year: r.Year, period: r.Period, value: parseFloat(r.NSA) })));
 }
 
 // Parses Ref CPI (S3, TIPS/RefCPI.csv): [{ date: 'YYYY-MM-DD', refCpi: Number }], oldest first.

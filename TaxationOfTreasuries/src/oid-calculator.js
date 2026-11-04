@@ -2,7 +2,7 @@
 // Specs: knowledge/12.1_Load_Oid_Inputs.md, 12.2_Calculate_Tips_Oid.md (calculation in shared/src/tips-oid.js),
 //        12.3_Render_Oid_Calculator.md (every string below).
 
-import { fetchTipsRefRows, fetchRefCpiRows } from '../../shared/src/market-data.js';
+import { fetchTipsRefRows, fetchRefCpiRows, fetchMonthlyCpiNsa } from '../../shared/src/market-data.js';
 import { calculateTipsOid, TREASURY_ROUNDING, NO_ROUNDING } from '../../shared/src/tips-oid.js';
 
 const STYLE = `
@@ -50,23 +50,33 @@ const HELP = `
       </ul>
     </li>
     <li>Index Ratio, not rounded, is the Ref CPI of the date divided by the Dated Date Ref CPI. Rounded as Treasury rounds it, the ratio is truncated to six decimal places and then rounded to five. Compare the OID of each with Box 8 of the Form 1099-OID.</li>
-    <li>When Ref CPI is not yet published for the End Date, the OID is calculated as of the last date with a published Ref CPI, and the result states that date.</li>
+    <li>When Treasury has not yet published the Ref CPI of a date:
+      <ul>
+        <li>The first of a month: the Ref CPI is the CPI-U of the month three months earlier, as 31 CFR 356 Appendix B states. January 1 takes the CPI-U of October.</li>
+        <li>Any other date: the OID is calculated as of the latest known Ref CPI, and the result states its date.</li>
+      </ul>
+    </li>
   </ul>`;
 
 let loaded = null; // { tipsRows, refCpiRows }, fetched once per page load
 
 function loadInputs() {
   if (!loaded) {
-    loaded = Promise.all([fetchTipsRefRows(), fetchRefCpiRows()]).then(([tipsRows, refCpiRows]) => ({
-      tipsRows: tipsRows.filter(r => Number.isFinite(r.datedDateRefCpi)),
-      refCpiRows: refCpiRows.filter(r => r.date && Number.isFinite(r.refCpi)),
-    }));
+    // CPI history is optional: without it the first of a month after the last Ref CPI date has no Ref CPI.
+    loaded = Promise.all([fetchTipsRefRows(), fetchRefCpiRows(), fetchMonthlyCpiNsa().catch(() => null)])
+      .then(([tipsRows, refCpiRows, monthlyCpi]) => ({
+        tipsRows: tipsRows.filter(r => Number.isFinite(r.datedDateRefCpi)),
+        refCpiRows: refCpiRows.filter(r => r.date && Number.isFinite(r.refCpi)),
+        monthlyCpi,
+      }));
     loaded.catch(() => { loaded = null; }); // a failed load is tried again on the next open
   }
   return loaded;
 }
 
 const money = n => (n < 0 ? '-$' : '$') + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const monthName = ym => new Date(Number(ym.slice(0, 4)), Number(ym.slice(5, 7)) - 1, 1)
+  .toLocaleString('en-US', { month: 'long', year: 'numeric' });
 const couponText = c => Number((c * 100).toFixed(3)) + '%';
 
 function messageFor(result, tips, refCpiRows) {
@@ -105,7 +115,12 @@ function resultHtml(r, tips) {
     <div class="oid-amount">OID ${money(r.oid)}</div>
     <div class="oid-formula">Par ${money(r.par).replace('.00', '')} × (${ir(r.endIndexRatio)} − ${ir(r.startIndexRatio)})</div>`;
   if (r.endDateLimited) {
-    html += `<div class="oid-note">Ref CPI is published through ${r.lastRefCpiDate}. The OID is calculated as of that date, not as of the End Date entered.</div>`;
+    html += `<div class="oid-note">The latest known Ref CPI is that of ${r.lastKnownRefCpiDate}. The OID is calculated as of that date, not as of the End Date entered.</div>`;
+  }
+  for (const [date, month] of [[r.startDate, r.startCpiMonth], [r.endDate, r.endCpiMonth]]) {
+    if (month) {
+      html += `<div class="oid-note">Treasury has not published the Ref CPI of ${date}. It is the CPI-U of ${monthName(month)}, as 31 CFR 356 Appendix B states for the first day of a month.</div>`;
+    }
   }
   if (r.oid < 0) html += '<div class="oid-note">A negative OID is a deflation adjustment.</div>';
   return html;
@@ -146,7 +161,7 @@ export async function render(container) {
     status.className = 'error';
     return;
   }
-  const { tipsRows, refCpiRows } = data;
+  const { tipsRows, refCpiRows, monthlyCpi } = data;
   status.textContent = `Ref CPI from ${refCpiRows[0].date} through ${refCpiRows[refCpiRows.length - 1].date}`;
   $('oid-cusips').innerHTML = tipsRows
     .map(t => `<option value="${t.cusip}">${couponText(t.coupon)} due ${t.maturity}</option>`).join('');
@@ -163,7 +178,7 @@ export async function render(container) {
     const result = calculateTipsOid({
       tips,
       quantity: Number($('oid-quantity').value),
-      startDate, endDate, refCpiRows,
+      startDate, endDate, refCpiRows, monthlyCpi,
       rounding: container.querySelector('input[name="oid-rounding"]:checked').value,
     });
     resultEl.innerHTML = result.ok

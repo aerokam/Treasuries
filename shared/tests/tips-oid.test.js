@@ -63,7 +63,7 @@ test('an End Date after the last Ref CPI date is calculated at the last Ref CPI 
   assert.equal(r.ok, true);
   assert.equal(r.endDateLimited, true);
   assert.equal(r.endDateUsed, '2025-02-01');
-  assert.equal(r.lastRefCpiDate, '2025-02-01');
+  assert.equal(r.lastKnownRefCpiDate, '2025-02-01');
   assert.equal(r.endRefCpi, 318.5);
 });
 
@@ -83,4 +83,52 @@ test('each invalid input has its own reason', () => {
   assert.equal(calculateTipsOid({ ...ok, startDate: '2025-10-16', endDate: '2025-10-16' }).reason, 'start-after-maturity');
   assert.equal(calculateTipsOid({ ...ok, endDate: '2026-01-01' }).reason, 'end-after-maturity');
   assert.equal(calculateTipsOid({ ...ok, endDate: '2024-12-31' }).reason, 'no-ref-cpi-end');
+});
+
+// The first of a month after the last date of the series: the CPI-U NSA of three months earlier, read directly.
+const later = { ...tips, maturity: '2030-10-15' };
+
+test('an End Date that is the first of a month after the last Ref CPI date is the CPI-U of the month three months before', () => {
+  const r = calculateTipsOid({ ...base, tips: later, startDate: '2024-06-14', endDate: '2025-03-01', monthlyCpi: { '2024-12': 320.123 } });
+  assert.equal(r.ok, true);
+  assert.equal(r.endDateLimited, false);
+  assert.equal(r.endDateUsed, '2025-03-01');
+  assert.equal(r.endRefCpi, 320.123);
+  assert.equal(r.endCpiMonth, '2024-12');
+  assert.equal(r.startCpiMonth, null);
+  assert.equal(r.oid, Math.round(20000 * (320.123 - 312.85893) / 259.46997 * 100) / 100);
+});
+
+test('January 1 takes the CPI-U of October of the year before', () => {
+  const r = calculateTipsOid({ ...base, tips: later, startDate: '2024-06-14', endDate: '2026-01-01', monthlyCpi: { '2025-10': 325.5 } });
+  assert.equal(r.endRefCpi, 325.5);
+  assert.equal(r.endCpiMonth, '2025-10');
+});
+
+test('a date after the last Ref CPI date that is not the first of a month, or whose CPI-U is absent, is calculated at the last date', () => {
+  const mid = calculateTipsOid({ ...base, tips: later, startDate: '2024-06-14', endDate: '2025-03-15', monthlyCpi: { '2024-12': 320.123 } });
+  assert.equal(mid.endDateLimited, true);
+  assert.equal(mid.endDateUsed, '2025-02-01');
+  const absent = calculateTipsOid({ ...base, tips: later, startDate: '2024-06-14', endDate: '2025-03-01', monthlyCpi: {} });
+  assert.equal(absent.endDateLimited, true);
+  const none = calculateTipsOid({ ...base, tips: later, startDate: '2024-06-14', endDate: '2025-03-01' });
+  assert.equal(none.endDateLimited, true);
+});
+
+test('a published Ref CPI is used in place of the CPI-U for the same date', () => {
+  const r = calculateTipsOid({ ...base, startDate: '2024-06-14', endDate: '2025-02-01', monthlyCpi: { '2024-11': 999 } });
+  assert.equal(r.endRefCpi, 318.5);
+  assert.equal(r.endCpiMonth, null);
+});
+
+test('the day after the last Ref CPI date is the latest known Ref CPI date when it is the first of a month with its CPI-U', () => {
+  const rowsToJan31 = [...rows.slice(0, 3), { date: '2025-01-31', refCpi: 318.1 }];
+  const known = calculateTipsOid({ ...base, tips: later, refCpiRows: rowsToJan31, startDate: '2024-06-14', endDate: '2025-02-15', monthlyCpi: { '2024-11': 319.5 } });
+  assert.equal(known.endDateLimited, true);
+  assert.equal(known.endDateUsed, '2025-02-01');
+  assert.equal(known.endCpiMonth, '2024-11');
+  assert.equal(known.lastKnownRefCpiDate, '2025-02-01');
+  const unknown = calculateTipsOid({ ...base, tips: later, refCpiRows: rowsToJan31, startDate: '2024-06-14', endDate: '2025-02-15' });
+  assert.equal(unknown.endDateUsed, '2025-01-31');
+  assert.equal(unknown.lastKnownRefCpiDate, '2025-01-31');
 });
