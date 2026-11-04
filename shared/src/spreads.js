@@ -3,7 +3,7 @@
 // on both sides.
 //
 // One implementation, imported by the YieldCurves page (YieldCurves/src/app.js) and the
-// acquisition job that publishes S15 (YieldCurves/scripts/updateSpotYieldCurves.js), per the
+// acquisition job that publishes S15 (YieldCurves/scripts/updateYieldCurveDataSets.js), per the
 // no-redundancy directive (projects/CLAUDE.md §2a). Three copies of both formulas existed
 // until 2026-09-14.
 

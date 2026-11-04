@@ -184,7 +184,7 @@ export const TIPS_SA_SPOT_FIT = { priceOf: b => b.price * b.saRatio, yieldOf: b 
 // bond's exact maturity, not at the nearest step below it. Never extends past tMax: GSW's
 // own published TIPS curve (TIPSY02-TIPSY20) likewise never extends past the instruments
 // it is fit to. Shared by spotCurveTermGrid (the chart/table grid) and the R2 persistence
-// pipeline (updateSpotYieldCurves.js's buildGridRows) so neither can drift from the other's
+// pipeline (yield-curve-stores.js#spotRowsFromFits) so neither can drift from the other's
 // endpoint handling.
 export function gridTerms(tMin, tMax, step = 0.5) {
   const terms = [];
@@ -202,7 +202,7 @@ export function gridTerms(tMin, tMax, step = 0.5) {
 // row per term, one column per curve). Without this, a shorter curve sharing the axis with
 // a longer one would still cut off at the last common step before its own true endpoint,
 // even though gridTerms alone gets the longer curve's endpoint right (that endpoint IS the
-// combined range's tMax). Used by updateSpotYieldCurves.js's buildGridRows, which tables
+// combined range's tMax). Used by yield-curve-stores.js#spotRowsFromFits, which tables
 // the nominal, TIPS-quoted and TIPS-SA curves together and their tMax values differ.
 export function unionGridTerms(fits, step = 0.5) {
   const tMin = Math.min(...fits.map(f => f.tMin));

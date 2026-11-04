@@ -10,23 +10,7 @@ export function parseCsv(text, hasHeader = true) {
   const lines = text.split(/\r?\n/).filter(l => l.trim());
   if (lines.length === 0) return result;
 
-  const parseRow = (line) => {
-    const parts = [];
-    let cur = '';
-    let inQuotes = false;
-    for (let i = 0; i < line.length; i++) {
-      const char = line[i];
-      if (char === '"') inQuotes = !inQuotes;
-      else if (char === ',' && !inQuotes) {
-        parts.push(cur.trim());
-        cur = '';
-      } else {
-        cur += char;
-      }
-    }
-    parts.push(cur.trim());
-    return parts.map(p => p.replace(/^"|"$/g, '').trim());
-  };
+  const parseRow = parseCsvLine;
 
   if (hasHeader) {
     const headers = parseRow(lines[0]);
@@ -42,6 +26,42 @@ export function parseCsv(text, hasHeader = true) {
     return lines.map(parseRow);
   }
   return result;
+}
+
+// The cells of one CSV line, trimmed and unquoted, by the rules of parseCsv.
+export function parseCsvLine(line) {
+  const parts = [];
+  let cur = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    if (char === '"') inQuotes = !inQuotes;
+    else if (char === ',' && !inQuotes) {
+      parts.push(cur.trim());
+      cur = '';
+    } else {
+      cur += char;
+    }
+  }
+  parts.push(cur.trim());
+  return parts.map(p => p.replace(/^"|"$/g, '').trim());
+}
+
+// Parses a store that has lines before its header (the date lines of Yield curves, Breakeven
+// inflation, Bid and ask spreads, FedInvest prices and Market quotes). The header is the first
+// line whose first cell is `headerFirstCell`, and every line before it is a preamble line.
+// Columns are found by header name, never by position, as parseCsv does.
+//
+// Returns { preamble: [[cell, ...], ...], rows: [{ header: cell, ... }, ...] }; null when no
+// line has `headerFirstCell` as its first cell. A leading byte order mark is ignored.
+export function parseCsvWithPreamble(text, headerFirstCell) {
+  const lines = (text || '').replace(/^\uFEFF/, '').split(/\r?\n/).filter(l => l.trim());
+  const at = lines.findIndex(l => parseCsvLine(l)[0] === headerFirstCell);
+  if (at < 0) return null;
+  return {
+    preamble: lines.slice(0, at).map(parseCsvLine),
+    rows: parseCsv(lines.slice(at).join('\n')),
+  };
 }
 
 // Serializes a header row and data rows (arrays of cell values) to CSV text.

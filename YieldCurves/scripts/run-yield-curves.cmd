@@ -1,7 +1,7 @@
 @echo off
 setlocal
 
-set SCRIPT=C:\Users\aerok\projects\Treasuries\YieldCurves\scripts\updateSpotYieldCurves.js
+set SCRIPT=C:\Users\aerok\projects\Treasuries\YieldCurves\scripts\updateYieldCurveDataSets.js
 set LOG=C:\Users\aerok\projects\Treasuries\YieldCurves\logs\yield-curves.log
 set NODE="C:\Program Files\nodejs\node.exe"
 

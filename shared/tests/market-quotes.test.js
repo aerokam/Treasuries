@@ -68,5 +68,15 @@ ok(parseDownloadDate('﻿2026-03-25 08:27\n' + HEADER) === '2026-03-25 08:27', '
   ok(unknown.length === 1 && unknown[0] === '999999AA1', 'the unrecognised CUSIP is reported');
 }
 
+// ── Columns are found by header name, after the lines before the header ──
+{
+  const reordered = ['2026-03-25 08:27', 'type,coupon,cusip,maturity,bidPrice,askPrice,adjBidPrice,adjAskPrice',
+    'TIPS,0.00125,91282CCA7,2026-04-15,100.062,100.132,124.011839,124.098594'].join('\n');
+  const reorderedTips = parseTipsQuotes(reordered);
+  ok(reorderedTips.length === 1 && reorderedTips[0].askPrice === 100.132 && reorderedTips[0].bidPrice === 100.062
+    && reorderedTips[0].adjAskPrice === 124.098594, 'quotes are read by header name, whatever the column order');
+  ok(parseDownloadDate(reordered) === '2026-03-25 08:27', 'the Download Date is the line before the header');
+}
+
 console.log(`${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

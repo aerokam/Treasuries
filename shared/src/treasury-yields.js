@@ -5,7 +5,7 @@
 // market-quotes.js#parseTreasuryQuotes, in the same pass as their parse.
 //
 // One implementation, imported by the YieldCurves page (YieldCurves/src/app.js) and by the
-// acquisition job that publishes S13 (YieldCurves/scripts/updateSpotYieldCurves.js), per the
+// acquisition job that publishes S13 (YieldCurves/scripts/updateYieldCurveDataSets.js), per the
 // no-redundancy directive (projects/CLAUDE.md §2a). The two kept separate copies until
 // 2026-09-14.
 import { yieldFromPrice } from './bond-math.js';

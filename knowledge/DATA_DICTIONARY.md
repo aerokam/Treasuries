@@ -779,7 +779,7 @@ coverExcessCost_c = Future 30Y total cost × coverWeight_c
 
 <a id="naive-maturity-sa-factor"></a>
 ### Naive Maturity SA Factor
-`Naive_Maturity_SA_Factor` = Naive Maturity Seasonal Adjustment Factor. *The [SA Factor](#sa-factor) of the same calendar month and day as the maturity date, taken from the most recent completed cycle with no correction for the horizon. Naive because it depends on the month and day of the maturity date alone. The [Maturity SA Factor](#maturity-sa-factor) is this value corrected for the uncertainty of a projection at longer maturities, and equals it where the correction leaves it unchanged, as when the maturity date is inside the published [Ref CPI](#ref-cpi) series and both are that date’s exact value.*
+`Naive_Maturity_SA_Factor` = Naive Maturity Seasonal Adjustment Factor. *The [SA Factor](#sa-factor) of the same calendar month and day as the maturity date, taken from the most recent completed cycle with no correction for the horizon. `shared/src/ref-cpi.js#naiveMaturitySaFactor`. Naive because it depends on the month and day of the maturity date alone. The [Maturity SA Factor](#maturity-sa-factor) is this value corrected for the uncertainty of a projection at longer maturities, and equals it where the correction leaves it unchanged, as when the maturity date is inside the published [Ref CPI](#ref-cpi) series and both are that date’s exact value.*
 
 <a id="seasonal-amplitude"></a>
 ### Seasonal Amplitude

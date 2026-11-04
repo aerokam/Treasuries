@@ -4,7 +4,7 @@
 // terms between two fitted spot curves (#across-terms).
 //
 // One implementation, imported by the YieldCurves page (YieldCurves/src/app.js) and by the
-// acquisition job that publishes S13 and S14 (YieldCurves/scripts/updateSpotYieldCurves.js), per
+// acquisition job that publishes S13 and S14 (YieldCurves/scripts/updateYieldCurveDataSets.js), per
 // the no-redundancy directive (projects/CLAUDE.md §2a).
 import { unionGridTerms, zToSA } from './spot-curve.js';
 

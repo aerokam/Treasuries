@@ -223,16 +223,34 @@ export function credibilityFactor(month, h) {
   return A2 / (A2 + s * s);
 }
 
+// The Naive Maturity SA Factor (DATA_DICTIONARY.md#naive-maturity-sa-factor): the SA Factor of
+// the maturity date's calendar month and day from the most recent completed cycle, or that
+// date's exact value where the published series holds the maturity date. No correction for the
+// horizon. The one place the naive value is calculated; maturitySaFactors and, through it,
+// maturitySaFactor take it from here. Returns null when the month/day never appears in the series.
+export function naiveMaturitySaFactor(rows, maturityDate) {
+  return saFactorForDate(rows, maturityDate);
+}
+
+// The Naive Maturity SA Factor and the Maturity SA Factor (DATA_DICTIONARY.md#maturity-sa-factor)
+// of a maturity date, as { naive, maturity }, with the horizon measured from `asOfDate` (the
+// settlement date in the apps). A maturity date inside the published series has the same exact
+// value for both, unscaled. Otherwise the Maturity SA Factor is the naive value scaled toward 1.0
+// by the Credibility Factor. Returns null when the month/day never appears in the series.
+export function maturitySaFactors(rows, maturityDate, asOfDate) {
+  const naive = naiveMaturitySaFactor(rows, maturityDate);
+  if (naive == null) return null;
+  if (rows.some(r => r['Ref CPI Date'] === maturityDate)) return { naive, maturity: naive };
+  const month = parseInt(maturityDate.slice(5, 7), 10);
+  const h = (Date.parse(maturityDate) - Date.parse(asOfDate)) / (365.2425 * 86400000);
+  return { naive, maturity: 1 + (naive - 1) * credibilityFactor(month, h) };
+}
+
 // SA factor for a maturity date, scaled toward 1.0 with the horizon from
 // `asOfDate` (the settlement date in the apps). A maturity date inside the
 // published series returns that exact day's value, unscaled. Returns null when
 // the month/day never appears in the series.
 export function maturitySaFactor(rows, maturityDate, asOfDate) {
-  const exact = rows.find(r => r['Ref CPI Date'] === maturityDate);
-  if (exact) return parseFloat(exact['SA Factor']);
-  const base = saFactorForDate(rows, maturityDate);
-  if (base == null) return null;
-  const month = parseInt(maturityDate.slice(5, 7), 10);
-  const h = (Date.parse(maturityDate) - Date.parse(asOfDate)) / (365.2425 * 86400000);
-  return 1 + (base - 1) * credibilityFactor(month, h);
+  const factors = maturitySaFactors(rows, maturityDate, asOfDate);
+  return factors ? factors.maturity : null;
 }

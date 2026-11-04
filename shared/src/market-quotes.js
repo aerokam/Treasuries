@@ -7,18 +7,21 @@
 // them rather than keeping its own copy. What stays with the caller is the part that genuinely
 // differs between pipelines -- which CUSIPs to gate on, which settlement date the quote is
 // stated at, and what to do with a row that is dropped.
-import { parseCsv } from './csv.js';
+import { parseCsvWithPreamble } from './csv.js';
 import { yieldFromPrice } from './bond-math.js';
 import { localDate } from './settlement.js';
 import { classifyByCusipRoot } from './treasury-cusip.js';
 
 // The file's first line is the Download Date alone, 'YYYY-MM-DD HH:MM' on a 24-hour clock; the
-// header is the second line and each line after it is one quote.
+// header follows it and each line after the header is one quote. The header is the first line
+// whose first cell is `type`, and the columns are found by header name; the lines before it are
+// the stamp. A file with no such header line has no quotes.
 function splitStore(text) {
+  const parsed = parseCsvWithPreamble(text, 'type');
+  if (parsed) return { stamp: parsed.preamble.length ? parsed.preamble[0].join(',') : null, rows: parsed.rows };
   const lines = (text || '').replace(/^\uFEFF/, '').split(/\r?\n/);
   const first = lines.findIndex(l => l.trim());
-  if (first < 0) return { stamp: null, body: '' };
-  return { stamp: lines[first].trim(), body: lines.slice(first + 1).join('\n') };
+  return { stamp: first < 0 ? null : lines[first].trim(), rows: [] };
 }
 
 // The Download Date line -> 'YYYY-MM-DD HH:MM', or null when the first line is not a stamp.
@@ -34,7 +37,7 @@ export function downloadDateIso(stamp) {
 }
 
 function quoteRows(text) {
-  return parseCsv(splitStore(text).body);
+  return splitStore(text).rows;
 }
 
 // Parses the TIPS Quotes (type === 'TIPS') of Market quotes (S7). One row per CUSIP (first
