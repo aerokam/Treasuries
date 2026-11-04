@@ -1,16 +1,16 @@
 # Seasonal Factor Drift — Why S_maturity Loses Meaning at Long Horizons
 
-**Evidence for:** [3.2 Adjust for seasonality](../../knowledge/1.3.2_Adjust_For_Seasonality.md)
+**Evidence for:** [1.3.2 Adjust for seasonality](../../knowledge/1.3.2_Adjust_For_Seasonality.md)
 
-**Status:** Research supporting the **S_maturity** input to the seasonal adjustment ([3.2 Adjust for seasonality](../../knowledge/1.3.2_Adjust_For_Seasonality.md)). Same relation to 1.0 that [SAO Residual Analysis](SAO_Residual_Analysis.md) has to [3.3](../../knowledge/1.3.3_Adjust_For_Other_Effects.md).
-**Dependencies:** [3.2 Adjust for seasonality](../../knowledge/1.3.2_Adjust_For_Seasonality.md), [Canty](Canty.md), [DATA_DICTIONARY.md#sa-factor](../../knowledge/DATA_DICTIONARY.md#sa-factor), [DATA_DICTIONARY.md#sa-price-factor](../../knowledge/DATA_DICTIONARY.md#sa-price-factor), [DATA_DICTIONARY.md#cpi-sa](../../knowledge/DATA_DICTIONARY.md#cpi-sa).
+**Status:** Research supporting the **S_maturity** input to the seasonal adjustment ([1.3.2 Adjust for seasonality](../../knowledge/1.3.2_Adjust_For_Seasonality.md)). Same relation to 1.0 that [SAO Residual Analysis](SAO_Residual_Analysis.md) has to [1.3.3](../../knowledge/1.3.3_Adjust_For_Other_Effects.md).
+**Dependencies:** [1.3.2 Adjust for seasonality](../../knowledge/1.3.2_Adjust_For_Seasonality.md), [Canty](Canty.md), [DATA_DICTIONARY.md#sa-factor](../../knowledge/DATA_DICTIONARY.md#sa-factor), [DATA_DICTIONARY.md#sa-price-factor](../../knowledge/DATA_DICTIONARY.md#sa-price-factor), [DATA_DICTIONARY.md#cpi-sa](../../knowledge/DATA_DICTIONARY.md#cpi-sa).
 **Data snapshot:** FRED `CPIAUCNS` (NSA, 1913–) and `CPIAUCSL` (SA, 1947–), monthly, overlap 1947-01 … 2026-07 (954 months). Live [S1](../../knowledge/DATA_DICTIONARY.md#s1) and [S4](../../knowledge/DATA_DICTIONARY.md#s4), settlement 2026-09-08, 53 TIPS.
 
 ---
 
 ## 1. The question
 
-The seasonal adjustment multiplies a TIPS price by `S_settle / S_maturity`, where `S_t = RefCPI_NSA(t) / RefCPI_SA(t)` is the seasonal factor for the calendar month and day of `t` ([3.2 §The Transformation](../../knowledge/1.3.2_Adjust_For_Seasonality.md#the-transformation)). `S_settle` is a known recent daily value. `S_maturity` is not: the maturity date of a long TIPS lies beyond the published Ref CPI series, so `shared/src/ref-cpi.js#saFactorForDate` substitutes the most recent past occurrence of that month and day.
+The seasonal adjustment multiplies a TIPS price by `S_settle / S_maturity`, where `S_t = RefCPI_NSA(t) / RefCPI_SA(t)` is the seasonal factor for the calendar month and day of `t` ([1.3.2 §The Transformation](../../knowledge/1.3.2_Adjust_For_Seasonality.md#the-transformation)). `S_settle` is a known recent daily value. `S_maturity` is not: the maturity date of a long TIPS lies beyond the published Ref CPI series, so `shared/src/ref-cpi.js#saFactorForDate` substitutes the most recent past occurrence of that month and day.
 
 That substitution is Canty's simplifying assumption that the 12 monthly seasonal factors repeat unchanged every year ([Canty](Canty.md) §2, Appendix B; [DATA_DICTIONARY.md#sa-price-factor](../../knowledge/DATA_DICTIONARY.md#sa-price-factor)). This document measures how well the assumption holds as the maturity date moves further from the estimation window, and what the reported seasonal adjustment on long-dated TIPS actually rests on.
 
@@ -94,7 +94,7 @@ Treat the current seasonal factor as a signal of [Seasonal Amplitude](../../know
 
 with `w(0) = 1` and `w → 0` as the drift band overtakes the amplitude. `A` and `sigma_drift(h)` are both measured above, so the weight has no free parameter.
 
-The app applies `w(h)` at every horizon with no floor, using the per-calendar-month `sigma_drift` (§4.1), and never scales `S_settle` ([3.2 §The calculation](../../knowledge/1.3.2_Adjust_For_Seasonality.md#horizon-dependent-maturity-factor)). `sigma_drift(h)` is a smooth, continuous function of horizon with no discontinuity at any candidate cutoff, so a floor would discard measured 1-to-5-year drift without a measurement to support the boundary. It is unnecessary in practice: `w` is about 0.91 at 1 year and 0.85 at 3, so the front-end adjustment is nearly unchanged, and the SAO fit ([3.3](../../knowledge/1.3.3_Adjust_For_Other_Effects.md)) snaps the front end to a smooth curve at full weight, absorbing the small residual. The weighting has its effect beyond about 6 years, where SAO no longer smooths and where the maturity month is eventually always February.
+The app applies `w(h)` at every horizon with no floor, using the per-calendar-month `sigma_drift` (§4.1), and never scales `S_settle` ([1.3.2 §The calculation](../../knowledge/1.3.2_Adjust_For_Seasonality.md#horizon-dependent-maturity-factor)). `sigma_drift(h)` is a smooth, continuous function of horizon with no discontinuity at any candidate cutoff, so a floor would discard measured 1-to-5-year drift without a measurement to support the boundary. It is unnecessary in practice: `w` is about 0.91 at 1 year and 0.85 at 3, so the front-end adjustment is nearly unchanged, and the SAO fit ([1.3.3](../../knowledge/1.3.3_Adjust_For_Other_Effects.md)) snaps the front end to a smooth curve at full weight, absorbing the small residual. The weighting has its effect beyond about 6 years, where SAO no longer smooths and where the maturity month is eventually always February.
 
 Pooled over the five maturity dates, `A = 0.263%`:
 
