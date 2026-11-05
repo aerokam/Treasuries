@@ -3,12 +3,13 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { calculateTipsOid, TREASURY_ROUNDING, NO_ROUNDING } from '../src/tips-oid.js';
+import { calculateTipsOid, tipsOutstandingInRange, rangeDatesOf, totalOid, TREASURY_ROUNDING, NO_ROUNDING } from '../src/tips-oid.js';
 
 // The 0.125% TIPS due 2025-10-15 of the AMD example in TIPS_OID_Tax_Reference.md: dated date
 // 2020-10-15, dated date Ref CPI 259.46997, Ref CPI 312.85893 on 2024-06-14. Quantity 20 is
 // $20,000 par. The Ref CPI of the other dates is chosen for each case, not published.
-const tips = { cusip: '91282CAQ4', maturity: '2025-10-15', datedDate: '2020-10-15', datedDateRefCpi: 259.46997 };
+// The Original Issue Date is set to the dated date so the cases that start there keep the Start Date as entered.
+const tips = { cusip: '91282CAQ4', maturity: '2025-10-15', datedDate: '2020-10-15', originalIssueDate: '2020-10-15', datedDateRefCpi: 259.46997 };
 const rows = [
   { date: '2020-10-15', refCpi: 259.46997 },
   { date: '2024-06-14', refCpi: 312.85893 },
@@ -79,7 +80,7 @@ test('each invalid input has its own reason', () => {
   assert.equal(calculateTipsOid({ ...ok, quantity: 1.5 }).reason, 'quantity');
   assert.equal(calculateTipsOid({ ...ok, endDate: '' }).reason, 'dates-missing');
   assert.equal(calculateTipsOid({ ...ok, startDate: '2025-02-01' }).reason, 'start-after-end');
-  assert.equal(calculateTipsOid({ ...ok, startDate: '2020-10-14', endDate: '2024-06-14' }).reason, 'start-before-dated-date');
+  assert.equal(calculateTipsOid({ ...ok, startDate: '2020-10-01', endDate: '2020-10-14' }).reason, 'end-before-original-issue');
   assert.equal(calculateTipsOid({ ...ok, startDate: '2025-10-16', endDate: '2025-10-16' }).reason, 'start-after-maturity');
   assert.equal(calculateTipsOid({ ...ok, endDate: '2026-01-01' }).reason, 'end-after-maturity');
   assert.equal(calculateTipsOid({ ...ok, endDate: '2024-12-31' }).reason, 'no-ref-cpi-end');
@@ -140,4 +141,50 @@ test('a date between the last Ref CPI date and the latest known Ref CPI date is 
   assert.equal(r.endDateLimited, true);
   assert.equal(r.endDateUsed, '2025-01-31');
   assert.equal(r.lastKnownRefCpiDate, '2025-03-01');
+});
+
+// A TIPS issued after its dated date: the Start Date before the Original Issue Date is replaced by it.
+const issuedLater = { ...tips, originalIssueDate: '2024-06-14' };
+
+test('a Start Date before the Original Issue Date is replaced by it, and the Index Ratio is taken there', () => {
+  const r = calculateTipsOid({ ...base, tips: issuedLater, startDate: '2020-10-15', endDate: '2025-01-01' });
+  assert.equal(r.ok, true);
+  assert.equal(r.startDate, '2020-10-15');
+  assert.equal(r.startDateUsed, '2024-06-14');
+  assert.equal(r.startDateReplaced, true);
+  assert.equal(r.startRefCpi, 312.85893);
+  assert.equal(r.oid, Math.round(20000 * (317.603 - 312.85893) / 259.46997 * 100) / 100);
+});
+
+test('a Start Date on or after the Original Issue Date is used as entered', () => {
+  const r = calculateTipsOid({ ...base, tips: issuedLater, startDate: '2024-06-14', endDate: '2025-01-01' });
+  assert.equal(r.startDateReplaced, false);
+  assert.equal(r.startDateUsed, '2024-06-14');
+});
+
+const others = [
+  { cusip: 'A', maturity: '2030-01-15', originalIssueDate: '2020-01-31' },
+  { cusip: 'B', maturity: '2024-07-15', originalIssueDate: '2014-07-31' },
+  { cusip: 'C', maturity: '2034-01-15', originalIssueDate: '2024-01-31' },
+  { cusip: 'D', maturity: '2024-01-01', originalIssueDate: '2014-01-31' },
+  { cusip: 'E', maturity: '2036-01-15', originalIssueDate: '2025-01-01' },
+];
+
+test('the TIPS outstanding in a range are issued before its End Date and mature after its Start Date, by maturity', () => {
+  assert.deepEqual(tipsOutstandingInRange(others, '2024-01-01', '2025-01-01').map(t => t.cusip), ['B', 'A', 'C']);
+});
+
+test('a TIPS that matures on the Start Date, or is issued on the End Date, is not outstanding in the range', () => {
+  const ids = tipsOutstandingInRange(others, '2024-01-01', '2025-01-01').map(t => t.cusip);
+  assert.equal(ids.includes('D'), false);
+  assert.equal(ids.includes('E'), false);
+});
+
+test('a row takes the range, the Original Issue Date when the range starts before it, and a locked Maturity Date when the range ends after it', () => {
+  assert.deepEqual(rangeDatesOf(others[0], '2024-01-01', '2025-01-01'), { startDate: '2024-01-01', endDate: '2025-01-01', endLocked: false });
+  assert.deepEqual(rangeDatesOf(others[2], '2023-01-01', '2040-01-01'), { startDate: '2024-01-31', endDate: '2034-01-15', endLocked: true });
+});
+
+test('the total OID sums the rows that have one and counts the rows that have none', () => {
+  assert.deepEqual(totalOid([{ ok: true, oid: 10.1 }, { ok: true, oid: -3.05 }, { ok: false, reason: 'quantity' }, { ok: true, oid: 0 }]), { total: 7.05, without: 1 });
 });

@@ -37,7 +37,7 @@
 
 **N** &nbsp; [Naive Maturity SA Factor](#naive-maturity-sa-factor) &middot; [Net Cash](#net-cash)
 
-**O** &nbsp; [OID](#oid) &middot; [Outstanding TIPS](#outstanding-tips)
+**O** &nbsp; [OID](#oid) &middot; [Original Issue Date](#original-issue-date) &middot; [Outstanding TIPS](#outstanding-tips)
 
 **P** &nbsp; [P+I](#pi) &middot; [P+I per TIPS](#pi-per-tips) &middot; [Par](#par) &middot; [par value](#par) *(see Par)* &middot; [par value nominal](#par) *(see Par)* &middot; [Par Yield](#par-yield) &middot; [Pass 1](#pass-1) &middot; [Pass 2](#pass-2) &middot; [Per-Year DARA](#per-year-dara) &middot; [PIMCO (E9)](#e9) &middot; [Plain CUSIP/Quantity Format](#plain-format) &middot; [pre ladder interest](#pre-ladder-credit) *(see Pre-Ladder Interest (PLI))* &middot; [Pre-Ladder Interest (PLI)](#pre-ladder-credit) &middot; [Price](#price)
 
@@ -134,7 +134,7 @@
   | `price` | [Price](#price) |
   | `yield` | [Yield](#yield) at the settlement date, as a decimal: real for a TIPS, nominal for every other security |
 
-- <a id="s2"></a>**TIPS reference data (S2)**, `TipsRef.csv` = `{ @cusip + maturity + datedDate + coupon + datedDateRefCpi + term }`
+- <a id="s2"></a>**TIPS reference data (S2)**, `TipsRef.csv` = `{ @cusip + maturity + datedDate + coupon + datedDateRefCpi + term + originalIssueDate }`
   *R2 key `TIPS/TipsRef.csv` ([View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/TIPS/TipsRef.csv)). Header row first, then one row per TIPS [FiscalData (E3)](#e3) has auctioned.*
 
   | Column | Defined term |
@@ -145,6 +145,7 @@
   | `coupon` | [Coupon Rate](#coupon-rate), as a decimal |
   | `datedDateRefCpi` | dated date [Ref CPI](#ref-cpi) |
   | `term` | [Term](#term) measured from the Dated Date, as FiscalData states it: `5-Year`, `10-Year`, `30-Year`, or with a part year, `5-Year 6-Month` |
+  | `originalIssueDate` | [Original Issue Date](#original-issue-date), `YYYY-MM-DD` |
 
 - <a id="s3"></a>**Ref CPI (S3)**, `RefCPI.csv` = `{ @date + refCpi }`
   *R2 key `TIPS/RefCPI.csv` ([View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/TIPS/RefCPI.csv)). The retrieved, authoritative [Ref CPI](#ref-cpi): header row first, then one row per calendar day from 1997-01-15, the dated date of the first TIPS issued, ascending by date. Ref CPI is the same for every TIPS on a given date, so the series is one continuous series.*
@@ -388,6 +389,10 @@
 `Dated_Date` = *For a TIPS, the 15th of the month of issue, and the date inflation indexation is stated relative to: the [Index Ratio](#index-ratio) is 1.00000 on the dated date, because the [Ref CPI](#ref-cpi) of that date is the ratio’s denominator. The issue date is the last business day of the month, so for a TIPS the dated date and the issue date never coincide.*
 
 For nominal Treasuries, 31 CFR §356.2 applies: *"Dated date means the date from which interest accrues for notes and bonds. The dated date and issue date are usually the same."* That sense governs auction accrued interest. For TIPS the reg’s exception is the rule, the dated date always falling before the issue date.
+
+<a id="original-issue-date"></a>
+### Original Issue Date
+`Original_Issue_Date` = *For a TIPS, the issue date of its first auction, the date [31 CFR 356](./31_CFR_356_Definitions_And_Formulas.md) names in its definition of the [Index Ratio](#index-ratio). It is the earliest date a holder can hold the TIPS, and the [Acquisition Date](#acquisition-date) of a holder who bought it at that auction or on a when-issued basis. Each reopening of the TIPS has its own issue date, which this term does not state.*
 
 <a id="coupon-rate"></a>
 ### Coupon Rate

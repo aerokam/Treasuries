@@ -15,7 +15,7 @@ const PAR_PER_QUANTITY = 1000;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 // Calculates the OID of one TIPS.
-//   tips          { cusip, maturity, datedDate, datedDateRefCpi }, one row of TIPS reference data (S2);
+//   tips          { cusip, maturity, datedDate, originalIssueDate, datedDateRefCpi }, one row of TIPS reference data (S2);
 //                 dates are 'YYYY-MM-DD'
 //   quantity      number of $1,000 par units, a positive integer
 //   startDate, endDate   'YYYY-MM-DD'
@@ -28,11 +28,14 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 //   'quantity'                   quantity is not a positive integer
 //   'dates-missing'              a date is not 'YYYY-MM-DD'
 //   'start-after-end'
-//   'start-before-dated-date'
 //   'start-after-maturity'
+//   'end-before-original-issue'
 //   'end-after-maturity'
 //   'no-ref-cpi-start'     the series has no Ref CPI for the Start Date
 //   'no-ref-cpi-end'       the series has no Ref CPI for the End Date, which is inside its range
+//
+// A Start Date before the Original Issue Date of the tips is replaced by it: startDateUsed is the date the
+// Index Ratio is taken at and startDateReplaced is true.
 //
 // A date after the last date of the series that is the first of a month has the Ref CPI of 31 CFR 356
 // App. B for that day: the CPI-U NSA of the month three months earlier, read from monthlyCpi with no
@@ -76,14 +79,16 @@ export function calculateTipsOid({ tips, quantity, startDate, endDate, refCpiRow
     return { ok: false, reason: 'dates-missing' };
   }
   if (startDate > endDate) return { ok: false, reason: 'start-after-end' };
-  if (startDate < tips.datedDate) return { ok: false, reason: 'start-before-dated-date' };
   if (startDate > tips.maturity) return { ok: false, reason: 'start-after-maturity' };
+  if (endDate < tips.originalIssueDate) return { ok: false, reason: 'end-before-original-issue' };
   if (endDate > tips.maturity) return { ok: false, reason: 'end-after-maturity' };
 
   const lastDate = refCpiRows && refCpiRows.length ? refCpiRows[refCpiRows.length - 1].date : null;
   const known = firstOfMonthAfterLatestCpi(monthlyCpi);
   const lastKnown = known != null && (lastDate == null || known > lastDate) ? known : lastDate;
-  const start = refCpiOf(startDate, refCpiRows, lastDate, monthlyCpi);
+  const startDateReplaced = startDate < tips.originalIssueDate;
+  const startDateUsed = startDateReplaced ? tips.originalIssueDate : startDate;
+  const start = refCpiOf(startDateUsed, refCpiRows, lastDate, monthlyCpi);
   if (start == null) return { ok: false, reason: 'no-ref-cpi-start', lastKnownRefCpiDate: lastKnown };
   let end = refCpiOf(endDate, refCpiRows, lastDate, monthlyCpi);
   let endDateLimited = false;
@@ -109,10 +114,40 @@ export function calculateTipsOid({ tips, quantity, startDate, endDate, refCpiRow
     ok: true,
     par,
     datedDateRefCpi: tips.datedDateRefCpi,
-    startDate, startRefCpi, startCpiMonth: start.cpiMonth, startIndexRatio,
+    startDate, startDateUsed, startDateReplaced, startRefCpi, startCpiMonth: start.cpiMonth, startIndexRatio,
     endDate, endDateUsed, endDateLimited, endRefCpi, endCpiMonth: end.cpiMonth, endIndexRatio,
     lastKnownRefCpiDate: lastKnown,
     rounding,
     oid,
   };
+}
+
+// The TIPS outstanding in a range (8.2 OID of every TIPS in a range): the rows of TIPS reference data (S2)
+// whose Original Issue Date is before the End Date of the range and whose Maturity Date is after its Start
+// Date, in order of Maturity Date.
+export function tipsOutstandingInRange(tipsRows, rangeStart, rangeEnd) {
+  return tipsRows
+    .filter(t => t.originalIssueDate < rangeEnd && t.maturity > rangeStart)
+    .sort((a, b) => a.maturity.localeCompare(b.maturity) || a.cusip.localeCompare(b.cusip));
+}
+
+// The Start Date and End Date a TIPS takes from a range until the user states others: the range as stated,
+// except that the Start Date is the Original Issue Date when the range starts before it and the End Date
+// is the Maturity Date, which the user cannot change (endLocked), when the range ends after it.
+export function rangeDatesOf(tips, rangeStart, rangeEnd) {
+  return {
+    startDate: rangeStart < tips.originalIssueDate ? tips.originalIssueDate : rangeStart,
+    endDate: rangeEnd > tips.maturity ? tips.maturity : rangeEnd,
+    endLocked: rangeEnd > tips.maturity,
+  };
+}
+
+// The total OID of rows that each have { ok, oid } (a calculateTipsOid result, or { ok: true, oid: 0 } for
+// a Quantity of 0): the sum of the OID of the rows that have one, in cents, and the number that have none.
+export function totalOid(results) {
+  let cents = 0, without = 0;
+  for (const r of results) {
+    if (r.ok) cents += Math.round(r.oid * 100); else without += 1;
+  }
+  return { total: cents / 100, without };
 }

@@ -1,10 +1,10 @@
 // tips-ref.js — the rows of TIPS reference data (S2) and how 1.6 builds them from
 // treasury_securities_auctions_v2 (E3). Spec: knowledge/1.6_Fetch_TIPS_Reference_Data.md.
 
-export const TIPS_REF_COLUMNS = ['cusip', 'maturity', 'datedDate', 'coupon', 'datedDateRefCpi', 'term'];
+export const TIPS_REF_COLUMNS = ['cusip', 'maturity', 'datedDate', 'coupon', 'datedDateRefCpi', 'term', 'originalIssueDate'];
 
 // The v2 fields 1.6 reads, by their real names (the API answers HTTP 400 to any other name).
-export const TIPS_REF_V2_FIELDS = ['cusip', 'ref_cpi_on_orig_dated_date', 'dated_date', 'maturity_date', 'security_term', 'int_rate'];
+export const TIPS_REF_V2_FIELDS = ['cusip', 'ref_cpi_on_orig_dated_date', 'dated_date', 'maturity_date', 'security_term', 'int_rate', 'issue_date'];
 
 const stated = v => v != null && String(v).trim() !== '' && String(v).trim().toLowerCase() !== 'null';
 
@@ -20,6 +20,7 @@ export function tipsRefFromV2(apiRows) {
       coupon: parseFloat(r.int_rate) / 100, // decimal (e.g. 0.00125)
       datedDateRefCpi: parseFloat(r.ref_cpi_on_orig_dated_date),
       term: r.security_term,
+      originalIssueDate: r.issue_date, // reopening is No in the query, so the issue date of the first auction
     }));
 }
 
@@ -33,5 +34,5 @@ export function mergeTipsRef(existingRows, newRows) {
 }
 
 export function tipsRefCsv(rows) {
-  return [TIPS_REF_COLUMNS.join(','), ...rows.map(r => TIPS_REF_COLUMNS.map(c => r[c]).join(','))].join('\n') + '\n';
+  return [TIPS_REF_COLUMNS.join(','), ...rows.map(r => TIPS_REF_COLUMNS.map(c => r[c] ?? '').join(','))].join('\n') + '\n';
 }

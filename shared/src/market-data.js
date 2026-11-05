@@ -54,6 +54,7 @@ export function parseTipsRefRows(text) {
     // before the rename (DD S2, "dated date Ref CPI").
     datedDateRefCpi: parseFloat(r.datedDateRefCpi ?? r.baseCpi),
     term:      r.term,
+    originalIssueDate: r.originalIssueDate,
   }));
 }
 
