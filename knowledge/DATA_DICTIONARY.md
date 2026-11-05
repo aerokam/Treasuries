@@ -17,7 +17,7 @@
 
 **B** &nbsp; [Before-State Preview](#before-state-preview) &middot; [bei](#breakeven-inflation) *(see Breakeven Inflation (BEI))* &middot; [bid](#ask) *(see Ask / Bid)* &middot; [Bid and Ask Spreads](#bid-and-ask-spreads) &middot; [Bid and ask spreads (S15)](#s15) &middot; [BlackRock iShares (E12)](#e12) &middot; [BLS (E4)](#e4) &middot; [Bond Holiday](#bond-holiday) &middot; [Bond holidays (S16)](#s16) &middot; [Bond Ladder](#bond-ladder) &middot; [BondBloxx product-page holdings table (E11)](#e11) &middot; [bracket maturity](#bracket-year-tips) *(see Bracket Year TIPS)* &middot; [Bracket Weight](#bracket-weight) &middot; [Bracket Year](#bracket-year) &middot; [Bracket Year TIPS](#bracket-year-tips) &middot; [Breakeven Inflation (BEI)](#breakeven-inflation) &middot; [Breakeven inflation (S14)](#s14) &middot; [Broker Positions Export](#broker-positions-export) &middot; [Build Result](#build-result)
 
-**C** &nbsp; [Cash Flow Calendar](#cash-flow-calendar) &middot; [Charts and Tables](#charts-and-tables) &middot; [clean price](#price) *(see Price)* &middot; [CNBC (E5)](#e5) &middot; [Construction Parameters](#construction-parameters) &middot; [Cost per TIPS](#cost-per-tips) &middot; [Coupon Rate](#coupon-rate) &middot; [Cover Excess](#cover-excess) &middot; [cover maturity](#cover-year-tips) *(see Cover Year TIPS)* &middot; [Cover Weight](#cover-weight) &middot; [Cover Year](#cover-year) &middot; [Cover Year TIPS](#cover-year-tips) &middot; [CPI CAGR](#cpi-cagr) &middot; [CPI Change (Month-over-Month)](#cpi-change-mom) &middot; [CPI Change (Point-to-Point)](#cpi-change-p2p) &middot; [CPI Change (Year-over-Year)](#cpi-change-yoy) &middot; [CPI history (S8)](#s8) &middot; [CPI Series](#cpi-series) &middot; [CPI-U NSA](#cpi-nsa) &middot; [CPI-U SA](#cpi-sa) &middot; [Credibility Factor](#credibility-factor) &middot; [CUSIP](#cusip)
+**C** &nbsp; [Cash Flow Calendar](#cash-flow-calendar) &middot; [Charts and Tables](#charts-and-tables) &middot; [clean price](#price) *(see Price)* &middot; [CNBC (E5)](#e5) &middot; [Construction Parameters](#construction-parameters) &middot; [Cost per TIPS](#cost-per-tips) &middot; [Coupon Rate](#coupon-rate) &middot; [Cover Excess](#cover-excess) &middot; [cover maturity](#cover-year-tips) *(see Cover Year TIPS)* &middot; [Cover Weight](#cover-weight) &middot; [Cover Year](#cover-year) &middot; [Cover Year TIPS](#cover-year-tips) &middot; [CPI CAGR](#cpi-cagr) &middot; [CPI Change (Month-over-Month)](#cpi-change-mom) &middot; [CPI Change (Point-to-Point)](#cpi-change-p2p) &middot; [CPI Change (Year-over-Year)](#cpi-change-yoy) &middot; [CPI history (S8)](#s8) &middot; [CPI Release Schedule](#cpi-release-schedule) &middot; [CPI release schedule (S19)](#s19) &middot; [CPI Series](#cpi-series) &middot; [CPI-U NSA](#cpi-nsa) &middot; [CPI-U SA](#cpi-sa) &middot; [Credibility Factor](#credibility-factor) &middot; [CUSIP](#cusip)
 
 **D** &nbsp; [DAA](#daa) &middot; [Daily Ref CPI](#daily-ref-cpi) &middot; [DARA](#dara) &middot; [DARA Plan](#dara-plan) &middot; [DARA Plan File](#dara-plan-file) &middot; [Dated Date](#dated-date) &middot; [Day Change](#day-change) &middot; [Deck Content](#deck-content) &middot; [Deck Pages](#deck-pages) &middot; [Disposition Date](#disposition-date) &middot; [Download Date](#download-date) &middot; [Downloaded Data Sets](#downloaded-data-sets) &middot; [Drill Popup](#drill-popup) &middot; [Drill Request](#drill-request) &middot; [Duration](#duration) &middot; [Duration Matching](#duration-matching)
 
@@ -87,8 +87,8 @@
   *Authority for daily interpolated RefCPI. Provides values for every day of the month.*
 - <a id="e3"></a>**FiscalData (E3)** = `CUSIP + Auction_Date + Security_Type + High_Yield + Bid_to_Cover + ...`
   *U.S. Treasury official auction results and immutable security metadata (Coupons, Dated Dates).*
-- <a id="e4"></a>**BLS (E4)** = `Year + Month + Value + Seasonal_Adjustment_Flag`
-  *Consumer Price Index (CPI-U) monthly data. Used to derive SA factors by comparing NSA vs. SA values.*
+- <a id="e4"></a>**BLS (E4)** = `Year + Month + Value + Seasonal_Adjustment_Flag + { Reference_Month + Release_Date + Release_Time }`
+  *Consumer Price Index (CPI-U) monthly data, and the schedule on which BLS releases it. Used to derive SA factors by comparing NSA vs. SA values. The schedule is the release table of `www.bls.gov/schedule/news_release/cpi.htm`: one row per release, under the page's column names Reference Month, Release Date and Release Time. Measured 2026-11-05, the table lists the releases of the October 2026 reference month (2026-11-10) through the November 2027 reference month (2027-12-10) and lists no release dated before 2026-11-05. Source of [CPI release schedule (S19)](#s19).*
 - <a id="e5"></a>**CNBC (E5)** — one source, two independent services, each its own flow rather than a mechanism of the other:
   - **Chart-bar feed** = `Symbol + TimeRange + { TradeTime + Close }`
     *The feed behind CNBC's own Treasury/TIPS charts (`webql-redesign.cnbcfm.com/graphql`, operation `getQuoteChartData`), sourced from Tradeweb. One bar per `TradeTime` at the resolution `TimeRange` selects (`1D` down to one minute, `5D` to five, coarser tiers to a day or a quarter), `Close` the yield at that bar. Symbols include `US10Y`, `US30YTIPS`, and every other maturity [Yields Monitor](../YieldsMonitor/knowledge/2.1_Assemble_Range_Data.md) tracks. Compared against broker quotes on the same securities, the values sit closer to the bid than to the ask wherever the two differ — an observation from that comparison, not a documented property of the feed (see [Close Price Investigation §4](../YieldsMonitor/knowledge/Close_Price_Investigation.md#4-provenance)), so this is not a mid-price feed as an earlier version of this entry stated. Source of [Market Yields](#market-yields).*
@@ -274,6 +274,14 @@
   *R2 key `bls/CPI.csv` ([View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/bls/CPI.csv)). The same series and columns as [CPI history (S8)](#s8), January 2019 onward, newest row first.*
 - <a id="s18"></a>**Intraday archive (S18)**, `{YYYYMMDD}.json` = `@Symbol + @Date + { Feed: { TimeRange + { TradeTime + Close } } } + FetchedAtET`
   *R2 key `Treasuries/yields-history/intraday-raw/{symbol}/{YYYYMMDD}.json`. One immutable daily snapshot per symbol of the raw feeds [CNBC (E5)](#e5) served that day, and `FetchedAtET`, the wall-clock time the snapshot was taken.*
+- <a id="s19"></a>**CPI release schedule (S19)**, `CpiReleaseSchedule.csv` = `{ @Release Date + Reference Month + Release Time }`
+  *R2 key `bls/CpiReleaseSchedule.csv` ([View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/bls/CpiReleaseSchedule.csv)). Header row first, then one row per release of the [Monthly CPI-U](#monthly-cpi-u) that [BLS (E4)](#e4) lists, ascending by `Release Date`. The store holds the latest schedule only: each write replaces the previous contents.*
+
+  | Column | Defined term |
+  |---|---|
+  | `Reference Month` | the month the released [Monthly CPI-U](#monthly-cpi-u) is for, as [BLS (E4)](#e4) states it: `October 2026` |
+  | `Release Date` | the date of the release, `YYYY-MM-DD` |
+  | `Release Time` | the time of the release, as [BLS (E4)](#e4) states it: `08:30 AM` |
 
 - <a id="r2-read-access"></a>**R2 Read Access** = `{ @Allowed_Origin }`
   *Every app reads the bucket by a browser `fetch()` from `pub-ba11062b177640459f72e0a88d0261ae.r2.dev`. A browser rejects a cross-origin read from a bucket that has no CORS policy, and a bucket has none until one is configured. The policy of this bucket is set in the Cloudflare dashboard (R2, the bucket, Settings, CORS Policy), and no file in this repository manages it. It allows three origins, each matched literally:*
@@ -868,6 +876,7 @@ Some values are true only until Treasury issues more TIPS. Left inline as approx
 - <a id="upcoming-auctions"></a>**Upcoming Auctions** = *the upcoming auction records of* [FiscalData (E3)](#e3)
 - <a id="tips-reference-data"></a>**TIPS Reference Data** = *the TIPS security records of* [FiscalData (E3)](#e3)
 - <a id="monthly-cpi-u"></a>**Monthly CPI-U** = [BLS (E4)](#e4)
+- <a id="cpi-release-schedule"></a>**CPI Release Schedule** = [BLS (E4)](#e4) release table
 - <a id="market-yields"></a>**Market Yields** = [CNBC (E5)](#e5) chart-bar feed
 - <a id="market-quotes"></a>**Market Quotes** = [Market quotes source (E6)](#e6)
 - <a id="live-quotes"></a>**Live Quotes** = [CNBC (E5)](#e5) quote service
@@ -877,9 +886,9 @@ Some values are true only until Treasury issues more TIPS. Left inline as approx
 
 ### 6.2 Level 0 and Level 1
 
-- <a id="source-data"></a>**Source Data** = `FedInvest_Daily_Price_List + Daily_Ref_CPI + Auction_Results + TIPS_Reference_Data + Monthly_CPI_U + Market_Yields + Market_Quotes + Fund_Holdings + GSW_Curve_Parameters + Tentative_Auction_Schedule`
+- <a id="source-data"></a>**Source Data** = `FedInvest_Daily_Price_List + Daily_Ref_CPI + Auction_Results + TIPS_Reference_Data + Monthly_CPI_U + Market_Yields + Market_Quotes + Fund_Holdings + GSW_Curve_Parameters + Tentative_Auction_Schedule + CPI_Release_Schedule`
   *Every flow from an external entity that process 1 reads, drawn as one flow into it at Level 1. [Live Quotes](#live-quotes) and [Upcoming Auctions](#upcoming-auctions) are not part of it: no acquisition job reads [CNBC (E5)](#e5)'s quote service or the upcoming auctions of [FiscalData (E3)](#e3). [Yields Monitor](../YieldsMonitor/knowledge/2.2_Read_Live_Quotes.md) reads the first directly and [Treasury Auctions](/knowledge/DFD_LEVEL2_TREASURYAUCTIONS) the second, and Level 1 draws each as a flow into that app rather than into process 1.*
-- <a id="reference-data"></a>**Reference Data** = `{ FedInvest prices (S1) | TIPS reference data (S2) | Ref CPI (S3) | Ref CPI NSA and SA (S4) | Auction results (S5) | Yield history (S6) | Market quotes (S7) | CPI history (S8) | Tentative auction schedule (S9) | Fund holdings (S11) | GSW curve parameters (S12) | Yield curves (S13) | Breakeven inflation (S14) | Bid and ask spreads (S15) | Bond holidays (S16) | Monthly CPI (S17) }`
+- <a id="reference-data"></a>**Reference Data** = `{ FedInvest prices (S1) | TIPS reference data (S2) | Ref CPI (S3) | Ref CPI NSA and SA (S4) | Auction results (S5) | Yield history (S6) | Market quotes (S7) | CPI history (S8) | Tentative auction schedule (S9) | Fund holdings (S11) | GSW curve parameters (S12) | Yield curves (S13) | Breakeven inflation (S14) | Bid and ask spreads (S15) | Bond holidays (S16) | Monthly CPI (S17) | Intraday archive (S18) | CPI release schedule (S19) }`
   *The contents of the R2 data stores.*
 - <a id="app-inputs"></a>**App Inputs** = *What a user enters or selects in an app. [View Selections](#view-selections) are the Yield Curves case.*
 - <a id="app-outputs"></a>**App Outputs** = *What an app shows a user. [Charts and Tables](#charts-and-tables) are the Yield Curves case.*

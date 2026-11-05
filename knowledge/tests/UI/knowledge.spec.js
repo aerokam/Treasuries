@@ -52,7 +52,7 @@ test.describe('Knowledge Map and Viewer', () => {
   test('every ingestion job has a Level 3 page that opens its spec and is the page its spec points up to', async ({ page, request }) => {
     await page.goto('/knowledge/DFD_LEVEL2_INGESTION.html');
     const hrefs = await page.locator('a.process').evaluateAll(els => els.map(a => a.getAttribute('href')));
-    expect(hrefs).toHaveLength(14);
+    expect(hrefs).toHaveLength(15);
 
     for (const href of hrefs) {
       expect(href, 'a job bubble opens its Level 3 page').toMatch(/^DFD_LEVEL3_INGEST_[A-Z]+\.html$/);

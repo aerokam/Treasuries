@@ -5,7 +5,7 @@
 This file is interaction/workflow guidance only — commands, tool gotchas, git hooks. It is **not** a substitute for the specs and must never restate spec content (see the top-level `CLAUDE.md`'s Specs-First Mandate and Single Source of Truth directive). Before touching code in a project that has a `knowledge/` folder, read the governing spec(s) first:
 
 - **TipsLadderManager**: `TipsLadderManager/knowledge/`, the specs `1.0`–`3.0` and the process specs `4.1`–`4.6`, plus the repo-root `knowledge/DATA_DICTIONARY.md`.
-- **Shared/global** (R2 data stores, ingestion pipelines, domain terminology used by every app): repo-root `knowledge/DATA_DICTIONARY.md`, the ingestion process specs `knowledge/1.1`–`1.15`, `Bond_Basics.md`, `TIPS_Basics.md`.
+- **Shared/global** (R2 data stores, ingestion pipelines, domain terminology used by every app): repo-root `knowledge/DATA_DICTIONARY.md`, the ingestion process specs `knowledge/1.1`–`1.16`, `Bond_Basics.md`, `TIPS_Basics.md`.
 - **YieldCurves**: `YieldCurves/knowledge/` (SA/SAO adjustment logic, visual standards) plus the shared specs above for data pipeline facts — YieldCurves has no separate project-level data-pipeline spec of its own.
 
 If a claim below ever conflicts with a spec, the spec wins — fix this file, don't propagate the stale claim.
@@ -249,7 +249,7 @@ npx serve .               # Serve locally (run from root of Treasuries repo)
 
 ### Data Infrastructure (R2)
 
-R2 file manifest is specified in the repo-root `knowledge/DATA_DICTIONARY.md` §2.0, and each job that writes a store in its process spec `knowledge/1.1`–`1.15` (covers `Treasuries/YieldsFromFedInvestPrices.csv`, `Treasuries/MarketQuotes.csv`, `TIPS/RefCpiNsaSa.csv`, `misc/BondHolidaysSifma.csv`). Do not restate here.
+R2 file manifest is specified in the repo-root `knowledge/DATA_DICTIONARY.md` §2.0, and each job that writes a store in its process spec `knowledge/1.1`–`1.16` (covers `Treasuries/YieldsFromFedInvestPrices.csv`, `Treasuries/MarketQuotes.csv`, `TIPS/RefCpiNsaSa.csv`, `misc/BondHolidaysSifma.csv`). Do not restate here.
 
 ### Market Quotes Download Flow
 

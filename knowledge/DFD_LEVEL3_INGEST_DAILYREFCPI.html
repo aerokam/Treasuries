@@ -159,14 +159,15 @@
 <h1>Level 3 &mdash; 1.13 Fetch daily Ref CPI</h1>
 
 <div class="diagram">
-<svg viewBox="0 0 1010 304" role="img" aria-label="Level 3: 1.13 Fetch daily Ref CPI, one process with the external entity it reads and the data stores it reads and writes.">
+<svg viewBox="0 0 1010 400" role="img" aria-label="Level 3: 1.13 Fetch daily Ref CPI, one process with the external entity it reads and the data stores it reads and writes.">
   <defs><marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#55558c"/></marker></defs>
-  <path class="flow" d="M 270.0 56.0 Q 374.3 93.8 478.6 131.6" marker-end="url(#a1)"/>
+  <path class="flow" d="M 270.0 56.0 Q 376.1 113.7 482.3 171.4" marker-end="url(#a1)"/>
   <text class="flow-label" x="276" y="48"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#daily-ref-cpi"><tspan class="lk">daily Ref CPI</tspan></a></text>
-  <path class="flow" d="M 270.0 152.0 Q 372.5 152.0 475.0 152.0" marker-end="url(#a1)"/>
-  <path class="flow" d="M 270.0 248.0 Q 374.3 210.2 478.6 172.4" marker-end="url(#a1)"/>
-  <path class="flow" d="M 594.5 144.0 Q 667.2 144.0 740.0 144.0" marker-end="url(#a1)"/>
-  <path class="flow" d="M 740.0 160.0 Q 667.2 160.0 594.5 160.0" marker-end="url(#a1)"/>
+  <path class="flow" d="M 270.0 152.0 Q 373.0 170.7 476.0 189.3" marker-end="url(#a1)"/>
+  <path class="flow" d="M 270.0 248.0 Q 373.0 229.3 476.0 210.7" marker-end="url(#a1)"/>
+  <path class="flow" d="M 270.0 344.0 Q 376.1 286.3 482.3 228.6" marker-end="url(#a1)"/>
+  <path class="flow" d="M 594.5 192.0 Q 667.2 192.0 740.0 192.0" marker-end="url(#a1)"/>
+  <path class="flow" d="M 740.0 208.0 Q 667.2 208.0 594.5 208.0" marker-end="url(#a1)"/>
   <a class="entity" href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#e2">
     <rect x="75" y="30" width="190" height="52" rx="3"/>
     <text class="e-name" x="170" y="53">TreasuryDirect</text>
@@ -184,17 +185,23 @@
     <line x1="30" y1="268" x2="265" y2="268"/>
     <text class="s-name" x="147.5" y="253">CPI history (S8)</text>
   </a>
+  <a class="store" href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s19">
+    <rect x="30" y="324" width="235" height="40" fill="transparent" stroke="none"/>
+    <line x1="30" y1="324" x2="265" y2="324"/>
+    <line x1="30" y1="364" x2="265" y2="364"/>
+    <text class="s-name" x="147.5" y="349">CPI release schedule (S19)</text>
+  </a>
   <a class="store" href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s3">
-    <rect x="745" y="132" width="235" height="40" fill="transparent" stroke="none"/>
-    <line x1="745" y1="132" x2="980" y2="132"/>
-    <line x1="745" y1="172" x2="980" y2="172"/>
-    <text class="s-name" x="862.5" y="157">Ref CPI (S3)</text>
+    <rect x="745" y="180" width="235" height="40" fill="transparent" stroke="none"/>
+    <line x1="745" y1="180" x2="980" y2="180"/>
+    <line x1="745" y1="220" x2="980" y2="220"/>
+    <text class="s-name" x="862.5" y="205">Ref CPI (S3)</text>
   </a>
   <a class="process" href="viewer.html#/md/knowledge/1.13_Fetch_Daily_Ref_CPI.md">
-    <circle cx="535" cy="152" r="60"/>
-    <text class="p-id" x="535" y="132">1.13</text>
-    <text class="p-name" x="535" y="153">Fetch daily</text>
-    <text class="p-name" x="535" y="169">Ref CPI</text>
+    <circle cx="535" cy="200" r="60"/>
+    <text class="p-id" x="535" y="180">1.13</text>
+    <text class="p-name" x="535" y="201">Fetch daily</text>
+    <text class="p-name" x="535" y="217">Ref CPI</text>
   </a>
 </svg>
 </div>
@@ -203,7 +210,7 @@
   The process drills to <a href="viewer.html#/md/knowledge/1.13_Fetch_Daily_Ref_CPI.md">1.13 Fetch daily Ref CPI</a>, the process spec.
   The flow entering from the left is <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#daily-ref-cpi">daily Ref CPI</a>, drawn against its source on the <a href="DFD_LEVEL0.html">context diagram</a>.
   <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s3">Ref CPI (S3)</a> has an arrow each way: the run merges what it fetches into what the store already holds.
-  <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s3">Ref CPI (S3)</a> is not written when the fetched series ends before the last day of the second month after the latest month of <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s8">CPI history (S8)</a>, or when the merged series has a gap of more than one calendar day or is shorter than what the store already held.
+  The run is skipped when the current date, on an Eastern clock, is not a Release Date of <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s19">CPI release schedule (S19)</a>. <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s3">Ref CPI (S3)</a> is not written when the fetched series ends before the last day of the second month after the latest month of <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s8">CPI history (S8)</a>, or when the merged series has a gap of more than one calendar day or is shorter than what the store already held.
 </p>
 
 </body>

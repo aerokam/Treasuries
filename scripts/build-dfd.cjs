@@ -60,7 +60,7 @@ const TERMS = {
   'auction results': 'auction-results', 'TIPS reference data': 'tips-reference-data',
   'monthly CPI-U': 'monthly-cpi-u', 'market yields': 'market-yields', 'market quotes': 'market-quotes',
   'fund holdings': 'fund-holdings', 'GSW curve parameters': 'gsw-curve-parameters',
-  'tentative auction schedule': 'tentative-auction-schedule',
+  'tentative auction schedule': 'tentative-auction-schedule', 'CPI release schedule': 'cpi-release-schedule',
   'TIPS prices': 'tips-prices', 'Treasury prices': 'treasury-prices', 'TIPS quotes': 'tips-quotes',
   'Treasury quotes': 'treasury-quotes', 'TIPS yields': 'tips-yields', 'Treasury yields': 'treasury-yields',
   'SA factors': 'sa-factor', 'Ref CPI': 'ref-cpi', 'SA yields': 'sa-yields', 'SAO yields': 'sao-yields',
@@ -238,7 +238,7 @@ const MODULE_NAMES = {
   m22: ['date-', 'picker.js'],
   m23: ['date-range-', 'filter.js'],
 };
-// The ingestion jobs 1.2 to 1.15 are registered below from INGEST_JOBS, with the job's own module list.
+// The ingestion jobs 1.2 to 1.16 are registered below from INGEST_JOBS, with the job's own module list.
 const SHARED = {
   'ingest-fedinvest': { r: 46,
     at: { m1: [310, 326], m2: [513, 296], m3: [644, 466] },
@@ -341,6 +341,7 @@ const INGEST_STORES = {
   yc: ['Yield curves', DS('s13')], bei: ['Breakeven inflation', DS('s14')],
   spread: ['Bid and ask spreads', DS('s15')], hol: ['Bond holidays', DS('s16')],
   blscpi: ['Monthly CPI', DS('s17')], ia: ['Intraday archive', DS('s18')],
+  cpisched: ['CPI release schedule', DS('s19')],
 };
 const INGEST_ENTITIES = {
   e1: { name: ['FedInvest'], href: DD + 'e1' },
@@ -389,17 +390,22 @@ const INGEST_JOBS = [
     entities: [], reads: ['blscpi'], writes: ['nsasa'], modules: ['m14'] },
   { id: '1.12', slug: 'CPIHISTORY', file: '1.12_Fetch_CPI_History.md', title: 'Fetch CPI history',
     name: ['Fetch CPI', 'history'], data: 'monthly CPI-U',
-    entities: ['e4'], reads: [], writes: ['cpihist'] },
+    entities: ['e4'], reads: ['cpisched'], writes: ['cpihist'],
+    stops: 'The run is skipped when the current date, on an Eastern clock, is not a Release Date of {cpisched}.' },
   { id: '1.13', slug: 'DAILYREFCPI', file: '1.13_Fetch_Daily_Ref_CPI.md', title: 'Fetch daily Ref CPI',
     name: ['Fetch daily', 'Ref CPI'], data: 'daily Ref CPI',
-    entities: ['e2'], reads: ['tipsref', 'cpihist', 'refcpi'], writes: ['refcpi'],
-    stops: '{refcpi} is not written when the fetched series ends before the last day of the second month after the latest month of {cpihist}, or when the merged series has a gap of more than one calendar day or is shorter than what the store already held.' },
+    entities: ['e2'], reads: ['tipsref', 'cpihist', 'refcpi', 'cpisched'], writes: ['refcpi'],
+    stops: 'The run is skipped when the current date, on an Eastern clock, is not a Release Date of {cpisched}. {refcpi} is not written when the fetched series ends before the last day of the second month after the latest month of {cpihist}, or when the merged series has a gap of more than one calendar day or is shorter than what the store already held.' },
   { id: '1.14', slug: 'FUNDHOLDINGS', file: '1.14_Enrich_Fund_Holdings.md', title: 'Enrich fund holdings',
     name: ['Enrich fund', 'holdings'], data: 'fund holdings',
     entities: ['fund'], reads: ['quotes', 'yc'], writes: ['funds'], modules: ['m1', 'm2', 'm3', 'm4'] },
   { id: '1.15', slug: 'GSWCURVE', file: '1.15_Fetch_GSW_Curve_Parameters.md', title: 'Fetch GSW curve parameters',
     name: ['Fetch GSW', 'curve parameters'], data: 'GSW curve parameters',
     entities: ['e13'], reads: [], writes: ['gsw'] },
+  { id: '1.16', slug: 'CPIRELEASESCHEDULE', file: '1.16_Fetch_CPI_Release_Schedule.md', title: 'Fetch CPI release schedule',
+    name: ['Fetch CPI', 'release', 'schedule'], data: 'CPI release schedule',
+    entities: ['e4'], reads: [], writes: ['cpisched'],
+    stops: 'The run ends with an error and writes nothing when the release table is missing or has no rows, when a Release Date cannot be read, or when two rows share a Release Date.' },
 ];
 const ingestPageName = job => 'DFD_LEVEL3_INGEST_' + job.slug + '.html';
 const ingestSharedKey = job => 'ingest-' + job.slug.toLowerCase();
@@ -555,6 +561,7 @@ function level1() {
     { id: 'hol', name: 'Bond holidays', href: DS('s16') },
     { id: 'blscpi', name: 'Monthly CPI', href: DS('s17') },
     { id: 'ia', name: 'Intraday archive', href: DS('s18') },
+    { id: 'cpisched', name: 'CPI release schedule', href: DS('s19') },
     { id: 'spot', name: 'Yield curves', href: DS('s13') },
     { id: 'bei', name: 'Breakeven inflation', href: DS('s14') },
     { id: 'spread', name: 'Bid and ask spreads', href: DS('s15') },
@@ -1066,7 +1073,7 @@ function level2Ingestion() {
     up: 'DFD_LEVEL1.html', upLabel: 'Level 1', svg: P.join(NL),
     notes: ['  One process per scheduled job, with the external entity it reads (if any). The <a href="' + DS() + '">Data Stores</a> shape stands for every data store: a job that writes one has an arrow to it, a job that reads one has an arrow from it, and a job that does both has both.',
       '  ' + andList(storeOnly) + ' read no external source: they calculate from what the retrieving jobs have stored. ' + andList(entityAndStore) + ' read both an external source and one or more stores.',
-      '  An entity feeding two jobs (FiscalData, BLS, CNBC) is drawn once, with a separately labelled flow to each — the same source, not two sources. FiscalData\'s two flows here match its two flows in the Data Dictionary; BLS\'s and CNBC\'s two jobs each read the same flow independently.',
+      '  An entity feeding two or more jobs (FiscalData, BLS, CNBC) is drawn once, with a separately labelled flow to each — the same source, not two sources. FiscalData\'s two flows here match its two flows in the Data Dictionary; BLS\'s 1.9 and 1.12 read the same flow independently, and CNBC\'s two jobs do the same. 1.16 reads a second BLS flow, <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#cpi-release-schedule">CPI release schedule</a>.',
       '  1.4 reads two entities, FiscalData and TreasuryDirect, for the one flow <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#auction-results">auction results</a>.',
       '  E7 through E12 are drawn as one box: the six fund-holdings providers, each with its own entry in the <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md">Data Dictionary</a>, are otherwise identical in shape from this diagram\'s point of view — one job reads all six.',
       '  Each job explodes at Level 3, which draws the data stores that job reads and writes and the shared modules it calls. 1.1 decomposes into three processes; every other job is one process there, and its bubble opens the job\'s process spec, which names the script that implements it and the script that registers its schedule.'].join(NL)
@@ -1188,7 +1195,7 @@ function level3IngestFedInvest() {
   });
 }
 
-// ── Level 3: one ingestion job that has no sub-processes (1.2 to 1.15) ───────
+// ── Level 3: one ingestion job that has no sub-processes (1.2 to 1.16) ───────
 function level3Ingest(job) {
   const { PR, SW, EW, EH, PAIR, MR } = ING;
   const L = ingestLayout(job), { cx, cy, LR, RX } = L;

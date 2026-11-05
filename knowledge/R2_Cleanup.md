@@ -47,6 +47,7 @@ The data stores of the bucket, with their R2 keys, are in [Data Dictionary §2.0
 - `misc/TIPS_SAO.csv` — no code references, deleted
 - `misc/BondMarketHolidays.csv` — old pre-SIFMA file, only referenced in external Bogleheads spreadsheet, deleted
 - `bls/CpiReleaseSchedule2024.csv` — year expired, deleted
+- `bls/CpiReleaseSchedule2025.csv`, `bls/CpiReleaseSchedule2026.csv` — replaced by the single `bls/CpiReleaseSchedule.csv` ([CPI release schedule (S19)](./DATA_DICTIONARY.md#s19)), deleted 2026-11-05
 
 **TipsRef consolidation:**
 - `Treasuries/TipsRef.csv` — consolidated to `TIPS/TipsRef.csv`; browser app updated accordingly
