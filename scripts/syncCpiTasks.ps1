@@ -10,8 +10,9 @@
     refused ("Access is denied") to a non-elevated one, so an elevated run would lock these tasks
     out of the next weekly sync.
 
-    A date after today gets a CpiHistory trigger at 5:35am PT (8:35am ET) and a RefCpi trigger at
-    6:30am PT (9:30am ET). Nothing is changed when S19 cannot be read or lists no date after today.
+    A Release Date gets a CpiHistory trigger at 5:35am PT (8:35am ET) and a RefCpi trigger at
+    6:30am PT (9:30am ET), each unless that time has already passed. Nothing is changed when S19
+    cannot be read or lists no Release Date with a task time still ahead.
     A task is changed only when its triggers differ from the dates.
 .PARAMETER ProjectDir
     Treasuries project root. Defaults to the parent of this script's directory.
@@ -39,11 +40,12 @@ foreach ($line in ($csv -split "`n")) {
     # Format: October 2026,2026-11-10,08:30 AM
     if ($line -match '^[^,]+,(\d{4}-\d{2}-\d{2}),') {
         $d = [datetime]::ParseExact($Matches[1], 'yyyy-MM-dd', [System.Globalization.CultureInfo]::InvariantCulture)
-        if ($d.Date.AddHours(5).AddMinutes(35) -gt $now) { $dates.Add($d) }
+        $dates.Add($d)
     }
 }
-if ($dates.Count -eq 0) {
-    Write-Host "No Release Date after today in CPI release schedule (S19): CpiHistory and RefCpi left as they are."
+# 6:30am PT is the later of the two task times, so a Release Date with it still ahead is the last chance for a trigger.
+if (-not ($dates | Where-Object { $_.Date.AddHours(6).AddMinutes(30) -gt $now })) {
+    Write-Host "No Release Date ahead in CPI release schedule (S19): CpiHistory and RefCpi left as they are."
     exit 1
 }
 
@@ -51,8 +53,11 @@ if ($dates.Count -eq 0) {
 function Sync-CpiTask {
     param([string]$Name, [int]$Hour, [int]$Minute, [string]$Description, [string]$CmdFile,
           [Nullable[TimeSpan]]$RestartInterval, [int]$RestartCount = 0)
-    $want = @($dates | ForEach-Object { $_.Date.AddHours($Hour).AddMinutes($Minute).ToString('yyyy-MM-ddTHH:mm:ss') } | Sort-Object)
-    $triggers = $dates | ForEach-Object { New-ScheduledTaskTrigger -Once -At ($_.Date.AddHours($Hour).AddMinutes($Minute)) }
+    # A Release Date whose time for this task has already passed gets no trigger: a one-time trigger
+    # in the past would run at once under StartWhenAvailable.
+    $times    = @($dates | ForEach-Object { $_.Date.AddHours($Hour).AddMinutes($Minute) } | Where-Object { $_ -gt $now } | Sort-Object)
+    $want     = @($times | ForEach-Object { $_.ToString('yyyy-MM-ddTHH:mm:ss') })
+    $triggers = $times | ForEach-Object { New-ScheduledTaskTrigger -Once -At $_ }
     $task = Get-ScheduledTask -TaskName $Name -ErrorAction SilentlyContinue
     if (-not $task) {
         Register-CmdTask $Name $Description $triggers $CmdFile -RestartInterval $RestartInterval -RestartCount $RestartCount -LogonType Interactive
