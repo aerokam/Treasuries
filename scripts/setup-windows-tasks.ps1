@@ -6,7 +6,7 @@
     existing tasks are unregistered and re-created).
 
     Most tasks use weekly recurring triggers. CpiHistory and RefCpi have one trigger per Release
-    Date of CPI release schedule (S19), read from R2 each time this script runs.
+    Date of CPI release schedule (S19); CpiReleaseSchedule sets them weekly (see the CPI tasks block).
 
     All times are Pacific Time (PT). ET-based tasks run 5 minutes after their ET
     anchor. ET and PT observe DST together so the offset is always -3h.
@@ -51,63 +51,7 @@ Write-Host ""
 # Helpers
 # ---------------------------------------------------------------------------
 
-function Register-DataTask {
-    param(
-        [string]   $Name,
-        [string]   $Description,
-        [object[]] $Triggers,
-        [string]   $Execute,
-        [string]   $Argument,
-        [string]   $Cwd = $ProjectDir,
-        [Nullable[TimeSpan]] $RestartInterval,
-        [int]      $RestartCount = 0,
-        [ValidateSet('S4U', 'Interactive')]
-        [string]   $LogonType = 'S4U'
-    )
-    if (Get-ScheduledTask -TaskName $Name -ErrorAction SilentlyContinue) {
-        Unregister-ScheduledTask -TaskName $Name -Confirm:$false
-    }
-    # Run via conhost --headless so no console window ever appears/steals focus.
-    # Task Scheduler otherwise pops a visible conhost window for any console-subsystem
-    # action, even when the script itself redirects all output to a log file.
-    $conhost   = "$env:WINDIR\System32\conhost.exe"
-    $hiddenArg = "--headless `"$Execute`" $Argument"
-    $action    = New-ScheduledTaskAction -Execute $conhost -Argument $hiddenArg -WorkingDirectory $Cwd
-    $settingsArgs = @{ ExecutionTimeLimit = (New-TimeSpan -Minutes 30); StartWhenAvailable = $true }
-    if ($RestartCount -gt 0) {
-        $settingsArgs.RestartInterval = $RestartInterval
-        $settingsArgs.RestartCount    = $RestartCount
-    }
-    $settings  = New-ScheduledTaskSettingsSet @settingsArgs
-    # S4U (not Interactive): runs whether the user is logged on or not, without storing a
-    # password. Registering with S4U requires the elevated re-run above (Interactive alone
-    # doesn't). Interactive attaches to the user's real desktop session instead, so any
-    # window the task opens (e.g. Chrome) is visible — used for tasks that may need a
-    # manual step, at the cost of not running while logged off.
-    $principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType $LogonType -RunLevel Limited
-    $task      = New-ScheduledTask -Action $action -Trigger $Triggers -Settings $settings -Principal $principal -Description $Description
-    Register-ScheduledTask -TaskName $Name -InputObject $task | Out-Null
-    Write-Host "  [OK] $Name"
-}
-
-function Register-NodeTask {
-    param([string]$Name, [string]$Description, [object[]]$Triggers, [string]$Script)
-    Register-DataTask -Name $Name -Description $Description -Triggers $Triggers `
-        -Execute $NodeExe -Argument $Script
-}
-
-function Register-CmdTask {
-    param(
-        [string]   $Name, [string]$Description, [object[]]$Triggers, [string]$CmdFile,
-        [Nullable[TimeSpan]] $RestartInterval,
-        [int]      $RestartCount = 0,
-        [ValidateSet('S4U', 'Interactive')]
-        [string]   $LogonType = 'S4U'
-    )
-    Register-DataTask -Name $Name -Description $Description -Triggers $Triggers `
-        -Execute "cmd.exe" -Argument "/c `"$CmdFile`"" `
-        -RestartInterval $RestartInterval -RestartCount $RestartCount -LogonType $LogonType
-}
+. "$PSScriptRoot\task-helpers.ps1"
 
 [System.DayOfWeek[]] $Weekdays = 'Monday','Tuesday','Wednesday','Thursday','Friday'
 
@@ -126,8 +70,8 @@ $legacy = @(
     'SnapYieldHistory', 'YieldHistorySnap',
     # SA Factor variants
     'SaFactorUpdate',
-    # Ref CPI variants (superseded by the canonical 'RefCpi' task registered below)
-    'RefCPI', 'RefCpiRefresh',
+    # Ref CPI variants (superseded by the canonical 'RefCpi' task, which syncCpiTasks.ps1 registers)
+    'RefCpiRefresh',
     # CPI History variants
     'FetchCpiHistory', 'CpiHistoryRefresh',
     # CpiTasks variants (CpiTasks re-ran this script each Dec 29 to reload date-specific triggers)
@@ -302,74 +246,41 @@ Register-DataTask "VendorUpdateCheck" `
 # Ref CPI NSA and SA (S4) changes the SA Yield of every TIPS in it.
 
 # ---------------------------------------------------------------------------
-# CPI tasks  -  one trigger per Release Date of CPI release schedule (S19)
+# CPI tasks  -  triggers set weekly by CpiReleaseSchedule, not by this script
 # ---------------------------------------------------------------------------
-# CpiHistory and RefCpi run only on release dates. Their triggers are read from
-# bls/CpiReleaseSchedule.csv in R2 (S19) each time this script runs, so a date BLS moves or a
-# month it adds reaches the triggers by re-running this script (elevated). The weekly
-# CpiReleaseSchedule task keeps S19 current but cannot change a trigger itself: a task that is not
-# elevated gets "Access is denied" on Set-ScheduledTask. run-cpi-history.cmd and
-# run-ref-cpi.cmd also end at once unless today is a Release Date, so a trigger left on a date
-# BLS has since moved does no work.
+# CpiHistory and RefCpi run only on Release Dates of CPI release schedule (S19), one trigger per
+# date. They are Interactive tasks created by the user's own non-elevated token, because only such
+# a token can change them: a task created by an elevated process (every S4U task, and every task
+# this script registers) is refused ("Access is denied") to a non-elevated one. So this script
+# neither registers nor changes them. CpiReleaseSchedule does, every Sunday, through
+# scripts/syncCpiTasks.ps1, and it is itself Interactive so that it runs with that same token.
+# BLS does not release the CPI on a Sunday, so the refresh never falls on a Release Date.
+# Interactive tasks run only while the user is logged on; StartWhenAvailable runs a missed one at
+# the next logon, and run-cpi-history.cmd and run-ref-cpi.cmd end at once unless that day is still
+# a Release Date.
 
-$R2Base      = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev'
-$now         = Get-Date
-$futureDates = [System.Collections.Generic.List[datetime]]::new()
-try {
-    $csv = (Invoke-WebRequest -Uri "$R2Base/bls/CpiReleaseSchedule.csv" -UseBasicParsing -ErrorAction Stop).Content
-    foreach ($line in ($csv -split "`n")) {
-        # Format: October 2026,2026-11-10,08:30 AM
-        if ($line -match '^[^,]+,(\d{4}-\d{2}-\d{2}),') {
-            $d = [datetime]::ParseExact($Matches[1], 'yyyy-MM-dd', [System.Globalization.CultureInfo]::InvariantCulture)
-            if ($d.Date.AddHours(5).AddMinutes(35) -gt $now) { $futureDates.Add($d) }
-        }
-    }
-} catch {
-    Write-Warning "  Could not read bls/CpiReleaseSchedule.csv: $_"
-}
-
-# CpiReleaseSchedule  -  Sundays 6:20am PT. BLS does not release the CPI on a Sunday, so the refresh
-# of S19 can never fall on a Release Date ahead of that day's CpiHistory and RefCpi runs.
-# Read the BLS release schedule of the CPI and replace bls/CpiReleaseSchedule.csv (S19). The
-# page lists about thirteen months ahead, so a weekly run adds each new month within a week of
+# CpiReleaseSchedule  -  Sundays 6:20am PT
+# The page lists about thirteen months ahead, so a weekly run adds each new month within a week of
 # BLS listing it and picks up a moved date the same way.
-Register-NodeTask "CpiReleaseSchedule" `
-    "Fetch the BLS CPI release schedule, replace bls/CpiReleaseSchedule.csv in R2" `
+Register-CmdTask "CpiReleaseSchedule" `
+    "Fetch the BLS CPI release schedule, replace bls/CpiReleaseSchedule.csv in R2, set the CpiHistory and RefCpi triggers to its Release Dates" `
     @(New-ScheduledTaskTrigger -Weekly -DaysOfWeek Sunday -At "6:20am") `
-    "scripts/fetchCpiReleaseSchedule.js"
+    "$ProjectDir\scripts\run-cpi-release-schedule.cmd" `
+    -LogonType Interactive
 
-if ($futureDates.Count -gt 0) {
-    # CpiHistory  -  8:35am ET [PT: 5:35am]
-    $cpiTriggers = $futureDates | ForEach-Object {
-        New-ScheduledTaskTrigger -Once -At ($_.Date.AddHours(5).AddMinutes(35))
+# CpiHistory and RefCpi created as S4U by an earlier version of this script cannot be changed
+# without elevation, so they are removed here and recreated, Interactive, by the first run below.
+foreach ($name in 'CpiHistory', 'RefCpi') {
+    $t = Get-ScheduledTask -TaskName $name -ErrorAction SilentlyContinue
+    if ($t -and "$($t.Principal.LogonType)" -ne 'Interactive') {
+        Unregister-ScheduledTask -TaskName $name -Confirm:$false
+        Write-Host "  [REMOVED] $name (S4U)"
     }
-    Register-CmdTask "CpiHistory" `
-        "Fetch full CPI-U history from BLS on release dates, upload bls/CPI_history.csv" `
-        $cpiTriggers `
-        "$ProjectDir\scripts\run-cpi-history.cmd"
-
-    # RefCpi (TIPS/RefCPI.csv)  -  9:30am ET [PT: 6:30am], same release dates as CpiHistory.
-    # Ref CPI pulls from TreasuryDirect, a source separate from BLS that lags the 8:30am ET
-    # BLS print by an unknown amount; this used to chain off CpiHistory's own trigger, but a
-    # non-zero exit from a chained step didn't reliably restart the wrapping task, so
-    # RefCpi has run on its own trigger since 2026-09-18. 9:30am ET gives TreasuryDirect an
-    # hour to catch up on its own clock. Retry every 30 min, up to 12x (6h), if
-    # run-ref-cpi.cmd's freshness check reports TreasuryDirect still hasn't caught up.
-    $refCpiTriggers = $futureDates | ForEach-Object {
-        New-ScheduledTaskTrigger -Once -At ($_.Date.AddHours(6).AddMinutes(30))
-    }
-    Register-CmdTask "RefCpi" `
-        "Fetch daily interpolated Ref CPI from TreasuryDirect on BLS release dates, upload TIPS/RefCPI.csv, retrying if TreasuryDirect hasn't caught up yet" `
-        $refCpiTriggers `
-        "$ProjectDir\scripts\run-ref-cpi.cmd" `
-        -RestartInterval (New-TimeSpan -Minutes 30) -RestartCount 12
-
-    $first = ($futureDates | Sort-Object | Select-Object -First 1).ToString('yyyy-MM-dd')
-    $last  = ($futureDates | Sort-Object | Select-Object -Last 1).ToString('yyyy-MM-dd')
-    Write-Host "  Registered $($futureDates.Count) CPI date triggers ($first to $last)"
-} else {
-    Write-Warning "  No future CPI dates found  -  CpiHistory/RefCpi NOT registered."
 }
+# This script is elevated, so a task started from it is not: Task Scheduler runs an Interactive
+# task as the user, with the user's non-elevated token.
+Start-ScheduledTask -TaskName "CpiReleaseSchedule"
+Write-Host "  [STARTED] CpiReleaseSchedule, which registers CpiHistory and RefCpi. See logs/cpi-release-schedule.log."
 
 # ---------------------------------------------------------------------------
 
