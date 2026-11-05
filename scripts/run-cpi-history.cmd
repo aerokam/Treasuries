@@ -7,10 +7,16 @@ if not exist "%REPO%\logs" mkdir "%REPO%\logs"
 
 echo [%DATE% %TIME%] Checking CPI release schedule... >> "%LOG%"
 %NODE% "%REPO%\scripts\checkCpiReleaseDate.js" >> "%LOG%" 2>&1
-if %ERRORLEVEL% neq 0 (
+set RC=%ERRORLEVEL%
+if %RC% equ 1 (
   echo [%DATE% %TIME%] Not a release day — skipping. >> "%LOG%"
   echo. >> "%LOG%"
   exit /b 0
+)
+if %RC% neq 0 (
+  echo [%DATE% %TIME%] CPI release schedule not readable, exit code %RC%. >> "%LOG%"
+  echo. >> "%LOG%"
+  exit /b %RC%
 )
 
 echo [%DATE% %TIME%] Release day confirmed — fetching CPI history... >> "%LOG%"

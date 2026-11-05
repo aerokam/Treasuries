@@ -5,8 +5,8 @@
     Creates one scheduled task per ingestion job. Re-running is safe (idempotent  - 
     existing tasks are unregistered and re-created).
 
-    CPI tasks use date-specific triggers fetched live from R2. All other tasks use
-    weekly or daily recurring triggers.
+    All tasks use weekly or daily recurring triggers. The CPI tasks run daily and end at once
+    unless today is a Release Date of CPI release schedule (S19).
 
     All times are Pacific Time (PT). ET-based tasks run 5 minutes after their ET
     anchor. ET and PT observe DST together so the offset is always -3h.
@@ -130,8 +130,8 @@ $legacy = @(
     'RefCPI', 'RefCpiRefresh',
     # CPI History variants
     'FetchCpiHistory', 'CpiHistoryRefresh',
-    # CpiTasks variants
-    'RefreshCpiTasks', 'Update CPI release schedule',
+    # CpiTasks variants (CpiTasks re-ran this script each Dec 29 to reload date-specific triggers)
+    'CpiTasks', 'RefreshCpiTasks', 'Update CPI release schedule',
     # Close-price investigation probes (findings in YieldsMonitor/knowledge/Close_Price_Investigation.md)
     'CloseProbe', 'LockProbe'
 )
@@ -302,81 +302,41 @@ Register-DataTask "VendorUpdateCheck" `
 # Ref CPI NSA and SA (S4) changes the SA Yield of every TIPS in it.
 
 # ---------------------------------------------------------------------------
-# CPI release date tasks  -  date-specific triggers fetched live from R2
+# CPI tasks  -  daily triggers, each run gated on CPI release schedule (S19)
 # ---------------------------------------------------------------------------
-Write-Host ""
-Write-Host "Fetching CPI release schedule from R2..."
+# A trigger registered here stays as it is until this script is re-run with elevation, so a
+# date that BLS moves would never reach a date-specific trigger. The two triggers below carry
+# no dates: run-cpi-history.cmd and run-ref-cpi.cmd each end at once unless today is a Release
+# Date of CPI release schedule (S19), which scripts/checkCpiReleaseDate.js reads from R2 at
+# run time. The weekly CpiReleaseSchedule task keeps that store current.
 
-$R2Base      = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev'
-$now         = Get-Date
-$futureDates = [System.Collections.Generic.List[datetime]]::new()
+# CpiReleaseSchedule  -  Mondays 6:20am PT
+# Read the BLS release schedule of the CPI and replace bls/CpiReleaseSchedule.csv (S19). The
+# page lists about thirteen months ahead, so a weekly run adds each new month within a week of
+# BLS listing it and picks up a moved date the same way.
+Register-NodeTask "CpiReleaseSchedule" `
+    "Fetch the BLS CPI release schedule, replace bls/CpiReleaseSchedule.csv in R2" `
+    @(New-ScheduledTaskTrigger -Weekly -DaysOfWeek Monday -At "6:20am") `
+    "scripts/fetchCpiReleaseSchedule.js"
 
-foreach ($year in @($now.Year, $now.Year + 1)) {
-    $url = "$R2Base/bls/CpiReleaseSchedule$year.csv"
-    try {
-        $csv = (Invoke-WebRequest -Uri $url -UseBasicParsing -ErrorAction Stop).Content
-        foreach ($line in ($csv -split "`n")) {
-            # Format: "Friday, April 10, 2026","08:30 AM","Consumer Price Index..."
-            if ($line -match '^"([A-Za-z]+, [A-Za-z]+ \d+, \d+)"') {
-                try {
-                    $d = [datetime]::ParseExact(
-                        $Matches[1], "dddd, MMMM d, yyyy",
-                        [System.Globalization.CultureInfo]::InvariantCulture
-                    )
-                    if ($d -gt $now) { $futureDates.Add($d) }
-                } catch { }
-            }
-        }
-    } catch {
-        Write-Warning "  Could not fetch CpiReleaseSchedule$year.csv: $_"
-    }
-}
+# CpiHistory  -  daily 8:35am ET [PT: 5:35am], runs only on a Release Date
+Register-CmdTask "CpiHistory" `
+    "Fetch full CPI-U history from BLS on release dates, upload bls/CPI_history.csv" `
+    @(New-ScheduledTaskTrigger -Daily -At "5:35am") `
+    "$ProjectDir\scripts\run-cpi-history.cmd"
 
-if ($futureDates.Count -gt 0) {
-    # CpiHistory  -  8:35am ET [PT: 5:35am]
-    $cpiTriggers = $futureDates | ForEach-Object {
-        New-ScheduledTaskTrigger -Once -At ($_.Date.AddHours(5).AddMinutes(35))
-    }
-    Register-CmdTask "CpiHistory" `
-        "Fetch full CPI-U history from BLS on release dates, upload bls/CPI_history.csv" `
-        $cpiTriggers `
-        "$ProjectDir\scripts\run-cpi-history.cmd"
-
-    # RefCpi (TIPS/RefCPI.csv)  -  9:30am ET [PT: 6:30am], same release dates as CpiHistory.
-    # Ref CPI pulls from TreasuryDirect, a source separate from BLS that lags the 8:30am ET
-    # BLS print by an unknown amount; this used to chain off CpiHistory's own trigger, but a
-    # non-zero exit from a chained step didn't reliably restart the wrapping task, so
-    # RefCpi has run on its own trigger since 2026-09-18. 9:30am ET gives TreasuryDirect an
-    # hour to catch up on its own clock. Retry every 30 min, up to 12x (6h), if
-    # run-ref-cpi.cmd's freshness check reports TreasuryDirect still hasn't caught up.
-    $refCpiTriggers = $futureDates | ForEach-Object {
-        New-ScheduledTaskTrigger -Once -At ($_.Date.AddHours(6).AddMinutes(30))
-    }
-    Register-CmdTask "RefCpi" `
-        "Fetch daily interpolated Ref CPI from TreasuryDirect on BLS release dates, upload TIPS/RefCPI.csv, retrying if TreasuryDirect hasn't caught up yet" `
-        $refCpiTriggers `
-        "$ProjectDir\scripts\run-ref-cpi.cmd" `
-        -RestartInterval (New-TimeSpan -Minutes 30) -RestartCount 12
-
-    $nextDate = ($futureDates | Sort-Object | Select-Object -First 1).ToString('yyyy-MM-dd')
-    Write-Host "  Registered $($futureDates.Count) CPI date triggers (next: $nextDate)"
-} else {
-    Write-Warning "  No future CPI dates found  -  CpiHistory/RefCpi NOT registered."
-}
-
-# ---------------------------------------------------------------------------
-# CpiTasks  -  Dec 29 annually: re-runs this script to reload next year's CPI schedule
-# ---------------------------------------------------------------------------
-$dec29 = Get-Date -Year $now.Year -Month 12 -Day 29 -Hour 7 -Minute 0 -Second 0
-if ($dec29 -lt $now) { $dec29 = $dec29.AddYears(1) }
-
-Register-DataTask -Name "CpiTasks" `
-    -Description "Re-run setup script Dec 29 annually to reload next year's CPI release date triggers" `
-    -Triggers @(New-ScheduledTaskTrigger -Once -At $dec29) `
-    -Execute "$PSHOME\powershell.exe" `
-    -Argument "-ExecutionPolicy Bypass -NonInteractive -File `"$ProjectDir\scripts\setup-windows-tasks.ps1`""
-
-Write-Host "  CpiTasks scheduled for $($dec29.ToString('yyyy-MM-dd')) 07:00"
+# RefCpi (TIPS/RefCPI.csv)  -  daily 9:30am ET [PT: 6:30am], runs only on a Release Date.
+# Ref CPI pulls from TreasuryDirect, a source separate from BLS that lags the 8:30am ET
+# BLS print by an unknown amount; this used to chain off CpiHistory's own trigger, but a
+# non-zero exit from a chained step didn't reliably restart the wrapping task, so
+# RefCpi has run on its own trigger since 2026-09-18. 9:30am ET gives TreasuryDirect an
+# hour to catch up on its own clock. Retry every 30 min, up to 12x (6h), if
+# run-ref-cpi.cmd's freshness check reports TreasuryDirect still hasn't caught up.
+Register-CmdTask "RefCpi" `
+    "Fetch daily interpolated Ref CPI from TreasuryDirect on BLS release dates, upload TIPS/RefCPI.csv, retrying if TreasuryDirect hasn't caught up yet" `
+    @(New-ScheduledTaskTrigger -Daily -At "6:30am") `
+    "$ProjectDir\scripts\run-ref-cpi.cmd" `
+    -RestartInterval (New-TimeSpan -Minutes 30) -RestartCount 12
 
 # ---------------------------------------------------------------------------
 

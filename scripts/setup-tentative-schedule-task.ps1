@@ -13,7 +13,6 @@
 
     - TreasuryAuctions-TentativeSchedule-Refresh: re-runs this script itself on
       the 1st of the next Jan/Apr/Jul/Oct, rolling the trigger window forward.
-      Same self-rescheduling idiom as CpiTasks in setup-windows-tasks.ps1.
 
     Run once: powershell -ExecutionPolicy Bypass -File setup-tentative-schedule-task.ps1
 .PARAMETER ProjectDir
