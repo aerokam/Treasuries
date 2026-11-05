@@ -3,8 +3,8 @@ REM scripts/run-ref-cpi.cmd
 REM Fetches the latest daily interpolated Ref CPI from TreasuryDirect and appends any new
 REM dates onto the existing TIPS/RefCPI.csv in R2 (full history, 1997-01-15 to present --
 REM see scripts/fetchRefCpi.js). Triggered by its own Task Scheduler task (RefCpi) at
-REM 9:30am ET daily (scripts/setup-windows-tasks.ps1); the run is skipped unless today is a
-REM Release Date of CPI release schedule (S19), checked below. Independent of the CpiHistory task.
+REM 9:30am ET on each Release Date of CPI release schedule (S19) (scripts/setup-windows-tasks.ps1);
+REM the run is skipped unless today is a Release Date, checked below, so a trigger left on a date BLS moved does nothing. Independent of the CpiHistory task.
 
 set REPO=C:\Users\aerok\projects\Treasuries
 set LOG=%REPO%\logs\ref-cpi.log
