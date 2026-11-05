@@ -328,13 +328,14 @@ try {
     Write-Warning "  Could not read bls/CpiReleaseSchedule.csv: $_"
 }
 
-# CpiReleaseSchedule  -  Mondays 6:20am PT
+# CpiReleaseSchedule  -  Sundays 6:20am PT. BLS does not release the CPI on a Sunday, so the refresh
+# of S19 can never fall on a Release Date ahead of that day's CpiHistory and RefCpi runs.
 # Read the BLS release schedule of the CPI and replace bls/CpiReleaseSchedule.csv (S19). The
 # page lists about thirteen months ahead, so a weekly run adds each new month within a week of
 # BLS listing it and picks up a moved date the same way.
 Register-NodeTask "CpiReleaseSchedule" `
     "Fetch the BLS CPI release schedule, replace bls/CpiReleaseSchedule.csv in R2" `
-    @(New-ScheduledTaskTrigger -Weekly -DaysOfWeek Monday -At "6:20am") `
+    @(New-ScheduledTaskTrigger -Weekly -DaysOfWeek Sunday -At "6:20am") `
     "scripts/fetchCpiReleaseSchedule.js"
 
 if ($futureDates.Count -gt 0) {

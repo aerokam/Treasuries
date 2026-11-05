@@ -193,7 +193,7 @@
 <p class="notes">
   The process drills to <a href="viewer.html#/md/knowledge/1.12_Fetch_CPI_History.md">1.12 Fetch CPI history</a>, the process spec.
   The flow entering from the left is <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#monthly-cpi-u">monthly CPI-U</a>, drawn against its source on the <a href="DFD_LEVEL0.html">context diagram</a>.
-  The run is skipped when the current date, on an Eastern clock, is not a Release Date of <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s19">CPI release schedule (S19)</a>.
+  The run is skipped when the current date, on an Eastern clock, is not a Release Date of <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s19">CPI release schedule (S19)</a>. The run ends with an error and fetches nothing when <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s19">CPI release schedule (S19)</a> cannot be read.
 </p>
 
 </body>

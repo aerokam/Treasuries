@@ -88,7 +88,7 @@
 - <a id="e3"></a>**FiscalData (E3)** = `CUSIP + Auction_Date + Security_Type + High_Yield + Bid_to_Cover + ...`
   *U.S. Treasury official auction results and immutable security metadata (Coupons, Dated Dates).*
 - <a id="e4"></a>**BLS (E4)** = `Year + Month + Value + Seasonal_Adjustment_Flag + { Reference_Month + Release_Date + Release_Time }`
-  *Consumer Price Index (CPI-U) monthly data, and the schedule on which BLS releases it. Used to derive SA factors by comparing NSA vs. SA values. The schedule is the release table of `www.bls.gov/schedule/news_release/cpi.htm`: one row per release, under the page's column names Reference Month, Release Date and Release Time. Measured 2026-11-05, the table lists the releases of the October 2026 reference month (2026-11-10) through the November 2027 reference month (2027-12-10) and lists no release dated before 2026-11-05. Source of [CPI release schedule (S19)](#s19).*
+  *Consumer Price Index (CPI-U) monthly data, and the schedule on which BLS releases it. Used to derive SA factors by comparing NSA vs. SA values. The schedule is the release table of `www.bls.gov/schedule/news_release/cpi.htm`: one row per release, under the page's column names Reference Month, Release Date and Release Time. Source of [CPI release schedule (S19)](#s19).*
 - <a id="e5"></a>**CNBC (E5)** — one source, two independent services, each its own flow rather than a mechanism of the other:
   - **Chart-bar feed** = `Symbol + TimeRange + { TradeTime + Close }`
     *The feed behind CNBC's own Treasury/TIPS charts (`webql-redesign.cnbcfm.com/graphql`, operation `getQuoteChartData`), sourced from Tradeweb. One bar per `TradeTime` at the resolution `TimeRange` selects (`1D` down to one minute, `5D` to five, coarser tiers to a day or a quarter), `Close` the yield at that bar. Symbols include `US10Y`, `US30YTIPS`, and every other maturity [Yields Monitor](../YieldsMonitor/knowledge/2.1_Assemble_Range_Data.md) tracks. Compared against broker quotes on the same securities, the values sit closer to the bid than to the ask wherever the two differ — an observation from that comparison, not a documented property of the feed (see [Close Price Investigation §4](../YieldsMonitor/knowledge/Close_Price_Investigation.md#4-provenance)), so this is not a mid-price feed as an earlier version of this entry stated. Source of [Market Yields](#market-yields).*
@@ -274,7 +274,7 @@
   *R2 key `bls/CPI.csv` ([View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/bls/CPI.csv)). The same series and columns as [CPI history (S8)](#s8), January 2019 onward, newest row first.*
 - <a id="s18"></a>**Intraday archive (S18)**, `{YYYYMMDD}.json` = `@Symbol + @Date + { Feed: { TimeRange + { TradeTime + Close } } } + FetchedAtET`
   *R2 key `Treasuries/yields-history/intraday-raw/{symbol}/{YYYYMMDD}.json`. One immutable daily snapshot per symbol of the raw feeds [CNBC (E5)](#e5) served that day, and `FetchedAtET`, the wall-clock time the snapshot was taken.*
-- <a id="s19"></a>**CPI release schedule (S19)**, `CpiReleaseSchedule.csv` = `{ @Release Date + Reference Month + Release Time }`
+- <a id="s19"></a>**CPI release schedule (S19)**, `CpiReleaseSchedule.csv` = `{ Reference Month + @Release Date + Release Time }`
   *R2 key `bls/CpiReleaseSchedule.csv` ([View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/bls/CpiReleaseSchedule.csv)). Header row first, then one row per release of the [Monthly CPI-U](#monthly-cpi-u) that [BLS (E4)](#e4) lists, ascending by `Release Date`. The store holds the latest schedule only: each write replaces the previous contents.*
 
   | Column | Defined term |
@@ -876,7 +876,7 @@ Some values are true only until Treasury issues more TIPS. Left inline as approx
 - <a id="upcoming-auctions"></a>**Upcoming Auctions** = *the upcoming auction records of* [FiscalData (E3)](#e3)
 - <a id="tips-reference-data"></a>**TIPS Reference Data** = *the TIPS security records of* [FiscalData (E3)](#e3)
 - <a id="monthly-cpi-u"></a>**Monthly CPI-U** = [BLS (E4)](#e4)
-- <a id="cpi-release-schedule"></a>**CPI Release Schedule** = [BLS (E4)](#e4) release table
+- <a id="cpi-release-schedule"></a>**CPI Release Schedule** = `{ Reference_Month + Release_Date + Release_Time }` of [BLS (E4)](#e4)
 - <a id="market-yields"></a>**Market Yields** = [CNBC (E5)](#e5) chart-bar feed
 - <a id="market-quotes"></a>**Market Quotes** = [Market quotes source (E6)](#e6)
 - <a id="live-quotes"></a>**Live Quotes** = [CNBC (E5)](#e5) quote service
