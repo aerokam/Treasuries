@@ -3,7 +3,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { calculateTipsOid, tipsOutstandingInRange, rangeDatesOf, totalOid, TREASURY_ROUNDING, NO_ROUNDING } from '../src/tips-oid.js';
+import { calculateTipsOid, tipsOutstandingInRange, rangeDatesOf, oidByCusip, TREASURY_ROUNDING, NO_ROUNDING } from '../src/tips-oid.js';
 
 // The 0.125% TIPS due 2025-10-15 of the AMD example in TIPS_OID_Tax_Reference.md: dated date
 // 2020-10-15, dated date Ref CPI 259.46997, Ref CPI 312.85893 on 2024-06-14. Quantity 20 is
@@ -185,6 +185,21 @@ test('a row takes the range, the Original Issue Date when the range starts befor
   assert.deepEqual(rangeDatesOf(others[2], '2023-01-01', '2040-01-01'), { startDate: '2024-01-31', endDate: '2034-01-15', endLocked: true });
 });
 
-test('the total OID sums the rows that have one and counts the rows that have none', () => {
-  assert.deepEqual(totalOid([{ ok: true, oid: 10.1 }, { ok: true, oid: -3.05 }, { ok: false, reason: 'quantity' }, { ok: true, oid: 0 }]), { total: 7.05, without: 1 });
+const entry = (t, startDate, oid) => ({ tips: t, startDate, result: { ok: true, oid } });
+
+test('entries are ordered by Maturity Date, CUSIP, Start Date and the order given, grouped by CUSIP', () => {
+  const [a, b, c] = others;   // A matures 2030, B 2024, C 2034
+  const { groups } = oidByCusip([entry(c, '2024-03-01', 1), entry(a, '2024-06-01', 2), entry(b, '2024-02-01', 3), entry(a, '2024-02-01', 4), entry(a, '2024-02-01', 5)]);
+  assert.deepEqual(groups.map(g => g.tips.cusip), ['B', 'A', 'C']);
+  const ga = groups.find(g => g.tips.cusip === a.cusip);
+  assert.deepEqual(ga.entries.map(e => e.result.oid), [4, 5, 2]);
+});
+
+test('a CUSIP with two or more entries has a subtotal, one with a single entry has none, and the total sums every entry in cents', () => {
+  const [a, b] = others;
+  const { groups, total } = oidByCusip([entry(a, '2024-01-01', 10.1), entry(a, '2024-05-01', -3.05), entry(b, '2024-01-01', 0.1)]);
+  assert.equal(groups.find(g => g.tips.cusip === a.cusip).subtotal, 7.05);
+  assert.equal(groups.find(g => g.tips.cusip === b.cusip).subtotal, null);
+  assert.equal(total, 7.15);
+  assert.deepEqual(oidByCusip([]), { groups: [], total: 0 });
 });

@@ -142,12 +142,28 @@ export function rangeDatesOf(tips, rangeStart, rangeEnd) {
   };
 }
 
-// The total OID of rows that each have { ok, oid } (a calculateTipsOid result, or { ok: true, oid: 0 } for
-// a Quantity of 0): the sum of the OID of the rows that have one, in cents, and the number that have none.
-export function totalOid(results) {
-  let cents = 0, without = 0;
-  for (const r of results) {
-    if (r.ok) cents += Math.round(r.oid * 100); else without += 1;
+// The entries in their order, grouped by CUSIP, with the subtotal of each CUSIP and the total (8.2 OID of the
+// entries). Each entry is { tips, startDate, result } with result a calculateTipsOid result that is ok.
+// The order is the Maturity Date of the TIPS, the CUSIP, the Start Date, then the order given. A group's
+// subtotal is null when it has one entry. The sums are in cents.
+export function oidByCusip(entries) {
+  const sorted = entries
+    .map((e, i) => ({ e, i }))
+    .sort((a, b) => a.e.tips.maturity.localeCompare(b.e.tips.maturity)
+      || a.e.tips.cusip.localeCompare(b.e.tips.cusip)
+      || a.e.startDate.localeCompare(b.e.startDate)
+      || a.i - b.i)
+    .map(x => x.e);
+  const groups = [];
+  let totalCents = 0;
+  for (const e of sorted) {
+    let g = groups[groups.length - 1];
+    if (!g || g.tips.cusip !== e.tips.cusip) { g = { tips: e.tips, entries: [], subtotal: null }; groups.push(g); }
+    g.entries.push(e);
+    totalCents += Math.round(e.result.oid * 100);
   }
-  return { total: cents / 100, without };
+  for (const g of groups) {
+    if (g.entries.length > 1) g.subtotal = g.entries.reduce((s, e) => s + Math.round(e.result.oid * 100), 0) / 100;
+  }
+  return { groups, total: totalCents / 100 };
 }
