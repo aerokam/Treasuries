@@ -298,15 +298,31 @@ export async function render(container) {
   cusipEl.addEventListener('change', () => { applyDefaults(); setMessage(rangeMessage()); });
   startEl.addEventListener('input', () => { startEdited = true; });
   endEl.addEventListener('input', () => { endEdited = true; });
-  // When the user leaves a date field (not while typing, when a partial year is a date), a date outside the range is
-  // replaced in the field by the nearest date of the range, and a Start Date before the Original Issue Date of the
-  // chosen TIPS by the Original Issue Date.
-  startEl.addEventListener('blur', () => {
+  // A date outside the range is replaced in the field by the nearest date of the range, and a Start Date before the
+  // Original Issue Date of the chosen TIPS by the Original Issue Date. While a year is typed its partial values are
+  // dates (0002, 0020, 0202, 2024), so the replacement waits until the year has four digits, when the date is
+  // complete, and otherwise until the user leaves the field (8.3 Entry form).
+  const settleStart = v => {
     const tips = selectedTips();
-    if (tips && startEl.value && startEl.value < tips.originalIssueDate) startEl.value = tips.originalIssueDate;
-    startEl.value = withinRange(startEl.value);
-  });
-  endEl.addEventListener('blur', () => { endEl.value = withinRange(endEl.value); });
+    return withinRange(tips && v && v < tips.originalIssueDate ? tips.originalIssueDate : v);
+  };
+  // The field reports no value while a part of the date is half typed (the 0 of 06), so only the year is followed:
+  // the last year it reported, and whether the year has just reached four digits.
+  const yearOf = v => (v ? Number(v.slice(0, v.indexOf('-'))) : NaN);
+  const settleWhenComplete = (el, settle) => {
+    let lastYear = NaN;
+    el.addEventListener('focus', () => { lastYear = yearOf(el.value); });
+    el.addEventListener('input', () => {
+      const year = yearOf(el.value);
+      if (Number.isNaN(year)) return;
+      const justComplete = year >= 1000 && !(lastYear >= 1000);
+      lastYear = year;
+      if (justComplete) { el.value = settle(el.value); lastYear = yearOf(el.value); }
+    });
+    el.addEventListener('blur', () => { el.value = settle(el.value); });
+  };
+  settleWhenComplete(startEl, settleStart);
+  settleWhenComplete(endEl, withinRange);
   container.querySelectorAll('input[name="oid-rounding"]').forEach(el => el.addEventListener('change', renderTable));
 
   syncForm();

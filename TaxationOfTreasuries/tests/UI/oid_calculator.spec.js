@@ -225,15 +225,40 @@ test('the dates of an entry stay within the range: the fields limit them, leavin
   await expect(page.locator('table.oid-all')).toHaveCount(0);
 });
 
-test('a date typed one digit at a time is not replaced until the field is left', async ({ page }) => {
+// Keystrokes into the date field: the year passes through dates (0002, 0020, 0202) before it is complete.
+async function typeDate(page, selector, digits) {
+  await page.locator(selector).focus();
+  for (const ch of digits) await page.keyboard.type(ch);
+}
+
+test('a date typed into the Start Date is left alone while the year is typed, and replaced as soon as the year has four digits', async ({ page }) => {
+  await open(page);
+  await setRange(page, '2024-06-14', '2025-01-01');
+  await page.locator('#oid-cusip').selectOption('91282CAQ4');
+  const start = page.locator('#oid-entry-start');
+  await typeDate(page, '#oid-entry-start', '0101202');
+  await expect(start).toHaveValue('0202-01-01');
+  await page.keyboard.type('3');
+  await expect(start).toHaveValue('2024-06-14');   // 2023-01-01 is before the range
+  await start.blur();
+  await typeDate(page, '#oid-entry-start', '09012024');
+  await expect(start).toHaveValue('2024-09-01');   // inside the range: kept
+  // a month typed into a date whose year is complete is replaced when the field is left, not while it is typed
+  await start.blur();
+  await typeDate(page, '#oid-entry-start', '01');
+  await expect(start).toHaveValue('2024-01-01');
+  await start.blur();
+  await expect(start).toHaveValue('2024-06-14');
+});
+
+test('a date typed into the End Date after the range is replaced by the End Date of the range, and a Start Date before the Original Issue Date by it', async ({ page }) => {
   await open(page);
   await setRange(page, '2024-06-14', '2025-01-01');
   await page.locator('#oid-cusip').selectOption('91282CBZ1');
-  const start = page.locator('#oid-entry-start');
-  for (const partial of ['0002-09-01', '0020-09-01', '0202-09-01', '2024-09-01']) {
-    await start.fill(partial);
-    await expect(start).toHaveValue(partial);
-  }
+  await typeDate(page, '#oid-entry-end', '06012025');
+  await expect(page.locator('#oid-entry-end')).toHaveValue('2025-01-01');
+  await typeDate(page, '#oid-entry-start', '06202024');
+  await expect(page.locator('#oid-entry-start')).toHaveValue('2024-07-31');
 });
 
 test('coupons are shown as n.nnn%, no value has a dollar sign, and the values that make up the total are bold', async ({ page }) => {
