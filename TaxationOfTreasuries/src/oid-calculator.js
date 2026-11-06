@@ -31,7 +31,8 @@ const STYLE = `
   #oid-result td { padding: 5px 12px; border-bottom: 1px solid var(--border-light); }
   #oid-result td.num { text-align: right; font-family: 'Consolas', monospace; }
   #oid-result td button { font-size: 12px; padding: 2px 8px; margin-right: 4px; }
-  #oid-result tr.oid-subtotal td { font-weight: 600; background: #f1f5f5; }
+  #oid-result tr.oid-subtotal td { font-weight: 700; background: #f1f5f5; }
+  #oid-result td.oid-counts { font-weight: 700; }
   #oid-result tr.oid-total td { font-weight: 700; border-top: 2px solid var(--portal-header-bg); }
   #oid-result small { display: block; color: var(--portal-text-muted); font-size: 11px; }
   #oid-result .oid-note { background: #fff7e0; border: 1px solid #e6cf8a; border-radius: 4px; padding: 8px 12px; margin: 10px 0; }
@@ -85,8 +86,8 @@ function loadInputs() {
   return loaded;
 }
 
-const money = n => (n < 0 ? '-$' : '$') + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const couponText = c => Number((c * 100).toFixed(3)) + '%';
+const money = n => (n < 0 ? '-' : '') + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const couponText = c => (c * 100).toFixed(3) + '%';
 
 function messageFor(result, tips, refCpiRows) {
   const first = refCpiRows[0].date, last = result.lastKnownRefCpiDate || refCpiRows[refCpiRows.length - 1].date;
@@ -192,7 +193,16 @@ export async function render(container) {
     endEl.disabled = lock;
   };
 
-  const syncForm = () => { refreshList(); applyDefaults(); setMessage(rangeMessage()); };
+  // The Start Date and End Date of an entry stay within the range (8.3 Entry form).
+  const limitsToRange = () => {
+    for (const el of [startEl, endEl]) {
+      if (rangeOk()) { el.min = rangeStartEl.value; el.max = rangeEndEl.value; } else { el.removeAttribute('min'); el.removeAttribute('max'); }
+    }
+  };
+  const outsideRange = v => rangeOk() && v && (v < rangeStartEl.value || v > rangeEndEl.value);
+  const withinRange = v => (rangeOk() && v ? (v < rangeStartEl.value ? rangeStartEl.value : v > rangeEndEl.value ? rangeEndEl.value : v) : v);
+
+  const syncForm = () => { refreshList(); applyDefaults(); limitsToRange(); setMessage(rangeMessage()); };
 
   // ---- Table of entries ----
   const renderTable = () => {
@@ -217,7 +227,7 @@ export async function render(container) {
         if (r.oid < 0) negative = true;
         body += `<tr data-id="${e.id}"><td>${e.tips.cusip}</td><td>${e.tips.maturity}</td><td class="num">${couponText(e.tips.coupon)}</td>
           <td class="num">${e.quantity}</td><td>${e.startDate}</td><td>${e.endDate}</td>
-          <td class="num oid-cell">${money(r.oid)}${r.endDateLimited ? `<small>as of ${r.endDateUsed}</small>` : ''}</td>${buttons(e.id)}</tr>`;
+          <td class="num oid-cell${g.subtotal === null ? ' oid-counts' : ''}">${money(r.oid)}${r.endDateLimited ? `<small>as of ${r.endDateUsed}</small>` : ''}</td>${buttons(e.id)}</tr>`;
       }
       if (g.subtotal !== null) {
         body += `<tr class="oid-subtotal"><td colspan="6">Subtotal OID of ${g.tips.cusip}</td><td class="num">${money(g.subtotal)}</td><td></td></tr>`;
@@ -248,6 +258,7 @@ export async function render(container) {
     // A Start Date before the Original Issue Date is replaced by it (8.3 Entry form).
     const startDate = startEl.value && startEl.value < tips.originalIssueDate ? tips.originalIssueDate : startEl.value;
     const endDate = endEl.value;
+    if (outsideRange(startEl.value) || outsideRange(endDate)) { setMessage('The Start Date and End Date of an entry cannot be outside the range.'); return; }
     const result = calculateTipsOid({ tips, quantity, startDate, endDate, refCpiRows, monthlyCpi, rounding: rounding() });
     if (!result.ok) { setMessage(messageFor(result, tips, refCpiRows)); return; }
     entries.push({ id: nextId++, tips, quantity, startDate, endDate });
@@ -287,11 +298,15 @@ export async function render(container) {
   cusipEl.addEventListener('change', () => { applyDefaults(); setMessage(rangeMessage()); });
   startEl.addEventListener('input', () => { startEdited = true; });
   endEl.addEventListener('input', () => { endEdited = true; });
-  // A Start Date entered before the Original Issue Date of the chosen TIPS is replaced in the field by it.
-  startEl.addEventListener('change', () => {
+  // When the user leaves a date field (not while typing, when a partial year is a date), a date outside the range is
+  // replaced in the field by the nearest date of the range, and a Start Date before the Original Issue Date of the
+  // chosen TIPS by the Original Issue Date.
+  startEl.addEventListener('blur', () => {
     const tips = selectedTips();
     if (tips && startEl.value && startEl.value < tips.originalIssueDate) startEl.value = tips.originalIssueDate;
+    startEl.value = withinRange(startEl.value);
   });
+  endEl.addEventListener('blur', () => { endEl.value = withinRange(endEl.value); });
   container.querySelectorAll('input[name="oid-rounding"]').forEach(el => el.addEventListener('change', renderTable));
 
   syncForm();

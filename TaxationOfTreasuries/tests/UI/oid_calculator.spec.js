@@ -54,7 +54,7 @@ test('the CUSIP list holds the TIPS outstanding in the range, by Maturity Date, 
   await expect(options).toHaveCount(3);
   await expect(options.nth(0)).toHaveText('');
   await expect(options.nth(1)).toHaveText(/91282CAQ4\s+0\.125% due 2025-10-15/);
-  await expect(options.nth(2)).toHaveText(/91282CBZ1\s+1\.75% due 2030-07-15/);
+  await expect(options.nth(2)).toHaveText(/91282CBZ1\s+1\.750% due 2030-07-15/);
   await expect(page.locator('#oid-cusip')).not.toContainText('91282CXX0');
   await expect(message(page)).toHaveText('');
   await page.locator('#oid-end').fill('2024-07-01');   // before the Original Issue Date of the second TIPS
@@ -76,12 +76,12 @@ test('an entry takes the dates of the range, and Add puts it in the table and cl
   await expect(rows(page).first()).toContainText('91282CAQ4');
   await expect(rows(page).first()).toContainText('2025-10-15');
   await expect(rows(page).first()).toContainText('0.125%');
-  await expect(rows(page).first().locator('.oid-cell')).toHaveText('$4,115.23');
-  await expect(page.locator('#oid-total')).toHaveText('$4,115.23');
+  await expect(rows(page).first().locator('.oid-cell')).toHaveText('4,115.23');
+  await expect(page.locator('#oid-total')).toHaveText('4,115.23');
   await expect(page.locator('#oid-cusip')).toHaveValue('');
   await expect(page.locator('#oid-quantity')).toHaveValue('');
   await page.getByLabel('Rounded as Treasury rounds it').check();
-  await expect(page.locator('#oid-total')).toHaveText('$4,115.20');
+  await expect(page.locator('#oid-total')).toHaveText('4,115.20');
 });
 
 test('Enter in a field of the form adds the entry', async ({ page }) => {
@@ -122,32 +122,32 @@ test('a range ending after a Maturity Date locks the End Date at the Maturity Da
   await expect(page.locator('#oid-entry-end')).toHaveValue('2026-01-01');
   await expect(page.locator('#oid-entry-end')).toBeEnabled();
   await add(page, { cusip: '91282CAQ4', quantity: 1 });
-  await expect(rows(page).first().locator('.oid-cell')).toContainText('$28.00');
+  await expect(rows(page).first().locator('.oid-cell')).toContainText('28.00');
   await expect(rows(page).first().locator('.oid-cell')).toContainText('as of 2025-03-01');
   await expect(page.locator('.oid-note', { hasText: 'The latest known' })).toHaveText('The latest known Ref CPI is that of 2025-03-01. The OID of an entry whose End Date is after it is calculated as of that date.');
 });
 
 test('a TIPS acquired on two dates has two entries, a subtotal, and a CUSIP with one entry has none', async ({ page }) => {
   await open(page);
-  await setRange(page, '2024-06-14', '2025-01-01');
-  await add(page, { cusip: '91282CBZ1', quantity: 1 });
+  await setRange(page, '2024-06-14', '2025-02-01');
+  await add(page, { cusip: '91282CBZ1', quantity: 1, end: '2025-01-01' });
   await add(page, { cusip: '91282CBZ1', quantity: 2, start: '2025-01-01', end: '2025-02-01' });
-  await add(page, { cusip: '91282CAQ4', quantity: 1 });
+  await add(page, { cusip: '91282CAQ4', quantity: 1, end: '2025-01-01' });
   await expect(rows(page)).toHaveCount(3);
   await expect(rows(page).nth(0)).toContainText('91282CAQ4');
-  await expect(rows(page).nth(1).locator('.oid-cell')).toHaveText('$13.11');
-  await expect(rows(page).nth(2).locator('.oid-cell')).toHaveText('$5.73');
+  await expect(rows(page).nth(1).locator('.oid-cell')).toHaveText('13.11');
+  await expect(rows(page).nth(2).locator('.oid-cell')).toHaveText('5.73');
   await expect(page.locator('tr.oid-subtotal')).toHaveCount(1);
   await expect(page.locator('tr.oid-subtotal')).toContainText('Subtotal OID of 91282CBZ1');
-  await expect(page.locator('tr.oid-subtotal')).toContainText('$18.84');
-  await expect(page.locator('#oid-total')).toHaveText('$37.12');
+  await expect(page.locator('tr.oid-subtotal')).toContainText('18.84');
+  await expect(page.locator('#oid-total')).toHaveText('37.12');
 });
 
 test('Edit puts the entry in the form and out of the table, and Add returns it with the change', async ({ page }) => {
   await open(page);
   await setRange(page, '2024-06-14', '2025-01-01');
   await add(page, { cusip: '91282CBZ1', quantity: 1 });
-  await expect(page.locator('#oid-total')).toHaveText('$13.11');
+  await expect(page.locator('#oid-total')).toHaveText('13.11');
   await rows(page).first().getByRole('button', { name: 'Edit' }).click();
   await expect(page.locator('table.oid-all')).toHaveCount(0);
   await expect(page.locator('#oid-cusip')).toHaveValue('91282CBZ1');
@@ -157,7 +157,7 @@ test('Edit puts the entry in the form and out of the table, and Add returns it w
   await page.locator('#oid-quantity').fill('3');
   await page.getByRole('button', { name: 'Add' }).click();
   await expect(rows(page)).toHaveCount(1);
-  await expect(page.locator('#oid-total')).toHaveText('$39.33');
+  await expect(page.locator('#oid-total')).toHaveText('39.33');
 });
 
 test('Remove takes the entry out of the table and out of the total', async ({ page }) => {
@@ -165,10 +165,10 @@ test('Remove takes the entry out of the table and out of the total', async ({ pa
   await setRange(page, '2024-06-14', '2025-01-01');
   await add(page, { cusip: '91282CBZ1', quantity: 1 });
   await add(page, { cusip: '91282CAQ4', quantity: 1 });
-  await expect(page.locator('#oid-total')).toHaveText('$31.39');
+  await expect(page.locator('#oid-total')).toHaveText('31.39');
   await rows(page).first().getByRole('button', { name: 'Remove' }).click();
   await expect(rows(page)).toHaveCount(1);
-  await expect(page.locator('#oid-total')).toHaveText('$13.11');
+  await expect(page.locator('#oid-total')).toHaveText('13.11');
   await rows(page).first().getByRole('button', { name: 'Remove' }).click();
   await expect(page.locator('table.oid-all')).toHaveCount(0);
 });
@@ -179,7 +179,7 @@ test('a change of the range leaves the entries as they are, and Edit offers the 
   await add(page, { cusip: '91282CBZ1', quantity: 1 });
   await page.locator('#oid-end').fill('2024-07-01');
   await expect(page.locator('#oid-cusip option')).toHaveCount(2);
-  await expect(page.locator('#oid-total')).toHaveText('$13.11');
+  await expect(page.locator('#oid-total')).toHaveText('13.11');
   await rows(page).first().getByRole('button', { name: 'Edit' }).click();
   await expect(page.locator('#oid-cusip')).toHaveValue('91282CBZ1');
   await expect(page.locator('#oid-entry-end')).toHaveValue('2025-01-01');
@@ -204,18 +204,61 @@ test('Add with no CUSIP, a blank Quantity, or a Start Date after the End Date sh
   await expect(page.locator('table.oid-all')).toHaveCount(0);
 });
 
-test('an End Date after the Maturity Date typed before the range allows it shows its message', async ({ page }) => {
+test('the dates of an entry stay within the range: the fields limit them, leaving a field replaces a date outside, and Add refuses one', async ({ page }) => {
   await open(page);
   await setRange(page, '2024-06-14', '2025-01-01');
-  await add(page, { cusip: '91282CAQ4', quantity: 1, end: '2026-01-01' });
-  await expect(message(page)).toHaveText('The End Date is after the Maturity Date, 2025-10-15. For a TIPS held to maturity, enter the Maturity Date.');
+  await page.locator('#oid-cusip').selectOption('91282CAQ4');
+  await expect(page.locator('#oid-entry-start')).toHaveAttribute('min', '2024-06-14');
+  await expect(page.locator('#oid-entry-start')).toHaveAttribute('max', '2025-01-01');
+  await expect(page.locator('#oid-entry-end')).toHaveAttribute('max', '2025-01-01');
+  await page.locator('#oid-entry-start').fill('2024-01-01');
+  await page.locator('#oid-entry-start').blur();
+  await expect(page.locator('#oid-entry-start')).toHaveValue('2024-06-14');
+  await page.locator('#oid-entry-end').fill('2025-06-01');
+  await page.locator('#oid-entry-end').blur();
+  await expect(page.locator('#oid-entry-end')).toHaveValue('2025-01-01');
+  // a date outside the range still in the field when Enter adds the entry, as the field has not been left
+  await page.locator('#oid-quantity').fill('1');
+  await page.locator('#oid-entry-end').fill('2025-06-01');
+  await page.locator('#oid-entry-end').press('Enter');
+  await expect(message(page)).toHaveText('The Start Date and End Date of an entry cannot be outside the range.');
+  await expect(page.locator('table.oid-all')).toHaveCount(0);
+});
+
+test('a date typed one digit at a time is not replaced until the field is left', async ({ page }) => {
+  await open(page);
+  await setRange(page, '2024-06-14', '2025-01-01');
+  await page.locator('#oid-cusip').selectOption('91282CBZ1');
+  const start = page.locator('#oid-entry-start');
+  for (const partial of ['0002-09-01', '0020-09-01', '0202-09-01', '2024-09-01']) {
+    await start.fill(partial);
+    await expect(start).toHaveValue(partial);
+  }
+});
+
+test('coupons are shown as n.nnn%, no value has a dollar sign, and the values that make up the total are bold', async ({ page }) => {
+  await open(page);
+  await setRange(page, '2024-06-14', '2025-02-01');
+  await expect(page.locator('#oid-cusip option').nth(2)).toHaveText(/1\.750% due 2030-07-15/);
+  await add(page, { cusip: '91282CBZ1', quantity: 1, end: '2025-01-01' });
+  await add(page, { cusip: '91282CBZ1', quantity: 2, start: '2025-01-01', end: '2025-02-01' });
+  await add(page, { cusip: '91282CAQ4', quantity: 1, end: '2025-01-01' });
+  await expect(rows(page).nth(0)).toContainText('0.125%');
+  await expect(rows(page).nth(1)).toContainText('1.750%');
+  await expect(page.locator('table.oid-all')).not.toContainText('$');
+  const weight = loc => loc.evaluate(el => getComputedStyle(el).fontWeight);
+  expect(Number(await weight(rows(page).nth(0).locator('.oid-cell')))).toBeGreaterThanOrEqual(700);   // one entry: counts as it is
+  expect(Number(await weight(rows(page).nth(1).locator('.oid-cell')))).toBeLessThan(700);             // inside a subtotal
+  expect(Number(await weight(rows(page).nth(2).locator('.oid-cell')))).toBeLessThan(700);
+  expect(Number(await weight(page.locator('tr.oid-subtotal td').nth(1)))).toBeGreaterThanOrEqual(700);
+  expect(Number(await weight(page.locator('#oid-total')))).toBeGreaterThanOrEqual(700);
 });
 
 test('an End Date that is the first of a month after the last Ref CPI date uses the CPI-U of three months before', async ({ page }) => {
   await open(page);
   await setRange(page, '2024-06-14', '2025-03-01');
   await add(page, { cusip: '91282CAQ4', quantity: 1 });
-  await expect(page.locator('#oid-total')).toHaveText('$28.00');
+  await expect(page.locator('#oid-total')).toHaveText('28.00');
   await expect(page.locator('.oid-note')).toHaveText('Treasury has not yet published the Ref CPI of 2025-03-01. Each is known from the CPI-U of the month three months earlier, as 31 CFR 356 Appendix B §I.B.3 states for the first day of a month.');
   await expect(rows(page).first().locator('.oid-cell')).not.toContainText('as of');
 });
