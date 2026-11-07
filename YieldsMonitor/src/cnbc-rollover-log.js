@@ -182,6 +182,7 @@ export const CNBC_ROLLOVER_LOG = {
     { from: '2025-05-01', maturity: '2030-04-15' },
     { from: '2025-11-03', maturity: '2030-10-15' }, // issue-date fallback extends earlier than the previously cross-checked 2026-03-20 for this same maturity — superseded, dropped
     { from: '2026-06-01', maturity: '2031-04-15' }, // cross-checked (kept as-is over the derived 2026-05-01 — moot either way, CNBC has no raw data in that gap; see rollover log narrative)
+    { from: '2026-10-28', maturity: '2031-10-15' }, // cross-checked: 2026-10-09 fits the prior maturity (diff 1.5bp); 2026-10-28 and 2026-10-29 sit 10-14bp from it and 2026-10-30 fits this one (diff 0.1bp). CNBC has no 5Y bars between 2026-10-09 and 2026-10-28, so the issue-date fallback date (2026-11-02) is wrong here and the flip is unobservable inside that gap
   ],
   // US10YTIPS: genuinely unresolvable by the empirical cross-check above, not merely
   // unattempted. Consecutive 10-Year TIPS cohorts (issued every Jan/Jul) mature only
