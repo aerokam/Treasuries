@@ -303,3 +303,110 @@ test('a failed load shows the load error and no table', async ({ page }) => {
   await page.getByRole('button', { name: /OID Calculator/ }).click();
   await expect(page.locator('#oid-status')).toContainText('Load error: TipsRef.csv: HTTP 500');
 });
+
+
+// ---- Import CSV (8.3 Import) ----
+
+const importFile = (page, text) => page.locator('#oid-import').setInputFiles({ name: 'orders.csv', mimeType: 'text/csv', buffer: Buffer.from(text) });
+const importMessage = page => page.locator('#oid-import-message');
+
+test('a CSV file of acquisitions gives an entry for each line: par in dollars, a quoted quantity, MM/DD/YYYY or YYYY-MM-DD, an earlier Acquisition Date held from the range, and no Disposition Date held to the range End Date', async ({ page }) => {
+  await open(page);
+  await setRange(page, '2024-06-14', '2025-01-01');
+  await importFile(page, [
+    'CUSIP,QTY,Acquisition date',
+    '91282CAQ4,"20,000",06/14/2024',
+    '91282CAQ4,"$10,000",09/18/2023',
+    '91282CBZ1,"1,000",2024-07-31',
+    '',
+  ].join('\r\n'));
+  await expect(importMessage(page)).toHaveText('Imported 3 of 3 lines.');
+  await expect(rows(page)).toHaveCount(3);
+  // the Acquisition Date of 2023 is held from the Start Date of the range
+  await expect(rows(page).nth(0)).toContainText('91282CAQ4');
+  await expect(rows(page).nth(0).locator('td').nth(3)).toHaveText('20');
+  await expect(rows(page).nth(0).locator('td').nth(4)).toHaveText('2024-06-14');
+  await expect(rows(page).nth(0).locator('td').nth(5)).toHaveText('2025-01-01');
+  await expect(rows(page).nth(0).locator('.oid-cell')).toHaveText('365.67');
+  await expect(rows(page).nth(1).locator('td').nth(3)).toHaveText('10');
+  await expect(rows(page).nth(1).locator('td').nth(4)).toHaveText('2024-06-14');
+  await expect(rows(page).nth(1).locator('.oid-cell')).toHaveText('182.84');
+  await expect(rows(page).nth(2).locator('td').nth(4)).toHaveText('2024-07-31');
+  await expect(rows(page).nth(2).locator('.oid-cell')).toHaveText('13.11');
+  await expect(page.locator('tr.oid-subtotal')).toContainText('Subtotal OID of 91282CAQ4');
+  await expect(page.locator('#oid-total')).toHaveText('561.62');
+});
+
+test('a Disposition Date ends the entry there, a Disposition Date after the range End Date is the range End Date, and an End Date after the Maturity Date is the Maturity Date', async ({ page }) => {
+  await open(page);
+  await setRange(page, '2024-06-14', '2025-02-01');
+  await importFile(page, [
+    'cusip,qty,acquisition date,disposition date',
+    '91282CAQ4,"20,000",06/14/2024,01/01/2025',
+    '91282CBZ1,"1,000",07/31/2024,03/01/2025',
+    '91282CBZ1,"2,000",07/31/2024,',
+  ].join('\n'));
+  await expect(importMessage(page).locator('p')).toHaveText('Imported 3 of 3 lines.');
+  await expect(rows(page).nth(0).locator('td').nth(5)).toHaveText('2025-01-01');
+  await expect(rows(page).nth(1).locator('td').nth(5)).toHaveText('2025-02-01');
+  await expect(rows(page).nth(2).locator('td').nth(5)).toHaveText('2025-02-01');
+});
+
+test('a line that gives no entry is skipped with its line number and reason, and the other lines are imported', async ({ page }) => {
+  await open(page);
+  await setRange(page, '2024-06-14', '2025-01-01');
+  await importFile(page, [
+    'CUSIP,QTY,Acquisition date,Disposition date',            // line 1
+    '91282CAQ4,"20,000",06/14/2024',                          // line 2: good
+    '912828ZZZ,"1,000",06/14/2024',                           // line 3
+    '91282CAQ4,"1,500",06/14/2024',                           // line 4
+    '91282CAQ4,"1,000",06/31/2024',                           // line 5
+    '91282CAQ4,"1,000",06/14/2024,someday',                   // line 6
+    '91282CAQ4,"1,000",03/01/2025',                           // line 7
+    '91282CAQ4,"1,000",01/01/2023,12/31/2023',                // line 8
+    '91282CAQ4,"1,000",06/20/2024,06/19/2024',                // line 9
+    '91282CAQ4',                                              // line 10
+    '91282CXX0,"1,000",06/14/2024',                           // line 11: matured before the range
+  ].join('\r\n'));
+  await expect(rows(page)).toHaveCount(1);
+  await expect(importMessage(page).locator('p')).toHaveText('Imported 1 of 10 lines.');
+  await expect(importMessage(page).locator('li')).toHaveText([
+    'Line 3: 912828ZZZ is not in the TIPS reference data.',
+    'Line 4: Quantity is a par amount that is a multiple of 1,000, from 1,000.',
+    'Line 5: Acquisition Date is not a date.',
+    'Line 6: Disposition Date is not a date.',
+    'Line 7: Acquisition Date is after the End Date of the range.',
+    'Line 8: Disposition Date is before the Start Date of the range.',
+    'Line 9: Disposition Date is before the Acquisition Date.',
+    'Line 10: Needs a CUSIP, a quantity and an Acquisition Date.',
+    'Line 11: The Start Date is after the Maturity Date, 2022-10-15.',
+  ]);
+});
+
+test('importing replaces the entries of the table, an entry added afterward joins them, and a file that gives no entry leaves them', async ({ page }) => {
+  await open(page);
+  await setRange(page, '2024-06-14', '2025-01-01');
+  await add(page, { cusip: '91282CBZ1', quantity: 5 });
+  await expect(rows(page)).toHaveCount(1);
+  await importFile(page, 'CUSIP,QTY,Acquisition date\n91282CAQ4,"20,000",06/14/2024\n');
+  await expect(rows(page)).toHaveCount(1);
+  await expect(rows(page).first()).toContainText('91282CAQ4');
+  await add(page, { cusip: '91282CBZ1', quantity: 1 });
+  await expect(rows(page)).toHaveCount(2);
+  await importFile(page, 'CUSIP,QTY,Acquisition date\n912828ZZZ,"1,000",06/14/2024\n');
+  await expect(importMessage(page).locator('p')).toHaveText('Imported 0 of 1 lines.');
+  await expect(rows(page)).toHaveCount(2);
+  await importFile(page, 'CUSIP,QTY,Acquisition date\n');
+  await expect(importMessage(page)).toHaveText('The file has no lines to import.');
+  await expect(rows(page)).toHaveCount(2);
+});
+
+test('importing waits for the range', async ({ page }) => {
+  await open(page);
+  await importFile(page, 'CUSIP,QTY,Acquisition date\n91282CAQ4,"20,000",06/14/2024\n');
+  await expect(importMessage(page)).toHaveText('Enter a Start Date and an End Date for the range.');
+  await expect(page.locator('table.oid-all')).toHaveCount(0);
+  await setRange(page, '2024-06-14', '2025-01-01');
+  await importFile(page, 'CUSIP,QTY,Acquisition date\n91282CAQ4,"20,000",06/14/2024\n');
+  await expect(rows(page)).toHaveCount(1);
+});

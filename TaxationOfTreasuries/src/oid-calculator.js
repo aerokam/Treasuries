@@ -4,6 +4,7 @@
 
 import { fetchTipsRefRows, fetchRefCpiRows, fetchMonthlyCpiNsa } from '../../shared/src/market-data.js';
 import { initDatePicker } from '../../shared/src/date-picker.js';
+import { parseOrdersFile, entryOfLine } from './orders-file.js';
 import { calculateTipsOid, tipsOutstandingInRange, rangeDatesOf, oidByCusip, TREASURY_ROUNDING, NO_ROUNDING } from '../../shared/src/tips-oid.js';
 
 const STYLE = `
@@ -23,6 +24,11 @@ const STYLE = `
   .oid-range fieldset { border: 1px solid var(--border-light); border-radius: 4px; padding: 4px 12px 6px; }
   .oid-range fieldset legend { font-size: 13px; font-weight: 600; color: var(--portal-text-muted); padding: 0 4px; }
   .oid-range fieldset label { flex-direction: row; align-items: center; gap: 6px; font-weight: 400; font-size: 14px; color: var(--portal-text-main); }
+  .oid-import { display: flex; flex-wrap: wrap; gap: 14px 22px; align-items: flex-end; margin-bottom: 8px; }
+  .oid-import label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 600; color: var(--portal-text-muted); }
+  #oid-import-message { font-size: 13px; margin: 0 0 12px; }
+  #oid-import-message p { margin: 0 0 4px; }
+  #oid-import-message ul { margin: 2px 0 0; padding-left: 20px; color: #b91c1c; }
   .oid-entry { padding-top: 12px; border-top: 1px solid var(--border-light); }
   .oid-entry button, #oid-result button { font-size: 14px; padding: 6px 14px; border: 1px solid var(--border-light); border-radius: 4px; background: #fff; color: var(--portal-text-main); cursor: pointer; }
   #oid-form-message { min-height: 1.4em; margin: 0 0 8px; color: #b91c1c; font-weight: 600; }
@@ -45,6 +51,7 @@ const HELP = `
     <li>The Start Date and End Date at the top state the range. The CUSIPs offered are the TIPS outstanding in it, and a new entry takes its dates.</li>
     <li>Choose a CUSIP, enter the Quantity, Start Date and End Date of one acquisition, and press Add. A CUSIP acquired on different dates has one entry for each.</li>
     <li>Quantity is the number of $1,000 par units. A Quantity of 1 is $1,000 par.</li>
+    <li>Import CSV replaces the entries with those of a file of acquisitions, one line each: CUSIP, quantity as par (50,000 is a Quantity of 50), Acquisition Date and, optionally, Disposition Date. An Acquisition Date before the range is held from the Start Date of the range. A TIPS with no Disposition Date is held to the End Date of the range, or to its Maturity Date when that is earlier.</li>
     <li>Start Date is the first day the TIPS is held in the tax year:
       <ul>
         <li>A TIPS bought in the tax year: the Settlement Date of the purchase, not the Trade Date.</li>
@@ -120,6 +127,8 @@ export async function render(container) {
           <label><input type="radio" name="oid-rounding" value="${TREASURY_ROUNDING}"> Rounded as Treasury rounds it</label>
         </fieldset>
       </div>
+      <div class="oid-import"><label>Import CSV<input type="file" id="oid-import" accept=".csv,text/csv"></label></div>
+      <div id="oid-import-message"></div>
       <form class="oid-entry" id="oid-entry" novalidate>
         <label>CUSIP<select id="oid-cusip"><option value=""></option></select></label>
         <label>Quantity<input type="number" id="oid-quantity" min="1" step="1"></label>
@@ -269,6 +278,43 @@ export async function render(container) {
     syncForm();
     renderTable();
     cusipEl.focus();
+  });
+
+  // ---- Import (8.3 Import) ----
+  $('oid-import').addEventListener('change', async ev => {
+    const file = ev.target.files[0];
+    if (!file) return;
+    ev.target.value = ''; // the same file can be chosen again
+    const out = $('oid-import-message');
+    const say = text => { const p = document.createElement('p'); p.textContent = text; out.append(p); };
+    out.replaceChildren();
+    if (!rangeOk()) { say(rangeMessage()); return; }
+    const lines = parseOrdersFile(await file.text());
+    if (!lines.length) { say('The file has no lines to import.'); return; }
+    const imported = [], skipped = [];
+    for (const line of lines) {
+      const r = entryOfLine(line, { tipsRows, rangeStart: rangeStartEl.value, rangeEnd: rangeEndEl.value });
+      let reason = r.reason;
+      if (!reason) {
+        const result = calculateTipsOid({ tips: r.tips, quantity: r.quantity, startDate: r.startDate, endDate: r.endDate, refCpiRows, monthlyCpi, rounding: rounding() });
+        if (!result.ok) reason = messageFor(result, r.tips, refCpiRows);
+      }
+      if (reason) skipped.push({ number: line.number, reason });
+      else imported.push({ id: nextId++, tips: r.tips, quantity: r.quantity, startDate: r.startDate, endDate: r.endDate });
+    }
+    if (imported.length) {
+      entries = imported;
+      startEdited = endEdited = editing = false;
+      pinned = null;
+      syncForm();
+      renderTable();
+    }
+    say(`Imported ${imported.length} of ${lines.length} lines.`);
+    if (skipped.length) {
+      const ul = document.createElement('ul');
+      for (const s of skipped) { const li = document.createElement('li'); li.textContent = `Line ${s.number}: ${s.reason}`; ul.append(li); }
+      out.append(ul);
+    }
   });
 
   // ---- Edit and Remove ----
