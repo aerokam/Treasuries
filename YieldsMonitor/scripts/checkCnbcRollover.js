@@ -191,6 +191,13 @@ export async function bisectFlipDate(sym, oldCandidate, newCandidate, archivedYi
   return null; // exhausted the lookback window without ever finding the old cohort
 }
 
+// The flip date of a mismatch: the cross-check's when it resolved one, otherwise the date of this
+// check, the first date on which the live quote was found on the new maturity (the check runs daily).
+export function pinFromResult(result, detectionIso) {
+  if (result) return { flipDate: result.flipDate, newFit: result.newFit, oldFit: result.oldFit };
+  return { flipDate: detectionIso, newFit: null, oldFit: null };
+}
+
 function insertLogEntry(text, sym, entryLine) {
   const re = new RegExp(`(  ${sym}: \\[[\\s\\S]*?)(\\n  \\],)`);
   if (!re.test(text)) throw new Error(`Could not find ${sym} array in ${REL_LOG_MODULE}`);
@@ -263,12 +270,13 @@ export async function main() {
     }
 
     const result = await bisectFlipDate(sym, oldCandidate, newCandidate, archivedYields[sym]);
-    if (!result) {
-      log(`${sym}: could not resolve a clean flip date within ${LOOKBACK_DAYS} days — leaving unpinned for manual review.`);
-      continue;
+    const pin = pinFromResult(result, toIsoDate(new Date()));
+    if (result) {
+      log(`${sym}: pinned flip date ${pin.flipDate} -> ${live.maturity} (new fit ${result.newFit.diffNewBp.toFixed(1)}bp, old fit ${result.oldFit.diffOldBp.toFixed(1)}bp on ${result.oldFit.iso})`);
+    } else {
+      log(`${sym}: the cross-check could not resolve a clean flip date within ${LOOKBACK_DAYS} days — pinning the detection date ${pin.flipDate} -> ${live.maturity}.`);
     }
-    log(`${sym}: pinned flip date ${result.flipDate} -> ${live.maturity} (new fit ${result.newFit.diffNewBp.toFixed(1)}bp, old fit ${result.oldFit.diffOldBp.toFixed(1)}bp on ${result.oldFit.iso})`);
-    pinned.push({ sym, flipDate: result.flipDate, maturity: live.maturity, newFit: result.newFit, oldFit: result.oldFit });
+    pinned.push({ sym, maturity: live.maturity, ...pin });
   }
 
   if (!pinned.length) { log('Nothing to pin. Done.'); return; }
@@ -277,7 +285,9 @@ export async function main() {
   let logText = fs.readFileSync(LOG_MODULE_PATH, 'utf8');
   let specText = fs.readFileSync(SPEC_MD_PATH, 'utf8');
   for (const p of pinned) {
-    const evidence = `bisected between ${p.oldFit.iso} (old cohort, ~${p.oldFit.diffOldBp.toFixed(1)}bp) and ${p.flipDate} (new cohort, ~${p.newFit.diffNewBp.toFixed(1)}bp)`;
+    const evidence = p.oldFit
+      ? `bisected between ${p.oldFit.iso} (old cohort, ~${p.oldFit.diffOldBp.toFixed(1)}bp) and ${p.flipDate} (new cohort, ~${p.newFit.diffNewBp.toFixed(1)}bp)`
+      : `detection date: the first daily check that found the live quote on this maturity (the cross-check could not resolve the flip date)`;
     logText = insertLogEntry(logText, p.sym, `{ from: '${p.flipDate}', maturity: '${p.maturity}' }, // auto-pinned ${today} by checkCnbcRollover.js — ${evidence}`);
     specText = insertSpecRow(specText, p.sym, `| \`${p.sym}\` | ${p.flipDate} | ${p.maturity} | Auto-pinned by the daily rollover check (\`YieldsMonitor/scripts/checkCnbcRollover.js\`) — ${evidence} |`);
   }

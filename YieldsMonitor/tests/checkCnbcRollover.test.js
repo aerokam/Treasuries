@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { shouldPush } from '../scripts/checkCnbcRollover.js';
+import { shouldPush, pinFromResult } from '../scripts/checkCnbcRollover.js';
 
 test('pushes when local main has no unpushed commits and origin/main is not ahead', () => {
   assert.equal(shouldPush({ ahead: 0, behind: 0 }).push, true);
@@ -28,4 +28,15 @@ test('skips the push when a count could not be read', () => {
   assert.equal(shouldPush({ ahead: null, behind: null }).push, false);
   assert.equal(shouldPush({ ahead: 0, behind: null }).push, false);
   assert.equal(shouldPush({ ahead: NaN, behind: 0 }).push, false);
+});
+
+test('the flip date is the cross-check date when the cross-check resolved one', () => {
+  const r = { flipDate: '2026-10-28', newFit: { diffNewBp: 0.1 }, oldFit: { diffOldBp: 1.5 } };
+  assert.equal(pinFromResult(r, '2026-11-07').flipDate, '2026-10-28');
+});
+
+test('the flip date is the detection date when the cross-check did not resolve one', () => {
+  const p = pinFromResult(null, '2026-11-07');
+  assert.equal(p.flipDate, '2026-11-07');
+  assert.equal(p.oldFit, null);
 });
