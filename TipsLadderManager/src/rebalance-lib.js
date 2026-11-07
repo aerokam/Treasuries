@@ -281,10 +281,13 @@ export function inferFirstYearFromHoldings({ holdings, tipsMarketData, refCPI, s
 // number of Future 30Y years — i.e. lastYear — is encoded in the cost-weighted split between the two
 // covers, which is DARA-independent (a pure duration match). So we forward-reconstruct: for each
 // candidate lastYear, predict the upper-cover weight via the SAME future30yParamsCore + bracketWeights
-// the build uses, and return the year whose predicted split matches the file. Returns null when there
-// is no Cover Excess (ladder ends at the last actual TIPS) or the covers are missing — leaving the
-// derivation from the held maturity years in place. A simple excess/DARA ratio (as the gap uses) does NOT work
-// here: the upper cover is deep-discount and a long run of Future 30Y years carries a large LMI cascade.
+// the build uses. The file's quantities are whole numbers, so the observed weight is known only within
+// half a TIPS of each quantity; a candidate fits when its weight lies in that range. One fitting year is
+// returned. Two or more fitting years cannot be told apart by the file (a small DARA, where half a TIPS
+// is a large part of the weight), so none is returned. With no fitting year the nearest is returned.
+// Returns null when there is no Cover Excess (ladder ends at the last actual TIPS) or the covers are
+// missing — leaving the derivation from the held maturity years in place.
+// A simple excess/DARA ratio (as the gap uses) does NOT work here: the upper cover is deep-discount and a long run of Future 30Y years carries a large LMI cascade.
 export function inferLastYearFromHoldings({ holdings, tipsMarketData, refCPI, settlementDate, bondHolidays = new Set() }) {
   const limit = future30yLimit({ tipsMarketData, settlementDate, refCPI, bondHolidays });
   const covers = limit.covers;
@@ -309,8 +312,14 @@ export function inferLastYearFromHoldings({ holdings, tipsMarketData, refCPI, se
 
   // Cost-weighted observed upper weight, matched against the build's predicted weight per candidate year.
   const obsUW = (obsUp * cpbU) / ((obsUp * cpbU) + (obsLo * cpbL));
+  // The range of the upper weight for quantities within half a TIPS of the observed ones.
+  const upperWeightOf = (lo, up) => (up * cpbU) / ((up * cpbU) + (lo * cpbL));
+  const fitLow = upperWeightOf(obsLo + 0.5, Math.max(obsUp - 0.5, 0));
+  const fitHigh = upperWeightOf(Math.max(obsLo - 0.5, 0), obsUp + 0.5);
+  const EPS = 1e-9;
   const NOMINAL_DARA = 100000;   // predicted upper weight is scale-invariant; any nominal DARA works
   let best = null;
+  const fits = [];
   for (let L = maxTipsYear + 1; L <= Math.max(limit.lastYearMax, maxTipsYear + 1); L++) {
     const years = [];
     for (let y = maxTipsYear + 1; y <= L; y++) years.push(y);
@@ -318,7 +327,10 @@ export function inferLastYearFromHoldings({ holdings, tipsMarketData, refCPI, se
     const { upperWeight } = bracketWeights(covers.lowerDuration, covers.upperDuration, fp.avgDuration);
     const err = Math.abs(upperWeight - obsUW);
     if (!best || err < best.err) best = { L, err };
+    if (upperWeight >= fitLow - EPS && upperWeight <= fitHigh + EPS) fits.push(L);
   }
+  if (fits.length === 1) return fits[0];
+  if (fits.length > 1) return null;
   return best ? best.L : null;
 }
 

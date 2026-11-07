@@ -1342,12 +1342,44 @@ console.log(`\nRebalance: same DARA=20000, lastYear=${MAX_YEAR + 1} corner case,
     .map(d => ({ cusip: d.cusip, qty: d.fundedYearQty + d.excessQty, excessQty: d.excessQty }))
     .filter(h => h.qty > 0);
   const { summary } = runRebalance({ dara, bracketMode: '2bracket', holdings, tipsMarketData, refCPI, settlementDate });
-  assert('rebalance infers lastYear from the holdings', summary.lastYear, lastYear);
+  // At this DARA the Cover Excess is about 13 TIPS, and half a TIPS is a large part of the split, so the
+  // quantities may not settle the year (2.0 §Future 30Y Rungs). The year is the built one or none, never another.
+  assert('rebalance infers lastYear from the holdings, or none when the quantities cannot settle it', [lastYear, MAX_YEAR].includes(summary.lastYear), true);
   assert('rebal: no weight is negative', Math.min(summary.future30yLowerWeight, summary.future30yUpperWeight) >= 0, true);
   assert('rebal: no weight exceeds 1', Math.max(summary.future30yLowerWeight, summary.future30yUpperWeight) <= 1, true);
   assert('rebal: no excess quantity is negative', Math.min(summary.future30yLowerExQty, summary.future30yUpperExQty) >= 0, true);
   console.log(`        weights lower/upper: ${summary.future30yLowerWeight?.toFixed(4)} / ${summary.future30yUpperWeight?.toFixed(4)}`);
   console.log(`        exQty  lower/upper:  ${summary.future30yLowerExQty} / ${summary.future30yUpperExQty}`);
+}
+
+// ── Test: the last year recovered from the Cover Excess is the built one, or none — never another year ──
+// The held quantities are whole numbers, so the split of the Cover Excess is known only within half a TIPS of
+// each quantity (2.0 §Future 30Y Rungs). A small DARA leaves two years fitting and recovers none. Swept over
+// DARAs and over one to three Future 30Y years; a large DARA is always settled, whatever the day's quotes.
+console.log('\nInferLastYear: the built last year or none, at every DARA; always the built year at a large DARA');
+{
+  const wrong = [], unsettled = [];
+  for (const lastYear of [MAX_YEAR + 1, MAX_YEAR + 2, MAX_YEAR + 3]) {
+    for (let dara = 6000; dara <= 120000; dara += 1500) {
+      const { details } = runBuild({ dara, lastYear, tipsMarketData, refCPI, settlementDate });
+      const holdings = details.map(d => ({ cusip: d.cusip, qty: d.fundedYearQty + d.excessQty, excessQty: d.excessQty })).filter(h => h.qty > 0);
+      const got = inferLastYearFromHoldings({ holdings, tipsMarketData, refCPI, settlementDate, bondHolidays });
+      if (got != null && got !== lastYear) wrong.push(`${lastYear}@${dara}->${got}`);
+      if (dara >= 100000 && got !== lastYear) unsettled.push(`${lastYear}@${dara}->${got}`);
+    }
+  }
+  assert('no DARA recovers a year other than the built last year', wrong.join(' '), '');
+  assert('a DARA of 100,000 or more always recovers the built last year', unsettled.join(' '), '');
+  // Quantities that two years fit recover none: with the covers held in a few TIPS each, the split is within half a
+  // TIPS of more than one year, for some pair of quantities.
+  const { lowerCoverBond, upperCoverBond } = future30yLimit({ tipsMarketData, settlementDate, refCPI, bondHolidays }).covers;
+  let ambiguous = 0, settled = 0;
+  for (let lo = 1; lo <= 30; lo++) for (let up = 1; up <= 30; up++) {
+    const got = inferLastYearFromHoldings({ holdings: [{ cusip: lowerCoverBond.cusip, qty: lo, excessQty: lo }, { cusip: upperCoverBond.cusip, qty: up, excessQty: up }], tipsMarketData, refCPI, settlementDate, bondHolidays });
+    if (got == null) ambiguous++; else settled++;
+  }
+  assert('some quantities of the covers fit more than one year and recover none', ambiguous > 0, true);
+  assert('some quantities of the covers fit one year and recover it', settled > 0, true);
 }
 
 // ── Test: Rebalance — lastYear defaults to the latest maturity year held, not the last
