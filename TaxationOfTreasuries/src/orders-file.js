@@ -34,7 +34,7 @@ export function parseOrdersFile(text) {
 }
 
 // The transaction of one line, { number, tips, quantity (negative for a sale), date }, or { reason } when the line gives none.
-export function transactionOfLine(line, { tipsRows, rangeEnd }) {
+export function transactionOfLine(line, { tipsRows }) {
   const [cusipText, parText, dateText] = line.cells;
   if (line.cells.length < 3 || !cusipText || !parText || !dateText) return { reason: 'Needs a CUSIP, a quantity and a Settlement Date.' };
   const cusip = cusipText.toUpperCase();
@@ -44,7 +44,6 @@ export function transactionOfLine(line, { tipsRows, rangeEnd }) {
   if (!Number.isInteger(par) || par === 0 || par % 1000 !== 0) return { reason: 'Quantity is a par amount that is a multiple of 1,000, negative for a sale.' };
   const date = isoDateOf(dateText);
   if (!date) return { reason: 'Settlement Date is not a date.' };
-  if (date > rangeEnd) return { reason: 'Settlement Date is after the End Date of the range.' };
   return { number: line.number, tips, quantity: par / 1000, date };
 }
 
@@ -54,6 +53,7 @@ export function entriesOfTransactions(transactions, { rangeStart, rangeEnd }) {
   const entries = [];
   const byCusip = new Map();
   for (const t of transactions) {
+    if (t.date > rangeEnd) continue; // after the range: no holding within it
     if (!byCusip.has(t.tips.cusip)) byCusip.set(t.tips.cusip, []);
     byCusip.get(t.tips.cusip).push(t);
   }

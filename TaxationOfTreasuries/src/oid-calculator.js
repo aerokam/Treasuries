@@ -51,7 +51,7 @@ const HELP = `
     <li>The Start Date and End Date at the top state the range. The CUSIPs offered are the TIPS outstanding in it, and a new entry takes its dates.</li>
     <li>Choose a CUSIP, enter the Quantity, Start Date and End Date of one acquisition, and press Add. A CUSIP acquired on different dates has one entry for each.</li>
     <li>Quantity is the number of $1,000 par units. A Quantity of 1 is $1,000 par.</li>
-    <li>Import CSV replaces the entries with those of a file of transactions, one line each: CUSIP, quantity as par (50,000 is a Quantity of 50, and -50,000 is a sale of 50) and Settlement Date. A sale ends the earliest acquisitions of its CUSIP first. An acquisition before the range is held from the Start Date of the range. A TIPS not sold is held to the End Date of the range, or to its Maturity Date when that is earlier.</li>
+    <li>Import CSV replaces the entries with those of a file of transactions, one line each: CUSIP, quantity as par (50,000 is a Quantity of 50, and -50,000 is a sale of 50) and Settlement Date. A sale ends the earliest acquisitions of its CUSIP first. An acquisition before the range is held from the Start Date of the range. A TIPS not sold is held to the End Date of the range, or to its Maturity Date when that is earlier. The file stays loaded, so a change of the range shows the entries of another year.</li>
     <li>Start Date is the first day the TIPS is held in the tax year:
       <ul>
         <li>A TIPS bought in the tax year: the Settlement Date of the purchase, not the Trade Date.</li>
@@ -163,7 +163,8 @@ export async function render(container) {
   status.textContent = `Ref CPI from ${refCpiRows[0].date} through ${refCpiRows[refCpiRows.length - 1].date}`;
 
   // The entries, and the state of the form (8.3 Entry form).
-  let entries = [];       // { id, tips, quantity, startDate, endDate }
+  let entries = [];       // { id, tips, quantity, startDate, endDate }; a hand entry also followStart, followEnd; an entry of the file imported: true
+  let file = null;        // the TIPS Transactions File last imported: { total, transactions, errors }
   let nextId = 1;
   let startEdited = false, endEdited = false;  // the user changed the field since it took a date of the range
   let editing = false;    // the form holds an entry put there by Edit, whose dates are kept as they are
@@ -213,10 +214,30 @@ export async function render(container) {
 
   const syncForm = () => { refreshList(); applyDefaults(); limitsToRange(); setMessage(rangeMessage()); };
 
+  // The entries of the table: a hand entry is shown only while its TIPS is outstanding in the range, with the dates it
+  // states within the range, or the dates of the range when it took them from the range (8.3 Table of entries).
+  const shownEntries = () => {
+    if (!rangeOk()) return entries;
+    const rangeStart = rangeStartEl.value, rangeEnd = rangeEndEl.value;
+    const outstanding = new Set(tipsOutstandingInRange(tipsRows, rangeStart, rangeEnd).map(t => t.cusip));
+    return entries.flatMap(e => {
+      if (e.imported) return [e];
+      if (!outstanding.has(e.tips.cusip)) return [];
+      const d = rangeDatesOf(e.tips, rangeStart, rangeEnd);
+      let startDate = e.followStart ? d.startDate : withinRange(e.startDate);
+      if (startDate < e.tips.originalIssueDate) startDate = e.tips.originalIssueDate;
+      let endDate = e.followEnd ? d.endDate : withinRange(e.endDate);
+      if (endDate > e.tips.maturity) endDate = e.tips.maturity;
+      if (startDate > endDate || (startDate === endDate && e.startDate < e.endDate)) return [];
+      return [{ ...e, startDate, endDate }];
+    });
+  };
+
   // ---- Table of entries ----
   const renderTable = () => {
-    if (!entries.length) { resultEl.innerHTML = ''; return; }
-    const calc = entries.map(e => ({
+    const shown = shownEntries();
+    if (!shown.length) { resultEl.innerHTML = ''; return; }
+    const calc = shown.map(e => ({
       e,
       result: calculateTipsOid({ tips: e.tips, quantity: e.quantity, startDate: e.startDate, endDate: e.endDate, refCpiRows, monthlyCpi, rounding: rounding() }),
     }));
@@ -270,7 +291,7 @@ export async function render(container) {
     if (outsideRange(startEl.value) || outsideRange(endDate)) { setMessage('The Start Date and End Date of an entry cannot be outside the range.'); return; }
     const result = calculateTipsOid({ tips, quantity, startDate, endDate, refCpiRows, monthlyCpi, rounding: rounding() });
     if (!result.ok) { setMessage(messageFor(result, tips, refCpiRows)); return; }
-    entries.push({ id: nextId++, tips, quantity, startDate, endDate });
+    entries.push({ id: nextId++, tips, quantity, startDate, endDate, followStart: !startEdited, followEnd: !endEdited });
     cusipEl.value = '';
     quantityEl.value = '';
     startEdited = endEdited = editing = false;
@@ -281,50 +302,64 @@ export async function render(container) {
   });
 
   // ---- Import (8.3 Import) ----
-  $('oid-import').addEventListener('change', async ev => {
-    const file = ev.target.files[0];
-    if (!file) return;
-    ev.target.value = ''; // the same file can be chosen again
-    const out = $('oid-import-message');
-    const say = text => { const p = document.createElement('p'); p.textContent = text; out.append(p); };
-    out.replaceChildren();
-    if (!rangeOk()) { say(rangeMessage()); return; }
-    const lines = parseOrdersFile(await file.text());
-    if (!lines.length) { say('The file has no lines to import.'); return; }
-    const range = { rangeStart: rangeStartEl.value, rangeEnd: rangeEndEl.value };
-    const imported = [], skipped = new Map(), transactions = [];
-    for (const line of lines) {
-      const t = transactionOfLine(line, { tipsRows, ...range });
-      if (t.reason) skipped.set(line.number, t.reason);
-      else transactions.push(t);
-    }
-    for (const e of entriesOfTransactions(transactions, range)) {
-      const result = calculateTipsOid({ tips: e.tips, quantity: e.quantity, startDate: e.startDate, endDate: e.endDate, refCpiRows, monthlyCpi, rounding: rounding() });
-      if (!result.ok) { if (!skipped.has(e.number)) skipped.set(e.number, messageFor(result, e.tips, refCpiRows)); }
-      else imported.push({ id: nextId++, tips: e.tips, quantity: e.quantity, startDate: e.startDate, endDate: e.endDate });
-    }
-    if (imported.length) {
-      entries = imported;
-      startEdited = endEdited = editing = false;
-      pinned = null;
-      syncForm();
-      renderTable();
-    }
-    say(`Imported ${lines.length - skipped.size} of ${lines.length} lines.`);
+  const importOut = $('oid-import-message');
+  const showImport = (shownRows, total, skipped) => {
+    importOut.replaceChildren();
+    const p = document.createElement('p');
+    p.textContent = `${shownRows} out of ${total} rows have TIPS that were outstanding in the date range.`;
+    importOut.append(p);
     if (skipped.size) {
       const ul = document.createElement('ul');
-      for (const [number, reason] of [...skipped].sort((a, b) => a[0] - b[0])) { const li = document.createElement('li'); li.textContent = `Line ${number}: ${reason}`; ul.append(li); }
-      out.append(ul);
+      for (const [number, reason] of [...skipped].sort((x, y) => x[0] - y[0])) { const li = document.createElement('li'); li.textContent = `Line ${number}: ${reason}`; ul.append(li); }
+      importOut.append(ul);
     }
+  };
+  // The entries of the file for the range (8.3 Import), derived again when the range changes.
+  const deriveImported = () => {
+    const range = { rangeStart: rangeStartEl.value, rangeEnd: rangeEndEl.value };
+    const outstanding = new Set(tipsOutstandingInRange(tipsRows, range.rangeStart, range.rangeEnd).map(t => t.cusip));
+    const inRange = file.transactions.filter(t => outstanding.has(t.tips.cusip));
+    const skipped = new Map(file.errors);
+    const derived = [];
+    for (const e of entriesOfTransactions(inRange, range)) {
+      const result = calculateTipsOid({ tips: e.tips, quantity: e.quantity, startDate: e.startDate, endDate: e.endDate, refCpiRows, monthlyCpi, rounding: rounding() });
+      if (!result.ok) { if (!skipped.has(e.number)) skipped.set(e.number, messageFor(result, e.tips, refCpiRows)); }
+      else derived.push({ id: nextId++, imported: true, tips: e.tips, quantity: e.quantity, startDate: e.startDate, endDate: e.endDate });
+    }
+    entries = entries.filter(e => !e.imported).concat(derived);
+    showImport(inRange.length, file.total, skipped);
+  };
+  $('oid-import').addEventListener('change', async ev => {
+    const chosen = ev.target.files[0];
+    if (!chosen) return;
+    ev.target.value = ''; // the same file can be chosen again
+    const say = text => { importOut.replaceChildren(); const p = document.createElement('p'); p.textContent = text; importOut.append(p); };
+    if (!rangeOk()) { say(rangeMessage()); return; }
+    const lines = parseOrdersFile(await chosen.text());
+    if (!lines.length) { say('The file has no lines to import.'); return; }
+    const transactions = [], errors = new Map();
+    for (const line of lines) {
+      const t = transactionOfLine(line, { tipsRows });
+      if (t.reason) errors.set(line.number, t.reason);
+      else transactions.push(t);
+    }
+    if (!transactions.length) { showImport(0, lines.length, errors); return; }
+    file = { total: lines.length, transactions, errors };
+    entries = [];
+    startEdited = endEdited = editing = false;
+    pinned = null;
+    deriveImported();
+    syncForm();
+    renderTable();
   });
 
   // ---- Edit and Remove ----
   resultEl.addEventListener('click', ev => {
     const btn = ev.target.closest('button[data-id]');
     if (!btn) return;
-    const e = entries.find(x => x.id === Number(btn.dataset.id));
+    const e = shownEntries().find(x => x.id === Number(btn.dataset.id));
     if (!e) return;
-    entries = entries.filter(x => x !== e);
+    entries = entries.filter(x => x.id !== e.id);
     if (btn.classList.contains('oid-edit')) {
       pinned = e.tips;
       startEdited = endEdited = editing = true;
@@ -341,7 +376,8 @@ export async function render(container) {
   });
 
   // ---- Changes to the fields ----
-  for (const el of [rangeStartEl, rangeEndEl]) el.addEventListener('input', syncForm);
+  // A change of the range derives the entries of the file again and shows the hand entries within the new range.
+  for (const el of [rangeStartEl, rangeEndEl]) el.addEventListener('input', () => { syncForm(); if (file && rangeOk()) deriveImported(); renderTable(); });
   cusipEl.addEventListener('change', () => { applyDefaults(); setMessage(rangeMessage()); });
   startEl.addEventListener('input', () => { startEdited = true; });
   endEl.addEventListener('input', () => { endEdited = true; });

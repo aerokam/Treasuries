@@ -173,16 +173,36 @@ test('Remove takes the entry out of the table and out of the total', async ({ pa
   await expect(page.locator('table.oid-all')).toHaveCount(0);
 });
 
-test('a change of the range leaves the entries as they are, and Edit offers the TIPS of its entry', async ({ page }) => {
+test('a change of the range hides the entry of a TIPS not outstanding in it and shows the entry again when it is, and Edit offers the TIPS of its entry', async ({ page }) => {
   await open(page);
   await setRange(page, '2024-06-14', '2025-01-01');
   await add(page, { cusip: '91282CBZ1', quantity: 1 });
-  await page.locator('#oid-end').fill('2024-07-01');
-  await expect(page.locator('#oid-cusip option')).toHaveCount(2);
   await expect(page.locator('#oid-total')).toHaveText('13.11');
   await rows(page).first().getByRole('button', { name: 'Edit' }).click();
   await expect(page.locator('#oid-cusip')).toHaveValue('91282CBZ1');
-  await expect(page.locator('#oid-entry-end')).toHaveValue('2025-01-01');
+  await page.locator('#oid-end').fill('2024-07-01');   // before the Original Issue Date of the second TIPS
+  await expect(page.locator('#oid-cusip')).toHaveValue('91282CBZ1');
+  await page.locator('#oid-end').fill('2025-01-01');
+  await page.getByRole('button', { name: 'Add' }).click();
+  await expect(page.locator('#oid-total')).toHaveText('13.11');
+  await page.locator('#oid-end').fill('2024-07-01');
+  await expect(page.locator('table.oid-all')).toHaveCount(0);
+  await page.locator('#oid-end').fill('2025-01-01');
+  await expect(page.locator('#oid-total')).toHaveText('13.11');
+});
+
+test('a change of the range shows an entry with the dates of the range as the dates of the new range, and an entry with dates the user stated with those dates within the new range, or not at all when none of them are', async ({ page }) => {
+  await open(page);
+  await setRange(page, '2024-06-14', '2025-01-01');
+  await add(page, { cusip: '91282CAQ4', quantity: 1 });                                             // takes the dates of the range
+  await add(page, { cusip: '91282CAQ4', quantity: 2, start: '2024-06-14', end: '2025-01-01' });      // states its dates
+  expect(await tableDates(page)).toEqual([['1', '2024-06-14', '2025-01-01'], ['2', '2024-06-14', '2025-01-01']]);
+  await setRange(page, '2024-07-31', '2025-02-01');
+  expect(await tableDates(page)).toEqual([['1', '2024-07-31', '2025-02-01'], ['2', '2024-07-31', '2025-01-01']]);
+  await setRange(page, '2024-06-14', '2025-01-01');
+  expect(await tableDates(page)).toEqual([['1', '2024-06-14', '2025-01-01'], ['2', '2024-06-14', '2025-01-01']]);
+  await setRange(page, '2025-01-01', '2025-02-01');                                                 // after the stated End Date
+  expect(await tableDates(page)).toEqual([['1', '2025-01-01', '2025-02-01']]);
 });
 
 test('Add with no CUSIP, a blank Quantity, or a Start Date after the End Date shows its message and adds nothing', async ({ page }) => {
@@ -322,7 +342,7 @@ test('a CSV file of purchases gives an entry for each line: par in dollars, a qu
     '91282CBZ1,"1,000",2024-07-31',
     '',
   ].join('\r\n'));
-  await expect(importMessage(page)).toHaveText('Imported 3 of 3 lines.');
+  await expect(importMessage(page)).toHaveText('3 out of 3 rows have TIPS that were outstanding in the date range.');
   await expect(rows(page)).toHaveCount(3);
   // the Settlement Date of 2023 is held from the Start Date of the range
   await expect(rows(page).nth(0)).toContainText('91282CAQ4');
@@ -348,7 +368,7 @@ test('a sale (negative quantity) ends the earliest acquisitions of its CUSIP fir
     '91282CAQ4,"10,000",07/31/2024',
     '91282CAQ4,"-25,000",01/01/2025',
   ].join('\n'));
-  await expect(importMessage(page)).toHaveText('Imported 3 of 3 lines.');
+  await expect(importMessage(page)).toHaveText('3 out of 3 rows have TIPS that were outstanding in the date range.');
   expect(await tableDates(page)).toEqual([
     ['20', '2024-06-14', '2025-01-01'],
     ['5', '2024-07-31', '2025-02-01'],
@@ -368,7 +388,7 @@ test('a sale of more than the acquisitions of the file was acquired before the r
     '91282CBZ1,"-1,000",07/31/2024',         // 6: a sale ahead of its purchase in the file, on one day
     '91282CBZ1,"1,000",07/31/2024',          // 7
   ].join('\n'));
-  await expect(importMessage(page)).toHaveText('Imported 6 of 6 lines.');
+  await expect(importMessage(page)).toHaveText('6 out of 6 rows have TIPS that were outstanding in the date range.');
   expect(await tableDates(page)).toEqual([
     ['5', '2024-06-14', '2025-01-01'],
     ['5', '2024-07-31', '2025-01-01'],
@@ -384,21 +404,19 @@ test('a line that gives no transaction is skipped with its line number and reaso
     '912828ZZZ,"1,000",06/14/2024',                           // line 3
     '91282CAQ4,"1,500",06/14/2024',                           // line 4
     '91282CAQ4,"1,000",06/31/2024',                           // line 5
-    '91282CAQ4,"1,000",03/01/2025',                           // line 6
+    '91282CAQ4,"1,000",03/01/2025',                           // line 6: after the range, gives no entry
     '91282CAQ4',                                              // line 7
     '91282CAQ4,0,06/14/2024',                                 // line 8
-    '91282CXX0,"1,000",06/14/2024',                           // line 9: matured before the range
+    '91282CXX0,"1,000",06/14/2024',                           // line 9: matured before the range, so not counted
   ].join('\r\n'));
-  await expect(importMessage(page).locator('p')).toHaveText('Imported 1 of 8 lines.');
+  await expect(importMessage(page).locator('p')).toHaveText('2 out of 8 rows have TIPS that were outstanding in the date range.');
   expect(await tableDates(page)).toEqual([['20', '2024-06-14', '2025-01-01']]);
   await expect(importMessage(page).locator('li')).toHaveText([
     'Line 3: 912828ZZZ is not in the TIPS reference data.',
     'Line 4: Quantity is a par amount that is a multiple of 1,000, negative for a sale.',
     'Line 5: Settlement Date is not a date.',
-    'Line 6: Settlement Date is after the End Date of the range.',
     'Line 7: Needs a CUSIP, a quantity and a Settlement Date.',
     'Line 8: Quantity is a par amount that is a multiple of 1,000, negative for a sale.',
-    'Line 9: The Start Date is after the Maturity Date, 2022-10-15.',
   ]);
 });
 
@@ -413,7 +431,7 @@ test('importing replaces the entries of the table, an entry added afterward join
   await add(page, { cusip: '91282CBZ1', quantity: 1 });
   await expect(rows(page)).toHaveCount(2);
   await importFile(page, 'CUSIP,QTY,Settlement date\n912828ZZZ,"1,000",06/14/2024\n');
-  await expect(importMessage(page).locator('p')).toHaveText('Imported 0 of 1 lines.');
+  await expect(importMessage(page).locator('p')).toHaveText('0 out of 1 rows have TIPS that were outstanding in the date range.');
   await expect(rows(page)).toHaveCount(2);
   await importFile(page, 'CUSIP,QTY,Settlement date\n');
   await expect(importMessage(page)).toHaveText('The file has no lines to import.');
@@ -428,4 +446,33 @@ test('importing waits for the range', async ({ page }) => {
   await setRange(page, '2024-06-14', '2025-01-01');
   await importFile(page, 'CUSIP,QTY,Settlement date\n91282CAQ4,"20,000",06/14/2024\n');
   await expect(rows(page)).toHaveCount(1);
+});
+
+test('the file stays loaded: a change of the range derives its entries again, and the message counts the rows with a TIPS outstanding in the range', async ({ page }) => {
+  await open(page);
+  await setRange(page, '2024-06-14', '2025-01-01');
+  await importFile(page, [
+    'CUSIP,QTY,Settlement date',
+    '91282CAQ4,"20,000",06/14/2024',
+    '91282CBZ1,"1,000",07/31/2024',
+    '91282CXX0,"1,000",06/14/2021',          // matured 2022-10-15
+  ].join('\n'));
+  await expect(importMessage(page)).toHaveText('2 out of 3 rows have TIPS that were outstanding in the date range.');
+  expect(await tableDates(page)).toEqual([['20', '2024-06-14', '2025-01-01'], ['1', '2024-07-31', '2025-01-01']]);
+  await expect(page.locator('#oid-total')).toHaveText('378.78');
+  await setRange(page, '2025-01-01', '2025-02-01');
+  await expect(importMessage(page)).toHaveText('2 out of 3 rows have TIPS that were outstanding in the date range.');
+  expect(await tableDates(page)).toEqual([['20', '2025-01-01', '2025-02-01'], ['1', '2025-01-01', '2025-02-01']]);
+  await setRange(page, '2024-06-14', '2025-01-01');
+  await expect(page.locator('#oid-total')).toHaveText('378.78');
+});
+
+test('an entry added by hand after an import stays with the entries of the file when the range changes', async ({ page }) => {
+  await open(page);
+  await setRange(page, '2024-06-14', '2025-01-01');
+  await importFile(page, 'CUSIP,QTY,Settlement date\n91282CAQ4,"20,000",06/14/2024\n');
+  await add(page, { cusip: '91282CBZ1', quantity: 1 });
+  expect(await tableDates(page)).toEqual([['20', '2024-06-14', '2025-01-01'], ['1', '2024-07-31', '2025-01-01']]);
+  await setRange(page, '2025-01-01', '2025-02-01');
+  expect(await tableDates(page)).toEqual([['20', '2025-01-01', '2025-02-01'], ['1', '2025-01-01', '2025-02-01']]);
 });
