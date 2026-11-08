@@ -77,7 +77,7 @@ const TERMS = {
   'ladder parameters': 'ladder-parameters', 'build result': 'build-result', 'before-state preview': 'before-state-preview',
   'rebalance result': 'rebalance-result', 'ladder table': 'ladder-table', 'ladder export': 'ladder-export',
   'trade ticket': 'trade-ticket', 'construction parameters': 'construction-parameters', 'cash flow calendar': 'cash-flow-calendar',
-  'Holdings File': 'holdings-file', 'DARA Plan File': 'dara-plan-file',
+  'Holdings File': 'holdings-file', 'DARA Plan File': 'dara-plan-file', 'TIPS Transactions File': 'tips-transactions-file',
   'per-year DARA': 'per-year-dara',
   'holdings': 'holdings', 'DARA plan': 'dara-plan',
 };
@@ -2034,6 +2034,8 @@ function level2TaxationOfTreasuries() {
   P.push(labelAt((px['8.3'] + PR + UX) / 2, py['8.3'] - 14, 'charts and tables', 'middle'));
   P.push(flow(UX - 5, py['8.3'] + 70, px['8.3'] + PR - 6, py['8.3'] + 40, { obstacles: others('8.3') }));
   P.push(labelAt((px['8.3'] + PR + UX) / 2, py['8.3'] + 82, 'view selections', 'middle'));
+  P.push(flow(UX - 5, py['8.3'] - 70, px['8.3'] + PR - 6, py['8.3'] - 40, { obstacles: others('8.3') }));
+  P.push(labelAt((px['8.3'] + PR + UX) / 2, py['8.3'] - 82, 'TIPS Transactions File', 'middle'));
   P.push(flow(UX - 5, py['8.2'], px['8.2'] + PR + 3, py['8.2'], { obstacles: others('8.2') }));
   P.push(labelAt((px['8.2'] + PR + UX) / 2, py['8.2'] - 12, 'view selections', 'middle'));
   P.push(flow(px['8.1'] + 20, py['8.1'] - PR + 4, UX - 5, 170, { obstacles: others('8.1') }));
