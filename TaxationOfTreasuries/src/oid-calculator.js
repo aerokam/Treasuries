@@ -4,7 +4,7 @@
 
 import { fetchTipsRefRows, fetchRefCpiRows, fetchMonthlyCpiNsa } from '../../shared/src/market-data.js';
 import { initDatePicker } from '../../shared/src/date-picker.js';
-import { parseOrdersFile, entryOfLine } from './orders-file.js';
+import { parseOrdersFile, transactionOfLine, entriesOfTransactions } from './orders-file.js';
 import { calculateTipsOid, tipsOutstandingInRange, rangeDatesOf, oidByCusip, TREASURY_ROUNDING, NO_ROUNDING } from '../../shared/src/tips-oid.js';
 
 const STYLE = `
@@ -51,7 +51,7 @@ const HELP = `
     <li>The Start Date and End Date at the top state the range. The CUSIPs offered are the TIPS outstanding in it, and a new entry takes its dates.</li>
     <li>Choose a CUSIP, enter the Quantity, Start Date and End Date of one acquisition, and press Add. A CUSIP acquired on different dates has one entry for each.</li>
     <li>Quantity is the number of $1,000 par units. A Quantity of 1 is $1,000 par.</li>
-    <li>Import CSV replaces the entries with those of a file of acquisitions, one line each: CUSIP, quantity as par (50,000 is a Quantity of 50), Acquisition Date and, optionally, Disposition Date. An Acquisition Date before the range is held from the Start Date of the range. A TIPS with no Disposition Date is held to the End Date of the range, or to its Maturity Date when that is earlier.</li>
+    <li>Import CSV replaces the entries with those of a file of transactions, one line each: CUSIP, quantity as par (50,000 is a Quantity of 50, and -50,000 is a sale of 50) and Settlement Date. A sale ends the earliest acquisitions of its CUSIP first. An acquisition before the range is held from the Start Date of the range. A TIPS not sold is held to the End Date of the range, or to its Maturity Date when that is earlier.</li>
     <li>Start Date is the first day the TIPS is held in the tax year:
       <ul>
         <li>A TIPS bought in the tax year: the Settlement Date of the purchase, not the Trade Date.</li>
@@ -291,16 +291,17 @@ export async function render(container) {
     if (!rangeOk()) { say(rangeMessage()); return; }
     const lines = parseOrdersFile(await file.text());
     if (!lines.length) { say('The file has no lines to import.'); return; }
-    const imported = [], skipped = [];
+    const range = { rangeStart: rangeStartEl.value, rangeEnd: rangeEndEl.value };
+    const imported = [], skipped = new Map(), transactions = [];
     for (const line of lines) {
-      const r = entryOfLine(line, { tipsRows, rangeStart: rangeStartEl.value, rangeEnd: rangeEndEl.value });
-      let reason = r.reason;
-      if (!reason) {
-        const result = calculateTipsOid({ tips: r.tips, quantity: r.quantity, startDate: r.startDate, endDate: r.endDate, refCpiRows, monthlyCpi, rounding: rounding() });
-        if (!result.ok) reason = messageFor(result, r.tips, refCpiRows);
-      }
-      if (reason) skipped.push({ number: line.number, reason });
-      else imported.push({ id: nextId++, tips: r.tips, quantity: r.quantity, startDate: r.startDate, endDate: r.endDate });
+      const t = transactionOfLine(line, { tipsRows, ...range });
+      if (t.reason) skipped.set(line.number, t.reason);
+      else transactions.push(t);
+    }
+    for (const e of entriesOfTransactions(transactions, range)) {
+      const result = calculateTipsOid({ tips: e.tips, quantity: e.quantity, startDate: e.startDate, endDate: e.endDate, refCpiRows, monthlyCpi, rounding: rounding() });
+      if (!result.ok) { if (!skipped.has(e.number)) skipped.set(e.number, messageFor(result, e.tips, refCpiRows)); }
+      else imported.push({ id: nextId++, tips: e.tips, quantity: e.quantity, startDate: e.startDate, endDate: e.endDate });
     }
     if (imported.length) {
       entries = imported;
@@ -309,10 +310,10 @@ export async function render(container) {
       syncForm();
       renderTable();
     }
-    say(`Imported ${imported.length} of ${lines.length} lines.`);
-    if (skipped.length) {
+    say(`Imported ${lines.length - skipped.size} of ${lines.length} lines.`);
+    if (skipped.size) {
       const ul = document.createElement('ul');
-      for (const s of skipped) { const li = document.createElement('li'); li.textContent = `Line ${s.number}: ${s.reason}`; ul.append(li); }
+      for (const [number, reason] of [...skipped].sort((a, b) => a[0] - b[0])) { const li = document.createElement('li'); li.textContent = `Line ${number}: ${reason}`; ul.append(li); }
       out.append(ul);
     }
   });
