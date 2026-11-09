@@ -78,7 +78,7 @@ const TERMS = {
   'rebalance result': 'rebalance-result', 'ladder table': 'ladder-table', 'ladder export': 'ladder-export',
   'trade ticket': 'trade-ticket', 'construction parameters': 'construction-parameters', 'cash flow calendar': 'cash-flow-calendar',
   'Holdings File': 'holdings-file', 'DARA Plan File': 'dara-plan-file', 'TIPS Transactions File': 'tips-transactions-file',
-  'OID Range': 'oid-range', 'Index Ratio Rounding': 'index-ratio-rounding', 'OID Entry': 'oid-entry',
+  'OID Calculator User Selections': 'oid-calculator-user-selections', 'OID Range': 'oid-range', 'Index Ratio Rounding': 'index-ratio-rounding', 'OID Entry': 'oid-entry',
   'Document Selection': 'document-selection', 'Document Text': 'document-text',
   'per-year DARA': 'per-year-dara',
   'holdings': 'holdings', 'DARA plan': 'dara-plan',
@@ -585,6 +585,14 @@ function level1() {
     // Developed and maintained independently: it reads none of the data stores and none of the external entities.
     { key: 'at', cat: 'external', name: ['After-Tax TIPS', 'Ladder', 'Calculator'], spec: 'https://mweinb.github.io/after-tax-tips/', reads: [] },
   ];
+  // Files held in the repository, not in R2: no job writes them, and three apps read them.
+  const repoStores = [
+    { name: 'Taxation documents', href: DS('s20') },
+    { name: 'Deck content', href: DS('s21') },
+    { name: 'Yield curves snapshot', href: DS('s22') },
+    { name: 'Ref CPI NSA and SA snapshot', href: DS('s23') },
+  ];
+  const repoReaders = ['tx', 'pr', 'sa'];
   barycentre(stores, apps);
   // The column reproduces the portal index: the same four sections in the same
   // order, and the same apps in the same order inside each. Barycentre still
@@ -615,7 +623,7 @@ function level1() {
   const store = { x: SX, y: mid, w: SW };
   const JX = SX + SW + 90;                       // where the trunk fans out
   const OBS = [{ x: acq.cx, y: acq.cy, r: acq.r }, ...apps.map((a, j) => ({ x: AX, y: ay(j), r: AR }))];
-  const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 1: one acquisition process, the R2 data stores as one shape, eleven app processes and the user.">`, marker()];
+  const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 1: one acquisition process, the R2 data stores as one shape, the repository data stores as one shape, eleven app processes and the user.">`, marker()];
 
   for (const c of CATS) {
     const idx = apps.map((a, j) => a.cat === c.id ? j : -1).filter(j => j >= 0);
@@ -668,8 +676,9 @@ function level1() {
 
   // Three stores are read by no app. They are written for the user to pull
   // into a spreadsheet, so that flow leaves the store and goes to the user.
-  P.push(`  <path class="flow" d="M ${SX + SW / 2} ${mid + SH / 2 + 5} L ${SX + SW / 2} ${BOTTOM} L ${UX - 5} ${BOTTOM}" marker-end="url(#a1)"/>`);
-  P.push(labelAt(SX + SW / 2 + 12, BOTTOM - 9, 'downloaded data sets'));
+  const DLX = SX + 30;
+  P.push(`  <path class="flow" d="M ${DLX} ${mid + SH / 2 + 5} L ${DLX} ${BOTTOM} L ${UX - 5} ${BOTTOM}" marker-end="url(#a1)"/>`);
+  P.push(labelAt(DLX + 12, BOTTOM - 9, 'downloaded data sets'));
 
   P.push(`  <g class="entity"><rect x="${UX}" y="70" width="${UW}" height="${BOTTOM + 20 - 70}" rx="3"/><text class="e-name" x="${UX + UW / 2}" y="${(70 + BOTTOM + 20) / 2}">User</text></g>`);
   P.push(procShape(acq.cx, acq.cy, acq.r, 'DFD_LEVEL2_INGESTION.html', '1', ['Acquire and', 'derive', 'reference data']));
@@ -684,18 +693,34 @@ function level1() {
   P.push(`    <text class="s-name" x="${store.x + store.w / 2}" y="${store.y + 16}" style="opacity:0.7">${stores.length} files</text>`);
   P.push('  </a>');
 
+  // The repository shape: beside the R2 shape's downloaded-data line, level with the last app that reads it.
+  const RX = SX + 80, RW = SW - 80, ry = ay(apps.findIndex(a => a.key === 'pr'));
+  P.push(`  <path class="flow" d="M ${RX + RW + 5} ${ry} L ${JX} ${ry}"/>`);
+  apps.forEach((a, j) => {
+    if (!repoReaders.includes(a.key)) return;
+    const [x2, y2] = toCircle(JX, ry, AX, ay(j), AR);
+    P.push(flow(JX, ry, x2, y2, { obstacles: OBS }));
+  });
+  P.push(`  <a class="store" href="${DS()}">`);
+  P.push(`    <rect x="${RX}" y="${ry - SH / 2}" width="${RW}" height="${SH}" fill="transparent" stroke="none"/>`);
+  P.push(`    <line x1="${RX}" y1="${ry - SH / 2}" x2="${RX + RW}" y2="${ry - SH / 2}"/>`);
+  P.push(`    <line x1="${RX}" y1="${ry + SH / 2}" x2="${RX + RW}" y2="${ry + SH / 2}"/>`);
+  P.push(`    <text class="s-name" x="${RX + RW / 2}" y="${ry - 8}">Repository data stores</text>`);
+  P.push(`    <text class="s-name" x="${RX + RW / 2}" y="${ry + 16}" style="opacity:0.7">${repoStores.length} files</text>`);
+  P.push('  </a>');
+
   apps.forEach((a, j) => P.push(procShape(AX, ay(j), AR, a.spec, String(a.n), a.name)));
   P.push('</svg>');
 
   return page({
     title: 'Treasury Investors Portal — Level 1', h1: 'Level 1', maxWidth: W,
     up: 'DFD_LEVEL0.html', upLabel: 'Context Diagram', svg: P.join(NL),
-    notes: ['  Process 1 writes every store drawn here. No app writes one: the apps read, and the scheduled jobs inside process 1 do all the writing.',
+    notes: ['  Process 1 writes every R2 store drawn here. No app writes one: the apps read, and the scheduled jobs inside process 1 do all the writing.',
       '  Process 1 explodes at Level 2 into those jobs, one per store it writes.',
       '  The stores are drawn as one shape. Level 1 answers which app reads what rather than which file, and the shape opens the full list.',
       '  Three of those files are read by no app: YieldCurves.csv, BreakevenInflation.csv and BidAskSpreads.csv. They are written for the user to pull into a spreadsheet, so their flow goes to the user rather than to a process.',
       '  External entities are not redrawn at this level. Their flows are drawn against each entity on the <a href="DFD_LEVEL0.html">context diagram</a> and enter here as one flow.',
-      '  Seasonal Adjustments reads no store, so no flow reaches it from it: it reads two snapshot files kept in the app. Taxation of Treasuries also reads files held in the repository, its documents (Taxation documents, S20), which this level does not draw.',
+      '  The repository data stores are drawn as one shape as well: Taxation documents (S20), Deck content (S21), Yield curves snapshot (S22) and Ref CPI NSA and SA snapshot (S23). No process writes them. Taxation of Treasuries, Portal Primer and Seasonal Adjustments read them, and Seasonal Adjustments reads nothing else.',
       '  After-Tax TIPS Ladder Calculator is developed and maintained independently. It reads no store and no external entity, so only its flows with the user are drawn, and its bubble opens the app.',
       '  The app column reproduces the portal index: the same four sections in the same order, and the same apps in the same order inside each.',
       '  Every app has the same pair of flows with the user, labelled once at the top. The user is drawn once, as a tall shape, so no flow to it crosses another.'].join(NL)
@@ -1896,7 +1921,7 @@ function level2TipsReference() {
 const KPR = 'Primer/knowledge/';
 function level2Primer() {
   const stores = [
-    { id: 'deck', name: 'Deck content', href: DD + 'deck-content' },
+    { id: 'deck', name: 'Deck content', href: DS('s21') },
     { id: 'fedinv', name: 'FedInvest prices', href: DS('s1') },
     { id: 'tipsref', name: 'TIPS reference data', href: DS('s2') },
     { id: 'refcpi', name: 'Ref CPI', href: DS('s3') },
@@ -1945,7 +1970,7 @@ function level2Primer() {
     up: 'DFD_LEVEL1.html', upLabel: 'Level 1',
     svg: P.join(NL),
     notes: ['  <b>No process here writes a data store.</b> Every flow ends at the user and is gone when the page closes.',
-      '  <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#deck-content">Deck content</a> is a file kept in the app, drawn as a store of this diagram only; no job writes it.',
+      '  <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s21">Deck content (S21)</a> is a file held in the repository, not in R2; no job writes it.',
       '  10.2 also states its source line, as <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#charts-and-tables">charts and tables</a>, to the user.',
       SHARED_NOTE].join(NL)
   });
@@ -1954,10 +1979,10 @@ function level2Primer() {
 // ── Level 2: Seasonal Adjustments ───────────────────────────────────────────
 const KSA = 'SeasonalAdjustments/knowledge/';
 function level2SeasonalAdjustments() {
-  // The two snapshot files are kept in the app and are drawn here only: no job writes them.
+  // The two snapshot files are held in the repository: no job writes them.
   const stores = [
-    { id: 'ycsnap', name: 'Yield curves snapshot', href: DS('s13') },
-    { id: 'rcpi', name: 'Ref CPI NSA and SA snapshot', href: DS('s4') },
+    { id: 'ycsnap', name: 'Yield curves snapshot', href: DS('s22') },
+    { id: 'rcpi', name: 'Ref CPI NSA and SA snapshot', href: DS('s23') },
   ];
   const procs = [
     { id: '11.1', name: ['Load', 'snapshot'], href: V(KSA + '11.1_Load_Snapshot.md'), reads: ['ycsnap', 'rcpi'], out: { '11.2': ['SAO yields', 'SA factors'] } },
@@ -1972,7 +1997,7 @@ function level2SeasonalAdjustments() {
   const OBS = [...procs.map(q => ({ x: px[q.id], y: py[q.id], r: PR })), ...SM.obstacles];
   const LBL = [];
   const [vx, vy, vw, vh] = SM.viewBox(W, H);
-  const P = [`<svg viewBox="${vx} ${vy} ${vw} ${vh}" role="img" aria-label="Level 2 for Seasonal Adjustments: two processes reading two snapshot files kept in the app. No process writes a data store. Amber circles are the shared modules its processes call.">`, marker()];
+  const P = [`<svg viewBox="${vx} ${vy} ${vw} ${vh}" role="img" aria-label="Level 2 for Seasonal Adjustments: two processes reading two snapshot files held in the repository. No process writes a data store. Amber circles are the shared modules its processes call.">`, marker()];
   const sIdx = Object.fromEntries(stores.map((s, i) => [s.id, i]));
   procs.forEach(p => p.reads.forEach(id => {
     const y = sy(sIdx[id]), [x2, y2] = toCircle(SX + SW + 5, y, px[p.id], py[p.id], PR);
@@ -1998,7 +2023,7 @@ function level2SeasonalAdjustments() {
     up: 'DFD_LEVEL1.html', upLabel: 'Level 1',
     svg: P.join(NL),
     notes: ['  <b>No process here writes a data store.</b> Every flow ends at the user and is gone when the page closes.',
-      '  The two snapshot files are copies of the Market TIPS security rows of <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s13">Yield curves (S13)</a> and <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s4">Ref CPI NSA and SA (S4)</a>, kept in the app and drawn on this diagram only. No job writes them, and the app reads no R2 store.',
+      '  The two snapshot files, <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s22">Yield curves snapshot (S22)</a> and <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s23">Ref CPI NSA and SA snapshot (S23)</a>, are held in the repository, not in R2. No job writes them, and the app reads no R2 store.',
       '  11.1 also states the footer, as <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#charts-and-tables">charts and tables</a>, to the user.',
       SHARED_NOTE].join(NL)
   });
@@ -2017,15 +2042,15 @@ function level2TaxationOfTreasuries() {
     { id: '8.1', name: ['Load OID', 'inputs'], href: V(KTX + '8.1_Load_Oid_Inputs.md'), reads: ['tipsref', 'refcpi', 'cpihist'],
       out: { '8.2': ['TIPS reference rows', 'daily Ref CPI', 'monthly CPI-U'], '8.3': ['TIPS reference rows', 'daily Ref CPI'] } },
     { id: '8.2', name: ['Calculate', 'TIPS OID'], href: V(KTX + '8.2_Calculate_Tips_Oid.md'), reads: [], out: { '8.3': ['OID'] } },
-    { id: '8.3', name: ['Render OID', 'calculator'], href: V(KTX + '8.3_Render_Oid_Calculator.md'), reads: [], out: { '8.2': ['OID Range', 'Index Ratio Rounding', 'OID Entry'] } },
+    { id: '8.3', name: ['Render OID', 'calculator'], href: V(KTX + '8.3_Render_Oid_Calculator.md'), reads: [], out: { '8.2': ['OID Calculator User Selections'] } },
     { id: '8.4', name: ['Load', 'documents'], href: V(KTX + '8.4_Load_Documents.md'), reads: ['taxdocs'], out: { '8.5': ['Document Text'] } },
     { id: '8.5', name: ['Render', 'documents'], href: V(KTX + '8.5_Render_Documents.md'), reads: [], out: {} },
   ];
   const SX = 40, SW = 215, PR = 58, UX = 1190, UW = 145;
-  const sy = i => [250, 380, 510, 900][i];
+  const sy = i => [250, 380, 510, 740][i];
   const px = { '8.1': 440, '8.2': 700, '8.3': 970, '8.4': 970, '8.5': 970 };
-  const py = { '8.1': 315, '8.2': 610, '8.3': 315, '8.4': 900, '8.5': 1090 };
-  const H = 1220, W = 1360;
+  const py = { '8.1': 315, '8.2': 610, '8.3': 315, '8.4': 740, '8.5': 930 };
+  const H = 1060, W = 1360;
   const SM = sharedModules('tx');
   const OBS = [...procs.map(q => ({ x: px[q.id], y: py[q.id], r: PR })), ...SM.obstacles];
   const LBL = [];
@@ -2044,16 +2069,13 @@ function level2TaxationOfTreasuries() {
     P.push(flow(px[id] + PR + 3, py[id] + dy, UX - 5, py[id] + dy, { obstacles: others(id) }));
     P.push(labelAt(MX(id), py[id] + dy + (ly ?? -14), label, 'middle'));
   };
-  const fromUser = (id, y, label, ly) => {
+  const fromUser = (id, y, label, ly, anchor) => {
     const [x2, y2] = toCircle(UX - 5, y, px[id], py[id], PR);
     P.push(flow(UX - 5, y, x2, y2, { obstacles: others(id) }));
-    P.push(labelAt(UX - 80, y + ly, label, 'middle'));
+    P.push(anchor ? labelAt(UX - 12, y + ly, label, anchor) : labelAt(UX - 80, y + ly, label, 'middle'));
   };
   toUser('8.3', 0, 'charts and tables');
-  fromUser('8.3', py['8.3'] - 80, 'TIPS Transactions File', -8);
-  fromUser('8.3', py['8.3'] + 90, 'OID Range', -8);
-  fromUser('8.3', py['8.3'] + 190, 'Index Ratio Rounding', -8);
-  fromUser('8.3', py['8.3'] + 290, 'OID Entry', -8);
+  fromUser('8.3', py['8.3'] + 90, 'OID Calculator User Selections', -8, 'end');
   P.push(flow(px['8.1'] + 20, py['8.1'] - PR + 4, UX - 5, 170, { obstacles: others('8.1') }));
   P.push(labelAt(800, 205, 'charts and tables', 'middle'));
   fromUser('8.4', py['8.4'], 'Document Selection', -14);
@@ -2070,9 +2092,9 @@ function level2TaxationOfTreasuries() {
     up: 'DFD_LEVEL1.html', upLabel: 'Level 1',
     svg: P.join(NL),
     notes: ['  <b>No process here writes a data store.</b> Every flow ends at the user and is gone when the page closes.',
-      '  8.1 to 8.3 are the OID Calculator and 8.4 and 8.5 are the reference documents beside it. <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s20">Taxation documents (S20)</a> is held in the repository, not in R2, and is drawn on this diagram only.',
+      '  8.1 to 8.3 are the OID Calculator and 8.4 and 8.5 are the reference documents beside it. <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s20">Taxation documents (S20)</a> is held in the repository, not in R2.',
       '  8.1 sends its rows to 8.3 as well as to 8.2: 8.3 lists the CUSIPs of the TIPS reference rows and states the first and last dates of the daily Ref CPI. 8.1 also states that status, or the load error, as <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#charts-and-tables">charts and tables</a>, to the user.',
-      '  8.3 takes the user\'s inputs and sends 8.2 the OID Range, the Index Ratio Rounding and the OID Entry of each entry, whether the user stated it or a TIPS Transactions File gave it. 8.2 sends 8.3 the <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#oid">OID</a> with its working, or in its place the reason the inputs have no result.',
+      '  8.3 takes the <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#oid-calculator-user-selections">OID Calculator User Selections</a> from the user and sends them to 8.2. 8.2 sends 8.3 the <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#oid">OID</a> with its working, or in its place the reason the inputs have no result.',
       SHARED_NOTE].join(NL)
   });
 }

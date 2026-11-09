@@ -158,7 +158,7 @@
 <h1>Level 1</h1>
 
 <div class="diagram">
-<svg viewBox="0 0 1285 2012" role="img" aria-label="Level 1: one acquisition process, the R2 data stores as one shape, eleven app processes and the user.">
+<svg viewBox="0 0 1285 2012" role="img" aria-label="Level 1: one acquisition process, the R2 data stores as one shape, the repository data stores as one shape, eleven app processes and the user.">
   <defs><marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#55558c"/></marker></defs>
   <rect class="cat-band" x="800" y="94" width="200" height="486" rx="10" fill="#5a6e5a" stroke="#5a6e5a"/>
   <text class="cat-label" x="900" y="114" text-anchor="middle" fill="#5a6e5a">Daily Workflow</text>
@@ -214,8 +214,8 @@
   <path class="flow" d="M 1105.0 1831.0 Q 1034.0 1842.4 963.0 1831.0" marker-end="url(#a1)"/>
   <text class="flow-label" x="1035" y="156" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#app-outputs"><tspan class="lk">app outputs</tspan></a></text>
   <text class="flow-label" x="1035" y="234" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#app-inputs"><tspan class="lk">app inputs</tspan></a></text>
-  <path class="flow" d="M 545 1059 L 545 1962 L 1105 1962" marker-end="url(#a1)"/>
-  <text class="flow-label" x="557" y="1953"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#downloaded-data-sets"><tspan class="lk">downloaded data sets</tspan></a></text>
+  <path class="flow" d="M 460 1059 L 460 1962 L 1105 1962" marker-end="url(#a1)"/>
+  <text class="flow-label" x="472" y="1953"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#downloaded-data-sets"><tspan class="lk">downloaded data sets</tspan></a></text>
   <g class="entity"><rect x="1110" y="70" width="145" height="1912" rx="3"/><text class="e-name" x="1182.5" y="1026">User</text></g>
   <a class="process" href="DFD_LEVEL2_INGESTION.html">
     <circle cx="200" cy="1006" r="78"/>
@@ -230,6 +230,17 @@
     <line x1="430" y1="1054" x2="660" y2="1054"/>
     <text class="s-name" x="545" y="998">R2 data stores</text>
     <text class="s-name" x="545" y="1022" style="opacity:0.7">18 files</text>
+  </a>
+  <path class="flow" d="M 665 1478 L 750 1478"/>
+  <path class="flow" d="M 750.0 1478.0 Q 766.8 1313.3 876.0 1189.0" marker-end="url(#a1)"/>
+  <path class="flow" d="M 750.0 1478.0 Q 795.0 1470.8 840.0 1478.0" marker-end="url(#a1)"/>
+  <path class="flow" d="M 750.0 1478.0 Q 812.4 1523.2 857.6 1585.6" marker-end="url(#a1)"/>
+  <a class="store" href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#2.0-data-stores-s">
+    <rect x="510" y="1430" width="150" height="96" fill="transparent" stroke="none"/>
+    <line x1="510" y1="1430" x2="660" y2="1430"/>
+    <line x1="510" y1="1526" x2="660" y2="1526"/>
+    <text class="s-name" x="585" y="1470">Repository data stores</text>
+    <text class="s-name" x="585" y="1494" style="opacity:0.7">4 files</text>
   </a>
   <a class="process" href="DFD_LEVEL2_YIELDSMONITOR.html">
     <circle cx="900" cy="190" r="60"/>
@@ -302,12 +313,12 @@
 </div>
 
 <p class="notes">
-  Process 1 writes every store drawn here. No app writes one: the apps read, and the scheduled jobs inside process 1 do all the writing.
+  Process 1 writes every R2 store drawn here. No app writes one: the apps read, and the scheduled jobs inside process 1 do all the writing.
   Process 1 explodes at Level 2 into those jobs, one per store it writes.
   The stores are drawn as one shape. Level 1 answers which app reads what rather than which file, and the shape opens the full list.
   Three of those files are read by no app: YieldCurves.csv, BreakevenInflation.csv and BidAskSpreads.csv. They are written for the user to pull into a spreadsheet, so their flow goes to the user rather than to a process.
   External entities are not redrawn at this level. Their flows are drawn against each entity on the <a href="DFD_LEVEL0.html">context diagram</a> and enter here as one flow.
-  Seasonal Adjustments reads no store, so no flow reaches it from it: it reads two snapshot files kept in the app. Taxation of Treasuries also reads files held in the repository, its documents (Taxation documents, S20), which this level does not draw.
+  The repository data stores are drawn as one shape as well: Taxation documents (S20), Deck content (S21), Yield curves snapshot (S22) and Ref CPI NSA and SA snapshot (S23). No process writes them. Taxation of Treasuries, Portal Primer and Seasonal Adjustments read them, and Seasonal Adjustments reads nothing else.
   After-Tax TIPS Ladder Calculator is developed and maintained independently. It reads no store and no external entity, so only its flows with the user are drawn, and its bubble opens the app.
   The app column reproduces the portal index: the same four sections in the same order, and the same apps in the same order inside each.
   Every app has the same pair of flows with the user, labelled once at the top. The user is drawn once, as a tall shape, so no flow to it crosses another.

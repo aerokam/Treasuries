@@ -158,7 +158,7 @@
 <h1>Level 2 &mdash; Seasonal Adjustments</h1>
 
 <div class="diagram">
-<svg viewBox="0 0 1360 700" role="img" aria-label="Level 2 for Seasonal Adjustments: two processes reading two snapshot files kept in the app. No process writes a data store. Amber circles are the shared modules its processes call.">
+<svg viewBox="0 0 1360 700" role="img" aria-label="Level 2 for Seasonal Adjustments: two processes reading two snapshot files held in the repository. No process writes a data store. Amber circles are the shared modules its processes call.">
   <defs><marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#55558c"/></marker></defs>
   <path class="flow" d="M 260.0 290.0 Q 336.2 301.9 404.8 337.1" marker-end="url(#a1)"/>
   <path class="flow" d="M 260.0 420.0 Q 328.7 384.9 404.8 372.9" marker-end="url(#a1)"/>
@@ -176,13 +176,13 @@
   <path class="flow" d="M 464.1 252.0 Q 466.8 274.7 462.3 297.0" marker-end="url(#a1)"/>
   <path class="flow" d="M 410.2 445.7 Q 417.9 424.0 432.1 405.8" marker-end="url(#a1)"/>
   <path class="flow" d="M 924.1 252.0 Q 926.8 274.7 922.3 297.0" marker-end="url(#a1)"/>
-  <a class="store" href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s13">
+  <a class="store" href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s22">
     <rect x="40" y="270" width="215" height="40" fill="transparent" stroke="none"/>
     <line x1="40" y1="270" x2="255" y2="270"/>
     <line x1="40" y1="310" x2="255" y2="310"/>
     <text class="s-name" x="147.5" y="295">Yield curves snapshot</text>
   </a>
-  <a class="store" href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s4">
+  <a class="store" href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s23">
     <rect x="40" y="400" width="215" height="40" fill="transparent" stroke="none"/>
     <line x1="40" y1="400" x2="255" y2="400"/>
     <line x1="40" y1="440" x2="255" y2="440"/>
@@ -220,7 +220,7 @@
 
 <p class="notes">
   <b>No process here writes a data store.</b> Every flow ends at the user and is gone when the page closes.
-  The two snapshot files are copies of the Market TIPS security rows of <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s13">Yield curves (S13)</a> and <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s4">Ref CPI NSA and SA (S4)</a>, kept in the app and drawn on this diagram only. No job writes them, and the app reads no R2 store.
+  The two snapshot files, <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s22">Yield curves snapshot (S22)</a> and <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s23">Ref CPI NSA and SA snapshot (S23)</a>, are held in the repository, not in R2. No job writes them, and the app reads no R2 store.
   11.1 also states the footer, as <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#charts-and-tables">charts and tables</a>, to the user.
   The amber circles are shared modules (<a href="viewer.html#/md/knowledge/SharedModules.md">SharedModules.md</a>), not process steps of this diagram.
 </p>
