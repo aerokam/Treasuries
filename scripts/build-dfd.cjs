@@ -78,6 +78,8 @@ const TERMS = {
   'rebalance result': 'rebalance-result', 'ladder table': 'ladder-table', 'ladder export': 'ladder-export',
   'trade ticket': 'trade-ticket', 'construction parameters': 'construction-parameters', 'cash flow calendar': 'cash-flow-calendar',
   'Holdings File': 'holdings-file', 'DARA Plan File': 'dara-plan-file', 'TIPS Transactions File': 'tips-transactions-file',
+  'OID Range': 'oid-range', 'Index Ratio Rounding': 'index-ratio-rounding', 'OID Entry': 'oid-entry',
+  'Document Selection': 'document-selection', 'Document Text': 'document-text',
   'per-year DARA': 'per-year-dara',
   'holdings': 'holdings', 'DARA plan': 'dara-plan',
 };
@@ -285,7 +287,7 @@ const SHARED = {
     at: { m1: [446, 166], m11: [1091, 228], m12: [1062, 454], m22: [966, 106] },
     calls: { '7.1': ['m1'], '7.3': ['m11', 'm12', 'm22'] } },
   'tx': { r: 46,
-    at: { m13: [440, 166], m14: [720, 710] },
+    at: { m13: [440, 166], m14: [700, 770] },
     calls: { '8.1': ['m13'], '8.2': ['m14'] } },
   'fund': { r: 46,
     at: { m1: [386, 466] },
@@ -691,7 +693,7 @@ function level1() {
       '  The stores are drawn as one shape. Level 1 answers which app reads what rather than which file, and the shape opens the full list.',
       '  Three of those files are read by no app: YieldCurves.csv, BreakevenInflation.csv and BidAskSpreads.csv. They are written for the user to pull into a spreadsheet, so their flow goes to the user rather than to a process.',
       '  External entities are not redrawn at this level. Their flows are drawn against each entity on the <a href="DFD_LEVEL0.html">context diagram</a> and enter here as one flow.',
-      '  Seasonal Adjustments reads no store, so no flow reaches it from it: it reads two snapshot files kept in the app.',
+      '  Seasonal Adjustments reads no store, so no flow reaches it from it: it reads two snapshot files kept in the app. Taxation of Treasuries also reads files held in the repository, its documents (Taxation documents, S20), which this level does not draw.',
       '  After-Tax TIPS Ladder Calculator is developed and maintained independently. It reads no store and no external entity, so only its flows with the user are drawn, and its bubble opens the app.',
       '  The app column reproduces the portal index: the same four sections in the same order, and the same apps in the same order inside each.',
       '  Every app has the same pair of flows with the user, labelled once at the top. The user is drawn once, as a tall shape, so no flow to it crosses another.'].join(NL)
@@ -2006,23 +2008,26 @@ function level2TaxationOfTreasuries() {
     { id: 'tipsref', name: 'TIPS reference data', href: DS('s2') },
     { id: 'refcpi', name: 'Ref CPI', href: DS('s3') },
     { id: 'cpihist', name: 'CPI history', href: DS('s8') },
+    { id: 'taxdocs', name: 'Taxation documents', href: DS('s20') },
   ];
   const procs = [
     { id: '8.1', name: ['Load OID', 'inputs'], href: V(KTX + '8.1_Load_Oid_Inputs.md'), reads: ['tipsref', 'refcpi', 'cpihist'],
       out: { '8.2': ['TIPS reference rows', 'daily Ref CPI', 'monthly CPI-U'], '8.3': ['TIPS reference rows', 'daily Ref CPI'] } },
     { id: '8.2', name: ['Calculate', 'TIPS OID'], href: V(KTX + '8.2_Calculate_Tips_Oid.md'), reads: [], out: { '8.3': ['OID'] } },
-    { id: '8.3', name: ['Render OID', 'calculator'], href: V(KTX + '8.3_Render_Oid_Calculator.md'), reads: [], out: {} },
+    { id: '8.3', name: ['Render OID', 'calculator'], href: V(KTX + '8.3_Render_Oid_Calculator.md'), reads: [], out: { '8.2': ['OID Range', 'Index Ratio Rounding', 'OID Entry'] } },
+    { id: '8.4', name: ['Load', 'documents'], href: V(KTX + '8.4_Load_Documents.md'), reads: ['taxdocs'], out: { '8.5': ['Document Text'] } },
+    { id: '8.5', name: ['Render', 'documents'], href: V(KTX + '8.5_Render_Documents.md'), reads: [], out: {} },
   ];
   const SX = 40, SW = 215, PR = 58, UX = 1190, UW = 145;
-  const sy = i => 250 + i * 130;
-  const px = { '8.1': 440, '8.2': 720, '8.3': 970 };
-  const py = { '8.1': 315, '8.2': 540, '8.3': 315 };
-  const H = 800, W = 1360;
+  const sy = i => [250, 380, 510, 900][i];
+  const px = { '8.1': 440, '8.2': 700, '8.3': 970, '8.4': 970, '8.5': 970 };
+  const py = { '8.1': 315, '8.2': 610, '8.3': 315, '8.4': 900, '8.5': 1090 };
+  const H = 1220, W = 1360;
   const SM = sharedModules('tx');
   const OBS = [...procs.map(q => ({ x: px[q.id], y: py[q.id], r: PR })), ...SM.obstacles];
   const LBL = [];
   const [vx, vy, vw, vh] = SM.viewBox(W, H);
-  const P = [`<svg viewBox="${vx} ${vy} ${vw} ${vh}" role="img" aria-label="Level 2 for Taxation of Treasuries: three processes reading three data stores. No process writes a data store. Amber circles are the shared modules its processes call.">`, marker()];
+  const P = [`<svg viewBox="${vx} ${vy} ${vw} ${vh}" role="img" aria-label="Level 2 for Taxation of Treasuries: five processes reading four data stores. No process writes a data store. Amber circles are the shared modules its processes call.">`, marker()];
   const sIdx = Object.fromEntries(stores.map((s, i) => [s.id, i]));
   procs.forEach(p => p.reads.forEach(id => {
     const y = sy(sIdx[id]), [x2, y2] = toCircle(SX + SW + 5, y, px[p.id], py[p.id], PR);
@@ -2030,16 +2035,26 @@ function level2TaxationOfTreasuries() {
   }));
   P.push(internalFlows(procs, px, py, PR, OBS, LBL));
   const others = id => OBS.filter(o => !(o.x === px[id] && o.y === py[id]));
-  P.push(flow(px['8.3'] + PR + 3, py['8.3'], UX - 5, py['8.3'], { obstacles: others('8.3') }));
-  P.push(labelAt((px['8.3'] + PR + UX) / 2, py['8.3'] - 14, 'charts and tables', 'middle'));
-  P.push(flow(UX - 5, py['8.3'] + 70, px['8.3'] + PR - 6, py['8.3'] + 40, { obstacles: others('8.3') }));
-  P.push(labelAt((px['8.3'] + PR + UX) / 2, py['8.3'] + 82, 'view selections', 'middle'));
-  P.push(flow(UX - 5, py['8.3'] - 70, px['8.3'] + PR - 6, py['8.3'] - 40, { obstacles: others('8.3') }));
-  P.push(labelAt((px['8.3'] + PR + UX) / 2, py['8.3'] - 82, 'TIPS Transactions File', 'middle'));
-  P.push(flow(UX - 5, py['8.2'], px['8.2'] + PR + 3, py['8.2'], { obstacles: others('8.2') }));
-  P.push(labelAt((px['8.2'] + PR + UX) / 2, py['8.2'] - 12, 'view selections', 'middle'));
+  const MX = (id) => (px[id] + PR + UX) / 2;
+  // Out to the user, and in from the user, beside a process.
+  const toUser = (id, dy, label, ly) => {
+    P.push(flow(px[id] + PR + 3, py[id] + dy, UX - 5, py[id] + dy, { obstacles: others(id) }));
+    P.push(labelAt(MX(id), py[id] + dy + (ly ?? -14), label, 'middle'));
+  };
+  const fromUser = (id, y, label, ly) => {
+    const [x2, y2] = toCircle(UX - 5, y, px[id], py[id], PR);
+    P.push(flow(UX - 5, y, x2, y2, { obstacles: others(id) }));
+    P.push(labelAt(UX - 80, y + ly, label, 'middle'));
+  };
+  toUser('8.3', 0, 'charts and tables');
+  fromUser('8.3', py['8.3'] - 80, 'TIPS Transactions File', -8);
+  fromUser('8.3', py['8.3'] + 90, 'OID Range', -8);
+  fromUser('8.3', py['8.3'] + 190, 'Index Ratio Rounding', -8);
+  fromUser('8.3', py['8.3'] + 290, 'OID Entry', -8);
   P.push(flow(px['8.1'] + 20, py['8.1'] - PR + 4, UX - 5, 170, { obstacles: others('8.1') }));
   P.push(labelAt(800, 205, 'charts and tables', 'middle'));
+  fromUser('8.4', py['8.4'], 'Document Selection', -14);
+  toUser('8.5', 0, 'charts and tables');
   P.push(`  <g class="entity"><rect x="${UX}" y="100" width="${UW}" height="${H - 180}" rx="3"/><text class="e-name" x="${UX + UW / 2}" y="${H / 2}">User</text></g>`);
   SM.flows(P, px, py, PR, OBS);
   stores.forEach((s, i) => P.push(storeShape(SX, sy(i), SW, s.href, s.name)));
@@ -2052,9 +2067,9 @@ function level2TaxationOfTreasuries() {
     up: 'DFD_LEVEL1.html', upLabel: 'Level 1',
     svg: P.join(NL),
     notes: ['  <b>No process here writes a data store.</b> Every flow ends at the user and is gone when the page closes.',
-      '  The processes are those of the OID Calculator. The reference documents of the left pane are documents, drawn on no diagram: <a href="viewer.html#/md/TaxationOfTreasuries/docs/TaxationOfTreasuries_Foundation.md">Taxation of Treasuries</a> is the foundation they rest on.',
+      '  8.1 to 8.3 are the OID Calculator and 8.4 and 8.5 are the reference documents beside it. <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s20">Taxation documents (S20)</a> is held in the repository, not in R2, and is drawn on this diagram only.',
       '  8.1 sends its rows to 8.3 as well as to 8.2: 8.3 lists the CUSIPs of the TIPS reference rows and states the first and last dates of the daily Ref CPI. 8.1 also states that status, or the load error, as <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#charts-and-tables">charts and tables</a>, to the user.',
-      '  8.2 sends 8.3 the <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#oid">OID</a> with its working, or in its place the reason the inputs have no result.',
+      '  8.3 takes the user\'s inputs and sends 8.2 the OID Range, the Index Ratio Rounding and the OID Entry of each entry, whether the user stated it or a TIPS Transactions File gave it. 8.2 sends 8.3 the <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#oid">OID</a> with its working, or in its place the reason the inputs have no result.',
       SHARED_NOTE].join(NL)
   });
 }

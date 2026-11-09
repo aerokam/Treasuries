@@ -307,7 +307,7 @@
   The stores are drawn as one shape. Level 1 answers which app reads what rather than which file, and the shape opens the full list.
   Three of those files are read by no app: YieldCurves.csv, BreakevenInflation.csv and BidAskSpreads.csv. They are written for the user to pull into a spreadsheet, so their flow goes to the user rather than to a process.
   External entities are not redrawn at this level. Their flows are drawn against each entity on the <a href="DFD_LEVEL0.html">context diagram</a> and enter here as one flow.
-  Seasonal Adjustments reads no store, so no flow reaches it from it: it reads two snapshot files kept in the app.
+  Seasonal Adjustments reads no store, so no flow reaches it from it: it reads two snapshot files kept in the app. Taxation of Treasuries also reads files held in the repository, its documents (Taxation documents, S20), which this level does not draw.
   After-Tax TIPS Ladder Calculator is developed and maintained independently. It reads no store and no external entity, so only its flows with the user are drawn, and its bubble opens the app.
   The app column reproduces the portal index: the same four sections in the same order, and the same apps in the same order inside each.
   Every app has the same pair of flows with the user, labelled once at the top. The user is drawn once, as a tall shape, so no flow to it crosses another.
