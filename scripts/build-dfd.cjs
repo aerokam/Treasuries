@@ -239,6 +239,8 @@ const MODULE_NAMES = {
   m15: ['sa-yields.js'], m16: ['spot-curve.js'],
   m22: ['date-', 'picker.js'],
   m23: ['date-range-', 'filter.js'],
+  m24: ['tips-reference-', 'rows.js'],
+  m25: ['tips-reference-', 'table.js'],
 };
 // The ingestion jobs 1.2 to 1.16 are registered below from INGEST_JOBS, with the job's own module list.
 const SHARED = {
@@ -275,11 +277,11 @@ const SHARED = {
     calls: { '4.4.1': ['m5', 'm9', 'm10', 'm14'], '4.4.2': ['m3', 'm5', 'm10'], '4.4.3': ['m5', 'm3', 'm9', 'm10', 'm14'] },
     bows: { 'm5>4.4.3': [-0.08], 'm9>4.4.1': [0] } },
   'tlm-render': { r: 46,
-    at: { m6: [595, 310], m14: [1200, 515], m5: [890, 510], m7: [630, 515], m8: [760, 280], m3: [905, 1010], m2: [1328, 1008], m9: [620, 995] },
-    calls: { '4.5.1': ['m6', 'm14'], '4.5.2': ['m5', 'm6', 'm7', 'm8', 'm14'], '4.5.3': ['m3', 'm6', 'm7', 'm8', 'm14'], '4.5.4': ['m2', 'm3', 'm5', 'm6', 'm7', 'm8', 'm9', 'm14'] } },
+    at: { m6: [595, 310], m14: [1200, 515], m5: [890, 510], m7: [630, 515], m8: [760, 280], m3: [905, 1010], m2: [1328, 1008], m9: [620, 995], m25: [1350, 280] },
+    calls: { '4.5.1': ['m6', 'm14'], '4.5.2': ['m5', 'm6', 'm7', 'm8', 'm14', 'm25'], '4.5.3': ['m3', 'm6', 'm7', 'm8', 'm14'], '4.5.4': ['m2', 'm3', 'm5', 'm6', 'm7', 'm8', 'm9', 'm14'] } },
   'tipsref': { r: 50,
-    at: { m2: [570, 150], m3: [510, 50], m13: [419, 550], m14: [770, 470], m22: [677, 50], m23: [1068, 290] },
-    calls: { '6.1': ['m2', 'm3', 'm13', 'm14'], '6.2': ['m2', 'm3', 'm14', 'm22'], '6.3': ['m23'] } },
+    at: { m24: [570, 150], m13: [419, 550], m25: [1100, 525] },
+    calls: { '6.1': ['m13', 'm24'], '6.2': ['m24'], '6.3': ['m25'], '6.4': ['m25'] } },
   'primer': { r: 46,
     at: { m1: [544, 386], m14: [786, 346], m3: [986, 386] },
     calls: { '10.2': ['m1', 'm14'], '10.3': ['m3', 'm14'] } },
@@ -1834,9 +1836,10 @@ function level2TipsReference() {
     { id: 'quotes', name: 'Market quotes', href: DS('s7') },
     { id: 'refcpi', name: 'Ref CPI', href: DS('s3') },
     { id: 'hol', name: 'Bond holidays', href: DS('s16') },
+    { id: 'yc13', name: 'Yield curves', href: DS('s13') },
   ];
   const procs = [
-    { id: '6.1', name: ['Load', 'TIPS data'], href: V(KTR + '6.1_Load_TIPS_Data.md'), reads: ['tipsref', 'quotes', 'refcpi', 'hol'],
+    { id: '6.1', name: ['Load', 'TIPS data'], href: V(KTR + '6.1_Load_TIPS_Data.md'), reads: ['tipsref', 'quotes', 'refcpi', 'hol', 'yc13'],
       out: { '6.2': ['TIPS reference rows', 'daily Ref CPI', 'bond holidays', 'settlement date'], '6.3': ['download date', 'settlement date'] } },
     { id: '6.2', name: ['Calculate', 'index ratios', 'and coupons'], href: V(KTR + '6.2_Calculate_Index_Ratios_And_Coupons.md'), reads: [],
       out: { '6.3': ['TIPS reference rows'] } },
@@ -1852,7 +1855,7 @@ function level2TipsReference() {
   const OBS = [...procs.map(q => ({ x: px[q.id], y: py[q.id], r: PR })), ...SM.obstacles];
   const LBL = [];
   const [vx, vy, vw, vh] = SM.viewBox(W, H);
-  const P = [`<svg viewBox="${vx} ${vy} ${vw} ${vh}" role="img" aria-label="Level 2 for TIPS Reference: four processes reading four data stores. No process writes a data store. Amber circles are the shared modules its processes call.">`, marker()];
+  const P = [`<svg viewBox="${vx} ${vy} ${vw} ${vh}" role="img" aria-label="Level 2 for TIPS Reference: four processes reading five data stores. No process writes a data store. Amber circles are the shared modules its processes call.">`, marker()];
   const sIdx = Object.fromEntries(stores.map((s, i) => [s.id, i]));
   procs.forEach(p => p.reads.forEach(id => {
     const y = sy(sIdx[id]), [x2, y2] = toCircle(SX + SW + 5, y, px[p.id], py[p.id], PR);
@@ -1882,7 +1885,7 @@ function level2TipsReference() {
     up: 'DFD_LEVEL1.html', upLabel: 'Level 1',
     svg: P.join(NL),
     notes: ['  <b>No process here writes a data store.</b> Every flow ends at the user and is gone when the page closes.',
-      '  6.1 calls the function that <a href="DFD_LEVEL2_TIPSLADDERMANAGER.html">Ladder Manager</a> also calls to read market data. That function also fetches <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s13">Yield curves (S13)</a>, which this app does not use, so no flow from S13 is drawn.',
+      '  6.1 calls the function that <a href="DFD_LEVEL2_TIPSLADDERMANAGER.html">Ladder Manager</a> also calls to read market data, and reads the SA Yield of each TIPS from <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s13">Yield curves (S13)</a>.',
       '  6.4 writes the rows of the table to a csv file the user saves.',
       '  <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#tips-reference-rows">TIPS reference rows</a> is defined in the Data Dictionary &sect;6.7.',
       SHARED_NOTE].join(NL)

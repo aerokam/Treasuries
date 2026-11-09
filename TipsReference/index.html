@@ -5,100 +5,19 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>TIPS Reference - Treasury Investors Portal</title>
 <link rel="stylesheet" href="../shared/src/portal-theme.css">
+<link rel="stylesheet" href="../shared/src/tips-reference-table.css">
 <style>
   body { font-size: 13px; padding: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
 
   /* ── Header ── */
-  header { padding: 9px 14px; background: var(--portal-card-bg); color: var(--portal-card-text); border-bottom: 1px solid var(--portal-header-bg); display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+  header { padding: 9px 14px; background: var(--portal-card-bg); color: var(--portal-card-text); border-bottom: 1px solid var(--portal-header-bg); display: flex; align-items: center; gap: 12px; flex-shrink: 0; --trt-meta-color: var(--portal-card-text); --trt-label-color: var(--tab-inactive-text); }
   header h1 { font-size: 17px; margin: 0; color: var(--portal-card-text); }
-  #header-meta { display: none; gap: 18px; }
-  .meta-item { display: flex; flex-direction: column; }
-  .meta-label { font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--tab-inactive-text); opacity: 0.7; }
-  .meta-val { font-size: 12px; font-weight: 700; color: var(--portal-card-text); font-variant-numeric: tabular-nums; }
   /* Look comes from shared .date-picker.flush (portal-theme.css); only width is app-specific. */
-  #ref-cpi-date-input { width: 108px; }
   #status { font-size: 11px; color: var(--tab-inactive-text); font-style: italic; margin-left: auto; }
   #status.error { color: #f87171; font-style: normal; font-weight: 600; }
   .btn { padding: 4px 10px; font-size: 11px; }
   .btn:hover:not(:disabled) { transform: none; box-shadow: none; }
-
-  /* ── Row count bar ── */
-  #row-count { font-size: 11px; color: var(--portal-text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; padding: 5px 14px; border-bottom: 1px solid #f1f5f9; background: #fff; flex-shrink: 0; display: none; align-items: center; gap: 10px; }
-  #outstanding-toggle { text-transform: none; }
-
-  /* ── Table wrap ── */
-  .table-wrap { flex: 1; overflow: auto; min-height: 0; background: #fff; }
-
-  /* ── Table ── */
-  table { border-collapse: separate; border-spacing: 0; font-size: 11px; width: fit-content; background: #fff; }
-
-  thead th, thead td {
-    position: sticky;
-    z-index: 20;
-    background-clip: padding-box;
-  }
-
-  /* Row 1 — sortable headers */
-  thead tr:first-child th {
-    top: 0;
-    z-index: 22;
-    background: var(--portal-text-main);
-    color: var(--portal-text-on-dark);
-    padding: 5px 8px;
-    text-align: right;
-    font-weight: 600;
-    cursor: pointer;
-    user-select: none;
-    white-space: nowrap;
-    border-bottom: 1px solid var(--portal-header-bg);
-  }
-  thead tr:first-child th.wrap-header { white-space: normal; min-width: 64px; }
-  thead tr:first-child th.left { text-align: left; }
-  thead tr:first-child th:hover { background: #2d3f57; }
-  thead th.sort-asc::after  { content: ' \2191'; }
-  thead th.sort-desc::after { content: ' \2193'; }
-
-  /* Row 2 — filter inputs */
-  thead tr.filter-row td {
-    top: 29px; /* adjusted by JS after render */
-    z-index: 21;
-    background: #f1f5f9;
-    padding: 2px 4px;
-    border-bottom: 2px solid var(--border-light);
-  }
-
-  .filter-input { display: block; width: 100%; padding: 2px 5px; font-size: 11px; border: 1px solid var(--border-light); border-radius: 3px; outline: none; background: #fff; min-width: 40px; box-sizing: border-box; }
-  .filter-input:focus { border-color: #1a56db; }
-  .filter-input.active { border-color: #f59e0b; background: #fffbeb; }
-  .filter-input.has-range { padding-right: 20px; }
-  .range-toggle:hover { border-color: #1a56db !important; color: #1a56db !important; }
-  .range-toggle.active { border-color: #f59e0b !important; background: #fffbeb !important; color: #f59e0b !important; }
-
-  /* ── Clickable coupon cells ── */
-  td.cpn-clickable { cursor: pointer; color: #1a56db; }
-  td.cpn-clickable:hover { background: #eff6ff !important; text-decoration: underline; }
-
-  /* ── Coupon calc modal ── */
-  #cpn-modal { display: none; position: fixed; inset: 0; z-index: 200; align-items: center; justify-content: center; }
-  #cpn-modal.open { display: flex; }
-  #cpn-modal-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.35); }
-  #cpn-modal-card { position: relative; background: #fff; border-radius: 6px; padding: 20px 22px 18px; min-width: 340px; max-width: 420px; box-shadow: 0 8px 32px rgba(0,0,0,0.18); z-index: 1; }
-  #cpn-modal-title { font-size: 13px; font-weight: 700; color: var(--portal-text-main); margin-bottom: 14px; padding-right: 24px; }
-  #cpn-modal-close { position: absolute; top: 10px; right: 12px; background: none; border: none; font-size: 18px; line-height: 1; cursor: pointer; color: var(--tab-inactive-text); padding: 2px 6px; }
-  #cpn-modal-close:hover { color: var(--portal-text-main); }
-  .cmt { border-collapse: collapse; width: 100%; font-size: 12px; }
-  .cmt .cml { font-weight: 600; color: var(--portal-text-main, #1e293b); padding: 3px 14px 3px 0; white-space: nowrap; vertical-align: top; }
-  .cmt .cmv { text-align: right; font-variant-numeric: tabular-nums; padding: 3px 0; }
-  .cmt .cms td { padding-top: 2px; border-top: 1px solid #f1f5f9; height: 6px; }
-  .cmt .cmf td { padding-top: 4px; font-size: 11px; color: var(--portal-text-main, #1e293b); }
-  .cmt .cmr .cml { font-size: 13px; font-weight: 700; color: var(--portal-text-main); }
-  .cmt .cmr .cmv { font-size: 13px; font-weight: 700; color: var(--portal-text-main); }
-
-  /* Body rows */
-  tbody td { padding: 4px 8px; border-bottom: 1px solid #f1f5f9; font-variant-numeric: tabular-nums; white-space: nowrap; }
-  tbody tr:nth-child(odd) td { background: #d2dbe6; }
-  tbody tr:nth-child(even) td { background: #fff; }
-  tbody td.right { text-align: right; }
+  #table-host { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 </style>
 </head>
 <body>
@@ -106,557 +25,48 @@
 <header>
   <a href="../" class="portal-link">&#8592; Portal</a>
   <h1>TIPS Reference</h1>
-  <div id="header-meta">
-    <div class="meta-item">
-      <span class="meta-label">Price Date</span>
-      <span class="meta-val" id="meta-price-date">—</span>
-    </div>
-    <div class="meta-item">
-      <span class="meta-label">Settlement</span>
-      <span class="meta-val" id="meta-sett-date">—</span>
-    </div>
-    <div class="meta-item">
-      <span class="meta-label">Ref CPI Date</span>
-      <input type="date" id="ref-cpi-date-input" class="meta-val date-picker flush">
-    </div>
-    <div class="meta-item">
-      <span class="meta-label">Ref CPI</span>
-      <span class="meta-val" id="meta-ref-cpi">—</span>
-    </div>
-  </div>
+  <div id="header-meta"></div>
   <span id="status" style="margin-left:auto;">Loading…</span>
   <button id="export-btn" class="btn" disabled>Export CSV</button>
 </header>
 
-<div id="row-count">
-  <span id="row-count-text"></span>
-  <button id="outstanding-toggle" class="btn" type="button">Show all</button>
-</div>
-
-<div id="dateRangePopover" style="position: fixed; z-index: 100; background: #fff; border: 1px solid var(--border-light); border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.18); padding: 10px; display: none; flex-direction: column; gap: 6px; font-size: 11px; min-width: 170px;">
-  <div style="font-weight: 700; color: var(--portal-text-main); margin-bottom: 2px;" id="dateRangeTitle"></div>
-  <label style="display: flex; flex-direction: column; gap: 2px; font-weight: 600; color: #64748b;">From <input type="date" id="dateRangeFrom" class="date-picker" style="font-size: 11px; padding: 3px 4px;"></label>
-  <label style="display: flex; flex-direction: column; gap: 2px; font-weight: 600; color: #64748b;">To <input type="date" id="dateRangeTo" class="date-picker" style="font-size: 11px; padding: 3px 4px;"></label>
-  <div style="display: flex; justify-content: space-between; gap: 6px; margin-top: 4px;">
-    <button id="dateRangeClear" style="padding: 4px 8px; font-size: 10px; background: #64748b; color: #fff; border: none; border-radius: 3px; cursor: pointer;">Clear</button>
-    <button id="dateRangeDone" style="padding: 4px 8px; font-size: 10px; background: var(--tab-active-bg); color: #fff; border: none; border-radius: 3px; cursor: pointer;">Done</button>
-  </div>
-</div>
-
-<div class="table-wrap">
-  <table>
-    <thead>
-      <tr id="header-row"></tr>
-      <tr class="filter-row" id="filter-row"></tr>
-    </thead>
-    <tbody id="main-tbody"></tbody>
-  </table>
-</div>
-
-<div id="cpn-modal">
-  <div id="cpn-modal-overlay"></div>
-  <div id="cpn-modal-card">
-    <button id="cpn-modal-close">&times;</button>
-    <div id="cpn-modal-title"></div>
-    <div id="cpn-modal-body"></div>
-  </div>
-</div>
+<div id="table-host"></div>
 
 <script type="module">
-// Ref CPI logic is imported from the single shared home (no-redundancy directive,
-// projects/CLAUDE.md §2a) — never copied inline. lookupRefCpi is exact-date match
-// (null beyond the published range; no snap-back).
-import { lookupRefCpi, indexRatio, TREASURY_ROUNDING, NO_ROUNDING } from '../shared/src/ref-cpi.js';
-// Duration + coupon-date helpers from the single shared bond-math home (no inline copies).
-import { calculateDuration, calculateMDuration, termYears, accruedInterestAdjusted, _nextCouponOnOrAfter } from '../shared/src/bond-math.js';
-// Shared date picker (the canonical native type=date; projects/CLAUDE.md §2a).
-import { initDatePicker } from '../shared/src/date-picker.js';
-// Shared date range filter manager (projects/CLAUDE.md §2a).
-import { createDateRangeFilter } from '../shared/src/date-range-filter.js';
+// The table, its header figures and its calculation are the shared modules tips-reference-table.js and
+// tips-reference-rows.js (SharedModules.md M24, M25), which the TIPS Reference popup of TipsLadderManager also uses.
+import { createTipsReferenceTable } from '../shared/src/tips-reference-table.js';
 // Single entry point for market data (source decision, fetch, parse) — shared with
 // TipsLadderManager so a YIELD_SOURCE flip applies to every consumer at once
-// (projects/CLAUDE.md §2a; TipsLadderManager/knowledge/4.1_Load_Market_Data.md §Source selection).
+// (TipsLadderManager/knowledge/4.1_Load_Market_Data.md §Source selection).
 import { loadMarketData } from '../shared/src/market-data.js';
-// Bond-calendar primitives (weekend/SIFMA-holiday skip) — same module TipsLadderManager,
-// YieldsMonitor, SeasonalAdjustments, and YieldCurves import (4.1_Load_Market_Data.md §Source selection).
-import { localDate, toIsoDate, actualPaymentDate } from '../shared/src/settlement.js';
-
-var allRows = [];
-var refCpiRows = [];
-var lastRenderedRows = [];
-var priceDateStr = '';
-var settlementDateStr = '';
-var refCpiDateStr = '';
-var bondHolidays = new Set();
-var sortCol = 'maturity';
-var sortDir = 'asc';
-var filters = {};
-var dateRangeFilter = null;
-var showOutstanding = true; // default: hide matured TIPS (maturity < today)
-var cpnKnown = false; // true when some TIPS has an upcoming coupon with a known Adj Cpn/$1K
-
-var COLS = [
-  { key: 'cusip',      label: 'CUSIP',             align: 'left',  sortType: 'str',
-    fmt: function(v) { return v != null ? String(v) : ''; } },
-  { key: 'maturity',   label: 'Maturity',          align: 'left',  sortType: 'str', isDate: true,
-    fmt: function(v) { return fmtDate(v); } },
-  { key: 'coupon',     label: 'Coupon',             align: 'right', sortType: 'num',
-    fmt: function(v) { return v != null ? (v * 100).toFixed(3) + '%' : '—'; } },
-  { key: 'datedDate',  label: 'Dated Date',         align: 'left',  sortType: 'str', isDate: true,
-    fmt: function(v) { return fmtDate(v); } },
-  { key: 'datedDateRefCpi',    label: 'Dated Date Ref CPI', align: 'right', sortType: 'num', wrapHeader: true,
-    fmt: function(v) { return v != null ? v.toFixed(5) : '—'; } },
-  { key: 'price',      label: 'Price',              align: 'right', sortType: 'num',
-    fmt: function(v) { return v != null ? v.toFixed(3) : '—'; } },
-  { key: 'indexRatio', label: 'Index Ratio',        align: 'right', sortType: 'num',
-    fmt: function(v) { return v != null ? v.toFixed(5) : '—'; } },
-  { key: 'adjPrice',   label: 'Adj Price',          align: 'right', sortType: 'num',
-    fmt: function(v) { return v != null ? v.toFixed(3) : '—'; } },
-  { key: 'yield',      label: 'Yield',              align: 'right', sortType: 'num',
-    fmt: function(v) { return v != null ? (v * 100).toFixed(3) + '%' : '—'; } },
-  { key: 'term',        label: 'Term',               align: 'right', sortType: 'num',
-    fmt: function(v) { return v != null ? v.toFixed(2) + 'y' : '—'; } },
-  { key: 'macDuration', label: 'Mac Duration',        align: 'right', sortType: 'num',
-    fmt: function(v) { return v != null ? v.toFixed(2) : '—'; } },
-  { key: 'modDuration', label: 'Mod Duration',        align: 'right', sortType: 'num',
-    fmt: function(v) { return v != null ? v.toFixed(2) : '—'; } },
-  { key: 'accruedInterest', label: 'Adj Accrued/$1K', align: 'right', sortType: 'num', wrapHeader: true,
-    title: 'Accrued Interest (Adjusted) per 1,000 of par at the Ref CPI Date',
-    fmt: function(v) { return v != null ? v.toFixed(5) : '—'; } },
-  { key: 'nextCoupon',  cpnGroup: true, label: 'Cpn Date',             align: 'left',  sortType: 'str', isDate: true,
-    title: 'Coupon payment date on or after the selected Ref CPI Date',
-    fmt: function(v) { return v != null ? fmtDate(v) : '—'; } },
-  { key: 'cpnDateIR',   cpnGroup: true, label: 'Cpn Date IR',        align: 'right', sortType: 'num', wrapHeader: true,
-    fmt: function(v) { return v != null ? v.toFixed(5) : '—'; } },
-  { key: 'cpnPayment',  cpnGroup: true, label: 'Adj Cpn/$1K',        align: 'right', sortType: 'num', wrapHeader: true,
-    fmt: function(v) { return v != null ? v.toFixed(4) : '—'; },
-    // Export at higher precision than the on-screen 4dp: coupon and Index Ratio (already
-    // Treasury's own max precision, 5dp) are both exact, so cpnPayment is an exact decimal.
-    // Consumers who multiply by Quantity to get actual holding interest should round to
-    // cents once, on that final total — not on this per-$1,000 rate first. 6dp keeps that
-    // rounding error undetectable at any realistic holding size.
-    exportFmt: function(v) { return v != null ? v.toFixed(6) : '—'; } },
-];
-
-// The columns shown: the three Cpn columns only while some TIPS has a known upcoming coupon.
-function visibleCols() {
-  return COLS.filter(function(c) { return !c.cpnGroup || cpnKnown; });
-}
-
-// A maturity (or coupon) payment due on a weekend or SIFMA bond holiday is actually paid
-// on the next Treasury business day. Returns the date itself when it's already a business
-// day (on-or-after semantics — see shared/src/settlement.js actualPaymentDate). ISO-string
-// wrapper so the rest of this file, which works in ISO strings throughout, doesn't need to
-// touch Date objects.
-function effectivePaymentDate(isoStr) {
-  return toIsoDate(actualPaymentDate(localDate(isoStr), bondHolidays));
-}
-
-// Today's date in ET (matches scripts/getYieldsFedInvest.js todayET()) — used to detect
-// a TIPS maturing today so it stays visible after the market-data source drops its price
-// at maturity (TipsRef.csv, the primary source below, keeps listing it regardless).
-function todayET() {
-  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
-}
-
-function fmtDate(isoStr) {
-  if (!isoStr) return '';
-  var parts = isoStr.split('-');
-  if (parts.length !== 3) return isoStr;
-  return parts[1] + '/' + parts[2] + '/' + parts[0];
-}
-
-function recomputeWithRefCpi(dateStr) {
-  refCpiDateStr = dateStr;
-  var cpi = lookupRefCpi(refCpiRows, dateStr);
-  var refDate = localDate(dateStr); // local midnight, matches _nextCouponOnOrAfter candidates
-
-  var todayStr = todayET();
-  var todayDate = localDate(todayStr);
-  // A weekend + adjacent bond holiday can roll a coupon's payment forward by several
-  // calendar days, so a coupon dated a few days before today can still be paying out
-  // today — look back far enough to catch it (7 days safely covers any realistic
-  // weekend/holiday stack).
-  var couponLookbackDate = new Date(todayDate.getFullYear(), todayDate.getMonth(), todayDate.getDate() - 7);
-
-  allRows.forEach(function(r) {
-    var matDate = r.maturity ? new Date(r.maturity + 'T12:00:00Z') : null;
-    var isMatured = matDate && matDate <= todayDate;
-
-    // Index Ratio / Adj Price for a matured TIPS is pinned to its own maturity date's Ref
-    // CPI — that's the realized principal redemption, not a function of the globally
-    // selected Ref CPI Date.
-    var rowCpi = isMatured ? lookupRefCpi(refCpiRows, r.maturity) : cpi;
-    r.indexRatio = indexRatio(rowCpi, r.datedDateRefCpi, TREASURY_ROUNDING);
-    // Adj Price is a broker's adjusted price, which does not round the Index Ratio (DD Index Ratio).
-    var adjIR = indexRatio(rowCpi, r.datedDateRefCpi, NO_ROUNDING);
-    r.adjPrice = (adjIR != null && r.price != null) ? r.price * adjIR : null;
-
-    // Accrued Interest (Adjusted) at the Ref CPI Date, with the Index Ratio of that date (DD Accrued Interest (Adjusted)); none once matured.
-    r.accruedInterest = (matDate && r.coupon != null && r.datedDate && dateStr >= r.datedDate)
-      ? accruedInterestAdjusted(r.coupon, refDate, localDate(r.maturity), cpi, r.datedDateRefCpi)
-      : null;
-
-    // Cpn Date / Cpn Date IR / Adj Cpn/$1K: if today is the effective (weekend/holiday-rolled)
-    // payment date of this bond's next-or-final coupon, show that realized payment
-    // regardless of the globally selected Ref CPI Date — otherwise project the next
-    // coupon on/after the selected date. A matured bond's final coupon coincides with
-    // its maturity date, so a maturity landing on a weekend/holiday keeps showing that
-    // final coupon through the day it actually pays. A still-outstanding bond's regular
-    // semiannual coupon gets the same treatment: search from couponLookbackDate (not
-    // todayDate) so a coupon dated a few days ago — already in the past calendar-wise,
-    // but only now actually paid because of a weekend/holiday roll — is still found.
-    var candidateCpn = isMatured ? localDate(r.maturity)
-      : (matDate ? _nextCouponOnOrAfter(couponLookbackDate, matDate) : null);
-    var candidateCpnStr = isMatured ? r.maturity : (candidateCpn ? toIsoDate(candidateCpn) : null);
-    var todayIsCpnDate = candidateCpnStr && effectivePaymentDate(candidateCpnStr) === todayStr;
-    var cpnRefDate = todayIsCpnDate ? candidateCpn : refDate;
-    var nextCpn = (matDate && matDate >= cpnRefDate) ? _nextCouponOnOrAfter(cpnRefDate, matDate) : null;
-
-    if (nextCpn) {
-      r.nextCoupon = toIsoDate(nextCpn);
-      r.cpnRefCpi = lookupRefCpi(refCpiRows, r.nextCoupon);
-      var cpnIR = indexRatio(r.cpnRefCpi, r.datedDateRefCpi, TREASURY_ROUNDING);
-      r.cpnDateIR = cpnIR;
-      r.cpnPayment = (cpnIR != null && r.coupon != null)
-        ? (r.coupon / 2) * cpnIR * 1000
-        : null;
-    } else {
-      r.nextCoupon = null;
-      r.cpnRefCpi = null; r.cpnDateIR = null; r.cpnPayment = null;
-    }
-  });
-  cpnKnown = allRows.some(function(r) { return r.cpnPayment != null; });
-  if (!cpnKnown && COLS.some(function(c) { return c.cpnGroup && c.key === sortCol; })) { sortCol = 'maturity'; sortDir = 'asc'; }
-  document.getElementById('meta-ref-cpi').textContent = cpi != null ? cpi.toFixed(5) : '—';
-  buildHeader();
-  renderTable();
-}
-
-function cellDisplay(row, col) {
-  return col.fmt(row[col.key]);
-}
-
-function getFilteredSorted() {
-  var rows = allRows.slice();
-
-  if (showOutstanding) {
-    var todayStr = todayET();
-    rows = rows.filter(function(r) { return r.maturity && effectivePaymentDate(r.maturity) >= todayStr; });
-  }
-
-  // Apply date range filters
-  if (dateRangeFilter) {
-    Object.entries(dateRangeFilter.getAllRanges()).forEach(function(entry) {
-      var key = entry[0];
-      var range = entry[1];
-      if (!visibleCols().some(function(c) { return c.key === key; })) return;
-      if (range.from) {
-        rows = rows.filter(function(r) { return (r[key] || '') >= range.from; });
-      }
-      if (range.to) {
-        rows = rows.filter(function(r) { return (r[key] || '') <= range.to; });
-      }
-    });
-  }
-
-  Object.keys(filters).forEach(function(key) {
-    var val = filters[key].toLowerCase();
-    var col = visibleCols().find(function(c) { return c.key === key; });
-    if (!col) return;
-    rows = rows.filter(function(r) {
-      return cellDisplay(r, col).toLowerCase().indexOf(val) !== -1;
-    });
-  });
-  var col = COLS.find(function(c) { return c.key === sortCol; });
-  if (col) {
-    rows.sort(function(a, b) {
-      var av = a[sortCol], bv = b[sortCol];
-      var cmp;
-      if (col.sortType === 'num') {
-        cmp = (av != null ? av : -Infinity) - (bv != null ? bv : -Infinity);
-      } else {
-        cmp = String(av != null ? av : '').localeCompare(String(bv != null ? bv : ''));
-      }
-      return sortDir === 'asc' ? cmp : -cmp;
-    });
-  }
-  return rows;
-}
-
-function showCpnModal(row) {
-  function r2(label, val) { return '<tr><td class="cml">' + label + '</td><td class="cmv">' + val + '</td></tr>'; }
-  function sep() { return '<tr class="cms"><td colspan="2"></td></tr>'; }
-
-  var ir = row.cpnDateIR;
-  var semiRate = row.coupon != null ? row.coupon / 2 : null;
-
-  var formulaVars = 'Index Ratio &times; (Coupon Rate / 2) &times; 1,000';
-  var formulaNums = (ir != null && semiRate != null)
-    ? ir.toFixed(5) + ' &times; ' + (semiRate * 100).toFixed(4) + '% &times; 1,000'
-    : '—';
-
-  var html = '<table class="cmt">' +
-    r2('CUSIP', row.cusip || '—') +
-    r2('Coupon Date', row.nextCoupon ? fmtDate(row.nextCoupon) : '—') +
-    sep() +
-    r2('Coupon Rate', row.coupon != null ? (row.coupon * 100).toFixed(3) + '%' : '—') +
-    r2('Semi-Annual Rate', semiRate != null ? (semiRate * 100).toFixed(4) + '%' : '—') +
-    sep() +
-    r2('Index Ratio', ir != null ? ir.toFixed(5) : '—') +
-    sep() +
-    '<tr class="cmf"><td colspan="2">' + formulaVars + '</td></tr>' +
-    '<tr class="cmf"><td colspan="2">= ' + formulaNums + '</td></tr>' +
-    '<tr class="cmr"><td class="cml">Coupon Payment</td><td class="cmv">' +
-      (row.cpnPayment != null ? row.cpnPayment.toFixed(4) + ' per 1,000' : '—') +
-    '</td></tr>' +
-    '</table>';
-
-  document.getElementById('cpn-modal-title').textContent = 'Coupon Calculation';
-  document.getElementById('cpn-modal-body').innerHTML = html;
-  document.getElementById('cpn-modal').classList.add('open');
-}
-
-function buildHeader() {
-  var headerRow = document.getElementById('header-row');
-  var filterRow = document.getElementById('filter-row');
-  headerRow.innerHTML = '';
-  filterRow.innerHTML = '';
-
-  visibleCols().forEach(function(col) {
-    var th = document.createElement('th');
-    th.textContent = col.label;
-    if (col.align === 'left') th.classList.add('left');
-    if (col.wrapHeader) th.classList.add('wrap-header');
-    if (col.title) th.title = col.title;
-    if (sortCol === col.key) th.classList.add(sortDir === 'asc' ? 'sort-asc' : 'sort-desc');
-    th.addEventListener('click', function() {
-      if (sortCol === col.key) {
-        sortDir = sortDir === 'asc' ? 'desc' : 'asc';
-      } else {
-        sortCol = col.key;
-        sortDir = 'asc';
-      }
-      buildHeader();
-      renderTable();
-    });
-    headerRow.appendChild(th);
-
-    // Wrap the filter input (and, for date columns, the range-toggle button) in an inner
-    // positioning context rather than setting position:relative on the td itself — the td
-    // must stay position:sticky (from CSS) for the filter row to pin under the header;
-    // an inline style on the td would override that sticky rule (inline beats stylesheet).
-    var td = document.createElement('td');
-    var wrap = document.createElement('div');
-    wrap.style.position = 'relative';
-    var inp = document.createElement('input');
-    inp.type = 'text';
-    inp.size = 1;
-    inp.className = 'filter-input';
-    inp.placeholder = '\u2026';
-    inp.value = filters[col.key] || '';
-    if (filters[col.key]) inp.classList.add('active');
-    if (col.isDate) inp.classList.add('has-range');
-    (function(colKey, input) {
-      input.addEventListener('input', function() {
-        var v = input.value.trim();
-        if (v) { filters[colKey] = v; input.classList.add('active'); }
-        else { delete filters[colKey]; input.classList.remove('active'); }
-        renderTable();
-      });
-    })(col.key, inp);
-    wrap.appendChild(inp);
-    if (col.isDate) {
-      var range = dateRangeFilter ? dateRangeFilter.getDateRange(col.key) : {};
-      var rangeActive = range.from || range.to;
-      var btn = document.createElement('button');
-      btn.className = 'range-toggle' + (rangeActive ? ' active' : '');
-      btn.style.cssText = 'position:absolute;right:1px;top:1px;width:17px;height:17px;line-height:15px;font-size:12px;text-align:center;border:1px solid var(--border-light);border-radius:3px;cursor:pointer;background:#fff;color:var(--portal-text-muted);padding:0;';
-      btn.innerHTML = '\ud83d\udcc5';
-      btn.type = 'button';
-      btn.dataset.field = col.key;
-      (function(field, fieldLabel, btn) {
-        btn.addEventListener('click', function(e) {
-          e.stopPropagation();
-          if (dateRangeFilter) {
-            if (dateRangeFilter.isOpen() && dateRangeFilter.getCurrentField() === field) {
-              dateRangeFilter.close();
-            } else {
-              dateRangeFilter.open(field, fieldLabel, btn);
-            }
-          }
-        });
-      })(col.key, col.label, btn);
-      wrap.appendChild(btn);
-    }
-    td.appendChild(wrap);
-    filterRow.appendChild(td);
-  });
-
-  syncFilterRowTop();
-}
-
-// Header row height depends on the table's actual rendered width (wrap-header columns
-// wrap to 2 lines when narrow), which itself depends on tbody cell content since the
-// table has no fixed layout. Must be re-measured after tbody has real rows, not just
-// after buildHeader() — otherwise the empty-table measurement (from before data loads)
-// stays baked into the filter row's sticky top and leaves a gap / overlaps the first row.
-function syncFilterRowTop() {
-  var headerHeight = document.querySelector('thead tr:first-child').offsetHeight;
-  document.querySelectorAll('thead tr.filter-row td').forEach(function(td) {
-    td.style.top = headerHeight + 'px';
-  });
-}
-
-function renderTable() {
-  var rows = getFilteredSorted();
-  lastRenderedRows = rows;
-  var tbody = document.getElementById('main-tbody');
-  var rc = document.getElementById('row-count');
-  var rcText = document.getElementById('row-count-text');
-
-  var html = '';
-  rows.forEach(function(r, i) {
-    html += '<tr data-idx="' + i + '">';
-    visibleCols().forEach(function(col) {
-      var cls = col.align === 'right' ? 'right' : '';
-      if (col.key === 'cpnPayment' && r.cpnPayment != null) cls += (cls ? ' ' : '') + 'cpn-clickable';
-      html += '<td' + (cls ? ' class="' + cls + '"' : '') + '>' + cellDisplay(r, col) + '</td>';
-    });
-    html += '</tr>';
-  });
-  tbody.innerHTML = html;
-  syncFilterRowTop();
-  rcText.textContent = rows.length + ' of ' + allRows.length + ' TIPS';
-  rc.style.display = 'flex';
-}
 
 async function loadData() {
-  var statusEl = document.getElementById('status');
+  const statusEl = document.getElementById('status');
   try {
-    var d = await loadMarketData();
-    bondHolidays = d.bondHolidays;
-    refCpiRows = d.refCpiRows;
-    // Trade = the data's as-of/"today" date (the Download Date; for the dormant
-    // FedInvest cross-check path, settleDateStr doubles as this — see loadMarketData()).
-    // Settlement = T+1, source-dependent (4.1_Load_Market_Data.md §Source selection).
-    priceDateStr = d.tradeDateStr;
-    settlementDateStr = d.settleDateStr;
-
-    // Create yields map for quick lookup
-    var yieldsMap = {};
-    d.yieldsRows.forEach(function(r) { yieldsMap[r.cusip] = r; });
-
-    var settlDate = new Date(settlementDateStr + 'T12:00:00Z');
-
-    // Primary source: TipsRef.csv (all TIPS). Enrich with yields where available.
-    allRows = d.tipsRefRows.map(function(ref) {
-      var yields = yieldsMap[ref.cusip];
-      var matDate = ref.maturity ? new Date(ref.maturity + 'T12:00:00Z') : null;
-      var term = (matDate && matDate > settlDate) ? termYears(settlDate, matDate) : null;
-      var macDur = (matDate && ref.coupon != null && yields && yields.yield != null && !isNaN(yields.yield))
-        ? calculateDuration(settlDate, matDate, ref.coupon, yields.yield) : null;
-      var modDur = (macDur != null) ? calculateMDuration(settlDate, matDate, ref.coupon, yields.yield) : null;
-      return {
-        cusip:       ref.cusip,
-        maturity:    ref.maturity,
-        coupon:      ref.coupon,
-        datedDate:   ref.datedDate,
-        datedDateRefCpi:     ref.datedDateRefCpi,
-        price:       yields ? yields.price : null,
-        indexRatio:  null,
-        adjPrice:    null,
-        yield:       yields ? yields.yield : null,
-        term:        term,
-        macDuration: macDur,
-        modDuration: modDur,
-        accruedInterest: null,
-        nextCoupon:  null,
-        cpnDateIR:   null,
-        cpnPayment:  null,
-      };
+    const d = await loadMarketData();
+    createTipsReferenceTable({
+      host: document.getElementById('table-host'),
+      metaHost: document.getElementById('header-meta'),
+      exportButton: document.getElementById('export-btn'),
+      flushPicker: true,
+      tipsRefRows: d.tipsRefRows,
+      quotes: d.yieldsRows.map(r => ({ ...r, saYield: d.saYieldByCusip.get(r.cusip) ?? null })),
+      refCpiRows: d.refCpiRows,
+      bondHolidays: d.bondHolidays,
+      // Trade = the data's as-of/"today" date (the Download Date; for the dormant
+      // FedInvest cross-check path, settleDateStr doubles as this — see loadMarketData()).
+      // Settlement = T+1, source-dependent (4.1_Load_Market_Data.md §Source selection).
+      tradeDateStr: d.tradeDateStr,
+      settlementDateStr: d.settleDateStr,
+      showSaYield: true,
     });
-
-    document.getElementById('meta-price-date').textContent = fmtDate(priceDateStr);
-    document.getElementById('meta-sett-date').textContent = fmtDate(settlementDateStr);
-    document.getElementById('header-meta').style.display = 'flex';
     statusEl.textContent = '';
-    document.getElementById('export-btn').disabled = false;
-
-    initDatePicker(document.getElementById('ref-cpi-date-input'), {
-      value: settlementDateStr,
-      min: refCpiRows.length ? refCpiRows[0].date : undefined,
-      max: refCpiRows.length ? refCpiRows[refCpiRows.length - 1].date : undefined,
-      onChange: recomputeWithRefCpi,
-    });
-
-    // Initialize date range filter manager
-    dateRangeFilter = createDateRangeFilter({
-      popperId: 'dateRangePopover',
-      fromInputId: 'dateRangeFrom',
-      toInputId: 'dateRangeTo',
-      titleId: 'dateRangeTitle',
-      doneButtonId: 'dateRangeDone',
-      clearButtonId: 'dateRangeClear',
-      onApply: function() {
-        // Update toggle button styles and re-render when range is applied
-        var toggles = document.querySelectorAll('.range-toggle');
-        toggles.forEach(function(btn) {
-          var field = btn.dataset.field;
-          var range = dateRangeFilter.getDateRange(field);
-          btn.classList.toggle('active', !!(range.from || range.to));
-        });
-        renderTable();
-      }
-    });
-
-    recomputeWithRefCpi(settlementDateStr);
   } catch (err) {
     statusEl.textContent = err.message;
     statusEl.classList.add('error');
   }
 }
-
-document.getElementById('export-btn').addEventListener('click', function() {
-  var rows = getFilteredSorted();
-  var cols = visibleCols();
-  var headerLine = cols.map(function(c) { return c.label; }).join(',');
-  var dataLines = rows.map(function(r) {
-    return cols.map(function(col) {
-      var v = col.exportFmt ? col.exportFmt(r[col.key]) : cellDisplay(r, col);
-      return v.indexOf(',') !== -1 ? '"' + v + '"' : v;
-    }).join(',');
-  });
-  var csv = [headerLine].concat(dataLines).join('\n');
-  var blob = new Blob([csv], { type: 'text/csv' });
-  var a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'tips-reference' + (settlementDateStr ? '-' + settlementDateStr : '') + '.csv';
-  a.click();
-  URL.revokeObjectURL(a.href);
-});
-
-document.getElementById('outstanding-toggle').addEventListener('click', function() {
-  showOutstanding = !showOutstanding;
-  this.textContent = showOutstanding ? 'Show all' : 'Show outstanding';
-  renderTable();
-});
-
-document.getElementById('main-tbody').addEventListener('click', function(e) {
-  var td = e.target.closest('td.cpn-clickable');
-  if (!td) return;
-  var idx = parseInt(td.closest('tr').getAttribute('data-idx'), 10);
-  if (!isNaN(idx) && lastRenderedRows[idx]) showCpnModal(lastRenderedRows[idx]);
-});
-document.getElementById('cpn-modal-close').addEventListener('click', function() {
-  document.getElementById('cpn-modal').classList.remove('open');
-});
-document.getElementById('cpn-modal-overlay').addEventListener('click', function() {
-  document.getElementById('cpn-modal').classList.remove('open');
-});
-document.addEventListener('keydown', function(e) {
-  if (e.key === 'Escape') document.getElementById('cpn-modal').classList.remove('open');
-});
 
 loadData();
 </script>

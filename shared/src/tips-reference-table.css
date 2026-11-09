@@ -1,0 +1,77 @@
+/* tips-reference-table.css — the styles of shared/src/tips-reference-table.js, the table of the
+   TIPS Reference Rows (knowledge/SharedModules.md M25). Every selector carries the trt- prefix, so a
+   page that links this file keeps its own table, button and input styles.
+   A page sets --trt-meta-color and --trt-label-color where its background is dark. */
+
+/* ── Header figures ── */
+.trt-meta { display: flex; gap: 18px; align-items: flex-start; flex-wrap: wrap; }
+.trt-meta-item { display: flex; flex-direction: column; }
+.trt-meta-label { font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--trt-label-color, #64748b); opacity: 0.85; }
+.trt-meta-val { font-size: 12px; font-weight: 700; color: var(--trt-meta-color, #1e293b); font-variant-numeric: tabular-nums; }
+.trt-picker { width: 108px; }
+
+/* ── Table host ── */
+.trt { display: flex; flex-direction: column; flex: 1; min-height: 0; font-size: 13px; }
+.trt-count { font-size: 11px; color: var(--portal-text-muted, #475569); font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; padding: 5px 14px; border-bottom: 1px solid #f1f5f9; background: #fff; flex-shrink: 0; display: flex; align-items: center; gap: 10px; }
+.trt-btn { padding: 4px 10px; font-size: 11px; text-transform: none; cursor: pointer; }
+.trt-wrap { flex: 1; overflow: auto; min-height: 0; background: #fff; }
+
+.trt-table { border-collapse: separate; border-spacing: 0; font-size: 11px; width: fit-content; background: #fff; }
+.trt-table thead th, .trt-table thead td { position: sticky; z-index: 20; background-clip: padding-box; }
+
+/* Row 1: sortable headers */
+.trt-table thead tr.trt-head th {
+  top: 0; z-index: 22;
+  background: var(--portal-text-main, #1e293b);
+  color: var(--portal-text-on-dark, #fff);
+  padding: 5px 8px; text-align: right; font-weight: 600; cursor: pointer; user-select: none; white-space: nowrap;
+  border-bottom: 1px solid var(--portal-header-bg, #164242);
+}
+.trt-table thead tr.trt-head th.trt-wrap-header { white-space: normal; min-width: 64px; }
+.trt-table thead tr.trt-head th.trt-left { text-align: left; }
+.trt-table thead tr.trt-head th:hover { background: #2d3f57; }
+.trt-table thead th.trt-sort-asc::after { content: ' \2191'; }
+.trt-table thead th.trt-sort-desc::after { content: ' \2193'; }
+
+/* Row 2: filter inputs; the top offset is set after each render */
+.trt-table thead tr.trt-filter td { top: 29px; z-index: 21; background: #f1f5f9; padding: 2px 4px; border-bottom: 2px solid var(--border-light, #cbd5e1); }
+.trt-filter-input { display: block; width: 100%; padding: 2px 5px; font-size: 11px; border: 1px solid var(--border-light, #cbd5e1); border-radius: 3px; outline: none; background: #fff; min-width: 40px; box-sizing: border-box; }
+.trt-filter-input:focus { border-color: #1a56db; }
+.trt-filter-input.trt-active { border-color: #f59e0b; background: #fffbeb; }
+.trt-filter-input.trt-has-range { padding-right: 20px; }
+.trt-range-toggle { position: absolute; right: 1px; top: 1px; width: 17px; height: 17px; line-height: 15px; font-size: 12px; text-align: center; border: 1px solid var(--border-light, #cbd5e1); border-radius: 3px; cursor: pointer; background: #fff; color: var(--portal-text-muted, #475569); padding: 0; }
+.trt-range-toggle:hover { border-color: #1a56db; color: #1a56db; }
+.trt-range-toggle.trt-active { border-color: #f59e0b; background: #fffbeb; color: #f59e0b; }
+
+/* Body rows */
+.trt-table tbody td { padding: 4px 8px; border-bottom: 1px solid #f1f5f9; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.trt-table tbody tr:nth-child(odd) td { background: #d2dbe6; }
+.trt-table tbody tr:nth-child(even) td { background: #fff; }
+.trt-table tbody td.trt-right { text-align: right; }
+.trt-table tbody td.trt-cpn-clickable { cursor: pointer; color: #1a56db; }
+.trt-table tbody td.trt-cpn-clickable:hover { background: #eff6ff; text-decoration: underline; }
+
+/* ── Date range popover (a child of the body, so a transformed modal does not move it) ── */
+.trt-range-popover { position: fixed; z-index: 400; background: #fff; border: 1px solid var(--border-light, #cbd5e1); border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.18); padding: 10px; display: none; flex-direction: column; gap: 6px; font-size: 11px; min-width: 170px; }
+.trt-range-title { font-weight: 700; color: var(--portal-text-main, #1e293b); margin-bottom: 2px; }
+.trt-range-popover label { display: flex; flex-direction: column; gap: 2px; font-weight: 600; color: #64748b; }
+.trt-range-popover .trt-range-input { font-size: 11px; padding: 3px 4px; }
+.trt-range-buttons { display: flex; justify-content: space-between; gap: 6px; margin-top: 4px; }
+.trt-range-buttons button { padding: 4px 8px; font-size: 10px; color: #fff; border: none; border-radius: 3px; cursor: pointer; }
+.trt-range-clear { background: #64748b; }
+.trt-range-done { background: var(--tab-active-bg, #5BA4A4); }
+
+/* ── Coupon Calculation window (a child of the body) ── */
+.trt-cpn-modal { display: none; position: fixed; inset: 0; z-index: 410; align-items: center; justify-content: center; }
+.trt-cpn-modal.trt-open { display: flex; }
+.trt-cpn-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.35); }
+.trt-cpn-card { position: relative; background: #fff; border-radius: 6px; padding: 20px 22px 18px; min-width: 340px; max-width: 420px; box-shadow: 0 8px 32px rgba(0,0,0,0.18); z-index: 1; font-family: system-ui, -apple-system, sans-serif; }
+.trt-cpn-title { font-size: 13px; font-weight: 700; color: var(--portal-text-main, #1e293b); margin-bottom: 14px; padding-right: 24px; }
+.trt-cpn-close { position: absolute; top: 10px; right: 12px; background: none; border: none; font-size: 18px; line-height: 1; cursor: pointer; color: #64748b; padding: 2px 6px; }
+.trt-cpn-close:hover { color: var(--portal-text-main, #1e293b); }
+.trt-cmt { border-collapse: collapse; width: 100%; font-size: 12px; }
+.trt-cmt .trt-cml { font-weight: 600; color: var(--portal-text-main, #1e293b); padding: 3px 14px 3px 0; white-space: nowrap; vertical-align: top; }
+.trt-cmt .trt-cmv { text-align: right; font-variant-numeric: tabular-nums; padding: 3px 0; }
+.trt-cmt .trt-cms td { padding-top: 2px; border-top: 1px solid #f1f5f9; height: 6px; }
+.trt-cmt .trt-cmf td { padding-top: 4px; font-size: 11px; color: var(--portal-text-main, #1e293b); }
+.trt-cmt .trt-cmr .trt-cml, .trt-cmt .trt-cmr .trt-cmv { font-size: 13px; font-weight: 700; color: var(--portal-text-main, #1e293b); }

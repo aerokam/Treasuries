@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>TIPS Ladder Manager</title>
 <link rel="stylesheet" href="../shared/src/portal-theme.css">
+<link rel="stylesheet" href="../shared/src/tips-reference-table.css">
 <style>
   body { font-size: 13px; padding: 20px; }
   /* Chrome's scroll anchoring picks a node inside the sticky #top-row as the anchor while scrolled;
@@ -325,7 +326,7 @@
     <p><b>Other buttons and links.</b></p>
     <ul style="margin:0 0 10px 20px;padding:0">
       <li><b>Ref CPI</b> (info strip): the reference date used for every P+I, cost, and ARA calculation, defaulting to the settlement date — click it to set a different date.</li>
-      <li><b>Ref</b> / <b>Mkt</b> (info strip, next to the TIPS count): opens a table of TIPS reference data (<b>Ref</b>) and TIPS market data (<b>Mkt</b>).</li>
+      <li><b>Reference</b> (info strip, next to the TIPS count): opens the TIPS Reference table of every TIPS, with its market data.</li>
       <li><b>Term</b> / <b>Range</b> (info strip): the funded-year count and first–last year span of the rebalanced ladder.</li>
     </ul>
     </div>
@@ -371,7 +372,7 @@
     <p><b>Other buttons and links.</b></p>
     <ul style="margin:0 0 10px 20px;padding:0">
       <li><b>Ref CPI</b> (info strip): the reference date used for every P+I, cost, and ARA calculation, defaulting to the settlement date — click it to set a different date.</li>
-      <li><b>Ref</b> / <b>Mkt</b> (info strip, next to the TIPS count): opens a table of TIPS reference data (<b>Ref</b>) and TIPS market data (<b>Mkt</b>).</li>
+      <li><b>Reference</b> (info strip, next to the TIPS count): opens the TIPS Reference table of every TIPS, with its market data.</li>
       <li><b>Term</b> / <b>Range</b> (info strip): the funded-year count and first–last year span of the built ladder.</li>
     </ul>
     </div>
@@ -740,6 +741,7 @@ import { loadMarketData, lookupRefCpi, nextBondTradingDay, parseFedInvestTipsRow
 import { termYears } from '../shared/src/bond-math.js';
 import { indexRatio, NO_ROUNDING } from '../shared/src/ref-cpi.js';
 import { actualPaymentDate } from '../shared/src/settlement.js';
+import { createTipsReferenceTable } from '../shared/src/tips-reference-table.js';
 window.lookupRefCpi = lookupRefCpi;
 import { parseHoldingsFile, maturedOnOrBefore } from './src/holdings-import.js';
 
@@ -943,7 +945,7 @@ async function loadData() {
 
     _populateYearSelects();
 
-    _staticInfoSuffix = yieldsRows.length + ' TIPS: <a class="info-link tips-ref-link">Ref</a> <a class="info-link tips-mkt-link">Mkt</a>';
+    _staticInfoSuffix = yieldsRows.length + ' TIPS: <a class="info-link tips-ref-link">Reference</a>';
     _marketToday = { key: 'today', label: 'Today', tipsMarketData, settlementDate, settleDateStr, tradeDateStr,
                      refCpiDateStr: defaultRefCpiDateStr, staticInfoSuffix: _staticInfoSuffix };
     _buildRows();
@@ -4168,7 +4170,7 @@ function _fmtMDY(iso) { if (!iso) return ''; const [y,m,d] = iso.split('-'); ret
 // Override). Rebalance always prices at the settlement date, which the strip already shows as
 // "Settle" — repeating the same date under a second label was clutter, and the label said "Ref CPI"
 // over a date rather than a Ref CPI value. The Ref CPI figures themselves stay reachable from the
-// Ref/Mkt links alongside and from any Ref CPI row's drill.
+// Reference link alongside and from any Ref CPI row's drill.
 function _buildRows() {
   const html = `Trade: ${_fmtMDY(_tradeDateStr)} · Settle: ${_fmtMDY(_settleDateStr)}`;
   document.getElementById('info-source').innerHTML = html;
@@ -4319,9 +4321,7 @@ document.addEventListener('click', e => {
   const info = e.target.closest('.info-link');
   if (info) {
     if (info.classList.contains('tips-ref-link')) {
-      _showTipsRefModal('Ref');
-    } else if (info.classList.contains('tips-mkt-link')) {
-      _showTipsRefModal('Mkt');
+      _showTipsRefModal();
     } else if (info.dataset.popup) {
       showPopup(info, info.textContent, _infoPopups[info.dataset.popup]);
     }
@@ -4343,6 +4343,8 @@ const _escCloseMap = [
 ];
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
+    // The Coupon Calculation window of the TIPS Reference table closes itself; the popup beneath it stays.
+    if (document.querySelector('.trt-cpn-modal.trt-open')) return;
     for (const [overlayId, closeBtnId] of _escCloseMap) {
       const el = document.getElementById(overlayId);
       if (el && el.style.display !== 'none') { document.getElementById(closeBtnId).click(); break; }
@@ -4360,57 +4362,28 @@ document.addEventListener('keydown', e => {
   }
 });
 
-/* --- TIPS REF / MKT MODAL --- */
-async function _showTipsRefModal(type) {
-  const overlay = document.getElementById('tipsref-overlay');
-  const table = document.getElementById('tipsref-table');
-  const title = document.getElementById('tipsref-title');
-  const warn = document.getElementById('tipsref-warn');
-  
-  title.textContent = 'TIPS ' + type + ' Data';
-  overlay.style.display = 'block';
-  
-  document.getElementById('tipsref-mode-ref').classList.toggle('active', type === 'Ref');
-  document.getElementById('tipsref-mode-mkt').classList.toggle('active', type === 'Mkt');
-  
-  const rows = type === 'Ref'
-    ? Array.from(tipsMarketData.values()).map(r => ({...r, ...tipsRefMap.get(r.cusip)}))
-    : Array.from(tipsMarketData.values());
-  if (type === 'Mkt') rows.sort((a,b) => a.maturity - b.maturity);
-
-  let html = '<thead><tr><th>CUSIP</th><th>Maturity</th><th>Coupon</th>';
-  if (type === 'Ref') html += '<th style="text-align:left">Dated Date</th><th>Dated Date Ref CPI</th>';
-  else html += '<th>Price</th><th>Index Ratio</th><th>Adj Price</th><th>Yield</th>' + (exploreActive ? '' : '<th>SA Yield</th>');
-  html += '</tr></thead><tbody>';
-
-  const R = ' style="text-align:right"';
-  const refCpiSett = type === 'Mkt' ? lookupRefCpi(refCpiRows, toIso(settlementDate)) : null;
-  for (const r of rows) {
-    const matStr = type === 'Ref' ? r.maturity : _fmtMDY(toIso(r.maturity));
-    html += '<tr><td>' + r.cusip + '</td><td>' + matStr + '</td><td' + R + '>' + (r.coupon * 100).toFixed(3) + '%</td>';
-    if (type === 'Ref') {
-      html += '<td>' + (r.datedDate || '') + '</td><td' + R + '>' + (r.datedDateRefCpi != null ? r.datedDateRefCpi.toFixed(5) : '') + '</td>';
-    } else {
-      const ref = tipsRefMap.get(r.cusip);
-      const ir = indexRatio(refCpiSett, ref?.datedDateRefCpi, NO_ROUNDING);
-      const adjPrice = ir != null ? r.price * ir : null;
-      html += '<td' + R + '>' + r.price.toFixed(3) + '</td>';
-      html += '<td' + R + '>' + (ir != null ? ir.toFixed(9) : '—') + '</td>';
-      html += '<td' + R + '>' + (adjPrice != null ? adjPrice.toFixed(3) : '—') + '</td>';
-      html += '<td' + R + '>' + (r.yield * 100).toFixed(3) + '%</td>';
-      if (!exploreActive) html += '<td' + R + '>' + (r.saYield != null ? (r.saYield * 100).toFixed(3) + '%' : '—') + '</td>';
-    }
-    html += '</tr>';
-  }
-  html += '</tbody>';
-  table.innerHTML = html;
+/* --- TIPS REFERENCE MODAL --- */
+// The table is the one TipsReference draws (4.5.2; shared/src/tips-reference-table.js), built again from the market selected each time the popup opens.
+let _tipsRefTable = null;
+function _showTipsRefModal() {
+  document.getElementById('tipsref-overlay').style.display = 'block';
+  if (_tipsRefTable) _tipsRefTable.destroy();
+  const quotes = Array.from(tipsMarketData.values());
+  // A past market of Explore lists the TIPS it quotes, since a TIPS issued after that day did not exist in it.
+  const tipsRefRows = exploreActive ? quotes.map(q => tipsRefMap.get(q.cusip)).filter(Boolean) : Array.from(tipsRefMap.values());
+  _tipsRefTable = createTipsReferenceTable({
+    host: document.getElementById('tipsref-host'),
+    metaHost: document.getElementById('tipsref-meta'),
+    exportButton: document.getElementById('tipsref-export'),
+    tipsRefRows, quotes, refCpiRows, bondHolidays: _bondHolidays,
+    tradeDateStr: _tradeDateStr, settlementDateStr: _settleDateStr,
+    showSaYield: !exploreActive,
+  });
 }
 
 document.getElementById('tipsref-close').addEventListener('click', () => {
   document.getElementById('tipsref-overlay').style.display = 'none';
 });
-document.getElementById('tipsref-mode-ref').addEventListener('click', () => _showTipsRefModal('Ref'));
-document.getElementById('tipsref-mode-mkt').addEventListener('click', () => _showTipsRefModal('Mkt'));
 
 function _clearOutput() {
   rebalanceRendered = false; buildRendered = false; _rebalBeforeStateShown = false;
@@ -4445,7 +4418,7 @@ function _marketFromRows(iso, rows) {
   const md = buildTipsMarketData(rows);
   return { key: iso, label: _fmtMDY(iso), tipsMarketData: md, settlementDate: localDate(iso),
            settleDateStr: iso, tradeDateStr: iso, refCpiDateStr: iso,
-           staticInfoSuffix: rows.length + ' TIPS: <a class="info-link tips-ref-link">Ref</a> <a class="info-link tips-mkt-link">Mkt</a>' };
+           staticInfoSuffix: rows.length + ' TIPS: <a class="info-link tips-ref-link">Reference</a>' };
 }
 
 // The yield of each TIPS against its term from the market's settlement date, shortest first.
@@ -4690,21 +4663,18 @@ function _leaveExploreState(setExploreActive) {
 
 loadData();
 </script>
-<!-- TIPS popup (Ref / Mkt) -->
+<!-- TIPS Reference popup -->
 <div id="tipsref-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:150;overflow:hidden;">
-  <div id="tipsref-modal" style="background:#fff;width:680px;min-width:400px;min-height:200px;border-radius:8px;padding:20px 24px;position:fixed;top:60px;left:50%;transform:translateX(-50%);max-height:calc(100vh - 120px);display:flex;flex-direction:column;box-shadow:0 4px 18px rgba(0,0,0,.18);overflow:visible;">
+  <div id="tipsref-modal" style="background:#fff;width:min(1500px,96vw);min-width:400px;min-height:200px;border-radius:8px;padding:20px 24px;position:fixed;top:60px;left:50%;transform:translateX(-50%);max-height:calc(100vh - 120px);display:flex;flex-direction:column;box-shadow:0 4px 18px rgba(0,0,0,.18);overflow:visible;">
     <div class="resize-handle n"></div><div class="resize-handle s"></div><div class="resize-handle e"></div><div class="resize-handle w"></div>
     <div class="resize-handle nw"></div><div class="resize-handle ne"></div><div class="resize-handle sw"></div><div class="resize-handle se"></div>
     <button id="tipsref-close" style="position:absolute;top:10px;right:12px;background:none;border:none;font-size:22px;color:#888;cursor:pointer;padding:0;line-height:1;z-index:20;">×</button>
-    <div id="tipsref-title" style="font-size:13px;font-weight:700;color:#1e293b;padding-right:24px;border-bottom:2px solid #1e293b;padding-bottom:6px;cursor:move;user-select:none;"></div>
-    <div style="display:flex;gap:6px;margin-top:8px;margin-bottom:6px;">
-      <button id="tipsref-mode-ref" class="tab-btn active">Ref</button>
-      <button id="tipsref-mode-mkt" class="tab-btn">Mkt</button>
+    <div id="tipsref-title" style="font-size:13px;font-weight:700;color:#1e293b;padding-right:24px;border-bottom:2px solid #1e293b;padding-bottom:6px;cursor:move;user-select:none;">TIPS Reference</div>
+    <div style="display:flex;align-items:flex-end;gap:16px;margin:8px 0 6px;">
+      <div id="tipsref-meta"></div>
+      <button id="tipsref-export" class="btn" disabled style="margin-left:auto;">Export CSV</button>
     </div>
-    <div id="tipsref-warn" style="display:none;margin-bottom:8px;padding:6px 10px;background:#fee2e2;border:1px solid #fca5a5;border-radius:4px;font-size:12px;color:#991b1b;font-weight:600;"></div>
-    <div style="overflow:auto;flex:1;">
-      <table id="tipsref-table" class="simple" style="width:auto;"></table>
-    </div>
+    <div id="tipsref-host" style="flex:1;min-height:0;display:flex;flex-direction:column;"></div>
   </div>
 </div>
 </body>

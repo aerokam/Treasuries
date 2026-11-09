@@ -87,3 +87,8 @@ export function actualPaymentDate(d, holidaySet = new Set()) {
   const isTradingDay = d.getDay() !== 0 && d.getDay() !== 6 && !holidaySet.has(toIsoDate(d));
   return isTradingDay ? d : nextBusinessDay(d, holidaySet);
 }
+
+// Today's date in New York as 'YYYY-MM-DD', whatever the time zone of the machine.
+export function todayEt() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+}
