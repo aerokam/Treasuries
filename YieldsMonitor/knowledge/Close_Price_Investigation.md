@@ -92,7 +92,7 @@ Measured bar spacing per provider range (US10Y / US10YTIPS, consistent):
 | **10Y** | `5Y` | 10yr | **weekly (~7d)** | **yes ← crossover** |
 | ALL | `ALL` | ~30–46yr | **quarterly (~91d)** | yes |
 
-`1Y/2Y/3Y` are fully daily; resolution first drops below daily at **10Y** (weekly), and **ALL** is quarterly (~3mo). The merge/append therefore matters **only for 10Y and ALL** — the ranges where CNBC's own feed is sub-daily but we hold finer recent data.
+`1Y/2Y/3Y` are fully daily; resolution first drops below daily at **10Y** (weekly), and **ALL** is quarterly (~3mo). The merge/append therefore matters **only for 10Y and ALL** — the ranges where CNBC's feed is sub-daily but we hold finer recent data.
 
 ### Decision
 

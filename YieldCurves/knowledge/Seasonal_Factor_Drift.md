@@ -35,7 +35,7 @@ The consequence this document measures: BLS provides a factor for the recent pas
 
 ---
 
-## 3. Seasonal amplitude, and its own drift
+## 3. Seasonal amplitude, and its drift
 
 The implied vintage seasonal multiplier is `f(t) = CPIAUCNS(t) / CPIAUCSL(t)`. Because BLS revises only five years, `f` for a month more than five years old is the seasonal estimate frozen at that vintage, which is the quantity needed to measure real change over time.
 
@@ -82,7 +82,7 @@ Every TIPS maturing in 2040 or later matures on **February 15**, the 30-year TIP
 | Jul-15 | 0.175% | 0.240% | 0.278% | +0.075% | +0.256% |
 | Oct-15 | 0.141% | 0.176% | 0.172% | +0.141% | +0.245% |
 
-`S(Feb-15)` is among the fastest-drifting dates over 30 years (0.29%), and its current value (−0.448%) is about 2.5 times its own 1948–2026 average (−0.194%).
+`S(Feb-15)` is among the fastest-drifting dates over 30 years (0.29%), and its current value (−0.448%) is about 2.5 times its 1948–2026 average (−0.194%).
 
 ---
 

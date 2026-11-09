@@ -59,6 +59,12 @@ const RULES = [
   { id: 'flourish', re: /\bof course\b|\bimportantly\b|\bit(?:'s| is) worth noting\b|\bsimply put\b|\bneedless to say\b|\bas (?:noted|mentioned|discussed) (?:above|below|earlier)\b/i,
     why: 'adds emphasis or self-reference in place of information',
     use: 'delete it, or state the fact it is pointing at' },
+  // Developer directive 2026-10-06: "own" (its own copy, the app's own help) adds nothing.
+  // A verbatim quotation of an external source keeps the word the source used.
+  { id: 'own', re: /\bown\b/i,
+    why: 'is redundant: "its own copy" is "its copy"',
+    use: 'delete it, or say whose thing it is',
+    ignore: /for its own account|"[^"]*\bown\b[^"]*"|“[^”]*\bown\b[^”]*”/i },
   { id: 'tenor', re: /\btenors?\b/i,
     why: 'not used for a maturity or term in this repo',
     use: 'maturity' },

@@ -2,7 +2,7 @@
 
 Treasury's auction regulations. This is the primary corpus for word choice
 and sentence construction anywhere this suite writes about Treasury/TIPS
-concepts — CFR text first, then the language each app's own UI/spec uses,
+concepts — CFR text first, then the language each app's UI/spec uses,
 never generic paraphrase. Covers Subpart A in full (§356.0–§356.5),
 Appendix B (Formulas and Tables), Appendix C (Investment Considerations),
 and Appendix D (Description of the Indexes). Subparts B, C, and D

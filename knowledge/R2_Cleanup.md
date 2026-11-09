@@ -58,7 +58,7 @@ The data stores of the bucket, with their R2 keys, are in [Data Dictionary §2.0
 
 `TIPS/YieldsSaSao.csv` was **wrongly classified as an orphan** above. It is read by no
 *app*, but it is a deliberate **public resource** — published so people can pull market
-SA/SAO TIPS yields into their own spreadsheets. The upload in
+SA/SAO TIPS yields into their spreadsheets. The upload in
 `YieldCurves/scripts/updateSaSaoYields.js` has been restored and the file is written
 to `TIPS/YieldsSaSao.csv` on every broker-quote run. Do not remove it.
 
@@ -107,9 +107,9 @@ See [DATA_DICTIONARY.md#s7](./DATA_DICTIONARY.md#s7) and [DATA_DICTIONARY.md#s7]
 
 ## Correction (2026-08-24)
 
-`TIPS/tentative_tips.json` was a derived JSON extract of TIPS-only entries from the Tentative Auction Schedule XML, generated and uploaded by `scripts/updateTentativeSchedule.js` alongside the full XML mirror. It was never read by any app: `TreasuryAuctions/src/app.js` declared a `TENTATIVE_TIPS_URL` constant pointing at it but never fetched it, instead cross-referencing TIPS status client-side from the full XML mirror's own `TIPS` field. Removed the JSON generation/upload from `updateTentativeSchedule.js`, the dead constant from `app.js`, and the R2 object.
+`TIPS/tentative_tips.json` was a derived JSON extract of TIPS-only entries from the Tentative Auction Schedule XML, generated and uploaded by `scripts/updateTentativeSchedule.js` alongside the full XML mirror. It was never read by any app: `TreasuryAuctions/src/app.js` declared a `TENTATIVE_TIPS_URL` constant pointing at it but never fetched it, instead cross-referencing TIPS status client-side from the full XML mirror's `TIPS` field. Removed the JSON generation/upload from `updateTentativeSchedule.js`, the dead constant from `app.js`, and the R2 object.
 
-S9 in `DataStores.md` (since removed), `Portal.md` (since removed), and [DATA_DICTIONARY.md](./DATA_DICTIONARY.md#s9) previously pointed at this dead JSON file; it now correctly documents `TIPS/Tentative-Auction-Schedule.xml`, the file the app actually reads (which had no data-store entry of its own before this correction).
+S9 in `DataStores.md` (since removed), `Portal.md` (since removed), and [DATA_DICTIONARY.md](./DATA_DICTIONARY.md#s9) previously pointed at this dead JSON file; it now correctly documents `TIPS/Tentative-Auction-Schedule.xml`, the file the app actually reads (which had no data-store entry before this correction).
 
 Also removed `TreasuryAuctions/data/Tentative-Auction-Schedule.xml` and `TreasuryAuctions/data/tentative_tips.json` from git tracking and added `TreasuryAuctions/data/` to `.gitignore`: these were the script's local staging copies written before upload, not consumed by any app — R2 is the sole source apps read at runtime.
 
@@ -149,7 +149,7 @@ even though the download and upload had succeeded.
 
 Fixed at the source instead of the call site: the quote download wrapper piped `node` through
 `powershell -Command "& node ... 2>&1 | Tee-Object ..."`, and PowerShell 5.1 wraps a native
-command's redirected stderr into `NativeCommandError` objects, which flips `powershell.exe`'s own
+command's redirected stderr into `NativeCommandError` objects, which flips `powershell.exe`'s
 exit code to 1 regardless of what `node` actually exited with. Replaced with plain cmd-level
 redirection (`node "%SCRIPT%" >> "%LOG%" 2>&1`, matching `run-yield-curves.cmd`'s existing
 pattern), which reports `node`'s real exit code. This removes the failure mode for every future

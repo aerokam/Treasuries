@@ -52,7 +52,7 @@ Canty's paper uses generic notation for inflation-linked bonds across any market
 
 ---
 
-## 1b. Why this matters — the paper's own motivating example
+## 1b. Why this matters — the paper's motivating example
 
 Canty opens the "Seasonally adjusted prices" section (Risk, Jan 2009, p.107) — before introducing any of the math — with a concrete illustration of the problem, not an abstract one:
 
@@ -156,7 +156,7 @@ With semiannual coupons the cashflows fall in **two** calendar months, so there 
 
 $$DP = \sum_{i\ \text{odd}} C_i \frac{T_i S_1}{I_{Base}} df_i + \sum_{i\ \text{even}} C_i \frac{T_i S_2}{I_{Base}} df_i \qquad (15)$$
 
-Lacking the full discount curve for a single bond, approximate each seasonally-adjusted real discount factor by the bond's own real yield $RY$:
+Lacking the full discount curve for a single bond, approximate each seasonally-adjusted real discount factor by the bond's real yield $RY$:
 
 $$\frac{T_i}{I_{Base}} df_i \approx \frac{1}{(1+RY)^{t_i}} \qquad (16)$$
 

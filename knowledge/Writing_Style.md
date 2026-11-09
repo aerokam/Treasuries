@@ -44,7 +44,7 @@ How prose in this repository is written. Vocabulary is a separate question, sett
 
 **3.2 One claim per sentence.** Semicolons joining enumerations become bulleted lists.
 
-**3.3 No self-reference.** The prose does not discuss its own earlier wording, its revision history, or what it is about to say. It also does not negate a claim nobody made: *X, not necessarily Y* asserts Y was in question.
+**3.3 No self-reference.** The prose does not discuss its earlier wording, its revision history, or what it is about to say. It also does not negate a claim nobody made: *X, not necessarily Y* asserts Y was in question.
 
 **3.4 No editorial flourish.** *Of course*, *importantly*, *it is worth noting*, *simply put* and *needless to say* add emphasis in place of information.
 
@@ -68,4 +68,4 @@ How prose in this repository is written. Vocabulary is a separate question, sett
 
 `scripts/check-vocabulary.js` gates the mechanically detectable rules on the lines a commit adds or changes: banned terms, the anthropomorphic verbs in 1.2, the placement metaphors in 1.1, and the flourishes in 3.4. `--audit` lists what already exists across the repository.
 
-The rest is not detectable and does not become optional for that reason. The test applied when reading a passage back is whether every term in it is the one the Data Dictionary defines, and whether every verb states an operation. Prose that reads well passes neither test on its own.
+The rest is not detectable and does not become optional for that reason. The test applied when reading a passage back is whether every term in it is the one the Data Dictionary defines, and whether every verb states an operation. Prose that reads well passes neither test by itself.
