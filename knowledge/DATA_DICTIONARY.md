@@ -86,7 +86,43 @@
 - <a id="e2"></a>**TreasuryDirect SecIndex (E2)** = `CUSIP + Index_Date + Ref_CPI`
   *Authority for daily interpolated RefCPI. Provides values for every day of the month.*
 - <a id="e3"></a>**FiscalData (E3)** = `CUSIP + Auction_Date + Security_Type + High_Yield + Bid_to_Cover + ...`
-  *U.S. Treasury official auction results and immutable security metadata (Coupons, Dated Dates).*
+  *U.S. Treasury official auction results and immutable security metadata (Coupons, Dated Dates). Each table has an endpoint under `https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v1/accounting/od/`, which requires no authentication. The tables, and the query every table answers, follow.*
+  - <a id="e3-auctions"></a>**Auctions table** = `treasury_securities_auctions_v2`
+    *Titled "Treasury Securities Auctions Data (Updated)", at `https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v1/accounting/od/treasury_securities_auctions_v2`. One record per auction of a security, including an auction announced and not yet held, whose result fields state `null`. Every value is returned as a string, and a missing value is the string `null`. Measured 2026-11-10, it states 181 fields, which are the columns of [Auction results (S5)](#s5); measured 2026-10-28, it states 367 auctions from 2025-12-29. It replaces the `auctions_query` table, which FiscalData stopped updating after the auction of 2026-10-22 and decommissions in Spring 2027.*
+    - A TIPS is stated as a `Note` or a `Bond`, so `security_type:eq:TIPS` returns no rows. `inflation_protected:eq:Yes` selects the TIPS.
+    - `security_type` and its usual `security_term` values: `Bill` (`4-Week`, `8-Week`, `13-Week`, `17-Week`, `26-Week`, `52-Week`), `Note` (`2-Year`, `3-Year`, `5-Year`, `7-Year`, `10-Year`) and `Bond` (`20-Year`, `30-Year`).
+    - A reopening states its remaining term in `security_term` (`9-Year 10-Month` for a reopened 10-Year TIPS) and the term it was issued with in `original_security_term`. The term is also stated as a number in the column of its unit: `security_term_day`, `security_term_week`, `security_term_month` or `security_term_year`.
+  - <a id="e3-upcoming"></a>**Upcoming auctions table** = `upcoming_auctions_v2`
+    *Titled "Treasury Securities Upcoming Auctions (Updated)", at `https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v1/accounting/od/upcoming_auctions_v2`. One record per announced auction not yet held. It replaces the `upcoming_auctions` table, whose latest announcement date is 2026-10-22 (measured 2026-10-28), and states the same 9 fields with `auction_date` renamed `comp_auction_close_date`. Source of the [Upcoming Auctions](#upcoming-auctions).*
+
+    | Field | Label FiscalData states | Type |
+    |---|---|---|
+    | `record_date` | Record Date | DATE |
+    | `security_type` | Security Type | STRING |
+    | `security_term` | Security Term | STRING |
+    | `reopening` | Reopening | STRING |
+    | `cusip` | CUSIP | STRING |
+    | `offering_amt` | Offering Amount | CURRENCY |
+    | `announcemt_date` | Announcement Date | DATE |
+    | `comp_auction_close_date` | Competitive Auction Close Date | DATE |
+    | `issue_date` | Issue Date | DATE |
+
+  - <a id="e3-query"></a>**Query** = `( fields ) + ( filter ) + ( sort ) + ( format ) + ( page[number] ) + ( page[size] )`
+    *Appended to the endpoint of a table as `?name=value&name=value`. Every table answers it.*
+
+    | Parameter | Example | Behavior |
+    |---|---|---|
+    | `fields` | `fields=cusip,comp_auction_close_date,security_type` | Comma-separated. Omitted, every field is returned. A `sort` or `filter` field must be among the `fields`, or the request fails with `Field '...' does not exist`. |
+    | `filter` | `filter=security_type:eq:Bill,reopening:eq:No` | Comma-separated conditions, all of which must hold. |
+    | `sort` | `sort=-comp_auction_close_date` | A `-` prefix sorts descending. |
+    | `format` | `format=json` | `json` (the default), `csv` or `xml`. The CSV writes an apostrophe before a negative number. |
+    | `page[number]` | `page[number]=1` | Starts at 1. |
+    | `page[size]` | `page[size]=10000` | 100 rows when omitted. A value above 10000 returns HTTP 400 (`Invalid Query Param`), so a larger result is read by increasing `page[number]`. |
+
+    - A filter operator is `eq`, `lt`, `lte`, `gt`, `gte` or `in`, with `in` taking `(val1,val2)`. `neq` and `nin` return HTTP 400.
+    - A date is written `YYYY-MM-DD`: `comp_auction_close_date:gte:2026-01-01`.
+    - A name that is not a field of the table, in `fields`, `filter` or `sort`, returns HTTP 400.
+    - A request whose user agent names HeadlessChrome returns HTTP 500 without an `Access-Control-Allow-Origin` header, which a browser reports as a CORS error; the same request with an ordinary Chrome user agent returns 200 (measured 2026-10-28).
 - <a id="e4"></a>**BLS (E4)** = `Year + Month + Value + Seasonal_Adjustment_Flag + { Reference_Month + Release_Date + Release_Time }`
   *Consumer Price Index (CPI-U) monthly data, and the schedule on which BLS releases it. Used to derive SA factors by comparing NSA vs. SA values. The schedule is the release table of `www.bls.gov/schedule/news_release/cpi.htm`: one row per release, under the page's column names Reference Month, Release Date and Release Time. Source of [CPI release schedule (S19)](#s19).*
 - <a id="e5"></a>**CNBC (E5)** — one source, two independent services, each a flow rather than a mechanism of the other:
@@ -113,7 +149,7 @@
 - <a id="e14"></a>**Treasury Tentative Auction Schedule (E14)** = `{ AuctionDate + SecurityTermWeekYear + SecurityType + ReOpeningIndicator + TIPS + FloatingRate + AnnouncementDate + SettlementDate }`
   *Treasury’s schedule of upcoming auctions, published as XML at `home.treasury.gov/system/files/221/Tentative-Auction-Schedule.xml` and revised at each Quarterly Refunding. Source of [Tentative auction schedule (S9)](#s9).*
 - <a id="e15"></a>**TreasuryDirect (E15)** = `{ cusip + competitiveAuctionCloseDate + securityType + securityTerm + investmentRate + highRate + highYield + interestRate + highPrice + bidToCoverRatio + grandTotalParAwarded + ... }`
-  *The results of each auction of a security, as the `TA_WS/securities/auctioned` web service of `www.treasurydirect.gov` states them: one JSON object per auction, under TreasuryDirect’s camelCase field names, for the auctions that closed within the last `days` days (`/TA_WS/securities/auctioned?format=json&days=30`). Measured 2026-10-21 over the 250 auctions closed from 2025-04-23, `updatedTimestamp` is 3.1 to 15.5 minutes after the competitive close, 4.0 minutes at the median, and within 5 minutes for 240 of the 250. The service sends no CORS header. One of the two sources of [Auction Results](#auction-results).*
+  *The results of each auction of a security, as the `TA_WS/securities/auctioned` web service of `www.treasurydirect.gov` states them: one JSON object per auction, under TreasuryDirect’s camelCase field names, for the auctions that closed within the last `days` days at `https://www.treasurydirect.gov/TA_WS/securities/auctioned?format=json&days=30`, which requires no authentication. `format` accepts `json` only, and `xml` and `csv` return HTTP 406. A response holds at most 250 auctions (measured 2026-10-28). Measured 2026-10-21 over the 250 auctions closed from 2025-04-23, `updatedTimestamp` is 3.1 to 15.5 minutes after the competitive close, 4.0 minutes at the median, and within 5 minutes for 240 of the 250. The service sends no CORS header. One of the two sources of [Auction Results](#auction-results).*
 
 ---
 
@@ -166,7 +202,192 @@
   | `SA Factor` | [SA Factor](#sa-factor), `Ref CPI NSA / Ref CPI SA`, to five decimal places |
 
 - <a id="s5"></a>**Auction results (S5)**, `Auctions.csv` = `{ @cusip + @comp_auction_close_date + security_type + high_yield + bid_to_cover_ratio + prim_deal_comp_par_awarded + ... }`
-  *R2 key `Treasuries/Auctions.csv` ([View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/Auctions.csv)). Header row first, then one row per auction of a security, from 1980-01-01, newest `comp_auction_close_date` first and by `security_term` within a date. Every field of the `treasury_securities_auctions_v2` table of [FiscalData (E3)](#e3) is a column under FiscalData's field name, so a field FiscalData adds appears as a new column. The auctions before 2025-12-29, which that table does not state, were converted from the `auctions_query` table ([1.4](./1.4_Fetch_Auction_Results.md#s5-names)). A field with no value is written `null`. A column that FiscalData states as `null` for an auction holds the value [TreasuryDirect (E15)](#e15) states for it, where [1.4](./1.4_Fetch_Auction_Results.md#treasurydirect) maps that column, until FiscalData states a value.*
+  *R2 key `Treasuries/Auctions.csv` ([View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/Auctions.csv)). Header row first, then one row per auction of a security, from 1980-01-01, newest `comp_auction_close_date` first and by `security_term` within a date. Every field of the [auctions table of FiscalData (E3)](#e3-auctions) is a column under FiscalData's field name, in the order the table states them, so a field FiscalData adds appears as a new column. The table below states the 181 fields measured 2026-11-10; its Meaning is the defined term where one applies, and otherwise the label FiscalData states for the field. The auctions before 2025-12-29, which that table does not state, were converted from the `auctions_query` table ([1.4](./1.4_Fetch_Auction_Results.md#s5-names)). A field with no value is written `null`. A column that FiscalData states as `null` for an auction holds the value [TreasuryDirect (E15)](#e15) states for it, where [1.4](./1.4_Fetch_Auction_Results.md#treasurydirect) maps that column, until FiscalData states a value.*
+
+  | Column | Meaning | Type | Field of `auctions_query` |
+  |---|---|---|---|
+  | `record_date` | Record Date | DATE | same name |
+  | `cusip` | [CUSIP](./DATA_DICTIONARY.md#cusip) | STRING | same name |
+  | `security_type` | `Bill`, `Note` or `Bond` | STRING | same name |
+  | `security_desc` | Security Description | STRING | none |
+  | `comp_auction_close_date` | The auction date: the date of the competitive close | DATE | `auction_date` |
+  | `comp_auction_close_time` | Competitive Auction Close Time (EST) | STRING | `closing_time_comp` |
+  | `noncomp_auction_close_date` | Noncompetitive Auction Close Date | DATE | none |
+  | `noncomp_auction_close_time` | Noncompetitive Auction Close Time (EST) | STRING | `closing_time_noncomp` |
+  | `issue_date` | The date the security is issued | DATE | same name |
+  | `price_per_amt` | Price Per Amount | INTEGER | none |
+  | `maturity_date` | The [Maturity Date](./DATA_DICTIONARY.md#maturity-date) | DATE | same name |
+  | `pdf_filenm_announcemt` | Treasury Offering Announcement Press Release File Name | STRING | same name |
+  | `pdf_filenm_spec_announcemt` | Treasury Special Announcement PDF file name | STRING | same name |
+  | `pdf_filenm_comp_results` | Treasury Auction Results Press Release File Name | STRING | same name |
+  | `pdf_filenm_noncomp_results` | Treasury Noncompetitive Auction Results Press Release File Name | STRING | same name |
+  | `xml_filenm_announcemt` | Treasury Offering Announcement XML File Name | STRING | same name |
+  | `xml_filenm_comp_results` | Treasury Auction Results XML File Name | STRING | same name |
+  | `xml_filenm_noncomp_results` | Treasury Noncompetitive Auction Results XML File Name | STRING | none |
+  | `accrued_int` | The accrued interest, per the face amount `accrued_int_per_amount` (100 or 1000) | NUMBER | `accrued_int_per100`, `accrued_int_per1000` (reshaped) |
+  | `accrued_int_per_amount` | Accrued Interest Per Amount | INTEGER | `accrued_int_per100`, `accrued_int_per1000`, `adj_accrued_int_per1000`, `unadj_accrued_int_per1000` (reshaped) |
+  | `adj_accrued_int` | The accrued interest after the Index Ratio applies, per the face amount `accrued_int_per_amount` | NUMBER | `adj_accrued_int_per1000` (reshaped) |
+  | `adj_currently_outstanding` | Adjusted Currently Outstanding | NUMBER | none |
+  | `adj_price` | The [Adjusted Price](./DATA_DICTIONARY.md#adjusted-price) | NUMBER | same name |
+  | `allotted_pct_hi_discnt_margin` | Allotted At High Discount Margin Percentage | NUMBER | `allocation_pctage` (reshaped) |
+  | `allotted_high_pctage_decimals` | Allotted At High Percentage Decimals | INTEGER | `allocation_pctage_decimals` |
+  | `allotted_pctage_high_rate` | Allotted At High Rate Percentage | NUMBER | `allocation_pctage` (reshaped) |
+  | `allotted_pctage_high_yield` | Allotted At High Yield Percentage | NUMBER | `allocation_pctage` (reshaped) |
+  | `announcemtd_corpus_cusip` | Announced As Corpus CUSIP | STRING | none |
+  | `announcemtd_cusip` | Announced As CUSIP | STRING | `announcemtd_cusip`, `original_cusip` |
+  | `announcemtd_orig_dated_date` | Announced As Original Dated Date | DATE | none |
+  | `announcemtd_orig_issue_date` | Announced As Original Issue Date | DATE | none |
+  | `announcemtd_reopening` | Announced As Reopening | STRING | none |
+  | `announcemtd_security_desc` | Announced As Security Description | STRING | none |
+  | `announcemtd_security_type` | Announced As Security Type | STRING | none |
+  | `announcemt_date` | The announcement date | DATE | same name |
+  | `comp_apprx_amt_remaining` | Approximate Amount Remaining For Competitive Bids | INTEGER | none |
+  | `avg_discnt_margin` | Average Discount Margin | NUMBER | `avg_med_discnt_margin` (reshaped) |
+  | `avg_investment_rate` | Average Investment Rate | NUMBER | `avg_med_investment_rate` |
+  | `avg_price` | Average Price | NUMBER | `avg_med_price` |
+  | `avg_rate` | Average Rate | NUMBER | `avg_med_discnt_rate` (reshaped) |
+  | `avg_yield` | Average Yield | NUMBER | `avg_med_yield` (reshaped) |
+  | `bid_to_cover_ratio` | The bid-to-cover ratio | NUMBER | same name |
+  | `callable` | Callable | STRING | same name |
+  | `called_date` | Called Date | DATE | same name |
+  | `cash_management_bill` | Cash Management Bill | STRING | `cash_management_bill_cmb` |
+  | `comp_bid_decimals` | Competitive Bid Decimals | INTEGER | same name |
+  | `comp_bid_expression` | Competitive Bid Expression | NUMBER | none |
+  | `comp_discnt_margin_bid_increm` | Competitive Discount Margin Bid Increments | NUMBER | none |
+  | `comp_rate_bid_increments` | Competitive Rate Bid Increments | NUMBER | none |
+  | `comp_yield_bid_increments` | Competitive Yield Bid Increments | NUMBER | none |
+  | `corpus_cusip` | Corpus CUSIP | STRING | same name |
+  | `cpi_base_reference_period` | CPI Base Reference Period | STRING | same name |
+  | `currently_outstanding` | Currently Outstanding | INTEGER | same name |
+  | `dated_date` | The [Dated Date](./DATA_DICTIONARY.md#dated-date) | DATE | `back_dated_date`, `dated_date` |
+  | `dated_date_diff_issue_date` | Dated Date Different From Issue Date | STRING | `back_dated` |
+  | `dir_bid_comp_par_awarded` | The competitive par awarded to direct bidders | INTEGER | `direct_bidder_accepted` |
+  | `dir_bid_comp_par_recog` | Direct Bidders Competitive Par Recognized | INTEGER | `direct_bidder_tendered` |
+  | `dir_bid_noncomp_par_awarded` | Direct Bidders Noncompetitive Par Awarded | INTEGER | none |
+  | `dir_bid_noncomp_par_recog` | Direct Bidders Noncompetitive Par Recognized | INTEGER | none |
+  | `direct_ppt_bids_accepted` | Direct Participant Bids Accepted | STRING | none |
+  | `direct_ppt_inside_amt` | Direct Participants Inside Of Offering Amount | STRING | none |
+  | `eligible_call_date` | Eligible To Call Date | DATE | `call_date` |
+  | `fima_comp_bids_accepted` | FIMA Competitive Bids Accepted | STRING | none |
+  | `fima_included` | FIMA Competitive Inside Of Offering Amount | STRING | same name |
+  | `fima_noncomp_bids_accepted` | FIMA Noncompetitive Bids Accepted | STRING | none |
+  | `fima_noncomp_inside_amt` | FIMA Noncompetitive Inside Of Offering Amount | STRING | none |
+  | `fima_noncomp_par_awarded` | FIMA Noncompetitive Par Awarded | INTEGER | `fima_noncomp_accepted`, `noncomp_accepted` (derived) |
+  | `fima_noncomp_par_recog` | FIMA Noncompetitive Par Recognized | INTEGER | `fima_noncomp_tendered` |
+  | `first_int_payment_length` | First Interest Payment Length | STRING | `first_int_period` |
+  | `floating_rate` | Floating Rate | STRING | same name |
+  | `int_payment_frequency` | Frequency Of Interest Payments | STRING | same name |
+  | `grand_total_par_awarded` | The total par awarded | INTEGER | `noncomp_accepted`, `total_accepted` (derived) |
+  | `grand_total_par_recog` | The total par recognized | INTEGER | `total_tendered` |
+  | `high_discnt_margin` | High Discount Margin | NUMBER | same name |
+  | `high_rate` | High Rate | NUMBER | `high_discnt_rate` |
+  | `high_yield` | The high [Yield](./DATA_DICTIONARY.md#yield) of a Note, Bond or TIPS | NUMBER | same name |
+  | `frn_index_determination_date` | Index Determination Date | DATE | same name |
+  | `frn_index_determination_rate` | Index Determination Rate | NUMBER | same name |
+  | `announcemtd_index_ratio` | Index Ratio On Announcement Date | NUMBER | none |
+  | `index_ratio_on_issue_date` | The Index Ratio on the issue date | NUMBER | same name |
+  | `indir_bid_comp_par_awarded` | The competitive par awarded to indirect bidders | INTEGER | `indirect_bidder_accepted` |
+  | `indir_bid_comp_par_recog` | Indirect Bidders Competitive Par Recognized | INTEGER | `indirect_bidder_tendered` |
+  | `indir_bid_noncomp_par_awarded` | Indirect Bidders Noncompetitive Par Awarded | INTEGER | none |
+  | `indir_bid_noncomp_recog` | Indirect Bidders Noncompetitive Par Recognized | INTEGER | none |
+  | `indirct_ppt_bids_accepted` | Indirect Participant Bids Accepted | STRING | none |
+  | `indirct_ppt_inside_amt` | Indirect Participants Inside Of Offering Amount | STRING | none |
+  | `inflation_protected` | `Yes` for a TIPS, `No` otherwise | STRING | `inflation_index_security` |
+  | `int_rate` | The [Coupon Rate](./DATA_DICTIONARY.md#coupon-rate) of a Note, Bond or TIPS | NUMBER | same name |
+  | `investment_rate` | The high investment rate of a Bill | NUMBER | `high_investment_rate` |
+  | `long_short_first_int_payment` | Long Or Short First Interest Payment | NUMBER | none |
+  | `long_short_first_int_pmt_amt` | Long Or Short First Interest Payment Per Amount | INTEGER | none |
+  | `low_discnt_margin` | Low Discount Margin | NUMBER | same name |
+  | `low_discnt_margin_threshold` | Low Discount Margin Threshold | INTEGER | none |
+  | `low_investment_rate` | Low Investment Rate | NUMBER | same name |
+  | `low_price` | Low Price | NUMBER | same name |
+  | `low_rate` | Low Rate | NUMBER | `low_discnt_rate` |
+  | `low_rate_threshold` | Low Rate Threshold | INTEGER | none |
+  | `low_yield` | Low Yield | NUMBER | same name |
+  | `low_yield_threshold` | Low Yield Threshold | INTEGER | none |
+  | `maturing_date` | Maturing Date | DATE | `mat_date` |
+  | `maturing_securities_type` | Maturing Securities Type | STRING | none |
+  | `max_comp_award` | Maximum Competitive Award | INTEGER | same name |
+  | `max_noncomp_award` | Maximum Noncompetitive Award | INTEGER | same name |
+  | `max_single_bid` | Maximum Recognized Bid At A Single Discount Margin | INTEGER | `max_single_bid` (reshaped) |
+  | `max_recog_single_rate_bid` | Maximum Recognized Bid At A Single Rate | INTEGER | `max_single_bid` (reshaped) |
+  | `max_recog_single_yield_bid` | Maximum Recognized Bid At A Single Yield | INTEGER | `max_single_bid` (reshaped) |
+  | `med__discnt_margin` | Median Discount Margin | NUMBER | `avg_med_discnt_margin` (reshaped) |
+  | `med__discnt_margin_threshold` | Median Discount Margin Threshold | INTEGER | none |
+  | `med_rate` | Median Rate | NUMBER | `avg_med_discnt_rate` (reshaped) |
+  | `med_rate_threshold` | Median Rate Threshold | INTEGER | none |
+  | `med_yield` | Median Yield | NUMBER | `avg_med_yield` (reshaped) |
+  | `med_yield_threshold` | Median Yield Threshold | INTEGER | none |
+  | `min_strip_amt` | Minimum Amount Required For STRIPS | INTEGER | same name |
+  | `min_bid_amt` | Minimum To Bid Amount | INTEGER | same name |
+  | `min_to_issue_amt` | Minimum To Issue Amount | INTEGER | `min_to_issue` |
+  | `multiples_to_bid_amt` | Multiple To Bid Amount | INTEGER | `multiples_to_bid` |
+  | `multiples_to_issue_amt` | Multiple To Issue Amount | INTEGER | `multiples_to_issue` |
+  | `nlp_exclusion_amt` | NLP Exclusion Amount | INTEGER | same name |
+  | `nlp_reporting_threshold` | NLP Reporting Threshold | INTEGER | same name |
+  | `noncomp_bids_accepted` | Noncompetitive Bids Accepted | STRING | `noncomp_tenders_accepted` |
+  | `offering_amt` | The amount offered, in dollars | CURRENCY | same name |
+  | `original_dated_date` | Original Dated Date | DATE | same name |
+  | `original_issue_date` | The issue date of the original issue of a reopening | DATE | same name |
+  | `original_security_term` | The term at the original issue | STRING | same name |
+  | `high_price` | The high [Price](./DATA_DICTIONARY.md#price), per the face amount `price_per_amt` (100) | NUMBER | `price_per100`, `high_price` |
+  | `pricing_method` | Pricing Method | STRING | `auction_format` |
+  | `prim_deal_bids_accepted` | Primary Dealer Bids Accepted | STRING | none |
+  | `prim_deal_comp_par_awarded` | The competitive par awarded to primary dealers | INTEGER | `primary_dealer_accepted` |
+  | `prim_deal_comp_par_recog` | Primary Dealers Competitive Par Recognized | INTEGER | `primary_dealer_tendered` |
+  | `prim_deal_inside` | Primary Dealers Inside Of Offering Amount | STRING | none |
+  | `prim_deal_noncomp_par_awarded` | Primary Dealers Noncompetitive Par Awarded | INTEGER | none |
+  | `prim_deal_noncomp_recog` | Primary Dealers Noncompetitive Par Recognized | INTEGER | none |
+  | `private_holdings` | Private Holdings | INTEGER | `est_pub_held_mat_by_type_amt` |
+  | `announcemtd_ref_cpi` | Reference CPI On Announcement Date | NUMBER | none |
+  | `ref_cpi_on_issue_date` | The Ref CPI on the issue date | NUMBER | same name |
+  | `ref_cpi_on_orig_dated_date` | The [Ref CPI](./DATA_DICTIONARY.md#ref-cpi) on the Dated Date of the original issue | NUMBER | `ref_cpi_on_dated_date` |
+  | `reopening` | `Yes` or `No` | STRING | same name |
+  | `retail_noncomp_par_recog` | Retail Noncompetitive Par Recognized | INTEGER | none |
+  | `security_term` | The term of the security at this auction | STRING | same name |
+  | `security_term_day` | Security Term Day | STRING | `security_term_day_month` (reshaped) |
+  | `security_term_month` | Security Term Month | STRING | `security_term_day_month` (reshaped) |
+  | `security_term_week` | Security Term Week | STRING | `security_term_week_year` (reshaped) |
+  | `security_term_year` | Security Term Year | STRING | `security_term_week_year` (reshaped) |
+  | `series` | Series | STRING | same name |
+  | `soma_bids_accepted` | SOMA Bids Accepted | STRING | none |
+  | `soma_holdings` | SOMA Holdings | INTEGER | same name |
+  | `soma_inside_amt` | SOMA Inside Of Offering Amount | STRING | `soma_included` |
+  | `soma_noncomp_par_awarded` | SOMA Noncompetitive Par Awarded | INTEGER | `noncomp_accepted`, `soma_accepted` (derived) |
+  | `soma_noncomp_par_recog` | SOMA Noncompetitive Par Recognized | INTEGER | `soma_tendered` |
+  | `spread` | Spread | NUMBER | same name |
+  | `std_int_payment` | Standard Interest Payment | NUMBER | `std_int_payment_per1000` (reshaped) |
+  | `std_int_payment_per_amt` | Standard Interest Payment Per Amount | INTEGER | `std_int_payment_per1000` (reshaped) |
+  | `strippable` | Strippable | STRING | same name |
+  | `subtot_comp_inside_awrd` | The competitive bids awarded inside the offering amount | INTEGER | `comp_accepted`, `noncomp_accepted` (derived) |
+  | `subtot_comp_outside_awrd` | Subtotal Competitive Par Awarded Outside Of Offering Amount | INTEGER | none |
+  | `subtot_comp_inside_recog` | Subtotal Competitive Par Recognized Inside Of Offering Amount | INTEGER | `comp_tendered` |
+  | `subtot_comp_outside_recog` | Subtotal Competitive Par Recognized Outside Of Offering Amount | INTEGER | none |
+  | `subtot_noncomp_inside_awrd` | Subtotal Noncompetitive Par Awarded Inside Of Offering Amount | INTEGER | none |
+  | `subtot_noncomp_outside_awrd` | Subtotal Noncompetitive Par Awarded Outside Of Offering Amount | INTEGER | none |
+  | `subtot_noncomp_inside_recog` | Subtotal Noncompetitive Par Recognized Inside Of Offering Amount | INTEGER | none |
+  | `subtot_noncomp_outside_recog` | Subtotal Noncompetitive Par Recognized Outside Of Offering Amount | INTEGER | none |
+  | `technique` | Technique | STRING | none |
+  | `t_dir_bid_noncomp_recog` | Tentative Direct. Bidders Noncompetitive Par Recognized | INTEGER | none |
+  | `t_fima_noncomp_par_recog` | Tentative FIMA Noncompetitive Par Recognized | INTEGER | none |
+  | `t_indir_bid_noncomp_recog` | Tentative Indirect Bidders Noncompetitive Par Recognized | INTEGER | none |
+  | `t_prim_dealer_noncomp_recog` | Tentative Primary Dealers Noncompetitive Par Recognized | INTEGER | none |
+  | `t_retail_noncomp_par_recog` | Tentative Retail Noncompetitive Par Recognized | INTEGER | none |
+  | `t_soma_noncomp_par_recog` | Tentative SOMA Noncompetitive Par Recognized | INTEGER | none |
+  | `tsubtot_noncomp_inside_recog` | Tentative Subtotal Noncompetitive Par Recognized Inside Of Offering Amount | INTEGER | none |
+  | `tsubtot_noncomp_outside_recog` | Tentative Subtotal Noncompetitive Par Recognized Outside Of Offering Amount | INTEGER | none |
+  | `tiin_conversion_factor` | TIIN Conversion Factor | NUMBER | `tiin_conversion_factor_per1000` (reshaped) |
+  | `tiin_convers_factor_per_amt` | TIIN Conversion Factor Per Amount | INTEGER | `tiin_conversion_factor_per1000` (reshaped) |
+  | `total_mkt_amt_outstanding` | Total Marketable Amount Outstanding | INTEGER | none |
+  | `total_par_inside_awarded` | Total Par Awarded Inside Of Offering Amount | INTEGER | none |
+  | `total_par_outside_awarded` | Total Par Awarded Outside Of Offering Amount | INTEGER | none |
+  | `total_par_inside_recog` | Total Par Recognized Inside Of Offering Amount | INTEGER | none |
+  | `total_par_outside_recog` | Total Par Recognized Outside Of Offering Amount | INTEGER | none |
+  | `retail_bids_accepted` | Treasury Retail Bids Accepted | STRING | `treas_retail_tenders_accepted` |
+  | `retail_inside_amt` | Treasury Retail Inside Of Offering Amount | STRING | none |
+  | `unadj_accrued_int` | Unadjusted Accrued Interest | NUMBER | `unadj_accrued_int_per1000` (reshaped) |
+  | `unadj_price` | The price before the [Index Ratio](./DATA_DICTIONARY.md#index-ratio) applies | NUMBER | same name |
+
 - <a id="s6"></a>**Yield history (S6)**, `history.json` = `{ @Symbol + { Timestamp + Yield } }`
   *R2 key `Treasuries/yields-history/history.json` ([View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/yields-history/history.json)). One JSON object keyed by symbol, each value an array of `{ x, y }` points: `x` is the timestamp as `YYYYMMDDHHMMSS`, `y` the [Yield](#yield) as a number in percent. Each point is a closing value at daily resolution, at weekly resolution before the daily points begin and at quarterly resolution before the weekly points begin; [1.7 Update yield history](./1.7_Update_Yield_History.md) specifies the dating.*
 - <a id="s7"></a>**Market quotes (S7)**, `MarketQuotes.csv` = `Download_Date + { type + @cusip + maturity + coupon + askPrice + ( bidPrice ) + ( adjAskPrice ) + ( adjBidPrice ) }`
