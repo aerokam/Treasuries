@@ -112,10 +112,13 @@ async function fetchCusipSeries(cusip) {
   const match = text.match(/\[[\s\S]*\]/);
   if (!match) throw new Error('Could not parse JSONP response');
 
-  return JSON.parse(match[0]).map(r => ({
+  const rows = JSON.parse(match[0]).map(r => ({
     date:   r.indexDate.split('T')[0],
-    refCpi: parseFloat(r.refCpi)
+    refCpi: parseFloat(r.referenceCPI ?? r.refCpi)
   }));
+  const bad = rows.find(r => !Number.isFinite(r.refCpi));
+  if (bad) throw new Error(`SecIndex row ${bad.date} has no numeric Ref CPI -- field renamed? Aborting, not uploading.`);
+  return rows;
 }
 
 async function fetchExistingRefCpi() {
