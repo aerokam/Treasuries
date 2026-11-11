@@ -2,14 +2,16 @@
 // Run: node shared/tests/ref-cpi.test.js
 //
 // This is the "redundancy that verifies": the calculated NSA Ref CPI
-// (refCpiFromMonthly, 31 CFR App. B) must reproduce the authoritative
-// retrieved series (RefCPI.csv from TreasuryDirect). A mismatch means either
+// (refCpiFromMonthly, 31 CFR App. B) must reproduce the series TreasuryDirect
+// SecIndex states, read live here, not Ref CPI (S3), which is itself calculated. A mismatch means either
 // bad data or a bug in the interpolation — exactly the failure mode that
 // derailed the TipsReference session.
 
-import { lookupRefCpi, refCpiFromMonthly, monthlyCpiMap, indexRatio, TREASURY_ROUNDING, NO_ROUNDING,
+import { lookupRefCpi, refCpiFromMonthly, monthlyCpiMap, fillUnreportedMonths, indexRatio, TREASURY_ROUNDING, NO_ROUNDING,
          saFactorForDate, maturitySaFactor, credibilityFactor, seasonalDriftSigma } from '../src/ref-cpi.js';
 import { parseCsv } from '../src/csv.js';
+import { fetchSecIndexSeries, compare, lastDayTwoMonthsAfter } from '../../scripts/checkDailyRefCpi.js';
+import { calcSeries } from '../../scripts/calcDailyRefCpi.js';
 
 const R2 = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev';
 const REFCPI_URL    = `${R2}/TIPS/RefCPI.csv`;
@@ -53,11 +55,13 @@ function parseCpi(text) {
 }
 
 async function main() {
-  console.log('Fetching authoritative RefCPI.csv and monthly CPI.csv ...');
-  const [refText, cpiText] = await Promise.all([fetchText(REFCPI_URL), fetchText(CPI_URL)]);
-  const retrieved = parseRefCpi(refText);
+  console.log('Fetching the SecIndex series of three CUSIPs and monthly CPI.csv ...');
+  const [cpiText, ...series] = await Promise.all([fetchText(CPI_URL), ...['9128272M3', '912810FD5', '912810US5'].map(fetchSecIndexSeries)]);
+  const byDate = new Map();
+  for (const s of series) for (const r of s) byDate.set(r.date, r.refCpi);
+  const retrieved = [...byDate.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([date, refCpi]) => ({ date, refCpi }));
   const cpiRows   = parseCpi(cpiText);
-  const monthlyNsa = monthlyCpiMap(cpiRows.map(r => ({ year: r.year, period: r.period, value: r.nsa })));
+  const monthlyNsa = fillUnreportedMonths(monthlyCpiMap(cpiRows.map(r => ({ year: r.year, period: r.period, value: r.nsa }))));
 
   console.log(`Retrieved ${retrieved.length} daily rows; ${cpiRows.length} monthly CPI rows.\n`);
 
@@ -98,6 +102,26 @@ async function main() {
   ok(nsaMax <= TOL, `RefCpiNsaSa NSA max diff ${nsaMax.toExponential(3)} > TOL`);
   ok(saMax  <= TOL, `RefCpiNsaSa SA max diff ${saMax.toExponential(3)} > TOL`);
   console.log(`RefCpiNsaSa regression: ${nsaSaCompared} dates, NSA max ${nsaMax.toExponential(3)}, SA max ${saMax.toExponential(3)}`);
+
+  // ── fillUnreportedMonths: October 2025 was never reported; Treasury's index number for it is 325.604 (§I.B.4(iv)) ──
+  ok(fillUnreportedMonths({ '2024-9': 315.301, '2025-9': 324.8, '2025-11': 324.122 })['2025-10'] === 325.604, 'unreported month takes the twelve-month-change number');
+  ok(fillUnreportedMonths({ '2025-9': 324.8, '2025-11': 324.122 })['2025-10'] === undefined, 'no twelve-month base, no derived month');
+
+  // ── 1.13: S3's held dates are kept, only later days are calculated, the series ends on the first of the month three months after the latest month ──
+  {
+    const m = { '2026-8': 100, '2026-9': 101, '2026-10': 102 };
+    const held = [{ date: '2026-11-29', refCpi: 99.1 }, { date: '2026-11-30', refCpi: 99.2 }];
+    const out = calcSeries(m, { y: 2026, m: 10 }, held);
+    ok(out[0].refCpi === 99.1 && out[1].refCpi === 99.2, '1.13 keeps the held values');
+    ok(out[2].date === '2026-12-01' && out[2].refCpi === 101, '1.13 calculates the first of December as September');
+    ok(out[out.length - 1].date === '2027-01-01' && out[out.length - 1].refCpi === 102, '1.13 ends on 2027-01-01 at the October value');
+  }
+  // ── 1.17: a date S3 lacks, or states differently, is a mismatch ──
+  {
+    const mm = compare([{ date: 'd1', refCpi: 1 }, { date: 'd2', refCpi: 2 }, { date: 'd3', refCpi: 3 }], [{ date: 'd1', refCpi: 1 }, { date: 'd2', refCpi: 2.00001 }]);
+    ok(mm.length === 2 && mm[0].date === 'd2' && mm[1].date === 'd3' && mm[1].s3 === undefined, '1.17 reports a differing date and a missing date');
+    ok(lastDayTwoMonthsAfter(2026, 10) === '2026-12-31' && lastDayTwoMonthsAfter(2026, 11) === '2027-01-31', '1.17 expected end of the range');
+  }
 
   // ── lookupRefCpi edge cases ──
   const sample = retrieved[Math.floor(retrieved.length / 2)];

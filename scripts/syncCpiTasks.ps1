@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Sets the triggers of the CpiHistory and RefCpi tasks to one per Release Date of CPI release
+    Sets the triggers of the CpiHistory and RefCpiCheck tasks to one per Release Date of CPI release
     schedule (S19), reading the dates from bls/CpiReleaseSchedule.csv in R2.
 .DESCRIPTION
     Run by the weekly CpiReleaseSchedule task (scripts/run-cpi-release-schedule.cmd) after it
@@ -10,8 +10,9 @@
     refused ("Access is denied") to a non-elevated one, so an elevated run would lock these tasks
     out of the next weekly sync.
 
-    A Release Date gets a CpiHistory trigger at 5:35am PT (8:35am ET) and a RefCpi trigger at
-    6:30am PT (9:30am ET), each unless that time has already passed. Nothing is changed when S19
+    A Release Date gets a CpiHistory trigger at 5:35am PT (8:35am ET), which also calculates the daily
+    Ref CPI (1.13), and the day after it a RefCpiCheck trigger at 6:30am PT (9:30am ET), which checks it
+    against TreasuryDirect (1.17), each unless that time has already passed. Nothing is changed when S19
     cannot be read or lists no Release Date with a task time still ahead.
     A task is changed only when its triggers differ from the dates.
 .PARAMETER ProjectDir
@@ -52,10 +53,10 @@ if (-not ($dates | Where-Object { $_.Date.AddHours(6).AddMinutes(30) -gt $now })
 # One task: set its triggers in place when it exists and they differ, register it when it does not.
 function Sync-CpiTask {
     param([string]$Name, [int]$Hour, [int]$Minute, [string]$Description, [string]$CmdFile,
-          [Nullable[TimeSpan]]$RestartInterval, [int]$RestartCount = 0)
+          [Nullable[TimeSpan]]$RestartInterval, [int]$RestartCount = 0, [int]$DayOffset = 0)
     # A Release Date whose time for this task has already passed gets no trigger: a one-time trigger
     # in the past would run at once under StartWhenAvailable.
-    $times    = @($dates | ForEach-Object { $_.Date.AddHours($Hour).AddMinutes($Minute) } | Where-Object { $_ -gt $now } | Sort-Object)
+    $times    = @($dates | ForEach-Object { $_.Date.AddDays($DayOffset).AddHours($Hour).AddMinutes($Minute) } | Where-Object { $_ -gt $now } | Sort-Object)
     $want     = @($times | ForEach-Object { $_.ToString('yyyy-MM-ddTHH:mm:ss') })
     $triggers = $times | ForEach-Object { New-ScheduledTaskTrigger -Once -At $_ }
     $task = Get-ScheduledTask -TaskName $Name -ErrorAction SilentlyContinue
@@ -77,17 +78,21 @@ Sync-CpiTask "CpiHistory" 5 35 `
     "Fetch full CPI-U history from BLS on release dates, upload bls/CPI_history.csv" `
     "$ProjectDir\scripts\run-cpi-history.cmd"
 
-# RefCpi (TIPS/RefCPI.csv)  -  9:30am ET [PT: 6:30am], same release dates as CpiHistory.
-# Ref CPI pulls from TreasuryDirect, a source separate from BLS that lags the 8:30am ET
-# BLS print by an unknown amount; this used to chain off CpiHistory's own trigger, but a
-# non-zero exit from a chained step didn't reliably restart the wrapping task, so
-# RefCpi has run on its own trigger since 2026-09-18. 9:30am ET gives TreasuryDirect an
-# hour to catch up on its own clock. Retry every 30 min, up to 12x (6h), if
-# run-ref-cpi.cmd's freshness check reports TreasuryDirect still hasn't caught up.
-Sync-CpiTask "RefCpi" 6 30 `
-    "Fetch daily interpolated Ref CPI from TreasuryDirect on BLS release dates, upload TIPS/RefCPI.csv, retrying if TreasuryDirect hasn't caught up yet" `
-    "$ProjectDir\scripts\run-ref-cpi.cmd" `
-    -RestartInterval (New-TimeSpan -Minutes 30) -RestartCount 12
+# RefCpiCheck (1.17 Check daily Ref CPI)  -  9:30am ET [PT: 6:30am] on the day AFTER each Release Date.
+# The daily Ref CPI is calculated by CpiHistory's own run (run-cpi-history.cmd); this task compares it with
+# TreasuryDirect SecIndex a day later, which posted every release since March 2026 on the release day itself.
+# It logs to logs\ref-cpi-check.log and shows a Windows notification for a mismatch or an unpublished range,
+# so it has no restart settings: its result is reported, not retried.
+Sync-CpiTask "RefCpiCheck" 6 30 `
+    "Compare the calculated daily Ref CPI (TIPS/RefCPI.csv) with TreasuryDirect SecIndex the day after each BLS release, notify on a mismatch" `
+    "$ProjectDir\scripts\run-ref-cpi-check.cmd" `
+    -DayOffset 1
+
+# The RefCpi task of the earlier design fetched from TreasuryDirect; the check replaces it.
+if (Get-ScheduledTask -TaskName "RefCpi" -ErrorAction SilentlyContinue) {
+    Unregister-ScheduledTask -TaskName "RefCpi" -Confirm:$false
+    Write-Host "  [REMOVED] RefCpi (replaced by RefCpiCheck)"
+}
 
 $first = ($dates | Sort-Object | Select-Object -First 1).ToString('yyyy-MM-dd')
 $last  = ($dates | Sort-Object | Select-Object -Last 1).ToString('yyyy-MM-dd')

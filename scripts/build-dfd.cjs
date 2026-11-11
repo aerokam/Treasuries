@@ -396,10 +396,10 @@ const INGEST_JOBS = [
     name: ['Fetch CPI', 'history'], data: 'monthly CPI-U',
     entities: ['e4'], reads: ['cpisched'], writes: ['cpihist'],
     stops: 'The run is skipped when the current date, on an Eastern clock, is not a Release Date of {cpisched}. The run ends with an error and fetches nothing when {cpisched} cannot be read.' },
-  { id: '1.13', slug: 'DAILYREFCPI', file: '1.13_Fetch_Daily_Ref_CPI.md', title: 'Fetch daily Ref CPI',
-    name: ['Fetch daily', 'Ref CPI'], data: 'daily Ref CPI',
-    entities: ['e2'], reads: ['tipsref', 'cpihist', 'refcpi', 'cpisched'], writes: ['refcpi'],
-    stops: 'The run is skipped when the current date, on an Eastern clock, is not a Release Date of {cpisched}. The run ends with an error and fetches nothing when {cpisched} cannot be read. {refcpi} is not written when the fetched series ends before the last day of the second month after the latest month of {cpihist}, or when the merged series has a gap of more than one calendar day or is shorter than what the store already held.' },
+  { id: '1.13', slug: 'DAILYREFCPI', file: '1.13_Calculate_Daily_Ref_CPI.md', title: 'Calculate daily Ref CPI',
+    name: ['Calculate', 'daily Ref CPI'], data: null,
+    entities: [], reads: ['cpihist', 'refcpi'], writes: ['refcpi'], modules: ['m14'],
+    stops: '{refcpi} is not written when {cpihist} cannot be read, or when the merged series has a gap of more than one calendar day.' },
   { id: '1.14', slug: 'FUNDHOLDINGS', file: '1.14_Enrich_Fund_Holdings.md', title: 'Enrich fund holdings',
     name: ['Enrich fund', 'holdings'], data: 'fund holdings',
     entities: ['fund'], reads: ['quotes', 'yc'], writes: ['funds'], modules: ['m1', 'm2', 'm3', 'm4'] },
@@ -410,6 +410,10 @@ const INGEST_JOBS = [
     name: ['Fetch CPI', 'release', 'schedule'], data: 'CPI release schedule',
     entities: ['e4'], reads: [], writes: ['cpisched'],
     stops: 'The run ends with an error and writes nothing when the release table is missing or has no rows, when a Release Date cannot be read, or when two rows share a Release Date.' },
+  { id: '1.17', slug: 'CHECKREFCPI', file: '1.17_Check_Daily_Ref_CPI.md', title: 'Check daily Ref CPI',
+    name: ['Check daily', 'Ref CPI'], data: 'daily Ref CPI',
+    entities: ['e2'], reads: ['tipsref', 'cpihist', 'refcpi', 'cpisched'], writes: [],
+    stops: 'The run is skipped when the day before the current date, on an Eastern clock, is not a Release Date of {cpisched}. The run ends with an error and fetches nothing when {cpisched} cannot be read. The run writes no store: it reports a match, a mismatch, or a range {refcpi} holds that TreasuryDirect SecIndex has not yet published.' },
 ];
 const ingestPageName = job => 'DFD_LEVEL3_INGEST_' + job.slug + '.html';
 const ingestSharedKey = job => 'ingest-' + job.slug.toLowerCase();

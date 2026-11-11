@@ -23,6 +23,15 @@ echo [%DATE% %TIME%] Release day confirmed — fetching CPI history... >> "%LOG%
 %NODE% "%REPO%\scripts\fetchCpiHistory.js" --write >> "%LOG%" 2>&1
 set RC=%ERRORLEVEL%
 echo [%DATE% %TIME%] Exited with code %RC% >> "%LOG%"
+if %RC% neq 0 (
+  echo. >> "%LOG%"
+  exit /b %RC%
+)
+
+echo [%DATE% %TIME%] Calculating daily Ref CPI... >> "%LOG%"
+%NODE% "%REPO%\scripts\calcDailyRefCpi.js" --write >> "%LOG%" 2>&1
+set RC=%ERRORLEVEL%
+echo [%DATE% %TIME%] Exited with code %RC% >> "%LOG%"
 echo. >> "%LOG%"
 
 exit /b %RC%

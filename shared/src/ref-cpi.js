@@ -6,12 +6,12 @@
 // Ref CPI logic lives here and is imported — never copied inline.
 //
 // Two derivations of the daily Ref CPI:
-//   • RETRIEVED (authoritative): TreasuryDirect daily NSA series (RefCPI.csv).
-//     All apps consume this via lookupRefCpi().
 //   • CALCULATED: 31 CFR §356 App. B interpolation of a monthly CPI series
-//     (refCpiFromMonthly()). For NSA it is a FALLBACK + educational; for the
-//     seasonally-adjusted series it is the SOLE source (no official daily SA
-//     Ref CPI exists), so SA production always uses it.
+//     (refCpiFromMonthly()). For NSA it is what Ref CPI (S3, RefCPI.csv) holds and every
+//     app reads via lookupRefCpi() (knowledge/1.13_Calculate_Daily_Ref_CPI.md); for the
+//     seasonally-adjusted series it is the SOLE source (no official daily SA Ref CPI exists).
+//   • RETRIEVED: the TreasuryDirect SecIndex daily NSA series, the check of the calculated
+//     one (knowledge/1.17_Check_Daily_Ref_CPI.md).
 // The retrieved and calculated NSA series must agree (see shared/tests/ref-cpi.test.js).
 
 // ─── Retrieved lookup ────────────────────────────────────────────────────────
@@ -112,6 +112,29 @@ export function monthlyCpiMap(rows, valueKey = 'value') {
     if (!isNaN(v)) m[`${parseInt(r.year, 10)}-${mo}`] = v;
   }
   return m;
+}
+
+// A month BLS did not report (October 2025, with no CPI released) takes the number 31 CFR §356 App. B
+// §I.B.4(iv) derives from the last available twelve-month change: with M-N the last reported month before M,
+// CPI_M = CPI_(M-N) × (CPI_(M-N) / CPI_(M-N-12))^(N/12), to three decimal places as Treasury announces an index
+// number. The derived number stands for later calculations (§I.B.4(iv)(c)); a month reported later does not replace it.
+// `monthly` is the map monthlyCpiMap() builds. Months before the first reported month, and a month whose
+// twelve-month base is not available, stay absent. Returns a new map; the input is not changed.
+export function fillUnreportedMonths(monthly) {
+  const keys = Object.keys(monthly).map(k => { const [y, m] = k.split('-').map(Number); return y * 12 + (m - 1); });
+  if (keys.length === 0) return { ...monthly };
+  const idx = (y, m) => y * 12 + (m - 1);
+  const keyOf = i => `${Math.floor(i / 12)}-${(i % 12) + 1}`;
+  const out = { ...monthly };
+  for (let i = Math.min(...keys); i <= Math.max(...keys); i++) {
+    if (monthly[keyOf(i)] != null) continue;
+    let n = 1;
+    while (monthly[keyOf(i - n)] == null && i - n >= Math.min(...keys)) n++;
+    const last = monthly[keyOf(i - n)], base = monthly[keyOf(i - n - 12)];
+    if (last == null || base == null) continue;
+    out[keyOf(i)] = Math.round(last * Math.pow(last / base, n / 12) * 1000) / 1000;
+  }
+  return out;
 }
 
 // ─── Index Ratio ─────────────────────────────────────────────────────────────

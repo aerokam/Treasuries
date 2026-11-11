@@ -84,7 +84,7 @@
 - <a id="e1"></a>**FedInvest (E1)** = `Prices_For + { CUSIP + SECURITY_TYPE + RATE + MATURITY_DATE + CALL_DATE + BUY + SELL + END_OF_DAY }`
   *TreasuryDirect’s daily price list for marketable Treasury securities, one row per security. The page states the date its prices are for on a `Prices For:` line, and its price table has the eight columns above, named as the page names them. Prices are published for the current business day and, on a separate page, for a past date. The three prices, and how Treasury derives them, are described in [FedInvest Treasury Pricing Methodology](../YieldCurves/knowledge/FedInvest_Treasury_Pricing_Methodology.md).*
 - <a id="e2"></a>**TreasuryDirect SecIndex (E2)** = `CUSIP + Index_Date + Ref_CPI`
-  *Authority for daily interpolated RefCPI. Provides values for every day of the month.*
+  *Authority for daily interpolated RefCPI. Provides values for every day of the month. [Check daily Ref CPI (1.17)](./1.17_Check_Daily_Ref_CPI.md) compares it with [Ref CPI (S3)](#s3).*
 - <a id="e3"></a>**FiscalData (E3)** = `CUSIP + Auction_Date + Security_Type + High_Yield + Bid_to_Cover + ...`
   *U.S. Treasury official auction results and immutable security metadata (Coupons, Dated Dates). Each table has an endpoint under `https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v1/accounting/od/`, which requires no authentication. The tables, and the query every table answers, follow.*
   - <a id="e3-auctions"></a>**Auctions table** = `treasury_securities_auctions_v2`
@@ -184,12 +184,12 @@
   | `originalIssueDate` | [Original Issue Date](#original-issue-date), `YYYY-MM-DD` |
 
 - <a id="s3"></a>**Ref CPI (S3)**, `RefCPI.csv` = `{ @date + refCpi }`
-  *R2 key `TIPS/RefCPI.csv` ([View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/TIPS/RefCPI.csv)). The retrieved, authoritative [Ref CPI](#ref-cpi): header row first, then one row per calendar day from 1997-01-15, the dated date of the first TIPS issued, ascending by date. Ref CPI is the same for every TIPS on a given date, so the series is one continuous series.*
+  *R2 key `TIPS/RefCPI.csv` ([View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/TIPS/RefCPI.csv)). The calculated [Ref CPI](#ref-cpi): header row first, then one row per calendar day from 1997-01-15, the dated date of the first TIPS issued, ascending by date, through the first of the month three months after the latest month of [CPI history (S8)](#s8). Ref CPI is the same for every TIPS on a given date, so the series is one continuous series.*
 
   | Column | Defined term |
   |---|---|
   | `date` | the calendar date the value is for, `YYYY-MM-DD` |
-  | `refCpi` | [Ref CPI](#ref-cpi) NSA, as [TreasuryDirect SecIndex (E2)](#e2) states it, to five decimal places |
+  | `refCpi` | [Ref CPI](#ref-cpi) NSA, calculated from [CPI history (S8)](#s8), to five decimal places |
 
 - <a id="s4"></a>**Ref CPI NSA and SA (S4)**, `RefCpiNsaSa.csv` = `{ @Ref_CPI_Date + Ref_CPI_NSA + Ref_CPI_SA + SA_Factor }`
   *R2 key `TIPS/RefCpiNsaSa.csv` ([View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/TIPS/RefCpiNsaSa.csv)). Calculated by the 31 CFR App. B daily interpolation. Header row first, then one row per calendar day, newest row first. The daily SA series has no official or retrieved equivalent: this store is its sole source.*
@@ -737,9 +737,9 @@ For nominal Treasuries, 31 CFR §356.2 applies: *"Dated date means the date from
 
 **Ref is short for Reference**, everywhere in these apps and in Treasury’s field names. *Ref CPI* and *Reference CPI* are the same term, as are *dated date Ref CPI* and *dated date reference CPI*; the short form is the one to write.
 
-**Two derivations — retrieved is authoritative, calculated is the fallback:**
-- **Retrieved (authoritative):** TreasuryDirect SecIndex ([TreasuryDirect SecIndex (E2)](#e2)) → `RefCPI.csv` ([Ref CPI (S3)](#s3)). **All apps use this.**
-- **Calculated (NSA fallback + educational):** 31 CFR App. B interpolation of the monthly CPI-U NSA series ([BLS (E4)](#e4)). For **NSA only**, this is a **fallback** used if retrieval is unavailable, and is retained for educational value. It is also the Ref CPI of the first of a month after the last retrieved date, which is the CPI-U NSA of the month three months earlier read as it is, with no interpolation, as [Calculate TIPS OID (8.2)](../TaxationOfTreasuries/knowledge/8.2_Calculate_Tips_Oid.md) uses it. The retrieved and calculated NSA series **must agree** (verified by test).
+**Two derivations — calculated is what every app reads, retrieved is the check:**
+- **Calculated (NSA):** 31 CFR App. B interpolation of the monthly CPI-U NSA series ([CPI history (S8)](#s8)) → `RefCPI.csv` ([Ref CPI (S3)](#s3)), written as soon as BLS publishes a month by [Calculate daily Ref CPI (1.13)](./1.13_Calculate_Daily_Ref_CPI.md). **All apps use this.** The series ends on the first of the month three months after the latest month of CPI history, the CPI-U NSA of that month read as it is, with no interpolation, as [Calculate TIPS OID (8.2)](../TaxationOfTreasuries/knowledge/8.2_Calculate_Tips_Oid.md) uses it.
+- **Retrieved (the check):** TreasuryDirect SecIndex ([TreasuryDirect SecIndex (E2)](#e2)). [Check daily Ref CPI (1.17)](./1.17_Check_Daily_Ref_CPI.md) compares it with [Ref CPI (S3)](#s3) after it publishes, and reports any date that differs. The retrieved and calculated NSA series **must agree** (verified by that run and by test).
 
 **Seasonally adjusted daily Ref CPI is a calculated construct — the *only* source, never a fallback.** BLS publishes **monthly** CPI-SA alongside CPI-NSA, but there is **no official daily SA Ref CPI**: App. B daily interpolation officially applies to **NSA only**, because NSA is what drives TIPS inflation accrual. The daily **SA Ref CPI** and **`SA_Factor`** (`RefCpiNsaSa.csv`, [Ref CPI NSA and SA (S4)](#s4)) were devised here for seasonal yield comparison, so they are **necessarily calculated** and must always be produced. The App. B interpolation is defined once in `shared/src/ref-cpi.js` and applied to both series (NSA and SA); the math is shared, but SA production is never removed.
 
@@ -1099,7 +1099,7 @@ Some values are true only until Treasury issues more TIPS. Left inline as approx
 `EXCLUDE_MATURING_WITHIN_MONTHS` = 3 *A design choice, not derived from market data: a [TIPS](#tips) maturing no more than this many months after the [Settlement Date](#settlement-date) is not offered in Build: it is not among the First Year choices and is not chosen for a funded year under any Maturity preference, including Select maturities. A year with other TIPS maturing later uses those. The Default First Year (§5.1) is the earliest maturity year with a TIPS maturing later than that. A TIPS that short gives little protection against unexpected inflation, and [Market Quotes](#market-quotes) omit a Treasury maturing within about a week. Rebalance applies no exclusion: a TIPS in a holdings file is shown and kept as held. A value of 0 turns the exclusion off. Matches `ladder-core.js`.*
 `LOWER_COVER_YIELD` = 4% *The yield at which the Synthetic TIPS of the first Future 30Y year is measured when the Lower cover (§5.1) is chosen. A fixed yield above the market yield keeps the choice from changing with each day's yield; the durations of the covers barely move with yield, while the duration of that Synthetic TIPS moves with it. [Research](../TipsLadderManager/research/Future_30Y_Cover_Excess_Analysis.md).*
 `REFCPI_CUSIP` = *the CUSIP whose series the daily Ref CPI is pulled from at TreasuryDirect ([TreasuryDirect SecIndex (E2)](#e2)).*
-  **Selection rule (the rule, not the value):** Ref CPI is *market-wide* — identical across all TIPS on a given date — so the CUSIP determines only which dates its series covers. The recurring fetch selects, on every run, the [Outstanding TIPS](#outstanding-tips) with the latest [Maturity Date](#maturity-date) in [TIPS reference data (S2)](#s2), the CUSIP that stays outstanding longest, so no rotation is needed when a TIPS matures. The one-shot full-history rebuild merges `9128272M3` (matured 2007-01-15) and `912810FD5` (matures 2028-04-15), whose series together cover 1997-01-15 to present with no gap ([Fetch daily Ref CPI (1.13)](./1.13_Fetch_Daily_Ref_CPI.md)).
+  **Selection rule (the rule, not the value):** Ref CPI is *market-wide* — identical across all TIPS on a given date — so the CUSIP determines only which dates its series covers. The check selects, on every run, the [Outstanding TIPS](#outstanding-tips) with the latest [Maturity Date](#maturity-date) in [TIPS reference data (S2)](#s2), the CUSIP that stays outstanding longest, so no rotation is needed when a TIPS matures. The test of the whole of [Ref CPI (S3)](#s3) compares it with the series of `9128272M3` (matured 2007-01-15) and `912810FD5` (matures 2028-04-15), which together cover 1997-01-15 to present with no gap.
 `SIFMA_HOLIDAYS` = *The calendar of [Bond Holidays](#bond-holiday).*
 
 ---

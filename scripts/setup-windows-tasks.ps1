@@ -5,7 +5,7 @@
     Creates one scheduled task per ingestion job. Re-running is safe (idempotent  - 
     existing tasks are unregistered and re-created).
 
-    Most tasks use weekly recurring triggers. CpiHistory and RefCpi have one trigger per Release
+    Most tasks use weekly recurring triggers. CpiHistory and RefCpiCheck have one trigger per Release
     Date of CPI release schedule (S19); CpiReleaseSchedule sets them weekly (see the CPI tasks block).
 
     All times are Pacific Time (PT). ET-based tasks run 5 minutes after their ET
@@ -70,7 +70,7 @@ $legacy = @(
     'SnapYieldHistory', 'YieldHistorySnap',
     # SA Factor variants
     'SaFactorUpdate',
-    # Ref CPI variants (superseded by the canonical 'RefCpi' task, which syncCpiTasks.ps1 registers)
+    # Ref CPI variants (superseded by the RefCpiCheck task, which syncCpiTasks.ps1 registers)
     'RefCpiRefresh',
     # CPI History variants
     'FetchCpiHistory', 'CpiHistoryRefresh',
@@ -248,29 +248,29 @@ Register-DataTask "VendorUpdateCheck" `
 # ---------------------------------------------------------------------------
 # CPI tasks  -  triggers set weekly by CpiReleaseSchedule, not by this script
 # ---------------------------------------------------------------------------
-# CpiHistory and RefCpi run only on Release Dates of CPI release schedule (S19), one trigger per
-# date. They are Interactive tasks created by the user's own non-elevated token, because only such
+# CpiHistory and RefCpiCheck run only on Release Dates of CPI release schedule (S19), one trigger per
+# date (RefCpiCheck on the day after). They are Interactive tasks created by the user's own non-elevated token, because only such
 # a token can change them: a task created by an elevated process (every S4U task, and every task
 # this script registers) is refused ("Access is denied") to a non-elevated one. So this script
 # neither registers nor changes them. CpiReleaseSchedule does, every Sunday, through
 # scripts/syncCpiTasks.ps1, and it is itself Interactive so that it runs with that same token.
 # BLS does not release the CPI on a Sunday, so the refresh never falls on a Release Date.
 # Interactive tasks run only while the user is logged on; StartWhenAvailable runs a missed one at
-# the next logon, and run-cpi-history.cmd and run-ref-cpi.cmd end at once unless that day is still
-# a Release Date.
+# the next logon, and run-cpi-history.cmd and checkDailyRefCpi.js end at once unless that day is still
+# a Release Date (the day after one, for the check).
 
 # CpiReleaseSchedule  -  Sundays 6:20am PT
 # The page lists about thirteen months ahead, so a weekly run adds each new month within a week of
 # BLS listing it and picks up a moved date the same way.
 Register-CmdTask "CpiReleaseSchedule" `
-    "Fetch the BLS CPI release schedule, replace bls/CpiReleaseSchedule.csv in R2, set the CpiHistory and RefCpi triggers to its Release Dates" `
+    "Fetch the BLS CPI release schedule, replace bls/CpiReleaseSchedule.csv in R2, set the CpiHistory and RefCpiCheck triggers to its Release Dates" `
     @(New-ScheduledTaskTrigger -Weekly -DaysOfWeek Sunday -At "6:20am") `
     "$ProjectDir\scripts\run-cpi-release-schedule.cmd" `
     -LogonType Interactive
 
-# CpiHistory and RefCpi created as S4U by an earlier version of this script cannot be changed
+# CpiHistory and RefCpiCheck created as S4U by an earlier version of this script cannot be changed
 # without elevation, so they are removed here and recreated, Interactive, by the first run below.
-foreach ($name in 'CpiHistory', 'RefCpi') {
+foreach ($name in 'CpiHistory', 'RefCpiCheck') {
     $t = Get-ScheduledTask -TaskName $name -ErrorAction SilentlyContinue
     if ($t -and "$($t.Principal.LogonType)" -ne 'Interactive') {
         Unregister-ScheduledTask -TaskName $name -Confirm:$false
@@ -280,7 +280,7 @@ foreach ($name in 'CpiHistory', 'RefCpi') {
 # This script is elevated, so a task started from it is not: Task Scheduler runs an Interactive
 # task as the user, with the user's non-elevated token.
 Start-ScheduledTask -TaskName "CpiReleaseSchedule"
-Write-Host "  [STARTED] CpiReleaseSchedule, which registers CpiHistory and RefCpi. See logs/cpi-release-schedule.log."
+Write-Host "  [STARTED] CpiReleaseSchedule, which registers CpiHistory and RefCpiCheck. See logs/cpi-release-schedule.log."
 
 # ---------------------------------------------------------------------------
 
