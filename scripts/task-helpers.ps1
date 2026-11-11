@@ -20,9 +20,16 @@ function Register-DataTask {
     # Run via conhost --headless so no console window ever appears/steals focus.
     # Task Scheduler otherwise pops a visible conhost window for any console-subsystem
     # action, even when the script itself redirects all output to a log file.
-    $conhost   = "$env:WINDIR\System32\conhost.exe"
-    $hiddenArg = "--headless `"$Execute`" $Argument"
-    $action    = New-ScheduledTaskAction -Execute $conhost -Argument $hiddenArg -WorkingDirectory $Cwd
+    # A task that restarts on failure (RestartCount > 0) runs directly instead: conhost --headless
+    # returns exit code 0 whatever the script exits with, so Task Scheduler would never see the
+    # failure and never restart the task. Such a task shows a console window while it runs.
+    if ($RestartCount -gt 0) {
+        $action = New-ScheduledTaskAction -Execute $Execute -Argument $Argument -WorkingDirectory $Cwd
+    } else {
+        $conhost   = "$env:WINDIR\System32\conhost.exe"
+        $hiddenArg = "--headless `"$Execute`" $Argument"
+        $action    = New-ScheduledTaskAction -Execute $conhost -Argument $hiddenArg -WorkingDirectory $Cwd
+    }
     $settingsArgs = @{ ExecutionTimeLimit = (New-TimeSpan -Minutes 30); StartWhenAvailable = $true }
     if ($RestartCount -gt 0) {
         $settingsArgs.RestartInterval = $RestartInterval

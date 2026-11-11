@@ -75,8 +75,9 @@ function Sync-CpiTask {
 }
 
 Sync-CpiTask "CpiHistory" 5 35 `
-    "Fetch full CPI-U history from BLS on release dates, upload bls/CPI_history.csv" `
-    "$ProjectDir\scripts\run-cpi-history.cmd"
+    "Fetch full CPI-U history from BLS on release dates, upload bls/CPI_history.csv, calculate the daily Ref CPI; retries if BLS has not yet published the month" `
+    "$ProjectDir\scripts\run-cpi-history.cmd" `
+    -RestartInterval (New-TimeSpan -Minutes 30) -RestartCount 12
 
 # RefCpiCheck (1.17 Check daily Ref CPI)  -  9:30am ET [PT: 6:30am] on the day AFTER each Release Date.
 # The daily Ref CPI is calculated by CpiHistory's own run (run-cpi-history.cmd); this task compares it with

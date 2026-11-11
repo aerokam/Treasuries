@@ -118,6 +118,23 @@ async function main() {
     ...rows.map(r => [r.year, r.period, r.periodName, r.nsa, r.sa].join(',')),
   ].join('\n') + '\n';
 
+  // Not yet published: on a Release Date, the latest month fetched is before the Reference Month of
+  // that release (CPI release schedule, S19). Nothing is written and the run exits with a failure code.
+  if (doWrite) {
+    const todayET = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+    const res = await fetch(`https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/bls/CpiReleaseSchedule.csv?t=${Date.now()}`, { cache: 'no-store' });
+    const row = res.ok ? (await res.text()).split(/\r?\n/).slice(1).map(l => l.split(',')).find(c => c[1] === todayET) : null;
+    if (row) {
+      const [monthName, year] = row[0].split(' ');
+      const expected = `${year}M${String(['January','February','March','April','May','June','July','August','September','October','November','December'].indexOf(monthName) + 1).padStart(2, '0')}`;
+      const last = rows[rows.length - 1];
+      if (`${last.year}${last.period}` < expected) {
+        console.error(`BLS has not yet published ${row[0]}: latest month fetched is ${last.year} ${last.period}. Not writing -- will retry.`);
+        process.exit(1);
+      }
+    }
+  }
+
   console.log(`\nTotal rows: ${rows.length}`);
   console.log('First row:', rows[0]);
   console.log('Last row: ', rows[rows.length - 1]);
