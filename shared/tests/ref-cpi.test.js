@@ -7,7 +7,7 @@
 // bad data or a bug in the interpolation — exactly the failure mode that
 // derailed the TipsReference session.
 
-import { lookupRefCpi, refCpiFromMonthly, monthlyCpiMap, fillUnreportedMonths, indexRatio, TREASURY_ROUNDING, NO_ROUNDING,
+import { lookupRefCpi, parseRefCpiRows, refCpiFromMonthly, monthlyCpiMap, fillUnreportedMonths, indexRatio, TREASURY_ROUNDING, NO_ROUNDING,
          saFactorForDate, maturitySaFactor, credibilityFactor, seasonalDriftSigma } from '../src/ref-cpi.js';
 import { parseCsv } from '../src/csv.js';
 import { fetchSecIndexSeries, compare, lastDayTwoMonthsAfter } from '../../scripts/checkDailyRefCpi.js';
@@ -107,6 +107,13 @@ async function main() {
   ok(fillUnreportedMonths({ '2024-9': 315.301, '2025-9': 324.8, '2025-11': 324.122 })['2025-10'] === 325.604, 'unreported month takes the twelve-month-change number');
   ok(fillUnreportedMonths({ '2025-9': 324.8, '2025-11': 324.122 })['2025-10'] === undefined, 'no twelve-month base, no derived month');
 
+  // ── parseRefCpiRows reads the current header and the earlier one ──
+  {
+    const cur = parseRefCpiRows('Ref CPI Date,Ref CPI NSA,Ref CPI SA,SA Factor\n2026-01-01,325.604,325.051,1.00170\n');
+    ok(cur[0].date === '2026-01-01' && cur[0].refCpi === 325.604 && cur[0].refCpiSa === 325.051 && cur[0].saFactor === 1.0017, 'parseRefCpiRows reads the four columns');
+    const old = parseRefCpiRows('date,refCpi\n2026-01-01,325.604\n');
+    ok(old[0].date === '2026-01-01' && old[0].refCpi === 325.604 && Number.isNaN(old[0].refCpiSa), 'parseRefCpiRows reads the earlier header');
+  }
   // ── 1.13: S3's held dates are kept, only later days are calculated, the series ends on the first of the month three months after the latest month ──
   {
     const m = { '2026-8': 100, '2026-9': 101, '2026-10': 102 };

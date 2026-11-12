@@ -14,6 +14,8 @@
 //     one (knowledge/1.17_Check_Daily_Ref_CPI.md).
 // The retrieved and calculated NSA series must agree (see shared/tests/ref-cpi.test.js).
 
+import { parseCsv } from './csv.js';
+
 // ─── Retrieved lookup ────────────────────────────────────────────────────────
 // Ref CPI is defined per SPECIFIC calendar day. Returns the exact entry for
 // dateStr, or null if dateStr is outside the published range (before the first
@@ -164,8 +166,22 @@ export function indexRatio(settlementRefCpi, datedDateRefCpi, rounding) {
   return rounding === TREASURY_ROUNDING ? truncateThenRound(ratio) : ratio;
 }
 
-// ─── SA Factor lookup (RefCpiNsaSa.csv rows) ─────────────────────────────────
-// `rows` = TIPS/RefCpiNsaSa.csv parsed via shared/src/csv.js (any order):
+// ─── Ref CPI (S3) parser ─────────────────────────────────────────────────────
+// Parses TIPS/RefCPI.csv: [{ date: 'YYYY-MM-DD', refCpi, refCpiSa, saFactor }], in the file's order (oldest first).
+// refCpi is the Ref CPI NSA. The header row is `Ref CPI Date,Ref CPI NSA,Ref CPI SA,SA Factor`; the earlier
+// `date,refCpi` header is read too while R2 still carries a file written before the change, and its refCpiSa
+// and saFactor are NaN.
+export function parseRefCpiRows(text) {
+  return parseCsv(text).map(r => ({
+    date:     r['Ref CPI Date'] ?? r.date,
+    refCpi:   parseFloat(r['Ref CPI NSA'] ?? r.refCpi),
+    refCpiSa: parseFloat(r['Ref CPI SA']),
+    saFactor: parseFloat(r['SA Factor']),
+  }));
+}
+
+// ─── SA Factor lookup (Ref CPI rows) ─────────────────────────────────────────
+// `rows` = TIPS/RefCPI.csv parsed via shared/src/csv.js (any order):
 //   [{ "Ref CPI Date": 'YYYY-MM-DD', "SA Factor": '1.00343', ... }, ...]
 //
 // For a date inside the published series, returns that exact day's SA Factor.

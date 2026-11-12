@@ -4,7 +4,7 @@
 // long bill) to seed calculator defaults.
 // Spec: knowledge/1.0_Primer.md
 import { parseCsv } from '../../shared/src/csv.js';
-import { lookupRefCpi } from '../../shared/src/ref-cpi.js';
+import { lookupRefCpi, parseRefCpiRows } from '../../shared/src/ref-cpi.js';
 
 const R2_ROOT = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev';
 const TIPS_URL = R2_ROOT + '/TIPS';
@@ -37,10 +37,7 @@ export async function loadPrimerData() {
     yield:    parseFloat(r.yield) || null,
   })).filter(r => r.maturity && !isNaN(r.coupon));
 
-  const refCpiRows = parseCsv(await refCpiRes.text()).map(r => ({
-    date: r.date,
-    refCpi: parseFloat(r.refCpi),
-  }));
+  const refCpiRows = parseRefCpiRows(await refCpiRes.text());
 
   const tipsRefRows = parseCsv(await tipsRefRes.text()).map(r => ({
     cusip: r.cusip,

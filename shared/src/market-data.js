@@ -19,6 +19,7 @@ import { parseTipsQuotes, parseDownloadDate, downloadDateIso } from './market-qu
 import { yieldFromPrice } from './bond-math.js';
 import { localDate, toIsoDate, nextBusinessDay, parseHolidaySet } from './settlement.js';
 import { parseCsv as parseCsvRows } from './csv.js';
+import { parseRefCpiRows } from './ref-cpi.js';
 import { marketTipsRowsFromYieldCurves } from './yield-curve-stores.js';
 
 export const R2_ROOT = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev';
@@ -80,13 +81,7 @@ export async function fetchMonthlyCpiNsa() {
   return monthlyCpiMap(parseCsvRows(await res.text()).map(r => ({ year: r.Year, period: r.Period, value: parseFloat(r.NSA) })));
 }
 
-// Parses Ref CPI (S3, TIPS/RefCPI.csv): [{ date: 'YYYY-MM-DD', refCpi: Number }], oldest first.
-export function parseRefCpiRows(text) {
-  return parseCsvRows(text).map(r => ({
-    date:   r.date,
-    refCpi: parseFloat(r.refCpi),
-  }));
-}
+export { parseRefCpiRows };
 
 // Fetches RefCPI.csv, TipsRef.csv, YieldCurves.csv (Yield curves, S13), and BondHolidaysSifma.csv from R2 --
 // shared by both fetchTipsData() (FedInvest) and fetchMarketQuotesData() (Market quotes) so the

@@ -12,7 +12,7 @@ import { readFileSync, writeFileSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { nextBondTradingDay, R2_ROOT, parseTipsRefRows } from '../../../shared/src/market-data.js';
-import { indexRatio, lookupRefCpi, TREASURY_ROUNDING, NO_ROUNDING } from '../../../shared/src/ref-cpi.js';
+import { indexRatio, lookupRefCpi, parseRefCpiRows, TREASURY_ROUNDING, NO_ROUNDING } from '../../../shared/src/ref-cpi.js';
 import { parseHolidaySet, actualPaymentDate } from '../../../shared/src/settlement.js';
 import { parseCsv as parseCsvRows } from '../../../shared/src/csv.js';
 import { defaultFirstYear, tipsMaturingAfterExclusion } from '../../src/ladder-core.js';
@@ -1027,7 +1027,7 @@ for (const mode of ['build', 'rebalance']) {
       chooseMenu(page, 'export-menu', 'ladder-csv'),
     ]);
     const rows = parseCsvRows(readFileSync(await download.path(), 'utf8'));
-    const refCpiRows = parseCsvRows(await r2Text('TIPS/RefCPI.csv')).map(r => ({ date: r.date, refCpi: parseFloat(r.refCpi) }));
+    const refCpiRows = parseRefCpiRows(await r2Text('TIPS/RefCPI.csv'));
     const datedByCusip = new Map(parseTipsRefRows(await r2Text('TIPS/TipsRef.csv')).map(r => [r.cusip, r.datedDateRefCpi]));
     const settleRefCpi = lookupRefCpi(refCpiRows, await computeSettleDateStr());
     expect(settleRefCpi, 'Ref CPI at the Settlement Date').not.toBeNull();

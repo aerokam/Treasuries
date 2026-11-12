@@ -2,6 +2,7 @@
 // Fetches and parses S8 (CPI_history.csv) and S3 (RefCPI.csv) from R2.
 
 import { parseCsv } from '../../shared/src/csv.js';
+import { parseRefCpiRows } from '../../shared/src/ref-cpi.js';
 
 const R2_BASE = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev';
 const CPI_HISTORY_URL = `${R2_BASE}/bls/CPI_history.csv`;
@@ -54,15 +55,13 @@ export async function fetchRefCpi() {
   const res = await fetch(REF_CPI_URL, { cache: 'no-store' });
   if (!res.ok) throw new Error(`RefCPI.csv fetch failed: ${res.status}`);
   const text = await res.text();
-  const raw  = parseCsvLowerKeys(text);
   /** @type {RefCpiRow[]} */
   const rows = [];
-  for (const r of raw) {
+  for (const r of parseRefCpiRows(text)) {
     const parts = (r.date || '').split('-').map(Number);
     if (parts.length !== 3) continue;
-    const value = parseFloat(r.refcpi);
-    if (isNaN(value)) continue;
-    rows.push({ date: localDate(parts[0], parts[1], parts[2]), value });
+    if (isNaN(r.refCpi)) continue;
+    rows.push({ date: localDate(parts[0], parts[1], parts[2]), value: r.refCpi });
   }
   return rows; // already sorted ascending
 }
