@@ -1,5 +1,5 @@
 // 1.17 Check daily Ref CPI (knowledge/1.17_Check_Daily_Ref_CPI.md).
-// Compares the daily Ref CPI TreasuryDirect SecIndex states for one outstanding TIPS with Ref CPI (S3),
+// Compares the daily Ref CPI TreasuryDirect SecIndex states for one outstanding TIPS with RefCPI (S3),
 // logs the result to logs/ref-cpi-check.log, and shows a Windows notification for anything but a match.
 // Writes no store.
 //

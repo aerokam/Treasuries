@@ -81,7 +81,7 @@ let loaded = null; // { tipsRows, refCpiRows }, fetched once per page load
 
 function loadInputs() {
   if (!loaded) {
-    // CPI history is optional: without it the first of a month after the last Ref CPI date has no Ref CPI.
+    // CPI is optional: without it the first of a month after the last Ref CPI date has no Ref CPI.
     loaded = Promise.all([fetchTipsRefRows(), fetchRefCpiRows(), fetchMonthlyCpiNsa().catch(() => null)])
       .then(([tipsRows, refCpiRows, monthlyCpi]) => ({
         tipsRows: tipsRows.filter(r => Number.isFinite(r.datedDateRefCpi) && isIsoDate(r.originalIssueDate)),

@@ -555,7 +555,7 @@ The value implied for a year with no point in the series (a structural gap year,
 - `loadMarketData()` — the one entry point for a page.
 - `fetchTipsData()`, `fetchMarketQuotesData()` — the FedInvest and Market quotes paths that `loadMarketData()` selects between.
 - `parseFedInvestTipsRows(text)`, `parseTipsRefRows(text)`, `parseRefCpiRows(text)` — row parsers.
-- `fetchTipsRefRows()`, `fetchRefCpiRows()`, `fetchMonthlyCpiNsa()` — the fetch and parse of TIPS reference data, of Ref CPI and of the NSA value of each month of CPI history.
+- `fetchTipsRefRows()`, `fetchRefCpiRows()`, `fetchMonthlyCpiNsa()` — the fetch and parse of TIPS reference data, of Ref CPI and of the NSA value of each month of CPI.
 - `nextBondTradingDay(isoDateStr, holidaySet)`, `R2_ROOT`.
 - `lookupRefCpi` and `parseCsv` — re-exports of ref-cpi.js (M14) and csv.js (M1).
 
@@ -565,9 +565,9 @@ The value implied for a year with no point in the series (a structural gap year,
 
 ## <a id="m14"></a>ref-cpi.js (M14)
 **File**: `shared/src/ref-cpi.js`
-**Purpose**: The one implementation of Reference CPI logic: the lookup of the daily [Ref CPI](./DATA_DICTIONARY.md#ref-cpi) of [Ref CPI (S3)](./DATA_DICTIONARY.md#s3), its calculation from monthly CPI, the [Index Ratio](./DATA_DICTIONARY.md#index-ratio) and the SA Factor of a date and of a maturity.
+**Purpose**: The one implementation of Reference CPI logic: the lookup of the daily [Ref CPI](./DATA_DICTIONARY.md#ref-cpi) of [RefCPI (S3)](./DATA_DICTIONARY.md#s3), its calculation from monthly CPI, the [Index Ratio](./DATA_DICTIONARY.md#index-ratio) and the SA Factor of a date and of a maturity.
 **Exports**:
-- `lookupRefCpi(rows, dateStr)` — the Ref CPI of a date, read from the rows of Ref CPI (S3).
+- `lookupRefCpi(rows, dateStr)` — the Ref CPI of a date, read from the rows of RefCPI (S3).
 - `refCpiFromMonthly(dateStr, monthly)`, `monthlyCpiMap(rows, valueKey)`, `roundHalfUp(x, dp)` — the calculated Ref CPI.
 - `indexRatio(settlementRefCpi, datedDateRefCpi, rounding)` with `TREASURY_ROUNDING` and `NO_ROUNDING`.
 - `saFactorForDate(rows, dateStr)`, `maturitySaFactor(rows, maturityDate, asOfDate)`, `seasonalDriftSigma(month, h)`, `credibilityFactor(month, h)`.

@@ -339,7 +339,7 @@ const INGEST_STORES = {
   fedinv: ['FedInvest prices', DS('s1')], tipsref: ['TIPS reference data', DS('s2')],
   refcpi: ['Ref CPI', DS('s3')],
   auctions: ['Auction results', DS('s5')], yhist: ['Yield history', DS('s6')],
-  quotes: ['Market quotes', DS('s7')], cpihist: ['CPI history', DS('s8')],
+  quotes: ['Market quotes', DS('s7')], cpihist: ['CPI', DS('s8')],
   tent: ['Tentative auction schedule', DS('s9')],
   funds: ['Fund holdings', DS('s11')], gsw: ['GSW curve parameters', DS('s12')],
   yc: ['Yield curves', DS('s13')], bei: ['Breakeven inflation', DS('s14')],
@@ -386,7 +386,7 @@ const INGEST_JOBS = [
   { id: '1.8', slug: 'INTRADAYARCHIVE', file: '1.8_Archive_Intraday_Yields.md', title: 'Archive intraday yields',
     name: ['Archive', 'intraday yields'], data: 'market yields',
     entities: ['e5'], reads: [], writes: ['ia'] },
-  { id: '1.12', slug: 'CPIHISTORY', file: '1.12_Fetch_CPI_History.md', title: 'Fetch CPI history',
+  { id: '1.12', slug: 'CPIHISTORY', file: '1.12_Fetch_CPI.md', title: 'Fetch CPI',
     name: ['Fetch CPI', 'history'], data: 'monthly CPI-U',
     entities: ['e4'], reads: ['cpisched'], writes: ['cpihist'],
     stops: 'The run is skipped when the current date, on an Eastern clock, is not a Release Date of {cpisched}. The run ends with an error and fetches nothing when {cpisched} cannot be read.' },
@@ -555,7 +555,7 @@ function level1() {
     { id: 'auctions', name: 'Auction results', href: DS('s5') },
     { id: 'yhist', name: 'Yield history', href: DS('s6') },
     { id: 'quotes', name: 'Market quotes', href: DS('s7') },
-    { id: 'cpihist', name: 'CPI history', href: DS('s8') },
+    { id: 'cpihist', name: 'CPI', href: DS('s8') },
     { id: 'tent', name: 'Tentative auction schedule', href: DS('s9') },
     { id: 'funds', name: 'Fund holdings', href: DS('s11') },
     { id: 'gsw', name: 'GSW curve parameters', href: DS('s12') },
@@ -1797,7 +1797,7 @@ function level2FundHoldings() {
 const KCE = 'CpiExplorer/knowledge/';
 function level2CpiExplorer() {
   const stores = [
-    { id: 'cpihist', name: 'CPI history', href: DS('s8') },
+    { id: 'cpihist', name: 'CPI', href: DS('s8') },
     { id: 'refcpi', name: 'Ref CPI', href: DS('s3') },
   ];
   const procs = [
@@ -2031,7 +2031,7 @@ function level2TaxationOfTreasuries() {
   const stores = [
     { id: 'tipsref', name: 'TIPS reference data', href: DS('s2') },
     { id: 'refcpi', name: 'Ref CPI', href: DS('s3') },
-    { id: 'cpihist', name: 'CPI history', href: DS('s8') },
+    { id: 'cpihist', name: 'CPI', href: DS('s8') },
     { id: 'taxdocs', name: 'Taxation documents', href: DS('s20') },
   ];
   const procs = [

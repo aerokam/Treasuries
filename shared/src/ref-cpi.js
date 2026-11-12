@@ -166,7 +166,7 @@ export function indexRatio(settlementRefCpi, datedDateRefCpi, rounding) {
   return rounding === TREASURY_ROUNDING ? truncateThenRound(ratio) : ratio;
 }
 
-// ─── Ref CPI (S3) parser ─────────────────────────────────────────────────────
+// ─── RefCPI (S3) parser ─────────────────────────────────────────────────────
 // Parses TIPS/RefCPI.csv: [{ date: 'YYYY-MM-DD', refCpi, refCpiSa, saFactor }], in the file's order (oldest first).
 // refCpi is the Ref CPI NSA. The header row is `Ref CPI Date,Ref CPI NSA,Ref CPI SA,SA Factor`.
 export function parseRefCpiRows(text) {

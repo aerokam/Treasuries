@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Sets the triggers of the CpiHistory and RefCpiCheck tasks to one per Release Date of CPI release
+    Sets the triggers of the FetchCpi and RefCpiCheck tasks to one per Release Date of CPI release
     schedule (S19), reading the dates from bls/CpiReleaseSchedule.csv in R2.
 .DESCRIPTION
     Run by the weekly CpiReleaseSchedule task (scripts/run-cpi-release-schedule.cmd) after it
@@ -10,7 +10,7 @@
     refused ("Access is denied") to a non-elevated one, so an elevated run would lock these tasks
     out of the next weekly sync.
 
-    A Release Date gets a CpiHistory trigger at 5:35am PT (8:35am ET), which also calculates the daily
+    A Release Date gets a FetchCpi trigger at 5:35am PT (8:35am ET), which also calculates the daily
     Ref CPI (1.13), and the day after it a RefCpiCheck trigger at 6:30am PT (9:30am ET), which checks it
     against TreasuryDirect (1.17), each unless that time has already passed. Nothing is changed when S19
     cannot be read or lists no Release Date with a task time still ahead.
@@ -46,7 +46,7 @@ foreach ($line in ($csv -split "`n")) {
 }
 # 6:30am PT is the later of the two task times, so a Release Date with it still ahead is the last chance for a trigger.
 if (-not ($dates | Where-Object { $_.Date.AddHours(6).AddMinutes(30) -gt $now })) {
-    Write-Host "No Release Date ahead in CPI release schedule (S19): CpiHistory and RefCpi left as they are."
+    Write-Host "No Release Date ahead in CPI release schedule (S19): FetchCpi and RefCpi left as they are."
     exit 1
 }
 
@@ -74,13 +74,19 @@ function Sync-CpiTask {
     Write-Host "  [UPDATED] $Name, $($have.Count) triggers -> $($want.Count)"
 }
 
-Sync-CpiTask "CpiHistory" 5 35 `
+Sync-CpiTask "FetchCpi" 5 35 `
     "Fetch full CPI-U history from BLS on release dates, upload bls/CPI.csv, calculate the daily Ref CPI, refresh the yield curve data sets; retries if BLS has not yet published the month" `
-    "$ProjectDir\scripts\run-cpi-history.cmd" `
+    "$ProjectDir\scripts\run-fetch-cpi.cmd" `
     -RestartInterval (New-TimeSpan -Minutes 30) -RestartCount 12
 
+# The task of this name before 2026-11-12 is FetchCpi now.
+if (Get-ScheduledTask -TaskName "CpiHistory" -ErrorAction SilentlyContinue) {
+    Unregister-ScheduledTask -TaskName "CpiHistory" -Confirm:$false
+    Write-Host "  [REMOVED] CpiHistory (renamed FetchCpi)"
+}
+
 # RefCpiCheck (1.17 Check daily Ref CPI)  -  9:30am ET [PT: 6:30am] on the day AFTER each Release Date.
-# The daily Ref CPI is calculated by CpiHistory's own run (run-cpi-history.cmd); this task compares it with
+# The daily Ref CPI is calculated by FetchCpi's own run (run-fetch-cpi.cmd); this task compares it with
 # TreasuryDirect SecIndex a day later, which posted every release since March 2026 on the release day itself.
 # It logs to logs\ref-cpi-check.log and shows a Windows notification for a mismatch or an unpublished range,
 # so it has no restart settings: its result is reported, not retried.

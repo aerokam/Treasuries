@@ -52,7 +52,7 @@ const POPOVER_ID = 'trt-range-popover';
  * @param {boolean} [o.flushPicker]         draw the Interest Ref CPI Date picker without a box, for a dark header
  * @param {Array} o.tipsRefRows             TIPS reference data (S2)
  * @param {Iterable} o.quotes               { cusip, price, yield, saYield } for each quoted TIPS
- * @param {Array} o.refCpiRows              Ref CPI (S3)
+ * @param {Array} o.refCpiRows              RefCPI (S3)
  * @param {Set} o.bondHolidays              Bond holidays (S16)
  * @param {string} o.tradeDateStr           the Price Date
  * @param {string} o.settlementDateStr

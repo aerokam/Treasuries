@@ -17,8 +17,8 @@ if (existsSync(_envPath)) {
 // SA is only available from January 1947; earlier SA fields will be blank.
 //
 // Usage:
-//   node scripts/fetchCpiHistory.js          → dry run (prints row count + first/last rows)
-//   node scripts/fetchCpiHistory.js --write  → uploads to R2
+//   node scripts/fetchCpi.js          → dry run (prints row count + first/last rows)
+//   node scripts/fetchCpi.js --write  → uploads to R2
 
 const R2_KEY = 'bls/CPI.csv';
 const BLS_API = 'https://api.bls.gov/publicAPI/v2/timeseries/data/';
@@ -105,7 +105,7 @@ async function fetchAllCpiHistory() {
 async function main() {
   const doWrite = process.argv.includes('--write');
 
-  console.log(`fetchCpiHistory — fetching BLS CPI-U from ${FIRST_YEAR} to present`);
+  console.log(`fetchCpi — fetching BLS CPI-U from ${FIRST_YEAR} to present`);
   const rows = await fetchAllCpiHistory();
 
   if (rows.length === 0) {

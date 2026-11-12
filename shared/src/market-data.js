@@ -59,7 +59,7 @@ export function parseTipsRefRows(text) {
   }));
 }
 
-// Ref CPI (S3) and TIPS reference data (S2) alone, for an app that needs no quotes or yields.
+// RefCPI (S3) and TIPS reference data (S2) alone, for an app that needs no quotes or yields.
 // Each returns the rows the matching parse below produces; throws on an HTTP error.
 export async function fetchRefCpiRows() {
   const res = await fetch(TIPS_URL + '/RefCPI.csv', { cache: 'no-cache' });
@@ -73,7 +73,7 @@ export async function fetchTipsRefRows() {
   return parseTipsRefRows(await res.text());
 }
 
-// The monthly CPI-U NSA of CPI history (S8, bls/CPI.csv) as { 'YYYY-M': value } (month 1-12, not
+// The monthly CPI-U NSA of CPI (S8, bls/CPI.csv) as { 'YYYY-M': value } (month 1-12, not
 // zero-padded), the map refCpiFromMonthly() of ref-cpi.js reads. Throws on an HTTP error.
 export async function fetchMonthlyCpiNsa() {
   const res = await fetch(R2_ROOT + '/bls/CPI.csv', { cache: 'no-cache' });

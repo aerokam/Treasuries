@@ -20,7 +20,7 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 //   quantity      number of $1,000 par units, a positive integer
 //   startDate, endDate   'YYYY-MM-DD'
 //   refCpiRows    [{ date: 'YYYY-MM-DD', refCpi: Number }], ascending by date (S3)
-//   monthlyCpi    optional, the monthly CPI-U NSA of CPI history (S8) as monthlyCpiMap() of ref-cpi.js builds it
+//   monthlyCpi    optional, the monthly CPI-U NSA of CPI (S8) as monthlyCpiMap() of ref-cpi.js builds it
 //   rounding      TREASURY_ROUNDING or NO_ROUNDING, applied to the Index Ratio of each date
 //
 // Returns { ok: false, reason } or { ok: true, ... }. The reasons:

@@ -1,7 +1,7 @@
 @echo off
 REM scripts/run-cpi-release-schedule.cmd
 REM Replaces bls/CpiReleaseSchedule.csv in R2 (CPI release schedule, S19) from the BLS release
-REM table, then sets the triggers of the CpiHistory and RefCpiCheck tasks to its Release Dates.
+REM table, then sets the triggers of the FetchCpi and RefCpiCheck tasks to its Release Dates.
 REM Triggered weekly by the CpiReleaseSchedule task (scripts/setup-windows-tasks.ps1).
 
 set REPO=C:\Users\aerok\projects\Treasuries
@@ -19,7 +19,7 @@ if %RC% neq 0 (
   exit /b %RC%
 )
 
-echo [%DATE% %TIME%] Setting CpiHistory and RefCpiCheck triggers... >> "%LOG%"
+echo [%DATE% %TIME%] Setting FetchCpi and RefCpiCheck triggers... >> "%LOG%"
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%REPO%\scripts\syncCpiTasks.ps1" >> "%LOG%" 2>&1
 set RC=%ERRORLEVEL%
 echo [%DATE% %TIME%] Exited with code %RC% >> "%LOG%"

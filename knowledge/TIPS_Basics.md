@@ -32,7 +32,7 @@ For days 2-31:
                        (day - 1) / daysInMonth
 ```
 
-> **Two derivations that must agree.** Every app uses the value **calculated** by the interpolation above ([Ref CPI (S3)](./DATA_DICTIONARY.md#s3)). The value **retrieved** from TreasuryDirect checks it. The calculation is implemented once in `shared/src/ref-cpi.js`. See [DATA_DICTIONARY.md#ref-cpi](./DATA_DICTIONARY.md#ref-cpi).
+> **Two derivations that must agree.** Every app uses the value **calculated** by the interpolation above ([RefCPI (S3)](./DATA_DICTIONARY.md#s3)). The value **retrieved** from TreasuryDirect checks it. The calculation is implemented once in `shared/src/ref-cpi.js`. See [DATA_DICTIONARY.md#ref-cpi](./DATA_DICTIONARY.md#ref-cpi).
 
 **[Dated Date](./DATA_DICTIONARY.md#dated-date):** The 15th of the month in which the TIPS was issued.
 

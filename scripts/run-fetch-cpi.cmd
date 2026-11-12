@@ -1,6 +1,6 @@
 @echo off
 set REPO=C:\Users\aerok\projects\Treasuries
-set LOG=%REPO%\logs\cpi-history.log
+set LOG=%REPO%\logs\fetch-cpi.log
 set NODE="C:\Program Files\nodejs\node.exe"
 
 if not exist "%REPO%\logs" mkdir "%REPO%\logs"
@@ -19,8 +19,8 @@ if %RC% neq 0 (
   exit /b %RC%
 )
 
-echo [%DATE% %TIME%] Release day confirmed — fetching CPI history... >> "%LOG%"
-%NODE% "%REPO%\scripts\fetchCpiHistory.js" --write >> "%LOG%" 2>&1
+echo [%DATE% %TIME%] Release day confirmed — fetching CPI... >> "%LOG%"
+%NODE% "%REPO%\scripts\fetchCpi.js" --write >> "%LOG%" 2>&1
 set RC=%ERRORLEVEL%
 echo [%DATE% %TIME%] Exited with code %RC% >> "%LOG%"
 if %RC% neq 0 (

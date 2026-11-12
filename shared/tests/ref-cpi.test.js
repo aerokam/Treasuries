@@ -3,7 +3,7 @@
 //
 // This is the "redundancy that verifies": the calculated NSA Ref CPI
 // (refCpiFromMonthly, 31 CFR App. B) must reproduce the series TreasuryDirect
-// SecIndex states, read live here, not Ref CPI (S3), which is itself calculated. A mismatch means either
+// SecIndex states, read live here, not RefCPI (S3), which is itself calculated. A mismatch means either
 // bad data or a bug in the interpolation — exactly the failure mode that
 // derailed the TipsReference session.
 
@@ -46,7 +46,7 @@ function parseRefCpi(text) {
 }
 
 async function main() {
-  console.log('Fetching the SecIndex series of three CUSIPs, CPI history and Ref CPI ...');
+  console.log('Fetching the SecIndex series of three CUSIPs, CPI and Ref CPI ...');
   const [cpiText, refCpiText, ...series] = await Promise.all([fetchText(CPI_URL), fetchText(REFCPI_URL), ...['9128272M3', '912810FD5', '912810US5'].map(fetchSecIndexSeries)]);
   const byDate = new Map();
   for (const s of series) for (const r of s) byDate.set(r.date, r.refCpi);
@@ -57,7 +57,7 @@ async function main() {
 
   // ── Cross-check: calculated NSA must reproduce retrieved, where computable ──
   let compared = 0, maxDiff = 0, maxDiffDate = '';
-  // From 2019 on: CPI history states the revised CPI where Treasury kept the first-reported one on 426 dates of 2000 and 2016 (1.13).
+  // From 2019 on: CPI states the revised CPI where Treasury kept the first-reported one on 426 dates of 2000 and 2016 (1.13).
   for (const row of retrieved.filter(r => r.date >= '2019-01-01')) {
     const calc = refCpiFromMonthly(row.date, monthlyNsa);
     if (calc == null) continue;            // outside monthly coverage — skip
@@ -69,7 +69,7 @@ async function main() {
   ok(maxDiff <= TOL, `calc vs retrieved max diff ${maxDiff.toExponential(3)} on ${maxDiffDate} exceeds TOL ${TOL}`);
   console.log(`Cross-check: compared ${compared} dates, max |calc − retrieved| = ${maxDiff.toExponential(3)} (${maxDiffDate || 'n/a'})`);
 
-  // ── Regression: the live Ref CPI (S3) is what 1.13 calculates from CPI history (S8) ──
+  // ── Regression: the live RefCPI (S3) is what 1.13 calculates from CPI (S8) ──
   // The Ref CPI SA and the SA Factor of every date, and the Ref CPI NSA from 2019 on, must agree exactly.
   // Before 2019 S3 holds Treasury's first-reported NSA, which differs from the revised CPI on 426 dates (1.13).
   const s3 = parseRefCpiRows(refCpiText);

@@ -5,7 +5,7 @@
     Creates one scheduled task per ingestion job. Re-running is safe (idempotent  - 
     existing tasks are unregistered and re-created).
 
-    Most tasks use weekly recurring triggers. CpiHistory and RefCpiCheck have one trigger per Release
+    Most tasks use weekly recurring triggers. FetchCpi and RefCpiCheck have one trigger per Release
     Date of CPI release schedule (S19); CpiReleaseSchedule sets them weekly (see the CPI tasks block).
 
     All times are Pacific Time (PT). ET-based tasks run 5 minutes after their ET
@@ -68,12 +68,12 @@ $legacy = @(
     'TipsRefRefresh',
     # Yield History variants
     'SnapYieldHistory', 'YieldHistorySnap',
-    # SA Factor variants (SaFactors fetched the monthly CPI and calculated Ref CPI NSA and SA daily; the CpiHistory task now does both on each Release Date)
+    # SA Factor variants (SaFactors fetched the monthly CPI and calculated Ref CPI NSA and SA daily; the FetchCpi task now does both on each Release Date)
     'SaFactorUpdate', 'SaFactors',
     # Ref CPI variants (superseded by the RefCpiCheck task, which syncCpiTasks.ps1 registers)
     'RefCpiRefresh',
     # CPI History variants
-    'FetchCpiHistory', 'CpiHistoryRefresh',
+    'FetchCpiHistory', 'CpiHistoryRefresh', 'CpiHistory',
     # CpiTasks variants (CpiTasks re-ran this script each Dec 29 to reload date-specific triggers)
     'CpiTasks', 'RefreshCpiTasks', 'Update CPI release schedule',
     # Close-price investigation probes (findings in YieldsMonitor/knowledge/Close_Price_Investigation.md)
@@ -236,13 +236,13 @@ Register-DataTask "VendorUpdateCheck" `
 # success only, via YieldCurves/scripts/run-yield-curves.cmd. Both are its actual inputs
 # (MarketQuotes.csv and YieldsFromFedInvestPrices.csv), so it re-fits whenever
 # either one actually changed rather than on its own fixed clock.
-# It also runs as the last step of run-cpi-history.cmd (the CpiHistory task, below), because a new
-# Ref CPI (S3) changes the SA Yield of every TIPS in it.
+# It also runs as the last step of run-fetch-cpi.cmd (the FetchCpi task, below), because a new
+# RefCPI (S3) changes the SA Yield of every TIPS in it.
 
 # ---------------------------------------------------------------------------
 # CPI tasks  -  triggers set weekly by CpiReleaseSchedule, not by this script
 # ---------------------------------------------------------------------------
-# CpiHistory and RefCpiCheck run only on Release Dates of CPI release schedule (S19), one trigger per
+# FetchCpi and RefCpiCheck run only on Release Dates of CPI release schedule (S19), one trigger per
 # date (RefCpiCheck on the day after). They are Interactive tasks created by the user's own non-elevated token, because only such
 # a token can change them: a task created by an elevated process (every S4U task, and every task
 # this script registers) is refused ("Access is denied") to a non-elevated one. So this script
@@ -250,21 +250,21 @@ Register-DataTask "VendorUpdateCheck" `
 # scripts/syncCpiTasks.ps1, and it is itself Interactive so that it runs with that same token.
 # BLS does not release the CPI on a Sunday, so the refresh never falls on a Release Date.
 # Interactive tasks run only while the user is logged on; StartWhenAvailable runs a missed one at
-# the next logon, and run-cpi-history.cmd and checkDailyRefCpi.js end at once unless that day is still
+# the next logon, and run-fetch-cpi.cmd and checkDailyRefCpi.js end at once unless that day is still
 # a Release Date (the day after one, for the check).
 
 # CpiReleaseSchedule  -  Sundays 6:20am PT
 # The page lists about thirteen months ahead, so a weekly run adds each new month within a week of
 # BLS listing it and picks up a moved date the same way.
 Register-CmdTask "CpiReleaseSchedule" `
-    "Fetch the BLS CPI release schedule, replace bls/CpiReleaseSchedule.csv in R2, set the CpiHistory and RefCpiCheck triggers to its Release Dates" `
+    "Fetch the BLS CPI release schedule, replace bls/CpiReleaseSchedule.csv in R2, set the FetchCpi and RefCpiCheck triggers to its Release Dates" `
     @(New-ScheduledTaskTrigger -Weekly -DaysOfWeek Sunday -At "6:20am") `
     "$ProjectDir\scripts\run-cpi-release-schedule.cmd" `
     -LogonType Interactive
 
-# CpiHistory and RefCpiCheck created as S4U by an earlier version of this script cannot be changed
+# FetchCpi and RefCpiCheck created as S4U by an earlier version of this script cannot be changed
 # without elevation, so they are removed here and recreated, Interactive, by the first run below.
-foreach ($name in 'CpiHistory', 'RefCpiCheck') {
+foreach ($name in 'FetchCpi', 'RefCpiCheck') {
     $t = Get-ScheduledTask -TaskName $name -ErrorAction SilentlyContinue
     if ($t -and "$($t.Principal.LogonType)" -ne 'Interactive') {
         Unregister-ScheduledTask -TaskName $name -Confirm:$false
@@ -274,7 +274,7 @@ foreach ($name in 'CpiHistory', 'RefCpiCheck') {
 # This script is elevated, so a task started from it is not: Task Scheduler runs an Interactive
 # task as the user, with the user's non-elevated token.
 Start-ScheduledTask -TaskName "CpiReleaseSchedule"
-Write-Host "  [STARTED] CpiReleaseSchedule, which registers CpiHistory and RefCpiCheck. See logs/cpi-release-schedule.log."
+Write-Host "  [STARTED] CpiReleaseSchedule, which registers FetchCpi and RefCpiCheck. See logs/cpi-release-schedule.log."
 
 # ---------------------------------------------------------------------------
 

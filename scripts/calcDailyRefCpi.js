@@ -1,5 +1,5 @@
 // 1.13 Calculate daily Ref CPI (knowledge/1.13_Calculate_Daily_Ref_CPI.md).
-// Reads CPI history (S8) and writes Ref CPI (S3), TIPS/RefCPI.csv: the daily Ref CPI NSA, Ref CPI SA and SA Factor.
+// Reads CPI (S8) and writes RefCPI (S3), TIPS/RefCPI.csv: the daily Ref CPI NSA, Ref CPI SA and SA Factor.
 //
 // Usage:
 //   node scripts/calcDailyRefCpi.js          dry run: prints the row count and the last rows
@@ -64,7 +64,7 @@ async function main() {
   const held = s3.ok ? parseRefCpiRows(await s3.text()) : [];
   if (held.some(r => !Number.isFinite(r.refCpi))) throw new Error('S3 holds a non-numeric Ref CPI NSA -- not writing.');
   const { nsa, sa, last } = monthlyMapsFromS8(await s8.text());
-  if (!last) throw new Error('CPI history holds no month.');
+  if (!last) throw new Error('CPI holds no month.');
   const rows = calcSeries(nsa, sa, last, held);
   checkSeries(rows);
   console.log(`${rows.length} rows, ${rows[0].date} to ${rows[rows.length - 1].date}: S3 held ${held.length}, ${rows.length - held.length} added.`);
