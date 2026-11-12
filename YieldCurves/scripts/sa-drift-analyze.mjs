@@ -41,7 +41,7 @@ function parseFred(csv) {
 
 const [nsaCsv, saCsv, yieldsCsv, refCsv] = await Promise.all([
   txt(FRED('CPIAUCNS')), txt(FRED('CPIAUCSL')),
-  txt(`${R2}/Treasuries/YieldsFromFedInvestPrices.csv`), txt(`${R2}/TIPS/RefCpiNsaSa.csv`),
+  txt(`${R2}/Treasuries/YieldsFromFedInvestPrices.csv`), txt(`${R2}/TIPS/RefCPI.csv`),
 ]);
 
 const NSA = parseFred(nsaCsv), SA = parseFred(saCsv);

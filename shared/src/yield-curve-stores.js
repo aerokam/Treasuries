@@ -416,7 +416,7 @@ export function buildSpreadsCsv({ dates, rows }) {
 
 // ─── The whole of 1.3 ────────────────────────────────────────────────────────
 // yieldsText     S1, YieldsFromFedInvestPrices.csv
-// refCpiText     S4, RefCpiNsaSa.csv
+// refCpiText     S3, RefCPI.csv
 // holidayText    S16, BondHolidaysSifma.csv
 // quotesText     S7, MarketQuotes.csv
 // log, warn      optional progress sinks

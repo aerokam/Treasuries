@@ -3,7 +3,7 @@
 // (knowledge/DATA_DICTIONARY.md#s13, #s14, #s15).
 //
 // Loads the same R2 inputs the browser app loads (YieldsFromFedInvestPrices.csv,
-// RefCpiNsaSa.csv, BondHolidaysSifma.csv, MarketQuotes.csv). Every calculation and the layout of
+// RefCPI.csv, BondHolidaysSifma.csv, MarketQuotes.csv). Every calculation and the layout of
 // the three files are in shared/src/ — shared/src/yield-curve-stores.js#buildYieldCurveStores is
 // pure (texts in, texts out); this script fetches the inputs and uploads the outputs
 // (Single Source of Truth, projects/CLAUDE.md §2a).
@@ -22,7 +22,7 @@ import { buildYieldCurveStores } from '../../shared/src/yield-curve-stores.js';
 
 const R2_BASE_URL = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev';
 const YIELDS_CSV_URL = `${R2_BASE_URL}/Treasuries/YieldsFromFedInvestPrices.csv`;
-const REF_CPI_CSV_URL = `${R2_BASE_URL}/TIPS/RefCpiNsaSa.csv`;
+const REF_CPI_CSV_URL = `${R2_BASE_URL}/TIPS/RefCPI.csv`;
 const HOLIDAYS_CSV_URL = `${R2_BASE_URL}/misc/BondHolidaysSifma.csv`;
 const MARKET_QUOTES_URL = `${R2_BASE_URL}/Treasuries/MarketQuotes.csv`;
 

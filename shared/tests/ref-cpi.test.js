@@ -11,12 +11,11 @@ import { lookupRefCpi, parseRefCpiRows, refCpiFromMonthly, monthlyCpiMap, fillUn
          saFactorForDate, maturitySaFactor, credibilityFactor, seasonalDriftSigma } from '../src/ref-cpi.js';
 import { parseCsv } from '../src/csv.js';
 import { fetchSecIndexSeries, compare, lastDayTwoMonthsAfter } from '../../scripts/checkDailyRefCpi.js';
-import { calcSeries } from '../../scripts/calcDailyRefCpi.js';
+import { calcSeries, monthlyMapsFromS8 } from '../../scripts/calcDailyRefCpi.js';
 
 const R2 = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev';
 const REFCPI_URL    = `${R2}/TIPS/RefCPI.csv`;
-const CPI_URL       = `${R2}/bls/CPI.csv`;
-const REFCPINSASA_URL = `${R2}/TIPS/RefCpiNsaSa.csv`;
+const CPI_URL       = `${R2}/bls/CPI_history.csv`;
 
 // Both published and calculated Ref CPI are truncated-to-6/rounded-to-5 per
 // 31 CFR §356 App. B §I.B.3 (see refCpiFromMonthly), so these should agree
@@ -46,28 +45,20 @@ function parseRefCpi(text) {
   });
 }
 
-// CPI.csv columns: year, period(M01..M12), periodName, NSA, SA
-function parseCpi(text) {
-  return text.trim().split('\n').slice(1).map(l => {
-    const [year, period, , NSA, SA] = l.split(',');
-    return { year, period, nsa: parseFloat(NSA), sa: parseFloat(SA) };
-  });
-}
-
 async function main() {
-  console.log('Fetching the SecIndex series of three CUSIPs and monthly CPI.csv ...');
-  const [cpiText, ...series] = await Promise.all([fetchText(CPI_URL), ...['9128272M3', '912810FD5', '912810US5'].map(fetchSecIndexSeries)]);
+  console.log('Fetching the SecIndex series of three CUSIPs, CPI history and Ref CPI ...');
+  const [cpiText, refCpiText, ...series] = await Promise.all([fetchText(CPI_URL), fetchText(REFCPI_URL), ...['9128272M3', '912810FD5', '912810US5'].map(fetchSecIndexSeries)]);
   const byDate = new Map();
   for (const s of series) for (const r of s) byDate.set(r.date, r.refCpi);
   const retrieved = [...byDate.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([date, refCpi]) => ({ date, refCpi }));
-  const cpiRows   = parseCpi(cpiText);
-  const monthlyNsa = fillUnreportedMonths(monthlyCpiMap(cpiRows.map(r => ({ year: r.year, period: r.period, value: r.nsa }))));
+  const { nsa: monthlyNsa, sa: monthlySa, last } = monthlyMapsFromS8(cpiText);
 
-  console.log(`Retrieved ${retrieved.length} daily rows; ${cpiRows.length} monthly CPI rows.\n`);
+  console.log(`Retrieved ${retrieved.length} daily rows; ${Object.keys(monthlyNsa).length} monthly CPI rows.\n`);
 
   // ── Cross-check: calculated NSA must reproduce retrieved, where computable ──
   let compared = 0, maxDiff = 0, maxDiffDate = '';
-  for (const row of retrieved) {
+  // From 2019 on: CPI history states the revised CPI where Treasury kept the first-reported one on 426 dates of 2000 and 2016 (1.13).
+  for (const row of retrieved.filter(r => r.date >= '2019-01-01')) {
     const calc = refCpiFromMonthly(row.date, monthlyNsa);
     if (calc == null) continue;            // outside monthly coverage — skip
     compared++;
@@ -78,30 +69,25 @@ async function main() {
   ok(maxDiff <= TOL, `calc vs retrieved max diff ${maxDiff.toExponential(3)} on ${maxDiffDate} exceeds TOL ${TOL}`);
   console.log(`Cross-check: compared ${compared} dates, max |calc − retrieved| = ${maxDiff.toExponential(3)} (${maxDiffDate || 'n/a'})`);
 
-  // ── Regression: shared calc must reproduce the live RefCpiNsaSa.csv (NSA + SA) ──
-  // Guards calcRefCpi.js (which now imports refCpiFromMonthly) and the SA sole-source path.
-  // Regenerated 2026-08-28 (YieldCurves/scripts/calcRefCpi.js) with the fixed truncateThenRound,
-  // so this now compares at the same TOL as the cross-check above -- no more staleness gap.
-  const monthlySa = monthlyCpiMap(cpiRows.map(r => ({ year: r.year, period: r.period, value: r.sa })));
-  const nsaSaText = await fetchText(REFCPINSASA_URL);
-  // Header: "Ref CPI Date,Ref CPI NSA,Ref CPI SA,SA Factor"
-  const nsaSaRows = nsaSaText.trim().split('\n').slice(1).map(l => {
-    const [date, nsa, sa, factor] = l.split(',');
-    return { date: date.trim(), nsa: parseFloat(nsa), sa: parseFloat(sa), factor: parseFloat(factor) };
-  });
-  let nsaSaCompared = 0, nsaMax = 0, saMax = 0;
-  for (const row of nsaSaRows) {
-    const cn = refCpiFromMonthly(row.date, monthlyNsa);
-    const cs = refCpiFromMonthly(row.date, monthlySa);
-    if (cn == null || cs == null) continue;
-    nsaSaCompared++;
-    nsaMax = Math.max(nsaMax, Math.abs(cn - row.nsa));
-    saMax  = Math.max(saMax,  Math.abs(cs - row.sa));
+  // ── Regression: the live Ref CPI (S3) is what 1.13 calculates from CPI history (S8) ──
+  // The Ref CPI SA and the SA Factor of every date, and the Ref CPI NSA from 2019 on, must agree exactly.
+  // Before 2019 S3 holds Treasury's first-reported NSA, which differs from the revised CPI on 426 dates (1.13).
+  const s3 = parseRefCpiRows(refCpiText);
+  const calc = new Map(calcSeries(monthlyNsa, monthlySa, last).map(r => [r.date, r]));
+  let s3Compared = 0, nsaMax = 0, saMax = 0, factorMax = 0;
+  for (const row of s3) {
+    const c = calc.get(row.date);
+    if (!c) continue;
+    s3Compared++;
+    if (row.date >= '2019-01-01') nsaMax = Math.max(nsaMax, Math.abs(c.refCpi - row.refCpi));
+    saMax = Math.max(saMax, Math.abs(c.refCpiSa - row.refCpiSa));
+    factorMax = Math.max(factorMax, Math.abs(Math.round(row.refCpi / row.refCpiSa * 1e5) / 1e5 - row.saFactor));
   }
-  ok(nsaSaCompared > 1000, `RefCpiNsaSa compare count (${nsaSaCompared})`);
-  ok(nsaMax <= TOL, `RefCpiNsaSa NSA max diff ${nsaMax.toExponential(3)} > TOL`);
-  ok(saMax  <= TOL, `RefCpiNsaSa SA max diff ${saMax.toExponential(3)} > TOL`);
-  console.log(`RefCpiNsaSa regression: ${nsaSaCompared} dates, NSA max ${nsaMax.toExponential(3)}, SA max ${saMax.toExponential(3)}`);
+  ok(s3Compared > 10000, `Ref CPI compare count (${s3Compared})`);
+  ok(nsaMax <= TOL, `Ref CPI NSA max diff ${nsaMax.toExponential(3)} > TOL`);
+  ok(saMax <= TOL, `Ref CPI SA max diff ${saMax.toExponential(3)} > TOL`);
+  ok(factorMax <= TOL, `SA Factor max diff ${factorMax.toExponential(3)} > TOL`);
+  console.log(`Ref CPI regression: ${s3Compared} dates, NSA max ${nsaMax.toExponential(3)}, SA max ${saMax.toExponential(3)}, SA Factor max ${factorMax.toExponential(3)}`);
 
   // ── fillUnreportedMonths: October 2025 was never reported; Treasury's index number for it is 325.604 (§I.B.4(iv)) ──
   ok(fillUnreportedMonths({ '2024-9': 315.301, '2025-9': 324.8, '2025-11': 324.122 })['2025-10'] === 325.604, 'unreported month takes the twelve-month-change number');
@@ -114,14 +100,20 @@ async function main() {
     const old = parseRefCpiRows('date,refCpi\n2026-01-01,325.604\n');
     ok(old[0].date === '2026-01-01' && old[0].refCpi === 325.604 && Number.isNaN(old[0].refCpiSa), 'parseRefCpiRows reads the earlier header');
   }
-  // ── 1.13: S3's held dates are kept, only later days are calculated, the series ends on the first of the month three months after the latest month ──
+  // ── 1.13: S3's held Ref CPI NSA is kept, SA is calculated again, the series ends on the first of the month three months after the latest month ──
   {
-    const m = { '2026-8': 100, '2026-9': 101, '2026-10': 102 };
+    const m = {};
+    for (let i = 0; i <= 12 * 30 + 4; i++) m[`${1996 + Math.floor((i + 9) / 12)}-${(i + 9) % 12 + 1}`] = 100 + i * 0.1;
+    const sa = Object.fromEntries(Object.entries(m).map(([k, v]) => [k, v - 0.5]));
     const held = [{ date: '2026-11-29', refCpi: 99.1 }, { date: '2026-11-30', refCpi: 99.2 }];
-    const out = calcSeries(m, { y: 2026, m: 10 }, held);
-    ok(out[0].refCpi === 99.1 && out[1].refCpi === 99.2, '1.13 keeps the held values');
-    ok(out[2].date === '2026-12-01' && out[2].refCpi === 101, '1.13 calculates the first of December as September');
-    ok(out[out.length - 1].date === '2027-01-01' && out[out.length - 1].refCpi === 102, '1.13 ends on 2027-01-01 at the October value');
+    const out = calcSeries(m, sa, { y: 2026, m: 10 }, held);
+    const at = d => out.find(r => r.date === d);
+    ok(at('2026-11-29').refCpi === 99.1 && at('2026-11-30').refCpi === 99.2, '1.13 keeps the held Ref CPI NSA');
+    ok(at('2026-11-30').refCpiSa === refCpiFromMonthly('2026-11-30', sa), '1.13 calculates the Ref CPI SA of a held date');
+    ok(at('2026-12-01').refCpi === m['2026-9'] && at('2026-12-01').refCpiSa === sa['2026-9'], '1.13 calculates the first of December as September');
+    ok(out[0].date === '1997-01-15', '1.13 starts on 1997-01-15');
+    ok(out[out.length - 1].date === '2027-01-01' && out[out.length - 1].refCpi === m['2026-10'], '1.13 ends on 2027-01-01 at the October value');
+    ok(Math.abs(at('2026-12-01').saFactor - Math.round(at('2026-12-01').refCpi / at('2026-12-01').refCpiSa * 1e5) / 1e5) < 1e-12, '1.13 SA Factor is NSA over SA');
   }
   // ── 1.17: a date S3 lacks, or states differently, is a mismatch ──
   {
@@ -192,7 +184,7 @@ async function main() {
   ok(irRounded === 256.09365, `magnitude regression: Ref-CPI-scale truncateThenRound(256.093645...) → 256.09365 (got ${irRounded})`);
 
   // ── saFactorForDate ── (uses the raw CSV-column shape, via the shared parser)
-  const saRows = parseCsv(nsaSaText); // [{ "Ref CPI Date", "Ref CPI NSA", "Ref CPI SA", "SA Factor" }, ...]
+  const saRows = parseCsv(refCpiText); // [{ "Ref CPI Date", "Ref CPI NSA", "Ref CPI SA", "SA Factor" }, ...]
   const midRow = saRows[Math.floor(saRows.length / 2)];
   const midDate = midRow['Ref CPI Date'], midFactor = parseFloat(midRow['SA Factor']);
   // In-range date: must match an exact lookup against the row itself, and be

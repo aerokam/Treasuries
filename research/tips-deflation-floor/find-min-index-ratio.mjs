@@ -28,7 +28,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { parseCsv } from '../../shared/src/csv.js';
-import { lookupRefCpi, indexRatio, TREASURY_ROUNDING, refCpiFromMonthly, monthlyCpiMap } from '../../shared/src/ref-cpi.js';
+import { lookupRefCpi, parseRefCpiRows, indexRatio, TREASURY_ROUNDING, refCpiFromMonthly, monthlyCpiMap } from '../../shared/src/ref-cpi.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -110,8 +110,7 @@ async function main() {
   console.log('Fetching Treasury auction records...');
   const auctionRows = parseCsv(await fetchText(AUCTIONS_URL));
   console.log('Fetching Treasury\'s published daily Ref CPI series...');
-  const officialRefCpi = parseCsv(await fetchText(REFCPI_OFFICIAL_URL))
-    .map(r => ({ date: r.date, refCpi: parseFloat(r.refCpi) }))
+  const officialRefCpi = parseRefCpiRows(await fetchText(REFCPI_OFFICIAL_URL))
     .sort((a, b) => a.date < b.date ? -1 : 1);
   console.log(`  ${officialRefCpi.length} daily rows, ${officialRefCpi[0].date} .. ${officialRefCpi[officialRefCpi.length - 1].date}`);
   console.log('Fetching BLS CPI-U (NSA) monthly series for the independent cross-check...');

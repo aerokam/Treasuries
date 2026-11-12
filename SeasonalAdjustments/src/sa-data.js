@@ -7,7 +7,7 @@ import { nextBusinessDay, parseHolidaySet } from '../../shared/src/settlement.js
 import { parseCsv } from '../../shared/src/csv.js';
 
 const R2ROOT = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev';
-const R2 = R2ROOT + '/TIPS/RefCpiNsaSa.csv';
+const R2 = R2ROOT + '/TIPS/RefCPI.csv';
 const HOLIDAYS_URL = R2ROOT + '/misc/BondHolidaysSifma.csv';
 
 // Offline-fallback monthly anchors for the SA Factor shape.

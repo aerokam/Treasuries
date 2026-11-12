@@ -121,7 +121,7 @@ const panStartY = {}; // sym -> {min, max} at pan gesture start; cleared on pan 
 // TIPS maturities for curve completeness (the Yield Curves/BEI tabs otherwise show a
 // visibly incomplete curve past 5Y).
 const SA_SYMBOLS = new Set(['US1YTIPS', 'US2YTIPS', 'US5YTIPS', 'US10YTIPS', 'US30YTIPS']);
-const REF_CPI_SA_URL = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/TIPS/RefCpiNsaSa.csv';
+const REF_CPI_SA_URL = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/TIPS/RefCPI.csv';
 const HOLIDAYS_CSV_URL = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/misc/BondHolidaysSifma.csv';
 const TIPS_REF_URL = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/TIPS/TipsRef.csv';
 const CNBC_QUOTE_URL = 'https://quote.cnbc.com/quote-html-webservice/restQuote/symbolType/symbol';
@@ -615,7 +615,7 @@ async function fetchRefCpiSaRows() {
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         return parseCsv(await response.text());
       } catch (err) {
-        console.error('RefCpiNsaSa fetch failed:', err);
+        console.error('RefCPI fetch failed:', err);
         refCpiSaPromise = null; // allow retry
         return null;
       }

@@ -9,6 +9,7 @@ import { appendFileSync, mkdirSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { notify } from './notify.js';
+import { parseRefCpiRows } from '../shared/src/ref-cpi.js';
 
 const R2_BASE = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -59,7 +60,6 @@ export function compare(fetched, s3Rows) {
   return mismatches;
 }
 
-const parseCsvRows = csv => csv.trim().split(/\r?\n/).slice(1).map(l => { const [date, v] = l.split(','); return { date, refCpi: parseFloat(v) }; });
 const log = line => { mkdirSync(dirname(LOG), { recursive: true }); appendFileSync(LOG, `[${new Date().toISOString()}] ${line}\n`); console.log(line); };
 const get = async path => { const r = await fetch(`${R2_BASE}/${path}?t=${Date.now()}`, { cache: 'no-store' }); if (!r.ok) throw new Error(`${path}: HTTP ${r.status}`); return r.text(); };
 
@@ -73,7 +73,7 @@ async function main() {
   const [s2, s8, s3] = await Promise.all([get('TIPS/TipsRef.csv'), get('bls/CPI_history.csv'), get('TIPS/RefCPI.csv')]);
   const cusip = latestMaturityCusip(s2, todayET);
   const fetched = await fetchSecIndexSeries(cusip);
-  const mismatches = compare(fetched, parseCsvRows(s3));
+  const mismatches = compare(fetched, parseRefCpiRows(s3));
   const lastS8 = s8.trim().split(/\r?\n/).pop().split(',');
   const expected = lastDayTwoMonthsAfter(parseInt(lastS8[0], 10), parseInt(lastS8[1].slice(1), 10));
   const lastFetched = fetched[fetched.length - 1].date;

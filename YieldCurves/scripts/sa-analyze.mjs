@@ -15,7 +15,7 @@ const yRows = yieldsRaw.slice(2).map(l => {
   const o = {}; yHeader.forEach((h, i) => o[h] = c[i]); return o;
 });
 
-const refRaw = (await fetchText(`${R2}/TIPS/RefCpiNsaSa.csv`)).trim().split('\n');
+const refRaw = (await fetchText(`${R2}/TIPS/RefCPI.csv`)).trim().split('\n');
 const rHeader = refRaw[0].split(',');
 const rRows = refRaw.slice(1).map(l => {
   const c = l.split(',');

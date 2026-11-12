@@ -75,7 +75,7 @@ function Sync-CpiTask {
 }
 
 Sync-CpiTask "CpiHistory" 5 35 `
-    "Fetch full CPI-U history from BLS on release dates, upload bls/CPI_history.csv, calculate the daily Ref CPI; retries if BLS has not yet published the month" `
+    "Fetch full CPI-U history from BLS on release dates, upload bls/CPI_history.csv, calculate the daily Ref CPI, refresh the yield curve data sets; retries if BLS has not yet published the month" `
     "$ProjectDir\scripts\run-cpi-history.cmd" `
     -RestartInterval (New-TimeSpan -Minutes 30) -RestartCount 12
 

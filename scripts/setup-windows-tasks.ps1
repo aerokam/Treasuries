@@ -68,8 +68,8 @@ $legacy = @(
     'TipsRefRefresh',
     # Yield History variants
     'SnapYieldHistory', 'YieldHistorySnap',
-    # SA Factor variants
-    'SaFactorUpdate',
+    # SA Factor variants (SaFactors fetched the monthly CPI and calculated Ref CPI NSA and SA daily; the CpiHistory task now does both on each Release Date)
+    'SaFactorUpdate', 'SaFactors',
     # Ref CPI variants (superseded by the RefCpiCheck task, which syncCpiTasks.ps1 registers)
     'RefCpiRefresh',
     # CPI History variants
@@ -154,12 +154,6 @@ Register-NodeTask "IntradayArchive" `
     @(New-ScheduledTaskTrigger -Weekly -DaysOfWeek $Weekdays -At "2:05pm") `
     "YieldsMonitor/scripts/archiveIntraday.js"
 
-# SaFactors  -  Daily 6:35am PT
-Register-NodeTask "SaFactors" `
-    "Fetch CPI NSA/SA from BLS, calculate daily SA factors, upload RefCpiNsaSa.csv, then refresh the yield curve data sets (Yield curves, Breakeven inflation, Bid and ask spreads)" `
-    @(New-ScheduledTaskTrigger -Daily -At "6:35am") `
-    "YieldCurves/scripts/updateRefCpi.js"
-
 # FundHoldings  -  Daily 6:40am PT
 # Fetch Vanguard (VBIL/VTIP/VTP) + fminvest (RBIL) fund holdings, enrich, upload to R2.
 Register-NodeTask "FundHoldings" `
@@ -242,8 +236,8 @@ Register-DataTask "VendorUpdateCheck" `
 # success only, via YieldCurves/scripts/run-yield-curves.cmd. Both are its actual inputs
 # (MarketQuotes.csv and YieldsFromFedInvestPrices.csv), so it re-fits whenever
 # either one actually changed rather than on its own fixed clock.
-# It also runs as the last step of updateRefCpi.js (the SaFactors task, above), because a new
-# Ref CPI NSA and SA (S4) changes the SA Yield of every TIPS in it.
+# It also runs as the last step of run-cpi-history.cmd (the CpiHistory task, below), because a new
+# Ref CPI (S3) changes the SA Yield of every TIPS in it.
 
 # ---------------------------------------------------------------------------
 # CPI tasks  -  triggers set weekly by CpiReleaseSchedule, not by this script
