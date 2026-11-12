@@ -5,7 +5,7 @@ import { test, expect } from '@playwright/test';
 // The Original Issue Date of the first TIPS is set to its dated date so the cases that start there keep the Start Date as entered.
 // The second TIPS is issued after the start of the range of most cases, and the third matured before it.
 const TIPS_REF = 'cusip,maturity,datedDate,coupon,datedDateRefCpi,term,originalIssueDate\n91282CAQ4,2025-10-15,2020-10-15,0.00125,259.46997,5-Year,2020-10-15\n91282CBZ1,2030-07-15,2024-07-15,0.0175,313,5-Year,2024-07-31\n91282CXX0,2022-10-15,2017-10-15,0.00625,250,5-Year,2017-10-31\n';
-const REF_CPI = 'date,refCpi\n2020-10-15,259.46997\n2024-06-14,312.85893\n2024-07-31,313.5\n2025-01-01,317.60300\n2025-02-01,318.50000\n';
+const REF_CPI = 'Ref CPI Date,Ref CPI NSA,Ref CPI SA,SA Factor\n2020-10-15,259.46997,259.46997,1.00000\n2024-06-14,312.85893,312.85893,1.00000\n2024-07-31,313.5,313.5,1.00000\n2025-01-01,317.60300,317.60300,1.00000\n2025-02-01,318.50000,318.50000,1.00000\n';
 
 // CPI history (S8) holds December 2024, the month three months before 2025-03-01.
 const CPI_HISTORY = 'Year,Period,PeriodName,NSA,SA\n2024,M12,December,320.123,\n';
@@ -13,7 +13,7 @@ const CPI_HISTORY = 'Year,Period,PeriodName,NSA,SA\n2024,M12,December,320.123,\n
 async function open(page) {
   await page.route('**/TIPS/TipsRef.csv', route => route.fulfill({ status: 200, contentType: 'text/csv', body: TIPS_REF }));
   await page.route('**/TIPS/RefCPI.csv', route => route.fulfill({ status: 200, contentType: 'text/csv', body: REF_CPI }));
-  await page.route('**/bls/CPI_history.csv', route => route.fulfill({ status: 200, contentType: 'text/csv', body: CPI_HISTORY }));
+  await page.route('**/bls/CPI.csv', route => route.fulfill({ status: 200, contentType: 'text/csv', body: CPI_HISTORY }));
   await page.goto('/TaxationOfTreasuries/');
   await page.getByRole('button', { name: /OID Calculator/ }).click();
   await expect(page.locator('#oid-status')).toContainText('Ref CPI from 2020-10-15 through 2025-02-01');
@@ -318,7 +318,7 @@ test('a Start Date after the latest known Ref CPI shows the dates for which Ref 
 test('a failed load shows the load error and no table', async ({ page }) => {
   await page.route('**/TIPS/TipsRef.csv', route => route.fulfill({ status: 500, body: '' }));
   await page.route('**/TIPS/RefCPI.csv', route => route.fulfill({ status: 200, contentType: 'text/csv', body: REF_CPI }));
-  await page.route('**/bls/CPI_history.csv', route => route.fulfill({ status: 200, contentType: 'text/csv', body: CPI_HISTORY }));
+  await page.route('**/bls/CPI.csv', route => route.fulfill({ status: 200, contentType: 'text/csv', body: CPI_HISTORY }));
   await page.goto('/TaxationOfTreasuries/');
   await page.getByRole('button', { name: /OID Calculator/ }).click();
   await expect(page.locator('#oid-status')).toContainText('Load error: TipsRef.csv: HTTP 500');

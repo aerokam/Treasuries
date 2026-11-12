@@ -1,11 +1,11 @@
 // CpiExplorer — data.js
-// Fetches and parses S8 (CPI_history.csv) and S3 (RefCPI.csv) from R2.
+// Fetches and parses S8 (CPI.csv) and S3 (RefCPI.csv) from R2.
 
 import { parseCsv } from '../../shared/src/csv.js';
 import { parseRefCpiRows } from '../../shared/src/ref-cpi.js';
 
 const R2_BASE = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev';
-const CPI_HISTORY_URL = `${R2_BASE}/bls/CPI_history.csv`;
+const CPI_HISTORY_URL = `${R2_BASE}/bls/CPI.csv`;
 const REF_CPI_URL     = `${R2_BASE}/TIPS/RefCPI.csv`;
 
 /**
@@ -29,10 +29,10 @@ function localDate(yyyy, mm, dd = 1) {
   return new Date(yyyy, mm - 1, dd);
 }
 
-/** Fetch and parse S8: CPI_history.csv → CpiRow[] */
+/** Fetch and parse S8: CPI.csv → CpiRow[] */
 export async function fetchCpiHistory() {
   const res = await fetch(CPI_HISTORY_URL, { cache: 'no-store' });
-  if (!res.ok) throw new Error(`CPI_history.csv fetch failed: ${res.status}`);
+  if (!res.ok) throw new Error(`CPI.csv fetch failed: ${res.status}`);
   const text = await res.text();
   const raw = parseCsvLowerKeys(text);
   /** @type {CpiRow[]} */

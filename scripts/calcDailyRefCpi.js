@@ -9,7 +9,7 @@ import { parseCsv } from '../shared/src/csv.js';
 import { uploadToR2 } from '../YieldCurves/scripts/r2.js';
 
 const R2_BASE = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev';
-const CPI_KEY = 'bls/CPI_history.csv';
+const CPI_KEY = 'bls/CPI.csv';
 const FIRST_DATE = '1997-01-15';   // the dated date of the first TIPS issued
 const DAY = 86400000;
 

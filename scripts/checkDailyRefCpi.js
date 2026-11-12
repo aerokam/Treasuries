@@ -70,7 +70,7 @@ async function main() {
     const dates = (await get('bls/CpiReleaseSchedule.csv')).split(/\r?\n/).slice(1).map(l => l.split(',')[1]).filter(Boolean);
     if (!dates.includes(yesterday)) { console.log(`${yesterday} is not a Release Date; nothing to check.`); return 4; }
   }
-  const [s2, s8, s3] = await Promise.all([get('TIPS/TipsRef.csv'), get('bls/CPI_history.csv'), get('TIPS/RefCPI.csv')]);
+  const [s2, s8, s3] = await Promise.all([get('TIPS/TipsRef.csv'), get('bls/CPI.csv'), get('TIPS/RefCPI.csv')]);
   const cusip = latestMaturityCusip(s2, todayET);
   const fetched = await fetchSecIndexSeries(cusip);
   const mismatches = compare(fetched, parseRefCpiRows(s3));

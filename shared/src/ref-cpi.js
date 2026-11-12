@@ -168,13 +168,11 @@ export function indexRatio(settlementRefCpi, datedDateRefCpi, rounding) {
 
 // ─── Ref CPI (S3) parser ─────────────────────────────────────────────────────
 // Parses TIPS/RefCPI.csv: [{ date: 'YYYY-MM-DD', refCpi, refCpiSa, saFactor }], in the file's order (oldest first).
-// refCpi is the Ref CPI NSA. The header row is `Ref CPI Date,Ref CPI NSA,Ref CPI SA,SA Factor`; the earlier
-// `date,refCpi` header is read too while R2 still carries a file written before the change, and its refCpiSa
-// and saFactor are NaN.
+// refCpi is the Ref CPI NSA. The header row is `Ref CPI Date,Ref CPI NSA,Ref CPI SA,SA Factor`.
 export function parseRefCpiRows(text) {
   return parseCsv(text).map(r => ({
-    date:     r['Ref CPI Date'] ?? r.date,
-    refCpi:   parseFloat(r['Ref CPI NSA'] ?? r.refCpi),
+    date:     r['Ref CPI Date'],
+    refCpi:   parseFloat(r['Ref CPI NSA']),
     refCpiSa: parseFloat(r['Ref CPI SA']),
     saFactor: parseFloat(r['SA Factor']),
   }));

@@ -73,11 +73,11 @@ export async function fetchTipsRefRows() {
   return parseTipsRefRows(await res.text());
 }
 
-// The monthly CPI-U NSA of CPI history (S8, bls/CPI_history.csv) as { 'YYYY-M': value } (month 1-12, not
+// The monthly CPI-U NSA of CPI history (S8, bls/CPI.csv) as { 'YYYY-M': value } (month 1-12, not
 // zero-padded), the map refCpiFromMonthly() of ref-cpi.js reads. Throws on an HTTP error.
 export async function fetchMonthlyCpiNsa() {
-  const res = await fetch(R2_ROOT + '/bls/CPI_history.csv', { cache: 'no-cache' });
-  if (!res.ok) throw new Error('CPI_history.csv: HTTP ' + res.status);
+  const res = await fetch(R2_ROOT + '/bls/CPI.csv', { cache: 'no-cache' });
+  if (!res.ok) throw new Error('CPI.csv: HTTP ' + res.status);
   return monthlyCpiMap(parseCsvRows(await res.text()).map(r => ({ year: r.Year, period: r.Period, value: parseFloat(r.NSA) })));
 }
 

@@ -10,7 +10,7 @@ if (existsSync(_envPath)) {
   });
 }
 
-// Fetch full BLS CPI-U history (1913–present) and upload to R2 as bls/CPI_history.csv.
+// Fetch full BLS CPI-U history (1913–present) and upload to R2 as bls/CPI.csv.
 //
 // BLS free tier: max 10 years per request → batches in 10-year windows.
 // Series fetched: CUUR0000SA0 (NSA) and CUSR0000SA0 (SA).
@@ -20,7 +20,7 @@ if (existsSync(_envPath)) {
 //   node scripts/fetchCpiHistory.js          → dry run (prints row count + first/last rows)
 //   node scripts/fetchCpiHistory.js --write  → uploads to R2
 
-const R2_KEY = 'bls/CPI_history.csv';
+const R2_KEY = 'bls/CPI.csv';
 const BLS_API = 'https://api.bls.gov/publicAPI/v2/timeseries/data/';
 const SERIES = ['CUUR0000SA0', 'CUSR0000SA0'];
 const FIRST_YEAR = 1913;
