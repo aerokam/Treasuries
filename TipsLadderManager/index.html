@@ -1367,24 +1367,27 @@ function _activeTable() {
   return currentMode === 'build' ? tableEl : simpleEl;
 }
 
-function _setGroupExpanded(tbl, fy, expanded) {
+// `byUser` marks a state the holder chose (a click on the header row, or Expand/Collapse All or Bracket/Cover Years),
+// as opposed to the default. Only a marked state is carried across a re-render (_captureExpandedState).
+function _setGroupExpanded(tbl, fy, expanded, byUser = false) {
   const hdr = tbl.querySelector(`tr.fy-group-header[data-fy="${fy}"]`);
   if (!hdr) return;
   hdr.dataset.expanded = expanded ? 'true' : 'false';
+  if (byUser) hdr.dataset.userSet = 'true';
   tbl.querySelectorAll(`tr.fy-child[data-fy="${fy}"]`).forEach(tr => { tr.hidden = !expanded; });
   tbl.querySelectorAll(`tr.acct-subrow[data-fy="${fy}"]`).forEach(tr => { tr.hidden = !expanded; });
 }
 
 function _setAllGroupsExpanded(expanded, tbl = _activeTable()) {
   tbl.querySelectorAll('tr.fy-group-header').forEach(hdr => {
-    _setGroupExpanded(tbl, hdr.dataset.fy, expanded);
+    _setGroupExpanded(tbl, hdr.dataset.fy, expanded, true);
   });
   _updateExpandCollapseLabels();
 }
 
 function _setBracketGroupsExpanded(expanded, tbl = _activeTable()) {
   tbl.querySelectorAll('tr.fy-group-header.bracket').forEach(hdr => {
-    _setGroupExpanded(tbl, hdr.dataset.fy, expanded);
+    _setGroupExpanded(tbl, hdr.dataset.fy, expanded, true);
   });
   _updateExpandCollapseLabels();
 }
@@ -1396,13 +1399,13 @@ function _defaultGroupExpanded(hdr) {
   return hdr.classList.contains('bracket');
 }
 
-// Snapshot of which funded years are currently expanded, taken right before a table's innerHTML
+// Snapshot of the funded years whose open/closed state the holder set, taken right before a table's innerHTML
 // is replaced -- rebuilding wipes every data-expanded attribute, so this is the only way to carry
 // expand/collapse state across a Rebalance Ladder run.
 function _captureExpandedState(tbl) {
   const state = new Map();
   tbl.querySelectorAll('tr.fy-group-header').forEach(hdr => {
-    state.set(hdr.dataset.fy, hdr.dataset.expanded === 'true');
+    if (hdr.dataset.userSet === 'true') state.set(hdr.dataset.fy, hdr.dataset.expanded === 'true');
   });
   return state;
 }
@@ -1419,8 +1422,8 @@ function _captureExpandedState(tbl) {
 function _restoreOrDefaultGroupsExpanded(tbl, prevState) {
   tbl.querySelectorAll('tr.fy-group-header').forEach(hdr => {
     const fy = hdr.dataset.fy;
-    const expanded = prevState.has(fy) ? prevState.get(fy) : _defaultGroupExpanded(hdr);
-    _setGroupExpanded(tbl, fy, expanded);
+    const carried = prevState.has(fy);
+    _setGroupExpanded(tbl, fy, carried ? prevState.get(fy) : _defaultGroupExpanded(hdr), carried);
   });
   _updateExpandCollapseLabels();
 }
@@ -1520,7 +1523,7 @@ let _deferToolbarLayout = false;
       else { _setSelection([y]); _lastClickedYear = y; }
       return;
     }
-    _setGroupExpanded(tbl, hdr.dataset.fy, hdr.dataset.expanded !== 'true');
+    _setGroupExpanded(tbl, hdr.dataset.fy, hdr.dataset.expanded !== 'true', true);
     _updateExpandCollapseLabels();
   });
 });
