@@ -80,7 +80,12 @@ function extractRows(text) {
   const header = rawRows[headerIndex];
   const colIndex = Object.fromEntries([...REQUIRED_COLS, ...OPTIONAL_COLS].map(c => [c, header.indexOf(c)]));
 
-  const body = rawRows.slice(headerIndex + 1);
+  // The table is followed by disclaimer text rows; a holding has a 9-character
+  // CUSIP and a numeric Market Value.
+  const body = rawRows.slice(headerIndex + 1).filter(r =>
+    /^[A-Z0-9]{9}$/.test(r[colIndex.CUSIP] || "") &&
+    Number.isFinite(Number(parseNumber(r[colIndex["Market Value"]])))
+  );
   return { fundName, asOf, colIndex, body };
 }
 
