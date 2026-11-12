@@ -44,7 +44,7 @@ Canty's paper uses generic notation for inflation-linked bonds across any market
 
 - **The 3-month lag, stated exactly.** Ref CPI(month $M$, day 1) = CPI-U($M-3$); Ref CPI interpolates linearly from there to Ref CPI(month $M{+}1$, day 1) = CPI-U($M-2$) across the days of month $M$. For example, Ref CPI for **March 1** equals the CPI-U value for **December**; a March 15 settlement (day 15 of a 31-day month) interpolates between the December and January values. Single implementation: `shared/src/ref-cpi.js` `refCpiFromMonthly()`.
 
-- **No official daily SA Ref CPI.** BLS publishes monthly SA CPI-U alongside monthly NSA, but there is no official daily SA Ref CPI — daily interpolation officially applies to NSA only (it drives TIPS inflation accrual). The daily SA Ref CPI in `RefCpiNsaSa.csv` is constructed by applying the same App. B interpolation to the monthly CPI-SA series. It is a necessary calculated construct, not an official publication, and is used solely for seasonal yield comparison.
+- **No official daily SA Ref CPI.** BLS publishes monthly SA CPI-U alongside monthly NSA, but there is no official daily SA Ref CPI — daily interpolation officially applies to NSA only (it drives TIPS inflation accrual). The daily SA Ref CPI in `RefCPI.csv` is constructed by applying the same App. B interpolation to the monthly CPI-SA series. It is a necessary calculated construct, not an official publication, and is used solely for seasonal yield comparison.
 
 - **Trend component = SA Ref CPI.** Because the SA Factor $S = \text{NSA}/\text{SA}$ and the index decomposes as $I = T \times S$, the trend component $T$ is exactly the SA Ref CPI: $T = I / S = \text{NSA} / (\text{NSA}/\text{SA}) = \text{SA}$.
 

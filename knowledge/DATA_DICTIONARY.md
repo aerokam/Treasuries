@@ -33,7 +33,7 @@
 
 **L** &nbsp; [Ladder](#ladder) &middot; [ladder eligible tips](#outstanding-tips) *(see Outstanding TIPS)* &middot; [Ladder Export](#ladder-export) &middot; [Ladder Parameters](#ladder-parameters) &middot; [ladder period](#ladder) *(see Ladder)* &middot; [Ladder Table](#ladder-table) &middot; [Last-Year Interest](#last-year-interest) &middot; [Live Quotes](#live-quotes) &middot; [LMI](#lmi)
 
-**M** &nbsp; [Market Quotes](#market-quotes) &middot; [Market quotes (S7)](#s7) &middot; [Market quotes source (E6)](#e6) &middot; [Market Yields](#market-yields) &middot; [Maturity Date](#maturity-date) &middot; [Maturity SA Factor](#maturity-sa-factor) &middot; [Maturity Year](#maturity-year) &middot; [Monthly CPI (S17)](#s17) &middot; [Monthly CPI-U](#monthly-cpi-u)
+**M** &nbsp; [Market Quotes](#market-quotes) &middot; [Market quotes (S7)](#s7) &middot; [Market quotes source (E6)](#e6) &middot; [Market Yields](#market-yields) &middot; [Maturity Date](#maturity-date) &middot; [Maturity SA Factor](#maturity-sa-factor) &middot; [Maturity Year](#maturity-year) &middot; [Monthly CPI-U](#monthly-cpi-u)
 
 **N** &nbsp; [Naive Maturity SA Factor](#naive-maturity-sa-factor) &middot; [Net Cash](#net-cash)
 
@@ -43,7 +43,7 @@
 
 **Q** &nbsp; [Quantity](#quantity)
 
-**R** &nbsp; [R2 Read Access](#r2-read-access) &middot; [Rebalance Result](#rebalance-result) &middot; [Ref CPI](#ref-cpi) &middot; [Ref CPI (S3)](#s3) &middot; [Ref CPI NSA and SA (S4)](#s4) &middot; [Ref CPI NSA and SA snapshot (S23)](#s23) &middot; [Reference Data](#reference-data) &middot; [Reference Date](#reference-date) &middot; [Retained Bracket Excess](#retained-bracket-excess) &middot; [Retained Lower Bracket](#retained-lower-bracket) &middot; [Rolling CPI Change](#rolling-cpi-change) &middot; [Rung](#rung)
+**R** &nbsp; [R2 Read Access](#r2-read-access) &middot; [Rebalance Result](#rebalance-result) &middot; [Ref CPI](#ref-cpi) &middot; [Ref CPI (S3)](#s3) &middot; [Ref CPI NSA and SA snapshot (S23)](#s23) &middot; [Reference Data](#reference-data) &middot; [Reference Date](#reference-date) &middot; [Retained Bracket Excess](#retained-bracket-excess) &middot; [Retained Lower Bracket](#retained-lower-bracket) &middot; [Rolling CPI Change](#rolling-cpi-change) &middot; [Rung](#rung)
 
 **S** &nbsp; [SA Factor](#sa-factor) &middot; [SA Price](#sa-price) &middot; [SA Price Factor](#sa-price-factor) &middot; [SA Yield](#sa-yield) &middot; [SA Yield Series](#sa-yield-series) &middot; [SA Yields](#sa-yields) &middot; [SACP](#sacp) &middot; [same year excess interest](#same-maturity-excess-interest) *(see Same-Maturity Excess Interest)* &middot; [Same-Maturity Excess Interest](#same-maturity-excess-interest) &middot; [SAO Blend Weight](#sao-blend-weight) &middot; [SAO Yield](#sao-yield) &middot; [SAO Yields](#sao-yields) &middot; [Schwab Asset Management holdings export (E10)](#e10) &middot; [Schwab Export](#schwab-export) &middot; [Seasonal Amplitude](#seasonal-amplitude) &middot; [Seasonal Factor Drift](#seasonal-factor-drift) &middot; [Settlement Date](#settlement-date) &middot; [Settlement Ref CPI](#settlement-ref-cpi) &middot; [Simulated](#simulated) &middot; [simulated future 30y tips](#simulated-outstanding-future-30y-tips) *(see Simulated Outstanding Future 30Y TIPS)* &middot; [Simulated Outstanding Future 10Y TIPS](#simulated-outstanding-future-10y-tips) &middot; [Simulated Outstanding Future 30Y TIPS](#simulated-outstanding-future-30y-tips) &middot; [Simulated Outstanding TIPS](#simulated-outstanding-tips) &middot; [Source Data](#source-data) &middot; [Spot Yield](#spot-yield) &middot; [Spot Yield Curves](#spot-yield-curves) &middot; [Start Date](#start-date) &middot; [Static](#static) &middot; [Synthetic TIPS](#synthetic-tips)
 
@@ -183,22 +183,14 @@
   | `term` | [Term](#term) measured from the Dated Date, as FiscalData states it: `5-Year`, `10-Year`, `30-Year`, or with a part year, `5-Year 6-Month` |
   | `originalIssueDate` | [Original Issue Date](#original-issue-date), `YYYY-MM-DD` |
 
-- <a id="s3"></a>**Ref CPI (S3)**, `RefCPI.csv` = `{ @date + refCpi }`
-  *R2 key `TIPS/RefCPI.csv` ([View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/TIPS/RefCPI.csv)). The calculated [Ref CPI](#ref-cpi): header row first, then one row per calendar day from 1997-01-15, the dated date of the first TIPS issued, ascending by date, through the first of the month three months after the latest month of [CPI history (S8)](#s8). Ref CPI is the same for every TIPS on a given date, so the series is one continuous series.*
-
-  | Column | Defined term |
-  |---|---|
-  | `date` | the calendar date the value is for, `YYYY-MM-DD` |
-  | `refCpi` | [Ref CPI](#ref-cpi) NSA, calculated from [CPI history (S8)](#s8), to five decimal places |
-
-- <a id="s4"></a>**Ref CPI NSA and SA (S4)**, `RefCpiNsaSa.csv` = `{ @Ref_CPI_Date + Ref_CPI_NSA + Ref_CPI_SA + SA_Factor }`
-  *R2 key `TIPS/RefCpiNsaSa.csv` ([View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/TIPS/RefCpiNsaSa.csv)). Calculated by the 31 CFR App. B daily interpolation. Header row first, then one row per calendar day, newest row first. The daily SA series has no official or retrieved equivalent: this store is its sole source.*
+- <a id="s3"></a>**Ref CPI (S3)**, `RefCPI.csv` = `{ @Ref_CPI_Date + Ref_CPI_NSA + Ref_CPI_SA + SA_Factor }`
+  *R2 key `TIPS/RefCPI.csv` ([View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/TIPS/RefCPI.csv)). The calculated [Ref CPI](#ref-cpi) NSA and SA: header row first, then one row per calendar day from 1997-01-15, the dated date of the first TIPS issued, ascending by date, through the first of the month three months after the latest month of [CPI history (S8)](#s8). Ref CPI is the same for every TIPS on a given date, so the series is one continuous series. The daily SA series has no official or retrieved equivalent: this store is its sole source.*
 
   | Column | Defined term |
   |---|---|
   | `Ref CPI Date` | the calendar date the values are for, `YYYY-MM-DD` |
-  | `Ref CPI NSA` | [Ref CPI](#ref-cpi) NSA, interpolated daily from [Monthly CPI (S17)](#s17), to five decimal places |
-  | `Ref CPI SA` | the same interpolation applied to the SA series of [Monthly CPI (S17)](#s17), to five decimal places |
+  | `Ref CPI NSA` | [Ref CPI](#ref-cpi) NSA, calculated from the NSA series of [CPI history (S8)](#s8), to five decimal places |
+  | `Ref CPI SA` | the same calculation applied to the SA series of [CPI history (S8)](#s8), to five decimal places |
   | `SA Factor` | [SA Factor](#sa-factor), `Ref CPI NSA / Ref CPI SA`, to five decimal places |
 
 - <a id="s5"></a>**Auction results (S5)**, `Auctions.csv` = `{ @cusip + @comp_auction_close_date + security_type + high_yield + bid_to_cover_ratio + prim_deal_comp_par_awarded + ... }`
@@ -403,8 +395,8 @@
   | `bidPrice` | [Price](#price), [bid](#bid) side |
   | `adjAskPrice`, `adjBidPrice` | [Adjusted Ask Price / Adjusted Bid Price](#adjusted-price), TIPS only |
 
-- <a id="s8"></a>**CPI history (S8)**, `CPI_history.csv` = `{ @Year + @Period + PeriodName + NSA + SA }`
-  *R2 key `bls/CPI_history.csv` ([View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/bls/CPI_history.csv)). Header row first, then one row per month from January 1913, oldest row first. `NSA` is series `CUUR0000SA0` and `SA` is `CUSR0000SA0` of [BLS (E4)](#e4); `SA` is blank before January 1947.*
+- <a id="s8"></a>**CPI history (S8)**, `CPI.csv` = `{ @Year + @Period + PeriodName + NSA + SA }`
+  *R2 key `bls/CPI.csv` ([View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/bls/CPI.csv)). Header row first, then one row per month from January 1913, oldest row first. `NSA` is series `CUUR0000SA0` and `SA` is `CUSR0000SA0` of [BLS (E4)](#e4); `SA` is blank before January 1947. BLS collected no data for October 2025, so that month's `NSA` and `SA` are blank: the CPI is shown as BLS reported it, and [Calculate daily Ref CPI (1.13)](./1.13_Calculate_Daily_Ref_CPI.md) derives the number [31 CFR 356 Appendix B §I.B.4(iv)](./31_CFR_356_Definitions_And_Formulas.md) gives for it.*
 
   | Column | Defined term |
   |---|---|
@@ -492,8 +484,6 @@
 
 - <a id="s16"></a>**Bond holidays (S16)**, `BondHolidaysSifma.csv` = `{ Date + Holiday_Name }`
   *R2 key `misc/BondHolidaysSifma.csv` ([View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/misc/BondHolidaysSifma.csv)). SIFMA's US bond-market holiday schedule, filtered to the eleven base US market holidays plus New Year's Day. No header row. `Date` is written as `"Weekday, Month D, YYYY"`. Backs the [Bond Holiday](#bond-holiday) term.*
-- <a id="s17"></a>**Monthly CPI (S17)**, `CPI.csv` = `{ @Year + @Period + PeriodName + NSA + SA }`
-  *R2 key `bls/CPI.csv` ([View Preview](https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/bls/CPI.csv)). The same series and columns as [CPI history (S8)](#s8), January 2019 onward, newest row first, with one difference: BLS collected no data for October 2025, so S8 leaves that month blank and this store holds the 325.604 (NSA) and 325.551 (SA) of [Fetch monthly CPI (1.9)](./1.9_Fetch_Monthly_CPI.md), which [Calculate daily Ref CPI NSA and SA (1.10)](./1.10_Interpolate_Daily_Ref_CPI_NSA_And_SA.md) needs.*
 - <a id="s18"></a>**Intraday archive (S18)**, `{YYYYMMDD}.json` = `@Symbol + @Date + { Feed: { TimeRange + { TradeTime + Close } } } + FetchedAtET`
   *R2 key `Treasuries/yields-history/intraday-raw/{symbol}/{YYYYMMDD}.json`. One immutable daily snapshot per symbol of the raw feeds [CNBC (E5)](#e5) served that day, and `FetchedAtET`, the wall-clock time the snapshot was taken.*
 - <a id="s19"></a>**CPI release schedule (S19)**, `CpiReleaseSchedule.csv` = `{ Reference Month + @Release Date + Release Time }`
@@ -520,7 +510,7 @@
   | `sa_yield` | the [SA Yield](#sa-yield) |
   | `sao_yield` | the [SAO Yield](#sao-yield) |
 - <a id="s23"></a>**Ref CPI NSA and SA snapshot (S23)**, `SeasonalAdjustments/data/RefCpiNsaSa.snapshot.csv` = `{ @Ref_CPI_Date + Ref_CPI_NSA + Ref_CPI_SA + SA_Factor }`
-  *A copy of [Ref CPI NSA and SA (S4)](#s4), with its columns, held in the repository. No R2 key holds the store, and no job writes it.*
+  *A copy of [Ref CPI (S3)](#s3), with its columns, held in the repository. No R2 key holds the store, and no job writes it.*
 
 - <a id="r2-read-access"></a>**R2 Read Access** = `{ @Allowed_Origin }`
   *Every app reads the bucket by a browser `fetch()` from `pub-ba11062b177640459f72e0a88d0261ae.r2.dev`. A browser rejects a cross-origin read from a bucket that has no CORS policy, and a bucket has none until one is configured. The policy of this bucket is set in the Cloudflare dashboard (R2, the bucket, Settings, CORS Policy), and no file in this repository manages it. It allows three origins, each matched literally:*
@@ -738,10 +728,10 @@ For nominal Treasuries, 31 CFR §356.2 applies: *"Dated date means the date from
 **Ref is short for Reference**, everywhere in these apps and in Treasury’s field names. *Ref CPI* and *Reference CPI* are the same term, as are *dated date Ref CPI* and *dated date reference CPI*; the short form is the one to write.
 
 **Two derivations — calculated is what every app reads, retrieved is the check:**
-- **Calculated (NSA):** 31 CFR App. B interpolation of the monthly CPI-U NSA series ([CPI history (S8)](#s8)) → `RefCPI.csv` ([Ref CPI (S3)](#s3)), written as soon as BLS publishes a month by [Calculate daily Ref CPI (1.13)](./1.13_Calculate_Daily_Ref_CPI.md). **All apps use this.** The series ends on the first of the month three months after the latest month of CPI history, the CPI-U NSA of that month read as it is, with no interpolation, as [Calculate TIPS OID (8.2)](../TaxationOfTreasuries/knowledge/8.2_Calculate_Tips_Oid.md) uses it.
+- **Calculated:** 31 CFR App. B interpolation of the monthly CPI-U NSA and SA series ([CPI history (S8)](#s8)) → `RefCPI.csv` ([Ref CPI (S3)](#s3)), written as soon as BLS publishes a month by [Calculate daily Ref CPI (1.13)](./1.13_Calculate_Daily_Ref_CPI.md). **All apps use this.** The series ends on the first of the month three months after the latest month of CPI history, the CPI-U NSA of that month read as it is, with no interpolation, as [Calculate TIPS OID (8.2)](../TaxationOfTreasuries/knowledge/8.2_Calculate_Tips_Oid.md) uses it.
 - **Retrieved (the check):** TreasuryDirect SecIndex ([TreasuryDirect SecIndex (E2)](#e2)). [Check daily Ref CPI (1.17)](./1.17_Check_Daily_Ref_CPI.md) compares it with [Ref CPI (S3)](#s3) after it publishes, and reports any date that differs. The retrieved and calculated NSA series **must agree** (verified by that run and by test).
 
-**Seasonally adjusted daily Ref CPI is a calculated construct — the *only* source, never a fallback.** BLS publishes **monthly** CPI-SA alongside CPI-NSA, but there is **no official daily SA Ref CPI**: App. B daily interpolation officially applies to **NSA only**, because NSA is what drives TIPS inflation accrual. The daily **SA Ref CPI** and **`SA_Factor`** (`RefCpiNsaSa.csv`, [Ref CPI NSA and SA (S4)](#s4)) were devised here for seasonal yield comparison, so they are **necessarily calculated** and must always be produced. The App. B interpolation is defined once in `shared/src/ref-cpi.js` and applied to both series (NSA and SA); the math is shared, but SA production is never removed.
+**Seasonally adjusted daily Ref CPI is a calculated construct — the *only* source, never a fallback.** BLS publishes **monthly** CPI-SA alongside CPI-NSA, but there is **no official daily SA Ref CPI**: App. B daily interpolation officially applies to **NSA only**, because NSA is what drives TIPS inflation accrual. The daily **SA Ref CPI** and **`SA_Factor`** (`RefCPI.csv`, [Ref CPI (S3)](#s3)) were devised here for seasonal yield comparison, so they are **necessarily calculated** and must always be produced. The App. B interpolation is defined once in `shared/src/ref-cpi.js` and applied to both series (NSA and SA); the math is shared, but SA production is never removed.
 
 **Lookup rule:** exact entry for the requested date; `null` if the date is **outside the published range** (before the series starts or past the last published day). The series carries one row per calendar day, so within range there is always an exact match — there is no "snap to an earlier date."
 
@@ -1008,7 +998,7 @@ coverExcessCost_c = Future 30Y total cost × coverWeight_c
 
 <a id="sa-factor"></a>
 ### SA Factor
-`SA_Factor` = Seasonal Adjustment Factor = `Ref_CPI_NSA(date) / Ref_CPI_SA(date)` *Daily ratio that isolates the seasonal component of the Ref CPI. `Ref_CPI_NSA` is the Treasury-published Ref CPI. `Ref_CPI_SA` applies the same 31 CFR App. B daily interpolation to BLS's monthly seasonally adjusted CPI-U — a constructed series, since no official seasonally adjusted Ref CPI exists. Analogous to the monthly seasonal factors BLS publishes (`NSA index / SA index`, shown ×100 to 3 dp), but daily and unscaled. Stored to five decimal places in [`RefCpiNsaSa.csv`](#s4); lookup via `shared/src/ref-cpi.js#saFactorForDate`.*
+`SA_Factor` = Seasonal Adjustment Factor = `Ref_CPI_NSA(date) / Ref_CPI_SA(date)` *Daily ratio that isolates the seasonal component of the Ref CPI. `Ref_CPI_NSA` is the Treasury-published Ref CPI. `Ref_CPI_SA` applies the same 31 CFR App. B daily interpolation to BLS's monthly seasonally adjusted CPI-U — a constructed series, since no official seasonally adjusted Ref CPI exists. Analogous to the monthly seasonal factors BLS publishes (`NSA index / SA index`, shown ×100 to 3 dp), but daily and unscaled. Stored to five decimal places in [`RefCPI.csv`](#s3); lookup via `shared/src/ref-cpi.js#saFactorForDate`.*
 
 <a id="sa-yield"></a>
 ### SA Yield
@@ -1131,7 +1121,7 @@ Some values are true only until Treasury issues more TIPS. Left inline as approx
 
 - <a id="source-data"></a>**Source Data** = `FedInvest_Daily_Price_List + Daily_Ref_CPI + Auction_Results + TIPS_Reference_Data + Monthly_CPI_U + Market_Yields + Market_Quotes + Fund_Holdings + GSW_Curve_Parameters + Tentative_Auction_Schedule + CPI_Release_Schedule`
   *Every flow from an external entity that process 1 reads, drawn as one flow into it at Level 1. [Live Quotes](#live-quotes) and [Upcoming Auctions](#upcoming-auctions) are not part of it: no acquisition job reads [CNBC (E5)](#e5)'s quote service or the upcoming auctions of [FiscalData (E3)](#e3). [Yields Monitor](../YieldsMonitor/knowledge/2.2_Read_Live_Quotes.md) reads the first directly and [Treasury Auctions](/knowledge/DFD_LEVEL2_TREASURYAUCTIONS) the second, and Level 1 draws each as a flow into that app rather than into process 1.*
-- <a id="reference-data"></a>**Reference Data** = `{ FedInvest prices (S1) | TIPS reference data (S2) | Ref CPI (S3) | Ref CPI NSA and SA (S4) | Auction results (S5) | Yield history (S6) | Market quotes (S7) | CPI history (S8) | Tentative auction schedule (S9) | Fund holdings (S11) | GSW curve parameters (S12) | Yield curves (S13) | Breakeven inflation (S14) | Bid and ask spreads (S15) | Bond holidays (S16) | Monthly CPI (S17) | Intraday archive (S18) | CPI release schedule (S19) }`
+- <a id="reference-data"></a>**Reference Data** = `{ FedInvest prices (S1) | TIPS reference data (S2) | Ref CPI (S3) | Auction results (S5) | Yield history (S6) | Market quotes (S7) | CPI history (S8) | Tentative auction schedule (S9) | Fund holdings (S11) | GSW curve parameters (S12) | Yield curves (S13) | Breakeven inflation (S14) | Bid and ask spreads (S15) | Bond holidays (S16) | Intraday archive (S18) | CPI release schedule (S19) }`
   *The contents of the R2 data stores.*
 - <a id="app-inputs"></a>**App Inputs** = *What a user enters or selects in an app. [View Selections](#view-selections) are the Yield Curves case.*
 - <a id="app-outputs"></a>**App Outputs** = *What an app shows a user. [Charts and Tables](#charts-and-tables) are the Yield Curves case.*

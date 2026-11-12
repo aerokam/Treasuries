@@ -337,14 +337,14 @@ function sharedModules(page) {
 // page keeps its own SHARED entry). stops, where the spec states it, says when the run writes nothing.
 const INGEST_STORES = {
   fedinv: ['FedInvest prices', DS('s1')], tipsref: ['TIPS reference data', DS('s2')],
-  refcpi: ['Ref CPI', DS('s3')], nsasa: ['Ref CPI NSA and SA', DS('s4')],
+  refcpi: ['Ref CPI', DS('s3')],
   auctions: ['Auction results', DS('s5')], yhist: ['Yield history', DS('s6')],
   quotes: ['Market quotes', DS('s7')], cpihist: ['CPI history', DS('s8')],
   tent: ['Tentative auction schedule', DS('s9')],
   funds: ['Fund holdings', DS('s11')], gsw: ['GSW curve parameters', DS('s12')],
   yc: ['Yield curves', DS('s13')], bei: ['Breakeven inflation', DS('s14')],
   spread: ['Bid and ask spreads', DS('s15')], hol: ['Bond holidays', DS('s16')],
-  blscpi: ['Monthly CPI', DS('s17')], ia: ['Intraday archive', DS('s18')],
+  ia: ['Intraday archive', DS('s18')],
   cpisched: ['CPI release schedule', DS('s19')],
 };
 const INGEST_ENTITIES = {
@@ -369,7 +369,7 @@ const INGEST_JOBS = [
     stops: 'The run is skipped on a weekend or a Bond Holiday, and {quotes} is left unchanged when the capture holds fewer than 10 TIPS rows.' },
   { id: '1.3', slug: 'YIELDCURVEDATA', file: '1.3_Calculate_Yield_Curve_Data_Sets.md', title: 'Calculate yield curve data sets',
     name: ['Calculate', 'yield curve', 'data sets'], data: null,
-    entities: [], reads: ['fedinv', 'quotes', 'nsasa', 'hol'], writes: ['yc', 'bei', 'spread'] },
+    entities: [], reads: ['fedinv', 'quotes', 'refcpi', 'hol'], writes: ['yc', 'bei', 'spread'] },
   { id: '1.4', slug: 'AUCTIONRESULTS', file: '1.4_Fetch_Auction_Results.md', title: 'Fetch auction results',
     name: ['Fetch auction', 'results'], data: 'auction results',
     entities: ['e3', 'e15'], reads: ['auctions'], writes: ['auctions'], modules: ['m1'],
@@ -386,12 +386,6 @@ const INGEST_JOBS = [
   { id: '1.8', slug: 'INTRADAYARCHIVE', file: '1.8_Archive_Intraday_Yields.md', title: 'Archive intraday yields',
     name: ['Archive', 'intraday yields'], data: 'market yields',
     entities: ['e5'], reads: [], writes: ['ia'] },
-  { id: '1.9', slug: 'MONTHLYCPI', file: '1.9_Fetch_Monthly_CPI.md', title: 'Fetch monthly CPI',
-    name: ['Fetch monthly', 'CPI'], data: 'monthly CPI-U',
-    entities: ['e4'], reads: [], writes: ['blscpi'] },
-  { id: '1.10', slug: 'REFCPINSASA', file: '1.10_Interpolate_Daily_Ref_CPI_NSA_And_SA.md', title: 'Interpolate daily Ref CPI NSA and SA',
-    name: ['Interpolate', 'daily Ref CPI', 'NSA and SA'], data: null,
-    entities: [], reads: ['blscpi'], writes: ['nsasa'], modules: ['m14'] },
   { id: '1.12', slug: 'CPIHISTORY', file: '1.12_Fetch_CPI_History.md', title: 'Fetch CPI history',
     name: ['Fetch CPI', 'history'], data: 'monthly CPI-U',
     entities: ['e4'], reads: ['cpisched'], writes: ['cpihist'],
@@ -558,7 +552,6 @@ function level1() {
     { id: 'fedinv', name: 'FedInvest prices', href: DS('s1') },
     { id: 'tipsref', name: 'TIPS reference data', href: DS('s2') },
     { id: 'refcpi', name: 'Ref CPI', href: DS('s3') },
-    { id: 'nsasa', name: 'Ref CPI NSA and SA', href: DS('s4') },
     { id: 'auctions', name: 'Auction results', href: DS('s5') },
     { id: 'yhist', name: 'Yield history', href: DS('s6') },
     { id: 'quotes', name: 'Market quotes', href: DS('s7') },
@@ -567,7 +560,6 @@ function level1() {
     { id: 'funds', name: 'Fund holdings', href: DS('s11') },
     { id: 'gsw', name: 'GSW curve parameters', href: DS('s12') },
     { id: 'hol', name: 'Bond holidays', href: DS('s16') },
-    { id: 'blscpi', name: 'Monthly CPI', href: DS('s17') },
     { id: 'ia', name: 'Intraday archive', href: DS('s18') },
     { id: 'cpisched', name: 'CPI release schedule', href: DS('s19') },
     { id: 'spot', name: 'Yield curves', href: DS('s13') },
@@ -580,7 +572,7 @@ function level1() {
     { key: 'tr', cat: 'reference', name: ['TIPS', 'Reference'], spec: 'DFD_LEVEL2_TIPSREFERENCE.html', reads: ['quotes', 'tipsref', 'refcpi', 'hol'] },
     { key: 'pr', cat: 'educational', name: ['Portal', 'Primer'], spec: 'DFD_LEVEL2_PRIMER.html', reads: ['fedinv', 'tipsref', 'refcpi'] },
     { key: 'ce', cat: 'reference', name: ['CPI', 'Explorer'], spec: 'DFD_LEVEL2_CPIEXPLORER.html', reads: ['refcpi', 'cpihist'] },
-    { key: 'ym', cat: 'workflow', name: ['Yields', 'Monitor'], spec: 'DFD_LEVEL2_YIELDSMONITOR.html', reads: ['tipsref', 'nsasa', 'hol', 'yhist', 'ia'] },
+    { key: 'ym', cat: 'workflow', name: ['Yields', 'Monitor'], spec: 'DFD_LEVEL2_YIELDSMONITOR.html', reads: ['tipsref', 'refcpi', 'hol', 'yhist', 'ia'] },
     { key: 'yc', cat: 'workflow', name: ['Yield', 'Curves'], spec: 'DFD_LEVEL2_YIELDCURVES.html', reads: ['yc', 'bei', 'spread', 'gsw'] },
     { key: 'sa', cat: 'educational', name: ['Seasonal', 'Adjustments'], spec: 'DFD_LEVEL2_SEASONALADJUSTMENTS.html', reads: [] },
     { key: 'fh', cat: 'reference', name: ['Fund', 'Holdings'], spec: 'DFD_LEVEL2_FUNDHOLDINGS.html', reads: ['funds'] },
@@ -736,7 +728,7 @@ function level3IngestYieldCurveData() {
   const stores = [
     { id: 'fedinv', name: 'FedInvest prices', href: DS('s1') },
     { id: 'quotes', name: 'Market quotes', href: DS('s7') },
-    { id: 'nsasa', name: 'Ref CPI NSA and SA', href: DS('s4') },
+    { id: 'refcpi', name: 'Ref CPI', href: DS('s3') },
     { id: 'hol', name: 'Bond holidays', href: DS('s16') },
   ];
   const outStores = [
@@ -745,7 +737,7 @@ function level3IngestYieldCurveData() {
     { id: 'spread', name: 'Bid and ask spreads', href: DS('s15') },
   ];
   const procs = [
-    { id: '1.3.1', name: ['Parse sources', 'and calculate', 'yields'], href: 'DFD_LEVEL4_INGEST_YIELDCURVEDATA_PARSE.html', reads: ['fedinv', 'quotes', 'nsasa', 'hol'],
+    { id: '1.3.1', name: ['Parse sources', 'and calculate', 'yields'], href: 'DFD_LEVEL4_INGEST_YIELDCURVEDATA_PARSE.html', reads: ['fedinv', 'quotes', 'refcpi', 'hol'],
       out: { '1.3.2': ['TIPS yields', 'SA factors'], '1.3.4': ['Treasury yields'], '1.3.5': ['Treasury yields'],
              '1.3.6': ['TIPS yields', 'Treasury yields'], '1.3.7': ['Treasury yields', 'download date'] } },
     { id: '1.3.2', name: ['Adjust for', 'seasonality'], href: V(KC + '1.3.2_Adjust_For_Seasonality.md'), reads: [],
@@ -803,14 +795,14 @@ function level4IngestYieldCurveDataParse() {
   const stores = [
     { id: 'fedinv', name: 'FedInvest prices', href: DS('s1') },
     { id: 'quotes', name: 'Market quotes', href: DS('s7') },
-    { id: 'nsasa', name: 'Ref CPI NSA and SA', href: DS('s4') },
+    { id: 'refcpi', name: 'Ref CPI', href: DS('s3') },
     { id: 'hol', name: 'Bond holidays', href: DS('s16') },
   ];
   const S = a => V(F31 + '#' + a);
   const procs = [
     { id: '1.3.1.1', name: ['Parse FedInvest', 'prices'], href: S('parse-fedinvest-prices'), reads: ['fedinv'], out: { '1.3.1.6': ['TIPS prices', 'settlement date'], '1.3.1.7': ['Treasury prices', 'settlement date'] } },
     { id: '1.3.1.2', name: ['Parse market', 'quotes'], href: S('parse-market-quotes'), reads: ['quotes'], out: { '1.3.1.5': ['download date'], '1.3.1.6': ['TIPS quotes'], '1.3.1.7': ['Treasury quotes'] } },
-    { id: '1.3.1.3', name: ['Parse Ref CPI', 'and SA factors'], href: S('parse-ref-cpi-and-sa-factors'), reads: ['nsasa'], out: {} },
+    { id: '1.3.1.3', name: ['Parse Ref CPI', 'and SA factors'], href: S('parse-ref-cpi-and-sa-factors'), reads: ['refcpi'], out: {} },
     { id: '1.3.1.4', name: ['Parse bond', 'holidays'], href: S('parse-bond-holidays'), reads: ['hol'], out: { '1.3.1.5': ['bond holidays'] } },
     { id: '1.3.1.5', name: ['Determine', 'settlement date'], href: S('determine-settlement-date'), reads: [], out: { '1.3.1.6': ['settlement date'], '1.3.1.7': ['settlement date'] } },
     { id: '1.3.1.6', name: ['Calculate', 'TIPS yields'], href: S('calculate-tips-yields'), reads: [], out: {} },
@@ -917,7 +909,7 @@ function level2YieldsMonitor() {
     { id: 'cnbc', entity: true, name: ['CNBC'], href: DD + 'e5' },
     { id: 'hol', name: 'Bond holidays', href: DS('s16') },
     { id: 'tipsref', name: 'TIPS reference data', href: DS('s2') },
-    { id: 'nsasa', name: 'Ref CPI NSA and SA', href: DS('s4') },
+    { id: 'refcpi', name: 'Ref CPI', href: DS('s3') },
   ];
   const procs = [
     { id: '2.1', name: ['Assemble', 'range data'], href: 'DFD_LEVEL3_YM_ASSEMBLE.html', reads: ['yhist', 'ia'],
@@ -926,7 +918,7 @@ function level2YieldsMonitor() {
       out: { '2.3': ['live quotes'], '2.4': ['live quotes'], '2.5': ['live quotes'] } },
     { id: '2.3', name: ['Calculate', 'day change'], href: V(KYM + '2.3_Calculate_Day_Change.md'), reads: ['hol'],
       out: { '2.5': ['day change'] } },
-    { id: '2.4', name: ['Adjust for', 'seasonality'], href: V(KYM + '2.4_Adjust_For_Seasonality.md'), reads: ['tipsref', 'nsasa', 'hol'],
+    { id: '2.4', name: ['Adjust for', 'seasonality'], href: V(KYM + '2.4_Adjust_For_Seasonality.md'), reads: ['tipsref', 'refcpi', 'hol'],
       out: { '2.5': ['SA yield series'], '2.6': ['SA yield series'], '2.7': ['SA yield series'] } },
     { id: '2.5', name: ['Render time', 'series'], href: V(KYM + '2.5_Render_Time_Series.md'), reads: ['hol'], out: {} },
     { id: '2.6', name: ['Render yield', 'curve', 'snapshots'], href: V(KYM + '2.6_Render_Yield_Curve_Snapshots.md'), reads: ['hol'], out: {} },
@@ -1106,7 +1098,7 @@ function level2Ingestion() {
     up: 'DFD_LEVEL1.html', upLabel: 'Level 1', svg: P.join(NL),
     notes: ['  One process per scheduled job, with the external entity it reads (if any). The <a href="' + DS() + '">Data Stores</a> shape stands for every data store: a job that writes one has an arrow to it, a job that reads one has an arrow from it, and a job that does both has both.',
       '  ' + andList(storeOnly) + ' read no external source: they calculate from what the retrieving jobs have stored. ' + andList(entityAndStore) + ' read both an external source and one or more stores.',
-      '  An entity feeding two or more jobs (FiscalData, BLS, CNBC) is drawn once, with a separately labelled flow to each — the same source, not two sources. FiscalData\'s two flows here match its two flows in the Data Dictionary; BLS\'s 1.9 and 1.12 read the same flow independently, and CNBC\'s two jobs do the same. 1.16 reads a second BLS flow, <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#cpi-release-schedule">CPI release schedule</a>.',
+      '  An entity feeding two or more jobs (FiscalData, BLS, CNBC) is drawn once, with a separately labelled flow to each — the same source, not two sources. FiscalData\'s two flows here match its two flows in the Data Dictionary; BLS\'s 1.12 reads one flow and 1.16 reads a second, <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#cpi-release-schedule">CPI release schedule</a>; CNBC\'s two jobs read the same flow independently.',
       '  1.4 reads two entities, FiscalData and TreasuryDirect, for the one flow <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#auction-results">auction results</a>.',
       '  E7 through E12 are drawn as one box: the six fund-holdings providers, each with its own entry in the <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md">Data Dictionary</a>, are otherwise identical in shape from this diagram\'s point of view — one job reads all six.',
       '  Each job explodes at Level 3, which draws the data stores that job reads and writes and the shared modules it calls. 1.1 decomposes into three processes; every other job is one process there, and its bubble opens the job\'s process spec, which names the script that implements it and the script that registers its schedule.'].join(NL)
