@@ -3,6 +3,23 @@
 
 import { UPPER_BRACKET_YEAR } from './ladder-core.js';
 
+// The role of a bracket CUSIP and the weight bracketWeightsN (Multi-bracket) or bracketWeights (2-bracket) solved for it.
+// The role comes from the CUSIP in the order active, retained, upper. Without a retained lower bracket
+// `brackets.lowerCUSIP` is the Active Lower Bracket's own CUSIP, so a test of it first reads the active
+// bracket as the retained one and its weight as 0 (`origLowerWeight`). Defined once; every popup that
+// names a bracket weight reads it here.
+function bracketRoleOf(s, cusip) {
+  if (s.bracketMode === '3bracket') {
+    if (cusip === s.newLowerCUSIP) return { role: 'active', weight: s.newLowerWeight3 ?? 0 };
+    const leg = (s.retainedLegs ?? []).find(r => r.cusip === cusip);
+    if (leg) return { role: 'retained', weight: leg.weight ?? 0 };
+    if (cusip === s.brackets?.lowerCUSIP) return { role: 'retained', weight: s.origLowerWeight ?? 0 };
+    return { role: 'upper', weight: s.upperWeight3 ?? s.upperWeight ?? 0 };
+  }
+  if (cusip === s.brackets?.lowerCUSIP) return { role: 'retained', weight: s.lowerWeight ?? 0 };
+  return { role: 'upper', weight: s.upperWeight ?? 0 };
+}
+
 function fm(n)  { return '$' + Math.round(n).toLocaleString('en-US'); }
 export function fm2(n) {
   const s = Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -501,18 +518,13 @@ export function buildDrillHTML(d, colKey, summary) {
         + row('Cost per TIPS', 'price/100 × index ratio × 1,000', fm2(d.costPerBond), false, undefined, 'cpbn')
         + row('Excess Quantity', 'round(<span class="formula-var" data-source="tec">Target cost</span> ÷ <span class="formula-var" data-source="cpbn">Cost per TIPS</span>)', exQty, true, undefined, 'qty');
     } else {
-    const is3B = summary.bracketMode === '3bracket';
     // Keyed by CUSIP, not year: the retained and active lower brackets can mature in the SAME
     // calendar year (3.0 §Bracket Identification Rules), and `summary.lowerYear` was never a real
     // field on summary in the first place (the year lives at summary.brackets.lowerYear) — that typo
     // made the first branch below dead code, so every 3-bracket excess row fell through to whichever
     // of newLowerWeight3/upperWeight3 the fundedYear happened to match, showing the wrong bracket's
     // weight whenever the retained and active legs shared a year.
-    const weight = is3B
-      ? (d.cusip === summary.brackets?.lowerCUSIP ? summary.origLowerWeight
-         : d.cusip === summary.newLowerCUSIP ? summary.newLowerWeight3
-         : summary.upperWeight3)
-      : (d.cusip === summary.brackets?.lowerCUSIP ? summary.lowerWeight : summary.upperWeight);
+    const weight = bracketRoleOf(summary, d.cusip).weight;
     const targetExCost = (summary.gapParams?.totalCost ?? 0) * (weight ?? 0);
 
     rows =
@@ -574,12 +586,8 @@ export function buildDrillHTML(d, colKey, summary) {
         + sep()
         + row('Excess Cost Before', '<span class="formula-var" data-source="cpb">Cost per TIPS</span> \xd7 <span class="formula-var" data-source="qty">Excess Quantity</span>', fm(exQty * d.costPerBond), true);
     } else if (s && s.brackets) {
-      const isLower = d.cusip === s.brackets.lowerCUSIP;
-      const isNewLower = s.bracketMode === '3bracket' && d.cusip === s.newLowerCUSIP;
-      const weight  = isLower ? (s.origLowerWeight ?? s.lowerWeight)
-                   : isNewLower ? (s.newLowerWeight3 ?? 0)
-                   : s.upperWeight;
-      const wLabel  = isLower ? 'Retained lower bracket weight' : isNewLower ? 'Active lower bracket weight' : 'Upper bracket weight';
+      const { role, weight } = bracketRoleOf(s, d.cusip);
+      const wLabel  = role === 'retained' ? 'Retained lower bracket weight' : role === 'active' ? 'Active lower bracket weight' : 'Upper bracket weight';
       const exCost  = s.gapParams.totalCost * weight;
       const exQty   = d.excessQtyAfter;
       rows = row('Excess Quantity', 'round(<span class="formula-var" data-source="tec">target cost</span> \xf7 <span class="formula-var" data-source="cpb">Cost per TIPS</span>)', exQty, false, undefined, 'qty')
