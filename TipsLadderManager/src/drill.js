@@ -3,6 +3,12 @@
 
 import { UPPER_BRACKET_YEAR } from './ladder-core.js';
 
+// A link inside a popup row that opens an info popup of the page (`_infoPopups`, routed by the `.info-link` click handler in index.html).
+// Every "see ... ↗" and "from ..." reference to Duration Calcs is built here, so a link that shows an arrow is a link that opens.
+function infoLink(popup, text) {
+  return '<a class="info-link" data-popup="' + popup + '" style="border-bottom:1px dotted #94a3b8;color:inherit;text-decoration:none;">' + text + '</a>';
+}
+
 // The role of a bracket CUSIP and the weight bracketWeightsN (Multi-bracket) or bracketWeights (2-bracket) solved for it.
 // The role comes from the CUSIP in the order active, retained, upper. Without a retained lower bracket
 // `brackets.lowerCUSIP` is the Active Lower Bracket's own CUSIP, so a test of it first reads the active
@@ -213,7 +219,7 @@ const creditedTotal = (c) => c.sim + c.cov + c.net + c.gapSim + c.gapExc + c.gap
 function syntheticYearAmountRows(a) {
   const isGap = a.kind === 'gap';
   const pi    = a.qty * a.piPerBond;
-  const durLink = '<a class="info-link" data-popup="' + (isGap ? 'duration' : 'future30yDuration') + '" style="border-bottom:1px dotted #94a3b8;color:inherit;text-decoration:none;">' + (isGap ? 'Gap Dur' : 'Future 30Y Dur') + '</a>';
+  const durLink = infoLink(isGap ? 'duration' : 'future30yDuration', isGap ? 'Gap Dur' : 'Future 30Y Dur');
   let rows = row('Quantity', 'From duration match calculations: see ' + durLink, a.qty, false, undefined, 'qty')
     + row('P+I per TIPS', '$1,000 \xd7 (1 + coupon ' + fd(a.synCpn * 100, 3) + '% \xf7 2), index ratio 1.00000', fm2(a.piPerBond), false, undefined, 'pipb')
     + row('P+I', '<span class="formula-var" data-source="pipb">P+I per TIPS</span> \xd7 <span class="formula-var" data-source="qty">Quantity</span>', fm(pi), false, undefined, 'pi')
@@ -341,7 +347,7 @@ export function buildDrillHTML(d, colKey, summary) {
       const weight  = isLower ? s.lowerWeight  : s.upperWeight;
       const wLabel  = isLower ? 'Lower bracket weight' : 'Upper bracket weight';
       const exCost  = s.gapParams.totalCost * weight;
-      rows = row(wLabel, 'see Duration Calcs ↗', fd(weight, 4), false, undefined, 'wt')
+      rows = row(wLabel, 'see ' + infoLink('duration', 'Duration Calcs') + ' ↗', fd(weight, 4), false, undefined, 'wt')
         + sep()
         + gapBreakdownRows(s.gapParams, s.DARA)
         + row('Gap total cost', 'Sum of gap year theoretical costs', fm(s.gapParams.totalCost), true, undefined, 'gtc')
@@ -362,7 +368,7 @@ export function buildDrillHTML(d, colKey, summary) {
       const weight  = isLower ? s.future30yLowerWeight : s.future30yUpperWeight;
       const wLabel  = isLower ? 'Lower cover weight' : 'Upper cover weight';
       const exCost  = (s.future30yParams?.future30yTotalCost ?? 0) * weight;
-      rows = row(wLabel, 'see Future 30Y Duration Calcs ↗', fd(weight, 4), false, undefined, 'wt')
+      rows = row(wLabel, 'see ' + infoLink('future30yDuration', 'Future 30Y Duration Calcs') + ' ↗', fd(weight, 4), false, undefined, 'wt')
         + sep()
         + future30yBreakdownRows(s.future30yParams)
         + row('Future 30Y total cost', 'Sum of the synthetic Future 30Y year costs', fm(s.future30yParams?.future30yTotalCost ?? 0), true, undefined, 'ftc')
@@ -513,7 +519,7 @@ export function buildDrillHTML(d, colKey, summary) {
       const totalCost = summary.future30yParams?.future30yTotalCost ?? 0;
       rows = future30yBreakdownRows(summary.future30yParams)
         + row('Future 30Y total cost', 'Sum of the synthetic Future 30Y year costs', fm(totalCost), true, undefined, 'ftc')
-        + row(isLower ? 'Lower cover weight' : 'Upper cover weight', 'from <a class="info-link" data-popup="future30yDuration" style="border-bottom:1px dotted #94a3b8;color:inherit;text-decoration:none;">Future 30Y Duration Calcs</a>', (weight ?? 0).toFixed(4), false, undefined, 'bw')
+        + row(isLower ? 'Lower cover weight' : 'Upper cover weight', 'from ' + infoLink('future30yDuration', 'Future 30Y Duration Calcs'), (weight ?? 0).toFixed(4), false, undefined, 'bw')
         + row('Target excess cost', '<span class="formula-var" data-source="ftc">Future 30Y total cost</span> × <span class="formula-var" data-source="bw">Cover Weight</span>', fm(totalCost * (weight ?? 0)), false, undefined, 'tec')
         + row('Cost per TIPS', 'price/100 × index ratio × 1,000', fm2(d.costPerBond), false, undefined, 'cpbn')
         + row('Excess Quantity', 'round(<span class="formula-var" data-source="tec">Target cost</span> ÷ <span class="formula-var" data-source="cpbn">Cost per TIPS</span>)', exQty, true, undefined, 'qty');
@@ -530,7 +536,7 @@ export function buildDrillHTML(d, colKey, summary) {
     rows =
       gapBreakdownRows(summary.gapParams, summary.DARA)
       + row('Gap total cost', 'Sum of gap year theoretical costs', fm(summary.gapParams?.totalCost ?? 0), true, undefined, 'gtc')
-      + row('Bracket weight', 'from <a class="info-link" data-popup="duration" style="border-bottom:1px dotted #94a3b8;color:inherit;text-decoration:none;">Duration Calcs</a>', (weight ?? 0).toFixed(4), false, undefined, 'bw')
+      + row('Bracket weight', 'from ' + infoLink('duration', 'Duration Calcs'), (weight ?? 0).toFixed(4), false, undefined, 'bw')
       + row('Target excess cost', '<span class="formula-var" data-source="gtc">Gap total cost</span> × <span class="formula-var" data-source="bw">Bracket weight</span>', fm(targetExCost), false, undefined, 'tec')
       + row('Cost per TIPS', 'price/100 × index ratio × 1,000', fm2(d.costPerBond), false, undefined, 'cpbn')
       + row('Excess Quantity', 'round(<span class="formula-var" data-source="tec">Target cost</span> ÷ <span class="formula-var" data-source="cpbn">Cost per TIPS</span>)', exQty, true, undefined, 'qty');
@@ -592,7 +598,7 @@ export function buildDrillHTML(d, colKey, summary) {
       const exQty   = d.excessQtyAfter;
       rows = row('Excess Quantity', 'round(<span class="formula-var" data-source="tec">target cost</span> \xf7 <span class="formula-var" data-source="cpb">Cost per TIPS</span>)', exQty, false, undefined, 'qty')
         + sep()
-        + row(wLabel, 'see Duration Calcs ↗', fd(weight, 4), false, undefined, 'wt')
+        + row(wLabel, 'see ' + infoLink('duration', 'Duration Calcs') + ' ↗', fd(weight, 4), false, undefined, 'wt')
         + sep()
         + row('Gap total cost', '', fm(s.gapParams.totalCost), false, undefined, 'gtc')
         + row('Target excess cost', '<span class="formula-var" data-source="gtc">Gap total cost</span> \xd7 <span class="formula-var" data-source="wt">' + wLabel.toLowerCase() + '</span>', fm(exCost), false, undefined, 'tec')
@@ -627,7 +633,7 @@ export function buildDrillHTML(d, colKey, summary) {
         + priceRow(d)
         + costPerTipsRow(d)
         + sep()
-        + row(wLabel, 'see Future 30Y Duration Calcs ↗', fd(weight, 4), false, undefined, 'wt')
+        + row(wLabel, 'see ' + infoLink('future30yDuration', 'Future 30Y Duration Calcs') + ' ↗', fd(weight, 4), false, undefined, 'wt')
         + future30yBreakdownRows(s.future30yParams)
         + row('Future 30Y total cost', 'Sum of the synthetic Future 30Y year costs', fm(s.future30yParams?.future30yTotalCost ?? 0), true, undefined, 'ftc')
         + row('Target excess cost', '<span class="formula-var" data-source="ftc">Future 30Y total cost</span> \xd7 <span class="formula-var" data-source="wt">' + wLabel.toLowerCase() + '</span>', fm(exCost), false, undefined, 'tec')
