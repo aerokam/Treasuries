@@ -873,6 +873,7 @@ function init() {
 
   // Sort Selected
   document.getElementById('sortSelectedBtn').addEventListener('click', () => {
+    document.getElementById('colSearch').value = '';
     const visible = viewCols[activeView];
     orderedColumns[activeView].sort((a, b) => {
       const aVis = visible.has(a);
