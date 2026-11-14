@@ -16,3 +16,5 @@ existing one here if it resurfaces.
   Result: v2 and TreasuryDirect state one field set; v2's delay after the close is open.
 - [tips-deflation-floor](tips-deflation-floor/README.md) — has any TIPS matured with an index
   ratio below 1.0. Result: no. Output: `TIPS/TipsIndexRatioAtMaturity.csv` in R2.
+- [dated-date-vs-original](dated-date-vs-original/README.md) — is the Dated Date of an auction ever
+  different from its Original Dated Date. Result: yes, in 54 of 11,185 rows, all reopenings.
