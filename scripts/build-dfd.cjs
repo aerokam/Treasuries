@@ -60,6 +60,7 @@ const TERMS = {
   'auction results': 'auction-results', 'TIPS reference data': 'tips-reference-data',
   'monthly CPI-U': 'monthly-cpi-u', 'market yields': 'market-yields', 'market quotes': 'market-quotes',
   'fund holdings': 'fund-holdings', 'GSW curve parameters': 'gsw-curve-parameters',
+  'CMT rates': 'cmt-rates', 'CMT': 'cmt', 'R-CMT': 'r-cmt',
   'tentative auction schedule': 'tentative-auction-schedule', 'CPI release schedule': 'cpi-release-schedule',
   'TIPS prices': 'tips-prices', 'Treasury prices': 'treasury-prices', 'TIPS quotes': 'tips-quotes',
   'Treasury quotes': 'treasury-quotes', 'TIPS yields': 'tips-yields', 'Treasury yields': 'treasury-yields',
@@ -342,6 +343,7 @@ const INGEST_STORES = {
   quotes: ['Market quotes', DS('s7')], cpihist: ['CPI', DS('s8')],
   tent: ['Tentative auction schedule', DS('s9')],
   funds: ['Fund holdings', DS('s11')], gsw: ['GSW curve parameters', DS('s12')],
+  cmt: ['CMT rates', DS('s24')], rcmt: ['R-CMT rates', DS('s25')],
   yc: ['Yield curves', DS('s13')], bei: ['Breakeven inflation', DS('s14')],
   spread: ['Bid and ask spreads', DS('s15')], hol: ['Bond holidays', DS('s16')],
   ia: ['Intraday archive', DS('s18')],
@@ -358,6 +360,7 @@ const INGEST_ENTITIES = {
   fund: { name: ['Fund providers', '(E7-E12)'], href: DD + 'fund-holdings', sources: 6 },
   e13: { name: ['Federal Reserve', 'FEDS 2008-05'], href: DD + 'e13' },
   e14: { name: ['Treasury Tentative', 'Auction Schedule'], href: DD + 'e14' },
+  e16: { name: ['Treasury Par', 'Yield Curve Rates'], href: DD + 'e16' },
 };
 const INGEST_JOBS = [
   { id: '1.1', slug: 'FEDINVEST', file: '1.1_Download_FedInvest_Prices.md', title: 'Download FedInvest prices and calculate yields',
@@ -408,6 +411,10 @@ const INGEST_JOBS = [
     name: ['Check daily', 'Ref CPI'], data: 'daily Ref CPI',
     entities: ['e2'], reads: ['tipsref', 'cpihist', 'refcpi', 'cpisched'], writes: [],
     stops: 'The run is skipped when the day before the current date, on an Eastern clock, is not a Release Date of {cpisched}. The run ends with an error and fetches nothing when {cpisched} cannot be read. The run writes no store: it reports a match, a mismatch, or a range {refcpi} holds that TreasuryDirect SecIndex has not yet published.' },
+  { id: '1.18', slug: 'CMTRATES', file: '1.18_Fetch_CMT_Rates.md', title: 'Fetch CMT rates',
+    name: ['Fetch CMT', 'rates'], data: 'CMT rates',
+    entities: ['e16'], reads: ['cmt', 'rcmt'], writes: ['cmt', 'rcmt'],
+    stops: 'A series writes nothing, and the run ends with an error, when a yearly file cannot be read, has no Date column or a maturity that is not a column of the store, or has a Date that cannot be read or is repeated. A failure in one series does not stop the other.' },
 ];
 const ingestPageName = job => 'DFD_LEVEL3_INGEST_' + job.slug + '.html';
 const ingestSharedKey = job => 'ingest-' + job.slug.toLowerCase();
@@ -559,6 +566,8 @@ function level1() {
     { id: 'tent', name: 'Tentative auction schedule', href: DS('s9') },
     { id: 'funds', name: 'Fund holdings', href: DS('s11') },
     { id: 'gsw', name: 'GSW curve parameters', href: DS('s12') },
+    { id: 'cmt', name: 'CMT rates', href: DS('s24') },
+    { id: 'rcmt', name: 'R-CMT rates', href: DS('s25') },
     { id: 'hol', name: 'Bond holidays', href: DS('s16') },
     { id: 'ia', name: 'Intraday archive', href: DS('s18') },
     { id: 'cpisched', name: 'CPI release schedule', href: DS('s19') },
@@ -573,7 +582,7 @@ function level1() {
     { key: 'pr', cat: 'educational', name: ['Portal', 'Primer'], spec: 'DFD_LEVEL2_PRIMER.html', reads: ['fedinv', 'tipsref', 'refcpi'] },
     { key: 'ce', cat: 'reference', name: ['CPI', 'Explorer'], spec: 'DFD_LEVEL2_CPIEXPLORER.html', reads: ['refcpi', 'cpihist'] },
     { key: 'ym', cat: 'workflow', name: ['Yields', 'Monitor'], spec: 'DFD_LEVEL2_YIELDSMONITOR.html', reads: ['tipsref', 'refcpi', 'hol', 'yhist', 'ia'] },
-    { key: 'yc', cat: 'workflow', name: ['Yield', 'Curves'], spec: 'DFD_LEVEL2_YIELDCURVES.html', reads: ['yc', 'bei', 'spread', 'gsw'] },
+    { key: 'yc', cat: 'workflow', name: ['Yield', 'Curves'], spec: 'DFD_LEVEL2_YIELDCURVES.html', reads: ['yc', 'bei', 'spread', 'gsw', 'cmt', 'rcmt'] },
     { key: 'sa', cat: 'educational', name: ['Seasonal', 'Adjustments'], spec: 'DFD_LEVEL2_SEASONALADJUSTMENTS.html', reads: [] },
     { key: 'fh', cat: 'reference', name: ['Fund', 'Holdings'], spec: 'DFD_LEVEL2_FUNDHOLDINGS.html', reads: ['funds'] },
     { key: 'ta', cat: 'reference', name: ['Treasury', 'Auctions'], spec: 'DFD_LEVEL2_TREASURYAUCTIONS.html', reads: ['auctions', 'tent'] },
@@ -854,14 +863,16 @@ function level2YieldCurves() {
     { id: 'yc', name: 'Yield curves', href: DS('s13') },
     { id: 'bei', name: 'Breakeven inflation', href: DS('s14') },
     { id: 'spread', name: 'Bid and ask spreads', href: DS('s15') },
+    { id: 'cmt', name: 'CMT rates', href: DS('s24') },
+    { id: 'rcmt', name: 'R-CMT rates', href: DS('s25') },
   ];
   const procs = [
-    { id: '3.1', name: ['Read yield curve', 'data sets'], href: V('YieldCurves/knowledge/3.1_Read_Yield_Curve_Data_Sets.md'), reads: ['yc', 'bei', 'spread'],
-      out: { '3.2': ['Treasury yields', 'SAO yields', 'spot yield curves', 'breakeven inflation', 'bid and ask spreads', 'download date'] } },
+    { id: '3.1', name: ['Read yield curve', 'data sets'], href: V('YieldCurves/knowledge/3.1_Read_Yield_Curve_Data_Sets.md'), reads: ['yc', 'bei', 'spread', 'cmt', 'rcmt'],
+      out: { '3.2': ['Treasury yields', 'SAO yields', 'spot yield curves', 'CMT', 'R-CMT', 'breakeven inflation', 'bid and ask spreads', 'download date'] } },
     { id: '3.2', name: ['Render charts', 'and tables'], href: 'DFD_LEVEL3_YC_RENDER.html', reads: [], out: {} },
   ];
   const SX = 40, SW = 215, PR = 58, UX = 1110, UW = 145;
-  const sy = i => 210 + i * 118;
+  const sy = i => 150 + i * 95;
   const px = { '3.1': 410, '3.2': 840 };
   const py = { '3.1': 328, '3.2': 328 };
   const H = 560, W = 1290;
@@ -869,7 +880,7 @@ function level2YieldCurves() {
   const OBS = [...procs.map(q => ({ x: px[q.id], y: py[q.id], r: PR })), ...SM.obstacles];
   const LBL = [];
   const [vx, vy, vw, vh] = SM.viewBox(W, H);
-  const P = [`<svg viewBox="${vx} ${vy} ${vw} ${vh}" role="img" aria-label="Level 2 for Yield Curves: two processes reading three data stores. No process writes a data store.">`, marker()];
+  const P = [`<svg viewBox="${vx} ${vy} ${vw} ${vh}" role="img" aria-label="Level 2 for Yield Curves: two processes reading five data stores. No process writes a data store.">`, marker()];
   const sIdx = Object.fromEntries(stores.map((s, i) => [s.id, i]));
   procs.forEach(p => p.reads.forEach(id => {
     const y = sy(sIdx[id]), [x2, y2] = toCircle(SX + SW + 5, y, px[p.id], py[p.id], PR);
@@ -892,7 +903,7 @@ function level2YieldCurves() {
     up: 'DFD_LEVEL1.html', upLabel: 'Level 1',
     svg: P.join(NL),
     notes: ['  <b>No process here writes a data store.</b> Every flow ends at 3.2 and is gone when the page closes.',
-      '  The three stores are written by <a href="DFD_LEVEL3_INGEST_YIELDCURVEDATA.html">Level 3 of 1.3 Calculate yield curve data sets</a>, a scheduled job; the app calculates none of their values.',
+      '  The first three stores are written by <a href="DFD_LEVEL3_INGEST_YIELDCURVEDATA.html">Level 3 of 1.3 Calculate yield curve data sets</a>, a scheduled job; the app calculates none of their values. The CMT rates and R-CMT rates are written by <a href="DFD_LEVEL3_INGEST_CMTRATES.html">Level 3 of 1.18 Fetch CMT rates</a>; 3.1 calculates the breakeven inflation of the CMT from them.',
       '  Each flow is named by the one structure it holds, defined in <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#6.0-data-flows">Data Dictionary &sect;6.0</a>. Two structures passing between the same two processes are drawn as two flows.',
       '  3.1 also reads the GSW curve parameters, for a reference curve drawn only on an analysis view opened with ?gsw. No view of the app uses them otherwise, so they are not drawn here.',
       SHARED_NOTE].join(NL)
@@ -1135,7 +1146,7 @@ function level3YieldCurvesRender() {
   const arriving = [
     ['3.2.3', 'Treasury yields  ←  3.1'], ['3.2.3', 'spot yield curves  ←  3.1'], ['3.2.3', 'download date  ←  3.1'],
     ['3.2.4', 'SAO yields  ←  3.1'], ['3.2.4', 'spot yield curves  ←  3.1'], ['3.2.4', 'download date  ←  3.1'],
-    ['3.2.5', 'breakeven inflation  ←  3.1'], ['3.2.6', 'bid and ask spreads  ←  3.1'],
+    ['3.2.3', 'CMT  ←  3.1'], ['3.2.4', 'R-CMT  ←  3.1'], ['3.2.5', 'breakeven inflation  ←  3.1'], ['3.2.6', 'bid and ask spreads  ←  3.1'],
   ];
   views.forEach(to => {
     const here = arriving.filter(([t]) => t === to);
