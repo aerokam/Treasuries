@@ -518,7 +518,7 @@
 
   | Column | Defined term |
   |---|---|
-  | `Date` | the [Trade Date](#trade-date) of the rates, which is also their [Settlement Date](#settlement-date) (T+0), `YYYY-MM-DD` |
+  | `Date` | the [Trade Date](#trade-date) of the rates, `YYYY-MM-DD` |
   | `1 Mo`, `1.5 Mo`, `2 Mo`, `3 Mo`, `4 Mo`, `6 Mo` | the [CMT](#cmt) at a maturity of 1, 1.5, 2, 3, 4 and 6 months |
   | `1 Yr`, `2 Yr`, `3 Yr`, `5 Yr`, `7 Yr`, `10 Yr`, `20 Yr`, `30 Yr` | the CMT at a maturity of 1, 2, 3, 5, 7, 10, 20 and 30 years |
 - <a id="s25"></a>**R-CMT rates (S25)**, `RCmtRates.csv` = `{ @Date + ( 5_Yr + 7_Yr + 10_Yr + 20_Yr + 30_Yr ) }`
@@ -526,7 +526,7 @@
 
   | Column | Defined term |
   |---|---|
-  | `Date` | the [Trade Date](#trade-date) of the rates, which is also their [Settlement Date](#settlement-date) (T+0), `YYYY-MM-DD` |
+  | `Date` | the [Trade Date](#trade-date) of the rates, `YYYY-MM-DD` |
   | `5 Yr`, `7 Yr`, `10 Yr`, `20 Yr`, `30 Yr` | the [R-CMT](#r-cmt) at a maturity of 5, 7, 10, 20 and 30 years |
 
 - <a id="r2-read-access"></a>**R2 Read Access** = `{ @Allowed_Origin }`
@@ -583,7 +583,7 @@
 
 - *Market quotes ([S7](#s7)): the [Download Date](#download-date) plus one bond trading day (T+1), in [1.3.1.5 Determine settlement date](1.3.1_Parse_Sources_And_Calculate_Yields.md#determine-settlement-date).*
 - *FedInvest prices ([S1](#s1)): the date FedInvest states its prices are for (T+0), in [1.1.1 Determine settlement date](./1.1_Download_FedInvest_Prices.md#determine-settlement-date), where the basis for T+0 is recorded.*
-- *[CMT rates (S24)](#s24) and [R-CMT rates (S25)](#s25): the `Date` of the rates (T+0), the date [Treasury Par Yield Curve Rates (E16)](#e16) states them for.*
+- *[CMT rates (S24)](#s24) and [R-CMT rates (S25)](#s25): the `Date` of the rates plus one bond trading day (T+1), past any Bond Holiday, in [Read yield curve data sets (3.1)](../YieldCurves/knowledge/3.1_Read_Yield_Curve_Data_Sets.md).*
 
 <a id="download-date"></a>
 ### Download Date
@@ -591,7 +591,7 @@
 
 <a id="trade-date"></a>
 ### Trade Date
-`Trade_Date` = *The date on which a bond trade is made, from which its [Settlement Date](#settlement-date) is counted. For [Market quotes (S7)](#s7) it is the [Download Date](#download-date), which also states the time of the run; for [FedInvest prices (S1)](#s1), the date FedInvest states its prices are for, which is also their Settlement Date (T+0). For [CMT rates (S24)](#s24) and [R-CMT rates (S25)](#s25) it is the `Date` of the rates, which is also their Settlement Date (T+0).*
+`Trade_Date` = *The date on which a bond trade is made, from which its [Settlement Date](#settlement-date) is counted. For [Market quotes (S7)](#s7) it is the [Download Date](#download-date), which also states the time of the run; for [FedInvest prices (S1)](#s1), the date FedInvest states its prices are for, which is also their Settlement Date (T+0). For [CMT rates (S24)](#s24) and [R-CMT rates (S25)](#s25) it is the `Date` of the rates.*
 
 <a id="acquisition-date"></a>
 ### Acquisition Date

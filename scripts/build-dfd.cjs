@@ -582,7 +582,7 @@ function level1() {
     { key: 'pr', cat: 'educational', name: ['Portal', 'Primer'], spec: 'DFD_LEVEL2_PRIMER.html', reads: ['fedinv', 'tipsref', 'refcpi'] },
     { key: 'ce', cat: 'reference', name: ['CPI', 'Explorer'], spec: 'DFD_LEVEL2_CPIEXPLORER.html', reads: ['refcpi', 'cpihist'] },
     { key: 'ym', cat: 'workflow', name: ['Yields', 'Monitor'], spec: 'DFD_LEVEL2_YIELDSMONITOR.html', reads: ['tipsref', 'refcpi', 'hol', 'yhist', 'ia'] },
-    { key: 'yc', cat: 'workflow', name: ['Yield', 'Curves'], spec: 'DFD_LEVEL2_YIELDCURVES.html', reads: ['yc', 'bei', 'spread', 'gsw', 'cmt', 'rcmt'] },
+    { key: 'yc', cat: 'workflow', name: ['Yield', 'Curves'], spec: 'DFD_LEVEL2_YIELDCURVES.html', reads: ['yc', 'bei', 'spread', 'gsw', 'cmt', 'rcmt', 'hol'] },
     { key: 'sa', cat: 'educational', name: ['Seasonal', 'Adjustments'], spec: 'DFD_LEVEL2_SEASONALADJUSTMENTS.html', reads: [] },
     { key: 'fh', cat: 'reference', name: ['Fund', 'Holdings'], spec: 'DFD_LEVEL2_FUNDHOLDINGS.html', reads: ['funds'] },
     { key: 'ta', cat: 'reference', name: ['Treasury', 'Auctions'], spec: 'DFD_LEVEL2_TREASURYAUCTIONS.html', reads: ['auctions', 'tent'] },
@@ -865,14 +865,15 @@ function level2YieldCurves() {
     { id: 'spread', name: 'Bid and ask spreads', href: DS('s15') },
     { id: 'cmt', name: 'CMT rates', href: DS('s24') },
     { id: 'rcmt', name: 'R-CMT rates', href: DS('s25') },
+    { id: 'hol', name: 'Bond holidays', href: DS('s16') },
   ];
   const procs = [
-    { id: '3.1', name: ['Read yield curve', 'data sets'], href: V('YieldCurves/knowledge/3.1_Read_Yield_Curve_Data_Sets.md'), reads: ['yc', 'bei', 'spread', 'cmt', 'rcmt'],
+    { id: '3.1', name: ['Read yield curve', 'data sets'], href: V('YieldCurves/knowledge/3.1_Read_Yield_Curve_Data_Sets.md'), reads: ['yc', 'bei', 'spread', 'cmt', 'rcmt', 'hol'],
       out: { '3.2': ['Treasury yields', 'SAO yields', 'spot yield curves', 'CMT', 'R-CMT', 'breakeven inflation', 'bid and ask spreads', 'download date'] } },
     { id: '3.2', name: ['Render charts', 'and tables'], href: 'DFD_LEVEL3_YC_RENDER.html', reads: [], out: {} },
   ];
   const SX = 40, SW = 215, PR = 58, UX = 1110, UW = 145;
-  const sy = i => 150 + i * 95;
+  const sy = i => 140 + i * 80;
   const px = { '3.1': 410, '3.2': 840 };
   const py = { '3.1': 328, '3.2': 328 };
   const H = 560, W = 1290;
@@ -880,7 +881,7 @@ function level2YieldCurves() {
   const OBS = [...procs.map(q => ({ x: px[q.id], y: py[q.id], r: PR })), ...SM.obstacles];
   const LBL = [];
   const [vx, vy, vw, vh] = SM.viewBox(W, H);
-  const P = [`<svg viewBox="${vx} ${vy} ${vw} ${vh}" role="img" aria-label="Level 2 for Yield Curves: two processes reading five data stores. No process writes a data store.">`, marker()];
+  const P = [`<svg viewBox="${vx} ${vy} ${vw} ${vh}" role="img" aria-label="Level 2 for Yield Curves: two processes reading six data stores. No process writes a data store.">`, marker()];
   const sIdx = Object.fromEntries(stores.map((s, i) => [s.id, i]));
   procs.forEach(p => p.reads.forEach(id => {
     const y = sy(sIdx[id]), [x2, y2] = toCircle(SX + SW + 5, y, px[p.id], py[p.id], PR);
