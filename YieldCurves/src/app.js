@@ -7,7 +7,9 @@ import {
   SAO_NOISE_YRS, SAO_BLEND_START_YRS, SAO_BLEND_END_YRS,
   nssBasis, zToSA,
 } from '../../shared/src/spot-curve.js';
-import { localDate } from '../../shared/src/settlement.js';
+import { localDate, parseHolidaySet } from '../../shared/src/settlement.js';
+import { parseCsv } from '../../shared/src/csv.js';
+import { parseRatesCsv, ratesAsNumbers, cmtViews } from '../../shared/src/cmt-rates.js';
 import { parseYieldCurvesCsv, parseBreakevenCsv, parseSpreadsCsv } from '../../shared/src/yield-curve-stores.js';
 import { handleChartKeydown, setupAxisWheelZoom, snapYBounds, snapYAfterZoom } from '../../shared/src/chart-keys.js';
 import { initDatePicker } from '../../shared/src/date-picker.js';
@@ -19,6 +21,9 @@ const R2_BASE_URL = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev';
 const YIELD_CURVES_URL = `${R2_BASE_URL}/Treasuries/YieldCurves.csv`;                // Yield curves (S13)
 const BREAKEVEN_URL = `${R2_BASE_URL}/Treasuries/BreakevenInflation.csv`;           // Breakeven inflation (S14)
 const SPREADS_URL = `${R2_BASE_URL}/Treasuries/BidAskSpreads.csv`;                  // Bid and ask spreads (S15)
+const CMT_URL = `${R2_BASE_URL}/Treasuries/CmtRates.csv`;                          // CMT rates (S24)
+const RCMT_URL = `${R2_BASE_URL}/TIPS/RCmtRates.csv`;                             // R-CMT rates (S25)
+const HOLIDAYS_URL = `${R2_BASE_URL}/misc/BondHolidaysSifma.csv`;                 // Bond holidays (S16)
 const GSW_TIPS_CURVE_URL = `${R2_BASE_URL}/TIPS/GswTipsCurve.json`;   // { date, beta0..beta3, tau1, tau2 } — updateGswTipsCurve.js
 
 // The GSW reference line is an analysis aid, not an end-user feature — the published curve
@@ -67,6 +72,7 @@ let spotRows = [];                // spot rows of S13: { type, termYears, source
 let storeDates = null;            // { fedInvest: { trade, settle }, market: { trade, settle } } of S13
 let beiStore = null;              // Breakeven inflation (S14): { dates, rows }
 let spreadsStore = null;          // Bid and ask spreads (S15): { dates, rows }
+let cmtView = null;                // { nominal, real, bei } of shared/src/cmt-rates.js#cmtViews, each null or { date, settle, points }
 let gswTipsCurve = null;          // { date, beta0..beta3, tau1, tau2 } — GSW fitted TIPS curve, R2 (weekly)
 let nominalsShowStrips = false;
 // Starts false/hidden -- the checkbox and this flag only turn on together, at load, when a
@@ -372,21 +378,27 @@ async function parseGswParameters(res) {
 // leaves its view empty.
 async function loadYieldCurveDataSets() {
   const get = url => fetch(url, { cache: 'no-cache' }).catch(e => ({ ok: false, error: e }));
-  const [ycRes, beiRes, spreadsRes, gswRes] = await Promise.all([
+  const [ycRes, beiRes, spreadsRes, gswRes, cmtRes, rcmtRes, holRes] = await Promise.all([
     get(YIELD_CURVES_URL), get(BREAKEVEN_URL), get(SPREADS_URL), get(GSW_TIPS_CURVE_URL),
+    get(CMT_URL), get(RCMT_URL), get(HOLIDAYS_URL),
   ]);
   if (!ycRes.ok) throw new Error(`Failed to fetch yield curves: ${ycRes.status || ycRes.error}`);
   const readOptional = async (res, parse, name) => {
     if (!res.ok) { console.warn(`${name} not available on R2`); return null; }
     try { return parse(await res.text()); } catch (e) { console.warn(`${name} could not be read:`, e); return null; }
   };
-  const [yieldCurves, breakeven, spreads, gsw] = await Promise.all([
+  const [yieldCurves, breakeven, spreads, gsw, cmtRows, rcmtRows, holidays] = await Promise.all([
     ycRes.text().then(parseYieldCurvesCsv),
     readOptional(beiRes, parseBreakevenCsv, 'Breakeven inflation'),
     readOptional(spreadsRes, parseSpreadsCsv, 'Bid and ask spreads'),
     parseGswParameters(gswRes),
+    readOptional(cmtRes, t => ratesAsNumbers(parseRatesCsv(t)), 'CMT rates'),
+    readOptional(rcmtRes, t => ratesAsNumbers(parseRatesCsv(t)), 'R-CMT rates'),
+    readOptional(holRes, t => parseHolidaySet(parseCsv(t, false)), 'Bond holidays'),
   ]);
-  return { yieldCurves, breakeven, spreads, gsw };
+  // The CMT views are optional: a store that cannot be read leaves its checkbox disabled.
+  const cmt = (cmtRows || rcmtRows) ? cmtViews(cmtRows || [], rcmtRows || [], holidays || new Set()) : null;
+  return { yieldCurves, breakeven, spreads, gsw, cmt };
 }
 
 // A security row of S13 of Type TIPS → the fields the TIPS views draw.
@@ -428,8 +440,9 @@ async function init() {
   console.log("init() started");
 
   try {
-    const { yieldCurves, breakeven, spreads, gsw } = await loadYieldCurveDataSets();
+    const { yieldCurves, breakeven, spreads, gsw, cmt } = await loadYieldCurveDataSets();
     gswTipsCurve = gsw;
+    cmtView = cmt;
     storeDates = yieldCurves.dates;
     beiStore = breakeven;
     spreadsStore = spreads;
@@ -457,6 +470,8 @@ async function init() {
       }
       updateModeToggle();
     }
+    if (cmtView?.nominal) document.getElementById('chkCmt').disabled = false;
+    if (cmtView?.real || cmtView?.bei) document.getElementById('chkTipsCmt').disabled = false;
     if (marketTipsData) {
       const chkBroker = document.getElementById('chkTipsBroker');
       chkBroker.disabled = false;
@@ -562,6 +577,28 @@ const nominalTypeShown = r => nominalsTypeFilters.has(r.type)
 // an Unclassified security are excluded. Used for the Maturity Range of a checked Spot.
 const isSpotFitType = b => b.type !== 'MARKET BASED STRIPS' && b.type !== 'MARKET BASED UNCLASSIFIED';
 
+// The CMT series that the active tab draws (3.2.3 Treasuries: the CMT, 3.2.4 TIPS: the R-CMT,
+// 3.2.5 breakeven: the CMT less the R-CMT), or null while its checkbox is unchecked, its store could
+// not be read, or spread mode is on (a CMT has no bid and no ask).
+function cmtSeriesOf(tab) {
+  if (spreadModeActive || !cmtView) return null;
+  const checked = document.getElementById(tab === 'treasuries' ? 'chkCmt' : 'chkTipsCmt').checked;
+  const s = tab === 'treasuries' ? cmtView.nominal : tab === 'bei' ? cmtView.bei : cmtView.real;
+  return checked && s ? s : null;
+}
+// The CMT points inside the Maturity Range as a chart series: a marker at each maturity, joined by a
+// line, on the x-axis of the chart (a Maturity Date, or weeks of term).
+const CMT_COLOR = '#be185d';
+function cmtDataset(label, series, inRange, now) {
+  const toX = xAxisMode === 'ttm' ? d => (d.getTime() - now) / (7 * 86400000) : d => d.getTime();
+  const data = series.points.filter(inRange).map(p => ({ x: toX(p.maturityDate), y: parseFloat((p.value * 100).toFixed(3)) }));
+  return { label, data, color: CMT_COLOR, curve: true, w: 2, dash: [], style: 'circle', r: 0, markerR: 3 };
+}
+// The text beside a CMT checkbox: the Date of the rates and their Settlement Date.
+const cmtMetaText = s => `rates ${isoToMDY(s.date)} · settle ${isoToMDY(s.settle)} (T+1)`;
+// Sets the same maturity ISO bounds the type checkboxes use, over the CMT points as well.
+const cmtInRange = (startDate, endDate) => p => p.maturityDate >= startDate && p.maturityDate <= endDate;
+
 // The Market source line beside a source checkbox: the Download Date and the Settlement Date.
 const marketMetaText = d => `${fmtBrokerTime(d.trade)} ET · settle ${isoToMDY(d.settle)} (T+1)`;
 
@@ -590,8 +627,9 @@ function processAndRenderNominals() {
   const statusEl = document.getElementById('status');
   const showFed = document.getElementById('chkFedInvest').checked;
   const showMq = document.getElementById('chkMarket').checked && !!marketNominalsData;
+  const cmtSeries = cmtSeriesOf('treasuries');
 
-  if (!showFed && !showMq) { statusEl.textContent = ''; if (chart) { chart.destroy(); chart = null; } return; }
+  if (!showFed && !showMq && !cmtSeries) { statusEl.textContent = ''; if (chart) { chart.destroy(); chart = null; } return; }
 
   try {
     let fedProcessed = null;
@@ -604,7 +642,7 @@ function processAndRenderNominals() {
     // Initial default: the range spans whatever is checked by default (Bills/Notes/Bonds).
     // A checkbox change recomputes it (recomputeRangeFromChecked); typing a range by hand
     // holds until the next one.
-    const allBonds = [...(fedProcessed || []), ...(mqProcessed || [])].sort((a, b) => a.maturityDate - b.maturityDate);
+    const allBonds = [...(fedProcessed || []), ...(mqProcessed || []), ...(cmtSeries?.points || [])].sort((a, b) => a.maturityDate - b.maturityDate);
     const startEl = document.getElementById('startMaturity');
     const endEl = document.getElementById('endMaturity');
     if (!startEl.value && allBonds.length > 0) {
@@ -633,12 +671,14 @@ function processAndRenderNominals() {
       renderSpreadCharts(spreadBonds, 'treasuries');
       renderSpreadTable(spreadBonds, 'treasuries');
     } else {
-      renderNominalsTable(fedFiltered, mqFiltered, fedSpot, mqSpot, startTermY, endTermY);
-      renderNominalsChart(fedFiltered, mqFiltered, fedSpot, mqSpot);
+      if (fedFiltered || mqFiltered) renderNominalsTable(fedFiltered, mqFiltered, fedSpot, mqSpot, startTermY, endTermY);
+      else document.getElementById('nominalsTableBody').innerHTML = '';
+      renderNominalsChart(fedFiltered, mqFiltered, fedSpot, mqSpot, cmtSeries ? cmtDataset('CMT', cmtSeries, cmtInRange(startDate, endDate), Date.now()) : null);
     }
 
     document.getElementById('treaFedMeta').textContent = showFed ? isoToMDY(storeDates.fedInvest.settle) : '';
     document.getElementById('treaMktMeta').textContent = showMq ? marketMetaText(storeDates.market) : '';
+    document.getElementById('treaCmtMeta').textContent = cmtSeries ? cmtMetaText(cmtSeries) : '';
     document.getElementById('treaFedCount').textContent = showFed ? (fedFiltered?.length || 0) : '';
     document.getElementById('treaMktCount').textContent = showMq ? (mqFiltered?.length || 0) : '';
     statusEl.textContent = '';
@@ -747,10 +787,10 @@ function renderNominalsTable(fedBonds, mqBonds, fedSpot, mqSpot, startTermY, end
   }
 }
 
-function renderNominalsChart(fedBonds, mqBonds, fedSpot, mqSpot) {
+function renderNominalsChart(fedBonds, mqBonds, fedSpot, mqSpot, cmtDef = null) {
   const ctx = document.getElementById('yieldChart').getContext('2d');
   const allBonds = [...(fedBonds || []), ...(mqBonds || [])];
-  const haveSpotInput = (fedSpot && fedSpot.length) || (mqSpot && mqSpot.length);
+  const haveSpotInput = (fedSpot && fedSpot.length) || (mqSpot && mqSpot.length) || (cmtDef && cmtDef.data.length);
   if (allBonds.length === 0 && !haveSpotInput) { if (chart) { chart.destroy(); chart = null; } return; }
 
   const now = Date.now();
@@ -797,6 +837,8 @@ function renderNominalsChart(fedBonds, mqBonds, fedSpot, mqSpot) {
       seriesDef.push({ label: `Spot${sfx}`, data: points.map(({ t, y }) => ({ x: yToX(t), y })), color, w: 2.5, dash: [], curve: true, r: 0, markerR: 2 });
     }
   }
+
+  if (cmtDef) seriesDef.push(cmtDef);
 
   // Filter series with no data points
   const activeSeries = seriesDef.filter(s => s.data.length > 0);
@@ -993,9 +1035,10 @@ function processAndRenderTips() {
   const statusEl = document.getElementById('status');
   const showFed = document.getElementById('chkTipsFed').checked;
   const showBroker = document.getElementById('chkTipsBroker').checked && !!marketTipsData;
+  const cmtSeries = cmtSeriesOf('tips');
 
-  if (!showFed && !showBroker) { statusEl.textContent = ''; if (chart) { chart.destroy(); chart = null; } return; }
-  if (showFed && !fedTipsData && !showBroker) return;
+  if (!showFed && !showBroker && !cmtSeries) { statusEl.textContent = ''; if (chart) { chart.destroy(); chart = null; } return; }
+  if (showFed && !fedTipsData && !showBroker && !cmtSeries) return;
 
   try {
     const fedBonds = showFed ? fedTipsData : null;
@@ -1004,7 +1047,7 @@ function processAndRenderTips() {
     const startEl = document.getElementById('startMaturity');
     const endEl = document.getElementById('endMaturity');
 
-    const allCurrent = [...(fedBonds || []), ...(brokerBonds || [])].sort((a, b) => a.maturityDate - b.maturityDate);
+    const allCurrent = [...(fedBonds || []), ...(brokerBonds || []), ...(cmtSeries?.points || [])].sort((a, b) => a.maturityDate - b.maturityDate);
     if (!startEl.value && allCurrent.length > 0) {
       startEl.value = allCurrent[0].maturity;
       endEl.value = allCurrent[allCurrent.length - 1].maturity;
@@ -1023,12 +1066,14 @@ function processAndRenderTips() {
     } else {
       tipsTableFed = fedFiltered;
       tipsTableBroker = brokerFiltered;
-      renderTable(fedFiltered, brokerFiltered);
-      renderChart(fedFiltered, brokerFiltered);
+      if (fedFiltered || brokerFiltered) renderTable(fedFiltered, brokerFiltered);
+      else document.getElementById('tableBody').innerHTML = '';
+      renderChart(fedFiltered, brokerFiltered, cmtSeries ? cmtDataset('R-CMT', cmtSeries, cmtInRange(startDate, endDate), Date.now()) : null);
     }
 
     document.getElementById('tipsFedMeta').textContent = showFed ? isoToMDY(storeDates.fedInvest.settle) : '';
     document.getElementById('tipsMktMeta').textContent = showBroker ? marketMetaText(storeDates.market) : '';
+    document.getElementById('tipsCmtMeta').textContent = cmtSeries ? cmtMetaText(cmtSeries) : '';
     document.getElementById('tipsFedCount').textContent = showFed ? (fedFiltered?.length || 0) : '';
     document.getElementById('tipsBrokerCount').textContent = showBroker ? (brokerFiltered?.length || 0) : '';
     statusEl.textContent = '';
@@ -1214,10 +1259,10 @@ function buildYieldXScale(allPoints) {
   };
 }
 
-function renderChart(fedBonds, brokerBonds) {
+function renderChart(fedBonds, brokerBonds, cmtDef = null) {
   const ctx = document.getElementById('yieldChart').getContext('2d');
   const allBonds = [...(fedBonds || []), ...(brokerBonds || [])];
-  if (allBonds.length === 0) { if (chart) { chart.destroy(); chart = null; } return; }
+  if (allBonds.length === 0 && !(cmtDef && cmtDef.data.length)) { if (chart) { chart.destroy(); chart = null; } return; }
 
   const now = Date.now();
   const toPt = xAxisMode === 'ttm'
@@ -1281,6 +1326,8 @@ function renderChart(fedBonds, brokerBonds) {
     color: '#111827', curve: true, w: 1.5, dash: [6, 4], style: 'circle', r: 0, markerR: 3,
   });
   }
+
+  if (cmtDef) seriesDef.push(cmtDef);
 
   const activeSeries = seriesDef.filter(s => s.data.length > 0);
   const allPoints = activeSeries.flatMap(s => s.data);
@@ -1370,7 +1417,7 @@ function rescaleToVisible(chart) {
 
   chart.data.datasets.forEach((dataset, i) => {
     if (!chart.isDatasetVisible(i)) return;
-    const isCurve = dataset.label.startsWith('Spot') || dataset.label.startsWith('GSW');
+    const isCurve = /^(Spot|GSW|CMT|R-CMT)/.test(dataset.label);
     dataset.data.forEach(p => { if (p.x >= xMin && p.x <= xMax) (isCurve ? curveVisibleY : allVisibleY).push(p.y); });
   });
 
@@ -1433,7 +1480,8 @@ function processAndRenderBei() {
   const statusEl = document.getElementById('status');
 
   const tips = (beiStore?.rows || []).map(toBeiBond).sort((a, b) => a.maturityDate - b.maturityDate);
-  if (tips.length === 0) {
+  const cmtSeries = cmtSeriesOf('bei');
+  if (tips.length === 0 && !cmtSeries) {
     statusEl.textContent = 'BEI requires market-quote TIPS and nominal data.';
     statusEl.className = '';
     if (chart) { chart.destroy(); chart = null; }
@@ -1448,18 +1496,20 @@ function processAndRenderBei() {
 
     const startEl = document.getElementById('startMaturity');
     const endEl = document.getElementById('endMaturity');
-    if (!startEl.value && tips.length > 0) {
-      startEl.value = tips[0].maturity;
-      endEl.value = tips[tips.length - 1].maturity;
+    const allBei = [...tips, ...(cmtSeries?.points || [])].sort((a, b) => a.maturityDate - b.maturityDate);
+    if (!startEl.value && allBei.length > 0) {
+      startEl.value = allBei[0].maturity;
+      endEl.value = allBei[allBei.length - 1].maturity;
     }
     const startDate = parseIsoInput(startEl.value) || new Date(0);
     const endDate = parseIsoInput(endEl.value) || new Date(9999, 0);
     const filtered = tips.filter(b => b.maturityDate >= startDate && b.maturityDate <= endDate);
 
     renderBeiTable(filtered);
-    renderBeiChart(filtered, spotBeiGrid);
+    renderBeiChart(filtered, spotBeiGrid, cmtSeries ? cmtDataset('CMT BEI', cmtSeries, cmtInRange(startDate, endDate), Date.now()) : null);
 
-    document.getElementById('tipsMktMeta').textContent = marketMetaText(beiStore.dates);
+    document.getElementById('tipsMktMeta').textContent = beiStore ? marketMetaText(beiStore.dates) : '';
+    document.getElementById('tipsCmtMeta').textContent = cmtSeries ? cmtMetaText(cmtSeries) : '';
     document.getElementById('tipsBrokerCount').textContent = filtered.length;
     document.getElementById('tipsFedMeta').textContent = '';
     document.getElementById('tipsFedCount').textContent = '';
@@ -1480,9 +1530,9 @@ function getBeiSeriesVisibility(label) {
   return true;
 }
 
-function renderBeiChart(bonds, spotBeiGrid) {
+function renderBeiChart(bonds, spotBeiGrid, cmtDef = null) {
   const ctx = document.getElementById('yieldChart').getContext('2d');
-  if (!bonds || bonds.length === 0) { if (chart) { chart.destroy(); chart = null; } return; }
+  if ((!bonds || bonds.length === 0) && !(cmtDef && cmtDef.data.length)) { if (chart) { chart.destroy(); chart = null; } return; }
 
   const now = Date.now();
   const toPt = xAxisMode === 'ttm'
@@ -1494,6 +1544,7 @@ function renderBeiChart(bonds, spotBeiGrid) {
     { label: 'SA BEI',  data: bonds.map(b => toPt(b, 'beiSa')),  color: '#dc2626', style: 'circle', w: 1.8, r: 1.25 },
     { label: 'SAO BEI', data: bonds.map(b => toPt(b, 'beiSao')), color: '#059669', style: 'circle', w: 2.2, r: 1.25 },
   ];
+  if (cmtDef) seriesDef.push(cmtDef);
   if (spotBeiGrid) seriesDef.push({ label: 'Spot BEI', data: spotBeiGrid, color: '#1a56db', style: 'circle', w: 2.5, r: 0, markerR: 2, curve: true });
 
   const activeSeries = seriesDef.filter(s => s.data.length > 0);
@@ -1631,6 +1682,8 @@ function switchChartMode(mode) {
     if (spreadChart2) { spreadChart2.destroy(); spreadChart2 = null; }
   }
   const isBei = activeTab === 'bei';
+  document.getElementById('tipsCmtLabel').style.display = isSpread ? 'none' : '';
+  document.getElementById('treaCmtLabel').style.display = isSpread ? 'none' : '';
   document.getElementById('tipsControls').style.display     = (activeTab === 'tips' && !isSpread) ? 'flex' : 'none';
   document.getElementById('nominalsControls').style.display = (activeTab === 'treasuries') ? 'flex' : 'none';
   document.getElementById('beiControls').style.display      = isBei ? 'flex' : 'none';
@@ -2121,14 +2174,21 @@ function preserveZoom() {
 const CHECKBOX_MIRROR = {
   chkTipsFed: 'chkFedInvest', chkFedInvest: 'chkTipsFed',
   chkTipsBroker: 'chkMarket', chkMarket: 'chkTipsBroker',
+  chkTipsCmt: 'chkCmt', chkCmt: 'chkTipsCmt',
 };
 function mirrorCheckbox(id) {
   const counterpart = document.getElementById(CHECKBOX_MIRROR[id]);
   if (!counterpart.disabled) counterpart.checked = document.getElementById(id).checked;
 }
-['chkTipsFed', 'chkTipsBroker', 'chkFedInvest', 'chkMarket'].forEach(id => {
+['chkTipsFed', 'chkTipsBroker', 'chkFedInvest', 'chkMarket', 'chkTipsCmt', 'chkCmt'].forEach(id => {
   document.getElementById(id).addEventListener('change', () => {
     mirrorCheckbox(id);
+    // Checking or unchecking the CMT changes which maturities the Maturity Range spans (3.2.3).
+    if (id === 'chkTipsCmt' || id === 'chkCmt') {
+      if (activeTab === 'treasuries') recomputeRangeFromChecked();
+      else { document.getElementById('startMaturity').value = ''; document.getElementById('endMaturity').value = ''; }
+      savedZoom[activeTab] = null;
+    }
     preserveZoom();
     updateModeToggle();
     processAndRender();
@@ -2241,6 +2301,8 @@ function recomputeRangeFromChecked() {
     if (fedNominalsData) candidates.push(...fedNominalsData.filter(isSpotFitType));
     if (marketNominalsData) candidates.push(...marketNominalsData.filter(isSpotFitType));
   }
+  const cmtSeries = cmtSeriesOf('treasuries');
+  if (cmtSeries) candidates.push(...cmtSeries.points);
   if (candidates.length === 0) { startEl.value = ''; endEl.value = ''; return; }
   const minB = candidates.reduce((a, b) => a.maturityDate <= b.maturityDate ? a : b);
   const maxB = candidates.reduce((a, b) => a.maturityDate >= b.maturityDate ? a : b);

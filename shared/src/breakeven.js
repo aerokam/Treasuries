@@ -43,3 +43,24 @@ export function spotBreakevenAcrossTerms(treasuriesFit, tipsFit) {
   }
   return points.length >= 3 ? points : null;
 }
+
+// The breakeven of the CMT (knowledge/DATA_DICTIONARY.md#breakeven-inflation, the CMT
+// construction): at the latest Date that both stores hold, the CMT less the R-CMT at each
+// maturity where both are stated.
+//
+// cmtRows, rcmtRows   rows of ratesAsNumbers() in cmt-rates.js, oldest Date first
+//
+// Returns { date, points: [{ column, bei }] } in the column order of the R-CMT, bei a decimal,
+// or null when no Date is held by both stores or no maturity has both rates.
+export function cmtBreakeven(cmtRows, rcmtRows) {
+  const cmtByDate = new Map(cmtRows.map(r => [r.date, r]));
+  let date = null;
+  for (const r of rcmtRows) if (cmtByDate.has(r.date) && (date === null || r.date > date)) date = r.date;
+  if (date === null) return null;
+  const cmt = cmtByDate.get(date).rates;
+  const rcmt = rcmtRows.find(r => r.date === date).rates;
+  const points = Object.keys(rcmt)
+    .filter(c => rcmt[c] != null && cmt[c] != null)
+    .map(c => ({ column: c, bei: cmt[c] - rcmt[c] }));
+  return points.length ? { date, points } : null;
+}

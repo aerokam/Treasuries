@@ -170,6 +170,16 @@ Register-NodeTask "GswTipsCurve" `
     @(New-ScheduledTaskTrigger -Daily -At "7:15am") `
     "YieldCurves/scripts/updateGswTipsCurve.js"
 
+# CmtRates  -  Weekdays every 30 minutes, 1:00pm to 6:00pm PT [ET: 4:00pm to 9:00pm]
+# Treasury publishes the day's CMT and R-CMT rates after 3:30pm ET; the posting time is not stated,
+# so the job runs through the evening until it has been measured. A run that finds no new row
+# writes nothing (knowledge/1.18_Fetch_CMT_Rates.md).
+$cmtTimes = 0..10 | ForEach-Object { (Get-Date -Hour 13 -Minute 0 -Second 0).AddMinutes(30 * $_) }
+Register-NodeTask "CmtRates" `
+    "Read CMT and R-CMT rates, upload Treasuries/CmtRates.csv and TIPS/RCmtRates.csv" `
+    @($cmtTimes | ForEach-Object { New-ScheduledTaskTrigger -Weekly -DaysOfWeek $Weekdays -At $_ }) `
+    "YieldCurves/scripts/updateCmtRates.js"
+
 # MarketQuotes  -  8:05am ET [PT: 5:05am]
 # Runs before market open, when the user is often not logged on yet — S4U so it runs
 # regardless. No visible window: if the automated MFA path (SMS code read from Phone
