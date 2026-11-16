@@ -7,6 +7,7 @@ import { parseCsv } from '../../shared/src/csv.js';
 import { localDate, toIsoDate, nextBusinessDay, parseHolidaySet } from '../../shared/src/settlement.js';
 import { resolveTipsBond } from './cnbc-rollover-log.js';
 import { layerCustomSeries, archiveDatesToRead, customBounds, showMarkers, countVisible, DATE_ONLY_RANGES } from './custom-series.js';
+import { parseRatesCsv, ratesAsNumbers } from '../../shared/src/cmt-rates.js';
 import { createTradingTimeScale, tradingGapPlugin, inTradingSession, toTradingTime, fromTradingTime, toCalendarScaledTime, setHolidays } from './trading-time.js';
 
 Chart.register(createTradingTimeScale(Chart));
@@ -35,6 +36,18 @@ const COLORS = [
 ];
 
 const SA_COLOR = '#f59e0b'; // fixed accent for the SA overlay line, distinct from every raw-line color
+const CMT_COLOR = '#0d9488'; // fixed accent for the CMT line, distinct from the SA color and every raw-line color
+// The column of CMT rates (S24) of each nominal symbol and of R-CMT rates (S25) of each TIPS symbol
+// (knowledge/2.1_Assemble_Range_Data.md, 2.1.5). US1YTIPS and US2YTIPS have none.
+const CMT_COLUMN = { US1M: '1 Mo', US2M: '2 Mo', US3M: '3 Mo', US6M: '6 Mo', US1Y: '1 Yr', US2Y: '2 Yr', US5Y: '5 Yr', US10Y: '10 Yr', US30Y: '30 Yr' };
+const RCMT_COLUMN = { US5YTIPS: '5 Yr', US10YTIPS: '10 Yr', US30YTIPS: '30 Yr' };
+const columnOf = sym => (sym.endsWith('TIPS') ? RCMT_COLUMN : CMT_COLUMN)[sym];
+const CMT_URL = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/CmtRates.csv';
+const RCMT_URL = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/TIPS/RCmtRates.csv';
+let showCmt = false;
+let cmtByDate = null;   // CMT rates (S24): 'YYYY-MM-DD' -> { date, rates }, once read
+let rcmtByDate = null;  // R-CMT rates (S25)
+let cmtPromise = null;
 
 // Yield Curves / BEI charts plot by maturity (a categorical axis, not time), so a missing
 // maturity (e.g. 5Y unresolved on a historical date) reads better as a lighter connector
@@ -300,7 +313,7 @@ function setupUI() {
     return `<label class="sym-item-check" id="label-${sym}"><input type="checkbox" value="${sym}" ${activeSymbols.has(sym) ? 'checked' : ''}><span class="color-dot" style="background:${color}"></span><span class="sym-code">${SYMBOL_LABELS[sym] || sym}</span><span class="sym-yield" id="yield-${sym}">---</span><span class="sym-change" id="change-${sym}"></span><span class="sym-updated" id="updated-${sym}" title="Time of the latest point plotted"></span></label>`;
   }).join('');
 
-  root.innerHTML = `<style>.range-picker { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 20px; } .range-btn { flex: 1; min-width: 45px; padding: 6px 0; border: none; background: var(--tab-inactive-bg); border-radius: 4px; cursor: pointer; font-weight: 700; font-size: 13px; color: var(--tab-inactive-text); text-transform: uppercase; letter-spacing: 0.04em; transition: background 0.1s; } .range-btn:hover:not(.active) { background: var(--btn-hover-bg); } .range-btn.active { background: var(--tab-active-bg); color: var(--tab-inactive-text); border-top: 3px solid var(--tab-active-accent); } .sym-group h4 { display: flex; justify-content: space-between; align-items: center; margin: 12px 0 6px; font-size: 13px; text-transform: uppercase; color: #000; font-weight: 800; letter-spacing: 0.05em; border-bottom: 1px solid #cbd5e1; padding-bottom: 2px; } .clear-btn { font-size: 11px; color: #64748b; cursor: pointer; text-transform: none; font-weight: 600; } .sym-item-check { display: flex; align-items: center; gap: 4px; padding: 4px 0; font-size: 15px; cursor: pointer; color: #000; } .color-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; } .sym-code { font-weight: 600; color: #000; width: 62px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .sym-yield { font-family: monospace; font-weight: 700; font-size: 15px; color: #000; width: 54px; flex-shrink: 0; text-align: right; } .sym-change { font-family: monospace; font-weight: 700; font-size: 13px; width: 50px; flex-shrink: 0; text-align: right; } .sym-change.up { color: #16a34a; } .sym-change.down { color: #dc2626; } .sym-col-head { display: flex; align-items: center; gap: 4px; padding: 2px 0; } .sym-col-head > span { font-family: inherit; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.04em; } .sym-col-head .hdr-spacer { width: 32px; flex-shrink: 0; } .sym-updated { font-family: monospace; font-weight: 700; font-size: 12px; color: #64748b; width: 72px; flex-shrink: 0; text-align: right; white-space: nowrap; } .yield-toggle-group { margin-top: 15px; font-size: 14px; font-weight: 700; color: #334155; background: #f8fafc; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; } .yield-toggle-title { margin-bottom: 4px; } .yield-toggle-option { display: flex; align-items: center; gap: 6px; padding: 2px 0; cursor: pointer; font-weight: 600; } #fetchStatus { font-size: 13px; color: #000; margin-top: 20px; font-weight: 700; display: grid; grid-template-columns: auto auto; column-gap: 4px; row-gap: 2px; } #fetchStatus .fs-label { text-align: right; } #fetchStatus .fs-val { text-align: left; } .no-data-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: #000; background: rgba(255,255,255,0.9); pointer-events: none; z-index: 10; } .sync-zoom-label { display: flex; align-items: center; gap: 6px; margin-top: 15px; font-size: 14px; font-weight: 700; color: #334155; cursor: pointer; background: #f8fafc; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; } .custom-date-range { display: none; flex-direction: column; gap: 6px; padding: 10px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; margin-bottom: 4px; } .custom-date-label { font-size: 12px; font-weight: 800; color: #334155; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.04em; } .custom-date-inputs { display: flex; flex-direction: column; gap: 6px; } .custom-date-inputs label { font-size: 12px; font-weight: 700; color: #334155; display: flex; flex-direction: column; gap: 2px; } .custom-date-inputs .date-picker { width: 100%; font-size: 13px; } .custom-date-apply { margin-top: 4px; padding: 6px; background: var(--tab-active-bg); color: var(--tab-inactive-text); border: none; border-top: 3px solid var(--tab-active-accent); border-radius: 4px; font-size: 13px; font-weight: 700; cursor: pointer; width: 100%; } .custom-date-apply:hover { opacity: 0.85; }</style><div class="range-picker">${rangeHtml}</div><div class="custom-date-range" id="custom-date-range"><div class="custom-date-label">Custom Date Range</div><div class="custom-date-inputs"><label>Start Date<input type="date" id="customStart" class="date-picker"></label><label>End Date<input type="date" id="customEnd" class="date-picker"></label></div><button class="custom-date-apply" id="applyCustomRange">Apply</button></div><div class="sym-group"><h4>TIPS <span class="clear-btn" data-type="TIPS">Clear All</span></h4>${symColumnHeaders}${createGrid(tips)}<h4>Treasuries <span class="clear-btn" data-type="Nominal">Clear All</span></h4>${symColumnHeaders}${createGrid(nominals)}</div><div class="yield-toggle-group"><label class="yield-toggle-option"><input type="checkbox" id="syncXAxis" ${syncXAxis ? 'checked' : ''}> Sync Zoom & Pan</label><label class="yield-toggle-option"><input type="checkbox" id="lockRight"> Lock Right</label><label class="yield-toggle-option"><input type="checkbox" id="hideNonTrading"${hideNonTrading ? 'checked' : ''}> Hide non-trading hours (2D, 10D)</label></div><div class="yield-toggle-group"><div class="yield-toggle-title" id="yieldToggleTitle">Show TIPS yields (${isCurveScope() ? 'Yield Curves / BEI' : 'Time Series'}):</div><label class="yield-toggle-option"><input type="checkbox" id="showQuotedYield" ${(isCurveScope() ? showQuotedYieldCurve : showQuotedYieldTS) ? 'checked' : ''}> Quoted</label><label class="yield-toggle-option"><input type="checkbox" id="showSaYield" ${(isCurveScope() ? showSaYieldCurve : showSaYieldTS) ? 'checked' : ''}> Seasonally Adjusted (SA)</label></div><div id="fetchStatus">Ready</div>`;
+  root.innerHTML = `<style>.range-picker { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 20px; } .range-btn { flex: 1; min-width: 45px; padding: 6px 0; border: none; background: var(--tab-inactive-bg); border-radius: 4px; cursor: pointer; font-weight: 700; font-size: 13px; color: var(--tab-inactive-text); text-transform: uppercase; letter-spacing: 0.04em; transition: background 0.1s; } .range-btn:hover:not(.active) { background: var(--btn-hover-bg); } .range-btn.active { background: var(--tab-active-bg); color: var(--tab-inactive-text); border-top: 3px solid var(--tab-active-accent); } .sym-group h4 { display: flex; justify-content: space-between; align-items: center; margin: 12px 0 6px; font-size: 13px; text-transform: uppercase; color: #000; font-weight: 800; letter-spacing: 0.05em; border-bottom: 1px solid #cbd5e1; padding-bottom: 2px; } .clear-btn { font-size: 11px; color: #64748b; cursor: pointer; text-transform: none; font-weight: 600; } .sym-item-check { display: flex; align-items: center; gap: 4px; padding: 4px 0; font-size: 15px; cursor: pointer; color: #000; } .color-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; } .sym-code { font-weight: 600; color: #000; width: 62px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .sym-yield { font-family: monospace; font-weight: 700; font-size: 15px; color: #000; width: 54px; flex-shrink: 0; text-align: right; } .sym-change { font-family: monospace; font-weight: 700; font-size: 13px; width: 50px; flex-shrink: 0; text-align: right; } .sym-change.up { color: #16a34a; } .sym-change.down { color: #dc2626; } .sym-col-head { display: flex; align-items: center; gap: 4px; padding: 2px 0; } .sym-col-head > span { font-family: inherit; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.04em; } .sym-col-head .hdr-spacer { width: 32px; flex-shrink: 0; } .sym-updated { font-family: monospace; font-weight: 700; font-size: 12px; color: #64748b; width: 72px; flex-shrink: 0; text-align: right; white-space: nowrap; } .yield-toggle-group { margin-top: 15px; font-size: 14px; font-weight: 700; color: #334155; background: #f8fafc; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; } .yield-toggle-title { margin-bottom: 4px; } .yield-toggle-option { display: flex; align-items: center; gap: 6px; padding: 2px 0; cursor: pointer; font-weight: 600; } #fetchStatus { font-size: 13px; color: #000; margin-top: 20px; font-weight: 700; display: grid; grid-template-columns: auto auto; column-gap: 4px; row-gap: 2px; } #fetchStatus .fs-label { text-align: right; } #fetchStatus .fs-val { text-align: left; } .no-data-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: #000; background: rgba(255,255,255,0.9); pointer-events: none; z-index: 10; } .sync-zoom-label { display: flex; align-items: center; gap: 6px; margin-top: 15px; font-size: 14px; font-weight: 700; color: #334155; cursor: pointer; background: #f8fafc; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; } .custom-date-range { display: none; flex-direction: column; gap: 6px; padding: 10px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; margin-bottom: 4px; } .custom-date-label { font-size: 12px; font-weight: 800; color: #334155; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.04em; } .custom-date-inputs { display: flex; flex-direction: column; gap: 6px; } .custom-date-inputs label { font-size: 12px; font-weight: 700; color: #334155; display: flex; flex-direction: column; gap: 2px; } .custom-date-inputs .date-picker { width: 100%; font-size: 13px; } .custom-date-apply { margin-top: 4px; padding: 6px; background: var(--tab-active-bg); color: var(--tab-inactive-text); border: none; border-top: 3px solid var(--tab-active-accent); border-radius: 4px; font-size: 13px; font-weight: 700; cursor: pointer; width: 100%; } .custom-date-apply:hover { opacity: 0.85; }</style><div class="range-picker">${rangeHtml}</div><div class="custom-date-range" id="custom-date-range"><div class="custom-date-label">Custom Date Range</div><div class="custom-date-inputs"><label>Start Date<input type="date" id="customStart" class="date-picker"></label><label>End Date<input type="date" id="customEnd" class="date-picker"></label></div><button class="custom-date-apply" id="applyCustomRange">Apply</button></div><div class="sym-group"><h4>TIPS <span class="clear-btn" data-type="TIPS">Clear All</span></h4>${symColumnHeaders}${createGrid(tips)}<h4>Treasuries <span class="clear-btn" data-type="Nominal">Clear All</span></h4>${symColumnHeaders}${createGrid(nominals)}</div><div class="yield-toggle-group"><label class="yield-toggle-option"><input type="checkbox" id="syncXAxis" ${syncXAxis ? 'checked' : ''}> Sync Zoom & Pan</label><label class="yield-toggle-option"><input type="checkbox" id="lockRight"> Lock Right</label><label class="yield-toggle-option"><input type="checkbox" id="hideNonTrading"${hideNonTrading ? 'checked' : ''}> Hide non-trading hours (2D, 10D)</label></div><div class="yield-toggle-group"><label class="yield-toggle-option"><input type="checkbox" id="showCmt" ${showCmt ? 'checked' : ''}> Show CMTs</label></div><div class="yield-toggle-group"><div class="yield-toggle-title" id="yieldToggleTitle">Show TIPS yields (${isCurveScope() ? 'Yield Curves / BEI' : 'Time Series'}):</div><label class="yield-toggle-option"><input type="checkbox" id="showQuotedYield" ${(isCurveScope() ? showQuotedYieldCurve : showQuotedYieldTS) ? 'checked' : ''}> Quoted</label><label class="yield-toggle-option"><input type="checkbox" id="showSaYield" ${(isCurveScope() ? showSaYieldCurve : showSaYieldTS) ? 'checked' : ''}> Seasonally Adjusted (SA)</label></div><div id="fetchStatus">Ready</div>`;
 
   document.getElementById('syncXAxis').addEventListener('change', (e) => {
     syncXAxis = e.target.checked;
@@ -311,6 +324,12 @@ function setupUI() {
   });
   document.getElementById('lockRight').addEventListener('change', (e) => { lockRight = e.target.checked; });
   document.getElementById('hideNonTrading').addEventListener('change', (e) => { hideNonTrading = e.target.checked; const views = captureChartViews(); updateCharts(); restoreChartViews(views); keepSyncedWindow(views); });
+  document.getElementById('showCmt').addEventListener('change', async (e) => {
+    showCmt = e.target.checked;
+    if (showCmt) await ensureCmtLoaded();
+    refreshCmtLines(true);
+    if (isCurveScope()) updateYieldCurves();
+  });
   document.getElementById('showQuotedYield').addEventListener('change', async (e) => {
     if (isCurveScope()) {
       if (!e.target.checked && !showSaYieldCurve) {
@@ -437,21 +456,36 @@ const pointMarkerPlugin = {
 };
 const markerRadius = ctx => (ctx.chart.$markerRadius && ctx.chart.$markerRadius[ctx.datasetIndex]) || 0;
 
+// A tooltip lists the Yield and SA Yield points at the cursor's index, and the CMT point within 12 px of the cursor:
+// the CMT points are not at the index of the other lines.
+Chart.Interaction.modes.indexWithCmt = function (chart, e, options, useFinalPosition) {
+  const items = Chart.Interaction.modes.index(chart, e, options, useFinalPosition).filter(it => chart.data.datasets[it.datasetIndex].tag !== 'cmt');
+  const di = chart.data.datasets.findIndex(d => d.tag === 'cmt');
+  if (di >= 0 && chart.isDatasetVisible(di)) {
+    const els = chart.getDatasetMeta(di).data, cx = Chart.helpers.getRelativePosition(e, chart).x;
+    let best = -1, bestDist = 12;
+    els.forEach((el, i) => { const d = Math.abs(el.x - cx); if (d <= bestDist) { bestDist = d; best = i; } });
+    if (best >= 0) items.push({ element: els[best], datasetIndex: di, index: best });
+  }
+  return items;
+};
+
 function createChartInstance(sym) {
   const ctx = document.getElementById(`chart-${sym}`).getContext('2d');
   const color = COLORS[Object.keys(AVAILABLE_SYMBOLS).indexOf(sym) % COLORS.length];
-  const saDataset = SA_SYMBOLS.has(sym) ? [{ label: `${sym} SA`, data: [], borderColor: SA_COLOR, backgroundColor: 'transparent', pointBackgroundColor: SA_COLOR, borderWidth: 1.5, pointRadius: markerRadius, clip: MARKER_CLIP, pointHoverRadius: 4, fill: false, tension: 0.1 }] : [];
+  const saDataset = SA_SYMBOLS.has(sym) ? [{ label: `${sym} SA`, tag: 'sa', data: [], borderColor: SA_COLOR, backgroundColor: 'transparent', pointBackgroundColor: SA_COLOR, borderWidth: 1.5, pointRadius: markerRadius, clip: MARKER_CLIP, pointHoverRadius: 4, fill: false, tension: 0.1 }] : [];
+  const cmtDataset = columnOf(sym) ? [{ label: `${sym} CMT`, tag: 'cmt', data: [], borderColor: CMT_COLOR, backgroundColor: 'transparent', pointBackgroundColor: CMT_COLOR, borderWidth: 1.5, pointRadius: 3, clip: MARKER_CLIP, pointHoverRadius: 5, fill: false, tension: 0 }] : [];
   charts[sym] = new Chart(ctx, {
     type: 'line',
     plugins: [pointMarkerPlugin, tradingGapPlugin],
-    data: { datasets: [{ label: sym, data: [], borderColor: color, backgroundColor: color + '1A', pointBackgroundColor: color, borderWidth: 1.5, pointRadius: markerRadius, clip: MARKER_CLIP, pointHoverRadius: 4, fill: false, tension: 0.1, segment: { borderColor: ctx => { if (!intradayRange()) return color; if (inTradingSession(ctx.p0.parsed.x) && inTradingSession(ctx.p1.parsed.x)) return color; const mid = (ctx.p0.parsed.x + ctx.p1.parsed.x) / 2; return (isAfterHoursEt(mid) || isWeekendEt(new Date(mid))) ? color + '55' : color; } } }, ...saDataset] },
+    data: { datasets: [{ label: sym, data: [], borderColor: color, backgroundColor: color + '1A', pointBackgroundColor: color, borderWidth: 1.5, pointRadius: markerRadius, clip: MARKER_CLIP, pointHoverRadius: 4, fill: false, tension: 0.1, segment: { borderColor: ctx => { if (!intradayRange()) return color; if (inTradingSession(ctx.p0.parsed.x) && inTradingSession(ctx.p1.parsed.x)) return color; const mid = (ctx.p0.parsed.x + ctx.p1.parsed.x) / 2; return (isAfterHoursEt(mid) || isWeekendEt(new Date(mid))) ? color + '55' : color; } } }, ...saDataset, ...cmtDataset] },
     options: {
-      animation: false, responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, layout: { padding: { right: MARKER_CLIP_PX } },
+      animation: false, responsive: true, maintainAspectRatio: false, interaction: { mode: 'indexWithCmt', intersect: false }, layout: { padding: { right: MARKER_CLIP_PX } },
       scales: {
         x: { type: 'tradingTime', compact: false, time: { tooltipFormat: 'MM/dd/yy HH:mm:ss', displayFormats: { hour: 'MM/dd HH:mm', day: 'MMM dd', month: 'MMM yyyy', year: 'yyyy' } }, grid: { color: '#f1f5f9' }, ticks: { autoSkip: true, font: { size: 9, weight: 'bold' }, color: '#000', callback(value, index, ticks) { const d = new Date(value); const span = this.options.compact ? toCalendarScaledTime(this.max) - toCalendarScaledTime(this.min) : this.max - this.min; if (span < 3 * 86400000) { const p = ET_HM_FMT.formatToParts(d).reduce((a, pt) => ({...a, [pt.type]: pt.value}), {}); return `${p.month}/${p.day} ${p.hour}:${p.minute}`; } if (span < 90 * 86400000) { const label = ET_TICK_DAY_FMT.format(d); if (index > 0 && ET_TICK_DAY_FMT.format(new Date(ticks[index - 1].value)) === label) return ''; return label; } const label = ET_TICK_MON_FMT.format(d); if (index > 0 && ET_TICK_MON_FMT.format(new Date(ticks[index - 1].value)) === label) return ''; return label; } } },
         y: { grid: { color: '#f1f5f9' }, ticks: { font: { size: 9, family: 'monospace', weight: 'bold' }, color: '#000', callback: v => v.toFixed(3) + '%' } }
       },
-      plugins: { legend: { display: false }, zoom: { zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'xy', onZoom: ({chart}) => { if (lockRight) applyLockRight(chart, xMaxAnchors[sym], lockRightAxis()); if (syncXAxis) syncAllChartsX(chart); }, onZoomComplete: ({chart}) => { if (lockRight) applyLockRight(chart, xMaxAnchors[sym], lockRightAxis()); applyXTimeUnit(chart, unitSpanPos()); rescaleYToVisible(chart, sym); if (syncXAxis) syncAllChartsX(chart); } }, pan: { enabled: true, mode: 'xy', onPanStart: ({chart}) => { Object.entries(charts).forEach(([s, c]) => { panStartY[s] = { min: c.scales.y.min, max: c.scales.y.max }; }); }, onPan: ({chart}) => { const w = chart.scales.x.takePanWindow?.(); if (w) { chart.options.scales.x.min = w.min; chart.options.scales.x.max = w.max; chart.update('none'); } if (syncXAxis) syncAllCharts(chart); }, onPanComplete: ({chart}) => { applyXTimeUnit(chart, unitSpanPos()); if (!yOverrideSyms.has(sym)) rescaleYToVisible(chart, sym); else chart.update('none'); if (syncXAxis) syncAllCharts(chart); Object.keys(panStartY).forEach(k => delete panStartY[k]); } } }, annotation: { annotations: {} }, tooltip: { backgroundColor: 'rgba(255, 255, 255, 0.95)', titleColor: '#64748b', titleFont: { size: 11, weight: 'bold' }, bodyColor: '#000', borderColor: '#cbd5e1', borderWidth: 1, padding: 8, bodyFont: { size: 12, weight: 'bold' }, cornerRadius: 6, displayColors: false, callbacks: { title: (items) => { if (!items.length) return ''; const date = new Date(items[0].parsed.x); if (DATE_ONLY_RANGES.has(activeRange)) return date.toLocaleDateString('en-US', { timeZone: 'America/New_York', month: '2-digit', day: '2-digit', year: '2-digit' }); return date.toLocaleString('en-US', { timeZone: 'America/New_York', hourCycle: 'h23', month: '2-digit', day: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' ET'; }, label: ctx => `${ctx.datasetIndex === 1 ? 'SA Yield' : 'Yield'}: ${ctx.parsed.y.toFixed(2)}%` } } }
+      plugins: { legend: { display: false }, zoom: { zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'xy', onZoom: ({chart}) => { if (lockRight) applyLockRight(chart, xMaxAnchors[sym], lockRightAxis()); if (syncXAxis) syncAllChartsX(chart); }, onZoomComplete: ({chart}) => { if (lockRight) applyLockRight(chart, xMaxAnchors[sym], lockRightAxis()); applyXTimeUnit(chart, unitSpanPos()); rescaleYToVisible(chart, sym); if (syncXAxis) syncAllChartsX(chart); } }, pan: { enabled: true, mode: 'xy', onPanStart: ({chart}) => { Object.entries(charts).forEach(([s, c]) => { panStartY[s] = { min: c.scales.y.min, max: c.scales.y.max }; }); }, onPan: ({chart}) => { const w = chart.scales.x.takePanWindow?.(); if (w) { chart.options.scales.x.min = w.min; chart.options.scales.x.max = w.max; chart.update('none'); } if (syncXAxis) syncAllCharts(chart); }, onPanComplete: ({chart}) => { applyXTimeUnit(chart, unitSpanPos()); if (!yOverrideSyms.has(sym)) rescaleYToVisible(chart, sym); else chart.update('none'); if (syncXAxis) syncAllCharts(chart); Object.keys(panStartY).forEach(k => delete panStartY[k]); } } }, annotation: { annotations: {} }, tooltip: { backgroundColor: 'rgba(255, 255, 255, 0.95)', titleColor: '#64748b', titleFont: { size: 11, weight: 'bold' }, bodyColor: '#000', borderColor: '#cbd5e1', borderWidth: 1, padding: 8, bodyFont: { size: 12, weight: 'bold' }, cornerRadius: 6, displayColors: false, callbacks: { title: (items) => { if (!items.length) return ''; const date = new Date(items[0].parsed.x); if (DATE_ONLY_RANGES.has(activeRange)) return date.toLocaleDateString('en-US', { timeZone: 'America/New_York', month: '2-digit', day: '2-digit', year: '2-digit' }); return date.toLocaleString('en-US', { timeZone: 'America/New_York', hourCycle: 'h23', month: '2-digit', day: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' ET'; }, label: ctx => `${ctx.dataset?.tag === 'sa' ? 'SA Yield' : ctx.dataset?.tag === 'cmt' ? (sym.endsWith('TIPS') ? 'R-CMT' : 'CMT') : 'Yield'}: ${ctx.parsed.y.toFixed(2)}%` } } }
     }
   });
   setupAxisWheelZoom(ctx.canvas, ({chart}) => {
@@ -700,6 +734,67 @@ async function ensureSaDataLoaded() {
 
 // The bond-market holidays are non-trading days for Hide non-trading hours as well as for SA, so
 // they are read before the charts are drawn, whether or not SA is on.
+// Reads CMT rates (S24) and R-CMT rates (S25) once, and again when force. A read that fails leaves
+// its store empty, so its symbols draw no CMT line (knowledge/2.1_Assemble_Range_Data.md, 2.1.5).
+async function ensureCmtLoaded(force = false) {
+  if (force) cmtPromise = null;
+  if (!cmtPromise) {
+    const read = async url => {
+      try {
+        const res = await fetchWithTimeout(url);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return new Map(ratesAsNumbers(parseRatesCsv(await res.text())).map(r => [r.date, r]));
+      } catch (err) { console.error('CMT read failed:', url, err); return new Map(); }
+    };
+    cmtPromise = Promise.all([read(CMT_URL), read(RCMT_URL)]).then(([c, r]) => { cmtByDate = c; rcmtByDate = r; });
+  }
+  await cmtPromise;
+}
+
+const etIsoOf = ms => { const [m, d, y] = getEtDateStr(new Date(ms)).split('/'); return `${y}-${m}-${d}`; };
+const pctOf = v => parseFloat((v * 100).toFixed(4));
+
+// The CMT Yield Series of a symbol for the active range: one point for each Date of the window that has a
+// rate in the column, at 15:30 ET (midnight ET on the daily ranges), the Yield in percent.
+function cmtSeries(sym) {
+  const col = columnOf(sym), byDate = sym.endsWith('TIPS') ? rcmtByDate : cmtByDate;
+  if (!col || !byDate) return [];
+  let startMs, endMs = Infinity;
+  if (activeRange === 'Custom') { if (!customStartDate || !customEndDate) return []; startMs = +customStartDate; endMs = +customEndDate; }
+  else startMs = +rangeCutoff(activeRange);
+  const dateOnly = DATE_ONLY_RANGES.has(activeRange);
+  const lo = etIsoOf(startMs - 86400000), hi = endMs === Infinity ? '9999-12-31' : etIsoOf(endMs + 86400000);
+  const out = [];
+  for (const [date, r] of byDate) {
+    const v = r.rates[col];
+    if (v == null || date < lo || date > hi) continue;
+    const [y, m, d] = date.split('-').map(Number);
+    const x = makeEtMoment(y, m - 1, d, dateOnly ? 0 : 15).getTime() + (dateOnly ? 0 : 30 * 60000);
+    if (x >= startMs && x < endMs) out.push({ x: new Date(x), y: pctOf(v) });
+  }
+  return out.sort((a, b) => a.x - b.x);
+}
+
+// The CMT of a symbol on an ET date ('MM/DD/YYYY'), in percent, or null: Show CMTs off, no column, or no rate that Date.
+function cmtOnDate(sym, dateStr) {
+  const col = columnOf(sym), byDate = sym.endsWith('TIPS') ? rcmtByDate : cmtByDate;
+  if (!showCmt || !col || !byDate || !dateStr) return null;
+  const [m, d, y] = dateStr.split('/');
+  const v = byDate.get(`${y}-${m}-${d}`)?.rates[col];
+  return v == null ? null : pctOf(v);
+}
+
+// Sets the CMT line of every chart that has one from the CMT rates read, and refits its Y-axis.
+function refreshCmtLines(forceRescale = false) {
+  Object.entries(charts).forEach(([sym, chart]) => {
+    const ds = chart.data.datasets.find(d => d.tag === 'cmt');
+    if (!ds) return;
+    ds.data = showCmt ? (plotSeries(cmtSeries(sym)) || []) : [];
+    if (forceRescale || !yOverrideSyms.has(sym)) rescaleYToVisible(chart, sym);
+    else chart.update('none');
+  });
+}
+
 async function ensureHolidaysLoaded() {
   if (saHolidaySet.size === 0) saHolidaySet = await fetchSaHolidaySet();
   setHolidays(saHolidaySet);
@@ -794,6 +889,14 @@ function etCutoff(adjust) {
   return makeEtMoment(t.getFullYear(), t.getMonth(), t.getDate(), 0);
 }
 
+// The cutoff of a preset range: midnight ET of the date 2 or 10 days, or 1, 2, 3, 10 or 50 years, before today.
+function rangeCutoff(range) {
+  return etCutoff(t => {
+    if (range === '2D') t.setDate(t.getDate() - 2); else if (range === '10D') t.setDate(t.getDate() - 10);
+    else if (range === '1Y') t.setFullYear(t.getFullYear() - 1); else if (range === '2Y') t.setFullYear(t.getFullYear() - 2); else if (range === '3Y') t.setFullYear(t.getFullYear() - 3); else if (range === '10Y') t.setFullYear(t.getFullYear() - 10); else if (range === 'ALL') t.setFullYear(t.getFullYear() - 50);
+  });
+}
+
 async function fetchOne(symbol, range, force = false) {
   if (range === 'Custom') {
     const history = await fetchHistory(symbol);
@@ -839,7 +942,7 @@ async function fetchOne(symbol, range, force = false) {
     }
     if (fetchTasks.length > 0) await Promise.all(fetchTasks);
     const data = liveCache[cacheKey] || [];
-    const cutoff = etCutoff(t => t.setDate(t.getDate() - (is2D ? 2 : 10)));
+    const cutoff = rangeCutoff(range);
     const filtered = data.filter(p => p.x >= cutoff && !isWeekendEt(p.x));
     if (filtered.length > 0) return filtered;
     // CNBC returned nothing at all for this symbol/tier (see fetchArchiveFallback above) —
@@ -850,9 +953,7 @@ async function fetchOne(symbol, range, force = false) {
     if (fallback && fallback.length > 0) return fallback.slice();
     return filtered;
   } else {
-    const cutoff = etCutoff(t => {
-      if (range === '1Y') t.setFullYear(t.getFullYear() - 1); else if (range === '2Y') t.setFullYear(t.getFullYear() - 2); else if (range === '3Y') t.setFullYear(t.getFullYear() - 3); else if (range === '10Y') t.setFullYear(t.getFullYear() - 10); else if (range === 'ALL') t.setFullYear(t.getFullYear() - 50);
-    });
+    const cutoff = rangeCutoff(range);
     if (range === '1Y' || range === '2Y' || range === '3Y') {
       // Daily bars from provider 6M (~3Y), the same feed cnbc.com uses, kept per symbol and reused
       // unless missing, not reaching the cutoff, or the user asked for a fresh read (force); then
@@ -1118,8 +1219,9 @@ function rescaleYToVisible(chart, sym) {
   // toggles (Quoted/SA) hide a line's chart.data but rangeData[sym] always has the raw
   // series, so gate it here too or the Y-axis would still fit hidden quoted data.
   const data = (SA_SYMBOLS.has(sym) && !showQuotedYieldTS) ? [] : raw;
-  const saData = (showSaYieldTS && chart.data.datasets[1]) ? chart.data.datasets[1].data : [];
-  const allPoints = data.concat(saData);
+  const saData = (showSaYieldTS && SA_SYMBOLS.has(sym) && chart.data.datasets[1]) ? chart.data.datasets[1].data : [];
+  const cmtData = chart.data.datasets.find(d => d.tag === 'cmt')?.data ?? [];
+  const allPoints = data.concat(saData, cmtData);
   const visible = allPoints.filter(p => { const t = +p.x; return p.y != null && t >= xMin && t <= xMax; }); if (visible.length === 0) return;
   const bounds = snapYBounds(Math.min(...visible.map(p=>p.y)), Math.max(...visible.map(p=>p.y)));
   chart.options.scales.y.min = bounds.min; chart.options.scales.y.max = bounds.max; chart.options.scales.y.ticks.stepSize = bounds.step; chart.update('none');
@@ -1347,11 +1449,12 @@ function updateCharts() {
 
   if (activeTab === 'yieldcurves' || activeTab === 'breakeven') updateYieldCurves();
   refreshSaOverlays();
+  refreshCmtLines();
   isUpdatingData = false;
 }
 
 async function updateAllData(force = false) {
-  await Promise.all([fetchAllData(force), ensureHolidaysLoaded()]);
+  await Promise.all([fetchAllData(force), ensureHolidaysLoaded(), showCmt ? ensureCmtLoaded(force) : null]);
   updateCharts();
 }
 
@@ -1445,6 +1548,7 @@ function updateYieldCurves() {
   // Start/End legend entries must always show regardless of the TIPS-scoped Quoted toggle.
   const curveOptions = { animation: false, responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, scales: { x: { grid: { color: '#f1f5f9' }, ticks: { font: { size: 10, weight: 'bold' }, color: '#000' } }, y: { grid: { color: '#f1f5f9' }, ticks: { font: { size: 9, family: 'monospace', weight: 'bold' }, color: '#000', callback: v => v.toFixed(3) + '%' } } }, plugins: { legend: { display: true, labels: { font: { size: 10, weight: 'bold' }, filter: (item, data) => {
     const label = String(data.datasets[item.datasetIndex].label);
+    if (label.includes('CMT')) return showCmt;
     if (label.includes('(SA)')) return showSaYieldCurve;
     const chartHasSa = data.datasets.some(d => String(d.label).includes('(SA)'));
     return !chartHasSa || showQuotedYieldCurve;
@@ -1462,11 +1566,16 @@ function updateYieldCurves() {
     const eD = rawGap ? syms.map(() => null) : syms.map(s => valueOnDate(s, endDateStr, true, eWin));
     const saSD = saEligible ? syms.map(s => showSaYieldCurve ? valueFromSeriesOnDate(saSeriesBySym[s], startDateStr, false, sWin) : null) : null;
     const saED = saEligible ? syms.map(s => showSaYieldCurve ? valueFromSeriesOnDate(saSeriesBySym[s], endDateStr, true, eWin) : null) : null;
+    const cmtName = saEligible ? 'R-CMT' : 'CMT', cmtSL = `${cmtName} ${startDateStr || '—'}`, cmtEL = `${cmtName} ${endDateStr || '—'}`;
+    const cmtSD = syms.map(s => cmtOnDate(s, startDateStr)), cmtED = syms.map(s => cmtOnDate(s, endDateStr));
     if (yieldCurveCharts[key]) {
       const c = yieldCurveCharts[key];
       c.data.datasets[0].data = sD; c.data.datasets[0].label = sL;
       c.data.datasets[1].data = eD; c.data.datasets[1].label = eL;
       if (saEligible) { c.data.datasets[2].data = saSD; c.data.datasets[2].label = `${sL} (SA)`; c.data.datasets[3].data = saED; c.data.datasets[3].label = `${eL} (SA)`; }
+      const n = c.data.datasets.length;
+      c.data.datasets[n - 2].data = cmtSD; c.data.datasets[n - 2].label = cmtSL;
+      c.data.datasets[n - 1].data = cmtED; c.data.datasets[n - 1].label = cmtEL;
       c.update();
       return;
     }
@@ -1478,6 +1587,8 @@ function updateYieldCurves() {
       datasets.push({ label: `${sL} (SA)`, data: saSD, borderColor: SA_COLOR, borderDash: [6,3], fill: false, tension: 0.3, spanGaps: true, segment: gapSegmentStyle(SA_COLOR) });
       datasets.push({ label: `${eL} (SA)`, data: saED, borderColor: SA_COLOR, fill: false, tension: 0.3, spanGaps: true, segment: gapSegmentStyle(SA_COLOR) });
     }
+    datasets.push({ label: cmtSL, data: cmtSD, borderColor: CMT_COLOR, borderDash: [6,3], pointBackgroundColor: CMT_COLOR, pointRadius: 3, fill: false, tension: 0.3, spanGaps: true, segment: gapSegmentStyle(CMT_COLOR) });
+    datasets.push({ label: cmtEL, data: cmtED, borderColor: CMT_COLOR, pointBackgroundColor: CMT_COLOR, pointRadius: 3, fill: false, tension: 0.3, spanGaps: true, segment: gapSegmentStyle(CMT_COLOR) });
     const ctx = document.getElementById(id).getContext('2d');
     yieldCurveCharts[key] = new Chart(ctx, { type: 'line', data: { labels: syms.map(s => SYMBOL_LABELS[s]), datasets }, options: curveOptions });
   };
@@ -1493,8 +1604,13 @@ function updateYieldCurves() {
     };
     const saSD = pairs.map(p => saBei(p, startDateStr, false, sWin));
     const saED = pairs.map(p => saBei(p, endDateStr, true, eWin));
+    const cmtBei = (p, dateStr) => { const n = cmtOnDate(p.n, dateStr), r = cmtOnDate(p.t, dateStr); return (n == null || r == null) ? null : n - r; };
+    const cmtSD = pairs.map(p => cmtBei(p, startDateStr)), cmtED = pairs.map(p => cmtBei(p, endDateStr));
+    const cmtSL = `CMT BEI ${startDateStr || '—'}`, cmtEL = `CMT BEI ${endDateStr || '—'}`;
     if (yieldCurveCharts[key]) {
       const c = yieldCurveCharts[key];
+      c.data.datasets[4].data = cmtSD; c.data.datasets[4].label = cmtSL;
+      c.data.datasets[5].data = cmtED; c.data.datasets[5].label = cmtEL;
       c.data.datasets[0].data = sD; c.data.datasets[0].label = sL;
       c.data.datasets[1].data = eD; c.data.datasets[1].label = eL;
       c.data.datasets[2].data = saSD; c.data.datasets[2].label = `${sL} (SA)`;
@@ -1511,7 +1627,9 @@ function updateYieldCurves() {
           { label: sL, data: sD, borderColor: '#1a56db', borderDash: [6,3], fill: false, tension: 0.3, spanGaps: true, segment: gapSegmentStyle('#1a56db') },
           { label: eL, data: eD, borderColor: '#dc2626', fill: false, tension: 0.3, spanGaps: true, segment: gapSegmentStyle('#dc2626') },
           { label: `${sL} (SA)`, data: saSD, borderColor: SA_COLOR, borderDash: [6,3], fill: false, tension: 0.3, spanGaps: true, segment: gapSegmentStyle(SA_COLOR) },
-          { label: `${eL} (SA)`, data: saED, borderColor: SA_COLOR, fill: false, tension: 0.3, spanGaps: true, segment: gapSegmentStyle(SA_COLOR) }
+          { label: `${eL} (SA)`, data: saED, borderColor: SA_COLOR, fill: false, tension: 0.3, spanGaps: true, segment: gapSegmentStyle(SA_COLOR) },
+          { label: cmtSL, data: cmtSD, borderColor: CMT_COLOR, borderDash: [6,3], pointBackgroundColor: CMT_COLOR, pointRadius: 3, fill: false, tension: 0.3, spanGaps: true, segment: gapSegmentStyle(CMT_COLOR) },
+          { label: cmtEL, data: cmtED, borderColor: CMT_COLOR, pointBackgroundColor: CMT_COLOR, pointRadius: 3, fill: false, tension: 0.3, spanGaps: true, segment: gapSegmentStyle(CMT_COLOR) }
         ]
       },
       options: curveOptions

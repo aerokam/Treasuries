@@ -158,20 +158,22 @@
 <h1>Level 2 &mdash; Yields Monitor</h1>
 
 <div class="diagram">
-<svg viewBox="0 0 1360 950" role="img" aria-label="Level 2 for Yields Monitor: seven processes reading five data stores and one external entity directly. No process writes a data store. Amber circles are the shared modules its processes call.">
+<svg viewBox="0 0 1360 950" role="img" aria-label="Level 2 for Yields Monitor: seven processes reading seven data stores and one external entity directly. No process writes a data store. Amber circles are the shared modules its processes call.">
   <defs><marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#55558c"/></marker></defs>
-  <path class="flow" d="M 260.0 170.0 Q 323.2 215.8 369.0 279.0" marker-end="url(#a1)"/>
-  <path class="flow" d="M 260.0 315.0 Q 306.3 309.2 352.0 318.1" marker-end="url(#a1)"/>
-  <path class="flow" d="M 260.0 605.0 Q 455.4 445.7 591.4 233.3" marker-end="url(#a1)"/>
-  <path class="flow" d="M 260.0 750.0 Q 416.0 725.0 572.0 750.0" marker-end="url(#a1)"/>
-  <path class="flow" d="M 260.0 895.0 Q 408.1 807.8 576.0 771.2" marker-end="url(#a1)"/>
-  <path class="flow" d="M 260.0 605.0 Q 408.1 692.2 576.0 728.8" marker-end="url(#a1)"/>
-  <path class="flow" d="M 260.0 605.0 Q 500.7 370.8 802.6 223.4" marker-end="url(#a1)"/>
-  <path class="flow" d="M 260.0 605.0 Q 495.0 405.3 793.5 482.9" marker-end="url(#a1)"/>
-  <path class="flow" d="M 260.0 446.0 Q 305.7 393.2 365.6 357.3" marker-end="url(#a1)"/>
-  <text class="flow-label" x="267" y="438"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#market-yields"><tspan class="lk">market yields</tspan></a></text>
-  <path class="flow" d="M 260.0 474.0 Q 318.5 505.9 364.1 554.5" marker-end="url(#a1)"/>
-  <text class="flow-label" x="267" y="494"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#live-quotes"><tspan class="lk">live quotes</tspan></a></text>
+  <path class="flow" d="M 260.0 130.0 Q 328.6 193.1 374.1 274.5" marker-end="url(#a1)"/>
+  <path class="flow" d="M 260.0 230.0 Q 314.9 252.1 360.3 290.2" marker-end="url(#a1)"/>
+  <path class="flow" d="M 260.0 730.0 Q 296.6 541.8 390.1 374.5" marker-end="url(#a1)"/>
+  <path class="flow" d="M 260.0 830.0 Q 290.5 592.1 393.6 375.6" marker-end="url(#a1)"/>
+  <path class="flow" d="M 260.0 430.0 Q 499.9 447.9 581.3 221.6" marker-end="url(#a1)"/>
+  <path class="flow" d="M 260.0 530.0 Q 370.6 708.4 580.1 720.4" marker-end="url(#a1)"/>
+  <path class="flow" d="M 260.0 630.0 Q 425.6 655.9 574.8 732.1" marker-end="url(#a1)"/>
+  <path class="flow" d="M 260.0 430.0 Q 496.4 486.2 586.1 712.1" marker-end="url(#a1)"/>
+  <path class="flow" d="M 260.0 430.0 Q 563.0 406.7 796.3 211.9" marker-end="url(#a1)"/>
+  <path class="flow" d="M 260.0 430.0 Q 529.0 405.5 792.1 466.1" marker-end="url(#a1)"/>
+  <path class="flow" d="M 260.0 316.0 Q 306.2 309.9 352.0 318.5" marker-end="url(#a1)"/>
+  <text class="flow-label" x="267" y="308"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#market-yields"><tspan class="lk">market yields</tspan></a></text>
+  <path class="flow" d="M 260.0 344.0 Q 335.6 432.7 379.8 540.5" marker-end="url(#a1)"/>
+  <text class="flow-label" x="267" y="364"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#live-quotes"><tspan class="lk">live quotes</tspan></a></text>
   <path class="flow" d="M 459.9 290.5 Q 514.3 245.4 580.1 219.5" marker-end="url(#a1)"/>
   <text class="flow-label" x="552" y="256" text-anchor="middle"><a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#yield-series"><tspan class="lk">yield series</tspan></a></text>
   <path class="flow" d="M 436.4 371.6 Q 546.1 521.6 603.6 698.4" marker-end="url(#a1)"/>
@@ -213,38 +215,50 @@
   <path class="flow" d="M 791.8 104.1 Q 807.7 121.0 817.5 142.0" marker-end="url(#a1)"/>
   <path class="flow" d="M 928.8 256.4 Q 909.3 244.6 894.4 227.4" marker-end="url(#a1)"/>
   <a class="store" href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s6">
-    <rect x="40" y="150" width="215" height="40" fill="transparent" stroke="none"/>
+    <rect x="40" y="110" width="215" height="40" fill="transparent" stroke="none"/>
+    <line x1="40" y1="110" x2="255" y2="110"/>
     <line x1="40" y1="150" x2="255" y2="150"/>
-    <line x1="40" y1="190" x2="255" y2="190"/>
-    <text class="s-name" x="147.5" y="175">Yield history (S6)</text>
+    <text class="s-name" x="147.5" y="135">Yield history (S6)</text>
   </a>
   <a class="store" href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s18">
-    <rect x="40" y="295" width="215" height="40" fill="transparent" stroke="none"/>
-    <line x1="40" y1="295" x2="255" y2="295"/>
-    <line x1="40" y1="335" x2="255" y2="335"/>
-    <text class="s-name" x="147.5" y="320">Intraday archive (S18)</text>
+    <rect x="40" y="210" width="215" height="40" fill="transparent" stroke="none"/>
+    <line x1="40" y1="210" x2="255" y2="210"/>
+    <line x1="40" y1="250" x2="255" y2="250"/>
+    <text class="s-name" x="147.5" y="235">Intraday archive (S18)</text>
   </a>
   <a class="entity" href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#e5">
-    <rect x="40" y="434" width="215" height="52" rx="3"/>
-    <text class="e-name" x="147.5" y="465">CNBC (E5)</text>
+    <rect x="40" y="304" width="215" height="52" rx="3"/>
+    <text class="e-name" x="147.5" y="335">CNBC (E5)</text>
   </a>
   <a class="store" href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s16">
-    <rect x="40" y="585" width="215" height="40" fill="transparent" stroke="none"/>
-    <line x1="40" y1="585" x2="255" y2="585"/>
-    <line x1="40" y1="625" x2="255" y2="625"/>
-    <text class="s-name" x="147.5" y="610">Bond holidays (S16)</text>
+    <rect x="40" y="410" width="215" height="40" fill="transparent" stroke="none"/>
+    <line x1="40" y1="410" x2="255" y2="410"/>
+    <line x1="40" y1="450" x2="255" y2="450"/>
+    <text class="s-name" x="147.5" y="435">Bond holidays (S16)</text>
   </a>
   <a class="store" href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s2">
-    <rect x="40" y="730" width="215" height="40" fill="transparent" stroke="none"/>
-    <line x1="40" y1="730" x2="255" y2="730"/>
-    <line x1="40" y1="770" x2="255" y2="770"/>
-    <text class="s-name" x="147.5" y="755">TIPS reference data (S2)</text>
+    <rect x="40" y="510" width="215" height="40" fill="transparent" stroke="none"/>
+    <line x1="40" y1="510" x2="255" y2="510"/>
+    <line x1="40" y1="550" x2="255" y2="550"/>
+    <text class="s-name" x="147.5" y="535">TIPS reference data (S2)</text>
   </a>
   <a class="store" href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s3">
-    <rect x="40" y="875" width="215" height="40" fill="transparent" stroke="none"/>
-    <line x1="40" y1="875" x2="255" y2="875"/>
-    <line x1="40" y1="915" x2="255" y2="915"/>
-    <text class="s-name" x="147.5" y="900">Ref CPI (S3)</text>
+    <rect x="40" y="610" width="215" height="40" fill="transparent" stroke="none"/>
+    <line x1="40" y1="610" x2="255" y2="610"/>
+    <line x1="40" y1="650" x2="255" y2="650"/>
+    <text class="s-name" x="147.5" y="635">Ref CPI (S3)</text>
+  </a>
+  <a class="store" href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s24">
+    <rect x="40" y="710" width="215" height="40" fill="transparent" stroke="none"/>
+    <line x1="40" y1="710" x2="255" y2="710"/>
+    <line x1="40" y1="750" x2="255" y2="750"/>
+    <text class="s-name" x="147.5" y="735">CMT rates (S24)</text>
+  </a>
+  <a class="store" href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s25">
+    <rect x="40" y="810" width="215" height="40" fill="transparent" stroke="none"/>
+    <line x1="40" y1="810" x2="255" y2="810"/>
+    <line x1="40" y1="850" x2="255" y2="850"/>
+    <text class="s-name" x="147.5" y="835">R-CMT rates (S25)</text>
   </a>
   <a class="process" href="DFD_LEVEL3_YM_ASSEMBLE.html">
     <circle cx="410" cy="320" r="58"/>

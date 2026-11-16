@@ -581,7 +581,7 @@ function level1() {
     { key: 'tr', cat: 'reference', name: ['TIPS', 'Reference'], spec: 'DFD_LEVEL2_TIPSREFERENCE.html', reads: ['quotes', 'tipsref', 'refcpi', 'hol'] },
     { key: 'pr', cat: 'educational', name: ['Portal', 'Primer'], spec: 'DFD_LEVEL2_PRIMER.html', reads: ['fedinv', 'tipsref', 'refcpi'] },
     { key: 'ce', cat: 'reference', name: ['CPI', 'Explorer'], spec: 'DFD_LEVEL2_CPIEXPLORER.html', reads: ['refcpi', 'cpihist'] },
-    { key: 'ym', cat: 'workflow', name: ['Yields', 'Monitor'], spec: 'DFD_LEVEL2_YIELDSMONITOR.html', reads: ['tipsref', 'refcpi', 'hol', 'yhist', 'ia'] },
+    { key: 'ym', cat: 'workflow', name: ['Yields', 'Monitor'], spec: 'DFD_LEVEL2_YIELDSMONITOR.html', reads: ['tipsref', 'refcpi', 'hol', 'yhist', 'ia', 'cmt', 'rcmt'] },
     { key: 'yc', cat: 'workflow', name: ['Yield', 'Curves'], spec: 'DFD_LEVEL2_YIELDCURVES.html', reads: ['yc', 'bei', 'spread', 'gsw', 'cmt', 'rcmt', 'hol'] },
     { key: 'sa', cat: 'educational', name: ['Seasonal', 'Adjustments'], spec: 'DFD_LEVEL2_SEASONALADJUSTMENTS.html', reads: [] },
     { key: 'fh', cat: 'reference', name: ['Fund', 'Holdings'], spec: 'DFD_LEVEL2_FUNDHOLDINGS.html', reads: ['funds'] },
@@ -922,9 +922,11 @@ function level2YieldsMonitor() {
     { id: 'hol', name: 'Bond holidays', href: DS('s16') },
     { id: 'tipsref', name: 'TIPS reference data', href: DS('s2') },
     { id: 'refcpi', name: 'Ref CPI', href: DS('s3') },
+    { id: 'cmt', name: 'CMT rates', href: DS('s24') },
+    { id: 'rcmt', name: 'R-CMT rates', href: DS('s25') },
   ];
   const procs = [
-    { id: '2.1', name: ['Assemble', 'range data'], href: 'DFD_LEVEL3_YM_ASSEMBLE.html', reads: ['yhist', 'ia'],
+    { id: '2.1', name: ['Assemble', 'range data'], href: 'DFD_LEVEL3_YM_ASSEMBLE.html', reads: ['yhist', 'ia', 'cmt', 'rcmt'],
       out: { '2.3': ['yield series'], '2.4': ['yield series'], '2.5': ['yield series'], '2.6': ['yield series'], '2.7': ['yield series'] } },
     { id: '2.2', name: ['Read live', 'quotes'], href: V(KYM + '2.2_Read_Live_Quotes.md'), reads: [],
       out: { '2.3': ['live quotes'], '2.4': ['live quotes'], '2.5': ['live quotes'] } },
@@ -937,7 +939,7 @@ function level2YieldsMonitor() {
     { id: '2.7', name: ['Render', 'breakeven', 'inflation'], href: V(KYM + '2.7_Render_Breakeven_Inflation.md'), reads: [], out: {} },
   ];
   const SX = 40, SW = 215, EH = 52, PR = 58, UX = 1190, UW = 145;
-  const sy = i => 170 + i * 145;
+  const sy = i => 130 + i * 100;
   const px = { '2.1': 410, '2.2': 410, '2.3': 630, '2.4': 630, '2.5': 850, '2.6': 850, '2.7': 850 };
   const py = { '2.1': 320, '2.2': 590, '2.3': 190, '2.4': 750, '2.5': 190, '2.6': 470, '2.7': 750 };
   const H = 950, W = 1360;
@@ -945,7 +947,7 @@ function level2YieldsMonitor() {
   const OBS = [...procs.map(q => ({ x: px[q.id], y: py[q.id], r: PR })), ...SM.obstacles];
   const LBL = [];
   const [vx, vy, vw, vh] = SM.viewBox(W, H);
-  const P = [`<svg viewBox="${vx} ${vy} ${vw} ${vh}" role="img" aria-label="Level 2 for Yields Monitor: seven processes reading five data stores and one external entity directly. No process writes a data store. Amber circles are the shared modules its processes call.">`, marker()];
+  const P = [`<svg viewBox="${vx} ${vy} ${vw} ${vh}" role="img" aria-label="Level 2 for Yields Monitor: seven processes reading seven data stores and one external entity directly. No process writes a data store. Amber circles are the shared modules its processes call.">`, marker()];
   const sIdx = Object.fromEntries(stores.map((s, i) => [s.id, i]));
   procs.forEach(p => p.reads.forEach(id => {
     const y = sy(sIdx[id]), [x2, y2] = toCircle(SX + SW + 5, y, px[p.id], py[p.id], PR);
@@ -994,6 +996,8 @@ function level3YieldsMonitorAssemble() {
   const stores = [
     { id: 'yhist', name: 'Yield history', href: DS('s6') },
     { id: 'ia', name: 'Intraday archive', href: DS('s18') },
+    { id: 'cmt', name: 'CMT rates', href: DS('s24') },
+    { id: 'rcmt', name: 'R-CMT rates', href: DS('s25') },
   ];
   const S = a => V(KYM + '2.1_Assemble_Range_Data.md' + (a ? '#' + a : ''));
   const procs = [
@@ -1001,11 +1005,12 @@ function level3YieldsMonitorAssemble() {
     { id: '2.1.2', name: ['Assemble', '1Y/2Y/3Y', 'range data'], href: S('assemble-1y-2y-3y-range-data'), reads: ['yhist'], out: {} },
     { id: '2.1.3', name: ['Assemble', '10Y/ALL', 'range data'], href: S('assemble-10y-all-range-data'), reads: ['yhist'], out: {} },
     { id: '2.1.4', name: ['Assemble', 'Custom', 'range data'], href: S('assemble-custom-range-data'), reads: ['yhist', 'ia'], out: {} },
+    { id: '2.1.5', name: ['Assemble', 'CMT', 'range data'], href: S('assemble-cmt-range-data'), reads: ['cmt', 'rcmt'], out: {} },
   ];
-  const SX = 40, SW = 205, PR = 60, W = 1150, H = 780;
-  const sy = i => 220 + i * 340;
-  const px = { '2.1.1': 420, '2.1.2': 420, '2.1.3': 420, '2.1.4': 420 };
-  const py = { '2.1.1': 110, '2.1.2': 320, '2.1.3': 530, '2.1.4': 700 };
+  const SX = 40, SW = 205, PR = 60, W = 1150, H = 960;
+  const sy = i => 130 + i * 230;
+  const px = { '2.1.1': 420, '2.1.2': 420, '2.1.3': 420, '2.1.4': 420, '2.1.5': 420 };
+  const py = { '2.1.1': 110, '2.1.2': 290, '2.1.3': 470, '2.1.4': 650, '2.1.5': 830 };
   const OBS = procs.map(q => ({ x: px[q.id], y: py[q.id], r: PR }));
   const P = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Level 3: Yields Monitor 2.1, one process per family of UI ranges.">`, marker()];
   const sIdx = Object.fromEntries(stores.map((s, i) => [s.id, i]));
@@ -1016,8 +1021,10 @@ function level3YieldsMonitorAssemble() {
   // Every process here also reads market yields live; each emits a yield series that
   // leaves 2.1 directly, for every other Yields Monitor process (see Level 2).
   procs.forEach(p => {
-    P.push(flow(8, py[p.id] - 14, px[p.id] - PR - 3, py[p.id] - 14, { obstacles: OBS.filter(o => !(o.x === px[p.id] && o.y === py[p.id])) }));
-    P.push(labelAt(12, py[p.id] - 26, 'market yields'));
+    if (p.id !== '2.1.5') {
+      P.push(flow(8, py[p.id] - 14, px[p.id] - PR - 3, py[p.id] - 14, { obstacles: OBS.filter(o => !(o.x === px[p.id] && o.y === py[p.id])) }));
+      P.push(labelAt(12, py[p.id] - 26, 'market yields'));
+    }
     const [x1, y1] = fromCircle(px[p.id], py[p.id], PR, W - 12, py[p.id]);
     P.push(flow(x1, y1, W - 12, py[p.id], { obstacles: OBS.filter(o => !(o.x === px[p.id] && o.y === py[p.id])) }));
     P.push(labelAt(W - 16, py[p.id] - 8, 'yield series', 'end'));
@@ -1030,9 +1037,9 @@ function level3YieldsMonitorAssemble() {
     spec: V(KYM + '2.1_Assemble_Range_Data.md'), specLabel: '2.1 Assemble range data',
     title: 'Yields Monitor 2.1 — Level 3', h1: 'Level 3 &mdash; Yields Monitor 2.1 Assemble range data', maxWidth: W,
     up: 'DFD_LEVEL2_YIELDSMONITOR.html', upLabel: 'Level 2 — Yields Monitor', svg: P.join(NL),
-    notes: ['  One process per family of UI ranges — 2D/10D, 1Y/2Y/3Y, 10Y/ALL and Custom — each independent: only one is active at a time, so nothing here combines their output.',
+    notes: ['  One process per family of UI ranges — 2D/10D, 1Y/2Y/3Y, 10Y/ALL and Custom — each independent: only one is active at a time, so nothing here combines their output. 2.1.5 runs beside the active one when Show CMTs is on.',
       '  Every process here drills to its own section of <a href="' + S() + '">2.1 Assemble range data</a>.',
-      '  Every process also reads <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#market-yields">market yields</a> live, from <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#e5">CNBC (E5)</a>\'s chart-bar feed, for its own primary feed or its own live tip — only <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s18">Intraday archive (S18)</a> and <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s6">Yield history (S6)</a> are the fallbacks drawn on the left.'].join(NL)
+      '  Every process except 2.1.5 also reads <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#market-yields">market yields</a> live, from <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#e5">CNBC (E5)</a>\'s chart-bar feed, for its own primary feed or its own live tip — only <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s18">Intraday archive (S18)</a> and <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s6">Yield history (S6)</a> are the fallbacks drawn on the left.'].join(NL)
   });
 }
 
