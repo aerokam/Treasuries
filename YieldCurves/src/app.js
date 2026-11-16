@@ -1494,8 +1494,10 @@ function toBeiBond(r) {
 function processAndRenderBei() {
   const statusEl = document.getElementById('status');
 
-  const tips = (beiStore?.rows || []).map(toBeiBond).sort((a, b) => a.maturityDate - b.maturityDate);
+  const showMarket = document.getElementById('chkTipsBroker').checked;
+  const tips = showMarket ? (beiStore?.rows || []).map(toBeiBond).sort((a, b) => a.maturityDate - b.maturityDate) : [];
   const cmtSeries = cmtSeriesOf('bei');
+  if (!showMarket && !cmtSeries) { statusEl.textContent = ''; statusEl.className = ''; if (chart) { chart.destroy(); chart = null; } document.getElementById('beiTableBody').innerHTML = ''; return; }
   if (tips.length === 0 && !cmtSeries) {
     statusEl.textContent = 'BEI requires market-quote TIPS and nominal data.';
     statusEl.className = '';
@@ -1506,7 +1508,7 @@ function processAndRenderBei() {
 
   try {
     const yToX = yearsToX(settleMsOf('Market'));
-    const spotBei = storedSpotPoints('BEI', 'Market', 'spotSa');
+    const spotBei = showMarket ? storedSpotPoints('BEI', 'Market', 'spotSa') : [];
     const spotBeiGrid = spotBei.length ? spotBei.map(({ t, y }) => ({ x: yToX(t), y })) : null;
 
     const startEl = document.getElementById('startMaturity');
@@ -1523,7 +1525,7 @@ function processAndRenderBei() {
     renderBeiTable(filtered);
     renderBeiChart(filtered, spotBeiGrid, cmtSeries ? cmtDataset('CMT BEI', cmtSeries, cmtInRange(startDate, endDate)) : null);
 
-    document.getElementById('tipsMktMeta').textContent = beiStore ? marketMetaText(beiStore.dates) : '';
+    document.getElementById('tipsMktMeta').textContent = showMarket && beiStore ? marketMetaText(beiStore.dates) : '';
     document.getElementById('tipsCmtMeta').textContent = cmtSeries ? cmtMetaText(cmtSeries) : '';
     document.getElementById('tipsBrokerCount').textContent = filtered.length;
     document.getElementById('tipsFedMeta').textContent = '';
@@ -1732,25 +1734,6 @@ function switchChartMode(mode) {
       }
       chkFed.disabled = false;
       if (fedLabel) fedLabel.style.opacity = '';
-    }
-  }
-
-  // BEI's Market/broker checkbox is locked ON too — it's the tab's sole data source
-  // (both TIPS and nominal legs), not a toggle. Spread mode never touches this checkbox,
-  // so any disabled state found here on entry/exit is BEI's own lock.
-  const chkBroker = document.getElementById('chkTipsBroker');
-  if (chkBroker) {
-    const brokerLabel = chkBroker.closest('label');
-    if (isBei) {
-      if (!chkBroker.disabled) chkBroker._savedChecked = chkBroker.checked;
-      chkBroker.checked = !!marketTipsData;
-      chkBroker.disabled = true;
-      if (brokerLabel) brokerLabel.style.opacity = '0.4';
-    } else if (chkBroker._savedChecked !== undefined) {
-      chkBroker.checked = chkBroker._savedChecked;
-      chkBroker.disabled = !marketTipsData;
-      if (brokerLabel) brokerLabel.style.opacity = marketTipsData ? '' : '0.4';
-      chkBroker._savedChecked = undefined;
     }
   }
 }
