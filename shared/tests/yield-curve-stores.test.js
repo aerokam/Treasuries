@@ -35,7 +35,7 @@ const eq = (a, b, msg) => ok(JSON.stringify(a) === JSON.stringify(b), `${msg} (g
 
 // ── Layout constants ──
 eq(S13_HEADER, 'CUSIP,Source,Maturity,Term (y),Type,Coupon,Price,Ask,SA,SAO,Settlement Date SA Factor,Naive Maturity SA Factor,Maturity SA Factor,SA Price Factor,SA Price,Spot,Spot SA', 'S13 header');
-eq(S14_HEADER, 'TIPS CUSIP,TIPS Maturity,TIPS Coupon,TIPS Ask,TIPS SA,TIPS SAO,Nominal CUSIP,Nominal Maturity,Nominal Coupon,Nominal Ask,Ask BEI,SA BEI,SAO BEI', 'S14 header');
+eq(S14_HEADER, 'TIPS CUSIP,Source,TIPS Maturity,TIPS Coupon,TIPS Ask,TIPS SA,TIPS SAO,Nominal CUSIP,Nominal Maturity,Nominal Coupon,Nominal Ask,Ask BEI,SA BEI,SAO BEI', 'S14 header');
 eq(S15_HEADER, 'CUSIP,Maturity,Type,Coupon,Ask Yield,Bid Yield,Yield Spread (bps),Ask Price,Bid Price,Adjusted Ask Price,Adjusted Bid Price,Price Spread %', 'S15 header');
 
 // ── Cell formats ──
@@ -170,9 +170,9 @@ const nomSec = (cusip, cusipType, maturity, coupon, yld, price, bidPrice, bidYie
   ok(rows[0].nominal_coupon === 0.04, 'S14: nominal_coupon');
   const csv = buildBreakevenCsv({ dates, rows });
   const lines = csv.split('\n');
-  eq(lines.slice(0, 3), ['Trade Date,2026-11-03 17:05', 'Settlement Date,2026-11-04', S14_HEADER], 'S14: two Market date lines, then the header');
+  eq(lines.slice(0, 5), ['Trade Date,FedInvest,2026-11-03', 'Settlement Date,FedInvest,2026-11-03', 'Trade Date,Market,2026-11-03 17:05', 'Settlement Date,Market,2026-11-04', S14_HEADER], 'S14: the date line of each source, then the header');
   const p = parseCsvWithPreamble(csv, 'TIPS CUSIP');
-  ok(p.preamble.length === 2 && p.rows.length === 2, 'S14: read back by header name');
+  ok(p.preamble.length === 4 && p.rows.length === 2 && p.rows.every(r => r.Source === 'Market'), 'S14: read back by header name, each row with its Source');
   const r1 = p.rows[0];
   eq([r1['TIPS CUSIP'], r1['TIPS Maturity'], r1['TIPS Coupon'], r1['TIPS Ask'], r1['TIPS SA'], r1['TIPS SAO']], ['T1', '2029-07-15', '0.0100000', '0.0150000', '0.0140000', ''], 'S14: a TIPS with no SAO Yield has a blank sao cell');
   eq([r1['Nominal CUSIP'], r1['Nominal Maturity'], r1['Nominal Coupon'], r1['Nominal Ask']], ['N1', '2029-01-15', '0.0400000', '0.0410000'], 'S14: the nominal columns, with nominal_coupon');
@@ -259,9 +259,11 @@ const nomSec = (cusip, cusipType, maturity, coupon, yld, price, bidPrice, bidYie
   }
 
   const s14p = parseCsvWithPreamble(out.breakevenCsv, 'TIPS CUSIP');
-  eq(s14p.preamble, [['Trade Date', '2026-11-03 17:05'], ['Settlement Date', '2026-11-04']], 'whole S14: date lines');
-  ok(s14p.rows.length === 7 && s14p.rows.every(r => notes.includes(r['Nominal CUSIP']) && r['Nominal Coupon'] === '0.0400000'), 'whole S14: one row per Market TIPS, against a Note, with its coupon (never a STRIPS or Unclassified)');
-  ok(s14p.rows.every((r, i) => i === 0 || s14p.rows[i - 1]['TIPS Maturity'] <= r['TIPS Maturity']), 'whole S14: rows in maturity order');
+  eq(s14p.preamble, [['Trade Date', 'FedInvest', '2026-11-03'], ['Settlement Date', 'FedInvest', '2026-11-03'], ['Trade Date', 'Market', '2026-11-03 17:05'], ['Settlement Date', 'Market', '2026-11-04']], 'whole S14: the date line of each source');
+  const mktBei = s14p.rows.filter(r => r.Source === 'Market'), fedBei = s14p.rows.filter(r => r.Source === 'FedInvest');
+  ok(mktBei.length === 7 && mktBei.every(r => notes.includes(r['Nominal CUSIP']) && r['Nominal Coupon'] === '0.0400000'), 'whole S14: one Market row per Market TIPS, against a Note, with its coupon (never a STRIPS or Unclassified)');
+  ok(fedBei.length === 7 && s14p.rows.length === 14 && s14p.rows.slice(0, 7).every(r => r.Source === 'FedInvest'), 'whole S14: one FedInvest row per FedInvest TIPS, before the Market rows');
+  ok([fedBei, mktBei].every(g => g.every((r, i) => i === 0 || g[i - 1]['TIPS Maturity'] <= r['TIPS Maturity'])), 'whole S14: the rows of each source in maturity order');
 
   const s15p = parseCsvWithPreamble(out.spreadsCsv, 'CUSIP');
   eq(s15p.preamble, [['Trade Date', '2026-11-03 17:05'], ['Settlement Date', '2026-11-04']], 'whole S15: date lines');
@@ -284,7 +286,8 @@ const nomSec = (cusip, cusipType, maturity, coupon, yld, price, bidPrice, bidYie
   ok(y.securities.length === out.counts.securityRows && y.spot.length === out.counts.spotRows, 'whole parseYieldCurvesCsv: every security and spot row');
   ok(y.securities.every((r, i) => r.cusip === secs[i].CUSIP && r.source === secs[i].Source), 'whole parseYieldCurvesCsv: security rows in file order');
   const b = parseBreakevenCsv(out.breakevenCsv);
-  eq(b.dates, out.dates.market, 'whole parseBreakevenCsv: the Market dates');
+  eq(b.dates, out.dates, 'whole parseBreakevenCsv: the dates of both sources');
+  ok(b.rows.filter(r => r.source === 'FedInvest').length === 7, 'whole parseBreakevenCsv: the Source of each row');
   ok(b.rows.length === out.counts.breakeven && b.rows.every(r => Math.abs(r.askBei - (r.nominalAsk - r.tipsAsk)) < 2e-7), 'whole parseBreakevenCsv: Ask BEI is Nominal Ask less TIPS Ask');
   const s = parseSpreadsCsv(out.spreadsCsv);
   eq(s.dates, out.dates.market, 'whole parseSpreadsCsv: the Market dates');
@@ -333,7 +336,7 @@ const reverseColumns = text => {
   const tips = [tipsSec('T1', '2029-07-15', 0.01, 0.015, 0.014, NaN, 100, 99.8, 0.016)];
   const csv = buildBreakevenCsv({ dates, rows: breakevenRows(tips, nominals) });
   const b = parseBreakevenCsv(csv);
-  eq(b.dates, dates.market, 'parseBreakevenCsv: the two Market dates');
+  eq(b.dates, dates, 'parseBreakevenCsv: the dates of both sources');
   const r = b.rows[0];
   ok(b.rows.length === 1 && r.tipsCusip === 'T1' && r.tipsMaturity === '2029-07-15' && r.tipsCoupon === 0.01 && r.tipsAsk === 0.015 && r.tipsSa === 0.014
     && r.nominalCusip === 'N1' && r.nominalMaturity === '2029-01-15' && r.nominalCoupon === 0.04 && r.nominalAsk === 0.041

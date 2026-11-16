@@ -165,3 +165,17 @@ test('Breakeven: the Market checkbox can be unchecked, leaving the CMT alone', a
   await page.check('#chkTipsBroker');
   expect((await datasets(page)).map(d => d.label)).toContain('Ask BEI');
 });
+
+test('Breakeven: the FedInvest checkbox is selectable and draws the FedInvest breakeven beside the Market one', async ({ page }) => {
+  await load(page);
+  await page.click('[data-tab="bei"]');
+  await expect(page.locator('#chkTipsFed')).not.toBeDisabled();
+  await page.check('#chkTipsFed');
+  const labels = (await datasets(page)).map(d => d.label);
+  expect(labels).toEqual(expect.arrayContaining(['Ask BEI (Fed)', 'SA BEI (Fed)', 'SAO BEI (Fed)', 'Ask BEI (Market)', 'SAO BEI (Market)']));
+  await page.uncheck('#chkTipsBroker');
+  const only = (await datasets(page)).map(d => d.label);
+  expect(only).toContain('Ask BEI');
+  expect(only.some(l => /Market/.test(l))).toBe(false);
+  await expect(page.locator('#tipsFedMeta')).toHaveText('03/25/2026');
+});
