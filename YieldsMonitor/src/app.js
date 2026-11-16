@@ -44,6 +44,7 @@ const RCMT_COLUMN = { US5YTIPS: '5 Yr', US10YTIPS: '10 Yr', US30YTIPS: '30 Yr' }
 const columnOf = sym => (sym.endsWith('TIPS') ? RCMT_COLUMN : CMT_COLUMN)[sym];
 const CMT_URL = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/Treasuries/CmtRates.csv';
 const RCMT_URL = 'https://pub-ba11062b177640459f72e0a88d0261ae.r2.dev/TIPS/RCmtRates.csv';
+let showMarket = true;
 let showCmt = false;
 let cmtByDate = null;   // CMT rates (S24): 'YYYY-MM-DD' -> { date, rates }, once read
 let rcmtByDate = null;  // R-CMT rates (S25)
@@ -204,7 +205,7 @@ function setupTabs() {
       // The Quoted/SA checkboxes are shared DOM elements whose meaning switches with the
       // active tab (see isCurveScope) — sync their displayed state and label to match.
       const curve = isCurveScope();
-      document.getElementById('yieldToggleTitle').textContent = `Show TIPS yields (${curve ? 'Yield Curves / BEI' : 'Time Series'}):`;
+      document.getElementById('yieldToggleTitle').textContent = `TIPS yields (${curve ? 'Yield Curves / BEI' : 'Time Series'}):`;
       document.getElementById('showQuotedYield').checked = curve ? showQuotedYieldCurve : showQuotedYieldTS;
       document.getElementById('showSaYield').checked = curve ? showSaYieldCurve : showSaYieldTS;
       if (tab === 'yieldcurves' || tab === 'breakeven') {
@@ -313,7 +314,7 @@ function setupUI() {
     return `<label class="sym-item-check" id="label-${sym}"><input type="checkbox" value="${sym}" ${activeSymbols.has(sym) ? 'checked' : ''}><span class="color-dot" style="background:${color}"></span><span class="sym-code">${SYMBOL_LABELS[sym] || sym}</span><span class="sym-yield" id="yield-${sym}">---</span><span class="sym-change" id="change-${sym}"></span><span class="sym-updated" id="updated-${sym}" title="Time of the latest point plotted"></span></label>`;
   }).join('');
 
-  root.innerHTML = `<style>.range-picker { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 20px; } .range-btn { flex: 1; min-width: 45px; padding: 6px 0; border: none; background: var(--tab-inactive-bg); border-radius: 4px; cursor: pointer; font-weight: 700; font-size: 13px; color: var(--tab-inactive-text); text-transform: uppercase; letter-spacing: 0.04em; transition: background 0.1s; } .range-btn:hover:not(.active) { background: var(--btn-hover-bg); } .range-btn.active { background: var(--tab-active-bg); color: var(--tab-inactive-text); border-top: 3px solid var(--tab-active-accent); } .sym-group h4 { display: flex; justify-content: space-between; align-items: center; margin: 12px 0 6px; font-size: 13px; text-transform: uppercase; color: #000; font-weight: 800; letter-spacing: 0.05em; border-bottom: 1px solid #cbd5e1; padding-bottom: 2px; } .clear-btn { font-size: 11px; color: #64748b; cursor: pointer; text-transform: none; font-weight: 600; } .sym-item-check { display: flex; align-items: center; gap: 4px; padding: 4px 0; font-size: 15px; cursor: pointer; color: #000; } .color-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; } .sym-code { font-weight: 600; color: #000; width: 62px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .sym-yield { font-family: monospace; font-weight: 700; font-size: 15px; color: #000; width: 54px; flex-shrink: 0; text-align: right; } .sym-change { font-family: monospace; font-weight: 700; font-size: 13px; width: 50px; flex-shrink: 0; text-align: right; } .sym-change.up { color: #16a34a; } .sym-change.down { color: #dc2626; } .sym-col-head { display: flex; align-items: center; gap: 4px; padding: 2px 0; } .sym-col-head > span { font-family: inherit; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.04em; } .sym-col-head .hdr-spacer { width: 32px; flex-shrink: 0; } .sym-updated { font-family: monospace; font-weight: 700; font-size: 12px; color: #64748b; width: 72px; flex-shrink: 0; text-align: right; white-space: nowrap; } .yield-toggle-group { margin-top: 15px; font-size: 14px; font-weight: 700; color: #334155; background: #f8fafc; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; } .yield-toggle-title { margin-bottom: 4px; } .yield-toggle-option { display: flex; align-items: center; gap: 6px; padding: 2px 0; cursor: pointer; font-weight: 600; } #fetchStatus { font-size: 13px; color: #000; margin-top: 20px; font-weight: 700; display: grid; grid-template-columns: auto auto; column-gap: 4px; row-gap: 2px; } #fetchStatus .fs-label { text-align: right; } #fetchStatus .fs-val { text-align: left; } .no-data-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: #000; background: rgba(255,255,255,0.9); pointer-events: none; z-index: 10; } .sync-zoom-label { display: flex; align-items: center; gap: 6px; margin-top: 15px; font-size: 14px; font-weight: 700; color: #334155; cursor: pointer; background: #f8fafc; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; } .custom-date-range { display: none; flex-direction: column; gap: 6px; padding: 10px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; margin-bottom: 4px; } .custom-date-label { font-size: 12px; font-weight: 800; color: #334155; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.04em; } .custom-date-inputs { display: flex; flex-direction: column; gap: 6px; } .custom-date-inputs label { font-size: 12px; font-weight: 700; color: #334155; display: flex; flex-direction: column; gap: 2px; } .custom-date-inputs .date-picker { width: 100%; font-size: 13px; } .custom-date-apply { margin-top: 4px; padding: 6px; background: var(--tab-active-bg); color: var(--tab-inactive-text); border: none; border-top: 3px solid var(--tab-active-accent); border-radius: 4px; font-size: 13px; font-weight: 700; cursor: pointer; width: 100%; } .custom-date-apply:hover { opacity: 0.85; }</style><div class="range-picker">${rangeHtml}</div><div class="custom-date-range" id="custom-date-range"><div class="custom-date-label">Custom Date Range</div><div class="custom-date-inputs"><label>Start Date<input type="date" id="customStart" class="date-picker"></label><label>End Date<input type="date" id="customEnd" class="date-picker"></label></div><button class="custom-date-apply" id="applyCustomRange">Apply</button></div><div class="sym-group"><h4>TIPS <span class="clear-btn" data-type="TIPS">Clear All</span></h4>${symColumnHeaders}${createGrid(tips)}<h4>Treasuries <span class="clear-btn" data-type="Nominal">Clear All</span></h4>${symColumnHeaders}${createGrid(nominals)}</div><div class="yield-toggle-group"><label class="yield-toggle-option"><input type="checkbox" id="syncXAxis" ${syncXAxis ? 'checked' : ''}> Sync Zoom & Pan</label><label class="yield-toggle-option"><input type="checkbox" id="lockRight"> Lock Right</label><label class="yield-toggle-option"><input type="checkbox" id="hideNonTrading"${hideNonTrading ? 'checked' : ''}> Hide non-trading hours (2D, 10D)</label></div><div class="yield-toggle-group"><label class="yield-toggle-option"><input type="checkbox" id="showCmt" ${showCmt ? 'checked' : ''}> Show CMTs</label></div><div class="yield-toggle-group"><div class="yield-toggle-title" id="yieldToggleTitle">Show TIPS yields (${isCurveScope() ? 'Yield Curves / BEI' : 'Time Series'}):</div><label class="yield-toggle-option"><input type="checkbox" id="showQuotedYield" ${(isCurveScope() ? showQuotedYieldCurve : showQuotedYieldTS) ? 'checked' : ''}> Quoted</label><label class="yield-toggle-option"><input type="checkbox" id="showSaYield" ${(isCurveScope() ? showSaYieldCurve : showSaYieldTS) ? 'checked' : ''}> Seasonally Adjusted (SA)</label></div><div id="fetchStatus">Ready</div>`;
+  root.innerHTML = `<style>.range-picker { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 20px; } .range-btn { flex: 1; min-width: 45px; padding: 6px 0; border: none; background: var(--tab-inactive-bg); border-radius: 4px; cursor: pointer; font-weight: 700; font-size: 13px; color: var(--tab-inactive-text); text-transform: uppercase; letter-spacing: 0.04em; transition: background 0.1s; } .range-btn:hover:not(.active) { background: var(--btn-hover-bg); } .range-btn.active { background: var(--tab-active-bg); color: var(--tab-inactive-text); border-top: 3px solid var(--tab-active-accent); } .sym-group h4 { display: flex; justify-content: space-between; align-items: center; margin: 12px 0 6px; font-size: 13px; text-transform: uppercase; color: #000; font-weight: 800; letter-spacing: 0.05em; border-bottom: 1px solid #cbd5e1; padding-bottom: 2px; } .clear-btn { font-size: 11px; color: #64748b; cursor: pointer; text-transform: none; font-weight: 600; } .sym-item-check { display: flex; align-items: center; gap: 4px; padding: 4px 0; font-size: 15px; cursor: pointer; color: #000; } .color-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; } .sym-code { font-weight: 600; color: #000; width: 62px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .sym-yield { font-family: monospace; font-weight: 700; font-size: 15px; color: #000; width: 54px; flex-shrink: 0; text-align: right; } .sym-change { font-family: monospace; font-weight: 700; font-size: 13px; width: 50px; flex-shrink: 0; text-align: right; } .sym-change.up { color: #16a34a; } .sym-change.down { color: #dc2626; } .sym-col-head { display: flex; align-items: center; gap: 4px; padding: 2px 0; } .sym-col-head > span { font-family: inherit; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.04em; } .sym-col-head .hdr-spacer { width: 32px; flex-shrink: 0; } .sym-updated { font-family: monospace; font-weight: 700; font-size: 12px; color: #64748b; width: 72px; flex-shrink: 0; text-align: right; white-space: nowrap; } .yield-toggle-group { margin-top: 15px; font-size: 14px; font-weight: 700; color: #334155; background: #f8fafc; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; } .yield-toggle-title { margin-bottom: 4px; } .yield-toggle-option { display: flex; align-items: center; gap: 6px; padding: 2px 0; cursor: pointer; font-weight: 600; } .yield-toggle-option.disabled { opacity: 0.45; cursor: default; } #fetchStatus { font-size: 13px; color: #000; margin-top: 20px; font-weight: 700; display: grid; grid-template-columns: auto auto; column-gap: 4px; row-gap: 2px; } #fetchStatus .fs-label { text-align: right; } #fetchStatus .fs-val { text-align: left; } .no-data-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: #000; background: rgba(255,255,255,0.9); pointer-events: none; z-index: 10; } .sync-zoom-label { display: flex; align-items: center; gap: 6px; margin-top: 15px; font-size: 14px; font-weight: 700; color: #334155; cursor: pointer; background: #f8fafc; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; } .custom-date-range { display: none; flex-direction: column; gap: 6px; padding: 10px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; margin-bottom: 4px; } .custom-date-label { font-size: 12px; font-weight: 800; color: #334155; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.04em; } .custom-date-inputs { display: flex; flex-direction: column; gap: 6px; } .custom-date-inputs label { font-size: 12px; font-weight: 700; color: #334155; display: flex; flex-direction: column; gap: 2px; } .custom-date-inputs .date-picker { width: 100%; font-size: 13px; } .custom-date-apply { margin-top: 4px; padding: 6px; background: var(--tab-active-bg); color: var(--tab-inactive-text); border: none; border-top: 3px solid var(--tab-active-accent); border-radius: 4px; font-size: 13px; font-weight: 700; cursor: pointer; width: 100%; } .custom-date-apply:hover { opacity: 0.85; }</style><div class="range-picker">${rangeHtml}</div><div class="custom-date-range" id="custom-date-range"><div class="custom-date-label">Custom Date Range</div><div class="custom-date-inputs"><label>Start Date<input type="date" id="customStart" class="date-picker"></label><label>End Date<input type="date" id="customEnd" class="date-picker"></label></div><button class="custom-date-apply" id="applyCustomRange">Apply</button></div><div class="sym-group"><h4>TIPS <span class="clear-btn" data-type="TIPS">Clear All</span></h4>${symColumnHeaders}${createGrid(tips)}<h4>Treasuries <span class="clear-btn" data-type="Nominal">Clear All</span></h4>${symColumnHeaders}${createGrid(nominals)}</div><div class="yield-toggle-group"><label class="yield-toggle-option"><input type="checkbox" id="syncXAxis" ${syncXAxis ? 'checked' : ''}> Sync Zoom & Pan</label><label class="yield-toggle-option"><input type="checkbox" id="lockRight"> Lock Right</label><label class="yield-toggle-option"><input type="checkbox" id="hideNonTrading"${hideNonTrading ? 'checked' : ''}> Hide non-trading hours (2D, 10D)</label></div><div class="yield-toggle-group"><div class="yield-toggle-title">Display</div><label class="yield-toggle-option"><input type="checkbox" id="showMarket" ${showMarket ? 'checked' : ''}> Show Market Yields</label><label class="yield-toggle-option"><input type="checkbox" id="showCmt" ${showCmt ? 'checked' : ''}> Show CMTs</label><div class="yield-toggle-title" id="yieldToggleTitle" style="margin-top:6px">TIPS yields (${isCurveScope() ? 'Yield Curves / BEI' : 'Time Series'}):</div><label class="yield-toggle-option"><input type="checkbox" id="showQuotedYield" ${(isCurveScope() ? showQuotedYieldCurve : showQuotedYieldTS) ? 'checked' : ''}> Quoted</label><label class="yield-toggle-option"><input type="checkbox" id="showSaYield" ${(isCurveScope() ? showSaYieldCurve : showSaYieldTS) ? 'checked' : ''}> Seasonally Adjusted (SA)</label></div><div id="fetchStatus">Ready</div>`;
 
   document.getElementById('syncXAxis').addEventListener('change', (e) => {
     syncXAxis = e.target.checked;
@@ -324,12 +325,25 @@ function setupUI() {
   });
   document.getElementById('lockRight').addEventListener('change', (e) => { lockRight = e.target.checked; });
   document.getElementById('hideNonTrading').addEventListener('change', (e) => { hideNonTrading = e.target.checked; const views = captureChartViews(); updateCharts(); restoreChartViews(views); keepSyncedWindow(views); });
-  document.getElementById('showCmt').addEventListener('change', async (e) => {
-    showCmt = e.target.checked;
+  // One of Market Yields and the CMTs stays checked: unchecking the one checked while the other is unchecked checks the other.
+  const applyDisplay = async () => {
     if (showCmt) await ensureCmtLoaded();
+    syncDisplayControls();
+    refreshMarketLines(true);
     refreshCmtLines(true);
     if (isCurveScope()) updateYieldCurves();
+  };
+  document.getElementById('showMarket').addEventListener('change', async (e) => {
+    showMarket = e.target.checked;
+    if (!showMarket && !showCmt) { showCmt = true; document.getElementById('showCmt').checked = true; }
+    await applyDisplay();
   });
+  document.getElementById('showCmt').addEventListener('change', async (e) => {
+    showCmt = e.target.checked;
+    if (!showCmt && !showMarket) { showMarket = true; document.getElementById('showMarket').checked = true; }
+    await applyDisplay();
+  });
+  syncDisplayControls();
   document.getElementById('showQuotedYield').addEventListener('change', async (e) => {
     if (isCurveScope()) {
       if (!e.target.checked && !showSaYieldCurve) {
@@ -455,6 +469,8 @@ const pointMarkerPlugin = {
   }
 };
 const markerRadius = ctx => (ctx.chart.$markerRadius && ctx.chart.$markerRadius[ctx.datasetIndex]) || 0;
+// The CMT line: markers as the other lines have, and a lone visible point is drawn, since it has no line.
+const cmtMarkerRadius = ctx => markerRadius(ctx) || (countVisible(ctx.dataset.data, ctx.chart.scales.x.min, ctx.chart.scales.x.max) === 1 ? POINT_MARKER_RADIUS : 0);
 
 // A tooltip lists the Yield and SA Yield points at the cursor's index, and the CMT point within 12 px of the cursor:
 // the CMT points are not at the index of the other lines.
@@ -474,7 +490,7 @@ function createChartInstance(sym) {
   const ctx = document.getElementById(`chart-${sym}`).getContext('2d');
   const color = COLORS[Object.keys(AVAILABLE_SYMBOLS).indexOf(sym) % COLORS.length];
   const saDataset = SA_SYMBOLS.has(sym) ? [{ label: `${sym} SA`, tag: 'sa', data: [], borderColor: SA_COLOR, backgroundColor: 'transparent', pointBackgroundColor: SA_COLOR, borderWidth: 1.5, pointRadius: markerRadius, clip: MARKER_CLIP, pointHoverRadius: 4, fill: false, tension: 0.1 }] : [];
-  const cmtDataset = columnOf(sym) ? [{ label: `${sym} CMT`, tag: 'cmt', data: [], borderColor: CMT_COLOR, backgroundColor: 'transparent', pointBackgroundColor: CMT_COLOR, borderWidth: 1.5, pointRadius: 3, clip: MARKER_CLIP, pointHoverRadius: 5, fill: false, tension: 0 }] : [];
+  const cmtDataset = columnOf(sym) ? [{ label: `${sym} CMT`, tag: 'cmt', data: [], borderColor: CMT_COLOR, backgroundColor: 'transparent', pointBackgroundColor: CMT_COLOR, borderWidth: 1.5, pointRadius: cmtMarkerRadius, clip: MARKER_CLIP, pointHoverRadius: 4, fill: false, tension: 0 }] : [];
   charts[sym] = new Chart(ctx, {
     type: 'line',
     plugins: [pointMarkerPlugin, tradingGapPlugin],
@@ -784,6 +800,24 @@ function cmtOnDate(sym, dateStr) {
   return v == null ? null : pctOf(v);
 }
 
+// The Quoted and SA checkboxes apply to Market Yields only: grayed out while it is unchecked.
+function syncDisplayControls() {
+  ['showQuotedYield', 'showSaYield'].forEach(id => {
+    const el = document.getElementById(id);
+    el.disabled = !showMarket;
+    el.parentElement.classList.toggle('disabled', !showMarket);
+  });
+}
+
+// Sets the Yield line of every chart from the Market Yields and the Quoted checkbox, then the SA line.
+function refreshMarketLines(forceRescale = false) {
+  Object.entries(charts).forEach(([sym, chart]) => {
+    chart.data.datasets[0].data = (showMarket && (!SA_SYMBOLS.has(sym) || showQuotedYieldTS)) ? (plotSeries(chartSeries(sym)) || []) : [];
+  });
+  refreshSaOverlays(forceRescale);
+  Object.entries(charts).forEach(([sym, chart]) => { if (!SA_SYMBOLS.has(sym)) { if (forceRescale || !yOverrideSyms.has(sym)) rescaleYToVisible(chart, sym); else chart.update('none'); } });
+}
+
 // Sets the CMT line of every chart that has one from the CMT rates read, and refits its Y-axis.
 function refreshCmtLines(forceRescale = false) {
   Object.entries(charts).forEach(([sym, chart]) => {
@@ -856,7 +890,7 @@ function refreshSaOverlays(forceRescale = false) {
   SA_SYMBOLS.forEach(sym => {
     const chart = charts[sym];
     if (chart && chart.data.datasets[1]) {
-      chart.data.datasets[1].data = showSaYieldTS ? computeSaSeries(sym, plotSeries(chartSeries(sym))) : [];
+      chart.data.datasets[1].data = (showMarket && showSaYieldTS) ? computeSaSeries(sym, plotSeries(chartSeries(sym))) : [];
       if (forceRescale || !yOverrideSyms.has(sym)) rescaleYToVisible(chart, sym);
       else chart.update('none');
     }
@@ -870,7 +904,7 @@ function refreshQuotedOverlays(forceRescale = false) {
   SA_SYMBOLS.forEach(sym => {
     const chart = charts[sym];
     if (!chart || !chart.data.datasets[0]) return;
-    chart.data.datasets[0].data = showQuotedYieldTS ? (plotSeries(chartSeries(sym)) || []) : [];
+    chart.data.datasets[0].data = (showMarket && showQuotedYieldTS) ? (plotSeries(chartSeries(sym)) || []) : [];
     if (forceRescale || !yOverrideSyms.has(sym)) rescaleYToVisible(chart, sym);
     else chart.update('none');
   });
@@ -1218,8 +1252,8 @@ function rescaleYToVisible(chart, sym) {
   // Bounds are fit only to whichever line(s) are actually shown — the "Show TIPS yields"
   // toggles (Quoted/SA) hide a line's chart.data but rangeData[sym] always has the raw
   // series, so gate it here too or the Y-axis would still fit hidden quoted data.
-  const data = (SA_SYMBOLS.has(sym) && !showQuotedYieldTS) ? [] : raw;
-  const saData = (showSaYieldTS && SA_SYMBOLS.has(sym) && chart.data.datasets[1]) ? chart.data.datasets[1].data : [];
+  const data = (!showMarket || (SA_SYMBOLS.has(sym) && !showQuotedYieldTS)) ? [] : raw;
+  const saData = (showMarket && showSaYieldTS && SA_SYMBOLS.has(sym) && chart.data.datasets[1]) ? chart.data.datasets[1].data : [];
   const cmtData = chart.data.datasets.find(d => d.tag === 'cmt')?.data ?? [];
   const allPoints = data.concat(saData, cmtData);
   const visible = allPoints.filter(p => { const t = +p.x; return p.y != null && t >= xMin && t <= xMax; }); if (visible.length === 0) return;
@@ -1359,7 +1393,7 @@ function updateCharts() {
 
     if (chart) {
       chart.options.scales.x.compact = compactOn();
-      chart.data.datasets[0].data = (SA_SYMBOLS.has(sym) && !showQuotedYieldTS) ? [] : plotSeries(data);
+      chart.data.datasets[0].data = (!showMarket || (SA_SYMBOLS.has(sym) && !showQuotedYieldTS)) ? [] : plotSeries(data);
       chart.options.scales.x.time.unit = undefined;
       chart.options.scales.x.time.displayFormats = { month: 'MMM yyyy', year: 'yyyy' };
       updateDynamicTicks(chart, data, sym);
@@ -1549,6 +1583,7 @@ function updateYieldCurves() {
   const curveOptions = { animation: false, responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, scales: { x: { grid: { color: '#f1f5f9' }, ticks: { font: { size: 10, weight: 'bold' }, color: '#000' } }, y: { grid: { color: '#f1f5f9' }, ticks: { font: { size: 9, family: 'monospace', weight: 'bold' }, color: '#000', callback: v => v.toFixed(3) + '%' } } }, plugins: { legend: { display: true, labels: { font: { size: 10, weight: 'bold' }, filter: (item, data) => {
     const label = String(data.datasets[item.datasetIndex].label);
     if (label.includes('CMT')) return showCmt;
+    if (!showMarket) return false;
     if (label.includes('(SA)')) return showSaYieldCurve;
     const chartHasSa = data.datasets.some(d => String(d.label).includes('(SA)'));
     return !chartHasSa || showQuotedYieldCurve;
@@ -1561,11 +1596,11 @@ function updateYieldCurves() {
   // TIPS-scoped Quoted toggle never hides it.
   const buildYield = (id, key, syms, saEligible) => {
     const sWin = curveWindow(syms, startDateStr, false), eWin = curveWindow(syms, endDateStr, true), sL = startLabel(sWin), eL = endLabel(eWin);
-    const rawGap = saEligible && !showQuotedYieldCurve;
+    const rawGap = !showMarket || (saEligible && !showQuotedYieldCurve);
     const sD = rawGap ? syms.map(() => null) : syms.map(s => valueOnDate(s, startDateStr, false, sWin));
     const eD = rawGap ? syms.map(() => null) : syms.map(s => valueOnDate(s, endDateStr, true, eWin));
-    const saSD = saEligible ? syms.map(s => showSaYieldCurve ? valueFromSeriesOnDate(saSeriesBySym[s], startDateStr, false, sWin) : null) : null;
-    const saED = saEligible ? syms.map(s => showSaYieldCurve ? valueFromSeriesOnDate(saSeriesBySym[s], endDateStr, true, eWin) : null) : null;
+    const saSD = saEligible ? syms.map(s => (showMarket && showSaYieldCurve) ? valueFromSeriesOnDate(saSeriesBySym[s], startDateStr, false, sWin) : null) : null;
+    const saED = saEligible ? syms.map(s => (showMarket && showSaYieldCurve) ? valueFromSeriesOnDate(saSeriesBySym[s], endDateStr, true, eWin) : null) : null;
     const cmtName = saEligible ? 'R-CMT' : 'CMT', cmtSL = `${cmtName} ${startDateStr || '—'}`, cmtEL = `${cmtName} ${endDateStr || '—'}`;
     const cmtSD = syms.map(s => cmtOnDate(s, startDateStr)), cmtED = syms.map(s => cmtOnDate(s, endDateStr));
     if (yieldCurveCharts[key]) {
@@ -1595,10 +1630,10 @@ function updateYieldCurves() {
 
   const buildBei = (id, key, pairs) => {
     const beiSyms = pairs.flatMap(p => [p.n, p.t]), sWin = curveWindow(beiSyms, startDateStr, false), eWin = curveWindow(beiSyms, endDateStr, true), sL = startLabel(sWin), eL = endLabel(eWin);
-    const sD = !showQuotedYieldCurve ? pairs.map(() => null) : pairs.map(p => { const n = valueOnDate(p.n, startDateStr, false, sWin), t = valueOnDate(p.t, startDateStr, false, sWin); return (n == null || t == null) ? null : n - t; });
-    const eD = !showQuotedYieldCurve ? pairs.map(() => null) : pairs.map(p => { const n = valueOnDate(p.n, endDateStr, true, eWin), t = valueOnDate(p.t, endDateStr, true, eWin); return (n == null || t == null) ? null : n - t; });
+    const sD = (!showMarket || !showQuotedYieldCurve) ? pairs.map(() => null) : pairs.map(p => { const n = valueOnDate(p.n, startDateStr, false, sWin), t = valueOnDate(p.t, startDateStr, false, sWin); return (n == null || t == null) ? null : n - t; });
+    const eD = (!showMarket || !showQuotedYieldCurve) ? pairs.map(() => null) : pairs.map(p => { const n = valueOnDate(p.n, endDateStr, true, eWin), t = valueOnDate(p.t, endDateStr, true, eWin); return (n == null || t == null) ? null : n - t; });
     const saBei = (p, dateStr, pickLast, win) => {
-      if (!showSaYieldCurve || !SA_SYMBOLS.has(p.t)) return null;
+      if (!showMarket || !showSaYieldCurve || !SA_SYMBOLS.has(p.t)) return null;
       const n = valueOnDate(p.n, dateStr, pickLast, win), t = valueFromSeriesOnDate(saSeriesBySym[p.t], dateStr, pickLast, win);
       return (n == null || t == null) ? null : n - t;
     };

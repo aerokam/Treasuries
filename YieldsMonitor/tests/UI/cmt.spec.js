@@ -78,3 +78,51 @@ test.describe('Show CMTs', () => {
     expect(off.slice(-2).every(d => d.y.every(v => v == null))).toBe(true);
   });
 });
+
+test.describe('Show Market Yields', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('YieldsMonitor/', { waitUntil: 'networkidle' });
+    await page.waitForSelector('.chart-card', { timeout: 15000 });
+    await page.locator('.range-btn[data-range="10D"]').click();
+    await expect(page.locator('#fetchStatus')).toContainText('TIPS latest:');
+  });
+
+  const yieldLine = (page, sym) => page.evaluate((s) => Chart.getChart(document.getElementById(`chart-${s}`)).data.datasets[0].data.length, sym);
+
+  test('is checked at first and, unchecked, empties the Yield lines and grays out Quoted and SA', async ({ page }) => {
+    await expect(page.locator('#showMarket')).toBeChecked();
+    await expect(page.locator('#showQuotedYield')).toBeEnabled();
+    expect(await yieldLine(page, 'US10Y')).toBeGreaterThan(0);
+
+    await page.check('#showCmt');
+    await expect.poll(async () => (await cmtLine(page, 'US10Y')).n).toBeGreaterThan(3);
+    await page.uncheck('#showMarket');
+    expect(await yieldLine(page, 'US10Y')).toBe(0);
+    expect(await yieldLine(page, 'US10YTIPS')).toBe(0);
+    expect((await cmtLine(page, 'US10Y')).n).toBeGreaterThan(3);
+    await expect(page.locator('#showQuotedYield')).toBeDisabled();
+    await expect(page.locator('#showSaYield')).toBeDisabled();
+
+    await page.check('#showMarket');
+    expect(await yieldLine(page, 'US10Y')).toBeGreaterThan(0);
+    await expect(page.locator('#showQuotedYield')).toBeEnabled();
+  });
+
+  test('keeps one of Market Yields and CMTs checked', async ({ page }) => {
+    await page.uncheck('#showMarket');
+    await expect(page.locator('#showCmt')).toBeChecked();
+    await page.uncheck('#showCmt');
+    await expect(page.locator('#showMarket')).toBeChecked();
+  });
+
+  test('empties the Market datasets of the Yield Curves tab and keeps the CMT ones', async ({ page }) => {
+    await page.check('#showCmt');
+    await expect.poll(async () => (await cmtLine(page, 'US10Y')).n).toBeGreaterThan(3);
+    await page.uncheck('#showMarket');
+    await page.click('[data-tab="yieldcurves"]');
+    const nominal = await curve(page, 'yield-curve-nominal');
+    expect(nominal[0].y.every(v => v == null)).toBe(true);
+    expect(nominal[1].y.every(v => v == null)).toBe(true);
+    expect(nominal[2].y.filter(v => v != null).length).toBe(9);
+  });
+});
