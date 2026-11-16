@@ -61,6 +61,24 @@ function iqrClipBounds(source, minFence = 0.5) {
   return { lo: q1 - fence, hi: q3 + fence };
 }
 
+// The yields of a Treasuries chart that set the Y scale once the IQR Clip is applied. series is
+// [{ label, ys }] of the securities drawn (fitted curves left out). The fence comes from the positive
+// yields of the Bills and Notes. Bills and Notes outside it, above or below, are dropped, and the
+// other types (Bonds, STRIPS) are dropped only below it, because their yields range too widely
+// for the upper fence. Returns the yields kept, or all of them when no fence can be set.
+function clipNominalYields(series) {
+  const all = series.flatMap(s => s.ys);
+  const short = series.filter(s => s.label.includes('Notes') || s.label.includes('Bills'));
+  const pos = short.flatMap(s => s.ys).filter(y => y > 0);
+  const bounds = pos.length >= 4 ? iqrClipBounds(pos) : null;
+  if (!bounds) return all;
+  const kept = series.flatMap(s => {
+    const isShort = short.includes(s);
+    return s.ys.filter(y => y >= bounds.lo && (!isShort || y <= bounds.hi));
+  });
+  return kept.length ? kept : all;
+}
+
 // --- State ---
 // Security rows of Yield curves (S13), mapped by toTipsBond / toNominalBond onto the fields the
 // render functions draw. A source with no rows is null.
@@ -81,6 +99,7 @@ let nominalsShowStrips = false;
 let nominalsShowUnclassified = false;
 let nominalsClipOutliers = true;
 let beiClipOutliers = true;
+let tipsClipOutliers = true;
 let chart = null;
 let chartTab = null;
 let spreadChart1 = null, spreadChart2 = null;
@@ -927,20 +946,7 @@ function renderNominalsChart(fedBonds, mqBonds, fedSpot, mqSpot, cmtDef = null) 
   const curveY = activeSeries.filter(s => s.curve).flatMap(s => s.data).map(d => d.y);
   let scaleY = barePointY.slice();
   if (nominalsClipOutliers && barePointY.length >= 4) {
-    // Use Bills/Notes yields for IQR (outliers live in short-dated issues; Bonds and STRIPS
-    // both widen IQR too much — STRIPS carry a coupon-date sawtooth of their own, not just
-    // near-maturity noise, so lumping them into this fence clips real variation). Filter IQR
-    // source to positive yields only — near-maturity Bills/Notes can show extreme negative
-    // YTM (e.g. -5%) when trading at a tiny premium with days to expiry.
-    const nearMaturityY = activeSeries.filter(s => s.label.includes('Notes') || s.label.includes('Bills')).flatMap(s => s.data).map(d => d.y);
-    const nearMaturityYPos = nearMaturityY.filter(y => y > 0);
-    if (nearMaturityYPos.length >= 4) {
-      const bounds = iqrClipBounds(nearMaturityYPos);
-      if (bounds) {
-        const clipped = barePointY.filter(y => y >= bounds.lo);
-        if (clipped.length > 0) scaleY = clipped;
-      }
-    }
+    scaleY = clipNominalYields(activeSeries.filter(s => !s.curve).map(s => ({ label: s.label, ys: s.data.map(d => d.y) })));
   }
   scaleY = scaleY.concat(curveY);
   if (scaleY.length === 0) scaleY = allPoints.map(d => d.y);
@@ -1424,20 +1430,19 @@ function rescaleToVisible(chart) {
   if (allVisibleY.length === 0 && curveVisibleY.length === 0) return;
 
   if (nominalsClipOutliers && chartTab === 'treasuries' && allVisibleY.length >= 4) {
-    // Use Bills/Notes yields for IQR (outliers live in short-dated issues; Bonds and STRIPS
-    // both widen IQR too much)
-    const nearMaturityVisibleY = [];
+    const series = [];
     chart.data.datasets.forEach((dataset, i) => {
-      if (!chart.isDatasetVisible(i) || !(dataset.label.includes('Notes') || dataset.label.includes('Bills'))) return;
-      dataset.data.forEach(p => { if (p.x >= xMin && p.x <= xMax) nearMaturityVisibleY.push(p.y); });
+      if (!chart.isDatasetVisible(i) || /^(Spot|GSW|CMT|R-CMT)/.test(dataset.label)) return;
+      series.push({ label: dataset.label, ys: dataset.data.filter(p => p.x >= xMin && p.x <= xMax).map(p => p.y) });
     });
-    const nearMaturityVisibleYPos = nearMaturityVisibleY.filter(y => y > 0);
-    if (nearMaturityVisibleYPos.length >= 4) {
-      const bounds = iqrClipBounds(nearMaturityVisibleYPos);
-      if (bounds) {
-        const clipped = allVisibleY.filter(y => y >= bounds.lo && y <= bounds.hi);
-        if (clipped.length > 0) allVisibleY = clipped;
-      }
+    allVisibleY = clipNominalYields(series);
+  }
+
+  if (tipsClipOutliers && chartTab === 'tips' && allVisibleY.length >= 4) {
+    const bounds = iqrClipBounds(allVisibleY);
+    if (bounds) {
+      const clipped = allVisibleY.filter(y => y >= bounds.lo && y <= bounds.hi);
+      if (clipped.length > 0) allVisibleY = clipped;
     }
   }
 
@@ -2346,6 +2351,12 @@ document.getElementById('nominalsControls').addEventListener('change', (e) => {
   recomputeRangeFromChecked();
   savedZoom['treasuries'] = null;
   processAndRenderNominals();
+});
+
+document.getElementById('tipsClipOutliers').addEventListener('change', (e) => {
+  tipsClipOutliers = e.target.checked;
+  savedZoom['tips'] = null;
+  processAndRenderTips();
 });
 
 document.getElementById('beiClipOutliers').addEventListener('change', (e) => {

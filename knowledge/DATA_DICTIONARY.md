@@ -1082,7 +1082,7 @@ coverExcessCost_c = Future 30Y total cost × coverWeight_c
 
 <a id="iqr-clip"></a>
 ### IQR Clip
-`IQR_Clip` = *Y-axis floor applied to the Treasuries chart tab to suppress near-maturity Bills/Notes with extreme negative YTM. Floor = Q1 − max(1.0 × IQR, 0.5%) computed from positive-yield Bills + Notes values only. Does not remove data points — only adjusts the visible axis scale. Upper bound unconstrained.*
+`IQR_Clip` = *Y-axis bounds applied to the Treasuries and TIPS chart tabs to suppress near-maturity securities with extreme yields. Bounds = Q1 − max(1.0 × IQR, 0.5%) and Q3 + max(1.0 × IQR, 0.5%). On the Treasuries tab they are computed from positive-yield Bills + Notes values only, and the upper bound applies to Bills and Notes only. On the TIPS tab they are computed from the yields drawn. Does not remove data points — only adjusts the visible axis scale.*
 
 ---
 
@@ -1193,7 +1193,7 @@ Some values are true only until Treasury issues more TIPS. Left inline as approx
   - *Taxation of Treasuries: none as one term. Its inputs are the [OID Calculator User Selections](#oid-calculator-user-selections) and the [Document Selection](#document-selection).*
   - *Ladder Manager: `Tab + { Expanded_Year } + { Selected_Year } + ( Popup_Request ) + ( Explore_Date )` — the tab; the funded years expanded in the ladder table; the rungs selected; the cell or button clicked to open a drill popup, the trade ticket, the cash flow calendar or an export; and the date chosen in Explore.*
 - <a id="axis-scales"></a>**Axis Scales** = `Horizontal_Axis_Range + Vertical_Axis_Range`
-  *The ranges of the two chart axes: the horizontal axis in calendar dates or in [Term](#term), and the vertical axis in yield, floored by any [IQR Clip](#iqr-clip).*
+  *The ranges of the two chart axes: the horizontal axis in calendar dates or in [Term](#term), and the vertical axis in yield, bounded by any [IQR Clip](#iqr-clip).*
 - <a id="drill-request"></a>**Drill Request** = `@CUSIP + Figure`
   *The security and the figure a user picks in a table, to see how the figure was calculated.*
 - <a id="charts-and-tables"></a>**Charts and Tables** = *The views drawn for the user: the chart and the table of the selected tab, or the spread charts and table in spread mode, in Yield Curves; the equivalent time-series, yield-curve-snapshot or breakeven-inflation view, in Yields Monitor; the table of the active tab, in Treasury Auctions; the table of the selected fund, in Fund Holdings; the chart of the selected series, in CPI Explorer; the table and its header, in TIPS Reference; the page of the deck and the calculator it mounts, in Portal Primer; the page of the deck, in Seasonal Adjustments; the document selected, with the left pane that lists the documents, and the OID with its working, or the message in its place, in the OID Calculator, in Taxation of Treasuries; the ladder table and its popups, in Ladder Manager.*
