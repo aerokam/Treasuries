@@ -676,8 +676,8 @@ function cmtDataset(label, series, inRange) {
   }));
   return { label, data, color: CMT_COLOR, curve: true, w: 2, dash: [], style: 'circle', r: 0, markerR: 3 };
 }
-// The text beside a CMT checkbox: the Date of the rates and their Settlement Date.
-const cmtMetaText = s => `rates ${isoToMDY(s.date)} · settle ${isoToMDY(s.settle)} (T+1)`;
+// The text beside a CMT checkbox: the Date of the rates, the date Treasury states them for.
+const cmtMetaText = s => `rates ${isoToMDY(s.date)}`;
 // Sets the same maturity ISO bounds the type checkboxes use, over the CMT points as well.
 const cmtInRange = (startDate, endDate) => p => p.maturityDate >= startDate && p.maturityDate <= endDate;
 

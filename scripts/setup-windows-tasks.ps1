@@ -170,14 +170,12 @@ Register-NodeTask "GswTipsCurve" `
     @(New-ScheduledTaskTrigger -Daily -At "7:15am") `
     "YieldCurves/scripts/updateGswTipsCurve.js"
 
-# CmtRates  -  Weekdays every 30 minutes, 1:00pm to 6:00pm PT [ET: 4:00pm to 9:00pm]
-# Treasury publishes the day's CMT and R-CMT rates after 3:30pm ET; the posting time is not stated,
-# so the job runs through the evening until it has been measured. A run that finds no new row
-# writes nothing (knowledge/1.18_Fetch_CMT_Rates.md).
-$cmtTimes = 0..10 | ForEach-Object { (Get-Date -Hour 13 -Minute 0 -Second 0).AddMinutes(30 * $_) }
+# CmtRates  -  Weekdays 3:00pm PT [ET: 6:00pm]
+# Treasury publishes the day's CMT and R-CMT rates by about 6:00pm ET, sometimes later. The job polls
+# every 5 minutes for up to 4 hours until it has the day's rates (knowledge/1.18_Fetch_CMT_Rates.md).
 Register-NodeTask "CmtRates" `
     "Read CMT and R-CMT rates, upload Treasuries/CmtRates.csv and TIPS/RCmtRates.csv" `
-    @($cmtTimes | ForEach-Object { New-ScheduledTaskTrigger -Weekly -DaysOfWeek $Weekdays -At $_ }) `
+    @(New-ScheduledTaskTrigger -Weekly -DaysOfWeek $Weekdays -At "3:00pm") `
     "YieldCurves/scripts/updateCmtRates.js"
 
 # MarketQuotes  -  8:05am ET [PT: 5:05am]
