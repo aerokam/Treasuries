@@ -154,3 +154,14 @@ test('Term axis: a security sits at its Maturity Date less the Settlement Date o
   const xs = await page.evaluate(() => Chart.getChart(document.getElementById('yieldChart')).data.datasets.find(d => d.label === 'Notes').data.map(p => Math.round(p.x * 7)));
   expect(xs[0]).toBe(731); // 2028-03-25 less the FedInvest Settlement Date 2026-03-25
 });
+
+test('Breakeven: the Market checkbox can be unchecked, leaving the CMT alone', async ({ page }) => {
+  await load(page);
+  await page.click('[data-tab="bei"]');
+  await expect(page.locator('#chkTipsBroker')).not.toBeDisabled();
+  await page.check('#chkTipsCmt');
+  await page.uncheck('#chkTipsBroker');
+  expect((await datasets(page)).map(d => d.label)).toEqual(['CMT BEI']);
+  await page.check('#chkTipsBroker');
+  expect((await datasets(page)).map(d => d.label)).toContain('Ask BEI');
+});
