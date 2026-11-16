@@ -62,7 +62,7 @@ test('Treasuries: the CMT is a source, unchecked until checked, and draws 6 poin
   const cmt = await dataset(page, 'CMT');
   expect(cmt.n).toBe(6);
   expect(cmt.y).toEqual([4.12, 4.26, 4.88, 4.98, 5.15, 5.47]);
-  await expect(page.locator('#treaCmtMeta')).toHaveText('rates 03/25/2026 · settle 03/26/2026 (T+1)');
+  await expect(page.locator('#treaCmtMeta')).toHaveText('rates 03/25/2026');
 
   await page.uncheck('#chkCmt');
   expect(await dataset(page, 'CMT')).toBeUndefined();
@@ -84,7 +84,7 @@ test('TIPS: the CMT checkbox draws the R-CMT, 3 points, and mirrors the Treasuri
   const real = await dataset(page, 'R-CMT');
   expect(real.n).toBe(3);
   expect(real.y).toEqual([2.68, 2.91, 3.28]);
-  await expect(page.locator('#tipsCmtMeta')).toHaveText('rates 03/25/2026 · settle 03/26/2026 (T+1)');
+  await expect(page.locator('#tipsCmtMeta')).toHaveText('rates 03/25/2026');
   await page.click('[data-tab="treasuries"]');
   await expect(page.locator('#chkCmt')).toBeChecked();
   expect((await dataset(page, 'CMT')).n).toBe(6);
