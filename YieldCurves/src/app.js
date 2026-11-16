@@ -609,7 +609,10 @@ function cmtSeriesOf(tab) {
 // line, on the x-axis of the chart (a Maturity Date, or weeks of term).
 const CMT_COLOR = '#be185d';
 function cmtDataset(label, series, inRange, now) {
-  const toX = xAxisMode === 'ttm' ? d => (d.getTime() - now) / (7 * 86400000) : d => d.getTime();
+  // On the term axis a CMT sits at its own term, the Maturity Date less its Settlement Date, so 1 Mo is the
+  // same distance from the origin whatever day it is; the other series measure from now.
+  const settleMs = localDate(series.settle).getTime();
+  const toX = xAxisMode === 'ttm' ? d => (d.getTime() - settleMs) / (7 * 86400000) : d => d.getTime();
   const data = series.points.filter(inRange).map(p => ({ x: toX(p.maturityDate), y: parseFloat((p.value * 100).toFixed(3)) }));
   return { label, data, color: CMT_COLOR, curve: true, w: 2, dash: [], style: 'circle', r: 0, markerR: 3 };
 }

@@ -115,3 +115,14 @@ test('A CMT store that cannot be read leaves its checkbox disabled and the rest 
   await expect(page.locator('#chkCmt')).toBeDisabled();
   await expect(page.locator('#nominalsTable tbody tr')).toHaveCount(5);
 });
+
+test('Term axis: each CMT sits at its own term from its Settlement Date, a whole number of days', async ({ page }) => {
+  await load(page);
+  await page.click('[data-tab="treasuries"]');
+  await page.check('#chkCmt');
+  await page.check('input[name="xAxisMode"][value="ttm"]');
+  const xs = await page.evaluate(() => Chart.getChart(document.getElementById('yieldChart')).data.datasets.find(d => d.label === 'CMT').data.map(p => p.x * 7));
+  expect(xs.length).toBe(6);
+  for (const d of xs) expect(Math.abs(d - Math.round(d))).toBeLessThan(1e-6);
+  expect(Math.round(xs[0])).toBe(31);
+});
