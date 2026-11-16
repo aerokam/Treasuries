@@ -149,10 +149,62 @@ const TERM_TICK_VALUES = [0,2,4,6,8,10,12,13,14,16,17,18,20,22,24,26,28,30,32,34
 const TERM_LABEL_4W   = new Set([0,4,8,12,16,20,24,28,32,36,40,44,48,52]);
 const TERM_LABEL_MINOR = new Set([6,13,17,26]);
 
+// The term axis outside a Bills-only chart reads in months below one year and in years from one year,
+// the terms the securities are published in. A Bills-only chart reads in weeks (the Bills axis).
+const WEEKS_PER_MONTH = 365.25 / 12 / 7;
+let termInWeeks = false;
+// A term in weeks as text for a tooltip: weeks on the Bills axis, else months below a year, else years.
+function termText(w) {
+  if (termInWeeks) return `${w.toFixed(1)}w`;
+  if (w < 52) return `${Number((w / WEEKS_PER_MONTH).toFixed(1))}m`;
+  return `${(w / 52).toFixed(1)}y`;
+}
+// Ticks of the term axis by the visible span in weeks: a year (over 260w), half a year (over 104w),
+// a quarter (over 52w), else a month. Under two months of span the ticks are weeks.
+function buildTermTicks(scale) {
+  const span = scale.max - scale.min, lo = Math.max(scale.min, 0), ticks = [];
+  const every = (step) => { for (let v = Math.ceil(lo / step) * step; v <= scale.max + 1e-9; v += step) ticks.push({ value: v }); };
+  if (span > 260) every(52);
+  else if (span > 104) every(26);
+  else if (span > 52) every(13);
+  else if (span >= 2 * WEEKS_PER_MONTH) every(WEEKS_PER_MONTH);
+  else every(1);
+  scale.ticks = ticks;
+}
+function termTickLabel(val, scale) {
+  if (val < -1e-9) return '';
+  if (val >= 52) {
+    const wy = Math.floor(val / 52);
+    const rm = Math.round((val / 52 - wy) * 12);
+    if (rm === 0) return `${wy}y`;
+    if (rm === 12) return `${wy + 1}y`;
+    return `${wy}y ${rm}m`;
+  }
+  if (scale.max - scale.min < 2 * WEEKS_PER_MONTH) return `${Math.round(val)}w`;
+  return `${Math.round(val / WEEKS_PER_MONTH)}m`;
+}
+
+// The origin of a term, in ms: the Settlement Date of the source of a security (S13 states one for
+// FedInvest and one for Market), so a term does not change with the day the page is opened. A source
+// whose Settlement Date is unread falls back to today.
+function settleMsOf(source) {
+  const d = storeDates?.[source === 'Market' ? 'market' : 'fedInvest']?.settle;
+  return d ? localDate(d).getTime() : new Date().setHours(0, 0, 0, 0);
+}
+// The origin of the term of a drawn series, by its label: a CMT series from its own Settlement Date, a
+// series suffixed (Market) or (Fed...) from that source, any other from soleSource.
+function originOfLabel(label, soleSource) {
+  if (/^(CMT BEI|CMT|R-CMT)/.test(label)) {
+    const v = label === 'CMT BEI' ? cmtView?.bei : label === 'CMT' ? cmtView?.nominal : cmtView?.real;
+    if (v) return localDate(v.settle).getTime();
+  }
+  return settleMsOf(/\(Market\)/.test(label) ? 'Market' : /\(Fed/.test(label) ? 'FedInvest' : soleSource);
+}
+
 // Format a ms timestamp as a term label (used by TIPS/spread chart tooltips).
 function ttmLabel(ms) {
-  const days = (ms - Date.now()) / 86400000;
-  if (days < 365.25) return `${(days / 7).toFixed(1)}w`;
+  const days = (ms - settleMsOf('Market')) / 86400000;
+  if (days < 365.25) return `${Number((days / 30.4375).toFixed(1))}m`;
   return `${Math.round(days / 365.25)}y`;
 }
 
@@ -608,9 +660,9 @@ function cmtSeriesOf(tab) {
 // The CMT points inside the Maturity Range as a chart series: a marker at each maturity, joined by a
 // line, on the x-axis of the chart (a Maturity Date, or weeks of term).
 const CMT_COLOR = '#be185d';
-function cmtDataset(label, series, inRange, now) {
+function cmtDataset(label, series, inRange) {
   // On the term axis a CMT sits at its own term, the Maturity Date less its Settlement Date, so 1 Mo is the
-  // same distance from the origin whatever day it is; the other series measure from now.
+  // same distance from the origin whatever day it is, as every series does from the Settlement Date of its source.
   const settleMs = localDate(series.settle).getTime();
   const toX = xAxisMode === 'ttm' ? d => (d.getTime() - settleMs) / (7 * 86400000) : d => d.getTime();
   const data = series.points.filter(inRange).map(p => ({ x: toX(p.maturityDate), y: parseFloat((p.value * 100).toFixed(3)) }));
@@ -695,7 +747,7 @@ function processAndRenderNominals() {
     } else {
       if (fedFiltered || mqFiltered) renderNominalsTable(fedFiltered, mqFiltered, fedSpot, mqSpot, startTermY, endTermY);
       else document.getElementById('nominalsTableBody').innerHTML = '';
-      renderNominalsChart(fedFiltered, mqFiltered, fedSpot, mqSpot, cmtSeries ? cmtDataset('CMT', cmtSeries, cmtInRange(startDate, endDate), Date.now()) : null);
+      renderNominalsChart(fedFiltered, mqFiltered, fedSpot, mqSpot, cmtSeries ? cmtDataset('CMT', cmtSeries, cmtInRange(startDate, endDate)) : null);
     }
 
     document.getElementById('treaFedMeta').textContent = showFed ? isoToMDY(storeDates.fedInvest.settle) : '';
@@ -815,9 +867,9 @@ function renderNominalsChart(fedBonds, mqBonds, fedSpot, mqSpot, cmtDef = null) 
   const haveSpotInput = (fedSpot && fedSpot.length) || (mqSpot && mqSpot.length) || (cmtDef && cmtDef.data.length);
   if (allBonds.length === 0 && !haveSpotInput) { if (chart) { chart.destroy(); chart = null; } return; }
 
-  const now = Date.now();
+  const soleSource = fedBonds && !mqBonds ? 'FedInvest' : 'Market';
   const toPoint = xAxisMode === 'ttm'
-    ? b => ({ x: (b.maturityDate.getTime() - now) / (7 * 86400000), y: parseFloat((b.yield * 100).toFixed(3)) })
+    ? b => ({ x: (b.maturityDate.getTime() - settleMsOf(b.source)) / (7 * 86400000), y: parseFloat((b.yield * 100).toFixed(3)) })
     : b => ({ x: b.maturityDate.getTime(), y: parseFloat((b.yield * 100).toFixed(3)) });
   const bothShown = fedBonds && mqBonds;
 
@@ -849,13 +901,13 @@ function renderNominalsChart(fedBonds, mqBonds, fedSpot, mqSpot, cmtDef = null) 
   // Spot is checked — an unchecked series must not appear in the dataset array, or Chart.js's
   // legend shows it struck through instead of simply omitting it. Its colour is distinct from
   // the per-bond lines.
-  const yToX = yearsToX(now);
   if (document.getElementById('showTsySpot').checked) {
     const bothSpot = fedSpot && fedSpot.length && mqSpot && mqSpot.length;
     const nomCurveSrc = [];
-    if (fedSpot && fedSpot.length) nomCurveSrc.push({ points: fedSpot, sfx: bothSpot ? ' (FedInvest)' : '', color: '#0f172a' });
-    if (mqSpot && mqSpot.length) nomCurveSrc.push({ points: mqSpot, sfx: bothSpot ? ' (Market)' : '',    color: '#b45309' });
-    for (const { points, sfx, color } of nomCurveSrc) {
+    if (fedSpot && fedSpot.length) nomCurveSrc.push({ source: 'FedInvest', points: fedSpot, sfx: bothSpot ? ' (FedInvest)' : '', color: '#0f172a' });
+    if (mqSpot && mqSpot.length) nomCurveSrc.push({ source: 'Market', points: mqSpot, sfx: bothSpot ? ' (Market)' : '',    color: '#b45309' });
+    for (const { source, points, sfx, color } of nomCurveSrc) {
+      const yToX = yearsToX(settleMsOf(source));
       seriesDef.push({ label: `Spot${sfx}`, data: points.map(({ t, y }) => ({ x: yToX(t), y })), color, w: 2.5, dash: [], curve: true, r: 0, markerR: 2 });
     }
   }
@@ -871,7 +923,8 @@ function renderNominalsChart(fedBonds, mqBonds, fedSpot, mqSpot, cmtDef = null) 
   let xScale;
   if (xAxisMode === 'ttm') {
     const rawMaxW = Math.max(...allPoints.map(d => d.x));
-    const isBillsOnly = rawMaxW <= 52;
+    const isBillsOnly = rawMaxW <= 52 && activeSeries.every(s => !s.curve && s.label.includes('Bills'));
+    termInWeeks = isBillsOnly;
     const maxW = isBillsOnly ? 52 : Math.ceil(rawMaxW / 52) * 52;
     let tickVals, tickCb, tickFont;
     if (isBillsOnly) {
@@ -879,18 +932,7 @@ function renderNominalsChart(fedBonds, mqBonds, fedSpot, mqSpot, cmtDef = null) 
       tickCb = val => (TERM_LABEL_4W.has(val) || TERM_LABEL_MINOR.has(val)) ? `${val}w` : '';
       tickFont = ctx => TERM_LABEL_MINOR.has(ctx.tick?.value) ? { size: 9 } : { size: 11 };
     } else {
-      tickCb = (val) => {
-        if (val < 0) return '';
-        if (val >= 52) {
-          const wy = Math.floor(val / 52);
-          const rm = Math.round((val / 52 - wy) * 12);
-          if (rm === 0) return `${wy}y`;
-          if (rm === 12) return `${wy + 1}y`;
-          return `${wy}y ${rm}m`;
-        }
-        if (val >= 4) return `${Math.round(val / 4.348)}m`;
-        return `${Math.round(val)}w`;
-      };
+      tickCb = function (val) { return termTickLabel(val, this); };
       tickFont = () => ({ size: 11 });
     }
     xScale = {
@@ -900,25 +942,7 @@ function renderNominalsChart(fedBonds, mqBonds, fedSpot, mqSpot, cmtDef = null) 
         if (isBillsOnly) {
           scale.ticks = tickVals.filter(v => v >= scale.min && v <= scale.max).map(v => ({ value: v }));
         } else {
-          const span = scale.max - scale.min;
-          const ticks = [];
-          if (span > 260) {
-            const start = Math.ceil(Math.max(scale.min, 0) / 52) * 52;
-            for (let v = start; v <= scale.max; v += 52) ticks.push({ value: v });
-          } else if (span > 104) {
-            const start = Math.ceil(Math.max(scale.min, 0) / 26) * 26;
-            for (let v = start; v <= scale.max; v += 26) ticks.push({ value: v });
-          } else if (span > 52) {
-            const start = Math.ceil(Math.max(scale.min, 0) / 13) * 13;
-            for (let v = start; v <= scale.max; v += 13) ticks.push({ value: v });
-          } else if (span > 12) {
-            const start = Math.ceil(Math.max(scale.min, 0) / 4) * 4;
-            for (let v = start; v <= scale.max; v += 4) ticks.push({ value: v });
-          } else {
-            const start = Math.ceil(Math.max(scale.min, 0));
-            for (let v = start; v <= scale.max; v += 1) ticks.push({ value: v });
-          }
-          scale.ticks = ticks;
+          buildTermTicks(scale);
         }
       },
       grid: { color: GRID_COLOR },
@@ -1015,8 +1039,8 @@ function renderNominalsChart(fedBonds, mqBonds, fedSpot, mqSpot, cmtDef = null) 
             title: items => {
               if (xAxisMode === 'ttm') {
                 const w = items[0].parsed.x;
-                const termLabel = w < 52 ? `${w.toFixed(1)}w` : `${(w / 52).toFixed(1)}y`;
-                return `${fmtDateMDY(new Date(now + w * 7 * 86400000))} (${termLabel})`;
+                const termLabel = termText(w);
+                return `${fmtDateMDY(new Date(originOfLabel(items[0].dataset.label, soleSource) + w * 7 * 86400000))} (${termLabel})`;
               }
               return fmtDateMDY(new Date(items[0].parsed.x));
             },
@@ -1077,7 +1101,7 @@ function processAndRenderTips() {
       tipsTableBroker = brokerFiltered;
       if (fedFiltered || brokerFiltered) renderTable(fedFiltered, brokerFiltered);
       else document.getElementById('tableBody').innerHTML = '';
-      renderChart(fedFiltered, brokerFiltered, cmtSeries ? cmtDataset('R-CMT', cmtSeries, cmtInRange(startDate, endDate), Date.now()) : null);
+      renderChart(fedFiltered, brokerFiltered, cmtSeries ? cmtDataset('R-CMT', cmtSeries, cmtInRange(startDate, endDate)) : null);
     }
 
     document.getElementById('tipsFedMeta').textContent = showFed ? isoToMDY(storeDates.fedInvest.settle) : '';
@@ -1210,41 +1234,13 @@ function buildYieldXScale(allPoints) {
   if (xAxisMode === 'ttm') {
     const rawMaxW = Math.max(...allPoints.map(d => d.x));
     const maxW = Math.ceil(rawMaxW / 52) * 52;
-    const ttmTickCb = (val) => {
-      if (val < 0) return '';
-      if (val >= 52) {
-        const wy = Math.floor(val / 52);
-        const rm = Math.round((val / 52 - wy) * 12);
-        if (rm === 0) return `${wy}y`;
-        if (rm === 12) return `${wy + 1}y`;
-        return `${wy}y ${rm}m`;
-      }
-      if (val >= 4) return `${Math.round(val / 4.348)}m`;
-      return `${Math.round(val)}w`;
-    };
+    termInWeeks = false;
+    const ttmTickCb = function (val) { return termTickLabel(val, this); };
     return {
       type: 'linear',
       min: 0, max: maxW,
       afterBuildTicks: scale => {
-        const span = scale.max - scale.min;
-        const ticks = [];
-        if (span > 260) {
-          const start = Math.ceil(Math.max(scale.min, 0) / 52) * 52;
-          for (let v = start; v <= scale.max; v += 52) ticks.push({ value: v });
-        } else if (span > 104) {
-          const start = Math.ceil(Math.max(scale.min, 0) / 26) * 26;
-          for (let v = start; v <= scale.max; v += 26) ticks.push({ value: v });
-        } else if (span > 52) {
-          const start = Math.ceil(Math.max(scale.min, 0) / 13) * 13;
-          for (let v = start; v <= scale.max; v += 13) ticks.push({ value: v });
-        } else if (span > 12) {
-          const start = Math.ceil(Math.max(scale.min, 0) / 4) * 4;
-          for (let v = start; v <= scale.max; v += 4) ticks.push({ value: v });
-        } else {
-          const start = Math.ceil(Math.max(scale.min, 0));
-          for (let v = start; v <= scale.max; v += 1) ticks.push({ value: v });
-        }
-        scale.ticks = ticks;
+        buildTermTicks(scale);
       },
       grid: { color: GRID_COLOR },
       ticks: { maxRotation: 0, callback: ttmTickCb }
@@ -1273,9 +1269,9 @@ function renderChart(fedBonds, brokerBonds, cmtDef = null) {
   const allBonds = [...(fedBonds || []), ...(brokerBonds || [])];
   if (allBonds.length === 0 && !(cmtDef && cmtDef.data.length)) { if (chart) { chart.destroy(); chart = null; } return; }
 
-  const now = Date.now();
+  const soleSource = fedBonds && !brokerBonds ? 'FedInvest' : 'Market';
   const toPt = xAxisMode === 'ttm'
-    ? (b, key) => ({ x: (b.maturityDate.getTime() - now) / (7 * 86400000), y: parseFloat((b[key] * 100).toFixed(3)) })
+    ? (b, key) => ({ x: (b.maturityDate.getTime() - settleMsOf(b.source)) / (7 * 86400000), y: parseFloat((b[key] * 100).toFixed(3)) })
     : (b, key) => ({ x: b.maturityDate.getTime(), y: parseFloat((b[key] * 100).toFixed(3)) });
   const both = fedBonds && brokerBonds;
   const seriesDef = [];
@@ -1300,20 +1296,20 @@ function renderChart(fedBonds, brokerBonds, cmtDef = null) {
   // Zero-coupon (spot) curves, per source: the stored points of S13 (Type TIPS), Spot fitted to
   // the quoted ask yields and Spot SA to the seasonally adjusted yields. Plus the GSW
   // reference (?gsw only).
-  const yToX = yearsToX(now);
-  const toCurve = points => points.map(({ t, y }) => ({ x: yToX(t), y }));
+  const toCurve = (points, source) => points.map(({ t, y }) => ({ x: yearsToX(settleMsOf(source))(t), y }));
   const curveSrc = [];
   if (fedBonds)    curveSrc.push({ source: 'FedInvest', sfx: both ? ' (Fed)' : '',    color: '#1a56db' });
   if (brokerBonds) curveSrc.push({ source: 'Market',    sfx: both ? ' (Market)' : '', color: '#b45309' });
   for (const { source, sfx, color } of curveSrc) {
-    const ask = toCurve(storedSpotPoints('TIPS', source, 'spot'));
+    const ask = toCurve(storedSpotPoints('TIPS', source, 'spot'), source);
     if (ask.length) seriesDef.push({ label: `Spot${sfx}`, data: ask, color, curve: true, w: 2.25, dash: [], style: 'circle', r: 0, markerR: 2 });
-    const sa = toCurve(storedSpotPoints('TIPS', source, 'spotSa'));
+    const sa = toCurve(storedSpotPoints('TIPS', source, 'spotSa'), source);
     if (sa.length) seriesDef.push({ label: `Spot SA${sfx}`, data: sa, color, curve: true, w: 2.25, dash: [2, 3], style: 'circle', r: 0, markerR: 2 });
   }
   // GSW zero reference (analysis aid, ?gsw only): evaluate its published Svensson parameters
   // (weekly R2 pull) on the same half-year grid, converted to the semi-annual basis. Falls
   // back to a baked-in snapshot if the R2 file is unavailable.
+  const soleOriginForGsw = () => settleMsOf(soleSource);
   if (SHOW_GSW) {
   let gswData, gswDate;
   if (gswTipsCurve) {
@@ -1323,11 +1319,11 @@ function renderChart(fedBonds, brokerBonds, cmtDef = null) {
     for (let t = 2; t <= 20 + 1e-9; t += 0.5) {   // GSW fits to 20y — don't extrapolate past it
       const p = nssBasis(t, tau1, tau2);
       const zc = beta0 * p[0] + beta1 * p[1] + beta2 * p[2] + beta3 * p[3];   // % continuous
-      gswData.push({ x: yToX(t), y: parseFloat(zToSA(zc).toFixed(3)) });
+      gswData.push({ x: yearsToX(soleOriginForGsw())(t), y: parseFloat(zToSA(zc).toFixed(3)) });
     }
   } else {
     gswDate = GSW_TIPS_ZERO_SNAPSHOT.date;
-    gswData = GSW_TIPS_ZERO_SNAPSHOT.points.map(([t, y]) => ({ x: yToX(t), y }));
+    gswData = GSW_TIPS_ZERO_SNAPSHOT.points.map(([t, y]) => ({ x: yearsToX(soleOriginForGsw())(t), y }));
   }
   seriesDef.push({
     label: `GSW zero ${gswDate}`,
@@ -1391,10 +1387,11 @@ function renderChart(fedBonds, brokerBonds, cmtDef = null) {
           backgroundColor: 'rgba(255,255,255,0.95)', titleColor: '#1e293b', bodyColor: '#475569', borderColor: '#e2e8f0', borderWidth: 1, padding: 8, cornerRadius: 6, displayColors: false,
           callbacks: {
             title: (items) => {
+              const origin = originOfLabel(items[0].dataset.label, soleSource);
               const ms = xAxisMode === 'ttm'
-                ? now + items[0].parsed.x * 7 * 86400000
+                ? origin + items[0].parsed.x * 7 * 86400000
                 : items[0].parsed.x;
-              const yrs = (ms - now) / (365.25 * 86400000);
+              const yrs = (ms - origin) / (365.25 * 86400000);
               return `${fmtDateMDY(new Date(ms))} · ${yrs.toFixed(1)}y`;
             },
             label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y}%`
@@ -1498,7 +1495,7 @@ function processAndRenderBei() {
   }
 
   try {
-    const yToX = yearsToX(Date.now());
+    const yToX = yearsToX(settleMsOf('Market'));
     const spotBei = storedSpotPoints('BEI', 'Market', 'spotSa');
     const spotBeiGrid = spotBei.length ? spotBei.map(({ t, y }) => ({ x: yToX(t), y })) : null;
 
@@ -1514,7 +1511,7 @@ function processAndRenderBei() {
     const filtered = tips.filter(b => b.maturityDate >= startDate && b.maturityDate <= endDate);
 
     renderBeiTable(filtered);
-    renderBeiChart(filtered, spotBeiGrid, cmtSeries ? cmtDataset('CMT BEI', cmtSeries, cmtInRange(startDate, endDate), Date.now()) : null);
+    renderBeiChart(filtered, spotBeiGrid, cmtSeries ? cmtDataset('CMT BEI', cmtSeries, cmtInRange(startDate, endDate)) : null);
 
     document.getElementById('tipsMktMeta').textContent = beiStore ? marketMetaText(beiStore.dates) : '';
     document.getElementById('tipsCmtMeta').textContent = cmtSeries ? cmtMetaText(cmtSeries) : '';
@@ -1542,9 +1539,9 @@ function renderBeiChart(bonds, spotBeiGrid, cmtDef = null) {
   const ctx = document.getElementById('yieldChart').getContext('2d');
   if ((!bonds || bonds.length === 0) && !(cmtDef && cmtDef.data.length)) { if (chart) { chart.destroy(); chart = null; } return; }
 
-  const now = Date.now();
+  const soleSource = 'Market';
   const toPt = xAxisMode === 'ttm'
-    ? (b, key) => ({ x: (b.maturityDate.getTime() - now) / (7 * 86400000), y: parseFloat((b[key] * 100).toFixed(3)) })
+    ? (b, key) => ({ x: (b.maturityDate.getTime() - settleMsOf(soleSource)) / (7 * 86400000), y: parseFloat((b[key] * 100).toFixed(3)) })
     : (b, key) => ({ x: b.maturityDate.getTime(), y: parseFloat((b[key] * 100).toFixed(3)) });
 
   const seriesDef = [
@@ -1615,10 +1612,11 @@ function renderBeiChart(bonds, spotBeiGrid, cmtDef = null) {
           backgroundColor: 'rgba(255,255,255,0.95)', titleColor: '#1e293b', bodyColor: '#475569', borderColor: '#e2e8f0', borderWidth: 1, padding: 8, cornerRadius: 6, displayColors: false,
           callbacks: {
             title: (items) => {
+              const origin = originOfLabel(items[0].dataset.label, soleSource);
               const ms = xAxisMode === 'ttm'
-                ? now + items[0].parsed.x * 7 * 86400000
+                ? origin + items[0].parsed.x * 7 * 86400000
                 : items[0].parsed.x;
-              const yrs = (ms - now) / (365.25 * 86400000);
+              const yrs = (ms - origin) / (365.25 * 86400000);
               return `${fmtDateMDY(new Date(ms))} · ${yrs.toFixed(1)}y`;
             },
             label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y}%`
@@ -1930,7 +1928,7 @@ function _makeSpreadChart(ctx, seriesDef, yAxisLabel, yUnit, shouldClip) {
           time: xAxisMode === 'ttm' ? { displayFormats: {} } : { displayFormats: { year: 'yyyy', month: 'MMM yyyy' } },
           grid: { color: GRID_COLOR },
           ...(xAxisMode === 'ttm'
-            ? { ticks: { autoSkip: true, maxRotation: 0, callback: (val, idx, ticks) => { if (!ticks || ticks.length < 2) return ttmLabel(val); const spanDays = (ticks[ticks.length-1].value - ticks[0].value) / 86400000; const days = (val - Date.now()) / 86400000; if (days <= 0) return ''; if (spanDays <= 91) return `${Math.round(days / 7)}w`; if (spanDays <= 365) return `${Math.round(days / 30.44)}m`; const yrs = days / 365.25; const wy = Math.floor(yrs); const rm = Math.round((yrs - wy) * 12); if (rm === 0) return `${wy}y`; if (rm === 12) return `${wy + 1}y`; if (wy === 0) return `${rm}m`; return `${wy}y ${rm}m`; } } }
+            ? { ticks: { autoSkip: true, maxRotation: 0, callback: (val, idx, ticks) => { if (!ticks || ticks.length < 2) return ttmLabel(val); const spanDays = (ticks[ticks.length-1].value - ticks[0].value) / 86400000; const days = (val - settleMsOf('Market')) / 86400000; if (days <= 0) return ''; if (spanDays <= 365) return `${Math.round(days / 30.44)}m`; const yrs = days / 365.25; const wy = Math.floor(yrs); const rm = Math.round((yrs - wy) * 12); if (rm === 0) return `${wy}y`; if (rm === 12) return `${wy + 1}y`; if (wy === 0) return `${rm}m`; return `${wy}y ${rm}m`; } } }
             : calendarTimeAxis({ gridColor: GRID_COLOR })
           ),
         },

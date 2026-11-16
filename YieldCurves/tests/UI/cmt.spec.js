@@ -126,3 +126,28 @@ test('Term axis: each CMT sits at its own term from its Settlement Date, a whole
   for (const d of xs) expect(Math.abs(d - Math.round(d))).toBeLessThan(1e-6);
   expect(Math.round(xs[0])).toBe(31);
 });
+
+test('Term axis reads in months below one year, and in weeks only for Bills alone', async ({ page }) => {
+  await load(page);
+  await page.click('[data-tab="treasuries"]');
+  await page.check('input[name="xAxisMode"][value="ttm"]');
+  const labels = () => page.evaluate(() => { const s = Chart.getChart(document.getElementById('yieldChart')).scales.x; return s.ticks.map(t => s.options.ticks.callback.call(s, t.value)); });
+  await page.uncheck('#chkMarket'); await page.check('#chkCmt');
+  await page.evaluate(() => { const e = document.getElementById('endMaturity'); e.value = '2027-03-26'; e.dispatchEvent(new Event('change', { bubbles: true })); });
+  const m = await labels();
+  expect(m).toContain('3m');
+  expect(m.some(l => /w$/.test(l))).toBe(false);
+  await page.uncheck('#chkCmt'); await page.check('#chkMarket');
+  await page.uncheck('#filterNotes'); await page.uncheck('#filterBonds');
+  expect((await labels()).some(l => /w$/.test(l))).toBe(true);
+});
+
+test('Term axis: a security sits at its Maturity Date less the Settlement Date of its source, not today', async ({ page }) => {
+  await load(page);
+  await page.click('[data-tab="treasuries"]');
+  await page.check('#chkFedInvest');
+  await page.uncheck('#chkMarket');
+  await page.check('input[name="xAxisMode"][value="ttm"]');
+  const xs = await page.evaluate(() => Chart.getChart(document.getElementById('yieldChart')).data.datasets.find(d => d.label === 'Notes').data.map(p => Math.round(p.x * 7)));
+  expect(xs[0]).toBe(731); // 2028-03-25 less the FedInvest Settlement Date 2026-03-25
+});
