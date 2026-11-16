@@ -660,12 +660,20 @@ function cmtSeriesOf(tab) {
 // The CMT points inside the Maturity Range as a chart series: a marker at each maturity, joined by a
 // line, on the x-axis of the chart (a Maturity Date, or weeks of term).
 const CMT_COLOR = '#be185d';
+// The canonical term of a CMT column in weeks: '1 Mo' a month, '1.5 Mo' 6 weeks, '5 Yr' 5 years of
+// 12 months. A CMT sits at its published term on the term axis, so it needs no day count.
+function cmtTermWeeks(column) {
+  if (column === '1.5 Mo') return 6;
+  const [n, unit] = column.split(' ');
+  return Number(n) * (unit === 'Yr' ? 12 : 1) * WEEKS_PER_MONTH;
+}
 function cmtDataset(label, series, inRange) {
-  // On the term axis a CMT sits at its own term, the Maturity Date less its Settlement Date, so 1 Mo is the
-  // same distance from the origin whatever day it is, as every series does from the Settlement Date of its source.
-  const settleMs = localDate(series.settle).getTime();
-  const toX = xAxisMode === 'ttm' ? d => (d.getTime() - settleMs) / (7 * 86400000) : d => d.getTime();
-  const data = series.points.filter(inRange).map(p => ({ x: toX(p.maturityDate), y: parseFloat((p.value * 100).toFixed(3)) }));
+  // Each point carries its published term (the column) and its Maturity Date for the tooltip.
+  const data = series.points.filter(inRange).map(p => ({
+    x: xAxisMode === 'ttm' ? cmtTermWeeks(p.column) : p.maturityDate.getTime(),
+    y: parseFloat((p.value * 100).toFixed(3)),
+    term: p.column, date: p.maturityDate.getTime(),
+  }));
   return { label, data, color: CMT_COLOR, curve: true, w: 2, dash: [], style: 'circle', r: 0, markerR: 3 };
 }
 // The text beside a CMT checkbox: the Date of the rates and their Settlement Date.
@@ -1037,6 +1045,7 @@ function renderNominalsChart(fedBonds, mqBonds, fedSpot, mqSpot, cmtDef = null) 
           cornerRadius: 6, displayColors: false,
           callbacks: {
             title: items => {
+              if (items[0].raw?.term) return `${fmtDateMDY(new Date(items[0].raw.date))} (${items[0].raw.term})`;
               if (xAxisMode === 'ttm') {
                 const w = items[0].parsed.x;
                 const termLabel = termText(w);
@@ -1387,6 +1396,7 @@ function renderChart(fedBonds, brokerBonds, cmtDef = null) {
           backgroundColor: 'rgba(255,255,255,0.95)', titleColor: '#1e293b', bodyColor: '#475569', borderColor: '#e2e8f0', borderWidth: 1, padding: 8, cornerRadius: 6, displayColors: false,
           callbacks: {
             title: (items) => {
+              if (items[0].raw?.term) return `${fmtDateMDY(new Date(items[0].raw.date))} · ${items[0].raw.term}`;
               const origin = originOfLabel(items[0].dataset.label, soleSource);
               const ms = xAxisMode === 'ttm'
                 ? origin + items[0].parsed.x * 7 * 86400000
@@ -1612,6 +1622,7 @@ function renderBeiChart(bonds, spotBeiGrid, cmtDef = null) {
           backgroundColor: 'rgba(255,255,255,0.95)', titleColor: '#1e293b', bodyColor: '#475569', borderColor: '#e2e8f0', borderWidth: 1, padding: 8, cornerRadius: 6, displayColors: false,
           callbacks: {
             title: (items) => {
+              if (items[0].raw?.term) return `${fmtDateMDY(new Date(items[0].raw.date))} · ${items[0].raw.term}`;
               const origin = originOfLabel(items[0].dataset.label, soleSource);
               const ms = xAxisMode === 'ttm'
                 ? origin + items[0].parsed.x * 7 * 86400000
