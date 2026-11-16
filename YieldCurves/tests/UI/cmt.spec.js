@@ -116,15 +116,18 @@ test('A CMT store that cannot be read leaves its checkbox disabled and the rest 
   await expect(page.locator('#nominalsTable tbody tr')).toHaveCount(5);
 });
 
-test('Term axis: each CMT sits at its own term from its Settlement Date, a whole number of days', async ({ page }) => {
+test('Term axis: each CMT sits at its published term, and its tooltip names that term', async ({ page }) => {
   await load(page);
   await page.click('[data-tab="treasuries"]');
   await page.check('#chkCmt');
   await page.check('input[name="xAxisMode"][value="ttm"]');
-  const xs = await page.evaluate(() => Chart.getChart(document.getElementById('yieldChart')).data.datasets.find(d => d.label === 'CMT').data.map(p => p.x * 7));
-  expect(xs.length).toBe(6);
-  for (const d of xs) expect(Math.abs(d - Math.round(d))).toBeLessThan(1e-6);
-  expect(Math.round(xs[0])).toBe(31);
+  const pts = await page.evaluate(() => Chart.getChart(document.getElementById('yieldChart')).data.datasets.find(d => d.label === 'CMT').data.map(p => ({ m: p.x / (365.25 / 12 / 7), term: p.term })));
+  expect(pts.length).toBe(6);
+  for (const p of pts) {
+    const months = /Yr/.test(p.term) ? parseFloat(p.term) * 12 : parseFloat(p.term);
+    if (p.term === '1.5 Mo') expect(p.m * (365.25 / 12 / 7)).toBeCloseTo(6, 6);
+    else expect(p.m).toBeCloseTo(months, 6);
+  }
 });
 
 test('Term axis reads in months below one year, and in weeks only for Bills alone', async ({ page }) => {
