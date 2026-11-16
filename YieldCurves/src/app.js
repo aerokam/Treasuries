@@ -318,7 +318,7 @@ const COL_HELP = {
   'spot-bei': {
     title: 'Spot BEI — Curve-Based Breakeven Inflation',
     html: `<p>Ask / SA / SAO BEI are per-TIPS: each subtracts a single closest-maturity nominal yield from that one bond's real yield.</p>
-<p><strong>Spot BEI</strong> is instead the <strong>nominal zero-coupon curve minus the seasonally adjusted real zero-coupon curve</strong>, read off at each horizon. Both curves are fitted to the market-quote securities. Every point is a genuine same-horizon breakeven — a 10-year point compares a 10-year nominal rate with a 10-year real rate — rather than a comparison of two bonds that only roughly line up in maturity.</p>`
+<p><strong>Spot BEI</strong> is instead the <strong>nominal zero-coupon curve minus the seasonally adjusted real zero-coupon curve</strong>, read off at each horizon. Both curves are fitted to the securities of one source, FedInvest or Market. Every point is a genuine same-horizon breakeven — a 10-year point compares a 10-year nominal rate with a 10-year real rate — rather than a comparison of two bonds that only roughly line up in maturity.</p>`
   },
   'gsw': {
     title: 'GSW — Federal Reserve TIPS Curve',
@@ -616,7 +616,7 @@ function switchTab(tab) {
     btn.classList.toggle('active', btn.dataset.tab === tab);
   });
 
-  // Show/Hide Source UI groups (BEI reuses the TIPS strip — it's Market-only, see switchChartMode)
+  // Show/Hide Source UI groups (BEI reuses the TIPS strip)
   document.getElementById('tipsSourceUI').style.display = (tab === 'tips' || tab === 'bei') ? 'flex' : 'none';
   document.getElementById('treasuriesSourceUI').style.display = tab === 'treasuries' ? 'flex' : 'none';
 
@@ -1479,12 +1479,12 @@ function rescaleToVisible(chart) {
 // spec: YieldCurves/knowledge/3.2_Render_Charts_And_Tables.md#draw-breakeven (3.2.5)
 // Per security: the rows of Breakeven inflation (S14), the closest-maturity nominal Ask less
 // each of the TIPS Ask, SA and SAO. Across terms: the stored spot rows of S13 of Type BEI and
-// Source Market, Spot SA (the nominal curve less the TIPS SA curve). Market-only.
+// each Source, Spot SA (the nominal curve less the TIPS SA curve).
 
 // A row of S14 → the fields the breakeven views draw.
 function toBeiBond(r) {
   return {
-    cusip: r.tipsCusip, maturity: r.tipsMaturity, maturityDate: localDate(r.tipsMaturity), coupon: r.tipsCoupon,
+    cusip: r.tipsCusip, source: r.source, maturity: r.tipsMaturity, maturityDate: localDate(r.tipsMaturity), coupon: r.tipsCoupon,
     askYield: r.tipsAsk, saYield: r.tipsSa, saoYield: r.tipsSao,
     nominalCusip: r.nominalCusip, nominalMaturity: r.nominalMaturity, nominalCoupon: r.nominalCoupon,
     nominalYield: r.nominalAsk, beiAsk: r.askBei, beiSa: r.saBei, beiSao: r.saoBei,
@@ -1494,12 +1494,15 @@ function toBeiBond(r) {
 function processAndRenderBei() {
   const statusEl = document.getElementById('status');
 
+  const showFed = document.getElementById('chkTipsFed').checked;
   const showMarket = document.getElementById('chkTipsBroker').checked;
-  const tips = showMarket ? (beiStore?.rows || []).map(toBeiBond).sort((a, b) => a.maturityDate - b.maturityDate) : [];
+  const rowsOf = (shown, source) => shown ? (beiStore?.rows || []).filter(r => r.source === source).map(toBeiBond).sort((a, b) => a.maturityDate - b.maturityDate) : [];
+  const fedBei = rowsOf(showFed, 'FedInvest');
+  const mktBei = rowsOf(showMarket, 'Market');
   const cmtSeries = cmtSeriesOf('bei');
-  if (!showMarket && !cmtSeries) { statusEl.textContent = ''; statusEl.className = ''; if (chart) { chart.destroy(); chart = null; } document.getElementById('beiTableBody').innerHTML = ''; return; }
-  if (tips.length === 0 && !cmtSeries) {
-    statusEl.textContent = 'BEI requires market-quote TIPS and nominal data.';
+  if (!showFed && !showMarket && !cmtSeries) { statusEl.textContent = ''; statusEl.className = ''; if (chart) { chart.destroy(); chart = null; } document.getElementById('beiTableBody').innerHTML = ''; return; }
+  if (fedBei.length === 0 && mktBei.length === 0 && !cmtSeries) {
+    statusEl.textContent = 'BEI requires TIPS and nominal data.';
     statusEl.className = '';
     if (chart) { chart.destroy(); chart = null; }
     document.getElementById('beiTableBody').innerHTML = '';
@@ -1507,29 +1510,34 @@ function processAndRenderBei() {
   }
 
   try {
-    const yToX = yearsToX(settleMsOf('Market'));
-    const spotBei = showMarket ? storedSpotPoints('BEI', 'Market', 'spotSa') : [];
-    const spotBeiGrid = spotBei.length ? spotBei.map(({ t, y }) => ({ x: yToX(t), y })) : null;
+    const spotGrid = (shown, source) => {
+      const pts = shown ? storedSpotPoints('BEI', source, 'spotSa') : [];
+      const yToX = yearsToX(settleMsOf(source));
+      return pts.length ? pts.map(({ t, y }) => ({ x: yToX(t), y })) : null;
+    };
 
     const startEl = document.getElementById('startMaturity');
     const endEl = document.getElementById('endMaturity');
-    const allBei = [...tips, ...(cmtSeries?.points || [])].sort((a, b) => a.maturityDate - b.maturityDate);
+    const allBei = [...fedBei, ...mktBei, ...(cmtSeries?.points || [])].sort((a, b) => a.maturityDate - b.maturityDate);
     if (!startEl.value && allBei.length > 0) {
       startEl.value = allBei[0].maturity;
       endEl.value = allBei[allBei.length - 1].maturity;
     }
     const startDate = parseIsoInput(startEl.value) || new Date(0);
     const endDate = parseIsoInput(endEl.value) || new Date(9999, 0);
-    const filtered = tips.filter(b => b.maturityDate >= startDate && b.maturityDate <= endDate);
+    const inRange = b => b.maturityDate >= startDate && b.maturityDate <= endDate;
+    const fedFiltered = showFed ? fedBei.filter(inRange) : null;
+    const mktFiltered = showMarket ? mktBei.filter(inRange) : null;
 
-    renderBeiTable(filtered);
-    renderBeiChart(filtered, spotBeiGrid, cmtSeries ? cmtDataset('CMT BEI', cmtSeries, cmtInRange(startDate, endDate)) : null);
+    renderBeiTable(fedFiltered, mktFiltered);
+    renderBeiChart(fedFiltered, mktFiltered, { FedInvest: spotGrid(showFed, 'FedInvest'), Market: spotGrid(showMarket, 'Market') },
+      cmtSeries ? cmtDataset('CMT BEI', cmtSeries, cmtInRange(startDate, endDate)) : null);
 
-    document.getElementById('tipsMktMeta').textContent = showMarket && beiStore ? marketMetaText(beiStore.dates) : '';
+    document.getElementById('tipsMktMeta').textContent = showMarket && beiStore ? marketMetaText(beiStore.dates.market) : '';
+    document.getElementById('tipsFedMeta').textContent = showFed && beiStore ? isoToMDY(beiStore.dates.fedInvest.settle) : '';
     document.getElementById('tipsCmtMeta').textContent = cmtSeries ? cmtMetaText(cmtSeries) : '';
-    document.getElementById('tipsBrokerCount').textContent = filtered.length;
-    document.getElementById('tipsFedMeta').textContent = '';
-    document.getElementById('tipsFedCount').textContent = '';
+    document.getElementById('tipsBrokerCount').textContent = showMarket ? (mktFiltered?.length || 0) : '';
+    document.getElementById('tipsFedCount').textContent = showFed ? (fedFiltered?.length || 0) : '';
     statusEl.textContent = '';
     statusEl.className = '';
   } catch (err) {
@@ -1539,30 +1547,49 @@ function processAndRenderBei() {
   }
 }
 
+// The series of a label of the breakeven chart without its source suffix: 'Ask BEI (Fed)' is 'Ask BEI'.
+const beiSeriesKey = label => label.replace(/ \((Fed|Market)\)$/, '');
+
 function getBeiSeriesVisibility(label) {
-  if (label === 'Ask BEI') return document.getElementById('showBeiAsk').checked;
-  if (label === 'SA BEI') return document.getElementById('showBeiSa').checked;
-  if (label === 'SAO BEI') return document.getElementById('showBeiSao').checked;
-  if (label === 'Spot BEI') return document.getElementById('showBeiSpot').checked;
+  const key = beiSeriesKey(label);
+  if (key === 'Ask BEI') return document.getElementById('showBeiAsk').checked;
+  if (key === 'SA BEI') return document.getElementById('showBeiSa').checked;
+  if (key === 'SAO BEI') return document.getElementById('showBeiSao').checked;
+  if (key === 'Spot BEI') return document.getElementById('showBeiSpot').checked;
   return true;
 }
 
-function renderBeiChart(bonds, spotBeiGrid, cmtDef = null) {
+function renderBeiChart(fedBonds, mktBonds, spotGrids, cmtDef = null) {
   const ctx = document.getElementById('yieldChart').getContext('2d');
-  if ((!bonds || bonds.length === 0) && !(cmtDef && cmtDef.data.length)) { if (chart) { chart.destroy(); chart = null; } return; }
+  if (!(fedBonds?.length) && !(mktBonds?.length) && !(cmtDef && cmtDef.data.length)) { if (chart) { chart.destroy(); chart = null; } return; }
 
-  const soleSource = 'Market';
-  const toPt = xAxisMode === 'ttm'
-    ? (b, key) => ({ x: (b.maturityDate.getTime() - settleMsOf(soleSource)) / (7 * 86400000), y: parseFloat((b[key] * 100).toFixed(3)) })
+  const both = fedBonds && mktBonds;
+  const soleSource = fedBonds && !mktBonds ? 'FedInvest' : 'Market';
+  const toPt = (source) => xAxisMode === 'ttm'
+    ? (b, key) => ({ x: (b.maturityDate.getTime() - settleMsOf(source)) / (7 * 86400000), y: parseFloat((b[key] * 100).toFixed(3)) })
     : (b, key) => ({ x: b.maturityDate.getTime(), y: parseFloat((b[key] * 100).toFixed(3)) });
 
-  const seriesDef = [
-    { label: 'Ask BEI', data: bonds.map(b => toPt(b, 'beiAsk')), color: '#f97316', style: 'circle', w: 1.5, r: 1.25 },
-    { label: 'SA BEI',  data: bonds.map(b => toPt(b, 'beiSa')),  color: '#dc2626', style: 'circle', w: 1.8, r: 1.25 },
-    { label: 'SAO BEI', data: bonds.map(b => toPt(b, 'beiSao')), color: '#059669', style: 'circle', w: 2.2, r: 1.25 },
-  ];
+  // FedInvest in greys and blue, dotted; Market in orange, red and green, solid: as on the TIPS view.
+  const seriesDef = [];
+  if (fedBonds) {
+    const sfx = both ? ' (Fed)' : '', pt = toPt('FedInvest');
+    seriesDef.push(
+      { label: `Ask BEI${sfx}`, data: fedBonds.map(b => pt(b, 'beiAsk')), color: '#94a3b8', style: 'circle', w: 1.5, r: 1.25, dash: [4, 4] },
+      { label: `SA BEI${sfx}`,  data: fedBonds.map(b => pt(b, 'beiSa')),  color: '#475569', style: 'circle', w: 1.8, r: 1.25, dash: [4, 4] },
+      { label: `SAO BEI${sfx}`, data: fedBonds.map(b => pt(b, 'beiSao')), color: '#1a56db', style: 'circle', w: 2.2, r: 1.25, dash: [4, 4] },
+    );
+  }
+  if (mktBonds) {
+    const sfx = both ? ' (Market)' : '', pt = toPt('Market');
+    seriesDef.push(
+      { label: `Ask BEI${sfx}`, data: mktBonds.map(b => pt(b, 'beiAsk')), color: '#f97316', style: 'circle', w: 1.5, r: 1.25, dash: [] },
+      { label: `SA BEI${sfx}`,  data: mktBonds.map(b => pt(b, 'beiSa')),  color: '#dc2626', style: 'circle', w: 1.8, r: 1.25, dash: [] },
+      { label: `SAO BEI${sfx}`, data: mktBonds.map(b => pt(b, 'beiSao')), color: '#059669', style: 'circle', w: 2.2, r: 1.25, dash: [] },
+    );
+  }
   if (cmtDef) seriesDef.push(cmtDef);
-  if (spotBeiGrid) seriesDef.push({ label: 'Spot BEI', data: spotBeiGrid, color: '#1a56db', style: 'circle', w: 2.5, r: 0, markerR: 2, curve: true });
+  if (fedBonds && spotGrids.FedInvest) seriesDef.push({ label: `Spot BEI${both ? ' (Fed)' : ''}`, data: spotGrids.FedInvest, color: '#0f172a', style: 'circle', w: 2.5, r: 0, markerR: 2, curve: true, dash: [] });
+  if (mktBonds && spotGrids.Market) seriesDef.push({ label: `Spot BEI${both ? ' (Market)' : ''}`, data: spotGrids.Market, color: '#1a56db', style: 'circle', w: 2.5, r: 0, markerR: 2, curve: true, dash: [] });
 
   const activeSeries = seriesDef.filter(s => s.data.length > 0);
   const allPoints = activeSeries.flatMap(s => s.data);
@@ -1595,6 +1622,7 @@ function renderBeiChart(bonds, spotBeiGrid, cmtDef = null) {
         borderColor: s.color,
         backgroundColor: s.color,
         borderWidth: s.w,
+        borderDash: s.dash,
         pointRadius: s.curve ? (s.markerR ?? 0) : s.r,
         pointHoverRadius: s.curve ? 5 : undefined,
         pointStyle: s.style,
@@ -1652,10 +1680,10 @@ function renderBeiChart(bonds, spotBeiGrid, cmtDef = null) {
   setupAxisWheelZoom(chart.canvas, ({chart}) => rescaleToVisible(chart), ({chart, factor}) => snapYAfterZoom(chart, factor));
 }
 
-function renderBeiTable(bonds) {
+function renderBeiTable(fedBonds, mktBonds) {
   const tbody = document.getElementById('beiTableBody');
   const fmtY = y => (y != null && !isNaN(y)) ? (y * 100).toFixed(3) + '%' : '—';
-  tbody.innerHTML = bonds.map(b => `
+  const row = b => `
     <tr>
       <td>${isoToMDY2(b.maturity)}</td>
       <td>${(b.coupon * 100).toFixed(3)}%</td>
@@ -1668,7 +1696,11 @@ function renderBeiTable(bonds) {
       <td>${fmtY(b.beiAsk)}</td>
       <td>${fmtY(b.beiSa)}</td>
       <td style="font-weight:700; color:#1a56db;">${fmtY(b.beiSao)}</td>
-    </tr>`).join('');
+    </tr>`;
+  // With both sources shown, a heading row names the source of each group of rows.
+  const both = fedBonds && mktBonds;
+  const group = (name, bonds) => bonds ? (both ? `<tr><td colspan="11" style="font-weight:700; background:#f1f5f9;">${name}</td></tr>` : '') + bonds.map(row).join('') : '';
+  tbody.innerHTML = group('FedInvest', fedBonds) + group('Market', mktBonds);
 }
 
 
@@ -1707,10 +1739,10 @@ function switchChartMode(mode) {
   document.getElementById('nominalsControls').style.display = (activeTab === 'treasuries') ? 'flex' : 'none';
   document.getElementById('beiControls').style.display      = isBei ? 'flex' : 'none';
 
-  // FedInvest is irrelevant in spread mode AND on the BEI tab (both use Market data only)
+  // FedInvest is irrelevant in spread mode (the bid and ask spreads are of Market quotes only)
   const fedId = activeTab === 'treasuries' ? 'chkFedInvest' : 'chkTipsFed';
   const chkFed = document.getElementById(fedId);
-  const lockFed = isSpread || isBei;
+  const lockFed = isSpread;
   if (chkFed) {
     const fedLabel = chkFed.closest('label');
     if (lockFed) {
@@ -2104,7 +2136,7 @@ Object.keys(BEI_SHOW).forEach((id) => {
     if (!chart || activeTab !== 'bei') return;
     const seriesKey = BEI_SHOW[id];
     chart.data.datasets.forEach((ds, i) => {
-      if (ds.label === seriesKey) chart.setDatasetVisibility(i, e.target.checked);
+      if (beiSeriesKey(ds.label) === seriesKey) chart.setDatasetVisibility(i, e.target.checked);
     });
     chart.update('none');
     rescaleToVisible(chart);

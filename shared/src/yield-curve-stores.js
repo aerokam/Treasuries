@@ -48,7 +48,7 @@ export const S13_HEADER = S13_COLUMNS.map(c => c[0]).join(',');
 
 // S14 columns, in file order: [header, key of the row object parseBreakevenCsv returns].
 export const S14_COLUMNS = [
-  ['TIPS CUSIP', 'tipsCusip'], ['TIPS Maturity', 'tipsMaturity'], ['TIPS Coupon', 'tipsCoupon'],
+  ['TIPS CUSIP', 'tipsCusip'], ['Source', 'source'], ['TIPS Maturity', 'tipsMaturity'], ['TIPS Coupon', 'tipsCoupon'],
   ['TIPS Ask', 'tipsAsk'], ['TIPS SA', 'tipsSa'], ['TIPS SAO', 'tipsSao'],
   ['Nominal CUSIP', 'nominalCusip'], ['Nominal Maturity', 'nominalMaturity'], ['Nominal Coupon', 'nominalCoupon'],
   ['Nominal Ask', 'nominalAsk'], ['Ask BEI', 'askBei'], ['SA BEI', 'saBei'], ['SAO BEI', 'saoBei'],
@@ -314,14 +314,18 @@ function readMarketDates(store, dateColumn, storeName) {
 }
 
 // Parses Breakeven inflation (S14) text.
-// Returns { dates: { trade, settle }, rows: [{ tipsCusip, tipsMaturity, tipsCoupon, tipsAsk, tipsSa,
+// Returns { dates: { fedInvest: { trade, settle }, market: { trade, settle } }, rows: [{ tipsCusip, source, tipsMaturity, tipsCoupon, tipsAsk, tipsSa,
 //   tipsSao, nominalCusip, nominalMaturity, nominalCoupon, nominalAsk, askBei, saBei, saoBei }] }.
-// Throws when the text has no header line, a column, or one of the two date lines.
+// Throws when the text has no header line, a column, or one of the four date lines.
 export function parseBreakevenCsv(text) {
   const name = 'Breakeven inflation (S14)';
   const store = readStore(text, S14_COLUMNS, name);
+  const date = (label, source) => readDateLine(store, label, source, 'TIPS Maturity', name);
   return {
-    dates: readMarketDates(store, 'TIPS Maturity', name),
+    dates: {
+      fedInvest: { trade: date('Trade Date', FEDINVEST), settle: date('Settlement Date', FEDINVEST) },
+      market: { trade: date('Trade Date', MARKET), settle: date('Settlement Date', MARKET) },
+    },
     rows: store.rows.filter(r => r['TIPS CUSIP']).map(r => readRow(r, S14_COLUMNS)),
   };
 }
@@ -340,16 +344,16 @@ export function parseSpreadsCsv(text) {
 }
 
 // ─── S14 ─────────────────────────────────────────────────────────────────────
-// One row per Market TIPS, against the nominal Treasury nearest it in maturity (1.3.5 Per security),
+// One row per TIPS of `source`, against the nominal Treasury nearest it in maturity (1.3.5 Per security),
 // in the order of the TIPS given. `nominals` are the Bills, Notes and Bonds only: a STRIPS and an
 // Unclassified security are not a reference for a coupon TIPS.
-export function breakevenRows(tips, nominals) {
+export function breakevenRows(tips, nominals, source = MARKET) {
   const rows = [];
   for (const b of tips) {
     const nom = findClosestNominal(nominals, b.maturityDate);
     if (!nom) continue;
     rows.push({
-      tips_cusip: b.cusip, tips_maturity: b.maturity, tips_coupon: b.coupon,
+      tips_cusip: b.cusip, source, tips_maturity: b.maturity, tips_coupon: b.coupon,
       tips_ask_yield: b.askYield, tips_sa_yield: b.saYield, tips_sao_yield: b.saoYield,
       nominal_cusip: nom.cusip, nominal_maturity: nom.maturity, nominal_coupon: nom.coupon, nominal_yield: nom.yield,
       ask_bei: nom.yield - b.askYield, sa_bei: nom.yield - b.saYield, sao_bei: nom.yield - b.saoYield,
@@ -360,10 +364,12 @@ export function breakevenRows(tips, nominals) {
 
 export function buildBreakevenCsv({ dates, rows }) {
   const lines = [
-    ...marketDateLinesNoSource(dates),
+    dateLine('Trade Date', FEDINVEST, dates.fedInvest.trade),
+    dateLine('Settlement Date', FEDINVEST, dates.fedInvest.settle),
+    ...marketDateLines(dates),
     S14_HEADER,
     ...rows.map(r => [
-      r.tips_cusip, r.tips_maturity, fmtCoupon(r.tips_coupon),
+      r.tips_cusip, r.source, r.tips_maturity, fmtCoupon(r.tips_coupon),
       fmtYield(r.tips_ask_yield), fmtYield(r.tips_sa_yield), fmtYield(r.tips_sao_yield),
       r.nominal_cusip, r.nominal_maturity, fmtCoupon(r.nominal_coupon), fmtYield(r.nominal_yield),
       fmtYield(r.ask_bei), fmtYield(r.sa_bei), fmtYield(r.sao_bei),
@@ -495,9 +501,12 @@ export function buildYieldCurveStores({ yieldsText, refCpiText, holidayText, quo
   ];
   log(`YieldCurves.csv: ${securityRows.length} security rows, ${spotRows.length} spot rows.`);
 
-  // S14 (Market only) and S15 (Market only).
-  const beiRows = breakevenRows(mktTips, mktNominalBonds);
-  log(`Computed breakeven inflation for ${beiRows.length} TIPS.`);
+  // S14 (both sources) and S15 (Market only).
+  const beiRows = [
+    ...breakevenRows(fedTips, fedNominalBonds, FEDINVEST),
+    ...breakevenRows(mktTips, mktNominalBonds, MARKET),
+  ];
+  log(`Computed breakeven inflation for ${beiRows.length} TIPS of both sources.`);
   const spreads = spreadRows(mktTips, mktNominalBondsAll);
   log(`Computed bid/ask spreads for ${spreads.length} securities.`);
 
