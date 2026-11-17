@@ -490,7 +490,7 @@ function createChartInstance(sym) {
   const ctx = document.getElementById(`chart-${sym}`).getContext('2d');
   const color = COLORS[Object.keys(AVAILABLE_SYMBOLS).indexOf(sym) % COLORS.length];
   const saDataset = SA_SYMBOLS.has(sym) ? [{ label: `${sym} SA`, tag: 'sa', data: [], borderColor: SA_COLOR, backgroundColor: 'transparent', pointBackgroundColor: SA_COLOR, borderWidth: 1.5, pointRadius: markerRadius, clip: MARKER_CLIP, pointHoverRadius: 4, fill: false, tension: 0.1 }] : [];
-  const cmtDataset = columnOf(sym) ? [{ label: `${sym} CMT`, tag: 'cmt', data: [], borderColor: CMT_COLOR, backgroundColor: 'transparent', pointBackgroundColor: CMT_COLOR, borderWidth: 1.5, pointRadius: cmtMarkerRadius, clip: MARKER_CLIP, pointHoverRadius: 4, fill: false, tension: 0 }] : [];
+  const cmtDataset = columnOf(sym) ? [{ label: `${sym} CMT`, tag: 'cmt', data: [], borderColor: CMT_COLOR, backgroundColor: 'transparent', pointBackgroundColor: CMT_COLOR, borderWidth: 1.5, pointRadius: cmtMarkerRadius, clip: { ...MARKER_CLIP, left: MARKER_CLIP_PX }, pointHoverRadius: 4, fill: false, tension: 0 }] : [];
   charts[sym] = new Chart(ctx, {
     type: 'line',
     plugins: [pointMarkerPlugin, tradingGapPlugin],
@@ -824,7 +824,10 @@ function refreshCmtLines(forceRescale = false) {
     const ds = chart.data.datasets.find(d => d.tag === 'cmt');
     if (!ds) return;
     ds.data = showCmt ? (plotSeries(cmtSeries(sym)) || []) : [];
-    if (forceRescale || !yOverrideSyms.has(sym)) rescaleYToVisible(chart, sym);
+    // A chart at its default view takes the default bounds again, since the CMT points change its left bound.
+    const dv = defaultViews[sym], x = chart.options.scales.x;
+    if (dv && x.min === dv.min && x.max === dv.max) applyDefaultBounds(sym, chart, chartSeries(sym));
+    else if (forceRescale || !yOverrideSyms.has(sym)) rescaleYToVisible(chart, sym);
     else chart.update('none');
   });
 }
@@ -1184,6 +1187,8 @@ function applyDefaultBounds(sym, chart, data) {
   } else {
     chart.options.scales.x.min = activeRange === 'Custom' ? customBounds(data).min : data[0].x.getTime();
   }
+  // The CMT points of the range are inside the bounds: the left bound is the earlier of the first point of the Yield line and of the CMT line.
+  if (showCmt) { const cmt = plotSeries(cmtSeries(sym)); if (cmt && cmt.length) chart.options.scales.x.min = Math.min(chart.options.scales.x.min, +cmt[0].x); }
   chart.options.scales.x.max = xMaxAnchors[sym] ?? snapXMax(data[data.length-1].x).getTime();
   // Use data bounds directly — chart.scales.x.min may be uninitialized on first load
   applyXTimeUnit(chart, unitSpanPos());

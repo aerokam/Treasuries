@@ -126,3 +126,22 @@ test.describe('Market Yields', () => {
     expect(nominal[2].y.filter(v => v != null).length).toBe(9);
   });
 });
+
+test('Every CMT point of the 10D range is inside the plot area, horizontally and vertically', async ({ page }) => {
+  await page.goto('YieldsMonitor/', { waitUntil: 'networkidle' });
+  await page.waitForSelector('.chart-card', { timeout: 15000 });
+  await page.locator('.range-btn[data-range="10D"]').click();
+  await expect(page.locator('#fetchStatus')).toContainText('TIPS latest:');
+  await page.check('#showCmt');
+  await expect.poll(async () => (await cmtLine(page, 'US10Y')).n).toBeGreaterThan(3);
+  for (const sym of ['US10Y', 'US30Y', 'US10YTIPS', 'US30YTIPS']) {
+    const r = await page.evaluate((s) => {
+      const c = Chart.getChart(document.getElementById(`chart-${s}`));
+      const ds = c.data.datasets.find(d => d.tag === 'cmt');
+      const { x, y } = c.scales;
+      return ds.data.map(p => ({ inX: +p.x >= x.min && +p.x <= x.max, inY: p.y >= y.min && p.y <= y.max }));
+    }, sym);
+    expect(r.length).toBeGreaterThan(3);
+    for (const p of r) { expect(p.inX).toBe(true); expect(p.inY).toBe(true); }
+  }
+});
