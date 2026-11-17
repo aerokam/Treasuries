@@ -1037,7 +1037,7 @@ function level3YieldsMonitorAssemble() {
     spec: V(KYM + '2.1_Assemble_Range_Data.md'), specLabel: '2.1 Assemble range data',
     title: 'Yields Monitor 2.1 — Level 3', h1: 'Level 3 &mdash; Yields Monitor 2.1 Assemble range data', maxWidth: W,
     up: 'DFD_LEVEL2_YIELDSMONITOR.html', upLabel: 'Level 2 — Yields Monitor', svg: P.join(NL),
-    notes: ['  One process per family of UI ranges — 2D/10D, 1Y/2Y/3Y, 10Y/ALL and Custom — each independent: only one is active at a time, so nothing here combines their output. 2.1.5 runs beside the active one when Show CMTs is on.',
+    notes: ['  One process per family of UI ranges — 2D/10D, 1Y/2Y/3Y, 10Y/ALL and Custom — each independent: only one is active at a time, so nothing here combines their output. 2.1.5 runs beside the active one when CMTs is checked.',
       '  Every process here drills to its own section of <a href="' + S() + '">2.1 Assemble range data</a>.',
       '  Every process except 2.1.5 also reads <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#market-yields">market yields</a> live, from <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#e5">CNBC (E5)</a>\'s chart-bar feed, for its own primary feed or its own live tip — only <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s18">Intraday archive (S18)</a> and <a href="viewer.html#/md/knowledge/DATA_DICTIONARY.md#s6">Yield history (S6)</a> are the fallbacks drawn on the left.'].join(NL)
   });

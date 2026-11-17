@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-// Show CMTs (YieldsMonitor/knowledge/2.1_Assemble_Range_Data.md 2.1.5, 2.5 CMT line, 2.6 and 2.7 CMT overlay).
+// CMTs (YieldsMonitor/knowledge/2.1_Assemble_Range_Data.md 2.1.5, 2.5 CMT line, 2.6 and 2.7 CMT overlay).
 // The CMT rates (S24) and R-CMT rates (S25) are read from R2, as the app reads them.
 
 const cmtLine = (page, sym) => page.evaluate((s) => {
@@ -10,7 +10,7 @@ const cmtLine = (page, sym) => page.evaluate((s) => {
 
 const curve = (page, id) => page.evaluate((i) => Chart.getChart(document.getElementById(i)).data.datasets.map(d => ({ label: d.label, y: d.data })), id);
 
-test.describe('Show CMTs', () => {
+test.describe('CMTs', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('YieldsMonitor/', { waitUntil: 'networkidle' });
     await page.waitForSelector('.chart-card', { timeout: 15000 });
@@ -79,7 +79,7 @@ test.describe('Show CMTs', () => {
   });
 });
 
-test.describe('Show Market Yields', () => {
+test.describe('Market Yields', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('YieldsMonitor/', { waitUntil: 'networkidle' });
     await page.waitForSelector('.chart-card', { timeout: 15000 });
