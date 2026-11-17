@@ -65,9 +65,13 @@ test.describe('CMTs', () => {
     expect(tipsCmt.label).toMatch(/^R-CMT /);
     expect(tipsCmt.y.filter(v => v != null).length).toBe(3);
     expect(tipsCmt.y[0]).toBeNull(); // 1-Year TIPS has no R-CMT
+    const tipsEnd = tips[tips.length - 1]; // dated the latest CMT, not today, whose rates are not yet published
+    expect(tipsEnd.y.filter(v => v != null).length).toBe(3);
 
     await page.click('[data-tab="breakeven"]');
     const bei = await curve(page, 'yield-curve-breakeven');
+    const beiLast = bei[bei.length - 1];
+    expect(beiLast.y.filter(v => v != null).length).toBe(3);
     const beiEnd = bei[bei.length - 2];
     expect(beiEnd.label).toMatch(/^CMT BEI /);
     expect(beiEnd.y.filter(v => v != null).length).toBe(3);

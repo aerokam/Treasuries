@@ -800,6 +800,23 @@ function cmtOnDate(sym, dateStr) {
   return v == null ? null : pctOf(v);
 }
 
+// The latest ET date ('MM/DD/YYYY') on or before dateStr that has a CMT for every symbol of the chart that has a column, or dateStr when none: the end date is today before its rates are published.
+function cmtEndDate(syms, dateStr) {
+  if (!showCmt || !dateStr) return dateStr;
+  const [m, d, y] = dateStr.split('/'), iso = `${y}-${m}-${d}`;
+  let best = null;
+  for (const s of syms) {
+    const col = columnOf(s), byDate = s.endsWith('TIPS') ? rcmtByDate : cmtByDate;
+    if (!col || !byDate) continue;
+    let latest = null;
+    for (const [k, r] of byDate) if (k <= iso && r.rates[col] != null && (latest == null || k > latest)) latest = k;
+    if (latest && (best == null || latest < best)) best = latest;
+  }
+  if (!best) return dateStr;
+  const [by, bm, bd] = best.split('-');
+  return `${bm}/${bd}/${by}`;
+}
+
 // The Quoted and SA checkboxes apply to Market Yields only: grayed out while it is unchecked.
 function syncDisplayControls() {
   ['showQuotedYield', 'showSaYield'].forEach(id => {
@@ -1606,8 +1623,8 @@ function updateYieldCurves() {
     const eD = rawGap ? syms.map(() => null) : syms.map(s => valueOnDate(s, endDateStr, true, eWin));
     const saSD = saEligible ? syms.map(s => (showMarket && showSaYieldCurve) ? valueFromSeriesOnDate(saSeriesBySym[s], startDateStr, false, sWin) : null) : null;
     const saED = saEligible ? syms.map(s => (showMarket && showSaYieldCurve) ? valueFromSeriesOnDate(saSeriesBySym[s], endDateStr, true, eWin) : null) : null;
-    const cmtName = saEligible ? 'R-CMT' : 'CMT', cmtSL = `${cmtName} ${startDateStr || '—'}`, cmtEL = `${cmtName} ${endDateStr || '—'}`;
-    const cmtSD = syms.map(s => cmtOnDate(s, startDateStr)), cmtED = syms.map(s => cmtOnDate(s, endDateStr));
+    const cmtName = saEligible ? 'R-CMT' : 'CMT', cmtSL = `${cmtName} ${startDateStr || '—'}`, cmtEL = `${cmtName} ${cmtEndDate(syms, endDateStr) || '—'}`;
+    const cmtSD = syms.map(s => cmtOnDate(s, startDateStr)), cmtED = syms.map(s => cmtOnDate(s, cmtEndDate(syms, endDateStr)));
     if (yieldCurveCharts[key]) {
       const c = yieldCurveCharts[key];
       c.data.datasets[0].data = sD; c.data.datasets[0].label = sL;
@@ -1645,8 +1662,9 @@ function updateYieldCurves() {
     const saSD = pairs.map(p => saBei(p, startDateStr, false, sWin));
     const saED = pairs.map(p => saBei(p, endDateStr, true, eWin));
     const cmtBei = (p, dateStr) => { const n = cmtOnDate(p.n, dateStr), r = cmtOnDate(p.t, dateStr); return (n == null || r == null) ? null : n - r; };
-    const cmtSD = pairs.map(p => cmtBei(p, startDateStr)), cmtED = pairs.map(p => cmtBei(p, endDateStr));
-    const cmtSL = `CMT BEI ${startDateStr || '—'}`, cmtEL = `CMT BEI ${endDateStr || '—'}`;
+    const cmtEnd = cmtEndDate(beiSyms, endDateStr);
+    const cmtSD = pairs.map(p => cmtBei(p, startDateStr)), cmtED = pairs.map(p => cmtBei(p, cmtEnd));
+    const cmtSL = `CMT BEI ${startDateStr || '—'}`, cmtEL = `CMT BEI ${cmtEnd || '—'}`;
     if (yieldCurveCharts[key]) {
       const c = yieldCurveCharts[key];
       c.data.datasets[4].data = cmtSD; c.data.datasets[4].label = cmtSL;
