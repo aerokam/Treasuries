@@ -168,6 +168,13 @@ const nomSec = (cusip, cusipType, maturity, coupon, yld, price, bidPrice, bidYie
   const rows = breakevenRows(tips, nominals);
   eq(rows.map(r => `${r.tips_cusip}>${r.nominal_cusip}`), ['T1>N1', 'T2>N2'], 'S14: each TIPS against the nominal nearest in maturity, in the order of the TIPS');
   ok(rows[0].nominal_coupon === 0.04, 'S14: nominal_coupon');
+  {
+    // A Note and a Bond of one Maturity Date: the higher Yield is the nominal. A nominal 3 days off the nearest competes, one 7 days off does not.
+    const nom2 = [nomSec('NOTE', 'Note', '2036-02-15', 0.04125, 0.05058, 93, 92.9, 0.0506), nomSec('BOND', 'Bond', '2036-02-15', 0.045, 0.04846, 97, 96.9, 0.0485),
+      nomSec('NEAR', 'Note', '2036-02-18', 0.04, 0.0507, 93, 92.9, 0.0507), nomSec('FAR', 'Bill', '2036-02-22', 0, 0.0600, 93, 92.9, 0.0600)];
+    const r2 = breakevenRows([tipsSec('T', '2036-01-15', 0.01875, 0.0287, 0.0287, 0.0287, 92, 91.9, 0.029)], nom2);
+    eq(r2.map(r => r.nominal_cusip), ['NEAR'], 'S14: the highest Yield within 5 days of the nearest Maturity Date, not the Bond of that date');
+  }
   const csv = buildBreakevenCsv({ dates, rows });
   const lines = csv.split('\n');
   eq(lines.slice(0, 5), ['Trade Date,FedInvest,2026-11-03', 'Settlement Date,FedInvest,2026-11-03', 'Trade Date,Market,2026-11-03 17:05', 'Settlement Date,Market,2026-11-04', S14_HEADER], 'S14: the date line of each source, then the header');

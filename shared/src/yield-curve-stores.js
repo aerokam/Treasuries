@@ -17,7 +17,7 @@ import { tipsYieldsFromPrices } from './tips-yields.js';
 import { saYieldsFromTipsYields } from './sa-yields.js';
 import { treasuryYieldsFromPrices } from './treasury-yields.js';
 import { addTipsSpreads, addTreasurySpreads } from './spreads.js';
-import { findClosestNominal, spotBreakevenAcrossTerms } from './breakeven.js';
+import { selectNominal, spotBreakevenAcrossTerms } from './breakeven.js';
 import { parseCsv, parseCsvWithPreamble } from './csv.js';
 import { localDate, marketSettleIso, parseHolidaySet } from './settlement.js';
 import { classifyByCusipRoot, isStrip } from './treasury-cusip.js';
@@ -344,13 +344,13 @@ export function parseSpreadsCsv(text) {
 }
 
 // ─── S14 ─────────────────────────────────────────────────────────────────────
-// One row per TIPS of `source`, against the nominal Treasury nearest it in maturity (1.3.5 Per security),
+// One row per TIPS of `source`, against the nominal Treasury of the highest Yield near it in maturity (1.3.5 Per security),
 // in the order of the TIPS given. `nominals` are the Bills, Notes and Bonds only: a STRIPS and an
 // Unclassified security are not a reference for a coupon TIPS.
 export function breakevenRows(tips, nominals, source = MARKET) {
   const rows = [];
   for (const b of tips) {
-    const nom = findClosestNominal(nominals, b.maturityDate);
+    const nom = selectNominal(nominals, b.maturityDate);
     if (!nom) continue;
     rows.push({
       tips_cusip: b.cusip, source, tips_maturity: b.maturity, tips_coupon: b.coupon,

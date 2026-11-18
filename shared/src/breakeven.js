@@ -8,14 +8,24 @@
 // the no-redundancy directive (projects/CLAUDE.md §2a).
 import { unionGridTerms, zToSA } from './spot-curve.js';
 
-// The nominal Treasury whose maturity date is nearest the given one. The selection is
-// unconditional: the smallest absolute difference wins however large that difference is, so a
-// TIPS with no nominal maturing near it is still paired. Returns null for an empty set.
-export function findClosestNominal(nominals, maturityDate) {
-  let best = null, bestDiff = Infinity;
+// The days either side of the nearest Maturity Date within which a nominal Treasury competes on Yield.
+export const NOMINAL_WINDOW_DAYS = 5;
+
+// The nominal Treasury a TIPS is stated against: the highest Yield among those whose Maturity Date
+// is within NOMINAL_WINDOW_DAYS of the nominal nearest the given date. The nearest is found
+// unconditionally, however far it lies, so a TIPS with no nominal maturing near it is still paired.
+// Returns null for an empty set.
+export function selectNominal(nominals, maturityDate) {
+  let nearest = null, bestDiff = Infinity;
   for (const n of nominals) {
     const diff = Math.abs(n.maturityDate.getTime() - maturityDate.getTime());
-    if (diff < bestDiff) { bestDiff = diff; best = n; }
+    if (diff < bestDiff) { bestDiff = diff; nearest = n; }
+  }
+  if (!nearest) return null;
+  const window = NOMINAL_WINDOW_DAYS * 86400000;
+  let best = nearest;
+  for (const n of nominals) {
+    if (Math.abs(n.maturityDate.getTime() - nearest.maturityDate.getTime()) <= window && n.yield > best.yield) best = n;
   }
   return best;
 }
