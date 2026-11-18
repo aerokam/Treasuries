@@ -179,3 +179,12 @@ test('Breakeven: the FedInvest checkbox is selectable and draws the FedInvest br
   expect(only.some(l => /Market/.test(l))).toBe(false);
   await expect(page.locator('#tipsFedMeta')).toHaveText('03/25/2026');
 });
+
+test('TIPS: a CMT checked on the Treasuries tab leaves the Maturity Range of the TIPS tab spanning all 3 R-CMT points', async ({ page }) => {
+  await load(page);
+  await page.click('[data-tab="treasuries"]');
+  await page.check('#chkCmt');
+  await page.click('[data-tab="tips"]');
+  expect((await dataset(page, 'R-CMT')).n).toBe(3);
+  expect((await dataset(page, 'R-CMT')).y[2]).toBe(3.28);
+});

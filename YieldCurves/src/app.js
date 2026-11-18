@@ -2220,6 +2220,8 @@ function mirrorCheckbox(id) {
       if (activeTab === 'treasuries') recomputeRangeFromChecked();
       else { document.getElementById('startMaturity').value = ''; document.getElementById('endMaturity').value = ''; }
       savedZoom[activeTab] = null;
+      // The checkbox is mirrored to the other tabs, whose saved Maturity Range would leave out the CMT maturities (the 30-Year R-CMT lies past the last TIPS): they recompute on entry.
+      for (const tab of Object.keys(savedDateRange)) if (tab !== activeTab) savedDateRange[tab] = null;
     }
     preserveZoom();
     updateModeToggle();
